@@ -26,6 +26,7 @@ import pandas as pd
 import polars as pl
 
 from backend.config import get_settings
+from backend.realtime.events import JobEvent, publish_job_event
 from skyulf.data.catalog import DataCatalog
 from skyulf.data.dataset import SplitDataset
 from skyulf.engines.registry import EngineRegistry
@@ -41,6 +42,32 @@ if TYPE_CHECKING:
     from ...artifacts.store import ArtifactStore
 
 logger = logging.getLogger(__name__)
+
+
+def _emit_trial_event(
+    job_id: str, current: int, total: int, score: float | None, metric: str | None
+) -> None:
+    """Publish a completed tuning trial as a live ``trial`` WebSocket event.
+
+    Aggregate scalars only — ``/ws/jobs`` broadcasts to every client without
+    auth, so hyperparameters never ride along. Silent for scoreless trials
+    (failed/pruned) and the preview-path ``job_id='unknown'`` sentinel;
+    transport failures are swallowed so training is never impacted.
+    """
+    if score is None or job_id == "unknown":
+        return
+    event = JobEvent(
+        event="trial",
+        job_id=job_id,
+        trial_number=current,
+        trial_total=total,
+        trial_score=float(score),
+        trial_metric=metric,
+    )
+    try:
+        publish_job_event(event)
+    except Exception as exc:
+        logger.warning("trial event publish failed for %s: %s", job_id, exc)
 
 
 class NodeRunnersMixin:
@@ -832,6 +859,7 @@ class NodeRunnersMixin:
             if score is not None:
                 msg += f" - Score: {score:.4f}"
             self.log(msg)
+            _emit_trial_event(job_id, current, total, score, tuning_params.get("metric"))
 
         # Run fit_predict
         # This will:

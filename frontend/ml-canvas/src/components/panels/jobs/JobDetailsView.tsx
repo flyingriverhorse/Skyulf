@@ -8,8 +8,10 @@ import {
 import { JobInfo, LeakageGateVerdict } from '../../../core/api/jobs';
 import { useJobStore } from '../../../core/store/useJobStore';
 import { useJobPolling, isTerminalStatus } from '../../../core/hooks/useJobPolling';
+import { useTuningTrials } from '../../../core/hooks/useTuningTrials';
 import { formatMetricName, extractEnsembleSummary, formatBaseEstimator, isEnsembleModelType, getEnsembleSubTask, getEnsembleStrategy } from '../../../core/utils/format';
 import { MetricsGrid } from './MetricsGrid';
+import { TuningTrialsChart } from './TuningTrialsChart';
 import { useConfirm, RecordLink, NodeInspectorLink, ModalShell } from '../../shared';
 import { toast } from '../../../core/toast';
 
@@ -428,6 +430,9 @@ export const JobDetailsView: React.FC<JobDetailsViewProps> = ({ job: initialJob,
     const { jobs: polledJobs } = useJobPolling(pollIds, { intervalMs: 2000 });
     const job: JobInfo = polledJobs[initialJob.job_id] ?? initialJob;
     const retryAvailability = useMemo(() => getRetryAvailability(job), [job]);
+    // Live tuning-trial series (WebSocket while running, persisted
+    // metrics.trials for completed jobs) for the trial chart below.
+    const { points: trialPoints, latest: trialLatest, metric: trialMetric } = useTuningTrials(job);
 
     // Auto-scroll logs
     useEffect(() => {
@@ -617,9 +622,11 @@ export const JobDetailsView: React.FC<JobDetailsViewProps> = ({ job: initialJob,
                             <div className="p-4 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-100 dark:border-gray-700">
                                 <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Progress</div>
                                 <div className="font-medium text-gray-800 dark:text-gray-200">
-                                    {/* The job payload carries no numeric progress field, so a running/queued
-                                        job states that honestly instead of implying a bar we can't back. */}
-                                    {isTerminalStatus(job.status) ? '—' : 'Not reported'}
+                                    {/* Live tuning jobs report completed trials; everything else states
+                                        honestly instead of implying a bar we can't back. */}
+                                    {trialLatest
+                                        ? `Trial ${trialLatest.trial}/${trialLatest.total}`
+                                        : isTerminalStatus(job.status) ? '—' : 'Not reported'}
                                 </div>
                             </div>
                             <div className="p-4 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-100 dark:border-gray-700">
@@ -649,6 +656,13 @@ export const JobDetailsView: React.FC<JobDetailsViewProps> = ({ job: initialJob,
                                 </button>
                             )}
                         </div>
+
+                        {/* Tuning trial chart — live series while running, persisted trials after. */}
+                        <TuningTrialsChart
+                            points={trialPoints}
+                            metric={trialMetric ?? getScoringMetric(job)}
+                            isLive={!isTerminalStatus(job.status) && trialPoints.length > 0}
+                        />
 
                         {/* Timeline Section */}
                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">

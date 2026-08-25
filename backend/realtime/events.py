@@ -20,17 +20,27 @@ logger = logging.getLogger(__name__)
 # auth is wired up; today every endpoint already returns every job.
 JOB_EVENTS_CHANNEL = "skyulf:jobs:events"
 
-JobEventType = Literal["status", "progress", "created", "deleted"]
+JobEventType = Literal["status", "progress", "created", "deleted", "trial"]
 
 
 class JobEvent(BaseModel):
-    """A minimal status hint emitted whenever a job row changes."""
+    """A minimal status hint emitted whenever a job row changes.
+
+    ``trial`` events additionally carry the completed tuning trial's
+    aggregate scalars for the live trial chart. Scalars only — the
+    channel broadcasts to every connected client without auth, so no
+    hyperparameters or data may ride along.
+    """
 
     event: JobEventType
     job_id: str
     status: str | None = None
     progress: int | None = None
     current_step: str | None = None
+    trial_number: int | None = None
+    trial_total: int | None = None
+    trial_score: float | None = None
+    trial_metric: str | None = None
 
 
 def _redis_client_sync() -> Any:

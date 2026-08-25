@@ -40,6 +40,23 @@ vi.mock('../../shared', async () => {
   return { ...actual, useConfirm: () => mocks.confirm };
 });
 
+// jsdom has no layout engine for recharts' ResponsiveContainer — passthrough
+// with explicit dimensions so the tuning trial chart renders in tests (same
+// convention as FeatureImportanceView.test.tsx).
+vi.mock('recharts', async () => {
+  const actual = await vi.importActual<typeof import('recharts')>('recharts');
+  return {
+    ...actual,
+    ResponsiveContainer: ({ children }: { children: React.ReactElement }) => (
+      <div style={{ width: 800, height: 240 }}>
+        {React.isValidElement(children)
+          ? React.cloneElement(children, { width: 800, height: 240 } as never)
+          : children}
+      </div>
+    ),
+  };
+});
+
 const makeJob = (overrides: Partial<JobInfo> = {}): JobInfo => ({
   job_id: 'job-1234567890',
   pipeline_id: 'pipe-1',
@@ -403,5 +420,43 @@ describe('JobDetailsView', () => {
 
     const dialog = screen.getByRole('dialog');
     expect(within(dialog).getByText(/No train\/test split is defined/)).toBeInTheDocument();
+  });
+
+  describe('tuning trial chart', () => {
+    const trials = [
+      { params: { C: 0.1 }, score: 0.6 },
+      { params: { C: 1 }, score: 0.8 },
+      { params: { C: 10 }, score: 0.75 },
+    ];
+
+    it('redraws the trial chart for a completed tuning job from persisted metrics', () => {
+      renderDetails(makeJob({
+        job_type: 'tuning',
+        status: 'completed',
+        metrics: { trials } as unknown as Record<string, number>,
+        result: { scoring_metric: 'accuracy' },
+      }));
+
+      expect(screen.getByText('Tuning Trials')).toBeInTheDocument();
+      expect(screen.getByText(/accuracy/)).toBeInTheDocument();
+      expect(screen.getByText('Best so far')).toBeInTheDocument();
+    });
+
+    it('shows no chart for a fixed run with a single trial', () => {
+      renderDetails(makeJob({
+        job_type: 'training',
+        status: 'completed',
+        metrics: { trials: trials.slice(0, 1) } as unknown as Record<string, number>,
+      }));
+
+      expect(screen.queryByText('Tuning Trials')).toBeNull();
+    });
+
+    it('keeps the honest "Not reported" progress tile when a running job has no trial data yet', () => {
+      renderDetails(makeJob({ job_type: 'tuning', status: 'running' }));
+
+      expect(screen.getByText('Not reported')).toBeInTheDocument();
+      expect(screen.queryByText('Tuning Trials')).toBeNull();
+    });
   });
 });
