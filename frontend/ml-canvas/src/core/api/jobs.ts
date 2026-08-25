@@ -79,6 +79,14 @@ export interface RunPipelineResponse {
   job_ids: string[];  // All job IDs when parallel branches are detected
 }
 
+/** Backfill snapshot of completed trials for a running tuning job — the
+ * trials a client missed by opening the job mid-run (the WebSocket only
+ * broadcasts to already-connected subscribers). */
+export interface TrialSnapshot {
+  trials: Array<{ trial: number; total: number; score: number; metric: string | null }>;
+  metric: string | null;
+}
+
 export const jobsApi = {
   runPipeline: async (payload: RunPipelineRequest): Promise<RunPipelineResponse> => {
     const response = await apiClient.post<RunPipelineResponse>('/pipeline/run', payload);
@@ -87,6 +95,11 @@ export const jobsApi = {
 
   getJob: async (jobId: string): Promise<JobInfo> => {
     const response = await apiClient.get<JobInfo>(`/pipeline/jobs/${jobId}`);
+    return response.data;
+  },
+
+  getJobTrials: async (jobId: string): Promise<TrialSnapshot> => {
+    const response = await apiClient.get<TrialSnapshot>(`/pipeline/jobs/${jobId}/trials`);
     return response.data;
   },
 

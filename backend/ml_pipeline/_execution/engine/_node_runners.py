@@ -27,6 +27,7 @@ import polars as pl
 
 from backend.config import get_settings
 from backend.realtime.events import JobEvent, publish_job_event
+from backend.realtime.trial_buffer import record_trial
 from skyulf.data.catalog import DataCatalog
 from skyulf.data.dataset import SplitDataset
 from skyulf.engines.registry import EngineRegistry
@@ -56,6 +57,9 @@ def _emit_trial_event(
     """
     if score is None or job_id == "unknown":
         return
+    # Backfill history for clients that open the job mid-run; the live
+    # broadcast below only reaches already-connected subscribers.
+    record_trial(job_id, current, total, float(score), metric)
     event = JobEvent(
         event="trial",
         job_id=job_id,
