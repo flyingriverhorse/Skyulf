@@ -1586,3 +1586,32 @@ def test_empty_search_space_silently_ignores_user_hyperparams(
         "from direct fit when params != defaults, but it matched. Re-check this "
         "assumption before relying on it elsewhere."
     )
+
+
+# ---------------------------------------------------------------------------
+# progress=True console reporter (core-only use)
+# ---------------------------------------------------------------------------
+
+
+def test_progress_flag_prints_end_summary(capsys):
+    X, y = _clf_xy()
+    _tuner_clf().fit(X, y, _clf_config(progress=True))
+    out = capsys.readouterr().out
+    # Piped stdout (pytest) is not a TTY: no per-trial lines, summary only.
+    assert "Tuning complete | 2/2 scored trials | metric accuracy" in out
+    assert "best " in out
+    assert "top: " in out
+
+
+def test_explicit_callback_suppresses_reporter(capsys):
+    X, y = _clf_xy()
+    seen: list[tuple] = []
+    _tuner_clf().fit(X, y, _clf_config(progress=True), progress_callback=lambda *a: seen.append(a))
+    assert capsys.readouterr().out == ""
+    assert len(seen) == 2  # one event per grid candidate
+
+
+def test_no_progress_flag_stays_silent(capsys):
+    X, y = _clf_xy()
+    _tuner_clf().fit(X, y, _clf_config())
+    assert capsys.readouterr().out == ""

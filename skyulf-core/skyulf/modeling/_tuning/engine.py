@@ -33,6 +33,7 @@ from ...engines.sklearn_bridge import SklearnBridge
 from .._sklearn_compat import normalize_logistic_regression_params
 from ..base import BaseModelApplier, BaseModelCalculator
 from .fold_pipeline import FoldPreprocessingStep
+from .reporter import ConsoleTrialReporter
 from .schemas import TuningConfig, TuningResult
 
 if TYPE_CHECKING:
@@ -352,6 +353,14 @@ class TuningCalculator(BaseModelCalculator):
         """
         tuning_config = self._build_tuning_config(config)
 
+        # Core-only console progress: the backend always supplies its own
+        # callback (and never sets `progress`), so this only ever fires for
+        # direct SDK use.
+        reporter: ConsoleTrialReporter | None = None
+        if progress_callback is None and tuning_config.progress:
+            reporter = ConsoleTrialReporter()
+            progress_callback = reporter
+
         # For Time Series Split, sort data chronologically (and drop the time
         # column from features) before converting to numpy below - numpy has
         # no column names, so this must happen while X still carries them.
@@ -444,6 +453,9 @@ class TuningCalculator(BaseModelCalculator):
         else:
             X_refit, y_refit = X_np, y_np
         model = self._refit_best_model(tuning_result, tuning_config, X_refit, y_refit, log_callback)
+
+        if reporter is not None:
+            reporter.finish(tuning_result)
 
         return (model, tuning_result)
 
