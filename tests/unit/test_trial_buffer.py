@@ -25,6 +25,7 @@ def buffer():
     yield _Handle()
     for job_id in job_ids:
         trial_buffer.clear_trials(job_id)
+        trial_buffer.clear_iterations(job_id)
 
 
 def test_emit_records_trial_for_late_openers(buffer, monkeypatch):
@@ -117,4 +118,51 @@ def test_trials_endpoint_serves_snapshot(buffer):
     assert client.get("/api/pipeline/jobs/job-never-seen/trials").json() == {
         "trials": [],
         "metric": None,
+        "iterations": [],
+        "iteration_metric": None,
     }
+
+
+def test_emit_records_iteration_for_late_openers(buffer, monkeypatch):
+    monkeypatch.setattr(_node_runners, "publish_job_event", lambda _e: None)
+    job = buffer.add("job-iter-1")
+    _node_runners._emit_iteration_event(job, 1, 5, 0.6, "logloss", "minimize")
+    _node_runners._emit_iteration_event(job, 2, 5, np.float64(0.5), "logloss", "minimize")
+
+    iterations = trial_buffer.get_iterations(job)
+    assert [t["iteration"] for t in iterations] == [1, 2]
+    assert [t["total"] for t in iterations] == [5, 5]
+    assert [t["score"] for t in iterations] == [0.6, 0.5]
+    assert type(iterations[1]["score"]) is float
+    assert iterations[0]["metric"] == "logloss"
+    assert iterations[0]["direction"] == "minimize"
+
+
+def test_iteration_buffer_independent_of_trial_buffer(buffer):
+    job = buffer.add("job-iter-2")
+    trial_buffer.record_trial(job, 1, 1, 0.9, "accuracy")
+    trial_buffer.record_iteration(job, 1, 3, 0.5, "rmse", "minimize")
+    assert len(trial_buffer.get_trials(job)) == 1
+    assert len(trial_buffer.get_iterations(job)) == 1
+    trial_buffer.clear_iterations(job)
+    assert len(trial_buffer.get_trials(job)) == 1
+    assert trial_buffer.get_iterations(job) == []
+
+
+def test_trials_endpoint_serves_iterations_snapshot(buffer):
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+
+    from backend.ml_pipeline._internal._routers.jobs import router as jobs_router
+
+    app = FastAPI()
+    app.include_router(jobs_router, prefix="/api/pipeline")
+    client = TestClient(app)
+
+    job = buffer.add("job-iter-3")
+    trial_buffer.record_iteration(job, 1, 4, 0.7, "logloss", "minimize")
+    trial_buffer.record_iteration(job, 2, 4, 0.6, "logloss", "minimize")
+
+    body = client.get(f"/api/pipeline/jobs/{job}/trials").json()
+    assert [i["iteration"] for i in body["iterations"]] == [1, 2]
+    assert body["iteration_metric"] == "logloss"

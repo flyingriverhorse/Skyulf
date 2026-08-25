@@ -202,10 +202,19 @@ class _BaseEnsembleCalculator(SklearnCalculator):
         progress_callback: Callable[..., Any] | None = None,
         log_callback: Callable[..., Any] | None = None,
         validation_data: Any = None,
+        iteration_callback: Callable[..., Any] | None = None,
     ) -> Any:
         config = self._inject_tuning_base_config(config)
         config = self._resolve_estimators(config)
-        return super().fit(X, y, config, progress_callback, log_callback, validation_data)
+        return super().fit(
+            X,
+            y,
+            config,
+            progress_callback,
+            log_callback,
+            validation_data,
+            iteration_callback=iteration_callback,
+        )
 
     # --- tuning hooks -------------------------------------------------------
 

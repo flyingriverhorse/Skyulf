@@ -458,5 +458,79 @@ describe('JobDetailsView', () => {
       expect(screen.getByText('Not reported')).toBeInTheDocument();
       expect(screen.queryByText('Tuning Trials')).toBeNull();
     });
+
+    it('redraws the iteration chart for a completed fixed boosting job', () => {
+      renderDetails(makeJob({
+        job_type: 'training',
+        status: 'completed',
+        metrics: {
+          trials: [{ params: {}, score: 0.8 }],
+          iterations: [
+            { iteration: 1, total: 200, score: 0.5, metric: 'logloss', direction: 'minimize' },
+            { iteration: 2, total: 200, score: 0.4, metric: 'logloss', direction: 'minimize' },
+          ],
+          iteration_direction: 'minimize',
+        } as unknown as Record<string, number>,
+      }));
+
+      expect(screen.getByText('Boosting Iterations')).toBeInTheDocument();
+      expect(screen.queryByText('Tuning Trials')).toBeNull();
+    });
+
+    it('shows no iteration chart for a single-iteration boosting job', () => {
+      renderDetails(makeJob({
+        job_type: 'training',
+        status: 'completed',
+        metrics: {
+          trials: [{ params: {}, score: 0.8 }],
+          iterations: [
+            { iteration: 1, total: 1, score: 0.5, metric: 'logloss', direction: 'minimize' },
+          ],
+        } as unknown as Record<string, number>,
+      }));
+
+      expect(screen.queryByText('Boosting Iterations')).toBeNull();
+    });
+
+    it('offers Trials/Iterations tabs when a boosting tuning job persisted both series', () => {
+      renderDetails(makeJob({
+        job_type: 'tuning',
+        status: 'completed',
+        metrics: {
+          trials,
+          iterations: [
+            { iteration: 1, total: 3, score: 0.6, metric: 'logloss', direction: 'minimize' },
+            { iteration: 2, total: 3, score: 0.4, metric: 'logloss', direction: 'minimize' },
+            { iteration: 3, total: 3, score: 0.5, metric: 'logloss', direction: 'minimize' },
+          ],
+          iteration_direction: 'minimize',
+        } as unknown as Record<string, number>,
+      }));
+
+      // Default follows the active series: iterations for a boosting job.
+      expect(screen.getByRole('button', { name: 'Trials' })).toBeInTheDocument();
+      const iterationsTab = screen.getByRole('button', { name: 'Iterations' });
+      expect(iterationsTab).toHaveAttribute('aria-pressed', 'true');
+      expect(screen.getByText('Boosting Iterations')).toBeInTheDocument();
+      expect(screen.queryByText('Tuning Trials')).toBeNull();
+
+      // Clicking Trials pins the trial chart.
+      fireEvent.click(screen.getByRole('button', { name: 'Trials' }));
+      expect(screen.getByText('Tuning Trials')).toBeInTheDocument();
+      expect(screen.queryByText('Boosting Iterations')).toBeNull();
+      expect(screen.getByRole('button', { name: 'Trials' })).toHaveAttribute('aria-pressed', 'true');
+    });
+
+    it('renders no series tabs for single-series jobs', () => {
+      renderDetails(makeJob({
+        job_type: 'tuning',
+        status: 'completed',
+        metrics: { trials } as unknown as Record<string, number>,
+      }));
+
+      expect(screen.getByText('Tuning Trials')).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Trials' })).toBeNull();
+      expect(screen.queryByRole('button', { name: 'Iterations' })).toBeNull();
+    });
   });
 });

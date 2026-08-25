@@ -31,7 +31,16 @@ class _DummyCalculator(BaseModelCalculator):
         """Returns classification."""
         return "classification"
 
-    def fit(self, X, y, config, progress_callback=None, log_callback=None, validation_data=None):
+    def fit(
+        self,
+        X,
+        y,
+        config,
+        progress_callback=None,
+        log_callback=None,
+        validation_data=None,
+        iteration_callback=None,
+    ):
         """Return a simple dict as the model artifact."""
         return {"fitted": True, "n_samples": len(X)}
 
@@ -50,7 +59,16 @@ class _ColumnsRecordingCalculator(_DummyCalculator):
     def __init__(self):
         self.feature_columns: list[str] = []
 
-    def fit(self, X, y, config, progress_callback=None, log_callback=None, validation_data=None):
+    def fit(
+        self,
+        X,
+        y,
+        config,
+        progress_callback=None,
+        log_callback=None,
+        validation_data=None,
+        iteration_callback=None,
+    ):
         """Record the fitted feature columns and return the dummy artifact."""
         self.feature_columns = list(X.columns)
         return super().fit(X, y, config, progress_callback, log_callback, validation_data)
@@ -363,11 +381,20 @@ def test_fit_predict_preprocessing_routes_payload_to_calculator():
             log_callback=None,
             validation_data=None,
             preprocessing=None,
+            iteration_callback=None,
         ):
             self.fit_kwargs = {"validation_data": validation_data, "preprocessing": preprocessing}
             self.fit_X_len = len(X)
             assert preprocessing is not None
-            return super().fit(X, y, config, progress_callback, log_callback, validation_data)
+            return super().fit(
+                X,
+                y,
+                config,
+                progress_callback,
+                log_callback,
+                validation_data,
+                iteration_callback=iteration_callback,
+            )
 
     calculator = _RecordingCalculator()
     estimator = StatefulEstimator(calculator=calculator, applier=_DummyApplier(), node_id="p2")

@@ -64,3 +64,55 @@ def test_numpy_score_coerces_to_native_float():
     # orjson rejects numpy scalars outright — this must serialize.
     payload = orjson.dumps(event.model_dump(exclude_none=True))
     assert orjson.loads(payload)["trial_score"] == 0.91
+
+
+def test_iteration_event_validates():
+    """Boosting fits stream one ``iteration`` event per boosting round."""
+    event = JobEvent(
+        event="iteration",
+        job_id="job-1",
+        iteration_number=40,
+        iteration_total=200,
+        iteration_score=0.42,
+        iteration_metric="logloss",
+        iteration_direction="minimize",
+    )
+    assert event.iteration_number == 40
+    assert event.iteration_total == 200
+    assert event.iteration_score == 0.42
+    assert event.iteration_metric == "logloss"
+    assert event.iteration_direction == "minimize"
+
+
+def test_iteration_payload_dumps_only_set_fields():
+    event = JobEvent(
+        event="iteration",
+        job_id="job-1",
+        iteration_number=1,
+        iteration_total=2,
+        iteration_score=0.5,
+        iteration_metric="auc",
+        iteration_direction="maximize",
+    )
+    assert event.model_dump(exclude_none=True) == {
+        "event": "iteration",
+        "job_id": "job-1",
+        "iteration_number": 1,
+        "iteration_total": 2,
+        "iteration_score": 0.5,
+        "iteration_metric": "auc",
+        "iteration_direction": "maximize",
+    }
+
+
+def test_iteration_numpy_score_coerces_to_native_float():
+    event = JobEvent(
+        event="iteration",
+        job_id="job-1",
+        iteration_number=1,
+        iteration_total=5,
+        iteration_score=np.float32(0.31),
+    )
+    assert type(event.iteration_score) is float
+    payload = orjson.dumps(event.model_dump(exclude_none=True))
+    assert orjson.loads(payload)["iteration_score"] == pytest.approx(0.31)

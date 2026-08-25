@@ -49,6 +49,7 @@ except ImportError:
 
 from ..core.meta.decorators import node_meta
 from ..registry import NodeRegistry
+from ._boosting_progress import LightGBMIterationAdapter, XgboostIterationAdapter
 from ._sklearn_compat import normalize_logistic_regression_params
 from .sklearn_wrapper import SklearnApplier, SklearnCalculator
 
@@ -109,9 +110,18 @@ class LogisticRegressionCalculator(SklearnCalculator):
         progress_callback: Callable[..., Any] | None = None,
         log_callback: Callable[..., Any] | None = None,
         validation_data: Any = None,
+        iteration_callback: Callable[..., Any] | None = None,
     ) -> Any:
         self._validate_solver_penalty(config)
-        return super().fit(X, y, config, progress_callback, log_callback, validation_data)
+        return super().fit(
+            X,
+            y,
+            config,
+            progress_callback,
+            log_callback,
+            validation_data,
+            iteration_callback=iteration_callback,
+        )
 
     def _resolve_fit_params(self, config: dict[str, Any]) -> dict[str, Any]:
         """Merges fit params, then normalizes ``penalty`` for sklearn >=1.8.
@@ -231,9 +241,18 @@ class CalibratedClassifierCalculator(SklearnCalculator):
         progress_callback: Callable[..., Any] | None = None,
         log_callback: Callable[..., Any] | None = None,
         validation_data: Any = None,
+        iteration_callback: Callable[..., Any] | None = None,
     ) -> Any:
         config = self._resolve_base_estimator(config)
-        return super().fit(X, y, config, progress_callback, log_callback, validation_data)
+        return super().fit(
+            X,
+            y,
+            config,
+            progress_callback,
+            log_callback,
+            validation_data,
+            iteration_callback=iteration_callback,
+        )
 
     @classmethod
     def _resolve_base_estimator(cls, config: dict[str, Any] | None) -> dict[str, Any]:
@@ -485,6 +504,22 @@ if XGBOOST_AVAILABLE:
                 problem_type="classification",
             )
 
+        def _boosting_fit_kwargs(self, model, X_np, y_np, iteration_callback):
+            if iteration_callback is None or XgboostIterationAdapter is None:
+                return {}
+            # XGBoost 3.x reads callbacks from the estimator itself (they were
+            # removed from fit()). eval_set is display-only (no early
+            # stopping), so the trained model is identical to a plain fit — it
+            # just streams per-round training loss for the live chart.
+            model.callbacks = [
+                XgboostIterationAdapter(iteration_callback, total=int(model.n_estimators))
+            ]
+            return {
+                "eval_set": [(X_np, y_np)],
+                "verbose": False,
+                "_detach_callbacks": True,
+            }
+
 
 # --- Extra Trees Classifier ---
 class ExtraTreesClassifierApplier(SklearnApplier):
@@ -620,7 +655,14 @@ if LIGHTGBM_AVAILABLE:
             )
 
         def fit(
-            self, X, y, config, progress_callback=None, log_callback=None, validation_data=None
+            self,
+            X,
+            y,
+            config,
+            progress_callback=None,
+            log_callback=None,
+            validation_data=None,
+            iteration_callback=None,
         ):
             import warnings
 
@@ -633,7 +675,16 @@ if LIGHTGBM_AVAILABLE:
                     progress_callback=progress_callback,
                     log_callback=log_callback,
                     validation_data=validation_data,
+                    iteration_callback=iteration_callback,
                 )
+
+        def _boosting_fit_kwargs(self, model, X_np, y_np, iteration_callback):
+            if iteration_callback is None:
+                return {}
+            return {
+                "eval_set": [(X_np, y_np)],
+                "callbacks": [LightGBMIterationAdapter(iteration_callback)],
+            }
 
 
 # --- Gaussian NB ---

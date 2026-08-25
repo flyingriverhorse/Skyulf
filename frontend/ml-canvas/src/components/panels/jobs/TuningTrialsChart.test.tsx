@@ -47,4 +47,11 @@ describe('TuningTrialsChart', () => {
     rerender(<TuningTrialsChart points={points} />);
     expect(screen.queryByText(/live/i)).toBeNull();
   });
+
+  it('labels iteration series instead of trials when kind is iteration', () => {
+    render(<TuningTrialsChart points={points} metric="logloss" kind="iteration" />);
+    expect(screen.getByText(/Boosting Iterations/i)).toBeTruthy();
+    expect(screen.getByText(/Iteration score/i)).toBeTruthy();
+    expect(screen.queryByText(/Tuning Trials/i)).toBeNull();
+  });
 });

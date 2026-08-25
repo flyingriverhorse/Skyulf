@@ -85,6 +85,14 @@ export interface RunPipelineResponse {
 export interface TrialSnapshot {
   trials: Array<{ trial: number; total: number; score: number; metric: string | null }>;
   metric: string | null;
+  iterations?: Array<{
+    iteration: number;
+    total: number;
+    score: number;
+    metric: string | null;
+    direction: string | null;
+  }>;
+  iteration_metric?: string | null;
 }
 
 export const jobsApi = {

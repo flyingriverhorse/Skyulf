@@ -27,7 +27,7 @@ import polars as pl
 
 from backend.config import get_settings
 from backend.realtime.events import JobEvent, publish_job_event
-from backend.realtime.trial_buffer import record_trial
+from backend.realtime.trial_buffer import record_iteration, record_trial
 from skyulf.data.catalog import DataCatalog
 from skyulf.data.dataset import SplitDataset
 from skyulf.engines.registry import EngineRegistry
@@ -54,8 +54,10 @@ def _emit_trial_event(
     auth, so hyperparameters never ride along. Silent for scoreless trials
     (failed/pruned) and the preview-path ``job_id='unknown'`` sentinel;
     transport failures are swallowed so training is never impacted.
+    Non-finite scores (degenerate trials reporting -inf/NaN) are dropped:
+    the jobs API serializes with ``allow_nan=False``.
     """
-    if score is None or job_id == "unknown":
+    if score is None or not np.isfinite(score) or job_id == "unknown":
         return
     # Backfill history for clients that open the job mid-run; the live
     # broadcast below only reaches already-connected subscribers.
@@ -72,6 +74,42 @@ def _emit_trial_event(
         publish_job_event(event)
     except Exception as exc:
         logger.warning("trial event publish failed for %s: %s", job_id, exc)
+
+
+def _emit_iteration_event(
+    job_id: str,
+    current: int,
+    total: int,
+    score: float | None,
+    metric: str | None,
+    direction: str | None,
+) -> None:
+    """Publish a completed boosting iteration as a live ``iteration`` event.
+
+    Mirror of :func:`_emit_trial_event` for per-round XGBoost/LightGBM
+    progress. Scalars only (unauthenticated broadcast); ``direction`` tells
+    the chart which way the metric improves ("minimize"/"maximize") since
+    boosting scores are usually losses. Silent for scoreless iterations and
+    the preview-path ``job_id='unknown'`` sentinel; transport failures are
+    swallowed so training is never impacted. Non-finite scores are dropped
+    for the same ``allow_nan=False`` reason as trials.
+    """
+    if score is None or not np.isfinite(score) or job_id == "unknown":
+        return
+    record_iteration(job_id, current, total, float(score), metric, direction)
+    event = JobEvent(
+        event="iteration",
+        job_id=job_id,
+        iteration_number=current,
+        iteration_total=total,
+        iteration_score=float(score),
+        iteration_metric=metric,
+        iteration_direction=direction,
+    )
+    try:
+        publish_job_event(event)
+    except Exception as exc:
+        logger.warning("iteration event publish failed for %s: %s", job_id, exc)
 
 
 class NodeRunnersMixin:
@@ -865,6 +903,28 @@ class NodeRunnersMixin:
             self.log(msg)
             _emit_trial_event(job_id, current, total, score, tuning_params.get("metric"))
 
+        # Per-boosting-round progress (XGBoost/LightGBM): fires during every
+        # boosting fit the engine runs, including the final refit — plain
+        # sklearn models simply never invoke it. Points are kept locally as
+        # well so they can be persisted on the job for completed-job redraws.
+        iteration_points: list[dict[str, Any]] = []
+
+        def iteration_callback(current, total, score, metric, direction):
+            self.log(
+                f"Boosting iteration {current}/{total}"
+                + (f" - {metric or 'score'}: {score:.4f}" if score is not None else "")
+            )
+            iteration_points.append(
+                {
+                    "iteration": current,
+                    "total": total,
+                    "score": None if score is None else float(score),
+                    "metric": metric,
+                    "direction": direction,
+                }
+            )
+            _emit_iteration_event(job_id, current, total, score, metric, direction)
+
         # Run fit_predict
         # This will:
         # 1. Run tuning (TunerCalculator.fit)
@@ -882,6 +942,7 @@ class NodeRunnersMixin:
             progress_callback=progress_callback,
             log_callback=self.log,
             job_id=job_id,
+            iteration_callback=iteration_callback,
             **fit_kwargs,
         )
 
@@ -895,6 +956,16 @@ class NodeRunnersMixin:
         # trials for BOTH modes, so fixed-mode jobs report the effective
         # hyperparameters consistently with tuned-mode jobs)
         tuning_result, metrics = self._extract_tuning_metrics(estimator, tuning_params)
+
+        # Persist the boosting iteration history (when the model streamed one)
+        # so completed jobs redraw the curve without the live buffer.
+        if iteration_points:
+            metrics["iterations"] = iteration_points
+            last_point = iteration_points[-1]
+            if last_point.get("metric"):
+                metrics["iteration_metric"] = last_point["metric"]
+            if last_point.get("direction"):
+                metrics["iteration_direction"] = last_point["direction"]
 
         # Cross-Validation on the tuned/fixed model (using best/fixed params)
         cv_metrics = self._run_tuned_cv(

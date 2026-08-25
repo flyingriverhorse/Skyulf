@@ -8,7 +8,7 @@ import {
 import { JobInfo, LeakageGateVerdict } from '../../../core/api/jobs';
 import { useJobStore } from '../../../core/store/useJobStore';
 import { useJobPolling, isTerminalStatus } from '../../../core/hooks/useJobPolling';
-import { useTuningTrials } from '../../../core/hooks/useTuningTrials';
+import { useTuningTrials, type SeriesKind } from '../../../core/hooks/useTuningTrials';
 import { formatMetricName, extractEnsembleSummary, formatBaseEstimator, isEnsembleModelType, getEnsembleSubTask, getEnsembleStrategy } from '../../../core/utils/format';
 import { MetricsGrid } from './MetricsGrid';
 import { TuningTrialsChart } from './TuningTrialsChart';
@@ -430,9 +430,25 @@ export const JobDetailsView: React.FC<JobDetailsViewProps> = ({ job: initialJob,
     const { jobs: polledJobs } = useJobPolling(pollIds, { intervalMs: 2000 });
     const job: JobInfo = polledJobs[initialJob.job_id] ?? initialJob;
     const retryAvailability = useMemo(() => getRetryAvailability(job), [job]);
-    // Live tuning-trial series (WebSocket while running, persisted
-    // metrics.trials for completed jobs) for the trial chart below.
-    const { points: trialPoints, latest: trialLatest, metric: trialMetric } = useTuningTrials(job);
+    // Live tuning series: trials (search progress) and iterations (boosting
+    // refit progress) stream as two independent slices; a tab row shows both
+    // when a job has each, auto-following the streaming series until the
+    // user pins one by clicking.
+    const { trial: trialSlice, iteration: iterationSlice, activeKind } = useTuningTrials(job);
+    const [pinnedSeries, setPinnedSeries] = useState<SeriesKind | null>(null);
+    useEffect(() => {
+        setPinnedSeries(null);
+    }, [job.job_id]);
+    const hasBothSeries = trialSlice.points.length >= 2 && iterationSlice.points.length >= 2;
+    let visibleKind: SeriesKind = pinnedSeries ?? activeKind;
+    // The chart needs >=2 points; if the picked slice is still empty-ish,
+    // show the other one so the first streaming series is visible at once.
+    const picked = visibleKind === 'iteration' ? iterationSlice : trialSlice;
+    const other = visibleKind === 'iteration' ? trialSlice : iterationSlice;
+    if (picked.points.length < 2 && other.points.length >= 2) {
+        visibleKind = visibleKind === 'iteration' ? 'trial' : 'iteration';
+    }
+    const visibleSlice = visibleKind === 'iteration' ? iterationSlice : trialSlice;
 
     // Auto-scroll logs
     useEffect(() => {
@@ -622,10 +638,13 @@ export const JobDetailsView: React.FC<JobDetailsViewProps> = ({ job: initialJob,
                             <div className="p-4 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-100 dark:border-gray-700">
                                 <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Progress</div>
                                 <div className="font-medium text-gray-800 dark:text-gray-200">
-                                    {/* Live tuning jobs report completed trials; everything else states
-                                        honestly instead of implying a bar we can't back. */}
-                                    {trialLatest
-                                        ? `Trial ${trialLatest.trial}/${trialLatest.total}`
+                                    {/* Live tuning jobs report completed trials (or boosting
+                                        iterations); everything else states honestly instead
+                                        of implying a bar we can't back. */}
+                                    {visibleSlice.latest
+                                        ? visibleKind === 'iteration'
+                                            ? `Iteration ${visibleSlice.latest.trial}/${visibleSlice.latest.total}`
+                                            : `Trial ${visibleSlice.latest.trial}/${visibleSlice.latest.total}`
                                         : isTerminalStatus(job.status) ? '—' : 'Not reported'}
                                 </div>
                             </div>
@@ -657,11 +676,32 @@ export const JobDetailsView: React.FC<JobDetailsViewProps> = ({ job: initialJob,
                             )}
                         </div>
 
-                        {/* Tuning trial chart — live series while running, persisted trials after. */}
+                        {/* Tuning trial chart — live series while running, persisted trials after.
+                            Boosting tuning jobs have both series; tabs switch between them. */}
+                        {hasBothSeries && (
+                            <div className="flex gap-2">
+                                {(['trial', 'iteration'] as SeriesKind[]).map((kind) => (
+                                    <button
+                                        key={kind}
+                                        type="button"
+                                        onClick={() => setPinnedSeries(kind)}
+                                        aria-pressed={visibleKind === kind}
+                                        className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all whitespace-nowrap ${
+                                            visibleKind === kind
+                                                ? 'bg-indigo-600 text-white shadow-sm'
+                                                : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'
+                                        }`}
+                                    >
+                                        {kind === 'trial' ? 'Trials' : 'Iterations'}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
                         <TuningTrialsChart
-                            points={trialPoints}
-                            metric={trialMetric ?? getScoringMetric(job)}
-                            isLive={!isTerminalStatus(job.status) && trialPoints.length > 0}
+                            points={visibleSlice.points}
+                            metric={visibleSlice.metric ?? getScoringMetric(job)}
+                            isLive={!isTerminalStatus(job.status) && visibleSlice.points.length > 0}
+                            kind={visibleKind}
                         />
 
                         {/* Timeline Section */}

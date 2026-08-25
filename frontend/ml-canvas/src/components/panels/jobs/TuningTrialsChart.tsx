@@ -11,7 +11,7 @@ import {
 } from 'recharts';
 import { Activity } from 'lucide-react';
 import { useChartTheme } from '../../../core/hooks/useChartTheme';
-import type { TrialPoint } from '../../../core/hooks/useTuningTrials';
+import type { SeriesKind, TrialPoint } from '../../../core/hooks/useTuningTrials';
 
 interface TuningTrialsChartProps {
   points: TrialPoint[];
@@ -19,6 +19,8 @@ interface TuningTrialsChartProps {
   metric?: string | undefined;
   /** True while the job is still emitting trials. */
   isLive?: boolean;
+  /** Which series is charted — boosting iterations vs tuning trials. */
+  kind?: SeriesKind | undefined;
 }
 
 /**
@@ -32,14 +34,16 @@ export const TuningTrialsChart: React.FC<TuningTrialsChartProps> = ({
   points,
   metric,
   isLive = false,
+  kind = 'trial',
 }) => {
   const theme = useChartTheme();
   if (points.length < 2) return null;
+  const isIterations = kind === 'iteration';
 
   return (
     <div className="bg-white dark:bg-slate-800 p-6 rounded-lg shadow border dark:border-slate-700 mt-6">
       <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-        <Activity size={18} /> Tuning Trials
+        <Activity size={18} /> {isIterations ? 'Boosting Iterations' : 'Tuning Trials'}
         {metric ? (
           <span className="text-xs font-normal text-gray-400 ml-1">({metric})</span>
         ) : null}
@@ -59,7 +63,7 @@ export const TuningTrialsChart: React.FC<TuningTrialsChartProps> = ({
               tick={{ fill: theme.axisColor, fontSize: 11 }}
               tickLine={false}
               axisLine={{ stroke: theme.gridColor }}
-              label={{ value: 'Trial', position: 'insideBottomRight', offset: -2, fill: theme.subTextColor, fontSize: 11 }}
+              label={{ value: isIterations ? 'Iteration' : 'Trial', position: 'insideBottomRight', offset: -2, fill: theme.subTextColor, fontSize: 11 }}
             />
             <YAxis
               tick={{ fill: theme.axisColor, fontSize: 11 }}
@@ -70,13 +74,13 @@ export const TuningTrialsChart: React.FC<TuningTrialsChartProps> = ({
             <RechartsTooltip
               contentStyle={theme.tooltipContentStyle}
               itemStyle={theme.tooltipItemStyle}
-              labelFormatter={(label) => `Trial ${label}`}
+              labelFormatter={(label) => `${isIterations ? 'Iteration' : 'Trial'} ${label}`}
             />
             <Legend verticalAlign="top" height={36} iconType="circle" />
             <Line
               type="monotone"
               dataKey="score"
-              name="Trial score"
+              name={isIterations ? 'Iteration score' : 'Trial score'}
               stroke="#6366f1"
               strokeWidth={2}
               dot={{ r: 3, fill: '#6366f1' }}

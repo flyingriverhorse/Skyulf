@@ -576,7 +576,9 @@ def _tune_with_spied_halving_build(monkeypatch, preprocessing):
     monkeypatch.setattr(TuningCalculator, "_build_halving_searcher", fake_build)
     monkeypatch.setattr(TuningCalculator, "_execute_search", lambda self, *a, **k: None)
     monkeypatch.setattr(
-        TuningCalculator, "_extract_best_result", lambda self, searcher: ({"C": 1.0}, 0.9)
+        TuningCalculator,
+        "_extract_best_result",
+        lambda self, searcher, first_trial_error=None: ({"C": 1.0}, 0.9),
     )
     monkeypatch.setattr(TuningCalculator, "_collect_trials", lambda self, searcher, config: [])
     monkeypatch.setattr(TuningCalculator, "_log_final_completion", lambda self, *a: None)
@@ -678,6 +680,90 @@ def test_alignment_probe_without_frames_relies_on_static_flag():
     assert engine_mod._preserves_row_and_target_alignment(
         _StubPreprocessor(changes_row_count=False), None
     )
+
+
+def test_misaligned_fallback_searches_transformed_frames(monkeypatch):
+    """When the probe refuses the wrap (target re-encoding), the fallback must
+    hand the searcher the once-transformed frames — not the raw pre-transform
+    payload. Searching the raw string target is what crashed every optuna
+    trial for boosting models (XGBoost/LightGBM can't fit string labels).
+    """
+    captured: dict[str, Any] = {}
+
+    def fake_build(self, search_config, estimator, cv, metric, log_callback):
+        return object()
+
+    def fake_execute(self, searcher, X_arr, y_arr, config, log_callback=None):
+        captured["y_arr"] = y_arr
+        return []
+
+    monkeypatch.setattr(TuningCalculator, "_build_halving_searcher", fake_build)
+    monkeypatch.setattr(TuningCalculator, "_execute_search", fake_execute)
+    monkeypatch.setattr(
+        TuningCalculator,
+        "_extract_best_result",
+        lambda self, searcher, first_trial_error=None: ({"C": 1.0}, 0.9),
+    )
+    monkeypatch.setattr(TuningCalculator, "_collect_trials", lambda self, searcher, config: [])
+    monkeypatch.setattr(TuningCalculator, "_log_final_completion", lambda self, *a: None)
+
+    X, y_int = _clf_xy(n=60)
+    # Pre-transform target is strings (e.g. "Species"); the upstream encoder maps
+    # them back to integers — the exact shape the F-15 LabelEncoder node has.
+    y_str = pd.Series(y_int, name="Species").map({0: "neg", 1: "pos"})
+    encoder = _StubPreprocessor(
+        changes_row_count=False,
+        fit_transform=lambda X, y: (X, y.map({"neg": 0, "pos": 1})),
+    )
+
+    cfg = TuningConfig(
+        strategy="halving_grid",
+        metric="accuracy",
+        search_space={"C": [0.1, 1.0]},
+        cv_folds=3,
+    )
+    _tuner_clf().tune(
+        pd.DataFrame(X),
+        y_str,
+        cfg,
+        preprocessing=encoder,
+        preprocessing_frames=(pd.DataFrame(X), y_str),
+    )
+
+    import numpy as np
+
+    y_searched = captured["y_arr"]
+    assert np.issubdtype(np.asarray(y_searched).dtype, np.number), (
+        "fallback must search the encoded target, not the raw strings"
+    )
+
+
+def test_optuna_failed_trials_surface_error_in_log_and_message():
+    """A trial that fails (here: string target XGBoost can't fit) must push the
+    underlying error into the log callback and into the raised ValueError, so
+    the frontend job detail shows the real cause instead of a generic message.
+    """
+    pytest.importorskip("optuna")
+    xgb = pytest.importorskip("xgboost")  # noqa: F841
+    from skyulf.modeling.classification import XGBClassifierCalculator
+
+    X, y_int = _clf_xy(n=40)
+    y_str = pd.Series(y_int, name="Species").map({0: "setosa", 1: "versicolor"})
+    cfg = TuningConfig(
+        strategy="optuna",
+        metric="f1",
+        n_trials=2,
+        cv_folds=3,
+        search_space={"n_estimators": [10]},
+    )
+    logs: list[str] = []
+    with pytest.raises(ValueError) as excinfo:
+        TuningCalculator(XGBClassifierCalculator()).fit(
+            pd.DataFrame(X), y_str, cfg, log_callback=logs.append
+        )
+    assert "All trials failed" in str(excinfo.value)
+    assert "First trial error:" in str(excinfo.value)
+    assert any("failed" in message for message in logs)
 
 
 # ---------------------------------------------------------------------------

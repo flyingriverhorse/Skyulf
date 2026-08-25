@@ -1,5 +1,6 @@
 """Hyperparameter Tuner implementation."""
 
+import contextlib
 import copy
 import logging
 import warnings
@@ -285,6 +286,7 @@ class TuningCalculator(BaseModelCalculator):
         X_np: Any,
         y_np: Any,
         log_callback: Callable[[str], None] | None,
+        iteration_callback: Callable[..., None] | None = None,
     ) -> Any:
         """Build and fit the final model on the full dataset using the tuned best params."""
         best_params = tuning_result.best_params
@@ -308,10 +310,23 @@ class TuningCalculator(BaseModelCalculator):
         # ``a__b`` keys — e.g. an ensemble's tuned base-model params — through
         # ``set_params`` so they are not silently dropped.
         model = self._instantiate_model(model_cls, final_params)
+        # Boosting base calculators (XGBoost/LightGBM) attach an eval set +
+        # iteration callback here so the final refit streams per-round
+        # progress like any other boosting fit; every other model keeps a
+        # plain fit.
+        boosting_hook = getattr(self.model_calculator, "_boosting_fit_kwargs", None)
+        extra_fit_kwargs = (
+            boosting_hook(model, X_np, y_np, iteration_callback)
+            if boosting_hook is not None
+            else {}
+        )
+        detach_callbacks = extra_fit_kwargs.pop("_detach_callbacks", False)
         with warnings.catch_warnings(record=True) as caught:
             warnings.simplefilter("always")
             warnings.filterwarnings("ignore", message=".*valid feature names.*")
-            model.fit(X_np, y_np)
+            model.fit(X_np, y_np, **extra_fit_kwargs)
+        if detach_callbacks:
+            model.callbacks = None
         for w in caught:
             if issubclass(w.category, ConvergenceWarning):
                 conv_msg = (
@@ -334,6 +349,7 @@ class TuningCalculator(BaseModelCalculator):
         progress_callback: Callable[[int, int, float | None, dict | None], None] | None = None,
         log_callback: Callable[[str], None] | None = None,
         validation_data: tuple[pd.DataFrame | SkyulfDataFrame, pd.Series | Any] | None = None,
+        iteration_callback: Callable[..., None] | None = None,
         preprocessing: "FoldPreprocessor | None" = None,
     ) -> Any:
         """
@@ -346,8 +362,9 @@ class TuningCalculator(BaseModelCalculator):
         ``grid``/``random`` loop applies it directly; ``halving_*``/``optuna``
         get it via a Pipeline wrapper whose searcher-internal CV drives the
         refit. Chains that change the row count or the target (resampling,
-        row drops) cannot stay aligned inside that wrapper and fall back to
-        pre-transformed scoring with an explicit log instead. When set, the
+        row drops, target re-encoding) cannot stay aligned inside that wrapper
+        and fall back to scoring data transformed once on the full training
+        set, with an explicit log instead. When set, the
         final best-model refit runs the full split through the preprocessor
         once — the artifact serving uses.
         """
@@ -452,7 +469,14 @@ class TuningCalculator(BaseModelCalculator):
             X_refit, y_refit = SklearnBridge.to_sklearn((X_refit_frame, y_refit_frame))
         else:
             X_refit, y_refit = X_np, y_np
-        model = self._refit_best_model(tuning_result, tuning_config, X_refit, y_refit, log_callback)
+        model = self._refit_best_model(
+            tuning_result,
+            tuning_config,
+            X_refit,
+            y_refit,
+            log_callback,
+            iteration_callback=iteration_callback,
+        )
 
         if reporter is not None:
             reporter.finish(tuning_result)
@@ -1137,10 +1161,40 @@ class TuningCalculator(BaseModelCalculator):
         """Converts a pandas object to a numpy array, leaving numpy arrays unchanged."""
         return data.to_numpy() if hasattr(data, "to_numpy") else data
 
-    def _execute_search(self, searcher: Any, X_arr: Any, y_arr: Any, config: TuningConfig) -> None:
+    def _execute_search(
+        self,
+        searcher: Any,
+        X_arr: Any,
+        y_arr: Any,
+        config: TuningConfig,
+        log_callback: Callable[[str], None] | None = None,
+    ) -> list[str]:
         """Fits the searcher, translating known sklearn/optuna failure messages into
         actionable ``ValueError``s and re-raising anything else unchanged.
+
+        Returns the per-trial failure messages captured for optuna runs (one
+        entry per failed trial). Optuna logs these at WARNING level on its own
+        logger — without capturing them the only visible symptom is the generic
+        "no trials completed" error, with the real cause stuck in stderr.
         """
+        captured: list[str] = []
+        optuna_logger: logging.Logger | None = None
+        handler: logging.Handler | None = None
+        if config.strategy == "optuna" and _ensure_optuna_loaded():
+
+            class _TrialFailureHandler(logging.Handler):
+                def emit(self, record: logging.LogRecord) -> None:
+                    message = record.getMessage()
+                    if "failed" not in message:
+                        return
+                    captured.append(message)
+                    if log_callback:
+                        with contextlib.suppress(Exception):
+                            log_callback(message)
+
+            optuna_logger = logging.getLogger("optuna")
+            handler = _TrialFailureHandler(level=logging.WARNING)
+            optuna_logger.addHandler(handler)
         try:
             with warnings.catch_warnings():
                 warnings.filterwarnings(
@@ -1178,11 +1232,18 @@ class TuningCalculator(BaseModelCalculator):
                 ) from e
 
             raise e
+        finally:
+            if optuna_logger is not None and handler is not None:
+                optuna_logger.removeHandler(handler)
+        return captured
 
     @staticmethod
-    def _extract_best_result(searcher: Any) -> tuple[Any, float]:
+    def _extract_best_result(
+        searcher: Any, first_trial_error: str | None = None
+    ) -> tuple[Any, float]:
         """Reads ``best_params_``/``best_score_`` off a fitted searcher, translating the
-        "no completed trials" ``ValueError`` into a clearer, actionable message.
+        "no completed trials" ``ValueError`` into a clearer, actionable message that
+        carries the first captured per-trial error when available.
         """
         try:
             # Accessing best_params_ raises ValueError if no trials completed successfully
@@ -1190,12 +1251,14 @@ class TuningCalculator(BaseModelCalculator):
             best_score = searcher.best_score_
         except ValueError as e:
             if "No trials are completed yet" in str(e):
+                detail = f" First trial error: {first_trial_error}" if first_trial_error else ""
                 raise ValueError(
                     "Hyperparameter tuning failed: All trials failed. "
                     "This often happens if the model produces NaN scores "
                     "(e.g., due to unscaled data for linear models/SVMs, exploding gradients, "
                     "or mismatched parameters). "
                     "Try adding a 'Scale' node before this model or checking for NaN/Infinity in your data."
+                    + detail
                 ) from e
             raise e
         return best_params, best_score
@@ -1293,6 +1356,7 @@ class TuningCalculator(BaseModelCalculator):
         # per-fold hook cannot reach; wrap preprocessing + model in a Pipeline
         # so the searcher's own folds refit the preprocessor (F-15).
         wrapped = preprocessing is not None
+        fallback_frames: tuple[Any, Any] | None = None
         if wrapped and config.strategy in ("halving_grid", "halving_random", "optuna"):
             # An sklearn transformer step can only hand X to the next step, so
             # a chain that resamples, drops rows or transforms the target
@@ -1301,8 +1365,10 @@ class TuningCalculator(BaseModelCalculator):
             # authoritative (it catches any shape-changing step, including
             # future ones) and fails closed. The grid/random custom loop
             # threads the transformed y itself and stays enabled; the
-            # searcher-backed strategies fall back to pre-transformed scoring
-            # with an explicit log instead.
+            # searcher-backed strategies fall back to scoring data transformed
+            # once on the full training set (the pre-F-15 behaviour) — scoring
+            # the raw pre-transform frames would hand models an unfit target
+            # (e.g. string labels to XGBoost) and fail every trial.
             misaligned = getattr(
                 preprocessing, "changes_row_count", False
             ) or not _preserves_row_and_target_alignment(preprocessing, preprocessing_frames)
@@ -1313,9 +1379,26 @@ class TuningCalculator(BaseModelCalculator):
                         "Per-fold preprocessing refit skipped for this tuning strategy: "
                         "the step chain changes row count or the target (resampling / "
                         "row drops / target re-encoding), which cannot stay aligned "
-                        "inside the searcher's pipeline. Tuning scores the "
-                        "pre-transformed data and may be optimistically biased."
+                        "inside the searcher's pipeline. The chain is applied once to "
+                        "the full training set before the search instead — scores may "
+                        "be optimistically biased."
                     )
+                if preprocessing_frames is not None:
+                    try:
+                        fallback_frames = copy.deepcopy(preprocessing).fit_transform(
+                            *preprocessing_frames
+                        )
+                    except Exception:
+                        # Fail closed like the probe: a chain we cannot apply
+                        # once keeps the raw frames (pre-F-15 scoring would
+                        # crash per trial for unfit targets, but a hard failure
+                        # here would violate the never-fail-the-run contract).
+                        fallback_frames = None
+                        if log_callback:
+                            log_callback(
+                                "One-shot preprocessing apply failed; tuning scores the "
+                                "raw pre-transform data instead."
+                            )
         estimator: Any = base_estimator
         search_config = config
         if wrapped:
@@ -1381,13 +1464,18 @@ class TuningCalculator(BaseModelCalculator):
             if preprocessing_frames is not None:
                 X_for_search, y_for_search = preprocessing_frames
             X_arr, y_arr = X_for_search, y_for_search
+        elif fallback_frames is not None:
+            # Misaligned-chain fallback: search the once-transformed frames.
+            X_arr = self._to_numpy(fallback_frames[0])
+            y_arr = self._to_numpy(fallback_frames[1])
         else:
             X_arr = self._to_numpy(X_for_search)
             y_arr = self._to_numpy(y_for_search)
-        self._execute_search(searcher, X_arr, y_arr, config)
+        trial_errors = self._execute_search(searcher, X_arr, y_arr, config, log_callback)
 
         # 5. Extract Results
-        best_params, best_score = self._extract_best_result(searcher)
+        first_trial_error = trial_errors[0] if trial_errors else None
+        best_params, best_score = self._extract_best_result(searcher, first_trial_error)
 
         # Collect trials
         trials = self._collect_trials(searcher, config)
