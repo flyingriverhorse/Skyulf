@@ -14,14 +14,55 @@ from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
 from skyulf.data.dataset import SplitDataset
+from skyulf.leakage import (
+    data_dependent_transformers,
+    is_constant_imputation,
+    is_explicit_column_drop,
+    is_explicit_hash_encoding,
+    is_explicit_missing_indicator,
+)
+from skyulf.modeling.base import extract_xy
+from skyulf.preprocessing.fold_adapter import (
+    SPLITTER_STEP_TYPES,
+    UNSAFE_BRANCH_STEP_TYPES,
+    FeatureEngineerFoldAdapter,
+    MergedBranchFoldAdapter,
+)
 from skyulf.preprocessing.pipeline import FeatureEngineer
+from skyulf.registry import NodeRegistry
 
+from ...constants import StepType
 from ..schemas import NodeConfig
 
 if TYPE_CHECKING:
+    from skyulf.modeling.fold_preprocessing import FoldPreprocessor
+
     from ...artifacts.store import ArtifactStore
 
 logger = logging.getLogger(__name__)
+
+
+def _step_learns_from_data(step: dict[str, Any]) -> bool:
+    """Whether a step's ``fit`` reads statistics from the rows it is given.
+
+    Mirrors the leakage gate's per-step verdict (``skyulf.validate_leakage_safety``):
+    the param-aware exemptions for stateless modes come first, then the
+    registry-derived learner list. Unknown transformers fail closed — they
+    cannot be proven stateless, so they are treated as learners.
+    """
+    transformer = str(step.get("transformer") or "")
+    params = step.get("params") or {}
+    if is_explicit_column_drop(transformer, params):
+        return False
+    if is_constant_imputation(transformer, params):
+        return False
+    if is_explicit_missing_indicator(transformer, params):
+        return False
+    if is_explicit_hash_encoding(transformer, params):
+        return False
+    if transformer in data_dependent_transformers():
+        return True
+    return transformer not in NodeRegistry.get_all_metadata()
 
 
 class FeatureEngMixin:
@@ -34,6 +75,9 @@ class FeatureEngMixin:
     executed_transformers: list[dict[str, Any]]
     log: Callable[[str], None]
     _get_input: Any
+    _merge_input_order: Any
+    _get_merge_strategy: Any
+    _upstream_dropped_columns: Any
 
     def _resolve_feature_engineer_artifact_key(self, node: NodeConfig) -> str | None:
         if not node.inputs:
@@ -270,6 +314,306 @@ class FeatureEngMixin:
         except Exception:
             logger.exception("Failed to bundle transformers with model")
             raise
+
+    def _upstream_fe_chain(
+        self, training_node: NodeConfig
+    ) -> tuple[str, list[tuple[str, list[dict[str, Any]]]]] | None:
+        """Follow single-input ancestors from ``training_node`` up to the data loader.
+
+        Returns ``(loader_node_id, chain)`` where ``chain`` is
+        ``[(node_id, unfitted_step_configs), ...]`` in execution order
+        (feature-engineering node steps plus single-transformer nodes wrapped
+        as one-step pipelines, matching ``_run_transformer``). Returns
+        ``None`` when the upstream graph is not a linear chain of
+        feature-engineering/transformer nodes — merged inputs, a missing
+        loader, or an unsupported node type (training/preview in between).
+        """
+        chain: list[tuple[str, list[dict[str, Any]]]] = []
+        if len(dict.fromkeys(training_node.inputs or [])) > 1:
+            return None
+        current_id = training_node.inputs[0] if training_node.inputs else None
+        while current_id is not None:
+            cfg = self._node_configs.get(current_id)
+            if cfg is None:
+                return None
+            if len(dict.fromkeys(cfg.inputs or [])) > 1:
+                return None
+            if cfg.step_type == StepType.DATA_LOADER:
+                return current_id, list(reversed(chain))
+            if cfg.step_type == StepType.FEATURE_ENGINEERING:
+                chain.append((cfg.node_id, list((cfg.params or {}).get("steps", []))))
+            elif cfg.step_type not in (StepType.TRAINING, "data_preview"):
+                # Single-transformer node, wrapped exactly like _run_transformer does.
+                chain.append(
+                    (
+                        cfg.node_id,
+                        [
+                            {
+                                "name": "step",
+                                "transformer": cfg.step_type,
+                                "params": cfg.params or {},
+                            }
+                        ],
+                    )
+                )
+            else:
+                return None
+            current_id = cfg.inputs[0] if cfg.inputs else None
+        return None
+
+    @staticmethod
+    def _split_train_payload(output: Any, target_col: str) -> tuple[Any, Any]:
+        """Extract the pre-transform ``(X, y)`` train payload from a split output."""
+        train = output.train if isinstance(output, SplitDataset) else output
+        return extract_xy(train, target_col)
+
+    def _branch_chain_up_to_loader(
+        self, start_id: str
+    ) -> tuple[str, list[tuple[str, list[dict[str, Any]]]]] | None:
+        """Walk one branch from ``start_id`` up to its data loader.
+
+        Returns ``(loader_id, chain)`` with ``chain`` in execution order
+        (single-transformer nodes wrapped exactly like ``_run_transformer``).
+        Returns ``None`` when the walk hits a nested merge, a missing node,
+        no loader, or an unsupported node type (training/preview mid-branch).
+        """
+        chain: list[tuple[str, list[dict[str, Any]]]] = []
+        current_id: str | None = start_id
+        while current_id is not None:
+            cfg = self._node_configs.get(current_id)
+            if cfg is None:
+                return None
+            if len(dict.fromkeys(cfg.inputs or [])) > 1:
+                return None
+            if cfg.step_type == StepType.DATA_LOADER:
+                return current_id, list(reversed(chain))
+            if cfg.step_type == StepType.FEATURE_ENGINEERING:
+                chain.append((cfg.node_id, list((cfg.params or {}).get("steps", []))))
+            elif cfg.step_type not in (StepType.TRAINING, "data_preview"):
+                chain.append(
+                    (
+                        cfg.node_id,
+                        [
+                            {
+                                "name": "step",
+                                "transformer": cfg.step_type,
+                                "params": cfg.params or {},
+                            }
+                        ],
+                    )
+                )
+            else:
+                return None
+            current_id = cfg.inputs[0] if cfg.inputs else None
+        return None
+
+    def _try_fork_join_refit(
+        self, training_node: NodeConfig, target_col: str
+    ) -> tuple[tuple["FoldPreprocessor", tuple[Any, Any]] | None, str | None]:
+        """Resolve per-fold refit for a fork-join merged graph (task #11).
+
+        Supported shape: a shared trunk ending in a node whose last step is a
+        ``TrainTestSplitter``/``Split`` (the fork point), N parallel
+        transformer branches, and a column-wise merge straight into the
+        training node. Returns ``(resolved, reason)`` — ``(adapter, payload)``
+        on a match, else ``None`` plus the bail reason for the job log.
+        Anything else keeps the skip-with-warning fallback: never fail a run,
+        never leak silently.
+        """
+        inputs = list(dict.fromkeys(self._merge_input_order(training_node)))
+        if len(inputs) < 2:
+            return None, "training node has fewer than two merged inputs"
+
+        chains: list[tuple[str, list[tuple[str, list[dict[str, Any]]]]]] = []
+        for input_id in inputs:
+            walked = self._branch_chain_up_to_loader(input_id)
+            if walked is None:
+                return None, (
+                    f"branch '{input_id}' is not a linear transformer chain from a loader"
+                )
+            chains.append(walked)
+
+        loaders = {loader_id for loader_id, _ in chains}
+        if len(loaders) != 1:
+            return None, f"branches do not share one data loader (found {sorted(loaders)})"
+
+        # Fork point = last node of the longest common node-id prefix.
+        node_sequences = [[node_id for node_id, _steps in chain] for _loader, chain in chains]
+        prefix_len = 0
+        for position in range(min(len(seq) for seq in node_sequences)):
+            ids_at_position = {seq[position] for seq in node_sequences}
+            if len(ids_at_position) != 1:
+                break
+            prefix_len += 1
+        if prefix_len == 0:
+            return None, "branches share no common trunk"
+        fork_id = node_sequences[0][prefix_len - 1]
+        fork_steps = dict(chains[0][1]).get(fork_id)
+        if not fork_steps or fork_id == loaders.pop():
+            return None, "no splitter fork point on the shared trunk"
+        fork_splitter = fork_steps[-1].get("transformer")
+        if fork_splitter not in ("TrainTestSplitter", "Split"):
+            return None, (
+                f"fork node '{fork_id}' must end with a TrainTestSplitter/Split "
+                f"step, found '{fork_splitter}'"
+            )
+
+        # Trunk steps before the fork splitter are already baked into the
+        # fork artifact. Data-dependent ones learned from the full trunk
+        # frame (held-out rows included) — the same leak the linear path
+        # falls back on, so refuse the refit with an explicit reason.
+        trunk_steps = [
+            step for _node_id, steps in chains[0][1][: prefix_len - 1] for step in steps
+        ] + list(fork_steps[:-1])
+        trunk_learners = [step for step in trunk_steps if _step_learns_from_data(step)]
+        if trunk_learners:
+            names = ", ".join(sorted({str(step.get("transformer")) for step in trunk_learners}))
+            return None, (
+                f"data-dependent trunk step(s) before the fork splitter ({names}) "
+                "cannot be re-fit safely per fold"
+            )
+
+        branch_lists: list[list[dict[str, Any]]] = []
+        for (_loader, chain), input_id in zip(chains, inputs, strict=True):
+            branch_steps = [step for node_id, steps in chain[prefix_len:] for step in steps]
+            if not branch_steps:
+                return None, f"branch '{input_id}' has no steps after the fork point"
+            for step in branch_steps:
+                transformer = step.get("transformer")
+                if transformer in UNSAFE_BRANCH_STEP_TYPES:
+                    return None, (f"branch step '{transformer}' splits data or changes row counts")
+            branch_lists.append(branch_steps)
+
+        strategy = self._get_merge_strategy(training_node.node_id)
+        payload = self._split_train_payload(self.artifact_store.load(fork_id), target_col)
+        adapter = MergedBranchFoldAdapter(
+            branch_lists,
+            merge_strategy=strategy,
+            target_column=target_col,
+            drop_columns=self._upstream_dropped_columns(training_node),
+        )
+        n_steps = sum(len(steps) for steps in branch_lists)
+        self.log(
+            f"Per-fold preprocessing refit enabled: {n_steps} step(s) across "
+            f"{len(branch_lists)} merged branch(es) re-fit inside every CV/tuning "
+            "fold (scores are leakage-free)."
+        )
+        return (adapter, payload), None
+
+    def _resolve_fold_preprocessing(
+        self, training_node: NodeConfig, target_col: str
+    ) -> tuple["FoldPreprocessor", tuple[Any, Any]] | None:
+        """Resolve the per-fold preprocessing adapter + pre-transform train payload (F-15).
+
+        Returns ``(adapter, (X_pre, y_pre))`` so CV/tuning folds slice the rows
+        the adapter was built for, or ``None`` to keep pre-transformed scoring.
+        Falls back with an explicit job-log warning when the upstream graph is
+        not a linear chain or the payload cannot be reconstructed — never
+        fails the run.
+        """
+        warning = None
+        try:
+            resolved = self._upstream_fe_chain(training_node)
+            if resolved is None:
+                if len(dict.fromkeys(training_node.inputs or [])) > 1:
+                    merged, merged_reason = self._try_fork_join_refit(training_node, target_col)
+                    if merged is not None:
+                        return merged
+                    warning = merged_reason or (
+                        "merged graph is not a supported fork-join of transformer branches"
+                    )
+                else:
+                    warning = (
+                        "upstream graph is not a linear chain (merged branches or "
+                        "unsupported nodes)"
+                    )
+                return None
+            loader_id, chain = resolved
+
+            flat: list[tuple[dict[str, Any], str, int, int]] = [
+                (step, node_id, idx, len(steps))
+                for node_id, steps in chain
+                for idx, step in enumerate(steps)
+            ]
+            splitter_positions = [
+                i
+                for i, (step, *_) in enumerate(flat)
+                if step.get("transformer") in SPLITTER_STEP_TYPES
+            ]
+            if splitter_positions:
+                last_split = splitter_positions[-1]
+                pre_split_learners = [
+                    step for step, *_ in flat[:last_split] if _step_learns_from_data(step)
+                ]
+                if pre_split_learners:
+                    # Reconstructing the pre-transform payload would re-fit these
+                    # steps on the full frame (held-out rows included), and the
+                    # per-fold adapter would then apply them a second time —
+                    # leaky statistics plus double-transformed features.
+                    names = ", ".join(
+                        sorted({str(step.get("transformer")) for step in pre_split_learners})
+                    )
+                    warning = (
+                        f"data-dependent step(s) before the last splitter ({names}) "
+                        "cannot be re-fit safely per fold"
+                    )
+                    return None
+                # Stateless pre-split steps were already applied during payload
+                # reconstruction (or by the upstream node whose artifact is
+                # loaded below); keep them out of the per-fold chain so every
+                # step is applied exactly once.
+                learning_steps = [
+                    step
+                    for step, *_ in flat[last_split + 1 :]
+                    if step.get("transformer") not in SPLITTER_STEP_TYPES
+                ]
+            else:
+                # No split at all: every non-splitter step refits per fold.
+                learning_steps = [
+                    step for step, *_ in flat if step.get("transformer") not in SPLITTER_STEP_TYPES
+                ]
+            if not learning_steps:
+                # Only splitters (and stateless pre-split steps) upstream:
+                # nothing data-dependent to refit per fold.
+                return None
+
+            if not splitter_positions:
+                # No split at all: the raw loader frame IS the train payload.
+                payload = self._split_train_payload(self.artifact_store.load(loader_id), target_col)
+            else:
+                _step, node_id, idx, total = flat[splitter_positions[-1]]
+                if idx == total - 1:
+                    # The last splitter ends at a node boundary, so its stored
+                    # output artifact is the pre-transform SplitDataset itself.
+                    payload = self._split_train_payload(
+                        self.artifact_store.load(node_id), target_col
+                    )
+                else:
+                    # Splitter + learning steps share one FE node; re-run the
+                    # splitter-only step prefix on the raw loader frame to
+                    # reconstruct the pre-learning train rows.
+                    prefix_steps = [s for s, *_ in flat[: splitter_positions[-1] + 1]]
+                    split_output, _metrics = FeatureEngineer(prefix_steps).fit_transform(
+                        self.artifact_store.load(loader_id)
+                    )
+                    payload = self._split_train_payload(split_output, target_col)
+
+            adapter = FeatureEngineerFoldAdapter(learning_steps, target_column=target_col)
+            self.log(
+                f"Per-fold preprocessing refit enabled: {len(learning_steps)} step(s) "
+                "re-fit inside every CV/tuning fold (scores are leakage-free)."
+            )
+            return adapter, payload
+        except Exception:
+            logger.exception("Failed to resolve per-fold preprocessing")
+            warning = "payload reconstruction failed"
+            return None
+        finally:
+            if warning is not None:
+                self.log(
+                    f"Per-fold preprocessing refit skipped: {warning}; "
+                    "CV/tuning scores may be optimistically biased."
+                )
 
     def _run_feature_engineering(self, node: NodeConfig) -> tuple[str, dict[str, Any]]:
         # Input: DataFrame or SplitDataset (merged when multiple branches feed in).

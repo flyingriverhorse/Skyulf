@@ -1,9 +1,11 @@
 """Hyperparameter Tuner implementation."""
 
+import copy
 import logging
 import warnings
 from collections.abc import Callable
-from typing import Any, cast
+from dataclasses import replace
+from typing import TYPE_CHECKING, Any, cast
 
 import numpy as np
 import pandas as pd
@@ -23,13 +25,18 @@ from sklearn.model_selection import (
     StratifiedKFold,
     TimeSeriesSplit,
 )
+from sklearn.pipeline import Pipeline
 
 from ..._validation import raise_invalid_choice
 from ...engines import SkyulfDataFrame
 from ...engines.sklearn_bridge import SklearnBridge
 from .._sklearn_compat import normalize_logistic_regression_params
 from ..base import BaseModelApplier, BaseModelCalculator
+from .fold_pipeline import FoldPreprocessingStep
 from .schemas import TuningConfig, TuningResult
+
+if TYPE_CHECKING:
+    from ..fold_preprocessing import FoldPreprocessor
 
 logger = logging.getLogger(__name__)
 
@@ -97,6 +104,38 @@ def _ensure_optuna_loaded() -> bool:
                     "Optuna installed but OptunaSearchCV not found. Install 'optuna-integration'."
                 )
     return HAS_OPTUNA
+
+
+# Rows sampled to probe whether a preprocessor keeps X/y aligned inside the
+# halving/optuna Pipeline wrap (see _preserves_row_and_target_alignment).
+_ALIGNMENT_PROBE_ROWS = 200
+
+
+def _preserves_row_and_target_alignment(preprocessing: Any, frames: tuple[Any, Any] | None) -> bool:
+    """Whether the preprocessor's fit_transform keeps rows and target aligned.
+
+    An sklearn Pipeline transformer can only hand ``X`` to the next step, so
+    the wrap is only valid when the chain preserves the row count and leaves
+    ``y`` untouched. Static step lists drift, so this probes the real
+    implementation on a small slice: any row-count change or target
+    transformation (resampling, row drops, target-only label/ordinal
+    encoding) is detected. Fails closed — a probe that raises refuses the
+    wrap. Without named frames (numpy-only library calls) there is nothing
+    to probe; the caller's static flag is the only check there.
+    """
+    if frames is None:
+        return True
+    X, y = frames
+    try:
+        sample_x, sample_y = X.head(_ALIGNMENT_PROBE_ROWS), y.head(_ALIGNMENT_PROBE_ROWS)
+        X_out, y_out = copy.deepcopy(preprocessing).fit_transform(sample_x, sample_y)
+        if len(X_out) != len(sample_x):
+            return False
+        y_in = SklearnBridge.to_sklearn((sample_x, sample_y))[1]
+        y_probed = SklearnBridge.to_sklearn((X_out, y_out))[1]
+        return y_in.shape == y_probed.shape and bool(np.array_equal(y_in, y_probed))
+    except Exception:
+        return False
 
 
 class TuningCalculator(BaseModelCalculator):
@@ -290,14 +329,26 @@ class TuningCalculator(BaseModelCalculator):
         self,
         X: pd.DataFrame | SkyulfDataFrame,
         y: pd.Series | Any,
-        config: dict[str, Any],
+        config: dict[str, Any] | TuningConfig,
         progress_callback: Callable[[int, int, float | None, dict | None], None] | None = None,
         log_callback: Callable[[str], None] | None = None,
         validation_data: tuple[pd.DataFrame | SkyulfDataFrame, pd.Series | Any] | None = None,
+        preprocessing: "FoldPreprocessor | None" = None,
     ) -> Any:
         """
         Fits the tuner (runs tuning).
         Adapts the generic fit interface to the specific tune method.
+
+        ``preprocessing`` (F-15): re-fits the given preprocessor on
+        each candidate fold's training rows during search, so tuning scores
+        stop leaking held-out rows into preprocessing statistics. The custom
+        ``grid``/``random`` loop applies it directly; ``halving_*``/``optuna``
+        get it via a Pipeline wrapper whose searcher-internal CV drives the
+        refit. Chains that change the row count or the target (resampling,
+        row drops) cannot stay aligned inside that wrapper and fall back to
+        pre-transformed scoring with an explicit log instead. When set, the
+        final best-model refit runs the full split through the preprocessor
+        once — the artifact serving uses.
         """
         tuning_config = self._build_tuning_config(config)
 
@@ -324,12 +375,15 @@ class TuningCalculator(BaseModelCalculator):
             model_cls is not None
             and getattr(model_cls, "__name__", "") in self._MISSING_NATIVE_MODEL_CLASSES
         )
+        # With per-fold refit, X is the pre-transform payload: NaN there is
+        # legitimate when the pipeline carries an imputer, which re-runs on
+        # each fold's training rows before the model ever sees the data.
         self._validate_no_nan_inf(
             X_np,
             "Input features (X) contain NaN values. Please use an 'Imputer' node before this model.",
             "Input features (X) contain Infinite values. Please scale or clean your data.",
             "Input features (X) contain missing/NaN values. Please use an 'Imputer' node before this model.",
-            allow_nan=x_allows_nan,
+            allow_nan=x_allows_nan or preprocessing is not None,
         )
         self._validate_no_nan_inf(
             y_np,
@@ -361,6 +415,8 @@ class TuningCalculator(BaseModelCalculator):
                 progress_callback=progress_callback,
                 log_callback=log_callback,
                 validation_data=validation_data_np,
+                preprocessing=preprocessing,
+                preprocessing_frames=(X, y) if preprocessing is not None else None,
             )
         convergence_count = 0
         for w in caught:
@@ -378,8 +434,16 @@ class TuningCalculator(BaseModelCalculator):
             if log_callback:
                 log_callback(conv_msg)
 
-        # Refit the best model on the full dataset
-        model = self._refit_best_model(tuning_result, tuning_config, X_np, y_np, log_callback)
+        # Refit the best model on the full dataset. With per-fold refit
+        # enabled, the full dataset is the full-split frame run once through
+        # the preprocessor — the same artifact the folds were scored against
+        # and what serving will use for predictions.
+        if preprocessing is not None:
+            X_refit_frame, y_refit_frame = preprocessing.fit_transform(X, y)
+            X_refit, y_refit = SklearnBridge.to_sklearn((X_refit_frame, y_refit_frame))
+        else:
+            X_refit, y_refit = X_np, y_np
+        model = self._refit_best_model(tuning_result, tuning_config, X_refit, y_refit, log_callback)
 
         return (model, tuning_result)
 
@@ -617,6 +681,7 @@ class TuningCalculator(BaseModelCalculator):
         y_for_search: Any,
         metric: str,
         log_callback: Callable[[str], None] | None,
+        preprocessing: "FoldPreprocessor | None" = None,
     ) -> float:
         """Cross-validates one grid/random-search candidate and returns its mean fold score.
 
@@ -646,6 +711,7 @@ class TuningCalculator(BaseModelCalculator):
                 val_idx=val_idx,
                 metric=metric,
                 log_callback=log_callback,
+                preprocessing=preprocessing,
             )
             fold_scores.append(score)
 
@@ -668,6 +734,7 @@ class TuningCalculator(BaseModelCalculator):
         val_idx: Any,
         metric: str,
         log_callback: Callable[[str], None] | None,
+        preprocessing: "FoldPreprocessor | None" = None,
     ) -> float:
         """Fits one candidate on a single CV fold and returns its score, or ``-inf`` on failure.
 
@@ -683,6 +750,13 @@ class TuningCalculator(BaseModelCalculator):
         # Instantiate and Fit
         # Note: We must handle potential errors (e.g. incompatible params)
         try:
+            # F-15: refit preprocessing inside the fold so its statistics
+            # never see this fold's held-out rows (inside the try so a
+            # preprocessing failure is contained like a model-fit failure).
+            if preprocessing is not None:
+                X_train_fold, y_train_fold = preprocessing.fit_transform(X_train_fold, y_train_fold)
+                X_val_fold, y_val_fold = preprocessing.transform(X_val_fold, y_val_fold)
+
             model = self._instantiate_model(
                 model_class,
                 {**self.model_calculator.default_params, **params},
@@ -733,6 +807,7 @@ class TuningCalculator(BaseModelCalculator):
         metric: str,
         progress_callback: Callable[[int, int, float | None, dict | None], None] | None,
         log_callback: Callable[[str], None] | None,
+        preprocessing: "FoldPreprocessor | None" = None,
     ) -> tuple[list[dict[str, Any]], float, dict[str, Any] | None]:
         """Evaluates every candidate via CV, emitting progress/log callbacks, and tracks the best.
 
@@ -751,7 +826,15 @@ class TuningCalculator(BaseModelCalculator):
             # We instantiate the model with the current candidate parameters and evaluate it
             # using the configured CV strategy.
             mean_score = self._evaluate_candidate_cv(
-                i, params, model_class, cv, X_for_search, y_for_search, metric, log_callback
+                i,
+                params,
+                model_class,
+                cv,
+                X_for_search,
+                y_for_search,
+                metric,
+                log_callback,
+                preprocessing,
             )
 
             if log_callback:
@@ -778,6 +861,7 @@ class TuningCalculator(BaseModelCalculator):
         metric: str,
         progress_callback: Callable[[int, int, float | None, dict | None], None] | None,
         log_callback: Callable[[str], None] | None,
+        preprocessing: "FoldPreprocessor | None" = None,
     ) -> TuningResult:
         """Runs a custom grid/random search loop (instead of sklearn's searchers) so
         per-candidate and per-fold progress/log callbacks can be emitted during tuning.
@@ -803,6 +887,7 @@ class TuningCalculator(BaseModelCalculator):
             metric,
             progress_callback,
             log_callback,
+            preprocessing,
         )
 
         if log_callback:
@@ -1129,6 +1214,15 @@ class TuningCalculator(BaseModelCalculator):
         return trials
 
     @staticmethod
+    def _strip_model_prefix(params: Any) -> Any:
+        """Removes the internal ``model__`` pipeline prefix from extracted params
+        (see ``tune``'s wrapped Pipeline path) so callers see the original
+        search-space keys."""
+        if not isinstance(params, dict):
+            return params
+        return {key.removeprefix("model__"): value for key, value in params.items()}
+
+    @staticmethod
     def _log_final_completion(
         log_callback: Callable[[str], None] | None,
         config: TuningConfig,
@@ -1158,10 +1252,17 @@ class TuningCalculator(BaseModelCalculator):
         progress_callback: Callable[[int, int, float | None, dict | None], None] | None = None,
         log_callback: Callable[[str], None] | None = None,
         validation_data: tuple[Any, Any] | None = None,
+        preprocessing: "FoldPreprocessor | None" = None,
+        preprocessing_frames: tuple[Any, Any] | None = None,
     ) -> TuningResult:
         """
         Runs hyperparameter tuning.
         """
+        if preprocessing is not None and validation_data is not None:
+            raise ValueError(
+                "Per-fold preprocessing refit is not supported with validation_data "
+                "holdout tuning. Disable the flag or remove the validation input."
+            )
         # 1. Prepare Estimator
         # We need a base estimator. Since our Calculator wraps the class,
         # we need to instantiate the underlying sklearn model with default params.
@@ -1176,6 +1277,50 @@ class TuningCalculator(BaseModelCalculator):
         # resolved ``estimators``); the instantiator filters/routes them safely.
         base_estimator = self._instantiate_model(model_class, self.model_calculator.default_params)
 
+        # halving/optuna searchers run their CV internally, where the engine's
+        # per-fold hook cannot reach; wrap preprocessing + model in a Pipeline
+        # so the searcher's own folds refit the preprocessor (F-15).
+        wrapped = preprocessing is not None
+        if wrapped and config.strategy in ("halving_grid", "halving_random", "optuna"):
+            # An sklearn transformer step can only hand X to the next step, so
+            # a chain that resamples, drops rows or transforms the target
+            # would leave the model fitting reshaped X against the original,
+            # un-aligned y. The static flag is a cheap fast path; the probe is
+            # authoritative (it catches any shape-changing step, including
+            # future ones) and fails closed. The grid/random custom loop
+            # threads the transformed y itself and stays enabled; the
+            # searcher-backed strategies fall back to pre-transformed scoring
+            # with an explicit log instead.
+            misaligned = getattr(
+                preprocessing, "changes_row_count", False
+            ) or not _preserves_row_and_target_alignment(preprocessing, preprocessing_frames)
+            if misaligned:
+                wrapped = False
+                if log_callback:
+                    log_callback(
+                        "Per-fold preprocessing refit skipped for this tuning strategy: "
+                        "the step chain changes row count or the target (resampling / "
+                        "row drops / target re-encoding), which cannot stay aligned "
+                        "inside the searcher's pipeline. Tuning scores the "
+                        "pre-transformed data and may be optimistically biased."
+                    )
+        estimator: Any = base_estimator
+        search_config = config
+        if wrapped:
+            estimator = Pipeline(
+                [
+                    ("preprocessing", FoldPreprocessingStep(preprocessing)),
+                    ("model", base_estimator),
+                ]
+            )
+            # Search-space keys must route through the pipeline to the model step.
+            search_config = replace(
+                config,
+                search_space={
+                    f"model__{key}": values for key, values in (config.search_space or {}).items()
+                },
+            )
+
         # 2. Prepare Splitter
         # If validation data is provided, use PredefinedSplit to train on X and validate on validation_data
         # Otherwise use CV
@@ -1186,6 +1331,10 @@ class TuningCalculator(BaseModelCalculator):
         metric = self._resolve_metric(config, y)
 
         if config.strategy in ["grid", "random"]:
+            # Per-fold refit needs named frames (the adapter rebuilds a real
+            # FeatureEngineer), not the numpy arrays used by the searchers.
+            if preprocessing is not None and preprocessing_frames is not None:
+                X_for_search, y_for_search = preprocessing_frames
             # Use custom loop to support progress and log callbacks
             return self._run_grid_or_random_search(
                 X_for_search,
@@ -1196,14 +1345,15 @@ class TuningCalculator(BaseModelCalculator):
                 metric,
                 progress_callback,
                 log_callback,
+                preprocessing,
             )
         elif config.strategy in ["halving_grid", "halving_random"]:
             searcher = self._build_halving_searcher(
-                config, base_estimator, cv, metric, log_callback
+                search_config, estimator, cv, metric, log_callback
             )
         elif config.strategy == "optuna":
             searcher = self._build_optuna_searcher(
-                config, base_estimator, cv, metric, progress_callback, log_callback
+                search_config, estimator, cv, metric, progress_callback, log_callback
             )
         else:
             raise_invalid_choice(
@@ -1213,9 +1363,15 @@ class TuningCalculator(BaseModelCalculator):
             )
 
         # 4. Run Search
-        # Ensure numpy
-        X_arr = self._to_numpy(X_for_search)
-        y_arr = self._to_numpy(y_for_search)
+        # The wrapped pipeline needs named frames (the adapter rebuilds a real
+        # FeatureEngineer); numpy conversion would strip column names.
+        if wrapped:
+            if preprocessing_frames is not None:
+                X_for_search, y_for_search = preprocessing_frames
+            X_arr, y_arr = X_for_search, y_for_search
+        else:
+            X_arr = self._to_numpy(X_for_search)
+            y_arr = self._to_numpy(y_for_search)
         self._execute_search(searcher, X_arr, y_arr, config)
 
         # 5. Extract Results
@@ -1223,6 +1379,11 @@ class TuningCalculator(BaseModelCalculator):
 
         # Collect trials
         trials = self._collect_trials(searcher, config)
+        if wrapped:
+            best_params = self._strip_model_prefix(best_params)
+            trials = [
+                {**trial, "params": self._strip_model_prefix(trial["params"])} for trial in trials
+            ]
 
         # Final completion log for strategies that don't emit per-trial callbacks
         # (halving_grid / halving_random / optuna). The grid/random branch above
