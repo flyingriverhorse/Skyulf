@@ -13,6 +13,7 @@ genuinely required? And can we honestly claim leakage-proof?*
 | [2026-08-11-audit-findings.md](2026-08-11-audit-findings.md) | All 49 findings (4 CRITICAL, 18 HIGH, 17 MED, 10 LOW) with executable reproductions, an explicit list of what is **proven correct**, and a tiered fix order with target versions. |
 | [2026-08-11-leakage-enforcement-plan.md](2026-08-11-leakage-enforcement-plan.md) | Plan to strengthen leakage enforcement so the documented claim becomes true, rather than softening the docs. Includes the required documentation changes. |
 | [2026-08-11-backend-polars-migration-plan.md](2026-08-11-backend-polars-migration-plan.md) | **Skyulf is presented as Polars-backed, but the backend is 100% pandas** (`backend/data/catalog.py` reads only via `pd.read_csv`/`pd.read_parquet`). Phased plan to close that gap, plus a categorised inventory of every `.to_pandas()` site in `skyulf-core` and which are worth converting. |
+| [2026-08-26-holdout-validation-refit-and-merge-findings.md](2026-08-26-holdout-validation-refit-and-merge-findings.md) | **v0.8.4 holdout + validation-split refit** — closes the last F-15 gap (tuning with a validation split now refits preprocessing on train rows only and scores the untouched validation split, all five strategies). Dedicated integration tests with measured scores (noise stays at chance 0.44–0.48, signal stays high 0.90–0.97), a noise-vs-signal explainer, and **two product realities** with root-cause analysis + prioritised recommendations: (1) `MergedBranchFoldAdapter` merges pure `last_wins` (ownership is inert for `SplitDataset` baselines — eager and refit stay consistent, but overlapping columns resolve by merge order); (2) index-based row tracking is unreliable, so isolation is asserted by row count. Neither is a correctness defect. |
 
 ## Method
 
@@ -77,9 +78,11 @@ notes on each finding in the findings document and the tier table at its end. Le
 Remaining, tracked here:
 
 1. **Release logistics** — `080`/`081` are not yet merged to `master`.
-2. **F-15 / T5** — per-fold preprocessing refit in CV/tuning: deliberately a separate initiative
-   (core 0.7.0). **Design note written 2026-08-23** (`2026-08-23-f15-per-fold-refit-design.md`);
-   implementation pending, opt-in first. Docs carry the CV caveat until the default flip lands.
+2. **F-15 / T5** — per-fold preprocessing refit in CV/tuning: **shipped always-on** (core 0.8.0,
+   design note `2026-08-23-f15-per-fold-refit-design.md`). **v0.8.4** closed the last gap — holdout
+   tuning with a validation split now refits preprocessing on train rows only and scores the
+   untouched validation split. See `2026-08-26-holdout-validation-refit-and-merge-findings.md` for
+   the measured scores and two follow-up product realities (both non-defects, recommendations logged).
 3. ~~Open question from §6: `promote_job` vs `"succeeded"`~~ — **resolved 2026-08-23 by a
    state-changing probe: harmless dead enum drift** (nothing ever writes `"succeeded"`); deleting
    the member is optional routine cleanup. See the findings' §6.
