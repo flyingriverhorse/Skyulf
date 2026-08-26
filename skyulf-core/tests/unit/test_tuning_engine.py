@@ -6,6 +6,7 @@ import typing
 import warnings
 from typing import Any
 
+import numpy as np
 import pandas as pd
 import polars as pl
 import pytest
@@ -559,11 +560,20 @@ class _StubPreprocessor:
         return X, y
 
 
-def _tune_with_spied_halving_build(monkeypatch, preprocessing, frames="default", extracted=None):
+def _tune_with_spied_halving_build(
+    monkeypatch,
+    preprocessing,
+    frames="default",
+    extracted=None,
+    validation_data=None,
+    validation_frames=None,
+):
     """Run halving_grid tune() with the searcher machinery spied/stubbed.
 
-    Returns ``(estimator_passed_to_searcher, logs, result)`` without running a
-    real search. ``frames=None`` simulates a numpy-only SDK call.
+    Returns ``(built, logs, result)`` without running a real search;
+    ``built`` carries the ``estimator``, ``cv`` and search ``X``/``y`` the
+    searcher would have received. ``frames=None`` simulates a numpy-only
+    SDK call.
     """
     built: dict[str, Any] = {}
     logs: list[str] = []
@@ -572,10 +582,15 @@ def _tune_with_spied_halving_build(monkeypatch, preprocessing, frames="default",
 
     def fake_build(self, search_config, estimator, cv, metric, log_callback):
         built["estimator"] = estimator
+        built["cv"] = cv
         return object()
 
+    def fake_execute(self, searcher, X_arr, y_arr, config, log_callback=None):
+        built["X"], built["y"] = X_arr, y_arr
+        return []
+
     monkeypatch.setattr(TuningCalculator, "_build_halving_searcher", fake_build)
-    monkeypatch.setattr(TuningCalculator, "_execute_search", lambda self, *a, **k: None)
+    monkeypatch.setattr(TuningCalculator, "_execute_search", fake_execute)
     monkeypatch.setattr(
         TuningCalculator,
         "_extract_best_result",
@@ -600,8 +615,10 @@ def _tune_with_spied_halving_build(monkeypatch, preprocessing, frames="default",
         log_callback=logs.append,
         preprocessing=preprocessing,
         preprocessing_frames=frames,
+        validation_data=validation_data,
+        validation_frames=validation_frames,
     )
-    return built["estimator"], logs, result
+    return built, logs, result
 
 
 def test_halving_wrap_accepts_row_shaping_preprocessing(monkeypatch):
@@ -611,10 +628,11 @@ def test_halving_wrap_accepts_row_shaping_preprocessing(monkeypatch):
     """
     from skyulf.modeling._tuning.fold_pipeline import FoldAwareModelStep
 
-    estimator, logs, result = _tune_with_spied_halving_build(
+    built, logs, result = _tune_with_spied_halving_build(
         monkeypatch,
         _StubPreprocessor(fit_transform=lambda X, y: (X.iloc[:-1], y.iloc[:-1])),
     )
+    estimator = built["estimator"]
     assert isinstance(estimator, Pipeline)
     assert isinstance(estimator.named_steps["model"], FoldAwareModelStep)
     assert any("fold-aware estimator" in message for message in logs)
@@ -626,10 +644,11 @@ def test_halving_wrap_accepts_target_mutating_preprocessing(monkeypatch):
     wrapped too — predictions are mapped back to the original label space."""
     from skyulf.modeling._tuning.fold_pipeline import FoldAwareModelStep
 
-    estimator, logs, _result = _tune_with_spied_halving_build(
+    built, logs, _result = _tune_with_spied_halving_build(
         monkeypatch,
         _StubPreprocessor(fit_transform=lambda X, y: (X, y.map({0: "neg", 1: "pos"}))),
     )
+    estimator = built["estimator"]
     assert isinstance(estimator, Pipeline)
     assert isinstance(estimator.named_steps["model"], FoldAwareModelStep)
     assert not any("skipped" in message for message in logs)
@@ -638,7 +657,7 @@ def test_halving_wrap_accepts_target_mutating_preprocessing(monkeypatch):
 def test_halving_wrap_strips_model_estimator_prefix(monkeypatch):
     """best_params and per-trial params keep the caller's original keys after
     routing the search space through ``model__estimator__``."""
-    _estimator, _logs, result = _tune_with_spied_halving_build(
+    _built, _logs, result = _tune_with_spied_halving_build(
         monkeypatch,
         _StubPreprocessor(),
         extracted=({"model__estimator__C": 1.0}, 0.9),
@@ -649,14 +668,77 @@ def test_halving_wrap_strips_model_estimator_prefix(monkeypatch):
 def test_halving_frameless_sdk_call_falls_back_with_log(monkeypatch):
     """Without named frames (numpy-only library call) the chain cannot run
     inside the searcher's folds; keep scoring the raw payload with a log."""
-    estimator, logs, result = _tune_with_spied_halving_build(
+    built, logs, result = _tune_with_spied_halving_build(
         monkeypatch,
         _StubPreprocessor(),
         frames=None,
         extracted=({"C": 1.0}, 0.9),
     )
-    assert not isinstance(estimator, Pipeline)
+    assert not isinstance(built["estimator"], Pipeline)
     assert any("no named frames" in message for message in logs)
+    assert result.best_params == {"C": 1.0}
+
+
+def test_halving_wrap_with_validation_builds_predefined_split_on_concat_frames(monkeypatch):
+    """Holdout + named frames: the searcher receives a PredefinedSplit over
+    the concatenated train+val frames (train marked -1, validation 0) and the
+    fold-aware wrap stays active."""
+    from sklearn.model_selection import PredefinedSplit
+
+    from skyulf.modeling._tuning.fold_pipeline import FoldAwareModelStep
+
+    X_np, y_np = _clf_xy(n=60)
+    X_frame = pd.DataFrame(X_np, columns=list("abcd"))  # ty: ignore[invalid-argument-type]
+    y_series = pd.Series(y_np, name="target")
+    train_frames = (X_frame.iloc[:45], y_series.iloc[:45])
+    val_frames = (X_frame.iloc[45:], y_series.iloc[45:])
+
+    built, _logs, result = _tune_with_spied_halving_build(
+        monkeypatch,
+        _StubPreprocessor(),
+        frames=train_frames,
+        validation_data=val_frames,
+        validation_frames=val_frames,
+    )
+
+    cv = built["cv"]
+    assert isinstance(cv, PredefinedSplit)
+    assert np.array_equal(np.asarray(cv.test_fold), [-1] * 45 + [0] * 15)
+    X_search, y_search = built["X"], built["y"]
+    assert len(X_search) == len(y_search) == 60
+    assert list(X_search.index) == list(range(60)), "concat must reset the index"
+    assert X_search.iloc[:45].equals(X_frame.iloc[:45].reset_index(drop=True))
+    assert np.array_equal(X_search.iloc[45:].to_numpy(), X_frame.iloc[45:].to_numpy())
+    assert len(y_search) == 60 and np.array_equal(
+        np.asarray(y_search.iloc[45:]), np.asarray(y_series.iloc[45:])
+    )
+    estimator = built["estimator"]
+    assert isinstance(estimator, Pipeline)
+    assert isinstance(estimator.named_steps["model"], FoldAwareModelStep)
+    assert result.best_params == {"C": 1.0}
+
+
+def test_halving_validation_without_validation_frames_falls_back_with_log(monkeypatch):
+    """Holdout tuning without named validation frames cannot score the
+    untouched validation split through the chain: drop the wrap and say so."""
+    from sklearn.model_selection import PredefinedSplit
+
+    X_np, y_np = _clf_xy(n=60)
+    X_frame = pd.DataFrame(X_np, columns=list("abcd"))  # ty: ignore[invalid-argument-type]
+    y_series = pd.Series(y_np, name="target")
+    val_frames = (X_frame.iloc[45:], y_series.iloc[45:])
+
+    built, logs, result = _tune_with_spied_halving_build(
+        monkeypatch,
+        _StubPreprocessor(),
+        validation_data=val_frames,
+        validation_frames=None,
+        extracted=({"C": 1.0}, 0.9),
+    )
+
+    assert not isinstance(built["estimator"], Pipeline)
+    assert isinstance(built["cv"], PredefinedSplit)
+    assert any("no named validation frames" in message for message in logs)
     assert result.best_params == {"C": 1.0}
 
 

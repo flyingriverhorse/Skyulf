@@ -342,6 +342,7 @@ class StatefulEstimator:
         job_id: str = "unknown",
         preprocessing: FoldPreprocessor | None = None,
         preprocessing_train: tuple[Any, Any] | None = None,
+        preprocessing_validation: tuple[Any, Any] | None = None,
         iteration_callback: Callable[..., None] | None = None,
     ) -> dict[str, pd.Series]:
         """
@@ -352,7 +353,10 @@ class StatefulEstimator:
         ``preprocessing_train`` must carry the pre-transform ``(X, y)``
         payload the calculator should fit/tune on, so fold slicing stays
         aligned with the preprocessor; predictions still run on this
-        dataset's (post-transform) splits.
+        dataset's (post-transform) splits. ``preprocessing_validation`` is
+        the matching pre-transform validation payload for holdout tuning —
+        ``dataset.validation`` is post-transform, so the refit cannot score
+        against it directly.
         """
         # Handle raw DataFrame or Tuple input by wrapping it in a dummy SplitDataset
         dataset = self._normalize_fit_predict_dataset(dataset, target_column, log_callback)
@@ -380,6 +384,7 @@ class StatefulEstimator:
                 log_callback=log_callback,
                 validation_data=validation_data,
                 preprocessing=preprocessing,
+                validation_frames=preprocessing_validation,
                 iteration_callback=iteration_callback,
             )
         else:

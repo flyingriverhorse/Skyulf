@@ -367,6 +367,13 @@ class FeatureEngMixin:
         train = output.train if isinstance(output, SplitDataset) else output
         return extract_xy(train, target_col)
 
+    @staticmethod
+    def _split_validation_payload(output: Any, target_col: str) -> tuple[Any, Any] | None:
+        """Extract the pre-transform ``(X, y)`` validation payload, if split out."""
+        if not isinstance(output, SplitDataset) or output.validation is None:
+            return None
+        return extract_xy(output.validation, target_col)
+
     def _branch_chain_up_to_loader(
         self, start_id: str
     ) -> tuple[str, list[tuple[str, list[dict[str, Any]]]]] | None:
@@ -409,16 +416,19 @@ class FeatureEngMixin:
 
     def _try_fork_join_refit(
         self, training_node: NodeConfig, target_col: str
-    ) -> tuple[tuple["FoldPreprocessor", tuple[Any, Any]] | None, str | None]:
+    ) -> tuple[
+        tuple["FoldPreprocessor", tuple[Any, Any], tuple[Any, Any] | None] | None, str | None
+    ]:
         """Resolve per-fold refit for a fork-join merged graph (task #11).
 
         Supported shape: a shared trunk ending in a node whose last step is a
         ``TrainTestSplitter``/``Split`` (the fork point), N parallel
         transformer branches, and a column-wise merge straight into the
-        training node. Returns ``(resolved, reason)`` — ``(adapter, payload)``
-        on a match, else ``None`` plus the bail reason for the job log.
-        Anything else keeps the skip-with-warning fallback: never fail a run,
-        never leak silently.
+        training node. Returns ``(resolved, reason)`` — ``(adapter, payload,
+        validation_payload)`` on a match (validation_payload is ``None`` when
+        the fork split out no validation rows), else ``None`` plus the bail
+        reason for the job log. Anything else keeps the skip-with-warning
+        fallback: never fail a run, never leak silently.
         """
         inputs = list(dict.fromkeys(self._merge_input_order(training_node)))
         if len(inputs) < 2:
@@ -485,7 +495,9 @@ class FeatureEngMixin:
             branch_lists.append(branch_steps)
 
         strategy = self._get_merge_strategy(training_node.node_id)
-        payload = self._split_train_payload(self.artifact_store.load(fork_id), target_col)
+        fork_artifact = self.artifact_store.load(fork_id)
+        payload = self._split_train_payload(fork_artifact, target_col)
+        validation_payload = self._split_validation_payload(fork_artifact, target_col)
         adapter = MergedBranchFoldAdapter(
             branch_lists,
             merge_strategy=strategy,
@@ -498,18 +510,20 @@ class FeatureEngMixin:
             f"{len(branch_lists)} merged branch(es) re-fit inside every CV/tuning "
             "fold (scores are leakage-free)."
         )
-        return (adapter, payload), None
+        return (adapter, payload, validation_payload), None
 
     def _resolve_fold_preprocessing(
         self, training_node: NodeConfig, target_col: str
-    ) -> tuple["FoldPreprocessor", tuple[Any, Any]] | None:
-        """Resolve the per-fold preprocessing adapter + pre-transform train payload (F-15).
+    ) -> tuple["FoldPreprocessor", tuple[Any, Any], tuple[Any, Any] | None] | None:
+        """Resolve the per-fold preprocessing adapter + pre-transform payloads (F-15).
 
-        Returns ``(adapter, (X_pre, y_pre))`` so CV/tuning folds slice the rows
-        the adapter was built for, or ``None`` to keep pre-transformed scoring.
-        Falls back with an explicit job-log warning when the upstream graph is
-        not a linear chain or the payload cannot be reconstructed — never
-        fails the run.
+        Returns ``(adapter, (X_pre, y_pre), validation_payload)`` so CV/tuning
+        folds slice the rows the adapter was built for — ``validation_payload``
+        is the pre-transform ``(X, y)`` validation split when one exists
+        (holdout tuning scores candidates against it untouched), else ``None``
+        — or ``None`` to keep pre-transformed scoring. Falls back with an
+        explicit job-log warning when the upstream graph is not a linear
+        chain or the payload cannot be reconstructed — never fails the run.
         """
         warning = None
         try:
@@ -579,15 +593,17 @@ class FeatureEngMixin:
 
             if not splitter_positions:
                 # No split at all: the raw loader frame IS the train payload.
-                payload = self._split_train_payload(self.artifact_store.load(loader_id), target_col)
+                loader_frame = self.artifact_store.load(loader_id)
+                payload = self._split_train_payload(loader_frame, target_col)
+                validation_payload = self._split_validation_payload(loader_frame, target_col)
             else:
                 _step, node_id, idx, total = flat[splitter_positions[-1]]
                 if idx == total - 1:
                     # The last splitter ends at a node boundary, so its stored
                     # output artifact is the pre-transform SplitDataset itself.
-                    payload = self._split_train_payload(
-                        self.artifact_store.load(node_id), target_col
-                    )
+                    split_artifact = self.artifact_store.load(node_id)
+                    payload = self._split_train_payload(split_artifact, target_col)
+                    validation_payload = self._split_validation_payload(split_artifact, target_col)
                 else:
                     # Splitter + learning steps share one FE node; re-run the
                     # splitter-only step prefix on the raw loader frame to
@@ -597,13 +613,14 @@ class FeatureEngMixin:
                         self.artifact_store.load(loader_id)
                     )
                     payload = self._split_train_payload(split_output, target_col)
+                    validation_payload = self._split_validation_payload(split_output, target_col)
 
             adapter = FeatureEngineerFoldAdapter(learning_steps, target_column=target_col)
             self.log(
                 f"Per-fold preprocessing refit enabled: {len(learning_steps)} step(s) "
                 "re-fit inside every CV/tuning fold (scores are leakage-free)."
             )
-            return adapter, payload
+            return adapter, payload, validation_payload
         except Exception:
             logger.exception("Failed to resolve per-fold preprocessing")
             warning = "payload reconstruction failed"

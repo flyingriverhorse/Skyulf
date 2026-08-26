@@ -489,18 +489,26 @@ full-split scoring reports a CV AUC of **0.867** and a tuning best score of
 **0.867** — pure memorisation of held-out rows — while per-fold refit
 reports **~0.50** across all strategies, exactly chance. On real-signal
 data the honest scores stay close to the old ones (the drop is the bias
-leaving, not the signal). The shapes that still fall back to pre-transformed
-scoring with an explicit job-log warning: merged graphs that are not
-fork-join (nested merges, row-count-changing branches, splitters mid-chain),
-holdout tuning with an explicit `validation_data` split (no folds to refit
-around), and any graph with a data-dependent step configured before the last
-splitter (payload reconstruction would re-fit it on the full frame). Chains
+leaving, not the signal). Holdout tuning with an explicit `validation_data`
+split is covered too: the pre-transform train and validation frames are
+concatenated into one search frame, the chain refits on the train rows only
+through a single `PredefinedSplit` fold (train rows masked `-1`, validation
+rows form the one scoring fold), and candidates are scored against the
+untouched validation split — for all five strategies. The shapes that still
+fall back to pre-transformed scoring with an explicit job-log warning:
+merged graphs that are not fork-join (nested merges, row-count-changing
+branches, splitters mid-chain), and any graph with a data-dependent step
+configured before the last splitter (payload reconstruction would re-fit it
+on the full frame). Chains
 that change the row count or the target (resampling, row drops, target
 re-encoding) are leakage-free under `halving_*`/`optuna` too: a fold-aware
 estimator runs the chain inside `fit` on each fold's training rows and maps
 predictions back to the original label space so scorers compare against the
 untouched target. Library users calling CV/tuning directly get
 the same guarantee by passing a preprocessor — e.g. `FeatureEngineerFoldAdapter(
-steps_config, target_column)` — via the `preprocessing` parameter; without
-it, CV/tuning scores the pre-transformed data and remains an optimistic
-estimate.
+steps_config, target_column)` — via the `preprocessing` parameter; holdout
+tuning additionally needs the pre-transform validation payload via
+`validation_frames` so candidates can be scored against the untouched
+validation split (without it, holdout falls back to raw-payload scoring with
+an explicit log). Without a preprocessor, CV/tuning scores the
+pre-transformed data and remains an optimistic estimate.

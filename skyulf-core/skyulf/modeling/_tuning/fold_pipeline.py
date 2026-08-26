@@ -49,17 +49,25 @@ class FoldAwareModelStep(BaseEstimator):
         self.feature_names = feature_names
 
     def _ensure_frames(self, X: Any, y: Any) -> tuple[Any, Any]:
-        """Rebuild named frames when searcher slicing hands arrays instead.
+        """Rebuild named pandas frames when slicing hands non-pandas input.
 
-        Named frames survive sklearn's ``safe_indexing`` slicing, so this is
-        a fallback for the rare path that strips them; the column contract
-        captured at construction restores the names the preprocessor needs.
+        Polars input converts through ``to_pandas`` so dtypes survive — the
+        ``np.asarray`` fallback would collapse mixed-type frames to object
+        dtype and silently disable numeric steps (e.g. SimpleImputer). The
+        plain-array path restores column names from the contract captured at
+        construction.
         """
         if not hasattr(X, "iloc"):
-            columns = pd.Index(self.feature_names) if self.feature_names else None
-            X = pd.DataFrame(np.asarray(X), columns=columns)
+            if hasattr(X, "to_pandas"):
+                X = X.to_pandas()
+            else:
+                columns = pd.Index(self.feature_names) if self.feature_names else None
+                X = pd.DataFrame(np.asarray(X), columns=columns)
         if y is not None and not hasattr(y, "iloc"):
-            y = pd.Series(np.asarray(y), index=X.index)
+            if hasattr(y, "to_pandas"):
+                y = y.to_pandas()
+            else:
+                y = pd.Series(np.asarray(y), index=X.index)
         return X, y
 
     @staticmethod

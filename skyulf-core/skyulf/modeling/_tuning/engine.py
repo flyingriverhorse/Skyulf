@@ -318,6 +318,7 @@ class TuningCalculator(BaseModelCalculator):
         validation_data: tuple[pd.DataFrame | SkyulfDataFrame, pd.Series | Any] | None = None,
         iteration_callback: Callable[..., None] | None = None,
         preprocessing: "FoldPreprocessor | None" = None,
+        validation_frames: tuple[Any, Any] | None = None,
     ) -> Any:
         """
         Fits the tuner (runs tuning).
@@ -329,11 +330,16 @@ class TuningCalculator(BaseModelCalculator):
         ``grid``/``random`` loop applies it directly; ``halving_*``/``optuna``
         get it via a fold-aware meta-estimator whose ``fit`` runs the chain
         inside every searcher-internal fold — safe even for chains that
-        resample rows or re-encode the target. Only frameless SDK calls
-        (no named frames for the preprocessor to run on) score the raw
-        pre-transform payload, with an explicit log instead. When set, the
-        final best-model refit runs the full split through the preprocessor
-        once — the artifact serving uses.
+        resample rows or re-encode the target. Holdout tuning
+        (``validation_data`` set) refits the chain on the train rows only and
+        scores candidates against the untouched validation split when
+        ``validation_frames`` (the pre-transform validation payload) is
+        supplied; frameless calls fall back to raw-payload scoring with an
+        explicit log instead. When set, the final best-model refit runs the
+        full split through the preprocessor once — the artifact serving uses.
+        Polars payloads are accepted for both frame pairs — the engine and
+        the fold-aware wrap convert them via ``to_pandas()`` with dtypes
+        intact.
         """
         tuning_config = self._build_tuning_config(config)
 
@@ -410,6 +416,7 @@ class TuningCalculator(BaseModelCalculator):
                 validation_data=validation_data_np,
                 preprocessing=preprocessing,
                 preprocessing_frames=(X, y) if preprocessing is not None else None,
+                validation_frames=validation_frames,
             )
         convergence_count = 0
         for w in caught:
@@ -477,6 +484,9 @@ class TuningCalculator(BaseModelCalculator):
     ) -> tuple[Any, Any, Any]:
         """Concatenates train/val data and builds a ``PredefinedSplit`` over it.
 
+        Numpy (frameless) variant — the frame-based per-fold-refit variant is
+        ``_build_predefined_split_cv_frames``.
+
         The search treats ``X`` (train) as always-in-training-set (-1) and the concatenated
         ``validation_data`` as the single test fold (0), so the searcher trains on ``X`` and
         validates on ``validation_data``.
@@ -493,6 +503,35 @@ class TuningCalculator(BaseModelCalculator):
         # -1 means "never in test set" (so always in training set)
         # 0 means "in test set for fold 0"
         test_fold = np.concatenate([np.full(len(X), -1), np.full(len(X_val), 0)])
+
+        cv = PredefinedSplit(test_fold)
+        return cv, X_for_search, y_for_search
+
+    def _build_predefined_split_cv_frames(
+        self,
+        preprocessing_frames: tuple[Any, Any],
+        validation_frames: tuple[Any, Any],
+    ) -> tuple[Any, Any, Any]:
+        """Frame variant of ``_build_predefined_split_cv`` for per-fold refit.
+
+        Concatenates the pre-transform train and validation frames (positional
+        index reset so the mask aligns) and builds a ``PredefinedSplit`` where
+        train rows are always in training (-1) and validation rows form the
+        single scoring fold (0): the preprocessing chain refits on train rows
+        only and candidates score against untouched validation rows.
+        """
+        from sklearn.model_selection import PredefinedSplit
+
+        def _as_pandas(frame: Any) -> Any:
+            return frame.to_pandas() if hasattr(frame, "to_pandas") else frame
+
+        X_train, y_train = preprocessing_frames
+        X_val, y_val = validation_frames
+
+        X_for_search = pd.concat([_as_pandas(X_train), _as_pandas(X_val)], ignore_index=True)
+        y_for_search = pd.concat([_as_pandas(y_train), _as_pandas(y_val)], ignore_index=True)
+
+        test_fold = np.concatenate([np.full(len(X_train), -1), np.full(len(X_val), 0)])
 
         cv = PredefinedSplit(test_fold)
         return cv, X_for_search, y_for_search
@@ -1299,15 +1338,21 @@ class TuningCalculator(BaseModelCalculator):
         validation_data: tuple[Any, Any] | None = None,
         preprocessing: "FoldPreprocessor | None" = None,
         preprocessing_frames: tuple[Any, Any] | None = None,
+        validation_frames: tuple[Any, Any] | None = None,
     ) -> TuningResult:
         """
         Runs hyperparameter tuning.
         """
-        if preprocessing is not None and validation_data is not None:
-            raise ValueError(
-                "Per-fold preprocessing refit is not supported with validation_data "
-                "holdout tuning. Disable the flag or remove the validation input."
-            )
+        # Holdout tuning with per-fold preprocessing refit: the train and
+        # validation frames are concatenated (train rows masked -1 in a
+        # PredefinedSplit) so every strategy refits the chain on train rows
+        # only and scores candidates against the untouched validation split.
+        holdout_refit = (
+            preprocessing is not None
+            and validation_data is not None
+            and preprocessing_frames is not None
+            and validation_frames is not None
+        )
         # 1. Prepare Estimator
         # We need a base estimator. Since our Calculator wraps the class,
         # we need to instantiate the underlying sklearn model with default params.
@@ -1341,6 +1386,18 @@ class TuningCalculator(BaseModelCalculator):
                     "no named frames are available to run the preprocessing chain "
                     "inside the searcher's folds. Scores are computed on the raw "
                     "pre-transform payload."
+                )
+        if wrapped and validation_data is not None and validation_frames is None:
+            # Holdout tuning needs the validation rows as named frames too
+            # (the searcher scores them in the original pre-transform space).
+            # Without them the wrap would score misaligned rows, so fall back
+            # to raw-payload scoring with an explicit log instead.
+            wrapped = False
+            if log_callback:
+                log_callback(
+                    "Per-fold preprocessing refit skipped for holdout tuning: "
+                    "no named validation frames are available to score against. "
+                    "Scores are computed on the raw pre-transform payload."
                 )
         estimator: Any = base_estimator
         search_config = config
@@ -1379,7 +1436,13 @@ class TuningCalculator(BaseModelCalculator):
         # 2. Prepare Splitter
         # If validation data is provided, use PredefinedSplit to train on X and validate on validation_data
         # Otherwise use CV
-        cv, X_for_search, y_for_search = self._build_cv_splitter(X, y, config, validation_data)
+        if holdout_refit:
+            assert preprocessing_frames is not None and validation_frames is not None
+            cv, X_for_search, y_for_search = self._build_predefined_split_cv_frames(
+                preprocessing_frames, validation_frames
+            )
+        else:
+            cv, X_for_search, y_for_search = self._build_cv_splitter(X, y, config, validation_data)
 
         # 3. Select Search Strategy
         # Handle multiclass metrics and map user-friendly names
@@ -1388,7 +1451,13 @@ class TuningCalculator(BaseModelCalculator):
         if config.strategy in ["grid", "random"]:
             # Per-fold refit needs named frames (the adapter rebuilds a real
             # FeatureEngineer), not the numpy arrays used by the searchers.
-            if preprocessing is not None and preprocessing_frames is not None:
+            # Holdout mode is excluded: the splitter stage already produced
+            # the concatenated train+validation frames the mask is aligned to.
+            if (
+                preprocessing is not None
+                and preprocessing_frames is not None
+                and validation_data is None
+            ):
                 X_for_search, y_for_search = preprocessing_frames
             # Use custom loop to support progress and log callbacks
             return self._run_grid_or_random_search(
@@ -1419,9 +1488,12 @@ class TuningCalculator(BaseModelCalculator):
 
         # 4. Run Search
         # The wrapped pipeline needs named frames (the adapter rebuilds a real
-        # FeatureEngineer); numpy conversion would strip column names.
+        # FeatureEngineer); numpy conversion would strip column names. In
+        # holdout mode the splitter stage already produced the concatenated
+        # train+validation frames the PredefinedSplit mask is aligned to.
         if wrapped:
-            if preprocessing_frames is not None:
+            if validation_data is None:
+                assert preprocessing_frames is not None  # narrowed by the wrap gating
                 X_for_search, y_for_search = preprocessing_frames
             X_arr, y_arr = X_for_search, y_for_search
         else:

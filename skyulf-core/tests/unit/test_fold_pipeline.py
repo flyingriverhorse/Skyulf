@@ -220,6 +220,37 @@ def test_array_input_rebuilds_frames_from_column_contract() -> None:
     assert len(step.predict(X.to_numpy())) == len(X)
 
 
+class DtypeSpyAdapter:
+    """Records the dtypes fit_transform receives (polars conversion guard)."""
+
+    def __init__(self) -> None:
+        self.dtypes: dict[str, str] = {}
+
+    def fit_transform(self, X: Any, y: Any) -> tuple[Any, Any]:
+        self.dtypes = {c: str(t) for c, t in X.dtypes.items()}
+        return X, y
+
+    def transform(self, X: Any, y: Any) -> tuple[Any, Any]:
+        return X, y
+
+
+def test_polars_input_converts_with_dtypes_intact() -> None:
+    """polars payloads must reach the chain as typed pandas frames — the
+    ``np.asarray`` fallback collapses mixed-type frames to object dtype and
+    silently disables numeric steps like SimpleImputer."""
+    import polars as pl
+
+    X_pl = pl.DataFrame({"a": [1.0, 2.0, 3.0, 4.0], "b": [1.5, 2.5, 3.5, 4.5]})
+    y_pl = pl.Series("target", [0, 1, 0, 1])
+    spy = DtypeSpyAdapter()
+    step = FoldAwareModelStep(estimator=LogisticRegression(), preprocessor=spy)
+
+    step.fit(X_pl, y_pl)
+
+    assert step.preprocessor_.dtypes == {"a": "float64", "b": "float64"}, step.preprocessor_.dtypes
+    assert len(step.predict(X_pl)) == len(X_pl)
+
+
 # ---------------------------------------------------------------------------
 # Regression passthrough
 # ---------------------------------------------------------------------------

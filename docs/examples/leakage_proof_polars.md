@@ -12,7 +12,7 @@ Polars frames and verifies the same invariants:
 
 All numbers below were produced by actually running these snippets against
 the current release. For the full discussion of what is and is not covered
-(structure gate, cross-validation caveat), see the
+(structure gate, and cross-validation / tuning scores), see the
 [pandas version's coverage section](leakage_proof_pandas.md#what-is-and-is-not-covered).
 
 ## 1. Setup and Data Loading
