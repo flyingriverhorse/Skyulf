@@ -138,6 +138,16 @@ def test_emit_records_iteration_for_late_openers(buffer, monkeypatch):
     assert iterations[0]["direction"] == "minimize"
 
 
+def test_per_job_cap_trims_oldest_iterations(buffer):
+    job = buffer.add("job-iter-cap")
+    for i in range(1, trial_buffer._MAX_TRIALS_PER_JOB + 100):
+        trial_buffer.record_iteration(job, i, 9999, 0.5, "logloss", "minimize")
+    iterations = trial_buffer.get_iterations(job)
+    assert len(iterations) == trial_buffer._MAX_TRIALS_PER_JOB
+    assert iterations[0]["iteration"] == 100
+    assert iterations[-1]["iteration"] == trial_buffer._MAX_TRIALS_PER_JOB + 99
+
+
 def test_iteration_buffer_independent_of_trial_buffer(buffer):
     job = buffer.add("job-iter-2")
     trial_buffer.record_trial(job, 1, 1, 0.9, "accuracy")

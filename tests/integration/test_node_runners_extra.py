@@ -1102,3 +1102,46 @@ def test_resolve_train_feature_columns_pandas_numeric_only_unchanged():
     )
     cols = harness._resolve_train_feature_columns(train_pd, "", numeric_only=True)
     assert cols == ["amount", "freq"]
+
+
+def test_xgboost_tuned_job_persists_iteration_history(pipeline_data_csv, tmp_path):
+    """A boosting tuned job records per-round iteration history on its metrics
+    (the completed-job chart redraw source) with metric + direction metadata."""
+    pytest.importorskip("xgboost")
+    engine = _make_engine(tmp_path, "artifacts_xgb_iterations")
+    config = PipelineConfig(
+        pipeline_id="p_xgb_iterations",
+        nodes=[
+            NodeConfig(
+                node_id="node_data",
+                step_type=StepType.DATA_LOADER,
+                params={"source": "csv", "path": pipeline_data_csv},
+            ),
+            NodeConfig(
+                node_id="node_tuning",
+                step_type=StepType.TRAINING,
+                inputs=["node_data"],
+                params={
+                    "run_mode": "tuned",
+                    "target_column": "target",
+                    "algorithm": "xgboost_classifier",
+                    "tuning_config": {
+                        "strategy": "grid",
+                        "metric": "accuracy",
+                        "cv_folds": 2,
+                        "search_space": {"max_depth": [2], "n_estimators": [15]},
+                    },
+                },
+            ),
+        ],
+    )
+    result = engine.run(config)
+    assert result.status == "success", result.node_results["node_tuning"].error
+    metrics = result.node_results["node_tuning"].metrics
+    iterations = metrics.get("iterations")
+    assert iterations, "a boosting tuned job must persist its iteration history"
+    totals = {point["total"] for point in iterations}
+    assert len(totals) == 1, f"iteration totals should be consistent, got {totals}"
+    assert iterations[0]["iteration"] == 1
+    assert metrics["iteration_metric"]
+    assert metrics["iteration_direction"] in {"minimize", "maximize"}

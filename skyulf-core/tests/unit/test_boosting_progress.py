@@ -221,3 +221,98 @@ class TestRefitForwardsIterationCallback:
 
         assert "callbacks" not in model.fit_kwargs
         assert "eval_set" not in model.fit_kwargs
+
+
+class TestEndToEndStreaming:
+    """Real boosting calculators streaming through tuning and plain fits —
+    covers the refit hook invocation, callback detach, and the regression
+    XGB adapter path that the fake-calculator tests cannot reach."""
+
+    def test_xgb_tuning_refit_streams_iterations_and_detaches_callbacks(self):
+        pytest.importorskip("xgboost")
+        from sklearn.datasets import make_classification
+
+        from skyulf.modeling._tuning.engine import TuningCalculator
+        from skyulf.modeling._tuning.schemas import TuningConfig
+        from skyulf.modeling.classification import XGBClassifierCalculator
+
+        X_arr, y_arr = make_classification(n_samples=120, n_features=4, random_state=0)
+        points: list[tuple] = []
+        model, _result = TuningCalculator(XGBClassifierCalculator()).fit(
+            pd.DataFrame(X_arr),
+            pd.Series(y_arr, name="target"),
+            config=TuningConfig(
+                strategy="grid",
+                metric="roc_auc",
+                search_space={"max_depth": [2]},
+                cv_folds=2,
+            ),
+            iteration_callback=lambda *args: points.append(args),
+        )
+
+        assert points, "boosting fits inside tuning must stream iteration points"
+        assert getattr(model, "callbacks", None) is None, (
+            "XGBoost callbacks must be detached from the saved artifact"
+        )
+
+    def test_xgb_regression_fit_streams_iterations(self):
+        pytest.importorskip("xgboost")
+        from sklearn.datasets import make_regression
+
+        from skyulf.modeling.regression import XGBRegressorCalculator
+
+        X_arr, y_arr = make_regression(n_samples=120, n_features=4, random_state=0)
+        points: list[tuple] = []
+        XGBRegressorCalculator().fit(
+            pd.DataFrame(X_arr),
+            pd.Series(y_arr, name="target"),
+            {"n_estimators": 12},
+            iteration_callback=lambda *args: points.append(args),
+        )
+
+        assert points, "a plain XGB regression fit must stream iteration points"
+        assert [p[0] for p in points] == list(range(1, 13))
+
+    def test_optuna_trial_failures_are_forwarded_to_log_callback(self, monkeypatch):
+        pytest.importorskip("optuna")
+
+        from sklearn.datasets import make_classification
+
+        from skyulf.modeling._tuning.engine import TuningCalculator
+        from skyulf.modeling._tuning.fold_pipeline import FoldAwareModelStep
+        from skyulf.modeling._tuning.schemas import TuningConfig
+        from skyulf.modeling.classification import LogisticRegressionCalculator
+
+        def _explode(self, X, y=None):
+            raise RuntimeError("synthetic fold failure")
+
+        monkeypatch.setattr(FoldAwareModelStep, "fit", _explode)
+
+        class _PassthroughAdapter:
+            """Never runs in practice — the exploded step.fit raises first —
+            but its presence switches tune() onto the wrapped searcher path."""
+
+            def fit_transform(self, X, y):
+                return X, y
+
+            def transform(self, X, y):
+                return X, y
+
+        X_arr, y_arr = make_classification(n_samples=90, n_features=4, random_state=1)
+        logs: list[str] = []
+        with pytest.raises(ValueError, match="All trials failed"):
+            TuningCalculator(LogisticRegressionCalculator()).fit(
+                pd.DataFrame(X_arr),
+                pd.Series(y_arr, name="target"),
+                config=TuningConfig(
+                    strategy="optuna",
+                    metric="accuracy",
+                    n_trials=2,
+                    search_space={"C": [0.5, 1.0]},
+                    cv_folds=3,
+                ),
+                log_callback=logs.append,
+                preprocessing=_PassthroughAdapter(),
+            )
+
+        assert any("failed" in message for message in logs), logs
