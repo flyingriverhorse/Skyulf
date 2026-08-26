@@ -1812,6 +1812,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#built-in-console-progress-no-callback-needed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Built-in console progress (no callback needed)
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -3383,6 +3394,12 @@
 <td><code>null</code></td>
 <td>Column name to sort by when using <code>time_series_split</code>. Auto-detects datetime column if omitted</td>
 </tr>
+<tr>
+<td><code>progress</code></td>
+<td><code>bool</code></td>
+<td><code>false</code></td>
+<td>Console trial progress for core-only runs (see <a href="#built-in-console-progress-no-callback-needed">Built-in console progress</a>). Ignored when you pass your own <code>progress_callback</code></td>
+</tr>
 </tbody>
 </table>
 <h2 id="strategy-specific-params">Strategy-specific params</h2>
@@ -3558,12 +3575,38 @@ metrics = estimator.evaluate(dataset=dataset, target_column=&quot;target&quot;)
 <blockquote>
 <p><strong>Important:</strong> Always pass <code>TuningCalculator(base_calc)</code> — not the raw base calculator. The <code>TuningConfig</code> keyword filter inside <code>TuningCalculator.fit</code> reads <code>strategy</code>, <code>n_trials</code>, <code>metric</code>, <code>search_space</code>, <code>cv_*</code>, etc. directly from the config dict. If you pass the unwrapped base calculator, <code>tuning_config</code> is ignored and a single default-param fit runs instead.</p>
 </blockquote>
+<h3 id="built-in-console-progress-no-callback-needed">Built-in console progress (no callback needed)</h3>
+<p>Instead of writing your own <code>progress_callback</code>, set <code>"progress": True</code> in the tuning config. Skyulf then attaches a tidy console reporter for core-only runs:</p>
+<pre><code class="language-python">tuning_config = {
+    &quot;strategy&quot;: &quot;optuna&quot;,
+    &quot;metric&quot;: &quot;f1&quot;,
+    &quot;n_trials&quot;: 25,
+    &quot;search_space&quot;: {...},
+    &quot;progress&quot;: True,   # built-in console progress
+}
+
+# No progress_callback needed:
+_ = estimator.fit_predict(dataset=dataset, target_column=&quot;target&quot;, config=tuning_config)
+</code></pre>
+<p><strong>On an interactive terminal (TTY)</strong> you get a single self-updating line — never a flood of per-trial output:</p>
+<pre><code>Tuning trial 12/25 | score 0.9306 | best 0.9497 (#8)
+</code></pre>
+<p><strong>When the run finishes</strong>, a compact summary always prints (TTY or not):</p>
+<pre><code>Tuning complete | 25/25 scored trials | metric f1
+  best 0.9497 | {'n_estimators': 500, 'max_depth': 3}
+  top: #8 0.9497 | #21 0.9410 | #3 0.9355
+</code></pre>
+<p><strong>When stdout is piped</strong> (CI, log files, notebooks that capture output), the live line is skipped and only the summary prints.</p>
+<blockquote>
+<p><strong>Note:</strong> <code>progress</code> is off by default and is ignored whenever you pass your own <code>progress_callback</code> — the reporter steps aside so your callback stays in full control. The backend/app never enables it (it streams trials over the jobs WebSocket instead), so this is purely for script/notebook/terminal use of <code>skyulf-core</code>.</p>
+</blockquote>
 <h2 id="tips">Tips</h2>
 <ul>
 <li>Start with <code>"strategy": "random"</code> and <code>"n_trials": 20</code> for a quick baseline.</li>
 <li>Switch to <code>"optuna"</code> when you want smarter exploration (Bayesian optimization).</li>
 <li>Use <code>"halving_random"</code> for large search spaces where grid search is infeasible.</li>
 <li>Always run a <code>TrainTestSplitter</code> before tuning to avoid data leakage.</li>
+<li>Running core-only from a terminal? Set <code>"progress": true</code> in the tuning config for a self-updating trial line plus an end-of-run summary — no callback code required.</li>
 <li>When exporting to a notebook, use the <strong>Export → Full</strong> mode to get per-branch training cells with live trial output; the <strong>Compact</strong> mode runs all branches in a loop and shows a coloured <code>(branch × split)</code> comparison table at the end.</li>
 </ul>
 

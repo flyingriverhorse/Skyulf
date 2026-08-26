@@ -5514,7 +5514,8 @@ payload the same way they do downstream of a real splitter.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>skyulf-core/skyulf/preprocessing/fold_adapter.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">161</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">160</span>
+<span class="normal">161</span>
 <span class="normal">162</span>
 <span class="normal">163</span>
 <span class="normal">164</span>
@@ -5570,9 +5571,7 @@ payload the same way they do downstream of a real splitter.</p>
 <span class="normal">214</span>
 <span class="normal">215</span>
 <span class="normal">216</span>
-<span class="normal">217</span>
-<span class="normal">218</span>
-<span class="normal">219</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">FeatureEngineerFoldAdapter</span><span class="p">:</span>
+<span class="normal">217</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">FeatureEngineerFoldAdapter</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""Re-runs a preprocessing step chain inside each CV/tuning fold.</span>
 
 <span class="sd">    Args:</span>
@@ -5590,9 +5589,8 @@ payload the same way they do downstream of a real splitter.</p>
             <span class="n">step</span> <span class="k">for</span> <span class="n">step</span> <span class="ow">in</span> <span class="n">steps_config</span> <span class="k">if</span> <span class="n">step</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"transformer"</span><span class="p">)</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">SPLITTER_STEP_TYPES</span>
         <span class="p">]</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_target_column</span> <span class="o">=</span> <span class="n">target_column</span>
-        <span class="c1"># True when any step reshapes the rows/target (resampling, row drops):</span>
-        <span class="c1"># such chains cannot be wrapped in an sklearn Pipeline step because a</span>
-        <span class="c1"># transformer can only hand X to the next step, leaving y un-aligned.</span>
+        <span class="c1"># True when any step reshapes the rows/target (resampling, row</span>
+        <span class="c1"># drops); documents the chain's nature for callers that need it.</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">changes_row_count</span> <span class="o">=</span> <span class="nb">any</span><span class="p">(</span>
             <span class="n">step</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"transformer"</span><span class="p">)</span> <span class="ow">in</span> <span class="n">ROW_COUNT_CHANGING_STEP_TYPES</span> <span class="k">for</span> <span class="n">step</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_steps_config</span>
         <span class="p">)</span>
@@ -6100,8 +6098,7 @@ stripped again after each merge so a branch cannot resurrect them.</p>
 <span class="normal">154</span>
 <span class="normal">155</span>
 <span class="normal">156</span>
-<span class="normal">157</span>
-<span class="normal">158</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">MergedBranchFoldAdapter</span><span class="p">:</span>
+<span class="normal">157</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">MergedBranchFoldAdapter</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""Re-runs fork-join preprocessing branches inside each CV/tuning fold.</span>
 
 <span class="sd">    Built for graphs where a shared trunk ends in a splitter (fork point) and</span>
@@ -6152,8 +6149,7 @@ stripped again after each merge so a branch cannot resurrect them.</p>
         <span class="bp">self</span><span class="o">.</span><span class="n">_drop_columns</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">drop_columns</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_engineers</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">FeatureEngineer</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
         <span class="c1"># Branch steps are screened against UNSAFE_BRANCH_STEP_TYPES, so the</span>
-        <span class="c1"># merge keeps every row; the tuning engine's runtime alignment probe</span>
-        <span class="c1"># is still the authoritative check before the Pipeline wrap.</span>
+        <span class="c1"># merge keeps every row.</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">changes_row_count</span> <span class="o">=</span> <span class="kc">False</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">fit_transform</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">y</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>

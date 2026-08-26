@@ -3113,9 +3113,7 @@
 <p>This page contains practical patterns for common workflows.</p>
 <h2 id="recipe-split-preprocess-train">Recipe: split, preprocess, train</h2>
 <p>If you want evaluation metrics, use a split step (or pass a <code>SplitDataset</code>).</p>
-<pre><code class="language-python">from __future__ import annotations
-
-import pandas as pd
+<pre><code class="language-python">import pandas as pd
 
 from skyulf import SkyulfPipeline
 
@@ -3197,9 +3195,7 @@ print(report.get(&quot;modeling&quot;))
 <li>load a persisted pipeline</li>
 <li>call <code>predict(df)</code> on a dataframe without the target column</li>
 </ol>
-<pre><code class="language-python">from __future__ import annotations
-
-import tempfile
+<pre><code class="language-python">import tempfile
 from pathlib import Path
 
 import pandas as pd

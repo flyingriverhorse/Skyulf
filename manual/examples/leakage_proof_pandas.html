@@ -3629,22 +3629,29 @@ full-split scoring reports a CV AUC of <strong>0.867</strong> and a tuning best 
 <strong>0.867</strong> — pure memorisation of held-out rows — while per-fold refit
 reports <strong>~0.50</strong> across all strategies, exactly chance. On real-signal
 data the honest scores stay close to the old ones (the drop is the bias
-leaving, not the signal). The shapes that still fall back to pre-transformed
-scoring with an explicit job-log warning: merged graphs that are not
-fork-join (nested merges, row-count-changing branches, splitters mid-chain),
-holdout tuning with an explicit <code>validation_data</code> split (no folds to refit
-around), preprocessing chains that change the row count or the target
-(resampling, row drops, target re-encoding) under <code>halving_*</code>/<code>optuna</code> — an
-sklearn pipeline transformer can only hand <code>X</code> forward, so the reshaped rows
-would lose alignment with <code>y</code>; the engine refuses that wrap via a static
-<code>changes_row_count</code> flag plus a runtime alignment probe that fails closed,
-rather than silently misaligning them — and any graph with a data-dependent
-step configured before the last splitter (payload reconstruction would
-re-fit it on the full frame). Library users calling CV/tuning directly get
+leaving, not the signal). Holdout tuning with an explicit <code>validation_data</code>
+split is covered too: the pre-transform train and validation frames are
+concatenated into one search frame, the chain refits on the train rows only
+through a single <code>PredefinedSplit</code> fold (train rows masked <code>-1</code>, validation
+rows form the one scoring fold), and candidates are scored against the
+untouched validation split — for all five strategies. The shapes that still
+fall back to pre-transformed scoring with an explicit job-log warning:
+merged graphs that are not fork-join (nested merges, row-count-changing
+branches, splitters mid-chain), and any graph with a data-dependent step
+configured before the last splitter (payload reconstruction would re-fit it
+on the full frame). Chains
+that change the row count or the target (resampling, row drops, target
+re-encoding) are leakage-free under <code>halving_*</code>/<code>optuna</code> too: a fold-aware
+estimator runs the chain inside <code>fit</code> on each fold's training rows and maps
+predictions back to the original label space so scorers compare against the
+untouched target. Library users calling CV/tuning directly get
 the same guarantee by passing a preprocessor — e.g. <code>FeatureEngineerFoldAdapter(
-steps_config, target_column)</code> — via the <code>preprocessing</code> parameter; without
-it, CV/tuning scores the pre-transformed data and remains an optimistic
-estimate.</p>
+steps_config, target_column)</code> — via the <code>preprocessing</code> parameter; holdout
+tuning additionally needs the pre-transform validation payload via
+<code>validation_frames</code> so candidates can be scored against the untouched
+validation split (without it, holdout falls back to raw-payload scoring with
+an explicit log). Without a preprocessor, CV/tuning scores the
+pre-transformed data and remains an optimistic estimate.</p>
 
 
 

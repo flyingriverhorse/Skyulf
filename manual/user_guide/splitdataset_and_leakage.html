@@ -3165,9 +3165,7 @@ caller already split safely, so it does not require a <code>TrainTestSplitter</c
 }
 </code></pre>
 <h3 id="pattern-b-create-splitdataset-yourself">Pattern B: create <code>SplitDataset</code> yourself</h3>
-<pre><code class="language-python">from __future__ import annotations
-
-import pandas as pd
+<pre><code class="language-python">import pandas as pd
 from sklearn.model_selection import train_test_split
 
 from skyulf.data.dataset import SplitDataset

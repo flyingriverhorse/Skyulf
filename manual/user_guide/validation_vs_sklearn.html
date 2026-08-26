@@ -3152,9 +3152,7 @@
 <li>sklearn: <code>fit(X_train, y_train)</code> then <code>predict(X_test)</code></li>
 <li>Skyulf: pass <code>SplitDataset(train=(X_train, y_train), test=(X_test, y_test))</code></li>
 </ul>
-<pre><code class="language-python">from __future__ import annotations
-
-import pandas as pd
+<pre><code class="language-python">import pandas as pd
 from sklearn.model_selection import train_test_split
 
 from skyulf.data.dataset import SplitDataset
@@ -3210,9 +3208,7 @@ print(&quot;Metrics keys:&quot;, list(metrics.keys()))
 <p>This comparison proves both stacks can run the same <em>shape</em> of workflow on the same split.
 We do <strong>not</strong> assert equality of predictions (different defaults / encodings can legitimately differ).</p>
 <p>For a stronger numeric sanity check, we also compute and print test accuracy for both pipelines and the absolute difference.</p>
-<pre><code class="language-python">from __future__ import annotations
-
-import numpy as np
+<pre><code class="language-python">import numpy as np
 import pandas as pd
 from sklearn.compose import ColumnTransformer
 from sklearn.datasets import load_breast_cancer
@@ -3523,9 +3519,7 @@ data-dependent step before the train/test split are rejected before execution
 <a href="../examples/leakage_proof_pandas.html#what-is-and-is-not-covered">"What is and is not covered"</a> for the
 current limits — notably that cross-validation/tuning scores do not yet re-fit preprocessing per
 fold and are therefore optimistic.</p>
-<pre><code class="language-python">from __future__ import annotations
-
-import pandas as pd
+<pre><code class="language-python">import pandas as pd
 
 from skyulf.preprocessing.imputation import SimpleImputerCalculator
 

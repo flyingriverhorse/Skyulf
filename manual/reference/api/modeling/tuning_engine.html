@@ -3209,42 +3209,42 @@ Wraps the base model applier to provide predictions using the refitted best mode
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>skyulf-core/skyulf/modeling/_tuning/engine.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1402</span>
-<span class="normal">1403</span>
-<span class="normal">1404</span>
-<span class="normal">1405</span>
-<span class="normal">1406</span>
-<span class="normal">1407</span>
-<span class="normal">1408</span>
-<span class="normal">1409</span>
-<span class="normal">1410</span>
-<span class="normal">1411</span>
-<span class="normal">1412</span>
-<span class="normal">1413</span>
-<span class="normal">1414</span>
-<span class="normal">1415</span>
-<span class="normal">1416</span>
-<span class="normal">1417</span>
-<span class="normal">1418</span>
-<span class="normal">1419</span>
-<span class="normal">1420</span>
-<span class="normal">1421</span>
-<span class="normal">1422</span>
-<span class="normal">1423</span>
-<span class="normal">1424</span>
-<span class="normal">1425</span>
-<span class="normal">1426</span>
-<span class="normal">1427</span>
-<span class="normal">1428</span>
-<span class="normal">1429</span>
-<span class="normal">1430</span>
-<span class="normal">1431</span>
-<span class="normal">1432</span>
-<span class="normal">1433</span>
-<span class="normal">1434</span>
-<span class="normal">1435</span>
-<span class="normal">1436</span>
-<span class="normal">1437</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">TuningApplier</span><span class="p">(</span><span class="n">BaseModelApplier</span><span class="p">):</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1526</span>
+<span class="normal">1527</span>
+<span class="normal">1528</span>
+<span class="normal">1529</span>
+<span class="normal">1530</span>
+<span class="normal">1531</span>
+<span class="normal">1532</span>
+<span class="normal">1533</span>
+<span class="normal">1534</span>
+<span class="normal">1535</span>
+<span class="normal">1536</span>
+<span class="normal">1537</span>
+<span class="normal">1538</span>
+<span class="normal">1539</span>
+<span class="normal">1540</span>
+<span class="normal">1541</span>
+<span class="normal">1542</span>
+<span class="normal">1543</span>
+<span class="normal">1544</span>
+<span class="normal">1545</span>
+<span class="normal">1546</span>
+<span class="normal">1547</span>
+<span class="normal">1548</span>
+<span class="normal">1549</span>
+<span class="normal">1550</span>
+<span class="normal">1551</span>
+<span class="normal">1552</span>
+<span class="normal">1553</span>
+<span class="normal">1554</span>
+<span class="normal">1555</span>
+<span class="normal">1556</span>
+<span class="normal">1557</span>
+<span class="normal">1558</span>
+<span class="normal">1559</span>
+<span class="normal">1560</span>
+<span class="normal">1561</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">TuningApplier</span><span class="p">(</span><span class="n">BaseModelApplier</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Applier for TuningCalculator.</span>
 <span class="sd">    Wraps the base model applier to provide predictions using the refitted best model.</span>
@@ -3344,7 +3344,38 @@ and requires the Optuna integration package.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>skyulf-core/skyulf/modeling/_tuning/engine.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 141</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 110</span>
+<span class="normal"> 111</span>
+<span class="normal"> 112</span>
+<span class="normal"> 113</span>
+<span class="normal"> 114</span>
+<span class="normal"> 115</span>
+<span class="normal"> 116</span>
+<span class="normal"> 117</span>
+<span class="normal"> 118</span>
+<span class="normal"> 119</span>
+<span class="normal"> 120</span>
+<span class="normal"> 121</span>
+<span class="normal"> 122</span>
+<span class="normal"> 123</span>
+<span class="normal"> 124</span>
+<span class="normal"> 125</span>
+<span class="normal"> 126</span>
+<span class="normal"> 127</span>
+<span class="normal"> 128</span>
+<span class="normal"> 129</span>
+<span class="normal"> 130</span>
+<span class="normal"> 131</span>
+<span class="normal"> 132</span>
+<span class="normal"> 133</span>
+<span class="normal"> 134</span>
+<span class="normal"> 135</span>
+<span class="normal"> 136</span>
+<span class="normal"> 137</span>
+<span class="normal"> 138</span>
+<span class="normal"> 139</span>
+<span class="normal"> 140</span>
+<span class="normal"> 141</span>
 <span class="normal"> 142</span>
 <span class="normal"> 143</span>
 <span class="normal"> 144</span>
@@ -4602,7 +4633,131 @@ and requires the Optuna integration package.</p>
 <span class="normal">1396</span>
 <span class="normal">1397</span>
 <span class="normal">1398</span>
-<span class="normal">1399</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">TuningCalculator</span><span class="p">(</span><span class="n">BaseModelCalculator</span><span class="p">):</span>
+<span class="normal">1399</span>
+<span class="normal">1400</span>
+<span class="normal">1401</span>
+<span class="normal">1402</span>
+<span class="normal">1403</span>
+<span class="normal">1404</span>
+<span class="normal">1405</span>
+<span class="normal">1406</span>
+<span class="normal">1407</span>
+<span class="normal">1408</span>
+<span class="normal">1409</span>
+<span class="normal">1410</span>
+<span class="normal">1411</span>
+<span class="normal">1412</span>
+<span class="normal">1413</span>
+<span class="normal">1414</span>
+<span class="normal">1415</span>
+<span class="normal">1416</span>
+<span class="normal">1417</span>
+<span class="normal">1418</span>
+<span class="normal">1419</span>
+<span class="normal">1420</span>
+<span class="normal">1421</span>
+<span class="normal">1422</span>
+<span class="normal">1423</span>
+<span class="normal">1424</span>
+<span class="normal">1425</span>
+<span class="normal">1426</span>
+<span class="normal">1427</span>
+<span class="normal">1428</span>
+<span class="normal">1429</span>
+<span class="normal">1430</span>
+<span class="normal">1431</span>
+<span class="normal">1432</span>
+<span class="normal">1433</span>
+<span class="normal">1434</span>
+<span class="normal">1435</span>
+<span class="normal">1436</span>
+<span class="normal">1437</span>
+<span class="normal">1438</span>
+<span class="normal">1439</span>
+<span class="normal">1440</span>
+<span class="normal">1441</span>
+<span class="normal">1442</span>
+<span class="normal">1443</span>
+<span class="normal">1444</span>
+<span class="normal">1445</span>
+<span class="normal">1446</span>
+<span class="normal">1447</span>
+<span class="normal">1448</span>
+<span class="normal">1449</span>
+<span class="normal">1450</span>
+<span class="normal">1451</span>
+<span class="normal">1452</span>
+<span class="normal">1453</span>
+<span class="normal">1454</span>
+<span class="normal">1455</span>
+<span class="normal">1456</span>
+<span class="normal">1457</span>
+<span class="normal">1458</span>
+<span class="normal">1459</span>
+<span class="normal">1460</span>
+<span class="normal">1461</span>
+<span class="normal">1462</span>
+<span class="normal">1463</span>
+<span class="normal">1464</span>
+<span class="normal">1465</span>
+<span class="normal">1466</span>
+<span class="normal">1467</span>
+<span class="normal">1468</span>
+<span class="normal">1469</span>
+<span class="normal">1470</span>
+<span class="normal">1471</span>
+<span class="normal">1472</span>
+<span class="normal">1473</span>
+<span class="normal">1474</span>
+<span class="normal">1475</span>
+<span class="normal">1476</span>
+<span class="normal">1477</span>
+<span class="normal">1478</span>
+<span class="normal">1479</span>
+<span class="normal">1480</span>
+<span class="normal">1481</span>
+<span class="normal">1482</span>
+<span class="normal">1483</span>
+<span class="normal">1484</span>
+<span class="normal">1485</span>
+<span class="normal">1486</span>
+<span class="normal">1487</span>
+<span class="normal">1488</span>
+<span class="normal">1489</span>
+<span class="normal">1490</span>
+<span class="normal">1491</span>
+<span class="normal">1492</span>
+<span class="normal">1493</span>
+<span class="normal">1494</span>
+<span class="normal">1495</span>
+<span class="normal">1496</span>
+<span class="normal">1497</span>
+<span class="normal">1498</span>
+<span class="normal">1499</span>
+<span class="normal">1500</span>
+<span class="normal">1501</span>
+<span class="normal">1502</span>
+<span class="normal">1503</span>
+<span class="normal">1504</span>
+<span class="normal">1505</span>
+<span class="normal">1506</span>
+<span class="normal">1507</span>
+<span class="normal">1508</span>
+<span class="normal">1509</span>
+<span class="normal">1510</span>
+<span class="normal">1511</span>
+<span class="normal">1512</span>
+<span class="normal">1513</span>
+<span class="normal">1514</span>
+<span class="normal">1515</span>
+<span class="normal">1516</span>
+<span class="normal">1517</span>
+<span class="normal">1518</span>
+<span class="normal">1519</span>
+<span class="normal">1520</span>
+<span class="normal">1521</span>
+<span class="normal">1522</span>
+<span class="normal">1523</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">TuningCalculator</span><span class="p">(</span><span class="n">BaseModelCalculator</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""Tune a plain ``BaseModelCalculator`` and refit it with the best parameters.</span>
 
 <span class="sd">    ``fit`` accepts a ``TuningConfig`` or dict with ``strategy``, ``metric``,</span>
@@ -4748,6 +4903,7 @@ and requires the Optuna integration package.</p>
         <span class="n">X_np</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
         <span class="n">y_np</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
         <span class="n">log_callback</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="nb">str</span><span class="p">],</span> <span class="kc">None</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">iteration_callback</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="kc">None</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">"""Build and fit the final model on the full dataset using the tuned best params."""</span>
         <span class="n">best_params</span> <span class="o">=</span> <span class="n">tuning_result</span><span class="o">.</span><span class="n">best_params</span>
@@ -4771,10 +4927,23 @@ and requires the Optuna integration package.</p>
         <span class="c1"># ``a__b`` keys — e.g. an ensemble's tuned base-model params — through</span>
         <span class="c1"># ``set_params`` so they are not silently dropped.</span>
         <span class="n">model</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_instantiate_model</span><span class="p">(</span><span class="n">model_cls</span><span class="p">,</span> <span class="n">final_params</span><span class="p">)</span>
+        <span class="c1"># Boosting base calculators (XGBoost/LightGBM) attach an eval set +</span>
+        <span class="c1"># iteration callback here so the final refit streams per-round</span>
+        <span class="c1"># progress like any other boosting fit; every other model keeps a</span>
+        <span class="c1"># plain fit.</span>
+        <span class="n">boosting_hook</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">model_calculator</span><span class="p">,</span> <span class="s2">"_boosting_fit_kwargs"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+        <span class="n">extra_fit_kwargs</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="n">boosting_hook</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">X_np</span><span class="p">,</span> <span class="n">y_np</span><span class="p">,</span> <span class="n">iteration_callback</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">boosting_hook</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+            <span class="k">else</span> <span class="p">{}</span>
+        <span class="p">)</span>
+        <span class="n">detach_callbacks</span> <span class="o">=</span> <span class="n">extra_fit_kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">"_detach_callbacks"</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span>
         <span class="k">with</span> <span class="n">warnings</span><span class="o">.</span><span class="n">catch_warnings</span><span class="p">(</span><span class="n">record</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span> <span class="k">as</span> <span class="n">caught</span><span class="p">:</span>
             <span class="n">warnings</span><span class="o">.</span><span class="n">simplefilter</span><span class="p">(</span><span class="s2">"always"</span><span class="p">)</span>
             <span class="n">warnings</span><span class="o">.</span><span class="n">filterwarnings</span><span class="p">(</span><span class="s2">"ignore"</span><span class="p">,</span> <span class="n">message</span><span class="o">=</span><span class="s2">".*valid feature names.*"</span><span class="p">)</span>
-            <span class="n">model</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X_np</span><span class="p">,</span> <span class="n">y_np</span><span class="p">)</span>
+            <span class="n">model</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X_np</span><span class="p">,</span> <span class="n">y_np</span><span class="p">,</span> <span class="o">**</span><span class="n">extra_fit_kwargs</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">detach_callbacks</span><span class="p">:</span>
+            <span class="n">model</span><span class="o">.</span><span class="n">callbacks</span> <span class="o">=</span> <span class="kc">None</span>
         <span class="k">for</span> <span class="n">w</span> <span class="ow">in</span> <span class="n">caught</span><span class="p">:</span>
             <span class="k">if</span> <span class="nb">issubclass</span><span class="p">(</span><span class="n">w</span><span class="o">.</span><span class="n">category</span><span class="p">,</span> <span class="n">ConvergenceWarning</span><span class="p">):</span>
                 <span class="n">conv_msg</span> <span class="o">=</span> <span class="p">(</span>
@@ -4797,7 +4966,9 @@ and requires the Optuna integration package.</p>
         <span class="n">progress_callback</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">,</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span> <span class="nb">dict</span> <span class="o">|</span> <span class="kc">None</span><span class="p">],</span> <span class="kc">None</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">log_callback</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="nb">str</span><span class="p">],</span> <span class="kc">None</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">validation_data</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span> <span class="o">|</span> <span class="n">SkyulfDataFrame</span><span class="p">,</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span> <span class="o">|</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">iteration_callback</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="kc">None</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">preprocessing</span><span class="p">:</span> <span class="s2">"FoldPreprocessor | None"</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">validation_frames</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Fits the tuner (runs tuning).</span>
@@ -4807,14 +4978,28 @@ and requires the Optuna integration package.</p>
 <span class="sd">        each candidate fold's training rows during search, so tuning scores</span>
 <span class="sd">        stop leaking held-out rows into preprocessing statistics. The custom</span>
 <span class="sd">        ``grid``/``random`` loop applies it directly; ``halving_*``/``optuna``</span>
-<span class="sd">        get it via a Pipeline wrapper whose searcher-internal CV drives the</span>
-<span class="sd">        refit. Chains that change the row count or the target (resampling,</span>
-<span class="sd">        row drops) cannot stay aligned inside that wrapper and fall back to</span>
-<span class="sd">        pre-transformed scoring with an explicit log instead. When set, the</span>
-<span class="sd">        final best-model refit runs the full split through the preprocessor</span>
-<span class="sd">        once — the artifact serving uses.</span>
+<span class="sd">        get it via a fold-aware meta-estimator whose ``fit`` runs the chain</span>
+<span class="sd">        inside every searcher-internal fold — safe even for chains that</span>
+<span class="sd">        resample rows or re-encode the target. Holdout tuning</span>
+<span class="sd">        (``validation_data`` set) refits the chain on the train rows only and</span>
+<span class="sd">        scores candidates against the untouched validation split when</span>
+<span class="sd">        ``validation_frames`` (the pre-transform validation payload) is</span>
+<span class="sd">        supplied; frameless calls fall back to raw-payload scoring with an</span>
+<span class="sd">        explicit log instead. When set, the final best-model refit runs the</span>
+<span class="sd">        full split through the preprocessor once — the artifact serving uses.</span>
+<span class="sd">        Polars payloads are accepted for both frame pairs — the engine and</span>
+<span class="sd">        the fold-aware wrap convert them via ``to_pandas()`` with dtypes</span>
+<span class="sd">        intact.</span>
 <span class="sd">        """</span>
         <span class="n">tuning_config</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_build_tuning_config</span><span class="p">(</span><span class="n">config</span><span class="p">)</span>
+
+        <span class="c1"># Core-only console progress: the backend always supplies its own</span>
+        <span class="c1"># callback (and never sets `progress`), so this only ever fires for</span>
+        <span class="c1"># direct SDK use.</span>
+        <span class="n">reporter</span><span class="p">:</span> <span class="n">ConsoleTrialReporter</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">if</span> <span class="n">progress_callback</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">tuning_config</span><span class="o">.</span><span class="n">progress</span><span class="p">:</span>
+            <span class="n">reporter</span> <span class="o">=</span> <span class="n">ConsoleTrialReporter</span><span class="p">()</span>
+            <span class="n">progress_callback</span> <span class="o">=</span> <span class="n">reporter</span>
 
         <span class="c1"># For Time Series Split, sort data chronologically (and drop the time</span>
         <span class="c1"># column from features) before converting to numpy below - numpy has</span>
@@ -4881,6 +5066,7 @@ and requires the Optuna integration package.</p>
                 <span class="n">validation_data</span><span class="o">=</span><span class="n">validation_data_np</span><span class="p">,</span>
                 <span class="n">preprocessing</span><span class="o">=</span><span class="n">preprocessing</span><span class="p">,</span>
                 <span class="n">preprocessing_frames</span><span class="o">=</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">)</span> <span class="k">if</span> <span class="n">preprocessing</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
+                <span class="n">validation_frames</span><span class="o">=</span><span class="n">validation_frames</span><span class="p">,</span>
             <span class="p">)</span>
         <span class="n">convergence_count</span> <span class="o">=</span> <span class="mi">0</span>
         <span class="k">for</span> <span class="n">w</span> <span class="ow">in</span> <span class="n">caught</span><span class="p">:</span>
@@ -4907,7 +5093,17 @@ and requires the Optuna integration package.</p>
             <span class="n">X_refit</span><span class="p">,</span> <span class="n">y_refit</span> <span class="o">=</span> <span class="n">SklearnBridge</span><span class="o">.</span><span class="n">to_sklearn</span><span class="p">((</span><span class="n">X_refit_frame</span><span class="p">,</span> <span class="n">y_refit_frame</span><span class="p">))</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="n">X_refit</span><span class="p">,</span> <span class="n">y_refit</span> <span class="o">=</span> <span class="n">X_np</span><span class="p">,</span> <span class="n">y_np</span>
-        <span class="n">model</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_refit_best_model</span><span class="p">(</span><span class="n">tuning_result</span><span class="p">,</span> <span class="n">tuning_config</span><span class="p">,</span> <span class="n">X_refit</span><span class="p">,</span> <span class="n">y_refit</span><span class="p">,</span> <span class="n">log_callback</span><span class="p">)</span>
+        <span class="n">model</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_refit_best_model</span><span class="p">(</span>
+            <span class="n">tuning_result</span><span class="p">,</span>
+            <span class="n">tuning_config</span><span class="p">,</span>
+            <span class="n">X_refit</span><span class="p">,</span>
+            <span class="n">y_refit</span><span class="p">,</span>
+            <span class="n">log_callback</span><span class="p">,</span>
+            <span class="n">iteration_callback</span><span class="o">=</span><span class="n">iteration_callback</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">reporter</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">reporter</span><span class="o">.</span><span class="n">finish</span><span class="p">(</span><span class="n">tuning_result</span><span class="p">)</span>
 
         <span class="k">return</span> <span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">tuning_result</span><span class="p">)</span>
 
@@ -4938,6 +5134,9 @@ and requires the Optuna integration package.</p>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
 <span class="w">        </span><span class="sd">"""Concatenates train/val data and builds a ``PredefinedSplit`` over it.</span>
 
+<span class="sd">        Numpy (frameless) variant — the frame-based per-fold-refit variant is</span>
+<span class="sd">        ``_build_predefined_split_cv_frames``.</span>
+
 <span class="sd">        The search treats ``X`` (train) as always-in-training-set (-1) and the concatenated</span>
 <span class="sd">        ``validation_data`` as the single test fold (0), so the searcher trains on ``X`` and</span>
 <span class="sd">        validates on ``validation_data``.</span>
@@ -4954,6 +5153,35 @@ and requires the Optuna integration package.</p>
         <span class="c1"># -1 means "never in test set" (so always in training set)</span>
         <span class="c1"># 0 means "in test set for fold 0"</span>
         <span class="n">test_fold</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">concatenate</span><span class="p">([</span><span class="n">np</span><span class="o">.</span><span class="n">full</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">X</span><span class="p">),</span> <span class="o">-</span><span class="mi">1</span><span class="p">),</span> <span class="n">np</span><span class="o">.</span><span class="n">full</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">X_val</span><span class="p">),</span> <span class="mi">0</span><span class="p">)])</span>
+
+        <span class="n">cv</span> <span class="o">=</span> <span class="n">PredefinedSplit</span><span class="p">(</span><span class="n">test_fold</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">cv</span><span class="p">,</span> <span class="n">X_for_search</span><span class="p">,</span> <span class="n">y_for_search</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_build_predefined_split_cv_frames</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">preprocessing_frames</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span>
+        <span class="n">validation_frames</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">"""Frame variant of ``_build_predefined_split_cv`` for per-fold refit.</span>
+
+<span class="sd">        Concatenates the pre-transform train and validation frames (positional</span>
+<span class="sd">        index reset so the mask aligns) and builds a ``PredefinedSplit`` where</span>
+<span class="sd">        train rows are always in training (-1) and validation rows form the</span>
+<span class="sd">        single scoring fold (0): the preprocessing chain refits on train rows</span>
+<span class="sd">        only and candidates score against untouched validation rows.</span>
+<span class="sd">        """</span>
+        <span class="kn">from</span><span class="w"> </span><span class="nn">sklearn.model_selection</span><span class="w"> </span><span class="kn">import</span> <span class="n">PredefinedSplit</span>
+
+        <span class="k">def</span><span class="w"> </span><span class="nf">_as_pandas</span><span class="p">(</span><span class="n">frame</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">frame</span><span class="o">.</span><span class="n">to_pandas</span><span class="p">()</span> <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">frame</span><span class="p">,</span> <span class="s2">"to_pandas"</span><span class="p">)</span> <span class="k">else</span> <span class="n">frame</span>
+
+        <span class="n">X_train</span><span class="p">,</span> <span class="n">y_train</span> <span class="o">=</span> <span class="n">preprocessing_frames</span>
+        <span class="n">X_val</span><span class="p">,</span> <span class="n">y_val</span> <span class="o">=</span> <span class="n">validation_frames</span>
+
+        <span class="n">X_for_search</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">concat</span><span class="p">([</span><span class="n">_as_pandas</span><span class="p">(</span><span class="n">X_train</span><span class="p">),</span> <span class="n">_as_pandas</span><span class="p">(</span><span class="n">X_val</span><span class="p">)],</span> <span class="n">ignore_index</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">y_for_search</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">concat</span><span class="p">([</span><span class="n">_as_pandas</span><span class="p">(</span><span class="n">y_train</span><span class="p">),</span> <span class="n">_as_pandas</span><span class="p">(</span><span class="n">y_val</span><span class="p">)],</span> <span class="n">ignore_index</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+        <span class="n">test_fold</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">concatenate</span><span class="p">([</span><span class="n">np</span><span class="o">.</span><span class="n">full</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">X_train</span><span class="p">),</span> <span class="o">-</span><span class="mi">1</span><span class="p">),</span> <span class="n">np</span><span class="o">.</span><span class="n">full</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">X_val</span><span class="p">),</span> <span class="mi">0</span><span class="p">)])</span>
 
         <span class="n">cv</span> <span class="o">=</span> <span class="n">PredefinedSplit</span><span class="p">(</span><span class="n">test_fold</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">cv</span><span class="p">,</span> <span class="n">X_for_search</span><span class="p">,</span> <span class="n">y_for_search</span>
@@ -5589,10 +5817,39 @@ and requires the Optuna integration package.</p>
 <span class="w">        </span><span class="sd">"""Converts a pandas object to a numpy array, leaving numpy arrays unchanged."""</span>
         <span class="k">return</span> <span class="n">data</span><span class="o">.</span><span class="n">to_numpy</span><span class="p">()</span> <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="s2">"to_numpy"</span><span class="p">)</span> <span class="k">else</span> <span class="n">data</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="nf">_execute_search</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">searcher</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">X_arr</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">y_arr</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="n">TuningConfig</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_execute_search</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">searcher</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
+        <span class="n">X_arr</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
+        <span class="n">y_arr</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
+        <span class="n">config</span><span class="p">:</span> <span class="n">TuningConfig</span><span class="p">,</span>
+        <span class="n">log_callback</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="nb">str</span><span class="p">],</span> <span class="kc">None</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
 <span class="w">        </span><span class="sd">"""Fits the searcher, translating known sklearn/optuna failure messages into</span>
 <span class="sd">        actionable ``ValueError``s and re-raising anything else unchanged.</span>
+
+<span class="sd">        Returns the per-trial failure messages captured for optuna runs (one</span>
+<span class="sd">        entry per failed trial). Optuna logs these at WARNING level on its own</span>
+<span class="sd">        logger — without capturing them the only visible symptom is the generic</span>
+<span class="sd">        "no trials completed" error, with the real cause stuck in stderr.</span>
 <span class="sd">        """</span>
+        <span class="n">captured</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">optuna_logger</span><span class="p">:</span> <span class="n">logging</span><span class="o">.</span><span class="n">Logger</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="n">handler</span><span class="p">:</span> <span class="n">logging</span><span class="o">.</span><span class="n">Handler</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">if</span> <span class="n">config</span><span class="o">.</span><span class="n">strategy</span> <span class="o">==</span> <span class="s2">"optuna"</span> <span class="ow">and</span> <span class="n">_ensure_optuna_loaded</span><span class="p">():</span>
+
+            <span class="k">class</span><span class="w"> </span><span class="nc">_TrialFailureHandler</span><span class="p">(</span><span class="n">logging</span><span class="o">.</span><span class="n">Handler</span><span class="p">):</span>
+                <span class="k">def</span><span class="w"> </span><span class="nf">emit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">record</span><span class="p">:</span> <span class="n">logging</span><span class="o">.</span><span class="n">LogRecord</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+                    <span class="n">message</span> <span class="o">=</span> <span class="n">record</span><span class="o">.</span><span class="n">getMessage</span><span class="p">()</span>
+                    <span class="k">if</span> <span class="s2">"failed"</span> <span class="ow">in</span> <span class="n">message</span><span class="p">:</span>
+                        <span class="n">captured</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">message</span><span class="p">)</span>
+                        <span class="k">if</span> <span class="n">log_callback</span><span class="p">:</span>
+                            <span class="k">with</span> <span class="n">contextlib</span><span class="o">.</span><span class="n">suppress</span><span class="p">(</span><span class="ne">Exception</span><span class="p">):</span>
+                                <span class="n">log_callback</span><span class="p">(</span><span class="n">message</span><span class="p">)</span>
+
+            <span class="n">optuna_logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="s2">"optuna"</span><span class="p">)</span>
+            <span class="n">handler</span> <span class="o">=</span> <span class="n">_TrialFailureHandler</span><span class="p">(</span><span class="n">level</span><span class="o">=</span><span class="n">logging</span><span class="o">.</span><span class="n">WARNING</span><span class="p">)</span>
+            <span class="n">optuna_logger</span><span class="o">.</span><span class="n">addHandler</span><span class="p">(</span><span class="n">handler</span><span class="p">)</span>
         <span class="k">try</span><span class="p">:</span>
             <span class="k">with</span> <span class="n">warnings</span><span class="o">.</span><span class="n">catch_warnings</span><span class="p">():</span>
                 <span class="n">warnings</span><span class="o">.</span><span class="n">filterwarnings</span><span class="p">(</span>
@@ -5630,11 +5887,18 @@ and requires the Optuna integration package.</p>
                 <span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="nn">e</span>
 
             <span class="k">raise</span> <span class="n">e</span>
+        <span class="k">finally</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">optuna_logger</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">handler</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">optuna_logger</span><span class="o">.</span><span class="n">removeHandler</span><span class="p">(</span><span class="n">handler</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">captured</span>
 
     <span class="nd">@staticmethod</span>
-    <span class="k">def</span><span class="w"> </span><span class="nf">_extract_best_result</span><span class="p">(</span><span class="n">searcher</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="nb">float</span><span class="p">]:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_extract_best_result</span><span class="p">(</span>
+        <span class="n">searcher</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">first_trial_error</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="nb">float</span><span class="p">]:</span>
 <span class="w">        </span><span class="sd">"""Reads ``best_params_``/``best_score_`` off a fitted searcher, translating the</span>
-<span class="sd">        "no completed trials" ``ValueError`` into a clearer, actionable message.</span>
+<span class="sd">        "no completed trials" ``ValueError`` into a clearer, actionable message that</span>
+<span class="sd">        carries the first captured per-trial error when available.</span>
 <span class="sd">        """</span>
         <span class="k">try</span><span class="p">:</span>
             <span class="c1"># Accessing best_params_ raises ValueError if no trials completed successfully</span>
@@ -5642,12 +5906,14 @@ and requires the Optuna integration package.</p>
             <span class="n">best_score</span> <span class="o">=</span> <span class="n">searcher</span><span class="o">.</span><span class="n">best_score_</span>
         <span class="k">except</span> <span class="ne">ValueError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
             <span class="k">if</span> <span class="s2">"No trials are completed yet"</span> <span class="ow">in</span> <span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">):</span>
+                <span class="n">detail</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">" First trial error: </span><span class="si">{</span><span class="n">first_trial_error</span><span class="si">}</span><span class="s2">"</span> <span class="k">if</span> <span class="n">first_trial_error</span> <span class="k">else</span> <span class="s2">""</span>
                 <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
                     <span class="s2">"Hyperparameter tuning failed: All trials failed. "</span>
                     <span class="s2">"This often happens if the model produces NaN scores "</span>
                     <span class="s2">"(e.g., due to unscaled data for linear models/SVMs, exploding gradients, "</span>
                     <span class="s2">"or mismatched parameters). "</span>
                     <span class="s2">"Try adding a 'Scale' node before this model or checking for NaN/Infinity in your data."</span>
+                    <span class="o">+</span> <span class="n">detail</span>
                 <span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="nn">e</span>
             <span class="k">raise</span> <span class="n">e</span>
         <span class="k">return</span> <span class="n">best_params</span><span class="p">,</span> <span class="n">best_score</span>
@@ -5679,12 +5945,15 @@ and requires the Optuna integration package.</p>
 
     <span class="nd">@staticmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">_strip_model_prefix</span><span class="p">(</span><span class="n">params</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">"""Removes the internal ``model__`` pipeline prefix from extracted params</span>
-<span class="sd">        (see ``tune``'s wrapped Pipeline path) so callers see the original</span>
-<span class="sd">        search-space keys."""</span>
+<span class="w">        </span><span class="sd">"""Removes the internal ``model__estimator__`` pipeline prefix from</span>
+<span class="sd">        extracted params (see ``tune``'s wrapped Pipeline path) so callers see</span>
+<span class="sd">        the original search-space keys."""</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">params</span><span class="p">,</span> <span class="nb">dict</span><span class="p">):</span>
             <span class="k">return</span> <span class="n">params</span>
-        <span class="k">return</span> <span class="p">{</span><span class="n">key</span><span class="o">.</span><span class="n">removeprefix</span><span class="p">(</span><span class="s2">"model__"</span><span class="p">):</span> <span class="n">value</span> <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">params</span><span class="o">.</span><span class="n">items</span><span class="p">()}</span>
+        <span class="k">return</span> <span class="p">{</span>
+            <span class="n">key</span><span class="o">.</span><span class="n">removeprefix</span><span class="p">(</span><span class="s2">"model__"</span><span class="p">)</span><span class="o">.</span><span class="n">removeprefix</span><span class="p">(</span><span class="s2">"estimator__"</span><span class="p">):</span> <span class="n">value</span>
+            <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">params</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
+        <span class="p">}</span>
 
     <span class="nd">@staticmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">_log_final_completion</span><span class="p">(</span>
@@ -5718,15 +5987,21 @@ and requires the Optuna integration package.</p>
         <span class="n">validation_data</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">preprocessing</span><span class="p">:</span> <span class="s2">"FoldPreprocessor | None"</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">preprocessing_frames</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">validation_frames</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">TuningResult</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Runs hyperparameter tuning.</span>
 <span class="sd">        """</span>
-        <span class="k">if</span> <span class="n">preprocessing</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">validation_data</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                <span class="s2">"Per-fold preprocessing refit is not supported with validation_data "</span>
-                <span class="s2">"holdout tuning. Disable the flag or remove the validation input."</span>
-            <span class="p">)</span>
+        <span class="c1"># Holdout tuning with per-fold preprocessing refit: the train and</span>
+        <span class="c1"># validation frames are concatenated (train rows masked -1 in a</span>
+        <span class="c1"># PredefinedSplit) so every strategy refits the chain on train rows</span>
+        <span class="c1"># only and scores candidates against the untouched validation split.</span>
+        <span class="n">holdout_refit</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="n">preprocessing</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+            <span class="ow">and</span> <span class="n">validation_data</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+            <span class="ow">and</span> <span class="n">preprocessing_frames</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+            <span class="ow">and</span> <span class="n">validation_frames</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+        <span class="p">)</span>
         <span class="c1"># 1. Prepare Estimator</span>
         <span class="c1"># We need a base estimator. Since our Calculator wraps the class,</span>
         <span class="c1"># we need to instantiate the underlying sklearn model with default params.</span>
@@ -5742,53 +6017,79 @@ and requires the Optuna integration package.</p>
         <span class="n">base_estimator</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_instantiate_model</span><span class="p">(</span><span class="n">model_class</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">model_calculator</span><span class="o">.</span><span class="n">default_params</span><span class="p">)</span>
 
         <span class="c1"># halving/optuna searchers run their CV internally, where the engine's</span>
-        <span class="c1"># per-fold hook cannot reach; wrap preprocessing + model in a Pipeline</span>
-        <span class="c1"># so the searcher's own folds refit the preprocessor (F-15).</span>
-        <span class="n">wrapped</span> <span class="o">=</span> <span class="n">preprocessing</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
-        <span class="k">if</span> <span class="n">wrapped</span> <span class="ow">and</span> <span class="n">config</span><span class="o">.</span><span class="n">strategy</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"halving_grid"</span><span class="p">,</span> <span class="s2">"halving_random"</span><span class="p">,</span> <span class="s2">"optuna"</span><span class="p">):</span>
-            <span class="c1"># An sklearn transformer step can only hand X to the next step, so</span>
-            <span class="c1"># a chain that resamples, drops rows or transforms the target</span>
-            <span class="c1"># would leave the model fitting reshaped X against the original,</span>
-            <span class="c1"># un-aligned y. The static flag is a cheap fast path; the probe is</span>
-            <span class="c1"># authoritative (it catches any shape-changing step, including</span>
-            <span class="c1"># future ones) and fails closed. The grid/random custom loop</span>
-            <span class="c1"># threads the transformed y itself and stays enabled; the</span>
-            <span class="c1"># searcher-backed strategies fall back to pre-transformed scoring</span>
-            <span class="c1"># with an explicit log instead.</span>
-            <span class="n">misaligned</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span>
-                <span class="n">preprocessing</span><span class="p">,</span> <span class="s2">"changes_row_count"</span><span class="p">,</span> <span class="kc">False</span>
-            <span class="p">)</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">_preserves_row_and_target_alignment</span><span class="p">(</span><span class="n">preprocessing</span><span class="p">,</span> <span class="n">preprocessing_frames</span><span class="p">)</span>
-            <span class="k">if</span> <span class="n">misaligned</span><span class="p">:</span>
-                <span class="n">wrapped</span> <span class="o">=</span> <span class="kc">False</span>
-                <span class="k">if</span> <span class="n">log_callback</span><span class="p">:</span>
-                    <span class="n">log_callback</span><span class="p">(</span>
-                        <span class="s2">"Per-fold preprocessing refit skipped for this tuning strategy: "</span>
-                        <span class="s2">"the step chain changes row count or the target (resampling / "</span>
-                        <span class="s2">"row drops / target re-encoding), which cannot stay aligned "</span>
-                        <span class="s2">"inside the searcher's pipeline. Tuning scores the "</span>
-                        <span class="s2">"pre-transformed data and may be optimistically biased."</span>
-                    <span class="p">)</span>
+        <span class="c1"># per-fold hook cannot reach; wrap preprocessing + model in one</span>
+        <span class="c1"># fit-time meta-estimator so the searcher's own folds drive a true</span>
+        <span class="c1"># per-fold refit (F-15). Preprocessing runs inside ``fit`` on the</span>
+        <span class="c1"># fold's training rows, so chains that resample rows or re-encode</span>
+        <span class="c1"># the target are safe here too.</span>
+        <span class="n">searcher_strategy</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">strategy</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"halving_grid"</span><span class="p">,</span> <span class="s2">"halving_random"</span><span class="p">,</span> <span class="s2">"optuna"</span><span class="p">)</span>
+        <span class="n">wrapped</span> <span class="o">=</span> <span class="n">preprocessing</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">searcher_strategy</span>
+        <span class="k">if</span> <span class="n">wrapped</span> <span class="ow">and</span> <span class="n">preprocessing_frames</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="c1"># Numpy-only SDK call: the preprocessor needs named frames to</span>
+            <span class="c1"># run, so the wrap cannot be built. Keep today's behaviour —</span>
+            <span class="c1"># score the raw pre-transform payload — with an explicit log.</span>
+            <span class="n">wrapped</span> <span class="o">=</span> <span class="kc">False</span>
+            <span class="k">if</span> <span class="n">log_callback</span><span class="p">:</span>
+                <span class="n">log_callback</span><span class="p">(</span>
+                    <span class="s2">"Per-fold preprocessing refit skipped for this tuning strategy: "</span>
+                    <span class="s2">"no named frames are available to run the preprocessing chain "</span>
+                    <span class="s2">"inside the searcher's folds. Scores are computed on the raw "</span>
+                    <span class="s2">"pre-transform payload."</span>
+                <span class="p">)</span>
+        <span class="k">if</span> <span class="n">wrapped</span> <span class="ow">and</span> <span class="n">validation_data</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">validation_frames</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="c1"># Holdout tuning needs the validation rows as named frames too</span>
+            <span class="c1"># (the searcher scores them in the original pre-transform space).</span>
+            <span class="c1"># Without them the wrap would score misaligned rows, so fall back</span>
+            <span class="c1"># to raw-payload scoring with an explicit log instead.</span>
+            <span class="n">wrapped</span> <span class="o">=</span> <span class="kc">False</span>
+            <span class="k">if</span> <span class="n">log_callback</span><span class="p">:</span>
+                <span class="n">log_callback</span><span class="p">(</span>
+                    <span class="s2">"Per-fold preprocessing refit skipped for holdout tuning: "</span>
+                    <span class="s2">"no named validation frames are available to score against. "</span>
+                    <span class="s2">"Scores are computed on the raw pre-transform payload."</span>
+                <span class="p">)</span>
         <span class="n">estimator</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="n">base_estimator</span>
         <span class="n">search_config</span> <span class="o">=</span> <span class="n">config</span>
-        <span class="k">if</span> <span class="n">wrapped</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">wrapped</span> <span class="ow">and</span> <span class="n">preprocessing_frames</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">frame_x</span> <span class="o">=</span> <span class="n">preprocessing_frames</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="n">feature_names</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="nb">tuple</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="nb">str</span><span class="p">,</span> <span class="n">frame_x</span><span class="o">.</span><span class="n">columns</span><span class="p">))</span> <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">frame_x</span><span class="p">,</span> <span class="s2">"columns"</span><span class="p">)</span> <span class="k">else</span> <span class="kc">None</span>
+            <span class="p">)</span>
             <span class="n">estimator</span> <span class="o">=</span> <span class="n">Pipeline</span><span class="p">(</span>
                 <span class="p">[</span>
-                    <span class="p">(</span><span class="s2">"preprocessing"</span><span class="p">,</span> <span class="n">FoldPreprocessingStep</span><span class="p">(</span><span class="n">preprocessing</span><span class="p">)),</span>
-                    <span class="p">(</span><span class="s2">"model"</span><span class="p">,</span> <span class="n">base_estimator</span><span class="p">),</span>
+                    <span class="p">(</span>
+                        <span class="s2">"model"</span><span class="p">,</span>
+                        <span class="n">FoldAwareModelStep</span><span class="p">(</span>
+                            <span class="n">estimator</span><span class="o">=</span><span class="n">base_estimator</span><span class="p">,</span>
+                            <span class="n">preprocessor</span><span class="o">=</span><span class="n">preprocessing</span><span class="p">,</span>
+                            <span class="n">feature_names</span><span class="o">=</span><span class="n">feature_names</span><span class="p">,</span>
+                        <span class="p">),</span>
+                    <span class="p">)</span>
                 <span class="p">]</span>
             <span class="p">)</span>
-            <span class="c1"># Search-space keys must route through the pipeline to the model step.</span>
+            <span class="k">if</span> <span class="n">log_callback</span><span class="p">:</span>
+                <span class="n">log_callback</span><span class="p">(</span>
+                    <span class="s2">"Per-fold preprocessing refit runs inside the searcher via "</span>
+                    <span class="s2">"the fold-aware estimator."</span>
+                <span class="p">)</span>
+            <span class="c1"># Search-space keys must route through the pipeline to the base estimator.</span>
             <span class="n">search_config</span> <span class="o">=</span> <span class="n">replace</span><span class="p">(</span>
                 <span class="n">config</span><span class="p">,</span>
                 <span class="n">search_space</span><span class="o">=</span><span class="p">{</span>
-                    <span class="sa">f</span><span class="s2">"model__</span><span class="si">{</span><span class="n">key</span><span class="si">}</span><span class="s2">"</span><span class="p">:</span> <span class="n">values</span> <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">values</span> <span class="ow">in</span> <span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">search_space</span> <span class="ow">or</span> <span class="p">{})</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
+                    <span class="sa">f</span><span class="s2">"model__estimator__</span><span class="si">{</span><span class="n">key</span><span class="si">}</span><span class="s2">"</span><span class="p">:</span> <span class="n">values</span>
+                    <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">values</span> <span class="ow">in</span> <span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">search_space</span> <span class="ow">or</span> <span class="p">{})</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
                 <span class="p">},</span>
             <span class="p">)</span>
 
         <span class="c1"># 2. Prepare Splitter</span>
         <span class="c1"># If validation data is provided, use PredefinedSplit to train on X and validate on validation_data</span>
         <span class="c1"># Otherwise use CV</span>
-        <span class="n">cv</span><span class="p">,</span> <span class="n">X_for_search</span><span class="p">,</span> <span class="n">y_for_search</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_build_cv_splitter</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">config</span><span class="p">,</span> <span class="n">validation_data</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">holdout_refit</span> <span class="ow">and</span> <span class="n">preprocessing_frames</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">validation_frames</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">cv</span><span class="p">,</span> <span class="n">X_for_search</span><span class="p">,</span> <span class="n">y_for_search</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_build_predefined_split_cv_frames</span><span class="p">(</span>
+                <span class="n">preprocessing_frames</span><span class="p">,</span> <span class="n">validation_frames</span>
+            <span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">cv</span><span class="p">,</span> <span class="n">X_for_search</span><span class="p">,</span> <span class="n">y_for_search</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_build_cv_splitter</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">config</span><span class="p">,</span> <span class="n">validation_data</span><span class="p">)</span>
 
         <span class="c1"># 3. Select Search Strategy</span>
         <span class="c1"># Handle multiclass metrics and map user-friendly names</span>
@@ -5797,7 +6098,13 @@ and requires the Optuna integration package.</p>
         <span class="k">if</span> <span class="n">config</span><span class="o">.</span><span class="n">strategy</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">"grid"</span><span class="p">,</span> <span class="s2">"random"</span><span class="p">]:</span>
             <span class="c1"># Per-fold refit needs named frames (the adapter rebuilds a real</span>
             <span class="c1"># FeatureEngineer), not the numpy arrays used by the searchers.</span>
-            <span class="k">if</span> <span class="n">preprocessing</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">preprocessing_frames</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="c1"># Holdout mode is excluded: the splitter stage already produced</span>
+            <span class="c1"># the concatenated train+validation frames the mask is aligned to.</span>
+            <span class="k">if</span> <span class="p">(</span>
+                <span class="n">preprocessing</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+                <span class="ow">and</span> <span class="n">preprocessing_frames</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+                <span class="ow">and</span> <span class="n">validation_data</span> <span class="ow">is</span> <span class="kc">None</span>
+            <span class="p">):</span>
                 <span class="n">X_for_search</span><span class="p">,</span> <span class="n">y_for_search</span> <span class="o">=</span> <span class="n">preprocessing_frames</span>
             <span class="c1"># Use custom loop to support progress and log callbacks</span>
             <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_run_grid_or_random_search</span><span class="p">(</span>
@@ -5828,18 +6135,21 @@ and requires the Optuna integration package.</p>
 
         <span class="c1"># 4. Run Search</span>
         <span class="c1"># The wrapped pipeline needs named frames (the adapter rebuilds a real</span>
-        <span class="c1"># FeatureEngineer); numpy conversion would strip column names.</span>
+        <span class="c1"># FeatureEngineer); numpy conversion would strip column names. In</span>
+        <span class="c1"># holdout mode the splitter stage already produced the concatenated</span>
+        <span class="c1"># train+validation frames the PredefinedSplit mask is aligned to.</span>
         <span class="k">if</span> <span class="n">wrapped</span><span class="p">:</span>
-            <span class="k">if</span> <span class="n">preprocessing_frames</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">validation_data</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">preprocessing_frames</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
                 <span class="n">X_for_search</span><span class="p">,</span> <span class="n">y_for_search</span> <span class="o">=</span> <span class="n">preprocessing_frames</span>
             <span class="n">X_arr</span><span class="p">,</span> <span class="n">y_arr</span> <span class="o">=</span> <span class="n">X_for_search</span><span class="p">,</span> <span class="n">y_for_search</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="n">X_arr</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_to_numpy</span><span class="p">(</span><span class="n">X_for_search</span><span class="p">)</span>
             <span class="n">y_arr</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_to_numpy</span><span class="p">(</span><span class="n">y_for_search</span><span class="p">)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_execute_search</span><span class="p">(</span><span class="n">searcher</span><span class="p">,</span> <span class="n">X_arr</span><span class="p">,</span> <span class="n">y_arr</span><span class="p">,</span> <span class="n">config</span><span class="p">)</span>
+        <span class="n">trial_errors</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_execute_search</span><span class="p">(</span><span class="n">searcher</span><span class="p">,</span> <span class="n">X_arr</span><span class="p">,</span> <span class="n">y_arr</span><span class="p">,</span> <span class="n">config</span><span class="p">,</span> <span class="n">log_callback</span><span class="p">)</span>
 
         <span class="c1"># 5. Extract Results</span>
-        <span class="n">best_params</span><span class="p">,</span> <span class="n">best_score</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_extract_best_result</span><span class="p">(</span><span class="n">searcher</span><span class="p">)</span>
+        <span class="n">first_trial_error</span> <span class="o">=</span> <span class="n">trial_errors</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">if</span> <span class="n">trial_errors</span> <span class="k">else</span> <span class="kc">None</span>
+        <span class="n">best_params</span><span class="p">,</span> <span class="n">best_score</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_extract_best_result</span><span class="p">(</span><span class="n">searcher</span><span class="p">,</span> <span class="n">first_trial_error</span><span class="p">)</span>
 
         <span class="c1"># Collect trials</span>
         <span class="n">trials</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_collect_trials</span><span class="p">(</span><span class="n">searcher</span><span class="p">,</span> <span class="n">config</span><span class="p">)</span>
@@ -5881,7 +6191,7 @@ and requires the Optuna integration package.</p>
 
 
 <h4 id="skyulf.modeling._tuning.engine.TuningCalculator.fit" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">fit</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">config</span><span class="p">,</span> <span class="n">progress_callback</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">log_callback</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">validation_data</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">preprocessing</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
+            <code class="highlight language-python"><span class="n">fit</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">config</span><span class="p">,</span> <span class="n">progress_callback</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">log_callback</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">validation_data</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">iteration_callback</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">preprocessing</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">validation_frames</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
 
 </h4>
 
@@ -5894,17 +6204,40 @@ Adapts the generic fit interface to the specific tune method.</p>
 each candidate fold's training rows during search, so tuning scores
 stop leaking held-out rows into preprocessing statistics. The custom
 <code>grid</code>/<code>random</code> loop applies it directly; <code>halving_*</code>/<code>optuna</code>
-get it via a Pipeline wrapper whose searcher-internal CV drives the
-refit. Chains that change the row count or the target (resampling,
-row drops) cannot stay aligned inside that wrapper and fall back to
-pre-transformed scoring with an explicit log instead. When set, the
-final best-model refit runs the full split through the preprocessor
-once — the artifact serving uses.</p>
+get it via a fold-aware meta-estimator whose <code>fit</code> runs the chain
+inside every searcher-internal fold — safe even for chains that
+resample rows or re-encode the target. Holdout tuning
+(<code>validation_data</code> set) refits the chain on the train rows only and
+scores candidates against the untouched validation split when
+<code>validation_frames</code> (the pre-transform validation payload) is
+supplied; frameless calls fall back to raw-payload scoring with an
+explicit log instead. When set, the final best-model refit runs the
+full split through the preprocessor once — the artifact serving uses.
+Polars payloads are accepted for both frame pairs — the engine and
+the fold-aware wrap convert them via <code>to_pandas()</code> with dtypes
+intact.</p>
 
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>skyulf-core/skyulf/modeling/_tuning/engine.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">328</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">311</span>
+<span class="normal">312</span>
+<span class="normal">313</span>
+<span class="normal">314</span>
+<span class="normal">315</span>
+<span class="normal">316</span>
+<span class="normal">317</span>
+<span class="normal">318</span>
+<span class="normal">319</span>
+<span class="normal">320</span>
+<span class="normal">321</span>
+<span class="normal">322</span>
+<span class="normal">323</span>
+<span class="normal">324</span>
+<span class="normal">325</span>
+<span class="normal">326</span>
+<span class="normal">327</span>
+<span class="normal">328</span>
 <span class="normal">329</span>
 <span class="normal">330</span>
 <span class="normal">331</span>
@@ -6024,7 +6357,17 @@ once — the artifact serving uses.</p>
 <span class="normal">445</span>
 <span class="normal">446</span>
 <span class="normal">447</span>
-<span class="normal">448</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">fit</span><span class="p">(</span>
+<span class="normal">448</span>
+<span class="normal">449</span>
+<span class="normal">450</span>
+<span class="normal">451</span>
+<span class="normal">452</span>
+<span class="normal">453</span>
+<span class="normal">454</span>
+<span class="normal">455</span>
+<span class="normal">456</span>
+<span class="normal">457</span>
+<span class="normal">458</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">fit</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">X</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span> <span class="o">|</span> <span class="n">SkyulfDataFrame</span><span class="p">,</span>
     <span class="n">y</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span> <span class="o">|</span> <span class="n">Any</span><span class="p">,</span>
@@ -6032,7 +6375,9 @@ once — the artifact serving uses.</p>
     <span class="n">progress_callback</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">,</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span> <span class="nb">dict</span> <span class="o">|</span> <span class="kc">None</span><span class="p">],</span> <span class="kc">None</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">log_callback</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="nb">str</span><span class="p">],</span> <span class="kc">None</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">validation_data</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span> <span class="o">|</span> <span class="n">SkyulfDataFrame</span><span class="p">,</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span> <span class="o">|</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">iteration_callback</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="kc">None</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">preprocessing</span><span class="p">:</span> <span class="s2">"FoldPreprocessor | None"</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">validation_frames</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Fits the tuner (runs tuning).</span>
@@ -6042,14 +6387,28 @@ once — the artifact serving uses.</p>
 <span class="sd">    each candidate fold's training rows during search, so tuning scores</span>
 <span class="sd">    stop leaking held-out rows into preprocessing statistics. The custom</span>
 <span class="sd">    ``grid``/``random`` loop applies it directly; ``halving_*``/``optuna``</span>
-<span class="sd">    get it via a Pipeline wrapper whose searcher-internal CV drives the</span>
-<span class="sd">    refit. Chains that change the row count or the target (resampling,</span>
-<span class="sd">    row drops) cannot stay aligned inside that wrapper and fall back to</span>
-<span class="sd">    pre-transformed scoring with an explicit log instead. When set, the</span>
-<span class="sd">    final best-model refit runs the full split through the preprocessor</span>
-<span class="sd">    once — the artifact serving uses.</span>
+<span class="sd">    get it via a fold-aware meta-estimator whose ``fit`` runs the chain</span>
+<span class="sd">    inside every searcher-internal fold — safe even for chains that</span>
+<span class="sd">    resample rows or re-encode the target. Holdout tuning</span>
+<span class="sd">    (``validation_data`` set) refits the chain on the train rows only and</span>
+<span class="sd">    scores candidates against the untouched validation split when</span>
+<span class="sd">    ``validation_frames`` (the pre-transform validation payload) is</span>
+<span class="sd">    supplied; frameless calls fall back to raw-payload scoring with an</span>
+<span class="sd">    explicit log instead. When set, the final best-model refit runs the</span>
+<span class="sd">    full split through the preprocessor once — the artifact serving uses.</span>
+<span class="sd">    Polars payloads are accepted for both frame pairs — the engine and</span>
+<span class="sd">    the fold-aware wrap convert them via ``to_pandas()`` with dtypes</span>
+<span class="sd">    intact.</span>
 <span class="sd">    """</span>
     <span class="n">tuning_config</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_build_tuning_config</span><span class="p">(</span><span class="n">config</span><span class="p">)</span>
+
+    <span class="c1"># Core-only console progress: the backend always supplies its own</span>
+    <span class="c1"># callback (and never sets `progress`), so this only ever fires for</span>
+    <span class="c1"># direct SDK use.</span>
+    <span class="n">reporter</span><span class="p">:</span> <span class="n">ConsoleTrialReporter</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="k">if</span> <span class="n">progress_callback</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">tuning_config</span><span class="o">.</span><span class="n">progress</span><span class="p">:</span>
+        <span class="n">reporter</span> <span class="o">=</span> <span class="n">ConsoleTrialReporter</span><span class="p">()</span>
+        <span class="n">progress_callback</span> <span class="o">=</span> <span class="n">reporter</span>
 
     <span class="c1"># For Time Series Split, sort data chronologically (and drop the time</span>
     <span class="c1"># column from features) before converting to numpy below - numpy has</span>
@@ -6116,6 +6475,7 @@ once — the artifact serving uses.</p>
             <span class="n">validation_data</span><span class="o">=</span><span class="n">validation_data_np</span><span class="p">,</span>
             <span class="n">preprocessing</span><span class="o">=</span><span class="n">preprocessing</span><span class="p">,</span>
             <span class="n">preprocessing_frames</span><span class="o">=</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">)</span> <span class="k">if</span> <span class="n">preprocessing</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
+            <span class="n">validation_frames</span><span class="o">=</span><span class="n">validation_frames</span><span class="p">,</span>
         <span class="p">)</span>
     <span class="n">convergence_count</span> <span class="o">=</span> <span class="mi">0</span>
     <span class="k">for</span> <span class="n">w</span> <span class="ow">in</span> <span class="n">caught</span><span class="p">:</span>
@@ -6142,7 +6502,17 @@ once — the artifact serving uses.</p>
         <span class="n">X_refit</span><span class="p">,</span> <span class="n">y_refit</span> <span class="o">=</span> <span class="n">SklearnBridge</span><span class="o">.</span><span class="n">to_sklearn</span><span class="p">((</span><span class="n">X_refit_frame</span><span class="p">,</span> <span class="n">y_refit_frame</span><span class="p">))</span>
     <span class="k">else</span><span class="p">:</span>
         <span class="n">X_refit</span><span class="p">,</span> <span class="n">y_refit</span> <span class="o">=</span> <span class="n">X_np</span><span class="p">,</span> <span class="n">y_np</span>
-    <span class="n">model</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_refit_best_model</span><span class="p">(</span><span class="n">tuning_result</span><span class="p">,</span> <span class="n">tuning_config</span><span class="p">,</span> <span class="n">X_refit</span><span class="p">,</span> <span class="n">y_refit</span><span class="p">,</span> <span class="n">log_callback</span><span class="p">)</span>
+    <span class="n">model</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_refit_best_model</span><span class="p">(</span>
+        <span class="n">tuning_result</span><span class="p">,</span>
+        <span class="n">tuning_config</span><span class="p">,</span>
+        <span class="n">X_refit</span><span class="p">,</span>
+        <span class="n">y_refit</span><span class="p">,</span>
+        <span class="n">log_callback</span><span class="p">,</span>
+        <span class="n">iteration_callback</span><span class="o">=</span><span class="n">iteration_callback</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">reporter</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">reporter</span><span class="o">.</span><span class="n">finish</span><span class="p">(</span><span class="n">tuning_result</span><span class="p">)</span>
 
     <span class="k">return</span> <span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">tuning_result</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
@@ -6155,7 +6525,7 @@ once — the artifact serving uses.</p>
 
 
 <h4 id="skyulf.modeling._tuning.engine.TuningCalculator.tune" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">tune</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">config</span><span class="p">,</span> <span class="n">progress_callback</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">log_callback</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">validation_data</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">preprocessing</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">preprocessing_frames</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
+            <code class="highlight language-python"><span class="n">tune</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">config</span><span class="p">,</span> <span class="n">progress_callback</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">log_callback</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">validation_data</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">preprocessing</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">preprocessing_frames</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">validation_frames</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
 
 </h4>
 
@@ -6167,90 +6537,7 @@ once — the artifact serving uses.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>skyulf-core/skyulf/modeling/_tuning/engine.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1247</span>
-<span class="normal">1248</span>
-<span class="normal">1249</span>
-<span class="normal">1250</span>
-<span class="normal">1251</span>
-<span class="normal">1252</span>
-<span class="normal">1253</span>
-<span class="normal">1254</span>
-<span class="normal">1255</span>
-<span class="normal">1256</span>
-<span class="normal">1257</span>
-<span class="normal">1258</span>
-<span class="normal">1259</span>
-<span class="normal">1260</span>
-<span class="normal">1261</span>
-<span class="normal">1262</span>
-<span class="normal">1263</span>
-<span class="normal">1264</span>
-<span class="normal">1265</span>
-<span class="normal">1266</span>
-<span class="normal">1267</span>
-<span class="normal">1268</span>
-<span class="normal">1269</span>
-<span class="normal">1270</span>
-<span class="normal">1271</span>
-<span class="normal">1272</span>
-<span class="normal">1273</span>
-<span class="normal">1274</span>
-<span class="normal">1275</span>
-<span class="normal">1276</span>
-<span class="normal">1277</span>
-<span class="normal">1278</span>
-<span class="normal">1279</span>
-<span class="normal">1280</span>
-<span class="normal">1281</span>
-<span class="normal">1282</span>
-<span class="normal">1283</span>
-<span class="normal">1284</span>
-<span class="normal">1285</span>
-<span class="normal">1286</span>
-<span class="normal">1287</span>
-<span class="normal">1288</span>
-<span class="normal">1289</span>
-<span class="normal">1290</span>
-<span class="normal">1291</span>
-<span class="normal">1292</span>
-<span class="normal">1293</span>
-<span class="normal">1294</span>
-<span class="normal">1295</span>
-<span class="normal">1296</span>
-<span class="normal">1297</span>
-<span class="normal">1298</span>
-<span class="normal">1299</span>
-<span class="normal">1300</span>
-<span class="normal">1301</span>
-<span class="normal">1302</span>
-<span class="normal">1303</span>
-<span class="normal">1304</span>
-<span class="normal">1305</span>
-<span class="normal">1306</span>
-<span class="normal">1307</span>
-<span class="normal">1308</span>
-<span class="normal">1309</span>
-<span class="normal">1310</span>
-<span class="normal">1311</span>
-<span class="normal">1312</span>
-<span class="normal">1313</span>
-<span class="normal">1314</span>
-<span class="normal">1315</span>
-<span class="normal">1316</span>
-<span class="normal">1317</span>
-<span class="normal">1318</span>
-<span class="normal">1319</span>
-<span class="normal">1320</span>
-<span class="normal">1321</span>
-<span class="normal">1322</span>
-<span class="normal">1323</span>
-<span class="normal">1324</span>
-<span class="normal">1325</span>
-<span class="normal">1326</span>
-<span class="normal">1327</span>
-<span class="normal">1328</span>
-<span class="normal">1329</span>
-<span class="normal">1330</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1330</span>
 <span class="normal">1331</span>
 <span class="normal">1332</span>
 <span class="normal">1333</span>
@@ -6319,7 +6606,131 @@ once — the artifact serving uses.</p>
 <span class="normal">1396</span>
 <span class="normal">1397</span>
 <span class="normal">1398</span>
-<span class="normal">1399</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">tune</span><span class="p">(</span>
+<span class="normal">1399</span>
+<span class="normal">1400</span>
+<span class="normal">1401</span>
+<span class="normal">1402</span>
+<span class="normal">1403</span>
+<span class="normal">1404</span>
+<span class="normal">1405</span>
+<span class="normal">1406</span>
+<span class="normal">1407</span>
+<span class="normal">1408</span>
+<span class="normal">1409</span>
+<span class="normal">1410</span>
+<span class="normal">1411</span>
+<span class="normal">1412</span>
+<span class="normal">1413</span>
+<span class="normal">1414</span>
+<span class="normal">1415</span>
+<span class="normal">1416</span>
+<span class="normal">1417</span>
+<span class="normal">1418</span>
+<span class="normal">1419</span>
+<span class="normal">1420</span>
+<span class="normal">1421</span>
+<span class="normal">1422</span>
+<span class="normal">1423</span>
+<span class="normal">1424</span>
+<span class="normal">1425</span>
+<span class="normal">1426</span>
+<span class="normal">1427</span>
+<span class="normal">1428</span>
+<span class="normal">1429</span>
+<span class="normal">1430</span>
+<span class="normal">1431</span>
+<span class="normal">1432</span>
+<span class="normal">1433</span>
+<span class="normal">1434</span>
+<span class="normal">1435</span>
+<span class="normal">1436</span>
+<span class="normal">1437</span>
+<span class="normal">1438</span>
+<span class="normal">1439</span>
+<span class="normal">1440</span>
+<span class="normal">1441</span>
+<span class="normal">1442</span>
+<span class="normal">1443</span>
+<span class="normal">1444</span>
+<span class="normal">1445</span>
+<span class="normal">1446</span>
+<span class="normal">1447</span>
+<span class="normal">1448</span>
+<span class="normal">1449</span>
+<span class="normal">1450</span>
+<span class="normal">1451</span>
+<span class="normal">1452</span>
+<span class="normal">1453</span>
+<span class="normal">1454</span>
+<span class="normal">1455</span>
+<span class="normal">1456</span>
+<span class="normal">1457</span>
+<span class="normal">1458</span>
+<span class="normal">1459</span>
+<span class="normal">1460</span>
+<span class="normal">1461</span>
+<span class="normal">1462</span>
+<span class="normal">1463</span>
+<span class="normal">1464</span>
+<span class="normal">1465</span>
+<span class="normal">1466</span>
+<span class="normal">1467</span>
+<span class="normal">1468</span>
+<span class="normal">1469</span>
+<span class="normal">1470</span>
+<span class="normal">1471</span>
+<span class="normal">1472</span>
+<span class="normal">1473</span>
+<span class="normal">1474</span>
+<span class="normal">1475</span>
+<span class="normal">1476</span>
+<span class="normal">1477</span>
+<span class="normal">1478</span>
+<span class="normal">1479</span>
+<span class="normal">1480</span>
+<span class="normal">1481</span>
+<span class="normal">1482</span>
+<span class="normal">1483</span>
+<span class="normal">1484</span>
+<span class="normal">1485</span>
+<span class="normal">1486</span>
+<span class="normal">1487</span>
+<span class="normal">1488</span>
+<span class="normal">1489</span>
+<span class="normal">1490</span>
+<span class="normal">1491</span>
+<span class="normal">1492</span>
+<span class="normal">1493</span>
+<span class="normal">1494</span>
+<span class="normal">1495</span>
+<span class="normal">1496</span>
+<span class="normal">1497</span>
+<span class="normal">1498</span>
+<span class="normal">1499</span>
+<span class="normal">1500</span>
+<span class="normal">1501</span>
+<span class="normal">1502</span>
+<span class="normal">1503</span>
+<span class="normal">1504</span>
+<span class="normal">1505</span>
+<span class="normal">1506</span>
+<span class="normal">1507</span>
+<span class="normal">1508</span>
+<span class="normal">1509</span>
+<span class="normal">1510</span>
+<span class="normal">1511</span>
+<span class="normal">1512</span>
+<span class="normal">1513</span>
+<span class="normal">1514</span>
+<span class="normal">1515</span>
+<span class="normal">1516</span>
+<span class="normal">1517</span>
+<span class="normal">1518</span>
+<span class="normal">1519</span>
+<span class="normal">1520</span>
+<span class="normal">1521</span>
+<span class="normal">1522</span>
+<span class="normal">1523</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">tune</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">X</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
     <span class="n">y</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
@@ -6329,15 +6740,21 @@ once — the artifact serving uses.</p>
     <span class="n">validation_data</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">preprocessing</span><span class="p">:</span> <span class="s2">"FoldPreprocessor | None"</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">preprocessing_frames</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">validation_frames</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">TuningResult</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Runs hyperparameter tuning.</span>
 <span class="sd">    """</span>
-    <span class="k">if</span> <span class="n">preprocessing</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">validation_data</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-            <span class="s2">"Per-fold preprocessing refit is not supported with validation_data "</span>
-            <span class="s2">"holdout tuning. Disable the flag or remove the validation input."</span>
-        <span class="p">)</span>
+    <span class="c1"># Holdout tuning with per-fold preprocessing refit: the train and</span>
+    <span class="c1"># validation frames are concatenated (train rows masked -1 in a</span>
+    <span class="c1"># PredefinedSplit) so every strategy refits the chain on train rows</span>
+    <span class="c1"># only and scores candidates against the untouched validation split.</span>
+    <span class="n">holdout_refit</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">preprocessing</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+        <span class="ow">and</span> <span class="n">validation_data</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+        <span class="ow">and</span> <span class="n">preprocessing_frames</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+        <span class="ow">and</span> <span class="n">validation_frames</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+    <span class="p">)</span>
     <span class="c1"># 1. Prepare Estimator</span>
     <span class="c1"># We need a base estimator. Since our Calculator wraps the class,</span>
     <span class="c1"># we need to instantiate the underlying sklearn model with default params.</span>
@@ -6353,53 +6770,79 @@ once — the artifact serving uses.</p>
     <span class="n">base_estimator</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_instantiate_model</span><span class="p">(</span><span class="n">model_class</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">model_calculator</span><span class="o">.</span><span class="n">default_params</span><span class="p">)</span>
 
     <span class="c1"># halving/optuna searchers run their CV internally, where the engine's</span>
-    <span class="c1"># per-fold hook cannot reach; wrap preprocessing + model in a Pipeline</span>
-    <span class="c1"># so the searcher's own folds refit the preprocessor (F-15).</span>
-    <span class="n">wrapped</span> <span class="o">=</span> <span class="n">preprocessing</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
-    <span class="k">if</span> <span class="n">wrapped</span> <span class="ow">and</span> <span class="n">config</span><span class="o">.</span><span class="n">strategy</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"halving_grid"</span><span class="p">,</span> <span class="s2">"halving_random"</span><span class="p">,</span> <span class="s2">"optuna"</span><span class="p">):</span>
-        <span class="c1"># An sklearn transformer step can only hand X to the next step, so</span>
-        <span class="c1"># a chain that resamples, drops rows or transforms the target</span>
-        <span class="c1"># would leave the model fitting reshaped X against the original,</span>
-        <span class="c1"># un-aligned y. The static flag is a cheap fast path; the probe is</span>
-        <span class="c1"># authoritative (it catches any shape-changing step, including</span>
-        <span class="c1"># future ones) and fails closed. The grid/random custom loop</span>
-        <span class="c1"># threads the transformed y itself and stays enabled; the</span>
-        <span class="c1"># searcher-backed strategies fall back to pre-transformed scoring</span>
-        <span class="c1"># with an explicit log instead.</span>
-        <span class="n">misaligned</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span>
-            <span class="n">preprocessing</span><span class="p">,</span> <span class="s2">"changes_row_count"</span><span class="p">,</span> <span class="kc">False</span>
-        <span class="p">)</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">_preserves_row_and_target_alignment</span><span class="p">(</span><span class="n">preprocessing</span><span class="p">,</span> <span class="n">preprocessing_frames</span><span class="p">)</span>
-        <span class="k">if</span> <span class="n">misaligned</span><span class="p">:</span>
-            <span class="n">wrapped</span> <span class="o">=</span> <span class="kc">False</span>
-            <span class="k">if</span> <span class="n">log_callback</span><span class="p">:</span>
-                <span class="n">log_callback</span><span class="p">(</span>
-                    <span class="s2">"Per-fold preprocessing refit skipped for this tuning strategy: "</span>
-                    <span class="s2">"the step chain changes row count or the target (resampling / "</span>
-                    <span class="s2">"row drops / target re-encoding), which cannot stay aligned "</span>
-                    <span class="s2">"inside the searcher's pipeline. Tuning scores the "</span>
-                    <span class="s2">"pre-transformed data and may be optimistically biased."</span>
-                <span class="p">)</span>
+    <span class="c1"># per-fold hook cannot reach; wrap preprocessing + model in one</span>
+    <span class="c1"># fit-time meta-estimator so the searcher's own folds drive a true</span>
+    <span class="c1"># per-fold refit (F-15). Preprocessing runs inside ``fit`` on the</span>
+    <span class="c1"># fold's training rows, so chains that resample rows or re-encode</span>
+    <span class="c1"># the target are safe here too.</span>
+    <span class="n">searcher_strategy</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">strategy</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"halving_grid"</span><span class="p">,</span> <span class="s2">"halving_random"</span><span class="p">,</span> <span class="s2">"optuna"</span><span class="p">)</span>
+    <span class="n">wrapped</span> <span class="o">=</span> <span class="n">preprocessing</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">searcher_strategy</span>
+    <span class="k">if</span> <span class="n">wrapped</span> <span class="ow">and</span> <span class="n">preprocessing_frames</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="c1"># Numpy-only SDK call: the preprocessor needs named frames to</span>
+        <span class="c1"># run, so the wrap cannot be built. Keep today's behaviour —</span>
+        <span class="c1"># score the raw pre-transform payload — with an explicit log.</span>
+        <span class="n">wrapped</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="k">if</span> <span class="n">log_callback</span><span class="p">:</span>
+            <span class="n">log_callback</span><span class="p">(</span>
+                <span class="s2">"Per-fold preprocessing refit skipped for this tuning strategy: "</span>
+                <span class="s2">"no named frames are available to run the preprocessing chain "</span>
+                <span class="s2">"inside the searcher's folds. Scores are computed on the raw "</span>
+                <span class="s2">"pre-transform payload."</span>
+            <span class="p">)</span>
+    <span class="k">if</span> <span class="n">wrapped</span> <span class="ow">and</span> <span class="n">validation_data</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">validation_frames</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="c1"># Holdout tuning needs the validation rows as named frames too</span>
+        <span class="c1"># (the searcher scores them in the original pre-transform space).</span>
+        <span class="c1"># Without them the wrap would score misaligned rows, so fall back</span>
+        <span class="c1"># to raw-payload scoring with an explicit log instead.</span>
+        <span class="n">wrapped</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="k">if</span> <span class="n">log_callback</span><span class="p">:</span>
+            <span class="n">log_callback</span><span class="p">(</span>
+                <span class="s2">"Per-fold preprocessing refit skipped for holdout tuning: "</span>
+                <span class="s2">"no named validation frames are available to score against. "</span>
+                <span class="s2">"Scores are computed on the raw pre-transform payload."</span>
+            <span class="p">)</span>
     <span class="n">estimator</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="n">base_estimator</span>
     <span class="n">search_config</span> <span class="o">=</span> <span class="n">config</span>
-    <span class="k">if</span> <span class="n">wrapped</span><span class="p">:</span>
+    <span class="k">if</span> <span class="n">wrapped</span> <span class="ow">and</span> <span class="n">preprocessing_frames</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">frame_x</span> <span class="o">=</span> <span class="n">preprocessing_frames</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">feature_names</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="nb">tuple</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="nb">str</span><span class="p">,</span> <span class="n">frame_x</span><span class="o">.</span><span class="n">columns</span><span class="p">))</span> <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">frame_x</span><span class="p">,</span> <span class="s2">"columns"</span><span class="p">)</span> <span class="k">else</span> <span class="kc">None</span>
+        <span class="p">)</span>
         <span class="n">estimator</span> <span class="o">=</span> <span class="n">Pipeline</span><span class="p">(</span>
             <span class="p">[</span>
-                <span class="p">(</span><span class="s2">"preprocessing"</span><span class="p">,</span> <span class="n">FoldPreprocessingStep</span><span class="p">(</span><span class="n">preprocessing</span><span class="p">)),</span>
-                <span class="p">(</span><span class="s2">"model"</span><span class="p">,</span> <span class="n">base_estimator</span><span class="p">),</span>
+                <span class="p">(</span>
+                    <span class="s2">"model"</span><span class="p">,</span>
+                    <span class="n">FoldAwareModelStep</span><span class="p">(</span>
+                        <span class="n">estimator</span><span class="o">=</span><span class="n">base_estimator</span><span class="p">,</span>
+                        <span class="n">preprocessor</span><span class="o">=</span><span class="n">preprocessing</span><span class="p">,</span>
+                        <span class="n">feature_names</span><span class="o">=</span><span class="n">feature_names</span><span class="p">,</span>
+                    <span class="p">),</span>
+                <span class="p">)</span>
             <span class="p">]</span>
         <span class="p">)</span>
-        <span class="c1"># Search-space keys must route through the pipeline to the model step.</span>
+        <span class="k">if</span> <span class="n">log_callback</span><span class="p">:</span>
+            <span class="n">log_callback</span><span class="p">(</span>
+                <span class="s2">"Per-fold preprocessing refit runs inside the searcher via "</span>
+                <span class="s2">"the fold-aware estimator."</span>
+            <span class="p">)</span>
+        <span class="c1"># Search-space keys must route through the pipeline to the base estimator.</span>
         <span class="n">search_config</span> <span class="o">=</span> <span class="n">replace</span><span class="p">(</span>
             <span class="n">config</span><span class="p">,</span>
             <span class="n">search_space</span><span class="o">=</span><span class="p">{</span>
-                <span class="sa">f</span><span class="s2">"model__</span><span class="si">{</span><span class="n">key</span><span class="si">}</span><span class="s2">"</span><span class="p">:</span> <span class="n">values</span> <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">values</span> <span class="ow">in</span> <span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">search_space</span> <span class="ow">or</span> <span class="p">{})</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
+                <span class="sa">f</span><span class="s2">"model__estimator__</span><span class="si">{</span><span class="n">key</span><span class="si">}</span><span class="s2">"</span><span class="p">:</span> <span class="n">values</span>
+                <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">values</span> <span class="ow">in</span> <span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">search_space</span> <span class="ow">or</span> <span class="p">{})</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
             <span class="p">},</span>
         <span class="p">)</span>
 
     <span class="c1"># 2. Prepare Splitter</span>
     <span class="c1"># If validation data is provided, use PredefinedSplit to train on X and validate on validation_data</span>
     <span class="c1"># Otherwise use CV</span>
-    <span class="n">cv</span><span class="p">,</span> <span class="n">X_for_search</span><span class="p">,</span> <span class="n">y_for_search</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_build_cv_splitter</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">config</span><span class="p">,</span> <span class="n">validation_data</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">holdout_refit</span> <span class="ow">and</span> <span class="n">preprocessing_frames</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">validation_frames</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">cv</span><span class="p">,</span> <span class="n">X_for_search</span><span class="p">,</span> <span class="n">y_for_search</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_build_predefined_split_cv_frames</span><span class="p">(</span>
+            <span class="n">preprocessing_frames</span><span class="p">,</span> <span class="n">validation_frames</span>
+        <span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">cv</span><span class="p">,</span> <span class="n">X_for_search</span><span class="p">,</span> <span class="n">y_for_search</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_build_cv_splitter</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">config</span><span class="p">,</span> <span class="n">validation_data</span><span class="p">)</span>
 
     <span class="c1"># 3. Select Search Strategy</span>
     <span class="c1"># Handle multiclass metrics and map user-friendly names</span>
@@ -6408,7 +6851,13 @@ once — the artifact serving uses.</p>
     <span class="k">if</span> <span class="n">config</span><span class="o">.</span><span class="n">strategy</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">"grid"</span><span class="p">,</span> <span class="s2">"random"</span><span class="p">]:</span>
         <span class="c1"># Per-fold refit needs named frames (the adapter rebuilds a real</span>
         <span class="c1"># FeatureEngineer), not the numpy arrays used by the searchers.</span>
-        <span class="k">if</span> <span class="n">preprocessing</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">preprocessing_frames</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="c1"># Holdout mode is excluded: the splitter stage already produced</span>
+        <span class="c1"># the concatenated train+validation frames the mask is aligned to.</span>
+        <span class="k">if</span> <span class="p">(</span>
+            <span class="n">preprocessing</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+            <span class="ow">and</span> <span class="n">preprocessing_frames</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+            <span class="ow">and</span> <span class="n">validation_data</span> <span class="ow">is</span> <span class="kc">None</span>
+        <span class="p">):</span>
             <span class="n">X_for_search</span><span class="p">,</span> <span class="n">y_for_search</span> <span class="o">=</span> <span class="n">preprocessing_frames</span>
         <span class="c1"># Use custom loop to support progress and log callbacks</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_run_grid_or_random_search</span><span class="p">(</span>
@@ -6439,18 +6888,21 @@ once — the artifact serving uses.</p>
 
     <span class="c1"># 4. Run Search</span>
     <span class="c1"># The wrapped pipeline needs named frames (the adapter rebuilds a real</span>
-    <span class="c1"># FeatureEngineer); numpy conversion would strip column names.</span>
+    <span class="c1"># FeatureEngineer); numpy conversion would strip column names. In</span>
+    <span class="c1"># holdout mode the splitter stage already produced the concatenated</span>
+    <span class="c1"># train+validation frames the PredefinedSplit mask is aligned to.</span>
     <span class="k">if</span> <span class="n">wrapped</span><span class="p">:</span>
-        <span class="k">if</span> <span class="n">preprocessing_frames</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">validation_data</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">preprocessing_frames</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
             <span class="n">X_for_search</span><span class="p">,</span> <span class="n">y_for_search</span> <span class="o">=</span> <span class="n">preprocessing_frames</span>
         <span class="n">X_arr</span><span class="p">,</span> <span class="n">y_arr</span> <span class="o">=</span> <span class="n">X_for_search</span><span class="p">,</span> <span class="n">y_for_search</span>
     <span class="k">else</span><span class="p">:</span>
         <span class="n">X_arr</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_to_numpy</span><span class="p">(</span><span class="n">X_for_search</span><span class="p">)</span>
         <span class="n">y_arr</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_to_numpy</span><span class="p">(</span><span class="n">y_for_search</span><span class="p">)</span>
-    <span class="bp">self</span><span class="o">.</span><span class="n">_execute_search</span><span class="p">(</span><span class="n">searcher</span><span class="p">,</span> <span class="n">X_arr</span><span class="p">,</span> <span class="n">y_arr</span><span class="p">,</span> <span class="n">config</span><span class="p">)</span>
+    <span class="n">trial_errors</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_execute_search</span><span class="p">(</span><span class="n">searcher</span><span class="p">,</span> <span class="n">X_arr</span><span class="p">,</span> <span class="n">y_arr</span><span class="p">,</span> <span class="n">config</span><span class="p">,</span> <span class="n">log_callback</span><span class="p">)</span>
 
     <span class="c1"># 5. Extract Results</span>
-    <span class="n">best_params</span><span class="p">,</span> <span class="n">best_score</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_extract_best_result</span><span class="p">(</span><span class="n">searcher</span><span class="p">)</span>
+    <span class="n">first_trial_error</span> <span class="o">=</span> <span class="n">trial_errors</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">if</span> <span class="n">trial_errors</span> <span class="k">else</span> <span class="kc">None</span>
+    <span class="n">best_params</span><span class="p">,</span> <span class="n">best_score</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_extract_best_result</span><span class="p">(</span><span class="n">searcher</span><span class="p">,</span> <span class="n">first_trial_error</span><span class="p">)</span>
 
     <span class="c1"># Collect trials</span>
     <span class="n">trials</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_collect_trials</span><span class="p">(</span><span class="n">searcher</span><span class="p">,</span> <span class="n">config</span><span class="p">)</span>
