@@ -1191,12 +1191,11 @@ class TuningCalculator(BaseModelCalculator):
             class _TrialFailureHandler(logging.Handler):
                 def emit(self, record: logging.LogRecord) -> None:
                     message = record.getMessage()
-                    if "failed" not in message:
-                        return
-                    captured.append(message)
-                    if log_callback:
-                        with contextlib.suppress(Exception):
-                            log_callback(message)
+                    if "failed" in message:
+                        captured.append(message)
+                        if log_callback:
+                            with contextlib.suppress(Exception):
+                                log_callback(message)
 
             optuna_logger = logging.getLogger("optuna")
             handler = _TrialFailureHandler(level=logging.WARNING)
@@ -1401,8 +1400,7 @@ class TuningCalculator(BaseModelCalculator):
                 )
         estimator: Any = base_estimator
         search_config = config
-        if wrapped:
-            assert preprocessing_frames is not None  # narrowed above
+        if wrapped and preprocessing_frames is not None:
             frame_x = preprocessing_frames[0]
             feature_names = (
                 tuple(map(str, frame_x.columns)) if hasattr(frame_x, "columns") else None
@@ -1436,8 +1434,7 @@ class TuningCalculator(BaseModelCalculator):
         # 2. Prepare Splitter
         # If validation data is provided, use PredefinedSplit to train on X and validate on validation_data
         # Otherwise use CV
-        if holdout_refit:
-            assert preprocessing_frames is not None and validation_frames is not None
+        if holdout_refit and preprocessing_frames is not None and validation_frames is not None:
             cv, X_for_search, y_for_search = self._build_predefined_split_cv_frames(
                 preprocessing_frames, validation_frames
             )
@@ -1492,8 +1489,7 @@ class TuningCalculator(BaseModelCalculator):
         # holdout mode the splitter stage already produced the concatenated
         # train+validation frames the PredefinedSplit mask is aligned to.
         if wrapped:
-            if validation_data is None:
-                assert preprocessing_frames is not None  # narrowed by the wrap gating
+            if validation_data is None and preprocessing_frames is not None:
                 X_for_search, y_for_search = preprocessing_frames
             X_arr, y_arr = X_for_search, y_for_search
         else:

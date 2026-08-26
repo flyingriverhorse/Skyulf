@@ -19,6 +19,8 @@ Run from the repo root:
     .venv/Scripts/python.exe skyulf-core/benchmarks/bench_holdout_refit_leakage.py
 """
 
+from typing import Any, Literal, cast
+
 import numpy as np
 import pandas as pd
 from sklearn.datasets import make_classification
@@ -32,6 +34,8 @@ from skyulf.modeling.classification import (
 )
 from skyulf.preprocessing.encoding import WOEEncoderApplier, WOEEncoderCalculator
 from skyulf.preprocessing.fold_adapter import FeatureEngineerFoldAdapter
+
+_Strategy = Literal["grid", "random", "optuna", "halving_grid", "halving_random"]
 
 WOE_STEPS = [
     {
@@ -84,8 +88,11 @@ def section_1() -> None:
     # transformed rows — held-out labels sit inside the WOE table.
     X_all = pd.concat([X_tr, X_val], ignore_index=True)
     y_all = pd.concat([y_tr, y_val], ignore_index=True)
-    leaky_params = WOEEncoderCalculator().fit((X_all, y_all), WOE_STEPS[0]["params"])
-    X_leaky, _ = WOEEncoderApplier().apply((X_all, y_all), dict(leaky_params))
+    # functools.wraps copies the inner (X, y, config) signature, but the
+    # @fit_method/@apply_method wrappers take (df, config) — cast keeps the
+    # call shape honest for static analyzers.
+    leaky_params = cast(Any, WOEEncoderCalculator()).fit((X_all, y_all), WOE_STEPS[0]["params"])
+    X_leaky, _ = cast(Any, WOEEncoderApplier()).apply((X_all, y_all), dict(leaky_params))
 
     cv_config = TuningConfig(
         strategy="grid", metric="roc_auc", search_space=dict(LR_SPACE), cv_folds=5
@@ -108,7 +115,7 @@ def section_1() -> None:
     print(f"{'mode':<30}{'OLD (leaky)':>14}{'NEW (refit)':>14}")
     print(f"{'CV tuning (grid)':<30}{old_cv:>14.4f}{new_cv:>14.4f}")
 
-    def holdout_config(strategy: str) -> TuningConfig:
+    def holdout_config(strategy: _Strategy) -> TuningConfig:
         return TuningConfig(
             strategy=strategy, metric="roc_auc", n_trials=4, search_space=dict(LR_SPACE)
         )
@@ -121,7 +128,14 @@ def section_1() -> None:
         validation_data=(X_leaky.iloc[320:], y_all.iloc[320:]),
     )
     print(f"{'holdout tuning (grid)':<30}{old_holdout:>14.4f}{'':>14}")
-    for strategy in ["grid", "random", "halving_grid", "halving_random", "optuna"]:
+    strategies: list[_Strategy] = [
+        "grid",
+        "random",
+        "halving_grid",
+        "halving_random",
+        "optuna",
+    ]
+    for strategy in strategies:
         new = tune_once(
             TuningCalculator(LogisticRegressionCalculator()),
             X_tr,
@@ -158,12 +172,13 @@ def section_2() -> None:
     X_tr, y_tr, _X_te, _y_te = imbalanced_split()
     print(f"train: {len(X_tr)} rows, minority {y_tr.mean() * 100:.1f}%")
     print(f"{'strategy':<18}{'OLD (leaky)':>14}{'NEW (per-fold)':>16}{'delta':>10}")
-    for strategy, n_trials in [
+    searches: list[tuple[_Strategy, int]] = [
         ("grid", 12),
         ("random", 12),
         ("halving_random", 15),
         ("optuna", 15),
-    ]:
+    ]
+    for strategy, n_trials in searches:
         config = TuningConfig(
             strategy=strategy,
             metric="roc_auc",
