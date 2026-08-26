@@ -1,7 +1,7 @@
 """Tests for skyulf.modeling._boosting_progress iteration adapters."""
 
 import types
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 import pandas as pd
@@ -35,6 +35,7 @@ class TestDirectionHeuristic:
 
 class TestXgboostAdapter:
     def test_reports_one_based_iteration_with_direction(self):
+        assert XgboostIterationAdapter is not None
         seen: list[tuple] = []
         adapter = XgboostIterationAdapter(lambda *args: seen.append(args), total=10)
         evals_log = {"validation_0": {"logloss": [0.5, 0.45, 0.4123]}}
@@ -45,12 +46,14 @@ class TestXgboostAdapter:
         assert seen == [(5, 10, pytest.approx(0.4123), "logloss", "minimize")]
 
     def test_auc_metric_maximizes(self):
+        assert XgboostIterationAdapter is not None
         seen: list[tuple] = []
         adapter = XgboostIterationAdapter(lambda *args: seen.append(args), total=3)
         adapter.after_iteration(None, 0, {"validation_0": {"auc": [0.8]}})
         assert seen[0][3:] == ("auc", "maximize")
 
     def test_empty_evals_log_no_callback(self):
+        assert XgboostIterationAdapter is not None
         seen: list[tuple] = []
         adapter = XgboostIterationAdapter(lambda *args: seen.append(args), total=3)
         stop = adapter.after_iteration(None, 1, {})
@@ -58,6 +61,8 @@ class TestXgboostAdapter:
         assert seen == []
 
     def test_callback_exception_swallowed(self):
+        assert XgboostIterationAdapter is not None
+
         def boom(*_: Any) -> None:
             raise RuntimeError("downstream blew up")
 
@@ -191,8 +196,9 @@ class TestRefitForwardsIterationCallback:
     def _refit(self, iteration_callback):
         from skyulf.modeling._tuning.engine import TuningCalculator
         from skyulf.modeling._tuning.schemas import TuningConfig, TuningResult
+        from skyulf.modeling.base import BaseModelCalculator
 
-        tuner = TuningCalculator(_FakeBoostingCalculator())
+        tuner = TuningCalculator(cast("BaseModelCalculator", _FakeBoostingCalculator()))
         result = TuningResult(
             best_params={}, best_score=0.9, n_trials=1, trials=[], scoring_metric="accuracy"
         )

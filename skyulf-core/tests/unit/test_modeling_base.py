@@ -380,8 +380,8 @@ def test_fit_predict_preprocessing_routes_payload_to_calculator():
             progress_callback=None,
             log_callback=None,
             validation_data=None,
-            preprocessing=None,
             iteration_callback=None,
+            preprocessing=None,
             validation_frames=None,
         ):
             self.fit_kwargs = {

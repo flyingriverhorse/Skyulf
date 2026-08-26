@@ -509,6 +509,7 @@ def test_fit_without_model_class_raises():
             progress_callback=None,
             log_callback=None,
             validation_data=None,
+            iteration_callback=None,
         ):
             return None
 
@@ -601,7 +602,7 @@ def _tune_with_spied_halving_build(
 
     X, y = _clf_xy(n=60)
     if frames == "default":
-        frames = (pd.DataFrame(X, columns=list("abcd")), pd.Series(y, name="target"))
+        frames = (pd.DataFrame(X, columns=list("abcd")), pd.Series(y, name="target"))  # ty: ignore[invalid-argument-type]
     cfg = TuningConfig(
         strategy="halving_grid",
         metric="accuracy",
@@ -794,7 +795,7 @@ def test_optuna_refits_every_fold_without_leakage():
     _IndexSpyAdapter.transform_calls.clear()
 
     X_np, y_np = _clf_xy(n=120)
-    X = pd.DataFrame(X_np, columns=list("abcd"))
+    X = pd.DataFrame(X_np, columns=list("abcd"))  # ty: ignore[invalid-argument-type]
     y = pd.Series(y_np, name="target")
     cfg = TuningConfig(
         strategy="optuna",
@@ -822,7 +823,7 @@ def test_halving_random_refits_folds_without_leakage():
     _IndexSpyAdapter.transform_calls.clear()
 
     X_np, y_np = _clf_xy(n=120)
-    X = pd.DataFrame(X_np, columns=list("abcd"))
+    X = pd.DataFrame(X_np, columns=list("abcd"))  # ty: ignore[invalid-argument-type]
     y = pd.Series(y_np, name="target")
     cfg = TuningConfig(
         strategy="halving_random",
@@ -855,10 +856,14 @@ def test_optuna_target_mutating_chain_matches_grid_scores():
             return X, y.map(self.mapping_) if y is not None else y
 
     X_np, y_int = _clf_xy(n=120)
-    X = pd.DataFrame(X_np, columns=list("abcd"))
+    X = pd.DataFrame(X_np, columns=list("abcd"))  # ty: ignore[invalid-argument-type]
     y_str = pd.Series(y_int, name="Species").map({0: "setosa", 1: "versicolor"})
 
-    base = {"metric": "accuracy", "cv_folds": 3, "search_space": {"n_estimators": [10]}}
+    base: dict[str, Any] = {
+        "metric": "accuracy",
+        "cv_folds": 3,
+        "search_space": {"n_estimators": [10]},
+    }
     _m_grid, grid_result = TuningCalculator(XGBClassifierCalculator()).fit(
         X,
         y_str,
@@ -1076,7 +1081,16 @@ class _FlipModelClassCalculator(BaseModelCalculator):
             return LogisticRegression
         return None
 
-    def fit(self, X, y, config, progress_callback=None, log_callback=None, validation_data=None):
+    def fit(
+        self,
+        X,
+        y,
+        config,
+        progress_callback=None,
+        log_callback=None,
+        validation_data=None,
+        iteration_callback=None,
+    ):
         return None
 
 
