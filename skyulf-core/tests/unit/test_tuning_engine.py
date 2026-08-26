@@ -540,15 +540,14 @@ def test_fit_halving_grid_search():
 
 
 # ---------------------------------------------------------------------------
-# Halving/optuna Pipeline wrap: row-count-changing preprocessing guard
+# Halving/optuna fold-aware wrap: leakage-free per-fold refit for ALL chains
 # ---------------------------------------------------------------------------
 
 
 class _StubPreprocessor:
-    """Minimal FoldPreprocessor stub with configurable flag + fit_transform."""
+    """Minimal FoldPreprocessor stub with a configurable fit_transform."""
 
-    def __init__(self, changes_row_count: bool, fit_transform=None):
-        self.changes_row_count = changes_row_count
+    def __init__(self, fit_transform=None):
         self._fit_transform = fit_transform
 
     def fit_transform(self, X, y):
@@ -560,14 +559,16 @@ class _StubPreprocessor:
         return X, y
 
 
-def _tune_with_spied_halving_build(monkeypatch, preprocessing):
+def _tune_with_spied_halving_build(monkeypatch, preprocessing, frames="default", extracted=None):
     """Run halving_grid tune() with the searcher machinery spied/stubbed.
 
     Returns ``(estimator_passed_to_searcher, logs, result)`` without running a
-    real search.
+    real search. ``frames=None`` simulates a numpy-only SDK call.
     """
     built: dict[str, Any] = {}
     logs: list[str] = []
+    if extracted is None:
+        extracted = ({"model__estimator__C": 1.0}, 0.9)
 
     def fake_build(self, search_config, estimator, cv, metric, log_callback):
         built["estimator"] = estimator
@@ -578,12 +579,14 @@ def _tune_with_spied_halving_build(monkeypatch, preprocessing):
     monkeypatch.setattr(
         TuningCalculator,
         "_extract_best_result",
-        lambda self, searcher, first_trial_error=None: ({"C": 1.0}, 0.9),
+        lambda self, searcher, first_trial_error=None: extracted,
     )
     monkeypatch.setattr(TuningCalculator, "_collect_trials", lambda self, searcher, config: [])
     monkeypatch.setattr(TuningCalculator, "_log_final_completion", lambda self, *a: None)
 
     X, y = _clf_xy(n=60)
+    if frames == "default":
+        frames = (pd.DataFrame(X, columns=list("abcd")), pd.Series(y, name="target"))
     cfg = TuningConfig(
         strategy="halving_grid",
         metric="accuracy",
@@ -596,145 +599,205 @@ def _tune_with_spied_halving_build(monkeypatch, preprocessing):
         cfg,
         log_callback=logs.append,
         preprocessing=preprocessing,
-        preprocessing_frames=(pd.DataFrame(X), pd.Series(y)),
+        preprocessing_frames=frames,
     )
     return built["estimator"], logs, result
 
 
-def test_halving_wrap_refused_for_row_shaping_preprocessing(monkeypatch):
-    """A resampling/row-dropping chain must not enter the searcher Pipeline.
-
-    An sklearn transformer step can only hand X forward, so the model would be
-    fitted on reshaped rows against the original y; the engine skips the wrap
-    and falls back to pre-transformed scoring with an explicit log instead.
+def test_halving_wrap_accepts_row_shaping_preprocessing(monkeypatch):
+    """Row-resampling/row-dropping chains now enter the searcher wrap: the
+    fold-aware estimator runs them inside ``fit`` on each fold's training
+    rows, so reshaped X and the transformed y stay aligned by construction.
     """
+    from skyulf.modeling._tuning.fold_pipeline import FoldAwareModelStep
+
     estimator, logs, result = _tune_with_spied_halving_build(
-        monkeypatch, _StubPreprocessor(changes_row_count=True)
+        monkeypatch,
+        _StubPreprocessor(fit_transform=lambda X, y: (X.iloc[:-1], y.iloc[:-1])),
     )
-    assert not isinstance(estimator, Pipeline)
-    assert any("Per-fold preprocessing refit skipped" in message for message in logs)
-    # No wrap means no ``model__`` key prefixing to strip back out.
+    assert isinstance(estimator, Pipeline)
+    assert isinstance(estimator.named_steps["model"], FoldAwareModelStep)
+    assert any("fold-aware estimator" in message for message in logs)
     assert result.best_params == {"C": 1.0}
 
 
-def test_halving_wrap_kept_for_shape_preserving_preprocessing(monkeypatch):
+def test_halving_wrap_accepts_target_mutating_preprocessing(monkeypatch):
+    """A target-only re-encoding (the XGBoost string-target crash case) is
+    wrapped too — predictions are mapped back to the original label space."""
+    from skyulf.modeling._tuning.fold_pipeline import FoldAwareModelStep
+
     estimator, logs, _result = _tune_with_spied_halving_build(
-        monkeypatch, _StubPreprocessor(changes_row_count=False)
+        monkeypatch,
+        _StubPreprocessor(fit_transform=lambda X, y: (X, y.map({0: "neg", 1: "pos"}))),
     )
     assert isinstance(estimator, Pipeline)
-    assert not any("Per-fold preprocessing refit skipped" in message for message in logs)
+    assert isinstance(estimator.named_steps["model"], FoldAwareModelStep)
+    assert not any("skipped" in message for message in logs)
 
 
-def test_alignment_probe_refuses_row_dropping_preprocessor(monkeypatch):
-    """The runtime probe catches row drops even when the static flag is False."""
-    estimator, logs, _result = _tune_with_spied_halving_build(
+def test_halving_wrap_strips_model_estimator_prefix(monkeypatch):
+    """best_params and per-trial params keep the caller's original keys after
+    routing the search space through ``model__estimator__``."""
+    _estimator, _logs, result = _tune_with_spied_halving_build(
         monkeypatch,
-        _StubPreprocessor(
-            changes_row_count=False,
-            fit_transform=lambda X, y: (X.iloc[:-1], y.iloc[:-1]),
-        ),
+        _StubPreprocessor(),
+        extracted=({"model__estimator__C": 1.0}, 0.9),
+    )
+    assert result.best_params == {"C": 1.0}
+
+
+def test_halving_frameless_sdk_call_falls_back_with_log(monkeypatch):
+    """Without named frames (numpy-only library call) the chain cannot run
+    inside the searcher's folds; keep scoring the raw payload with a log."""
+    estimator, logs, result = _tune_with_spied_halving_build(
+        monkeypatch,
+        _StubPreprocessor(),
+        frames=None,
+        extracted=({"C": 1.0}, 0.9),
     )
     assert not isinstance(estimator, Pipeline)
-    assert any("Per-fold preprocessing refit skipped" in message for message in logs)
+    assert any("no named frames" in message for message in logs)
+    assert result.best_params == {"C": 1.0}
 
 
-def test_alignment_probe_refuses_target_mutating_preprocessor(monkeypatch):
-    """A target-only re-encoding keeps rows but changes y values; probe refuses."""
-    estimator, logs, _result = _tune_with_spied_halving_build(
-        monkeypatch,
-        _StubPreprocessor(
-            changes_row_count=False,
-            fit_transform=lambda X, y: (X, y.map({0: "neg", 1: "pos"})),
-        ),
-    )
-    assert not isinstance(estimator, Pipeline)
-    assert any("Per-fold preprocessing refit skipped" in message for message in logs)
+class _IndexSpyAdapter:
+    """Records the row indices every fit_transform/transform call sees.
 
-
-def test_alignment_probe_fails_closed_when_fit_transform_raises(monkeypatch):
-    def broken(X, y):
-        raise RuntimeError("cannot probe")
-
-    estimator, logs, _result = _tune_with_spied_halving_build(
-        monkeypatch,
-        _StubPreprocessor(changes_row_count=False, fit_transform=broken),
-    )
-    assert not isinstance(estimator, Pipeline)
-    assert any("Per-fold preprocessing refit skipped" in message for message in logs)
-
-
-def test_alignment_probe_without_frames_relies_on_static_flag():
-    X, y = _clf_xy(n=30)
-    frames = (pd.DataFrame(X), pd.Series(y))
-    assert engine_mod._preserves_row_and_target_alignment(
-        _StubPreprocessor(changes_row_count=False), frames
-    )
-    assert not engine_mod._preserves_row_and_target_alignment(
-        _StubPreprocessor(
-            changes_row_count=False,
-            fit_transform=lambda X, y: (X.iloc[:-1], y.iloc[:-1]),
-        ),
-        frames,
-    )
-    # No named frames to probe (numpy-only library call): nothing to check.
-    assert engine_mod._preserves_row_and_target_alignment(
-        _StubPreprocessor(changes_row_count=False), None
-    )
-
-
-def test_misaligned_fallback_searches_transformed_frames(monkeypatch):
-    """When the probe refuses the wrap (target re-encoding), the fallback must
-    hand the searcher the once-transformed frames — not the raw pre-transform
-    payload. Searching the raw string target is what crashed every optuna
-    trial for boosting models (XGBoost/LightGBM can't fit string labels).
+    Records into class-level lists: ``FoldAwareModelStep`` deep-copies the
+    adapter per fold, so instance state would not survive back to the test.
     """
-    captured: dict[str, Any] = {}
 
-    def fake_build(self, search_config, estimator, cv, metric, log_callback):
-        return object()
+    fit_calls: list[frozenset] = []
+    transform_calls: list[frozenset] = []
 
-    def fake_execute(self, searcher, X_arr, y_arr, config, log_callback=None):
-        captured["y_arr"] = y_arr
-        return []
+    def fit_transform(self, X, y):
+        type(self).fit_calls.append(frozenset(X.index))
+        return X, y
 
-    monkeypatch.setattr(TuningCalculator, "_build_halving_searcher", fake_build)
-    monkeypatch.setattr(TuningCalculator, "_execute_search", fake_execute)
-    monkeypatch.setattr(
-        TuningCalculator,
-        "_extract_best_result",
-        lambda self, searcher, first_trial_error=None: ({"C": 1.0}, 0.9),
+    def transform(self, X, y):
+        type(self).transform_calls.append(frozenset(X.index))
+        return X, y
+
+
+def _expected_kfold_partitions(n: int, cv_folds: int = 3) -> list[tuple[frozenset, frozenset]]:
+    """Mirror the engine's default splitter (k_fold, shuffle=True, seed=42)."""
+    from sklearn.model_selection import KFold
+
+    splits = KFold(n_splits=cv_folds, shuffle=True, random_state=42).split(range(n))
+    return [(frozenset(train.tolist()), frozenset(val.tolist())) for train, val in splits]
+
+
+def _assert_fold_discipline(n: int, cv_folds: int = 3) -> None:
+    """The headline leakage assertions: fits stay inside their fold's training
+    rows, validations get the complementary rows."""
+    folds = _expected_kfold_partitions(n, cv_folds)
+    fit_calls = _IndexSpyAdapter.fit_calls
+    transform_calls = _IndexSpyAdapter.transform_calls
+    assert len(fit_calls) >= cv_folds, "preprocessing must refit inside the searcher's folds"
+    for rows in fit_calls:
+        assert any(rows <= train and rows.isdisjoint(val) for train, val in folds), (
+            f"fit saw rows outside one training fold: {sorted(rows)[:10]}..."
+        )
+    val_sets = {val for _train, val in folds}
+    assert val_sets <= set(transform_calls), (
+        "every validation fold must be scored through transform"
     )
-    monkeypatch.setattr(TuningCalculator, "_collect_trials", lambda self, searcher, config: [])
-    monkeypatch.setattr(TuningCalculator, "_log_final_completion", lambda self, *a: None)
 
-    X, y_int = _clf_xy(n=60)
-    # Pre-transform target is strings (e.g. "Species"); the upstream encoder maps
-    # them back to integers — the exact shape the F-15 LabelEncoder node has.
-    y_str = pd.Series(y_int, name="Species").map({0: "neg", 1: "pos"})
-    encoder = _StubPreprocessor(
-        changes_row_count=False,
-        fit_transform=lambda X, y: (X, y.map({"neg": 0, "pos": 1})),
-    )
 
+def test_optuna_refits_every_fold_without_leakage():
+    """Leakage proof (optuna): every fit_transform sees exactly one fold's
+    training rows, and each validation fold is transformed for scoring."""
+    pytest.importorskip("optuna")
+    _IndexSpyAdapter.fit_calls.clear()
+    _IndexSpyAdapter.transform_calls.clear()
+
+    X_np, y_np = _clf_xy(n=120)
+    X = pd.DataFrame(X_np, columns=list("abcd"))
+    y = pd.Series(y_np, name="target")
     cfg = TuningConfig(
-        strategy="halving_grid",
+        strategy="optuna",
         metric="accuracy",
-        search_space={"C": [0.1, 1.0]},
+        n_trials=2,
+        search_space={"C": [1.0]},
+        cv_folds=3,
+    )
+    result = _tuner_clf().tune(
+        X_np, y_np, cfg, preprocessing=_IndexSpyAdapter(), preprocessing_frames=(X, y)
+    )
+
+    assert result.n_trials >= 1
+    train_sets = {train for train, _val in _expected_kfold_partitions(len(X))}
+    assert train_sets <= set(_IndexSpyAdapter.fit_calls), (
+        "optuna must refit on each fold's full training rows"
+    )
+    _assert_fold_discipline(len(X))
+
+
+def test_halving_random_refits_folds_without_leakage():
+    """Leakage proof (halving_random): even with rung subsampling, no fit ever
+    sees a row from the fold it is scored against."""
+    _IndexSpyAdapter.fit_calls.clear()
+    _IndexSpyAdapter.transform_calls.clear()
+
+    X_np, y_np = _clf_xy(n=120)
+    X = pd.DataFrame(X_np, columns=list("abcd"))
+    y = pd.Series(y_np, name="target")
+    cfg = TuningConfig(
+        strategy="halving_random",
+        metric="accuracy",
+        n_trials=4,
+        search_space={"C": [0.1, 1.0, 10.0]},
         cv_folds=3,
     )
     _tuner_clf().tune(
-        pd.DataFrame(X),
-        y_str,
-        cfg,
-        preprocessing=encoder,
-        preprocessing_frames=(pd.DataFrame(X), y_str),
+        X_np, y_np, cfg, preprocessing=_IndexSpyAdapter(), preprocessing_frames=(X, y)
     )
 
-    import numpy as np
+    _assert_fold_discipline(len(X))
 
-    y_searched = captured["y_arr"]
-    assert np.issubdtype(np.asarray(y_searched).dtype, np.number), (
-        "fallback must search the encoded target, not the raw strings"
+
+def test_optuna_target_mutating_chain_matches_grid_scores():
+    """End-to-end on today's crash case: a target-mutating chain (string
+    labels) + XGBoost under optuna now runs per-fold instead of failing or
+    falling back — and scores the same as the grid path on the same folds."""
+    pytest.importorskip("optuna")
+    pytest.importorskip("xgboost")
+    from skyulf.modeling.classification import XGBClassifierCalculator
+
+    class _StrToIntAdapter:
+        def fit_transform(self, X, y):
+            self.mapping_ = {"setosa": 0, "versicolor": 1}
+            return X, y.map(self.mapping_)
+
+        def transform(self, X, y):
+            return X, y.map(self.mapping_) if y is not None else y
+
+    X_np, y_int = _clf_xy(n=120)
+    X = pd.DataFrame(X_np, columns=list("abcd"))
+    y_str = pd.Series(y_int, name="Species").map({0: "setosa", 1: "versicolor"})
+
+    base = {"metric": "accuracy", "cv_folds": 3, "search_space": {"n_estimators": [10]}}
+    _m_grid, grid_result = TuningCalculator(XGBClassifierCalculator()).fit(
+        X,
+        y_str,
+        config=TuningConfig(strategy="grid", **base),
+        preprocessing=_StrToIntAdapter(),
+    )
+    logs: list[str] = []
+    _m_optuna, optuna_result = TuningCalculator(XGBClassifierCalculator()).fit(
+        X,
+        y_str,
+        config=TuningConfig(strategy="optuna", n_trials=1, **base),
+        log_callback=logs.append,
+        preprocessing=_StrToIntAdapter(),
+    )
+
+    assert any("fold-aware estimator" in message for message in logs), (
+        "optuna must take the fold-aware wrap, not a fallback"
+    )
+    assert optuna_result.best_params == {"n_estimators": 10}
+    assert optuna_result.best_score == pytest.approx(grid_result.best_score, abs=1e-6), (
+        "per-fold optuna and grid must score the same single candidate equally"
     )
 
 

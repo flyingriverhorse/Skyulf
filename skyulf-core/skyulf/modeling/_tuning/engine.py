@@ -1,7 +1,6 @@
 """Hyperparameter Tuner implementation."""
 
 import contextlib
-import copy
 import logging
 import warnings
 from collections.abc import Callable
@@ -33,7 +32,7 @@ from ...engines import SkyulfDataFrame
 from ...engines.sklearn_bridge import SklearnBridge
 from .._sklearn_compat import normalize_logistic_regression_params
 from ..base import BaseModelApplier, BaseModelCalculator
-from .fold_pipeline import FoldPreprocessingStep
+from .fold_pipeline import FoldAwareModelStep
 from .reporter import ConsoleTrialReporter
 from .schemas import TuningConfig, TuningResult
 
@@ -106,38 +105,6 @@ def _ensure_optuna_loaded() -> bool:
                     "Optuna installed but OptunaSearchCV not found. Install 'optuna-integration'."
                 )
     return HAS_OPTUNA
-
-
-# Rows sampled to probe whether a preprocessor keeps X/y aligned inside the
-# halving/optuna Pipeline wrap (see _preserves_row_and_target_alignment).
-_ALIGNMENT_PROBE_ROWS = 200
-
-
-def _preserves_row_and_target_alignment(preprocessing: Any, frames: tuple[Any, Any] | None) -> bool:
-    """Whether the preprocessor's fit_transform keeps rows and target aligned.
-
-    An sklearn Pipeline transformer can only hand ``X`` to the next step, so
-    the wrap is only valid when the chain preserves the row count and leaves
-    ``y`` untouched. Static step lists drift, so this probes the real
-    implementation on a small slice: any row-count change or target
-    transformation (resampling, row drops, target-only label/ordinal
-    encoding) is detected. Fails closed — a probe that raises refuses the
-    wrap. Without named frames (numpy-only library calls) there is nothing
-    to probe; the caller's static flag is the only check there.
-    """
-    if frames is None:
-        return True
-    X, y = frames
-    try:
-        sample_x, sample_y = X.head(_ALIGNMENT_PROBE_ROWS), y.head(_ALIGNMENT_PROBE_ROWS)
-        X_out, y_out = copy.deepcopy(preprocessing).fit_transform(sample_x, sample_y)
-        if len(X_out) != len(sample_x):
-            return False
-        y_in = SklearnBridge.to_sklearn((sample_x, sample_y))[1]
-        y_probed = SklearnBridge.to_sklearn((X_out, y_out))[1]
-        return y_in.shape == y_probed.shape and bool(np.array_equal(y_in, y_probed))
-    except Exception:
-        return False
 
 
 class TuningCalculator(BaseModelCalculator):
@@ -360,11 +327,11 @@ class TuningCalculator(BaseModelCalculator):
         each candidate fold's training rows during search, so tuning scores
         stop leaking held-out rows into preprocessing statistics. The custom
         ``grid``/``random`` loop applies it directly; ``halving_*``/``optuna``
-        get it via a Pipeline wrapper whose searcher-internal CV drives the
-        refit. Chains that change the row count or the target (resampling,
-        row drops, target re-encoding) cannot stay aligned inside that wrapper
-        and fall back to scoring data transformed once on the full training
-        set, with an explicit log instead. When set, the
+        get it via a fold-aware meta-estimator whose ``fit`` runs the chain
+        inside every searcher-internal fold — safe even for chains that
+        resample rows or re-encode the target. Only frameless SDK calls
+        (no named frames for the preprocessor to run on) score the raw
+        pre-transform payload, with an explicit log instead. When set, the
         final best-model refit runs the full split through the preprocessor
         once — the artifact serving uses.
         """
@@ -1290,12 +1257,15 @@ class TuningCalculator(BaseModelCalculator):
 
     @staticmethod
     def _strip_model_prefix(params: Any) -> Any:
-        """Removes the internal ``model__`` pipeline prefix from extracted params
-        (see ``tune``'s wrapped Pipeline path) so callers see the original
-        search-space keys."""
+        """Removes the internal ``model__estimator__`` pipeline prefix from
+        extracted params (see ``tune``'s wrapped Pipeline path) so callers see
+        the original search-space keys."""
         if not isinstance(params, dict):
             return params
-        return {key.removeprefix("model__"): value for key, value in params.items()}
+        return {
+            key.removeprefix("model__").removeprefix("estimator__"): value
+            for key, value in params.items()
+        }
 
     @staticmethod
     def _log_final_completion(
@@ -1353,66 +1323,56 @@ class TuningCalculator(BaseModelCalculator):
         base_estimator = self._instantiate_model(model_class, self.model_calculator.default_params)
 
         # halving/optuna searchers run their CV internally, where the engine's
-        # per-fold hook cannot reach; wrap preprocessing + model in a Pipeline
-        # so the searcher's own folds refit the preprocessor (F-15).
-        wrapped = preprocessing is not None
-        fallback_frames: tuple[Any, Any] | None = None
-        if wrapped and config.strategy in ("halving_grid", "halving_random", "optuna"):
-            # An sklearn transformer step can only hand X to the next step, so
-            # a chain that resamples, drops rows or transforms the target
-            # would leave the model fitting reshaped X against the original,
-            # un-aligned y. The static flag is a cheap fast path; the probe is
-            # authoritative (it catches any shape-changing step, including
-            # future ones) and fails closed. The grid/random custom loop
-            # threads the transformed y itself and stays enabled; the
-            # searcher-backed strategies fall back to scoring data transformed
-            # once on the full training set (the pre-F-15 behaviour) — scoring
-            # the raw pre-transform frames would hand models an unfit target
-            # (e.g. string labels to XGBoost) and fail every trial.
-            misaligned = getattr(
-                preprocessing, "changes_row_count", False
-            ) or not _preserves_row_and_target_alignment(preprocessing, preprocessing_frames)
-            if misaligned:
-                wrapped = False
-                if log_callback:
-                    log_callback(
-                        "Per-fold preprocessing refit skipped for this tuning strategy: "
-                        "the step chain changes row count or the target (resampling / "
-                        "row drops / target re-encoding), which cannot stay aligned "
-                        "inside the searcher's pipeline. The chain is applied once to "
-                        "the full training set before the search instead — scores may "
-                        "be optimistically biased."
-                    )
-                if preprocessing_frames is not None:
-                    try:
-                        fallback_frames = copy.deepcopy(preprocessing).fit_transform(
-                            *preprocessing_frames
-                        )
-                    except Exception:
-                        # Fail closed like the probe: a chain we cannot apply
-                        # once keeps the raw frames (pre-F-15 scoring would
-                        # crash per trial for unfit targets, but a hard failure
-                        # here would violate the never-fail-the-run contract).
-                        fallback_frames = None
-                        if log_callback:
-                            log_callback(
-                                "One-shot preprocessing apply failed; tuning scores the "
-                                "raw pre-transform data instead."
-                            )
+        # per-fold hook cannot reach; wrap preprocessing + model in one
+        # fit-time meta-estimator so the searcher's own folds drive a true
+        # per-fold refit (F-15). Preprocessing runs inside ``fit`` on the
+        # fold's training rows, so chains that resample rows or re-encode
+        # the target are safe here too.
+        searcher_strategy = config.strategy in ("halving_grid", "halving_random", "optuna")
+        wrapped = preprocessing is not None and searcher_strategy
+        if wrapped and preprocessing_frames is None:
+            # Numpy-only SDK call: the preprocessor needs named frames to
+            # run, so the wrap cannot be built. Keep today's behaviour —
+            # score the raw pre-transform payload — with an explicit log.
+            wrapped = False
+            if log_callback:
+                log_callback(
+                    "Per-fold preprocessing refit skipped for this tuning strategy: "
+                    "no named frames are available to run the preprocessing chain "
+                    "inside the searcher's folds. Scores are computed on the raw "
+                    "pre-transform payload."
+                )
         estimator: Any = base_estimator
         search_config = config
         if wrapped:
+            assert preprocessing_frames is not None  # narrowed above
+            frame_x = preprocessing_frames[0]
+            feature_names = (
+                tuple(map(str, frame_x.columns)) if hasattr(frame_x, "columns") else None
+            )
             estimator = Pipeline(
                 [
-                    ("preprocessing", FoldPreprocessingStep(preprocessing)),
-                    ("model", base_estimator),
+                    (
+                        "model",
+                        FoldAwareModelStep(
+                            estimator=base_estimator,
+                            preprocessor=preprocessing,
+                            feature_names=feature_names,
+                        ),
+                    )
                 ]
             )
-            # Search-space keys must route through the pipeline to the model step.
+            if log_callback:
+                log_callback(
+                    "Per-fold preprocessing refit runs inside the searcher via "
+                    "the fold-aware estimator."
+                )
+            # Search-space keys must route through the pipeline to the base estimator.
             search_config = replace(
                 config,
                 search_space={
-                    f"model__{key}": values for key, values in (config.search_space or {}).items()
+                    f"model__estimator__{key}": values
+                    for key, values in (config.search_space or {}).items()
                 },
             )
 
@@ -1464,10 +1424,6 @@ class TuningCalculator(BaseModelCalculator):
             if preprocessing_frames is not None:
                 X_for_search, y_for_search = preprocessing_frames
             X_arr, y_arr = X_for_search, y_for_search
-        elif fallback_frames is not None:
-            # Misaligned-chain fallback: search the once-transformed frames.
-            X_arr = self._to_numpy(fallback_frames[0])
-            y_arr = self._to_numpy(fallback_frames[1])
         else:
             X_arr = self._to_numpy(X_for_search)
             y_arr = self._to_numpy(y_for_search)

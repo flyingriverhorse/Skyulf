@@ -493,14 +493,13 @@ leaving, not the signal). The shapes that still fall back to pre-transformed
 scoring with an explicit job-log warning: merged graphs that are not
 fork-join (nested merges, row-count-changing branches, splitters mid-chain),
 holdout tuning with an explicit `validation_data` split (no folds to refit
-around), preprocessing chains that change the row count or the target
-(resampling, row drops, target re-encoding) under `halving_*`/`optuna` — an
-sklearn pipeline transformer can only hand `X` forward, so the reshaped rows
-would lose alignment with `y`; the engine refuses that wrap via a static
-`changes_row_count` flag plus a runtime alignment probe that fails closed,
-rather than silently misaligning them — and any graph with a data-dependent
-step configured before the last splitter (payload reconstruction would
-re-fit it on the full frame). Library users calling CV/tuning directly get
+around), and any graph with a data-dependent step configured before the last
+splitter (payload reconstruction would re-fit it on the full frame). Chains
+that change the row count or the target (resampling, row drops, target
+re-encoding) are leakage-free under `halving_*`/`optuna` too: a fold-aware
+estimator runs the chain inside `fit` on each fold's training rows and maps
+predictions back to the original label space so scorers compare against the
+untouched target. Library users calling CV/tuning directly get
 the same guarantee by passing a preprocessor — e.g. `FeatureEngineerFoldAdapter(
 steps_config, target_column)` — via the `preprocessing` parameter; without
 it, CV/tuning scores the pre-transformed data and remains an optimistic

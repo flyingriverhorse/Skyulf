@@ -4,8 +4,9 @@ Tuning's internal CV had the same leak as plain CV: preprocessing was
 fitted once on the full training split, so every candidate score was
 optimistically biased. The ``preprocessing`` hook re-fits inside each
 candidate fold: for ``grid``/``random`` via the engine's own fold loop,
-and for ``halving_*``/``optuna`` by wrapping preprocessing + model in an
-sklearn ``Pipeline`` so the searcher's internal CV refits per fold.
+and for ``halving_*``/``optuna`` by wrapping preprocessing + model in one
+fold-aware meta-estimator so the searcher's internal CV refits per fold —
+including chains that change the row count or the target.
 Holdout tuning with ``validation_data`` is rejected with an explicit
 diagnostic — there are no folds to refit around.
 """
@@ -154,8 +155,8 @@ def _disc(auc: float) -> float:
 
 
 def test_tuning_halving_grid_refits_woe_noise_near_chance() -> None:
-    """halving_grid runs its CV inside the sklearn searcher; the Pipeline
-    wrapper must refit WOE per fold there too, killing the noise-target leak."""
+    """halving_grid runs its CV inside the sklearn searcher; the fold-aware
+    estimator must refit WOE per fold there too, killing the noise-target leak."""
     from skyulf.preprocessing.encoding import WOEEncoderApplier, WOEEncoderCalculator
 
     X, y, steps = _noise_woe_setup()
@@ -365,9 +366,9 @@ def test_merged_branch_adapter_refits_woe_noise_near_chance(
 
 
 def test_merged_branch_adapter_survives_the_halving_wrap() -> None:
-    """The halving/optuna wrap guards (static flag + runtime alignment probe)
-    accept the merged adapter, and the searcher-internal CV refits both
-    branches per fold — noise-target tuning stays near chance."""
+    """The fold-aware estimator wraps the merged adapter unconditionally, and
+    the searcher-internal CV refits both branches per fold — noise-target
+    tuning stays near chance."""
     from skyulf.preprocessing.fold_adapter import MergedBranchFoldAdapter
 
     X, y, woe_branch, scaler_branch = _merged_branch_setup()

@@ -19,12 +19,12 @@ from .pipeline import FeatureEngineer
 SPLITTER_STEP_TYPES = frozenset({"TrainTestSplitter", "Split", "feature_target_split"})
 
 # Steps whose fit_transform changes the row count (resampling, row drops,
-# outlier removal). They cannot run inside an sklearn Pipeline step — a
-# transformer may only return X, so the model would be fitted on reshaped X
-# against the original, un-aligned y — and the tuning engine reads
-# ``changes_row_count`` to skip the Pipeline wrap for such chains. Inside a
-# merged-branch fold they would also desynchronise the column-wise branch
-# merge (which requires equal row counts), so merged adapters reject them.
+# outlier removal). Inside a merged-branch fold they would desynchronise the
+# column-wise branch merge (which requires equal row counts), so merged
+# adapters reject them. The tuning engine's fold-aware estimator runs such
+# chains inside ``fit`` on each fold's training rows, so single-branch
+# tuning wraps accept them; ``changes_row_count`` documents the chain's
+# nature for callers that still need to know.
 ROW_COUNT_CHANGING_STEP_TYPES = frozenset(
     FeatureEngineer._ROW_DROPPING_TYPES
     | FeatureEngineer._RESAMPLING_TYPES
@@ -106,8 +106,7 @@ class MergedBranchFoldAdapter:
         self._drop_columns = list(drop_columns)
         self._engineers: list[FeatureEngineer] | None = None
         # Branch steps are screened against UNSAFE_BRANCH_STEP_TYPES, so the
-        # merge keeps every row; the tuning engine's runtime alignment probe
-        # is still the authoritative check before the Pipeline wrap.
+        # merge keeps every row.
         self.changes_row_count = False
 
     def fit_transform(self, X: Any, y: Any) -> tuple[Any, Any]:
@@ -176,9 +175,8 @@ class FeatureEngineerFoldAdapter:
             step for step in steps_config if step.get("transformer") not in SPLITTER_STEP_TYPES
         ]
         self._target_column = target_column
-        # True when any step reshapes the rows/target (resampling, row drops):
-        # such chains cannot be wrapped in an sklearn Pipeline step because a
-        # transformer can only hand X to the next step, leaving y un-aligned.
+        # True when any step reshapes the rows/target (resampling, row
+        # drops); documents the chain's nature for callers that need it.
         self.changes_row_count = any(
             step.get("transformer") in ROW_COUNT_CHANGING_STEP_TYPES for step in self._steps_config
         )
