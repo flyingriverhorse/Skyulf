@@ -15,8 +15,6 @@ This mirrors the sklearn pattern:
 - Skyulf: pass `SplitDataset(train=(X_train, y_train), test=(X_test, y_test))`
 
 ```python
-from __future__ import annotations
-
 import pandas as pd
 from sklearn.model_selection import train_test_split
 
@@ -78,8 +76,6 @@ We do **not** assert equality of predictions (different defaults / encodings can
 For a stronger numeric sanity check, we also compute and print test accuracy for both pipelines and the absolute difference.
 
 ```python
-from __future__ import annotations
-
 import numpy as np
 import pandas as pd
 from sklearn.compose import ColumnTransformer
@@ -307,8 +303,6 @@ current limits — notably that cross-validation/tuning scores do not yet re-fit
 fold and are therefore optimistic.
 
 ```python
-from __future__ import annotations
-
 import pandas as pd
 
 from skyulf.preprocessing.imputation import SimpleImputerCalculator

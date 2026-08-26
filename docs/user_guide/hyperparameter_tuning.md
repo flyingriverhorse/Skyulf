@@ -60,6 +60,7 @@ These keys go inside the `"modeling"` block when `"type"` is `"hyperparameter_tu
 | `cv_folds` | `int` | `5` | Number of CV folds |
 | `cv_type` | `str` | `"k_fold"` | One of `k_fold`, `stratified_k_fold`, `time_series_split`, `shuffle_split`, `nested_cv` |
 | `cv_time_column` | `str\|null` | `null` | Column name to sort by when using `time_series_split`. Auto-detects datetime column if omitted |
+| `progress` | `bool` | `false` | Console trial progress for core-only runs (see [Built-in console progress](#built-in-console-progress-no-callback-needed)). Ignored when you pass your own `progress_callback` |
 
 ## Strategy-specific params
 
@@ -200,10 +201,46 @@ metrics = estimator.evaluate(dataset=dataset, target_column="target")
 
 > **Important:** Always pass `TuningCalculator(base_calc)` — not the raw base calculator. The `TuningConfig` keyword filter inside `TuningCalculator.fit` reads `strategy`, `n_trials`, `metric`, `search_space`, `cv_*`, etc. directly from the config dict. If you pass the unwrapped base calculator, `tuning_config` is ignored and a single default-param fit runs instead.
 
+### Built-in console progress (no callback needed)
+
+Instead of writing your own `progress_callback`, set `"progress": True` in the tuning config. Skyulf then attaches a tidy console reporter for core-only runs:
+
+```python
+tuning_config = {
+    "strategy": "optuna",
+    "metric": "f1",
+    "n_trials": 25,
+    "search_space": {...},
+    "progress": True,   # built-in console progress
+}
+
+# No progress_callback needed:
+_ = estimator.fit_predict(dataset=dataset, target_column="target", config=tuning_config)
+```
+
+**On an interactive terminal (TTY)** you get a single self-updating line — never a flood of per-trial output:
+
+```
+Tuning trial 12/25 | score 0.9306 | best 0.9497 (#8)
+```
+
+**When the run finishes**, a compact summary always prints (TTY or not):
+
+```
+Tuning complete | 25/25 scored trials | metric f1
+  best 0.9497 | {'n_estimators': 500, 'max_depth': 3}
+  top: #8 0.9497 | #21 0.9410 | #3 0.9355
+```
+
+**When stdout is piped** (CI, log files, notebooks that capture output), the live line is skipped and only the summary prints.
+
+> **Note:** `progress` is off by default and is ignored whenever you pass your own `progress_callback` — the reporter steps aside so your callback stays in full control. The backend/app never enables it (it streams trials over the jobs WebSocket instead), so this is purely for script/notebook/terminal use of `skyulf-core`.
+
 ## Tips
 
 - Start with `"strategy": "random"` and `"n_trials": 20` for a quick baseline.
 - Switch to `"optuna"` when you want smarter exploration (Bayesian optimization).
 - Use `"halving_random"` for large search spaces where grid search is infeasible.
 - Always run a `TrainTestSplitter` before tuning to avoid data leakage.
+- Running core-only from a terminal? Set `"progress": true` in the tuning config for a self-updating trial line plus an end-of-run summary — no callback code required.
 - When exporting to a notebook, use the **Export → Full** mode to get per-branch training cells with live trial output; the **Compact** mode runs all branches in a loop and shows a coloured `(branch × split)` comparison table at the end.

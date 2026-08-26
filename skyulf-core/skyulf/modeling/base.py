@@ -112,6 +112,24 @@ class BaseModelCalculator(ABC):
         """
         return {}
 
+    def _boosting_fit_kwargs(
+        self,
+        model: Any,
+        X_np: Any,
+        y_np: Any,
+        iteration_callback: Callable[..., None] | None,
+    ) -> dict[str, Any]:
+        """Hook: extra kwargs for the underlying ``model.fit(...)`` call.
+
+        Boosting calculators (XGBoost/LightGBM) override this to attach an
+        eval set + iteration callback when one is supplied; every other model
+        keeps the plain fit. May also mutate ``model`` (XGBoost 3.x carries
+        callbacks on the estimator itself); returning ``"_detach_callbacks":
+        True`` tells the caller to clear ``model.callbacks`` after fit so the
+        saved artifact doesn't pickle live callback closures.
+        """
+        return {}
+
     @abstractmethod
     def fit(
         self,
@@ -121,6 +139,7 @@ class BaseModelCalculator(ABC):
         progress_callback: Callable[..., None] | None = None,
         log_callback: Callable[[str], None] | None = None,
         validation_data: tuple[pd.DataFrame | SkyulfDataFrame, pd.Series | Any] | None = None,
+        iteration_callback: Callable[..., None] | None = None,
     ) -> Any:
         """Trains the model and returns the fitted model artifact.
 
@@ -323,6 +342,8 @@ class StatefulEstimator:
         job_id: str = "unknown",
         preprocessing: FoldPreprocessor | None = None,
         preprocessing_train: tuple[Any, Any] | None = None,
+        preprocessing_validation: tuple[Any, Any] | None = None,
+        iteration_callback: Callable[..., None] | None = None,
     ) -> dict[str, pd.Series]:
         """
         Fits the model on training data and returns predictions for all splits.
@@ -332,7 +353,10 @@ class StatefulEstimator:
         ``preprocessing_train`` must carry the pre-transform ``(X, y)``
         payload the calculator should fit/tune on, so fold slicing stays
         aligned with the preprocessor; predictions still run on this
-        dataset's (post-transform) splits.
+        dataset's (post-transform) splits. ``preprocessing_validation`` is
+        the matching pre-transform validation payload for holdout tuning —
+        ``dataset.validation`` is post-transform, so the refit cannot score
+        against it directly.
         """
         # Handle raw DataFrame or Tuple input by wrapping it in a dummy SplitDataset
         dataset = self._normalize_fit_predict_dataset(dataset, target_column, log_callback)
@@ -360,6 +384,8 @@ class StatefulEstimator:
                 log_callback=log_callback,
                 validation_data=validation_data,
                 preprocessing=preprocessing,
+                validation_frames=preprocessing_validation,
+                iteration_callback=iteration_callback,
             )
         else:
             self.model = self.calculator.fit(
@@ -369,6 +395,7 @@ class StatefulEstimator:
                 progress_callback=progress_callback,
                 log_callback=log_callback,
                 validation_data=validation_data,
+                iteration_callback=iteration_callback,
             )
 
         # 3. Predict on all splits

@@ -47,6 +47,7 @@ class SklearnCalculator(BaseModelCalculator):
         progress_callback=None,
         log_callback=None,
         validation_data=None,
+        iteration_callback=None,
     ) -> Any:
         """Fit the Scikit-Learn model."""
         # 1. Merge Config with Defaults
@@ -103,10 +104,16 @@ class SklearnCalculator(BaseModelCalculator):
         # console/log behavior for those is preserved.
         with warnings.catch_warnings(record=True) as caught:
             warnings.simplefilter("always")
+            boosting_kwargs = self._boosting_fit_kwargs(model, X_np, y_np, iteration_callback)
+            detach_callbacks = boosting_kwargs.pop("_detach_callbacks", False)
             if sample_weight is not None:
-                model.fit(X_np, y_np, sample_weight=sample_weight)
+                model.fit(X_np, y_np, sample_weight=sample_weight, **boosting_kwargs)
             else:
-                model.fit(X_np, y_np)
+                model.fit(X_np, y_np, **boosting_kwargs)
+        # Never leave live callback closures on the fitted model — artifacts
+        # get pickled for storage/serving.
+        if detach_callbacks:
+            model.callbacks = None
         for w in caught:
             if issubclass(w.category, ConvergenceWarning):
                 conv_msg = f"{self.model_class.__name__} did not fully converge: {w.message}"

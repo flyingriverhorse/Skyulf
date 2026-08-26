@@ -1,12 +1,13 @@
 """F-15 backend wiring: always-on per-fold preprocessing refit at engine level.
 
-The app threads a ``FeatureEngineerFoldAdapter`` + pre-transform train payload
+The app threads a ``FeatureEngineerFoldAdapter`` + pre-transform payloads
 into every tuning/CV run so preprocessing statistics never see held-out fold
 rows — all tuning strategies included (halving/optuna get it via a Pipeline
-wrapper around the searcher's internal CV). Graphs the hook cannot serve
-(merged branches, validation-split holdout) fall back to pre-transformed
-scoring with an explicit job-log warning — never a failed run, never a silent
-leak.
+wrapper around the searcher's internal CV; holdout tuning with a validation
+split refits on the train rows only and scores the untouched validation
+split). Graphs the hook cannot serve (non-linear/unsupported upstream shapes,
+failed payload reconstruction) fall back to pre-transformed scoring with an
+explicit job-log warning — never a failed run, never a silent leak.
 """
 
 import numpy as np
@@ -914,26 +915,15 @@ def test_payload_reconstruction_failure_never_fails_the_run(
     ), f"expected the reconstruction-failure warning, logs={logs}"
 
 
-def test_validation_split_tuning_falls_back_with_warning(tmp_path):
-    """Holdout tuning with a validation split cannot refit per fold (the
-    tuning engine rejects the hook alongside validation_data); the runner
-    skips the hook with an explicit log instead of failing."""
-    rng = np.random.default_rng(17)
-    n = 240
-    df = pd.DataFrame(
-        {
-            "f1": rng.normal(0, 1, n),
-            "f2": rng.normal(0, 1, n),
-            "target": rng.integers(0, 2, size=n),
-        }
-    )
-    path = tmp_path / "validation_split.csv"
-    df.to_csv(path, index=False)
-
+def test_validation_split_tuning_refits_per_fold(noise_target_csv, tmp_path):
+    """Holdout tuning with a validation split gets the per-fold discipline:
+    WOE refits on the train rows only, candidates score against the untouched
+    validation split, and the post-tuning CV refits too — a memorising WOE on
+    a noise target must stay near chance in both scores."""
     result, logs = _run(
         tmp_path,
         [
-            _loader("node_data", str(path)),
+            _loader("node_data", noise_target_csv),
             NodeConfig(
                 node_id="node_split",
                 step_type="TrainTestSplitter",
@@ -944,8 +934,14 @@ def test_validation_split_tuning_falls_back_with_warning(tmp_path):
                     "validation_size": 0.2,
                 },
             ),
+            NodeConfig(
+                node_id="node_features",
+                step_type=StepType.FEATURE_ENGINEERING,
+                inputs=["node_split"],
+                params={"steps": [WOE_STEP]},
+            ),
             _training(
-                ["node_split"],
+                ["node_features"],
                 run_mode="tuned",
                 tuning_config={
                     "strategy": "grid",
@@ -956,13 +952,388 @@ def test_validation_split_tuning_falls_back_with_warning(tmp_path):
                 },
             ),
         ],
-        job_id="f15-validation-split-fallback",
+        job_id="f15-validation-split-refit",
     )
 
     assert result.status == "success"
+    assert any("Per-fold preprocessing refit enabled" in m for m in logs), logs
+    assert not any("Per-fold preprocessing refit skipped" in m for m in logs), logs
+    metrics = result.node_results["node_training"].metrics
+    assert _disc(metrics["best_score"]) < 0.65, (
+        f"holdout tuning score should sit near chance, got {metrics['best_score']}"
+    )
+    assert _disc(metrics["cv_roc_auc_mean"]) < 0.65, (
+        f"post-tuning CV score should sit near chance, got {metrics['cv_roc_auc_mean']}"
+    )
+
+
+# ---------------------------------------------------------------------------
+# Holdout tuning + validation split + detailed preprocessing — dedicated
+# end-to-end coverage of the v0.8.4 holdout refit at the app-engine level
+# ---------------------------------------------------------------------------
+
+
+IMPUTE_STEP = {
+    "name": "impute_num2",
+    "transformer": "SimpleImputer",
+    "params": {"strategy": "mean", "columns": ["num2"]},
+}
+SCALE_ALL_STEP = {
+    "name": "scale_num",
+    "transformer": "StandardScaler",
+    "params": {"columns": ["num1", "num2"]},
+}
+IMPUTE_F2_STEP = {
+    "name": "impute_f2",
+    "transformer": "SimpleImputer",
+    "params": {"strategy": "mean", "columns": ["f2"]},
+}
+WOE_CAT_STEP = {
+    "name": "woe_cat",
+    "transformer": "WOEEncoder",
+    "params": {"columns": ["cat"], "regularization": 0.5},
+}
+SCALE_SIGNAL_STEP = {
+    "name": "scale_signal",
+    "transformer": "StandardScaler",
+    "params": {"columns": ["f1", "f2"]},
+}
+
+
+def _val_auc(metrics: dict) -> float:
+    """The validation-split ROC-AUC, whatever the binary/multiclass key name."""
+    for key, value in metrics.items():
+        if key.startswith("val_roc_auc"):
+            return float(value)
+    raise AssertionError(f"no val_roc_auc* metric found in {sorted(metrics)}")
+
+
+def _noise_csv_with_nan(tmp_path) -> str:
+    """Noise target + NaN numeric column + memorising categorical column."""
+    rng = np.random.default_rng(42)
+    n, n_categories = 400, 200
+    num1 = rng.normal(0, 1, n)
+    num2 = rng.normal(0, 1, n)
+    num2[rng.random(n) < 0.15] = np.nan
+    df = pd.DataFrame(
+        {
+            "num1": num1,
+            "num2": num2,
+            "city": [f"c{v}" for v in rng.integers(0, n_categories, size=n)],
+            "target": rng.integers(0, 2, size=n),
+        }
+    )
+    path = tmp_path / "noise_nan.csv"
+    df.to_csv(path, index=False)
+    return str(path)
+
+
+def _signal_csv(tmp_path, n: int = 400) -> str:
+    """Informative numerics (f2 carries NaNs) + informative categorical +
+    mild label noise."""
+    rng = np.random.default_rng(5)
+    y = rng.integers(0, 2, size=n)
+    flip = rng.random(n) < 0.05
+    y = np.where(flip, 1 - y, y)
+    f2 = rng.normal(0, 1, n) - y * 1.0
+    f2[rng.random(n) < 0.15] = np.nan
+    df = pd.DataFrame(
+        {
+            "f1": rng.normal(0, 1, n) + y * 1.5,
+            "f2": f2,
+            "cat": [f"k{v}" for v in np.where(rng.random(n) < 0.8, y, 1 - y)],
+            "target": y,
+        }
+    )
+    path = tmp_path / "signal.csv"
+    df.to_csv(path, index=False)
+    return str(path)
+
+
+def _splitter_with_validation(node_id: str, inputs: list[str]) -> NodeConfig:
+    return NodeConfig(
+        node_id=node_id,
+        step_type="TrainTestSplitter",
+        inputs=inputs,
+        params={"target_column": "target", "test_size": 0.2, "validation_size": 0.2},
+    )
+
+
+def _holdout_tuning(**extra) -> dict:
+    tuning = {
+        "metric": "roc_auc",
+        "cv_folds": 3,
+        "cv_enabled": True,
+        "search_space": {"C": [0.1, 1.0]},
+    }
+    tuning.update(extra)
+    return tuning
+
+
+def test_validation_split_multi_step_chain_refits_honest(tmp_path):
+    """Imputer + memorising WOE + scaler + 3-way split, tuned holdout: the
+    NaN gate passes the pre-transform payload, the chain refits on train rows
+    only, and both scores stay near chance on the noise target."""
+    csv = _noise_csv_with_nan(tmp_path)
+    result, logs = _run(
+        tmp_path,
+        [
+            _loader("node_data", csv),
+            NodeConfig(
+                node_id="node_features",
+                step_type=StepType.FEATURE_ENGINEERING,
+                inputs=["node_data"],
+                params={
+                    "steps": [
+                        _splitter_with_validation_params(),
+                        IMPUTE_STEP,
+                        WOE_STEP,
+                        SCALE_ALL_STEP,
+                    ]
+                },
+            ),
+            _training(
+                ["node_features"],
+                run_mode="tuned",
+                tuning_config=_holdout_tuning(strategy="grid"),
+            ),
+        ],
+        job_id="f15-val-multistep-noise",
+    )
+
+    assert result.status == "success", logs
+    assert any("Per-fold preprocessing refit enabled" in m for m in logs), logs
+    assert not any("Per-fold preprocessing refit skipped" in m for m in logs), logs
+    metrics = result.node_results["node_training"].metrics
+    assert _disc(metrics["best_score"]) < 0.65, (
+        f"holdout tuning score should sit near chance, got {metrics['best_score']}"
+    )
+    assert _disc(metrics["cv_roc_auc_mean"]) < 0.65, (
+        f"post-tuning CV score should sit near chance, got {metrics['cv_roc_auc_mean']}"
+    )
+
+
+def _splitter_with_validation_params() -> dict:
+    return {
+        "name": "split",
+        "transformer": "TrainTestSplitter",
+        "params": {"target_column": "target", "test_size": 0.2, "validation_size": 0.2},
+    }
+
+
+def test_validation_split_signal_run_keeps_honest_scores(tmp_path):
+    """Optuna (wrapped path) + imputer/WOE/scaler chain + validation split on
+    real signal: honest scores stay well above chance and the untouched
+    validation split is evaluated alongside the test split."""
+    csv = _signal_csv(tmp_path)
+    result, logs = _run(
+        tmp_path,
+        [
+            _loader("node_data", csv),
+            _splitter_with_validation("node_split", ["node_data"]),
+            NodeConfig(
+                node_id="node_features",
+                step_type=StepType.FEATURE_ENGINEERING,
+                inputs=["node_split"],
+                params={"steps": [IMPUTE_F2_STEP, WOE_CAT_STEP, SCALE_SIGNAL_STEP]},
+            ),
+            _training(
+                ["node_features"],
+                run_mode="tuned",
+                tuning_config=_holdout_tuning(strategy="optuna", n_trials=3),
+            ),
+        ],
+        job_id="f15-val-signal-optuna",
+    )
+
+    assert result.status == "success", logs
+    assert any("Per-fold preprocessing refit enabled" in m for m in logs), logs
+    assert not any("Per-fold preprocessing refit skipped" in m for m in logs), logs
+    metrics = result.node_results["node_training"].metrics
+    assert metrics["best_score"] > 0.8, (
+        f"signal holdout tuning score should stay meaningful, got {metrics['best_score']}"
+    )
+    assert metrics["cv_roc_auc_mean"] > 0.8, (
+        f"signal post-tuning CV should stay meaningful, got {metrics['cv_roc_auc_mean']}"
+    )
+    assert _val_auc(metrics) > 0.8, (
+        f"untouched validation split should stay meaningful, got {_val_auc(metrics)}"
+    )
+
+
+def test_validation_split_fork_join_refits_honest(tmp_path):
+    """Fork-join merged graph + validation split: both branches re-run on the
+    fold-train rows and the memorising WOE column stays near chance.
+
+    The merged-branch adapter merges with pure ``last_wins`` (ownership is
+    inert for SplitDataset ancestors), so every branch must itself emit a
+    fully-numeric frame — hence each branch imputes, WOE-encodes ``city`` and
+    scales.
+    """
+    csv = _noise_csv_with_nan(tmp_path)
+
+    def _woe_fe_branch(node_id: str, regularization: float) -> NodeConfig:
+        return NodeConfig(
+            node_id=node_id,
+            step_type=StepType.FEATURE_ENGINEERING,
+            inputs=["node_split"],
+            params={
+                "steps": [
+                    IMPUTE_STEP,
+                    {
+                        "name": "woe_city",
+                        "transformer": "WOEEncoder",
+                        "params": {"columns": ["city"], "regularization": regularization},
+                    },
+                    SCALE_ALL_STEP,
+                ]
+            },
+        )
+
+    result, logs = _run(
+        tmp_path,
+        [
+            _loader("node_data", csv),
+            _splitter_with_validation("node_split", ["node_data"]),
+            _woe_fe_branch("woe_branch_a", 0.5),
+            _woe_fe_branch("woe_branch_b", 1.0),
+            _training(
+                ["woe_branch_a", "woe_branch_b"],
+                run_mode="tuned",
+                tuning_config=_holdout_tuning(strategy="grid"),
+            ),
+        ],
+        job_id="f15-val-fork-join",
+    )
+
+    assert result.status == "success", logs
     assert any(
-        "Per-fold preprocessing refit skipped" in m and "validation split" in m for m in logs
-    ), f"expected the validation-split fallback warning, logs={logs}"
+        "Per-fold preprocessing refit enabled" in m and "merged branch(es)" in m for m in logs
+    ), logs
+    metrics = result.node_results["node_training"].metrics
+    assert _disc(metrics["best_score"]) < 0.65, (
+        f"fork-join holdout score should sit near chance, got {metrics['best_score']}"
+    )
+    assert _disc(metrics["cv_roc_auc_mean"]) < 0.65, (
+        f"fork-join post-tuning CV should sit near chance, got {metrics['cv_roc_auc_mean']}"
+    )
+
+
+def test_validation_split_fork_join_signal_keeps_scores(tmp_path):
+    """Fork-join on signal data with a validation split: the merged-branch
+    refit keeps every score meaningful (no silent degradation)."""
+    csv = _signal_csv(tmp_path)
+    result, logs = _run(
+        tmp_path,
+        [
+            _loader("node_data", csv),
+            _splitter_with_validation("node_split", ["node_data"]),
+            NodeConfig(
+                node_id="scale_branch",
+                step_type=StepType.FEATURE_ENGINEERING,
+                inputs=["node_split"],
+                params={"steps": [IMPUTE_F2_STEP, SCALE_SIGNAL_STEP]},
+            ),
+            NodeConfig(
+                node_id="encode_branch",
+                step_type=StepType.FEATURE_ENGINEERING,
+                inputs=["node_split"],
+                params={"steps": [IMPUTE_F2_STEP, WOE_CAT_STEP, SCALE_SIGNAL_STEP]},
+            ),
+            _training(
+                ["scale_branch", "encode_branch"],
+                run_mode="tuned",
+                tuning_config=_holdout_tuning(strategy="grid"),
+            ),
+        ],
+        job_id="f15-val-fork-join-signal",
+    )
+
+    assert result.status == "success", logs
+    assert any("merged branch(es)" in m for m in logs), logs
+    metrics = result.node_results["node_training"].metrics
+    assert metrics["best_score"] > 0.8, (
+        f"fork-join holdout score should stay meaningful, got {metrics['best_score']}"
+    )
+    assert metrics["cv_roc_auc_mean"] > 0.8, (
+        f"fork-join post-tuning CV should stay meaningful, got {metrics['cv_roc_auc_mean']}"
+    )
+
+
+def test_validation_split_refit_never_fits_on_validation_rows(tmp_path, monkeypatch):
+    """Row-isolation proof through the real resolver: with a validation
+    split, the chain fits only on train rows across holdout tuning and the
+    post-tuning CV — a validation row never enters a fit."""
+    from skyulf.preprocessing.fold_adapter import FeatureEngineerFoldAdapter
+
+    rng = np.random.default_rng(17)
+    n = 360
+    y = rng.integers(0, 2, size=n)
+    df = pd.DataFrame(
+        {
+            "f1": rng.normal(0, 1, n) + y * 1.5,
+            "f2": rng.normal(0, 1, n) - y * 1.0,
+            "target": y,
+        }
+    )
+    csv = tmp_path / "isolation.csv"
+    df.to_csv(csv, index=False)
+
+    # ``train_test_split`` preserves scattered original indexes and the wrapped
+    # halving/optuna path rebuilds them, so absolute row positions are not a
+    # reliable identity. The robust isolation invariant is row *count*: in
+    # holdout tuning the concat frame holds ``n_train`` train rows plus the
+    # validation rows, so any preprocessing fit that saw validation rows would
+    # receive more than ``n_train`` rows.
+    fit_sizes: list[int] = []
+    transform_sizes: list[int] = []
+    original_fit_transform = FeatureEngineerFoldAdapter.fit_transform
+    original_transform = FeatureEngineerFoldAdapter.transform
+
+    def spy_fit_transform(self, X, y):
+        fit_sizes.append(len(X))
+        return original_fit_transform(self, X, y)
+
+    def spy_transform(self, X, y):
+        transform_sizes.append(len(X))
+        return original_transform(self, X, y)
+
+    monkeypatch.setattr(FeatureEngineerFoldAdapter, "fit_transform", spy_fit_transform)
+    monkeypatch.setattr(FeatureEngineerFoldAdapter, "transform", spy_transform)
+
+    result, logs = _run(
+        tmp_path,
+        [
+            _loader("node_data", str(csv)),
+            _splitter_with_validation("node_split", ["node_data"]),
+            NodeConfig(
+                node_id="node_features",
+                step_type=StepType.FEATURE_ENGINEERING,
+                inputs=["node_split"],
+                params={
+                    "steps": [{"name": "scale", "transformer": "StandardScaler", "params": {}}]
+                },
+            ),
+            _training(
+                ["node_features"],
+                run_mode="tuned",
+                tuning_config=_holdout_tuning(strategy="grid"),
+            ),
+        ],
+        job_id="f15-val-row-isolation",
+    )
+
+    assert result.status == "success", logs
+    assert any("Per-fold preprocessing refit enabled" in m for m in logs), logs
+    metrics = result.node_results["node_training"].metrics
+    n_train = int(metrics["n_rows"])
+    assert fit_sizes, "expected the adapter to receive fit_transform calls"
+    assert max(fit_sizes) == n_train, (
+        f"expected preprocessing to fit on exactly the train split ({n_train} rows), "
+        f"saw fit sizes {sorted(set(fit_sizes))} — a fit larger than the train split "
+        "means validation rows leaked into a fit"
+    )
+    assert transform_sizes, "expected validation rows to be transformed (scored) untouched"
 
 
 # ---------------------------------------------------------------------------

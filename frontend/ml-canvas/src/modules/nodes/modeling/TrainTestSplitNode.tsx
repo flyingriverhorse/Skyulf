@@ -111,7 +111,10 @@ const TrainTestSplitSettings: React.FC<{ config: TrainTestSplitConfig; onChange:
               {Math.round(trainSize * 100)}% Training, {Math.round(valSize * 100)}% Validation, {Math.round(config.test_size * 100)}% Testing
             </p>
             <p className="text-xs text-muted-foreground">
-              Setting a validation size enables threshold tuning to compute against a held-out validation split instead of falling back to the test split.
+              The validation split grades hyperparameter candidates during tuning
+              (instead of CV folds) and is used for threshold tuning. If left at 0,
+              tuning scores candidates with CV folds inside the training split and
+              threshold tuning falls back to the test split.
             </p>
             {trainSize <= 0 && (
               <p className="text-xs text-red-500 font-medium">

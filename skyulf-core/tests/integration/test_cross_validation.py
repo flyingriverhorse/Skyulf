@@ -469,7 +469,16 @@ class _FlakyInnerCalculator(BaseModelCalculator):
         """Report classification, matching the wrapped calculator."""
         return "classification"
 
-    def fit(self, X, y, config, progress_callback=None, log_callback=None, validation_data=None):
+    def fit(
+        self,
+        X,
+        y,
+        config,
+        progress_callback=None,
+        log_callback=None,
+        validation_data=None,
+        iteration_callback=None,
+    ):
         """Raise for small (inner-fold) splits; delegate to the real calculator otherwise."""
         if len(X) <= self._threshold:
             raise RuntimeError("Simulated inner-fold failure")
@@ -504,7 +513,16 @@ class _FlakyOnceCalculator(BaseModelCalculator):
         """Report classification, matching the wrapped calculator."""
         return "classification"
 
-    def fit(self, X, y, config, progress_callback=None, log_callback=None, validation_data=None):
+    def fit(
+        self,
+        X,
+        y,
+        config,
+        progress_callback=None,
+        log_callback=None,
+        validation_data=None,
+        iteration_callback=None,
+    ):
         """Raise on every 3rd call (the first inner-fold call per outer fold, since
         each outer fold does 1 outer fit + inner_folds inner fits and inner_folds=2)."""
         self._call_count += 1

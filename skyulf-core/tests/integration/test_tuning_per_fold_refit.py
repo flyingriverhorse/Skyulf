@@ -4,10 +4,13 @@ Tuning's internal CV had the same leak as plain CV: preprocessing was
 fitted once on the full training split, so every candidate score was
 optimistically biased. The ``preprocessing`` hook re-fits inside each
 candidate fold: for ``grid``/``random`` via the engine's own fold loop,
-and for ``halving_*``/``optuna`` by wrapping preprocessing + model in an
-sklearn ``Pipeline`` so the searcher's internal CV refits per fold.
-Holdout tuning with ``validation_data`` is rejected with an explicit
-diagnostic — there are no folds to refit around.
+and for ``halving_*``/``optuna`` by wrapping preprocessing + model in one
+fold-aware meta-estimator so the searcher's internal CV refits per fold —
+including chains that change the row count or the target.
+Holdout tuning with ``validation_data`` gets the same discipline: the
+preprocessor refits on the train rows only (a single ``PredefinedSplit``
+fold over concatenated train+val frames) and candidates are scored against
+the untouched validation split.
 """
 
 from typing import Any
@@ -154,8 +157,8 @@ def _disc(auc: float) -> float:
 
 
 def test_tuning_halving_grid_refits_woe_noise_near_chance() -> None:
-    """halving_grid runs its CV inside the sklearn searcher; the Pipeline
-    wrapper must refit WOE per fold there too, killing the noise-target leak."""
+    """halving_grid runs its CV inside the sklearn searcher; the fold-aware
+    estimator must refit WOE per fold there too, killing the noise-target leak."""
     from skyulf.preprocessing.encoding import WOEEncoderApplier, WOEEncoderCalculator
 
     X, y, steps = _noise_woe_setup()
@@ -286,18 +289,110 @@ def test_halving_grid_refits_on_fold_train_rows_only() -> None:
     assert set(recorder.fit_rows[-1]) == all_rows
 
 
-def test_validation_data_with_preprocessing_is_rejected() -> None:
-    """Holdout (PredefinedSplit) tuning cannot be re-run fold-wise in v1."""
+def test_holdout_grid_refits_preprocessing_on_train_rows_only() -> None:
+    """Holdout tuning applies the per-fold discipline to the single
+    PredefinedSplit fold: refit on train rows only, score the untouched
+    validation split, final refit on train rows only."""
     X, y = _make_classification_xy()
-    tuner = TuningCalculator(LogisticRegressionCalculator())
-    with pytest.raises(ValueError, match="validation"):
-        tuner.fit(
-            X,
-            y,
-            config=TuningConfig(strategy="grid", search_space={"C": [1.0]}),
-            validation_data=(X.iloc[:20], y.iloc[:20]),
-            preprocessing=RecordingPreprocessor(),
-        )
+    X_train, y_train = X.iloc[:100], y.iloc[:100]
+    X_val, y_val = X.iloc[100:], y.iloc[100:]
+    recorder = RecordingPreprocessor()
+
+    model, result = TuningCalculator(LogisticRegressionCalculator()).fit(
+        X_train,
+        y_train,
+        config=TuningConfig(strategy="grid", metric="accuracy", search_space={"C": [0.1, 1.0]}),
+        validation_data=(X_val, y_val),
+        preprocessing=recorder,
+        validation_frames=(X_val, y_val),
+    )
+
+    assert result.n_trials == 2
+    assert hasattr(model, "predict")
+    train_rows = set(X_train.index)
+    val_rows = set(X_val.index)
+    # 2 candidates x 1 holdout fold = 2 fold fit/transform pairs, plus the
+    # final best-model refit (the serving artifact) with no paired transform.
+    assert len(recorder.fit_rows) == 3
+    assert len(recorder.transform_rows) == 2
+    for fit_rows, scored_rows in zip(recorder.fit_rows[:2], recorder.transform_rows, strict=True):
+        assert set(fit_rows) == train_rows, "holdout refit must see train rows only"
+        assert set(scored_rows) == val_rows, "scoring must run on the untouched val split"
+    assert set(recorder.fit_rows[-1]) == train_rows
+
+
+def test_holdout_halving_grid_refits_on_train_rows_only() -> None:
+    """Holdout under the halving searcher: the fold-aware estimator receives
+    only train rows in fit and scores the untouched validation split."""
+    X, y = _make_classification_xy()
+    X_train, y_train = X.iloc[:100], y.iloc[:100]
+    X_val, y_val = X.iloc[100:], y.iloc[100:]
+    recorder = RecordingPreprocessor()
+
+    _model, result = TuningCalculator(LogisticRegressionCalculator()).fit(
+        X_train,
+        y_train,
+        config=TuningConfig(strategy="halving_grid", search_space={"C": [1.0]}),
+        validation_data=(X_val, y_val),
+        preprocessing=recorder,
+        validation_frames=(X_val, y_val),
+    )
+
+    assert recorder.fit_rows, "the searcher's internal CV must trigger per-fold refits"
+    assert result.best_params == {"C": 1.0}, (
+        "Pipeline param prefixes must be stripped from best_params"
+    )
+    train_rows = set(X_train.index)
+    val_rows = set(X_val.index)
+    # One extra fit with no paired transform: the final best-model refit on
+    # the train split (the serving artifact).
+    assert len(recorder.fit_rows) == len(recorder.transform_rows) + 1
+    for fit_rows, scored_rows in zip(recorder.fit_rows[:-1], recorder.transform_rows, strict=True):
+        assert set(fit_rows).isdisjoint(scored_rows), "fold fit must not see scored rows"
+        assert set(fit_rows) <= train_rows
+        assert set(scored_rows) <= val_rows
+    assert set(recorder.fit_rows[-1]) == train_rows
+
+
+def test_holdout_tuning_woe_noise_near_chance() -> None:
+    """Flagship honesty proof for holdout tuning: with a memorising WOE step
+    and a noise target, the leaky full-fit control scores far above chance on
+    the validation split, while the train-only refit stays near it."""
+    from skyulf.preprocessing.encoding import WOEEncoderApplier, WOEEncoderCalculator
+
+    X, y, steps = _noise_woe_setup()
+    X_train, y_train = X.iloc[:320], y.iloc[:320]
+    X_val, y_val = X.iloc[320:], y.iloc[320:]
+    config = TuningConfig(
+        strategy="random", metric="roc_auc", n_trials=1, search_space={"C": [1.0]}
+    )
+
+    # Leaky control: WOE fit on ALL rows (validation included), then holdout.
+    leaky_params = WOEEncoderCalculator().fit((X, y), steps[0]["params"])
+    X_leaky, _ = WOEEncoderApplier().apply((X, y), dict(leaky_params))
+    _m, leaky_result = TuningCalculator(LogisticRegressionCalculator()).fit(
+        X_leaky.iloc[:320],
+        y.iloc[:320],
+        config=config,
+        validation_data=(X_leaky.iloc[320:], y.iloc[320:]),
+    )
+
+    adapter = FeatureEngineerFoldAdapter(steps, target_column="target")
+    _m, refit_result = TuningCalculator(LogisticRegressionCalculator()).fit(
+        X_train,
+        y_train,
+        config=config,
+        validation_data=(X_val, y_val),
+        preprocessing=adapter,
+        validation_frames=(X_val, y_val),
+    )
+
+    assert _disc(leaky_result.best_score) > 0.75, (
+        f"expected the leaky encoding to memorise labels, got {leaky_result.best_score}"
+    )
+    assert _disc(refit_result.best_score) < 0.65, (
+        f"per-fold refit holdout tuning should sit near chance, got {refit_result.best_score}"
+    )
 
 
 def _merged_branch_setup() -> tuple[
@@ -365,9 +460,9 @@ def test_merged_branch_adapter_refits_woe_noise_near_chance(
 
 
 def test_merged_branch_adapter_survives_the_halving_wrap() -> None:
-    """The halving/optuna wrap guards (static flag + runtime alignment probe)
-    accept the merged adapter, and the searcher-internal CV refits both
-    branches per fold — noise-target tuning stays near chance."""
+    """The fold-aware estimator wraps the merged adapter unconditionally, and
+    the searcher-internal CV refits both branches per fold — noise-target
+    tuning stays near chance."""
     from skyulf.preprocessing.fold_adapter import MergedBranchFoldAdapter
 
     X, y, woe_branch, scaler_branch = _merged_branch_setup()

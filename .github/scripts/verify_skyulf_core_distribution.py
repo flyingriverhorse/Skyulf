@@ -1,7 +1,5 @@
 """Verify that a built skyulf-core wheel works outside its source checkout."""
 
-from __future__ import annotations
-
 import subprocess
 import sys
 import tempfile

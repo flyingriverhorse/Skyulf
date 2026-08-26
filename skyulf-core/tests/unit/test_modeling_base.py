@@ -31,7 +31,16 @@ class _DummyCalculator(BaseModelCalculator):
         """Returns classification."""
         return "classification"
 
-    def fit(self, X, y, config, progress_callback=None, log_callback=None, validation_data=None):
+    def fit(
+        self,
+        X,
+        y,
+        config,
+        progress_callback=None,
+        log_callback=None,
+        validation_data=None,
+        iteration_callback=None,
+    ):
         """Return a simple dict as the model artifact."""
         return {"fitted": True, "n_samples": len(X)}
 
@@ -50,7 +59,16 @@ class _ColumnsRecordingCalculator(_DummyCalculator):
     def __init__(self):
         self.feature_columns: list[str] = []
 
-    def fit(self, X, y, config, progress_callback=None, log_callback=None, validation_data=None):
+    def fit(
+        self,
+        X,
+        y,
+        config,
+        progress_callback=None,
+        log_callback=None,
+        validation_data=None,
+        iteration_callback=None,
+    ):
         """Record the fitted feature columns and return the dummy artifact."""
         self.feature_columns = list(X.columns)
         return super().fit(X, y, config, progress_callback, log_callback, validation_data)
@@ -362,12 +380,26 @@ def test_fit_predict_preprocessing_routes_payload_to_calculator():
             progress_callback=None,
             log_callback=None,
             validation_data=None,
+            iteration_callback=None,
             preprocessing=None,
+            validation_frames=None,
         ):
-            self.fit_kwargs = {"validation_data": validation_data, "preprocessing": preprocessing}
+            self.fit_kwargs = {
+                "validation_data": validation_data,
+                "preprocessing": preprocessing,
+                "validation_frames": validation_frames,
+            }
             self.fit_X_len = len(X)
             assert preprocessing is not None
-            return super().fit(X, y, config, progress_callback, log_callback, validation_data)
+            return super().fit(
+                X,
+                y,
+                config,
+                progress_callback,
+                log_callback,
+                validation_data,
+                iteration_callback=iteration_callback,
+            )
 
     calculator = _RecordingCalculator()
     estimator = StatefulEstimator(calculator=calculator, applier=_DummyApplier(), node_id="p2")
@@ -391,6 +423,73 @@ def test_fit_predict_preprocessing_routes_payload_to_calculator():
     assert len(preds["test"]) == 40
     assert calculator.fit_X_len == 160
     assert calculator.fit_kwargs["preprocessing"] is preprocessor
+
+
+def test_fit_predict_routes_preprocessing_validation_frames():
+    """preprocessing_validation must reach the calculator as validation_frames
+    (pre-transform space) while dataset.validation still flows through as
+    validation_data (post-transform space)."""
+    X_arr, y_arr = make_classification(
+        n_samples=200, n_features=5, n_informative=3, random_state=42
+    )
+    df = pd.DataFrame(X_arr, columns=[f"f{i}" for i in range(5)])  # ty: ignore[invalid-argument-type]
+    df["target"] = y_arr
+    dataset = SplitDataset(train=df.iloc[:120], test=df.iloc[160:], validation=df.iloc[120:160])
+    pre_train = (df.drop(columns=["target"]).iloc[:120], df["target"].iloc[:120])
+    pre_val = (df.drop(columns=["target"]).iloc[120:160], df["target"].iloc[120:160])
+
+    class _RecordingCalculator(_DummyCalculator):
+        def __init__(self):
+            self.fit_kwargs: dict[str, Any] = {}
+
+        def fit(  # ty: ignore[invalid-method-override]
+            self,
+            X,
+            y,
+            config,
+            progress_callback=None,
+            log_callback=None,
+            validation_data=None,
+            preprocessing=None,
+            iteration_callback=None,
+            validation_frames=None,
+        ):
+            self.fit_kwargs = {
+                "validation_data": validation_data,
+                "validation_frames": validation_frames,
+            }
+            return super().fit(
+                X,
+                y,
+                config,
+                progress_callback,
+                log_callback,
+                validation_data,
+                iteration_callback=iteration_callback,
+            )
+
+    calculator = _RecordingCalculator()
+    estimator = StatefulEstimator(calculator=calculator, applier=_DummyApplier(), node_id="p3")
+
+    class _PassThroughPreprocessor:
+        def fit_transform(self, X, y):
+            return X, y
+
+        def transform(self, X, y):
+            return X, y
+
+    estimator.fit_predict(
+        dataset,
+        "target",
+        config={},
+        preprocessing=_PassThroughPreprocessor(),
+        preprocessing_train=pre_train,
+        preprocessing_validation=pre_val,
+    )
+    assert calculator.fit_kwargs["validation_frames"] is pre_val
+    validation_data = calculator.fit_kwargs["validation_data"]
+    assert validation_data is not None
+    assert len(validation_data[0]) == 40
 
 
 # ---------------------------------------------------------------------------

@@ -24,8 +24,6 @@ If you prefer a scikit-learn-style workflow (`X`/`y` + `train_test_split`), see:
 This single snippet is intentionally end-to-end (no duplicated setup across steps).
 
 ```python
-from __future__ import annotations
-
 import tempfile
 from pathlib import Path
 

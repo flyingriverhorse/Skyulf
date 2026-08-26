@@ -6,6 +6,7 @@ import typing
 import warnings
 from typing import Any
 
+import numpy as np
 import pandas as pd
 import polars as pl
 import pytest
@@ -508,6 +509,7 @@ def test_fit_without_model_class_raises():
             progress_callback=None,
             log_callback=None,
             validation_data=None,
+            iteration_callback=None,
         ):
             return None
 
@@ -540,15 +542,14 @@ def test_fit_halving_grid_search():
 
 
 # ---------------------------------------------------------------------------
-# Halving/optuna Pipeline wrap: row-count-changing preprocessing guard
+# Halving/optuna fold-aware wrap: leakage-free per-fold refit for ALL chains
 # ---------------------------------------------------------------------------
 
 
 class _StubPreprocessor:
-    """Minimal FoldPreprocessor stub with configurable flag + fit_transform."""
+    """Minimal FoldPreprocessor stub with a configurable fit_transform."""
 
-    def __init__(self, changes_row_count: bool, fit_transform=None):
-        self.changes_row_count = changes_row_count
+    def __init__(self, fit_transform=None):
         self._fit_transform = fit_transform
 
     def fit_transform(self, X, y):
@@ -560,28 +561,48 @@ class _StubPreprocessor:
         return X, y
 
 
-def _tune_with_spied_halving_build(monkeypatch, preprocessing):
+def _tune_with_spied_halving_build(
+    monkeypatch,
+    preprocessing,
+    frames="default",
+    extracted=None,
+    validation_data=None,
+    validation_frames=None,
+):
     """Run halving_grid tune() with the searcher machinery spied/stubbed.
 
-    Returns ``(estimator_passed_to_searcher, logs, result)`` without running a
-    real search.
+    Returns ``(built, logs, result)`` without running a real search;
+    ``built`` carries the ``estimator``, ``cv`` and search ``X``/``y`` the
+    searcher would have received. ``frames=None`` simulates a numpy-only
+    SDK call.
     """
     built: dict[str, Any] = {}
     logs: list[str] = []
+    if extracted is None:
+        extracted = ({"model__estimator__C": 1.0}, 0.9)
 
     def fake_build(self, search_config, estimator, cv, metric, log_callback):
         built["estimator"] = estimator
+        built["cv"] = cv
         return object()
 
+    def fake_execute(self, searcher, X_arr, y_arr, config, log_callback=None):
+        built["X"], built["y"] = X_arr, y_arr
+        return []
+
     monkeypatch.setattr(TuningCalculator, "_build_halving_searcher", fake_build)
-    monkeypatch.setattr(TuningCalculator, "_execute_search", lambda self, *a, **k: None)
+    monkeypatch.setattr(TuningCalculator, "_execute_search", fake_execute)
     monkeypatch.setattr(
-        TuningCalculator, "_extract_best_result", lambda self, searcher: ({"C": 1.0}, 0.9)
+        TuningCalculator,
+        "_extract_best_result",
+        lambda self, searcher, first_trial_error=None: extracted,
     )
     monkeypatch.setattr(TuningCalculator, "_collect_trials", lambda self, searcher, config: [])
     monkeypatch.setattr(TuningCalculator, "_log_final_completion", lambda self, *a: None)
 
     X, y = _clf_xy(n=60)
+    if frames == "default":
+        frames = (pd.DataFrame(X, columns=list("abcd")), pd.Series(y, name="target"))  # ty: ignore[invalid-argument-type]
     cfg = TuningConfig(
         strategy="halving_grid",
         metric="accuracy",
@@ -594,90 +615,305 @@ def _tune_with_spied_halving_build(monkeypatch, preprocessing):
         cfg,
         log_callback=logs.append,
         preprocessing=preprocessing,
-        preprocessing_frames=(pd.DataFrame(X), pd.Series(y)),
+        preprocessing_frames=frames,
+        validation_data=validation_data,
+        validation_frames=validation_frames,
     )
-    return built["estimator"], logs, result
+    return built, logs, result
 
 
-def test_halving_wrap_refused_for_row_shaping_preprocessing(monkeypatch):
-    """A resampling/row-dropping chain must not enter the searcher Pipeline.
-
-    An sklearn transformer step can only hand X forward, so the model would be
-    fitted on reshaped rows against the original y; the engine skips the wrap
-    and falls back to pre-transformed scoring with an explicit log instead.
+def test_halving_wrap_accepts_row_shaping_preprocessing(monkeypatch):
+    """Row-resampling/row-dropping chains now enter the searcher wrap: the
+    fold-aware estimator runs them inside ``fit`` on each fold's training
+    rows, so reshaped X and the transformed y stay aligned by construction.
     """
-    estimator, logs, result = _tune_with_spied_halving_build(
-        monkeypatch, _StubPreprocessor(changes_row_count=True)
+    from skyulf.modeling._tuning.fold_pipeline import FoldAwareModelStep
+
+    built, logs, result = _tune_with_spied_halving_build(
+        monkeypatch,
+        _StubPreprocessor(fit_transform=lambda X, y: (X.iloc[:-1], y.iloc[:-1])),
     )
-    assert not isinstance(estimator, Pipeline)
-    assert any("Per-fold preprocessing refit skipped" in message for message in logs)
-    # No wrap means no ``model__`` key prefixing to strip back out.
+    estimator = built["estimator"]
+    assert isinstance(estimator, Pipeline)
+    assert isinstance(estimator.named_steps["model"], FoldAwareModelStep)
+    assert any("fold-aware estimator" in message for message in logs)
     assert result.best_params == {"C": 1.0}
 
 
-def test_halving_wrap_kept_for_shape_preserving_preprocessing(monkeypatch):
-    estimator, logs, _result = _tune_with_spied_halving_build(
-        monkeypatch, _StubPreprocessor(changes_row_count=False)
+def test_halving_wrap_accepts_target_mutating_preprocessing(monkeypatch):
+    """A target-only re-encoding (the XGBoost string-target crash case) is
+    wrapped too — predictions are mapped back to the original label space."""
+    from skyulf.modeling._tuning.fold_pipeline import FoldAwareModelStep
+
+    built, logs, _result = _tune_with_spied_halving_build(
+        monkeypatch,
+        _StubPreprocessor(fit_transform=lambda X, y: (X, y.map({0: "neg", 1: "pos"}))),
     )
+    estimator = built["estimator"]
     assert isinstance(estimator, Pipeline)
-    assert not any("Per-fold preprocessing refit skipped" in message for message in logs)
+    assert isinstance(estimator.named_steps["model"], FoldAwareModelStep)
+    assert not any("skipped" in message for message in logs)
 
 
-def test_alignment_probe_refuses_row_dropping_preprocessor(monkeypatch):
-    """The runtime probe catches row drops even when the static flag is False."""
-    estimator, logs, _result = _tune_with_spied_halving_build(
+def test_halving_wrap_strips_model_estimator_prefix(monkeypatch):
+    """best_params and per-trial params keep the caller's original keys after
+    routing the search space through ``model__estimator__``."""
+    _built, _logs, result = _tune_with_spied_halving_build(
         monkeypatch,
-        _StubPreprocessor(
-            changes_row_count=False,
-            fit_transform=lambda X, y: (X.iloc[:-1], y.iloc[:-1]),
-        ),
+        _StubPreprocessor(),
+        extracted=({"model__estimator__C": 1.0}, 0.9),
     )
-    assert not isinstance(estimator, Pipeline)
-    assert any("Per-fold preprocessing refit skipped" in message for message in logs)
+    assert result.best_params == {"C": 1.0}
 
 
-def test_alignment_probe_refuses_target_mutating_preprocessor(monkeypatch):
-    """A target-only re-encoding keeps rows but changes y values; probe refuses."""
-    estimator, logs, _result = _tune_with_spied_halving_build(
+def test_halving_frameless_sdk_call_falls_back_with_log(monkeypatch):
+    """Without named frames (numpy-only library call) the chain cannot run
+    inside the searcher's folds; keep scoring the raw payload with a log."""
+    built, logs, result = _tune_with_spied_halving_build(
         monkeypatch,
-        _StubPreprocessor(
-            changes_row_count=False,
-            fit_transform=lambda X, y: (X, y.map({0: "neg", 1: "pos"})),
-        ),
+        _StubPreprocessor(),
+        frames=None,
+        extracted=({"C": 1.0}, 0.9),
     )
-    assert not isinstance(estimator, Pipeline)
-    assert any("Per-fold preprocessing refit skipped" in message for message in logs)
+    assert not isinstance(built["estimator"], Pipeline)
+    assert any("no named frames" in message for message in logs)
+    assert result.best_params == {"C": 1.0}
 
 
-def test_alignment_probe_fails_closed_when_fit_transform_raises(monkeypatch):
-    def broken(X, y):
-        raise RuntimeError("cannot probe")
+def test_halving_wrap_with_validation_builds_predefined_split_on_concat_frames(monkeypatch):
+    """Holdout + named frames: the searcher receives a PredefinedSplit over
+    the concatenated train+val frames (train marked -1, validation 0) and the
+    fold-aware wrap stays active."""
+    from sklearn.model_selection import PredefinedSplit
 
-    estimator, logs, _result = _tune_with_spied_halving_build(
+    from skyulf.modeling._tuning.fold_pipeline import FoldAwareModelStep
+
+    X_np, y_np = _clf_xy(n=60)
+    X_frame = pd.DataFrame(X_np, columns=list("abcd"))  # ty: ignore[invalid-argument-type]
+    y_series = pd.Series(y_np, name="target")
+    train_frames = (X_frame.iloc[:45], y_series.iloc[:45])
+    val_frames = (X_frame.iloc[45:], y_series.iloc[45:])
+
+    built, _logs, result = _tune_with_spied_halving_build(
         monkeypatch,
-        _StubPreprocessor(changes_row_count=False, fit_transform=broken),
+        _StubPreprocessor(),
+        frames=train_frames,
+        validation_data=val_frames,
+        validation_frames=val_frames,
     )
-    assert not isinstance(estimator, Pipeline)
-    assert any("Per-fold preprocessing refit skipped" in message for message in logs)
+
+    cv = built["cv"]
+    assert isinstance(cv, PredefinedSplit)
+    assert np.array_equal(np.asarray(cv.test_fold), [-1] * 45 + [0] * 15)
+    X_search, y_search = built["X"], built["y"]
+    assert len(X_search) == len(y_search) == 60
+    assert list(X_search.index) == list(range(60)), "concat must reset the index"
+    assert X_search.iloc[:45].equals(X_frame.iloc[:45].reset_index(drop=True))
+    assert np.array_equal(X_search.iloc[45:].to_numpy(), X_frame.iloc[45:].to_numpy())
+    assert len(y_search) == 60 and np.array_equal(
+        np.asarray(y_search.iloc[45:]), np.asarray(y_series.iloc[45:])
+    )
+    estimator = built["estimator"]
+    assert isinstance(estimator, Pipeline)
+    assert isinstance(estimator.named_steps["model"], FoldAwareModelStep)
+    assert result.best_params == {"C": 1.0}
 
 
-def test_alignment_probe_without_frames_relies_on_static_flag():
-    X, y = _clf_xy(n=30)
-    frames = (pd.DataFrame(X), pd.Series(y))
-    assert engine_mod._preserves_row_and_target_alignment(
-        _StubPreprocessor(changes_row_count=False), frames
+def test_halving_validation_without_validation_frames_falls_back_with_log(monkeypatch):
+    """Holdout tuning without named validation frames cannot score the
+    untouched validation split through the chain: drop the wrap and say so."""
+    from sklearn.model_selection import PredefinedSplit
+
+    X_np, y_np = _clf_xy(n=60)
+    X_frame = pd.DataFrame(X_np, columns=list("abcd"))  # ty: ignore[invalid-argument-type]
+    y_series = pd.Series(y_np, name="target")
+    val_frames = (X_frame.iloc[45:], y_series.iloc[45:])
+
+    built, logs, result = _tune_with_spied_halving_build(
+        monkeypatch,
+        _StubPreprocessor(),
+        validation_data=val_frames,
+        validation_frames=None,
+        extracted=({"C": 1.0}, 0.9),
     )
-    assert not engine_mod._preserves_row_and_target_alignment(
-        _StubPreprocessor(
-            changes_row_count=False,
-            fit_transform=lambda X, y: (X.iloc[:-1], y.iloc[:-1]),
-        ),
-        frames,
+
+    assert not isinstance(built["estimator"], Pipeline)
+    assert isinstance(built["cv"], PredefinedSplit)
+    assert any("no named validation frames" in message for message in logs)
+    assert result.best_params == {"C": 1.0}
+
+
+class _IndexSpyAdapter:
+    """Records the row indices every fit_transform/transform call sees.
+
+    Records into class-level lists: ``FoldAwareModelStep`` deep-copies the
+    adapter per fold, so instance state would not survive back to the test.
+    """
+
+    fit_calls: list[frozenset] = []
+    transform_calls: list[frozenset] = []
+
+    def fit_transform(self, X, y):
+        type(self).fit_calls.append(frozenset(X.index))
+        return X, y
+
+    def transform(self, X, y):
+        type(self).transform_calls.append(frozenset(X.index))
+        return X, y
+
+
+def _expected_kfold_partitions(n: int, cv_folds: int = 3) -> list[tuple[frozenset, frozenset]]:
+    """Mirror the engine's default splitter (k_fold, shuffle=True, seed=42)."""
+    from sklearn.model_selection import KFold
+
+    splits = KFold(n_splits=cv_folds, shuffle=True, random_state=42).split(range(n))
+    return [(frozenset(train.tolist()), frozenset(val.tolist())) for train, val in splits]
+
+
+def _assert_fold_discipline(n: int, cv_folds: int = 3) -> None:
+    """The headline leakage assertions: fits stay inside their fold's training
+    rows, validations get the complementary rows."""
+    folds = _expected_kfold_partitions(n, cv_folds)
+    fit_calls = _IndexSpyAdapter.fit_calls
+    transform_calls = _IndexSpyAdapter.transform_calls
+    assert len(fit_calls) >= cv_folds, "preprocessing must refit inside the searcher's folds"
+    for rows in fit_calls:
+        assert any(rows <= train and rows.isdisjoint(val) for train, val in folds), (
+            f"fit saw rows outside one training fold: {sorted(rows)[:10]}..."
+        )
+    val_sets = {val for _train, val in folds}
+    assert val_sets <= set(transform_calls), (
+        "every validation fold must be scored through transform"
     )
-    # No named frames to probe (numpy-only library call): nothing to check.
-    assert engine_mod._preserves_row_and_target_alignment(
-        _StubPreprocessor(changes_row_count=False), None
+
+
+def test_optuna_refits_every_fold_without_leakage():
+    """Leakage proof (optuna): every fit_transform sees exactly one fold's
+    training rows, and each validation fold is transformed for scoring."""
+    pytest.importorskip("optuna")
+    _IndexSpyAdapter.fit_calls.clear()
+    _IndexSpyAdapter.transform_calls.clear()
+
+    X_np, y_np = _clf_xy(n=120)
+    X = pd.DataFrame(X_np, columns=list("abcd"))  # ty: ignore[invalid-argument-type]
+    y = pd.Series(y_np, name="target")
+    cfg = TuningConfig(
+        strategy="optuna",
+        metric="accuracy",
+        n_trials=2,
+        search_space={"C": [1.0]},
+        cv_folds=3,
     )
+    result = _tuner_clf().tune(
+        X_np, y_np, cfg, preprocessing=_IndexSpyAdapter(), preprocessing_frames=(X, y)
+    )
+
+    assert result.n_trials >= 1
+    train_sets = {train for train, _val in _expected_kfold_partitions(len(X))}
+    assert train_sets <= set(_IndexSpyAdapter.fit_calls), (
+        "optuna must refit on each fold's full training rows"
+    )
+    _assert_fold_discipline(len(X))
+
+
+def test_halving_random_refits_folds_without_leakage():
+    """Leakage proof (halving_random): even with rung subsampling, no fit ever
+    sees a row from the fold it is scored against."""
+    _IndexSpyAdapter.fit_calls.clear()
+    _IndexSpyAdapter.transform_calls.clear()
+
+    X_np, y_np = _clf_xy(n=120)
+    X = pd.DataFrame(X_np, columns=list("abcd"))  # ty: ignore[invalid-argument-type]
+    y = pd.Series(y_np, name="target")
+    cfg = TuningConfig(
+        strategy="halving_random",
+        metric="accuracy",
+        n_trials=4,
+        search_space={"C": [0.1, 1.0, 10.0]},
+        cv_folds=3,
+    )
+    _tuner_clf().tune(
+        X_np, y_np, cfg, preprocessing=_IndexSpyAdapter(), preprocessing_frames=(X, y)
+    )
+
+    _assert_fold_discipline(len(X))
+
+
+def test_optuna_target_mutating_chain_matches_grid_scores():
+    """End-to-end on today's crash case: a target-mutating chain (string
+    labels) + XGBoost under optuna now runs per-fold instead of failing or
+    falling back — and scores the same as the grid path on the same folds."""
+    pytest.importorskip("optuna")
+    pytest.importorskip("xgboost")
+    from skyulf.modeling.classification import XGBClassifierCalculator
+
+    class _StrToIntAdapter:
+        def fit_transform(self, X, y):
+            self.mapping_ = {"setosa": 0, "versicolor": 1}
+            return X, y.map(self.mapping_)
+
+        def transform(self, X, y):
+            return X, y.map(self.mapping_) if y is not None else y
+
+    X_np, y_int = _clf_xy(n=120)
+    X = pd.DataFrame(X_np, columns=list("abcd"))  # ty: ignore[invalid-argument-type]
+    y_str = pd.Series(y_int, name="Species").map({0: "setosa", 1: "versicolor"})
+
+    base: dict[str, Any] = {
+        "metric": "accuracy",
+        "cv_folds": 3,
+        "search_space": {"n_estimators": [10]},
+    }
+    _m_grid, grid_result = TuningCalculator(XGBClassifierCalculator()).fit(
+        X,
+        y_str,
+        config=TuningConfig(strategy="grid", **base),
+        preprocessing=_StrToIntAdapter(),
+    )
+    logs: list[str] = []
+    _m_optuna, optuna_result = TuningCalculator(XGBClassifierCalculator()).fit(
+        X,
+        y_str,
+        config=TuningConfig(strategy="optuna", n_trials=1, **base),
+        log_callback=logs.append,
+        preprocessing=_StrToIntAdapter(),
+    )
+
+    assert any("fold-aware estimator" in message for message in logs), (
+        "optuna must take the fold-aware wrap, not a fallback"
+    )
+    assert optuna_result.best_params == {"n_estimators": 10}
+    assert optuna_result.best_score == pytest.approx(grid_result.best_score, abs=1e-6), (
+        "per-fold optuna and grid must score the same single candidate equally"
+    )
+
+
+def test_optuna_failed_trials_surface_error_in_log_and_message():
+    """A trial that fails (here: string target XGBoost can't fit) must push the
+    underlying error into the log callback and into the raised ValueError, so
+    the frontend job detail shows the real cause instead of a generic message.
+    """
+    pytest.importorskip("optuna")
+    xgb = pytest.importorskip("xgboost")  # noqa: F841
+    from skyulf.modeling.classification import XGBClassifierCalculator
+
+    X, y_int = _clf_xy(n=40)
+    y_str = pd.Series(y_int, name="Species").map({0: "setosa", 1: "versicolor"})
+    cfg = TuningConfig(
+        strategy="optuna",
+        metric="f1",
+        n_trials=2,
+        cv_folds=3,
+        search_space={"n_estimators": [10]},
+    )
+    logs: list[str] = []
+    with pytest.raises(ValueError) as excinfo:
+        TuningCalculator(XGBClassifierCalculator()).fit(
+            pd.DataFrame(X), y_str, cfg, log_callback=logs.append
+        )
+    assert "All trials failed" in str(excinfo.value)
+    assert "First trial error:" in str(excinfo.value)
+    assert any("failed" in message for message in logs)
 
 
 # ---------------------------------------------------------------------------
@@ -845,7 +1081,16 @@ class _FlipModelClassCalculator(BaseModelCalculator):
             return LogisticRegression
         return None
 
-    def fit(self, X, y, config, progress_callback=None, log_callback=None, validation_data=None):
+    def fit(
+        self,
+        X,
+        y,
+        config,
+        progress_callback=None,
+        log_callback=None,
+        validation_data=None,
+        iteration_callback=None,
+    ):
         return None
 
 
@@ -1586,3 +1831,32 @@ def test_empty_search_space_silently_ignores_user_hyperparams(
         "from direct fit when params != defaults, but it matched. Re-check this "
         "assumption before relying on it elsewhere."
     )
+
+
+# ---------------------------------------------------------------------------
+# progress=True console reporter (core-only use)
+# ---------------------------------------------------------------------------
+
+
+def test_progress_flag_prints_end_summary(capsys):
+    X, y = _clf_xy()
+    _tuner_clf().fit(X, y, _clf_config(progress=True))
+    out = capsys.readouterr().out
+    # Piped stdout (pytest) is not a TTY: no per-trial lines, summary only.
+    assert "Tuning complete | 2/2 scored trials | metric accuracy" in out
+    assert "best " in out
+    assert "top: " in out
+
+
+def test_explicit_callback_suppresses_reporter(capsys):
+    X, y = _clf_xy()
+    seen: list[tuple] = []
+    _tuner_clf().fit(X, y, _clf_config(progress=True), progress_callback=lambda *a: seen.append(a))
+    assert capsys.readouterr().out == ""
+    assert len(seen) == 2  # one event per grid candidate
+
+
+def test_no_progress_flag_stays_silent(capsys):
+    X, y = _clf_xy()
+    _tuner_clf().fit(X, y, _clf_config())
+    assert capsys.readouterr().out == ""

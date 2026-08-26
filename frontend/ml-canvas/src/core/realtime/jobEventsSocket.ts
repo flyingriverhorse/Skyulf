@@ -12,11 +12,25 @@
  */
 
 export interface JobEvent {
-    event: 'status' | 'progress' | 'created' | 'deleted';
+    event: 'status' | 'progress' | 'created' | 'deleted' | 'trial' | 'iteration';
     job_id: string;
     status?: string;
     progress?: number;
     current_step?: string;
+    // `trial` events only — completed tuning trial scalars for the live
+    // trial chart (aggregate numbers only, never hyperparameters).
+    trial_number?: number;
+    trial_total?: number;
+    trial_score?: number;
+    trial_metric?: string;
+    // `iteration` events only — completed boosting iteration scalars for
+    // the live iteration chart; direction tells the chart which way the
+    // metric improves ("minimize"/"maximize").
+    iteration_number?: number;
+    iteration_total?: number;
+    iteration_score?: number;
+    iteration_metric?: string;
+    iteration_direction?: string;
 }
 
 interface Envelope {

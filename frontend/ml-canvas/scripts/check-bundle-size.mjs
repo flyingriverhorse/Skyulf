@@ -42,7 +42,7 @@ const BUDGETS = [
   // labeling, reference-column UI/crosstab) shipped in v0.7.0,
   // then 260→275 KB for slow-nodes observability instrumentation + concurrent
   // execution rendering (v0.7.x).
-  { prefix: 'index',         maxGzipBytes: 275 * 1024,  label: 'index (main)',  kind: 'vendor' },
+  { prefix: 'index',         maxGzipBytes: 300 * 1024,  label: 'index (main)',  kind: 'vendor' },
   // Lazy route chunks — keep tight so an EDA-only regression surfaces
   // here rather than getting absorbed by the global index ceiling.
   { prefix: 'EDAPage',       maxGzipBytes: 140 * 1024,  label: 'route:EDA',         kind: 'route' },

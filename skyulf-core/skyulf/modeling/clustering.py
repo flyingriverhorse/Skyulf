@@ -103,6 +103,7 @@ class _NumericOnlyClusteringCalculatorMixin:
         progress_callback=None,
         log_callback=None,
         validation_data=None,
+        iteration_callback=None,
     ) -> Any:
         reference_column = (config or {}).get("reference_column") or ""
         working_X = _drop_reference_column(X, reference_column)
@@ -119,6 +120,7 @@ class _NumericOnlyClusteringCalculatorMixin:
             progress_callback=progress_callback,
             log_callback=log_callback,
             validation_data=validation_data,
+            iteration_callback=iteration_callback,
         )
         if reference_column:
             # Stashed on the fitted estimator (plain attribute, pickles fine)

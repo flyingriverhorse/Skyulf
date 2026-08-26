@@ -20,8 +20,6 @@ Use this approach when you want maximum transparency, debugging control, or cust
 This single snippet is fully self-contained and can be pasted into a Python session as-is.
 
 ```python
-from __future__ import annotations
-
 import pandas as pd
 
 from skyulf.data.dataset import SplitDataset

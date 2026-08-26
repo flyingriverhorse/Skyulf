@@ -49,6 +49,7 @@ from skyulf.data.catalog import DataCatalog
 
 from ...artifacts.store import ArtifactStore
 from ...constants import StepType
+from .._cycle_validation import validate_no_cycles
 from .._leakage_validation import validate_no_preprocessing_before_split
 from .._schema_graph import predict_schemas, schemas_to_dict
 from ..schemas import (
@@ -203,6 +204,11 @@ class PipelineEngine(ArtifactsMixin, MergeMixin, FeatureEngMixin, NodeRunnersMix
         Executes the pipeline defined by the configuration.
         """
         self.log(f"Starting pipeline execution: {config.pipeline_id} (Job: {job_id})")
+
+        # Fail fast on cyclic graphs before anything runs: nodes in a loop
+        # would otherwise die late with a cryptic "Artifact not found".
+        # Must precede the leakage check, which bails out on cycles.
+        validate_no_cycles(config.nodes)
 
         # Fail fast (before any node runs / any fitting happens) if a
         # data-dependent preprocessing node is wired upstream of a

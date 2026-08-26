@@ -27,6 +27,7 @@ from backend.ml_pipeline._services.threshold_tuning_service import (
     ThresholdTuningService,
 )
 from backend.realtime.events import JobEvent, publish_job_event
+from backend.realtime.trial_buffer import get_iterations, get_trials
 
 # Retry (OPS-001) only makes sense for jobs that persisted a resubmittable
 # pipeline graph snapshot and have reached a state that will never mutate
@@ -109,6 +110,27 @@ async def get_job_status(job_id: str, session: AsyncSession = Depends(get_async_
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
     return job
+
+
+@router.get("/jobs/{job_id}/trials")
+async def get_job_trials(job_id: str):
+    """Snapshot of completed trials/iterations so far, for charts opened mid-run.
+
+    The ``/ws/jobs`` broadcast only reaches already-connected clients; this
+    backfills the trials (tuning) or boosting iterations a late opener
+    missed. Empty once the job's buffer has been evicted — terminal jobs
+    redraw from persisted ``metrics.trials`` / ``metrics.iterations``.
+    """
+    trials = get_trials(job_id)
+    metric = next((t["metric"] for t in reversed(trials) if t["metric"]), None)
+    iterations = get_iterations(job_id)
+    iteration_metric = next((t["metric"] for t in reversed(iterations) if t["metric"]), None)
+    return {
+        "trials": trials,
+        "metric": metric,
+        "iterations": iterations,
+        "iteration_metric": iteration_metric,
+    }
 
 
 @router.post("/jobs/{job_id}/cancel")

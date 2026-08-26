@@ -26,6 +26,8 @@ import pandas as pd
 import polars as pl
 
 from backend.config import get_settings
+from backend.realtime.events import JobEvent, publish_job_event
+from backend.realtime.trial_buffer import record_iteration, record_trial
 from skyulf.data.catalog import DataCatalog
 from skyulf.data.dataset import SplitDataset
 from skyulf.engines.registry import EngineRegistry
@@ -41,6 +43,73 @@ if TYPE_CHECKING:
     from ...artifacts.store import ArtifactStore
 
 logger = logging.getLogger(__name__)
+
+
+def _emit_trial_event(
+    job_id: str, current: int, total: int, score: float | None, metric: str | None
+) -> None:
+    """Publish a completed tuning trial as a live ``trial`` WebSocket event.
+
+    Aggregate scalars only — ``/ws/jobs`` broadcasts to every client without
+    auth, so hyperparameters never ride along. Silent for scoreless trials
+    (failed/pruned) and the preview-path ``job_id='unknown'`` sentinel;
+    transport failures are swallowed so training is never impacted.
+    Non-finite scores (degenerate trials reporting -inf/NaN) are dropped:
+    the jobs API serializes with ``allow_nan=False``.
+    """
+    if score is None or not np.isfinite(score) or job_id == "unknown":
+        return
+    # Backfill history for clients that open the job mid-run; the live
+    # broadcast below only reaches already-connected subscribers.
+    record_trial(job_id, current, total, float(score), metric)
+    event = JobEvent(
+        event="trial",
+        job_id=job_id,
+        trial_number=current,
+        trial_total=total,
+        trial_score=float(score),
+        trial_metric=metric,
+    )
+    try:
+        publish_job_event(event)
+    except Exception as exc:
+        logger.warning("trial event publish failed for %s: %s", job_id, exc)
+
+
+def _emit_iteration_event(
+    job_id: str,
+    current: int,
+    total: int,
+    score: float | None,
+    metric: str | None,
+    direction: str | None,
+) -> None:
+    """Publish a completed boosting iteration as a live ``iteration`` event.
+
+    Mirror of :func:`_emit_trial_event` for per-round XGBoost/LightGBM
+    progress. Scalars only (unauthenticated broadcast); ``direction`` tells
+    the chart which way the metric improves ("minimize"/"maximize") since
+    boosting scores are usually losses. Silent for scoreless iterations and
+    the preview-path ``job_id='unknown'`` sentinel; transport failures are
+    swallowed so training is never impacted. Non-finite scores are dropped
+    for the same ``allow_nan=False`` reason as trials.
+    """
+    if score is None or not np.isfinite(score) or job_id == "unknown":
+        return
+    record_iteration(job_id, current, total, float(score), metric, direction)
+    event = JobEvent(
+        event="iteration",
+        job_id=job_id,
+        iteration_number=current,
+        iteration_total=total,
+        iteration_score=float(score),
+        iteration_metric=metric,
+        iteration_direction=direction,
+    )
+    try:
+        publish_job_event(event)
+    except Exception as exc:
+        logger.warning("iteration event publish failed for %s: %s", job_id, exc)
 
 
 class NodeRunnersMixin:
@@ -717,7 +786,7 @@ class NodeRunnersMixin:
         tuning_params: dict[str, Any],
         tuning_result: Any,
         node: NodeConfig,
-        fold_preprocessing: tuple[Any, tuple[Any, Any]] | None = None,
+        fold_preprocessing: tuple[Any, tuple[Any, Any], tuple[Any, Any] | None] | None = None,
     ) -> dict[str, Any]:
         """Run post-tuning cross-validation with the tuned model's best params.
 
@@ -725,10 +794,12 @@ class NodeRunnersMixin:
         post-tuning CV only needs the outer evaluation and downgrades to
         ``stratified_k_fold`` (classification) or ``k_fold`` (regression).
 
-        ``fold_preprocessing`` (F-15): ``(adapter, (X_pre, y_pre))`` — CV must
-        slice the pre-transform rows so the per-fold refit stays aligned with
-        the preprocessor; ``data.test`` is kept only so the dataset shape is
-        preserved (cross_validate reads ``.train`` only).
+        ``fold_preprocessing`` (F-15): ``(adapter, (X_pre, y_pre),
+        validation_payload)`` — CV must slice the pre-transform rows so the
+        per-fold refit stays aligned with the preprocessor (the validation
+        payload is unused here: post-tuning CV evaluates train rows only);
+        ``data.test`` is kept only so the dataset shape is preserved
+        (cross_validate reads ``.train`` only).
         """
         if not tuning_params.get("cv_enabled", False):
             return {}
@@ -747,7 +818,7 @@ class NodeRunnersMixin:
         preprocessing = None
         cv_data = data
         if fold_preprocessing is not None:
-            preprocessing, pre_train = fold_preprocessing
+            preprocessing, pre_train, _pre_validation = fold_preprocessing
             cv_data = SplitDataset(train=pre_train, test=data.test, validation=None)
 
         self.log("Running cross-validation on tuned model with best parameters...")
@@ -816,22 +887,40 @@ class NodeRunnersMixin:
         # F-15: per-fold preprocessing refit is always attempted. All tuning
         # strategies support it (grid/random via the engine's fold loop,
         # halving/optuna via a Pipeline wrapper around the searcher's internal
-        # CV); only holdout tuning with a validation split is out of scope and
-        # falls back with an explicit log line instead of failing the run.
-        fold_preprocessing = None
-        if data.validation is not None:
-            self.log(
-                "Per-fold preprocessing refit skipped: a validation split is "
-                "present (holdout tuning path); scores may be optimistically biased."
-            )
-        else:
-            fold_preprocessing = self._resolve_fold_preprocessing(node, target_col)
+        # CV); holdout tuning with a validation split refits on the train rows
+        # only and scores candidates against the untouched validation split.
+        # Unsupported graphs fall back inside the resolver with an explicit
+        # job-log warning instead of failing the run.
+        fold_preprocessing = self._resolve_fold_preprocessing(node, target_col)
 
         def progress_callback(current, total, score=None, params=None):
             msg = f"Tuning progress: Trial {current}/{total}"
             if score is not None:
                 msg += f" - Score: {score:.4f}"
             self.log(msg)
+            _emit_trial_event(job_id, current, total, score, tuning_params.get("metric"))
+
+        # Per-boosting-round progress (XGBoost/LightGBM): fires during every
+        # boosting fit the engine runs, including the final refit — plain
+        # sklearn models simply never invoke it. Points are kept locally as
+        # well so they can be persisted on the job for completed-job redraws.
+        iteration_points: list[dict[str, Any]] = []
+
+        def iteration_callback(current, total, score, metric, direction):
+            self.log(
+                f"Boosting iteration {current}/{total}"
+                + (f" - {metric or 'score'}: {score:.4f}" if score is not None else "")
+            )
+            iteration_points.append(
+                {
+                    "iteration": current,
+                    "total": total,
+                    "score": None if score is None else float(score),
+                    "metric": metric,
+                    "direction": direction,
+                }
+            )
+            _emit_iteration_event(job_id, current, total, score, metric, direction)
 
         # Run fit_predict
         # This will:
@@ -840,9 +929,11 @@ class NodeRunnersMixin:
         # 3. Generate predictions on train/test/val splits (TunerApplier.predict)
         fit_kwargs: dict[str, Any] = {}
         if fold_preprocessing is not None:
-            adapter, pre_train = fold_preprocessing
+            adapter, pre_train, pre_validation = fold_preprocessing
             fit_kwargs["preprocessing"] = adapter
             fit_kwargs["preprocessing_train"] = pre_train
+            if pre_validation is not None:
+                fit_kwargs["preprocessing_validation"] = pre_validation
         estimator.fit_predict(
             data,
             target_col,
@@ -850,6 +941,7 @@ class NodeRunnersMixin:
             progress_callback=progress_callback,
             log_callback=self.log,
             job_id=job_id,
+            iteration_callback=iteration_callback,
             **fit_kwargs,
         )
 
@@ -863,6 +955,16 @@ class NodeRunnersMixin:
         # trials for BOTH modes, so fixed-mode jobs report the effective
         # hyperparameters consistently with tuned-mode jobs)
         tuning_result, metrics = self._extract_tuning_metrics(estimator, tuning_params)
+
+        # Persist the boosting iteration history (when the model streamed one)
+        # so completed jobs redraw the curve without the live buffer.
+        if iteration_points:
+            metrics["iterations"] = iteration_points
+            last_point = iteration_points[-1]
+            if last_point.get("metric"):
+                metrics["iteration_metric"] = last_point["metric"]
+            if last_point.get("direction"):
+                metrics["iteration_direction"] = last_point["direction"]
 
         # Cross-Validation on the tuned/fixed model (using best/fixed params)
         cv_metrics = self._run_tuned_cv(

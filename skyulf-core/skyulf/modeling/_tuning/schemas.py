@@ -24,6 +24,10 @@ class TuningConfig:
     cv_shuffle: bool = True
     cv_random_state: int = 42
     random_state: int = 42
+    # Console progress for core-only use (a self-updating trial line on TTYs
+    # plus an end-of-run best/trials summary). Off by default; the backend
+    # never sets it and supplies its own progress_callback instead.
+    progress: bool = False
     # Column to sort by chronologically when cv_type == "time_series_split"
     # (also dropped from features so it doesn't leak into training). Mirrors
     # the `time_column` parameter accepted by cross_validation.perform_cross_validation().

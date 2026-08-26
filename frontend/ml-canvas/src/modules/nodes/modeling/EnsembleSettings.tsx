@@ -469,6 +469,11 @@ function CrossValidationSection({ config, update, showCV, setShowCV, columns }: 
             />
             Enable Cross-Validation
           </label>
+          <p className="text-xs text-gray-500 dark:text-gray-400 pl-6">
+            {config.run_mode === 'advanced'
+              ? 'Candidates are already scored by CV during the search. This re-evaluates the winning ensemble after tuning (full metric panel + fold-to-fold variance); it never changes the selected hyperparameters.'
+              : 'Runs a k-fold evaluation of the trained ensemble after training. Evaluation only — it measures generalization and never changes the model or its configuration.'}
+          </p>
           {config.cv_enabled !== false && (
             <div className="space-y-3 pl-6 border-l-2 border-gray-100 dark:border-gray-800">
               <div className="grid grid-cols-2 gap-3">

@@ -7,8 +7,6 @@ This page contains practical patterns for common workflows.
 If you want evaluation metrics, use a split step (or pass a `SplitDataset`).
 
 ```python
-from __future__ import annotations
-
 import pandas as pd
 
 from skyulf import SkyulfPipeline
@@ -94,8 +92,6 @@ At inference time you typically:
 2. call `predict(df)` on a dataframe without the target column
 
 ```python
-from __future__ import annotations
-
 import tempfile
 from pathlib import Path
 
