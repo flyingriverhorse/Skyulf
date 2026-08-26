@@ -19,7 +19,7 @@ Run from the repo root:
     .venv/Scripts/python.exe skyulf-core/benchmarks/bench_holdout_refit_leakage.py
 """
 
-from typing import Any, Literal, cast
+from typing import Any, Literal
 
 import numpy as np
 import pandas as pd
@@ -88,11 +88,17 @@ def section_1() -> None:
     # transformed rows — held-out labels sit inside the WOE table.
     X_all = pd.concat([X_tr, X_val], ignore_index=True)
     y_all = pd.concat([y_tr, y_val], ignore_index=True)
-    # functools.wraps copies the inner (X, y, config) signature, but the
-    # @fit_method/@apply_method wrappers take (df, config) — cast keeps the
-    # call shape honest for static analyzers.
-    leaky_params = cast(Any, WOEEncoderCalculator()).fit((X_all, y_all), WOE_STEPS[0]["params"])
-    X_leaky, _ = cast(Any, WOEEncoderApplier()).apply((X_all, y_all), dict(leaky_params))
+    # functools.wraps copies the inner (X, y, config) signature over the
+    # @fit_method/@apply_method wrappers, whose real API is (df, config) —
+    # Any-typed locals keep the call shape honest for static analyzers.
+    woe_calculator: Any = WOEEncoderCalculator()
+    woe_applier: Any = WOEEncoderApplier()
+    # pylint: disable-next=no-value-for-parameter — pylint follows the
+    # functools.wraps-masked inner (X, y, config) signature, not the real
+    # (df, config) API these wrappers expose.
+    leaky_params = woe_calculator.fit((X_all, y_all), WOE_STEPS[0]["params"])
+    # pylint: disable-next=no-value-for-parameter
+    X_leaky, _ = woe_applier.apply((X_all, y_all), dict(leaky_params))
 
     cv_config = TuningConfig(
         strategy="grid", metric="roc_auc", search_space=dict(LR_SPACE), cv_folds=5
