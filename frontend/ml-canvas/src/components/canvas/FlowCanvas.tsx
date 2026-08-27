@@ -14,6 +14,7 @@ import {
   useGraphStore,
   wouldCreateCycle,
   isModelEndpointViolation,
+  collectGraphValidationIssues,
   CYCLE_CONNECTION_MESSAGE,
   MODEL_ENDPOINT_CONNECTION_MESSAGE,
 } from '../../core/store/useGraphStore';
@@ -81,6 +82,7 @@ const FlowCanvasContent: React.FC = () => {
     onConnect,
     addNode,
     executionResult,
+    lastRunError,
   } = useGraphStore(
     useShallow((state) => ({
       nodes: state.nodes,
@@ -90,10 +92,17 @@ const FlowCanvasContent: React.FC = () => {
       onConnect: state.onConnect,
       addNode: state.addNode,
       executionResult: state.executionResult,
+      lastRunError: state.lastRunError,
     }))
   );
 
-  const { isResultsPanelExpanded, perfOverlayEnabled, setPerfOverlayEnabled } = useViewStore();
+  const {
+    isResultsPanelExpanded,
+    isResultsPanelMaximized,
+    isResultsPanelDismissed,
+    perfOverlayEnabled,
+    setPerfOverlayEnabled,
+  } = useViewStore();
   const readOnly = useReadOnlyMode();
 
   const confirm = useConfirm();
@@ -134,6 +143,18 @@ const FlowCanvasContent: React.FC = () => {
 
   const branchStableNodes = useBranchStableNodes(nodes);
   const branchColorMap = useBranchColors(branchStableNodes, edges);
+
+  // Whether the Preview Results panel is showing (mirrors ResultsPanel's
+  // visibility rule) and how tall it is, so the zoom controls lift above
+  // it: 40px for the collapsed bar, 384px (h-96) when expanded. Uses the
+  // branch-stable nodes so drags don't re-validate every frame.
+  const validationIssueCount = useMemo(
+    () => collectGraphValidationIssues(branchStableNodes, edges).length,
+    [branchStableNodes, edges],
+  );
+  const resultsPanelVisible =
+    Boolean(executionResult || lastRunError || validationIssueCount > 0) &&
+    !isResultsPanelDismissed;
 
   // Mirror the per-edge Path label and the per-label color into the global
   // store so trainer cards and ResultsPanel can use the exact same letters
@@ -377,11 +398,20 @@ const FlowCanvasContent: React.FC = () => {
         <Background />
         <Controls
           position="bottom-left"
-          style={
-            (executionResult && !isResultsPanelExpanded)
-              ? { marginBottom: '40px', transition: 'margin-bottom 0.3s ease-in-out' }
-              : { transition: 'margin-bottom 0.3s ease-in-out' }
-          }
+          style={{
+            // Maximizing the panel covers the whole canvas, so the controls
+            // have nowhere to lift to — hide them instead of burying them.
+            ...(isResultsPanelMaximized && resultsPanelVisible
+              ? { display: 'none' }
+              : {
+                  marginBottom: resultsPanelVisible
+                    ? isResultsPanelExpanded
+                      ? '384px'
+                      : '40px'
+                    : '0px',
+                }),
+            transition: 'margin-bottom 0.3s ease-in-out',
+          }}
         />
       </ReactFlow>
       {perfOverlayEnabled && nodes.length > 0 && (

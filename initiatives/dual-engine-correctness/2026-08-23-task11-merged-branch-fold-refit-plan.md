@@ -95,3 +95,11 @@ Common-trunk detection: F = last node of the longest common node-id prefix of th
 3. Full regression sweep green (Phase 4), including unchanged merge-scenario e2e suite.
 4. `ruff check`, `ruff format --check`, `ty check` clean on all touched files.
 5. `test_merged_branches_fall_back_with_warning` still green (fallback path preserved).
+
+## Known constraint (2026-08-26)
+
+Post-split merges are pure-order — ownership is inert for `SplitDataset` baselines, so the last
+connected branch wins every shared column. Documented in `docs/guides/multi_path_pipelines.md`
+("After a Split: Order Decides Everything") and `docs/user_guide/troubleshooting.md`, and enforced
+at training time by the non-numeric fail-fast guard in `_node_runners.py` (findings doc
+`2026-08-26-holdout-validation-refit-and-merge-findings.md`, §2 Finding 1).

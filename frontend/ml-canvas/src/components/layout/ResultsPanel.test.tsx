@@ -95,4 +95,51 @@ describe('ResultsPanel', () => {
     const liveRegion = issueButton.closest('[role="alert"], [role="status"], [aria-live]');
     expect(liveRegion).toBeNull();
   });
+
+  it('closes preview results with the X button, clearing the run data', () => {
+    useGraphStore.setState({
+      executionResult: {
+        pipeline_id: 'p1',
+        status: 'success',
+        node_results: {},
+        preview_data: { Result: [{ a: 1 }] },
+        recommendations: [],
+      },
+      lastRunError: 'stale error',
+    });
+
+    render(<ResultsPanel />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Close preview results' }));
+
+    expect(useGraphStore.getState().executionResult).toBeNull();
+    expect(useGraphStore.getState().lastRunError).toBeNull();
+  });
+
+  it('closes a validation-only panel with the X button until the issues change', () => {
+    useGraphStore.getState().setGraph(
+      [
+        {
+          id: 'dataset',
+          type: 'custom',
+          position: { x: 0, y: 0 },
+          data: { definitionType: 'dataset_node', datasetId: 'ds-1' },
+        },
+        {
+          id: 'orphan-encoding',
+          type: 'custom',
+          position: { x: 100, y: 0 },
+          data: { definitionType: 'encoding', method: 'label', columns: ['status'] },
+        },
+      ],
+      [],
+    );
+
+    const { container } = render(<ResultsPanel />);
+    expect(screen.getByText('Preview Results')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Close preview results' }));
+
+    expect(container.querySelector('.absolute.bottom-0')).toBeNull();
+  });
 });

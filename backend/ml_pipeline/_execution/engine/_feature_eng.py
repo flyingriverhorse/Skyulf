@@ -417,35 +417,45 @@ class FeatureEngMixin:
     def _try_fork_join_refit(
         self, training_node: NodeConfig, target_col: str
     ) -> tuple[
-        tuple["FoldPreprocessor", tuple[Any, Any], tuple[Any, Any] | None] | None, str | None
+        tuple["FoldPreprocessor", tuple[Any, Any], tuple[Any, Any] | None] | None,
+        str | None,
+        str | None,
     ]:
         """Resolve per-fold refit for a fork-join merged graph (task #11).
 
         Supported shape: a shared trunk ending in a node whose last step is a
         ``TrainTestSplitter``/``Split`` (the fork point), N parallel
         transformer branches, and a column-wise merge straight into the
-        training node. Returns ``(resolved, reason)`` — ``(adapter, payload,
-        validation_payload)`` on a match (validation_payload is ``None`` when
-        the fork split out no validation rows), else ``None`` plus the bail
-        reason for the job log. Anything else keeps the skip-with-warning
-        fallback: never fail a run, never leak silently.
+        training node. Returns ``(resolved, reason, code)`` — ``(adapter,
+        payload, validation_payload), None, None`` on a match
+        (validation_payload is ``None`` when the fork split out no validation
+        rows), else ``None`` plus the bail reason for the job log and a stable
+        reason code for the ``fold_refit_fallback`` metric. Anything else
+        keeps the skip-with-warning fallback: never fail a run, never leak
+        silently.
         """
         inputs = list(dict.fromkeys(self._merge_input_order(training_node)))
         if len(inputs) < 2:
-            return None, "training node has fewer than two merged inputs"
+            return None, "training node has fewer than two merged inputs", "unsupported_graph"
 
         chains: list[tuple[str, list[tuple[str, list[dict[str, Any]]]]]] = []
         for input_id in inputs:
             walked = self._branch_chain_up_to_loader(input_id)
             if walked is None:
-                return None, (
-                    f"branch '{input_id}' is not a linear transformer chain from a loader"
+                return (
+                    None,
+                    (f"branch '{input_id}' is not a linear transformer chain from a loader"),
+                    "nested_merge",
                 )
             chains.append(walked)
 
         loaders = {loader_id for loader_id, _ in chains}
         if len(loaders) != 1:
-            return None, f"branches do not share one data loader (found {sorted(loaders)})"
+            return (
+                None,
+                (f"branches do not share one data loader (found {sorted(loaders)})"),
+                "unsupported_graph",
+            )
 
         # Fork point = last node of the longest common node-id prefix.
         node_sequences = [[node_id for node_id, _steps in chain] for _loader, chain in chains]
@@ -456,16 +466,20 @@ class FeatureEngMixin:
                 break
             prefix_len += 1
         if prefix_len == 0:
-            return None, "branches share no common trunk"
+            return None, "branches share no common trunk", "unsupported_graph"
         fork_id = node_sequences[0][prefix_len - 1]
         fork_steps = dict(chains[0][1]).get(fork_id)
         if not fork_steps or fork_id == loaders.pop():
-            return None, "no splitter fork point on the shared trunk"
+            return None, "no splitter fork point on the shared trunk", "fork_not_splitter"
         fork_splitter = fork_steps[-1].get("transformer")
         if fork_splitter not in ("TrainTestSplitter", "Split"):
-            return None, (
-                f"fork node '{fork_id}' must end with a TrainTestSplitter/Split "
-                f"step, found '{fork_splitter}'"
+            return (
+                None,
+                (
+                    f"fork node '{fork_id}' must end with a TrainTestSplitter/Split "
+                    f"step, found '{fork_splitter}'"
+                ),
+                "fork_not_splitter",
             )
 
         # Trunk steps before the fork splitter are already baked into the
@@ -478,20 +492,32 @@ class FeatureEngMixin:
         trunk_learners = [step for step in trunk_steps if _step_learns_from_data(step)]
         if trunk_learners:
             names = ", ".join(sorted({str(step.get("transformer")) for step in trunk_learners}))
-            return None, (
-                f"data-dependent trunk step(s) before the fork splitter ({names}) "
-                "cannot be re-fit safely per fold"
+            return (
+                None,
+                (
+                    f"data-dependent trunk step(s) before the fork splitter ({names}) "
+                    "cannot be re-fit safely per fold"
+                ),
+                "learner_before_split",
             )
 
         branch_lists: list[list[dict[str, Any]]] = []
         for (_loader, chain), input_id in zip(chains, inputs, strict=True):
             branch_steps = [step for node_id, steps in chain[prefix_len:] for step in steps]
             if not branch_steps:
-                return None, f"branch '{input_id}' has no steps after the fork point"
+                return (
+                    None,
+                    (f"branch '{input_id}' has no steps after the fork point"),
+                    "unsupported_graph",
+                )
             for step in branch_steps:
                 transformer = step.get("transformer")
                 if transformer in UNSAFE_BRANCH_STEP_TYPES:
-                    return None, (f"branch step '{transformer}' splits data or changes row counts")
+                    return (
+                        None,
+                        (f"branch step '{transformer}' splits data or changes row counts"),
+                        "row_changing_branch_step",
+                    )
             branch_lists.append(branch_steps)
 
         strategy = self._get_merge_strategy(training_node.node_id)
@@ -510,38 +536,50 @@ class FeatureEngMixin:
             f"{len(branch_lists)} merged branch(es) re-fit inside every CV/tuning "
             "fold (scores are leakage-free)."
         )
-        return (adapter, payload, validation_payload), None
+        return (adapter, payload, validation_payload), None, None
 
     def _resolve_fold_preprocessing(
         self, training_node: NodeConfig, target_col: str
-    ) -> tuple["FoldPreprocessor", tuple[Any, Any], tuple[Any, Any] | None] | None:
+    ) -> tuple[
+        tuple["FoldPreprocessor", tuple[Any, Any], tuple[Any, Any] | None] | None,
+        str | None,
+    ]:
         """Resolve the per-fold preprocessing adapter + pre-transform payloads (F-15).
 
-        Returns ``(adapter, (X_pre, y_pre), validation_payload)`` so CV/tuning
-        folds slice the rows the adapter was built for — ``validation_payload``
-        is the pre-transform ``(X, y)`` validation split when one exists
+        Returns ``(resolved, fallback_code)`` where ``resolved`` is
+        ``(adapter, (X_pre, y_pre), validation_payload)`` so CV/tuning folds
+        slice the rows the adapter was built for — ``validation_payload`` is
+        the pre-transform ``(X, y)`` validation split when one exists
         (holdout tuning scores candidates against it untouched), else ``None``
-        — or ``None`` to keep pre-transformed scoring. Falls back with an
+        — or ``None`` to keep pre-transformed scoring. ``fallback_code`` is a
+        stable reason code stamped into the training node's metrics
+        (``fold_refit_fallback``) when the run falls back, else ``None``
+        (including the nothing-to-refit silent skip). Falls back with an
         explicit job-log warning when the upstream graph is not a linear
         chain or the payload cannot be reconstructed — never fails the run.
         """
         warning = None
+        code: str | None = None
         try:
             resolved = self._upstream_fe_chain(training_node)
             if resolved is None:
                 if len(dict.fromkeys(training_node.inputs or [])) > 1:
-                    merged, merged_reason = self._try_fork_join_refit(training_node, target_col)
+                    merged, merged_reason, merged_code = self._try_fork_join_refit(
+                        training_node, target_col
+                    )
                     if merged is not None:
-                        return merged
+                        return merged, None
                     warning = merged_reason or (
                         "merged graph is not a supported fork-join of transformer branches"
                     )
+                    code = merged_code or "unsupported_graph"
                 else:
                     warning = (
                         "upstream graph is not a linear chain (merged branches or "
                         "unsupported nodes)"
                     )
-                return None
+                    code = "unsupported_graph"
+                return None, code
             loader_id, chain = resolved
 
             flat: list[tuple[dict[str, Any], str, int, int]] = [
@@ -571,7 +609,8 @@ class FeatureEngMixin:
                         f"data-dependent step(s) before the last splitter ({names}) "
                         "cannot be re-fit safely per fold"
                     )
-                    return None
+                    code = "learner_before_split"
+                    return None, code
                 # Stateless pre-split steps were already applied during payload
                 # reconstruction (or by the upstream node whose artifact is
                 # loaded below); keep them out of the per-fold chain so every
@@ -589,7 +628,7 @@ class FeatureEngMixin:
             if not learning_steps:
                 # Only splitters (and stateless pre-split steps) upstream:
                 # nothing data-dependent to refit per fold.
-                return None
+                return None, None
 
             if not splitter_positions:
                 # No split at all: the raw loader frame IS the train payload.
@@ -620,11 +659,12 @@ class FeatureEngMixin:
                 f"Per-fold preprocessing refit enabled: {len(learning_steps)} step(s) "
                 "re-fit inside every CV/tuning fold (scores are leakage-free)."
             )
-            return adapter, payload, validation_payload
+            return (adapter, payload, validation_payload), None
         except Exception:
             logger.exception("Failed to resolve per-fold preprocessing")
             warning = "payload reconstruction failed"
-            return None
+            code = "payload_reconstruction_failed"
+            return None, code
         finally:
             if warning is not None:
                 self.log(

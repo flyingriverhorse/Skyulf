@@ -105,3 +105,68 @@ describe('PropertiesPanel merge strategy', () => {
     expect(screen.getByText(/Keep Drop Missing Columns \(first connected/)).toBeTruthy();
   });
 });
+
+describe('PropertiesPanel multi-input mode merge-winner hint', () => {
+  beforeAll(() => initializeRegistry());
+
+  const TRAINING_NODE = {
+    id: 'train-node',
+    type: 'custom',
+    position: { x: 0, y: 0 },
+    selected: true,
+    data: {
+      definitionType: 'classification',
+      label: 'Training',
+      // ClassificationNode defaultConfig — TrainingSettings reads these fields.
+      run_mode: 'basic',
+      model_type: 'random_forest_classifier',
+      hyperparameters: {},
+      cv_enabled: true,
+      cv_folds: 5,
+      cv_type: 'k_fold',
+      cv_shuffle: true,
+      cv_random_state: 42,
+      cv_time_column: '',
+      n_trials: 10,
+      metric: 'accuracy',
+      search_strategy: 'random',
+      random_state: 42,
+      search_space: {},
+    },
+  };
+
+  const seedTraining = (executionMode?: string) => {
+    useGraphStore.setState({
+      nodes: [
+        { ...TRAINING_NODE, data: { ...TRAINING_NODE.data, ...(executionMode ? { execution_mode: executionMode } : {}) } },
+        { id: 'branch-a', type: 'custom', position: { x: 0, y: 0 }, data: { definitionType: 'WOEEncoder', label: 'Encoder' } },
+        { id: 'branch-b', type: 'custom', position: { x: 0, y: 0 }, data: { definitionType: 'Scale', label: 'Scaler' } },
+      ],
+      edges: [
+        { id: 'e1', source: 'branch-a', target: 'train-node' },
+        { id: 'e2', source: 'branch-b', target: 'train-node' },
+      ],
+      executionResult: null,
+    } as never);
+  };
+
+  const renderPanel = () =>
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <PropertiesPanel />
+      </QueryClientProvider>,
+    );
+
+  it('in merge mode names the last connected branch as the winner', () => {
+    seedTraining('merge');
+    renderPanel();
+    expect(screen.getByText(/If two branches carry the same column/)).toBeTruthy();
+    expect(screen.getByText('Scaler')).toBeTruthy();
+  });
+
+  it('in parallel mode shows no merge-winner hint', () => {
+    seedTraining('parallel');
+    renderPanel();
+    expect(screen.queryByText(/If two branches carry the same column/)).not.toBeInTheDocument();
+  });
+});

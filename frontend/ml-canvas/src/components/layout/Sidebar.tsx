@@ -47,7 +47,7 @@ export const Sidebar: React.FC = () => {
 
   if (!isSidebarOpen) {
     return (
-      <div className="absolute left-4 top-4 z-50">
+      <div className="absolute left-4 top-4 z-10">
         <button
           onClick={() => setSidebarOpen(true)}
           className="p-2 bg-background border shadow-md rounded-md text-muted-foreground hover:text-foreground transition-colors"

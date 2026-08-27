@@ -724,6 +724,7 @@ class TuningCalculator(BaseModelCalculator):
         metric: str,
         log_callback: Callable[[str], None] | None,
         preprocessing: "FoldPreprocessor | None" = None,
+        fold_errors: list[str] | None = None,
     ) -> float:
         """Cross-validates one grid/random-search candidate and returns its mean fold score.
 
@@ -754,6 +755,7 @@ class TuningCalculator(BaseModelCalculator):
                 metric=metric,
                 log_callback=log_callback,
                 preprocessing=preprocessing,
+                fold_errors=fold_errors,
             )
             fold_scores.append(score)
 
@@ -777,11 +779,13 @@ class TuningCalculator(BaseModelCalculator):
         metric: str,
         log_callback: Callable[[str], None] | None,
         preprocessing: "FoldPreprocessor | None" = None,
+        fold_errors: list[str] | None = None,
     ) -> float:
         """Fits one candidate on a single CV fold and returns its score, or ``-inf`` on failure.
 
         Errors (e.g. incompatible params) are caught and logged rather than raised, so a single
-        bad fold doesn't abort the whole candidate evaluation.
+        bad fold doesn't abort the whole candidate evaluation. When ``fold_errors`` is provided,
+        the first failure message is recorded so the search can surface it if every trial fails.
         """
         # Split
         X_train_fold = X_any.iloc[train_idx] if hasattr(X_any, "iloc") else X_any[train_idx]
@@ -818,6 +822,8 @@ class TuningCalculator(BaseModelCalculator):
                 )
             return score
         except Exception as e:
+            if fold_errors is not None and not fold_errors:
+                fold_errors.append(str(e))
             if log_callback:
                 n_splits = cv.get_n_splits(X_arr, y_arr)
                 log_callback(
@@ -850,6 +856,7 @@ class TuningCalculator(BaseModelCalculator):
         progress_callback: Callable[[int, int, float | None, dict | None], None] | None,
         log_callback: Callable[[str], None] | None,
         preprocessing: "FoldPreprocessor | None" = None,
+        fold_errors: list[str] | None = None,
     ) -> tuple[list[dict[str, Any]], float, dict[str, Any] | None]:
         """Evaluates every candidate via CV, emitting progress/log callbacks, and tracks the best.
 
@@ -877,6 +884,7 @@ class TuningCalculator(BaseModelCalculator):
                 metric,
                 log_callback,
                 preprocessing,
+                fold_errors,
             )
 
             if log_callback:
@@ -920,6 +928,7 @@ class TuningCalculator(BaseModelCalculator):
             log_callback(f"Total candidates to evaluate: {total_candidates}")
 
         # 2. Iterate Candidates
+        fold_errors: list[str] = []
         trials, best_score, best_params = self._evaluate_search_candidates(
             candidates,
             X_for_search,
@@ -930,6 +939,7 @@ class TuningCalculator(BaseModelCalculator):
             progress_callback,
             log_callback,
             preprocessing,
+            fold_errors,
         )
 
         if log_callback:
@@ -937,10 +947,11 @@ class TuningCalculator(BaseModelCalculator):
             log_callback(f"Best Params: {best_params}")
 
         if best_params is None:
+            detail = f" First trial error: {fold_errors[0]}" if fold_errors else ""
             raise ValueError(
                 "Hyperparameter tuning failed: All trials failed. "
                 "This usually means the model failed to train with the provided hyperparameter combinations. "
-                "Please check your search space and data."
+                f"Please check your search space and data.{detail}"
             )
 
         return TuningResult(

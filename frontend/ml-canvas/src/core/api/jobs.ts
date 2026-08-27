@@ -15,6 +15,29 @@ export interface LeakageGateVerdict {
   exempted?: Array<{ node_id: string; step_type: string; reason: string }>;
 }
 
+// Per-fold preprocessing audit the training runner stamps into metrics when
+// per-fold refit was active. Absent for legacy jobs and for graphs that fell
+// back to pre-transformed scoring. isolation_ok: no fit saw more rows than
+// the train split, i.e. no held-out row entered a preprocessing fit.
+export interface RefitAuditVerdict {
+  fit_calls: number;
+  max_fit_rows: number;
+  transform_calls: number;
+  train_rows?: number;
+  isolation_ok?: boolean;
+}
+
+// Stable reason code stamped into job metrics (`fold_refit_fallback`) when
+// CV/tuning fell back to pre-transformed scoring instead of per-fold
+// preprocessing refit. Absent on covered runs.
+export type FoldRefitFallbackCode =
+  | 'nested_merge'
+  | 'fork_not_splitter'
+  | 'learner_before_split'
+  | 'row_changing_branch_step'
+  | 'unsupported_graph'
+  | 'payload_reconstruction_failed';
+
 export interface JobInfo {
   job_id: string;
   pipeline_id: string;

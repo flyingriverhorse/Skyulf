@@ -5,7 +5,7 @@ import {
   ChevronsDown, ChevronsUp, RotateCw, Info,
   Link2, FlaskConical, GitBranch, Workflow, ScanEye, Tag, Layers,
 } from 'lucide-react';
-import { JobInfo, LeakageGateVerdict } from '../../../core/api/jobs';
+import { JobInfo, LeakageGateVerdict, RefitAuditVerdict, FoldRefitFallbackCode } from '../../../core/api/jobs';
 import { useJobStore } from '../../../core/store/useJobStore';
 import { useJobPolling, isTerminalStatus } from '../../../core/hooks/useJobPolling';
 import { useTuningTrials, type SeriesKind } from '../../../core/hooks/useTuningTrials';
@@ -408,6 +408,23 @@ interface JobDetailsViewProps {
   filters?: Record<string, string>;
 }
 
+// Plain-language reasons for the Score Advisory modal, keyed by the stable
+// `fold_refit_fallback` codes the engine stamps into the job metrics.
+const FALLBACK_REASON_TEXT: Record<FoldRefitFallbackCode, string> = {
+  nested_merge:
+    'A branch contains its own merge node. Per-fold refit supports exactly one merge straight into the training node.',
+  fork_not_splitter:
+    'The branches split off at a point that is not a train/test splitter, so the pre-transform rows cannot be reconstructed per fold.',
+  learner_before_split:
+    'A data-dependent step runs before the last train/test split, so it already learned from held-out rows in the full run — re-fitting it per fold would apply its statistics twice.',
+  row_changing_branch_step:
+    'A branch step filters or splits rows, so the branches no longer align row-for-row and cannot be re-fit inside each fold.',
+  unsupported_graph:
+    'The upstream graph is not a shape per-fold refit supports (a linear chain, or one merge of transformer branches after a splitter).',
+  payload_reconstruction_failed:
+    'Reconstructing the pre-transform rows failed unexpectedly; the run continued on the already-transformed data. Check the job log for the traceback.',
+};
+
 export const JobDetailsView: React.FC<JobDetailsViewProps> = ({ job: initialJob, onBack, onClose, origin, filters }) => {
     const { cancelJob, retryJob } = useJobStore();
     const confirm = useConfirm();
@@ -418,6 +435,8 @@ export const JobDetailsView: React.FC<JobDetailsViewProps> = ({ job: initialJob,
     const [wrapLines, setWrapLines] = useState(true);
     const [copied, setCopied] = useState(false);
     const [gateModalOpen, setGateModalOpen] = useState(false);
+    const [auditModalOpen, setAuditModalOpen] = useState(false);
+    const [advisoryModalOpen, setAdvisoryModalOpen] = useState(false);
     const logsEndRef = useRef<HTMLDivElement>(null);
 
     // Poll the single job until terminal. We feed an empty array once
@@ -508,6 +527,23 @@ export const JobDetailsView: React.FC<JobDetailsViewProps> = ({ job: initialJob,
     const leakageGate = (
         (job.result as Record<string, unknown> | null)?.metrics as Record<string, unknown> | undefined
     )?.leakage_gate as LeakageGateVerdict | undefined;
+
+    // Per-fold refit audit (findings 2026-08-26 §3/B): stamped only when
+    // per-fold preprocessing refit was active, so fallback/legacy runs omit it.
+    const refitAudit = (
+        (job.result as Record<string, unknown> | null)?.metrics as Record<string, unknown> | undefined
+    )?.fold_refit_audit as RefitAuditVerdict | undefined;
+
+    // Fallback demand telemetry: stamped only when the run fell back to
+    // pre-transformed scoring, so covered/legacy runs omit the tile.
+    const refitFallback = (
+        (job.result as Record<string, unknown> | null)?.metrics as Record<string, unknown> | undefined
+    )?.fold_refit_fallback as FoldRefitFallbackCode | undefined;
+
+    // 4 base tiles + one column per optional verdict/advisory tile.
+    const extraTiles = (leakageGate ? 1 : 0) + (refitAudit ? 1 : 0) + (refitFallback ? 1 : 0);
+    const smGridCols =
+        extraTiles >= 3 ? 'sm:grid-cols-7' : extraTiles === 2 ? 'sm:grid-cols-6' : extraTiles === 1 ? 'sm:grid-cols-5' : 'sm:grid-cols-4';
 
     return (
         <div className="flex flex-col h-full">
@@ -604,7 +640,7 @@ export const JobDetailsView: React.FC<JobDetailsViewProps> = ({ job: initialJob,
                 {activeTab === 'overview' ? (
                     <div className="space-y-6">
                         {/* Status Section */}
-                        <div className={`grid grid-cols-2 ${leakageGate ? 'sm:grid-cols-6' : 'sm:grid-cols-5'} gap-4`}>
+                        <div className={`grid grid-cols-2 ${smGridCols} gap-4`}>
                             <div className="p-4 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-100 dark:border-gray-700">
                                 <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Status</div>
                                 <div className="font-medium capitalize flex items-center gap-2 text-gray-800 dark:text-gray-200">
@@ -636,19 +672,6 @@ export const JobDetailsView: React.FC<JobDetailsViewProps> = ({ job: initialJob,
                                 </div>
                             </div>
                             <div className="p-4 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-100 dark:border-gray-700">
-                                <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Progress</div>
-                                <div className="font-medium text-gray-800 dark:text-gray-200">
-                                    {/* Live tuning jobs report completed trials (or boosting
-                                        iterations); everything else states honestly instead
-                                        of implying a bar we can't back. */}
-                                    {visibleSlice.latest
-                                        ? visibleKind === 'iteration'
-                                            ? `Iteration ${visibleSlice.latest.trial}/${visibleSlice.latest.total}`
-                                            : `Trial ${visibleSlice.latest.trial}/${visibleSlice.latest.total}`
-                                        : isTerminalStatus(job.status) ? '—' : 'Not reported'}
-                                </div>
-                            </div>
-                            <div className="p-4 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-100 dark:border-gray-700">
                                 <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Engine</div>
                                 <div className="font-medium text-gray-800 dark:text-gray-200">
                                     {/* Legacy jobs predate engine recording and trained on pandas. */}
@@ -672,6 +695,38 @@ export const JobDetailsView: React.FC<JobDetailsViewProps> = ({ job: initialJob,
                                     }`}>
                                         {leakageGate.status === 'passed' ? 'Passed' : leakageGate.status === 'no_split' ? 'No split' : 'Warnings'}
                                     </div>
+                                </button>
+                            )}
+                            {refitAudit && (
+                                <button
+                                    type="button"
+                                    onClick={() => setAuditModalOpen(true)}
+                                    className="p-4 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-100 dark:border-gray-700 text-left hover:border-gray-300 dark:hover:border-gray-500 transition-colors"
+                                    title="Show the per-fold preprocessing audit for this run"
+                                >
+                                    <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Fold Refit Audit</div>
+                                    <div className={`font-medium ${
+                                        refitAudit.isolation_ok === false
+                                            ? 'text-amber-600 dark:text-amber-400'
+                                            : 'text-green-600 dark:text-green-400'
+                                    }`}>
+                                        {refitAudit.isolation_ok === false
+                                            ? 'Isolation warning'
+                                            : refitAudit.train_rows !== undefined
+                                                ? `Isolation verified (${refitAudit.max_fit_rows}/${refitAudit.train_rows})`
+                                                : 'Isolation verified'}
+                                    </div>
+                                </button>
+                            )}
+                            {refitFallback && (
+                                <button
+                                    type="button"
+                                    onClick={() => setAdvisoryModalOpen(true)}
+                                    className="p-4 bg-amber-50 dark:bg-amber-900/10 rounded-lg border border-amber-200 dark:border-amber-800 text-left hover:border-amber-400 dark:hover:border-amber-600 transition-colors"
+                                    title="This run fell back to pre-transformed scoring — show why"
+                                >
+                                    <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Score Advisory</div>
+                                    <div className="font-medium text-amber-600 dark:text-amber-400">Scores may be optimistic</div>
                                 </button>
                             )}
                         </div>
@@ -801,7 +856,7 @@ export const JobDetailsView: React.FC<JobDetailsViewProps> = ({ job: initialJob,
 
                                 {job.job_type === 'training' && !!(job.result as Record<string, unknown>).metrics && (
                                     <div className="space-y-4">
-                                        <MetricsGrid metrics={(job.result as Record<string, unknown>).metrics as Record<string, unknown>} />
+                                        <MetricsGrid metrics={(job.result as Record<string, unknown>).metrics as Record<string, unknown>} excludeKeys={['fold_refit_fallback']} />
                                         <FeatureImportancesSection result={job.result as Record<string, unknown>} />
                                     </div>
                                 )}
@@ -969,7 +1024,7 @@ export const JobDetailsView: React.FC<JobDetailsViewProps> = ({ job: initialJob,
                                                 <h4 className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Evaluation Metrics</h4>
                                                 <MetricsGrid
                                                     metrics={(job.result as Record<string, unknown>).metrics as Record<string, unknown>}
-                                                    excludeKeys={['best_score', 'best_params', 'trials']}
+                                                    excludeKeys={['best_score', 'best_params', 'trials', 'fold_refit_fallback']}
                                                 />
                                             </div>
                                         )}
@@ -1156,6 +1211,101 @@ export const JobDetailsView: React.FC<JobDetailsViewProps> = ({ job: initialJob,
                                 This job ran before detailed gate reporting was added, so only the verdict and its messages are available.
                             </p>
                         )}
+                    </div>
+                </ModalShell>
+            )}
+
+            {refitAudit && (
+                <ModalShell
+                    isOpen={auditModalOpen}
+                    onClose={() => setAuditModalOpen(false)}
+                    title="Fold Refit Audit"
+                    size="lg"
+                >
+                    <div className="p-6 space-y-5 text-sm">
+                        <p className="text-gray-700 dark:text-gray-300">
+                            {refitAudit.isolation_ok === false
+                                ? 'A preprocessing fit saw more rows than the train split contains — held-out (validation/test) rows may have entered a fit, so this run\'s CV/tuning scores may be optimistic. Check the job logs for the full audit line.'
+                                : 'Preprocessing was re-fit inside every CV/tuning fold, and every fit received at most the train-split row count — no held-out row ever entered a preprocessing fit, so the CV/tuning scores are honest estimates.'}
+                        </p>
+
+                        <div>
+                            <h4 className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">
+                                Measured during this run
+                            </h4>
+                            <ul className="space-y-2">
+                                <li className="flex items-center justify-between gap-3 p-3 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-100 dark:border-gray-700">
+                                    <span className="text-gray-700 dark:text-gray-300">Preprocessing fits (one per fold)</span>
+                                    <span className="font-mono text-xs text-gray-800 dark:text-gray-200">{refitAudit.fit_calls} call(s)</span>
+                                </li>
+                                <li className="flex items-center justify-between gap-3 p-3 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-100 dark:border-gray-700">
+                                    <span className="text-gray-700 dark:text-gray-300">Largest rows seen by any fit</span>
+                                    <span className="font-mono text-xs text-gray-800 dark:text-gray-200">
+                                        {refitAudit.max_fit_rows}
+                                        {refitAudit.train_rows !== undefined ? ` of ${refitAudit.train_rows} train rows` : ''}
+                                    </span>
+                                </li>
+                                <li className="flex items-center justify-between gap-3 p-3 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-100 dark:border-gray-700">
+                                    <span className="text-gray-700 dark:text-gray-300">Transforms (held-out folds)</span>
+                                    <span className="font-mono text-xs text-gray-800 dark:text-gray-200">{refitAudit.transform_calls} call(s)</span>
+                                </li>
+                                <li className="flex items-center justify-between gap-3 p-3 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-100 dark:border-gray-700">
+                                    <span className="text-gray-700 dark:text-gray-300">Isolation verdict</span>
+                                    <span className={`text-xs px-2 py-0.5 rounded-full border whitespace-nowrap ${
+                                        refitAudit.isolation_ok === false
+                                            ? 'bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-800'
+                                            : 'bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 border-green-200 dark:border-green-800'
+                                    }`}>
+                                        {refitAudit.isolation_ok === false ? 'held-out rows may have entered a fit' : 'no held-out rows in any fit'}
+                                    </span>
+                                </li>
+                            </ul>
+                        </div>
+
+                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                            During cross-validation and hyperparameter tuning, preprocessing (imputation,
+                            scaling, encoding) is re-fit on each fold&apos;s training rows only. A leaked fit
+                            would receive the train split plus held-out rows — a larger count than shown
+                            here — and would make the reported scores optimistically biased.
+                        </p>
+                    </div>
+                </ModalShell>
+            )}
+
+            {refitFallback && (
+                <ModalShell
+                    isOpen={advisoryModalOpen}
+                    onClose={() => setAdvisoryModalOpen(false)}
+                    title="Score Advisory"
+                    size="lg"
+                >
+                    <div className="p-6 space-y-5 text-sm">
+                        <p className="text-gray-700 dark:text-gray-300">
+                            This pipeline&apos;s shape does not support per-fold preprocessing refit, so
+                            cross-validation and tuning scored candidates on data that was transformed
+                            using the whole dataset. The reported scores may therefore be optimistically
+                            biased — treat them as upper bounds, not honest estimates.
+                        </p>
+
+                        <div>
+                            <h4 className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">
+                                Why this run fell back
+                            </h4>
+                            <div className="p-3 bg-amber-50 dark:bg-amber-900/10 rounded-lg border border-amber-200 dark:border-amber-800">
+                                <span className="text-xs font-mono text-amber-600 dark:text-amber-400">{refitFallback}</span>
+                                <p className="mt-1 text-gray-700 dark:text-gray-300">
+                                    {FALLBACK_REASON_TEXT[refitFallback] ??
+                                        'The upstream graph is not a shape per-fold refit supports.'}
+                                </p>
+                            </div>
+                        </div>
+
+                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                            The model itself was still trained and evaluated normally, and the job log
+                            carries the full warning line. Restructuring the pipeline into a linear chain
+                            or a fork-join of transformer branches after the Split node re-enables
+                            leakage-free per-fold scoring.
+                        </p>
                     </div>
                 </ModalShell>
             )}

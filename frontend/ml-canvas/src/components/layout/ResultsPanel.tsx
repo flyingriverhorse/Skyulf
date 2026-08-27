@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { collectGraphValidationIssues, useGraphStore } from '../../core/store/useGraphStore';
 import { useViewStore } from '../../core/store/useViewStore';
-import { AlertTriangle, ChevronUp, ChevronDown, Maximize2, Minimize2, Table, XCircle } from 'lucide-react';
+import { AlertTriangle, ChevronUp, ChevronDown, Maximize2, Minimize2, Table, X, XCircle } from 'lucide-react';
 import type { PreviewDataRows, PreviewData } from '../../core/api/client';
 import { generateBranchColors } from '../../core/hooks/useBranchColors';
 import { clickableProps } from '../../core/utils/a11y';
@@ -25,23 +25,41 @@ type ResultsPane = 'data' | 'issues' | 'steps';
 /** Shows preview results alongside canvas validation and run failure summaries. */
 export const ResultsPanel: React.FC = () => {
   const executionResult = useGraphStore((state) => state.executionResult);
+  const setExecutionResult = useGraphStore((state) => state.setExecutionResult);
+  const setLastRunError = useGraphStore((state) => state.setLastRunError);
   const canvasNodes = useGraphStore((state) => state.nodes);
   const canvasEdges = useGraphStore((state) => state.edges);
   const lastRunError = useGraphStore((state) => state.lastRunError);
   const onNodesChange = useGraphStore((state) => state.onNodesChange);
   const chainSiblings = useGraphStore((state) => state.chainSiblings);
   const confirm = useConfirm();
-  const { isResultsPanelExpanded, setResultsPanelExpanded } = useViewStore();
+  const {
+    isResultsPanelExpanded,
+    setResultsPanelExpanded,
+    isResultsPanelMaximized: isMaximized,
+    setResultsPanelMaximized: setIsMaximized,
+    isResultsPanelDismissed: dismissed,
+    setResultsPanelDismissed: setDismissed,
+  } = useViewStore();
   const [activeBranch, setActiveBranch] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<string | null>(null);
   const [mergeWarningsOpen, setMergeWarningsOpen] = useState<boolean>(false);
   const [pane, setPane] = useState<ResultsPane | null>(null);
-  const [isMaximized, setIsMaximized] = useState<boolean>(false);
   const validationHeadingId = React.useId();
   const validationIssues = useMemo(
     () => collectGraphValidationIssues(canvasNodes, canvasEdges),
     [canvasNodes, canvasEdges],
   );
+
+  // After the user closes the panel with X it stays hidden until something
+  // new happens: fresh preview/run results arrive, or the set of validation
+  // issues changes (edited graph → new problem to look at).
+  React.useEffect(() => {
+    if (executionResult || lastRunError) setDismissed(false);
+  }, [executionResult, lastRunError, setDismissed]);
+  React.useEffect(() => {
+    setDismissed(false);
+  }, [validationIssues, setDismissed]);
 
   // Map node id → readable label (falls back to a prettified definitionType
   // so users see "Drop Rows" instead of "drop_rows-04475cca-eef7-4fdb-...").
@@ -182,6 +200,7 @@ export const ResultsPanel: React.FC = () => {
 
   const showSummary = validationIssues.length > 0 || lastRunError !== null;
   if (!executionResult && !showSummary) return null;
+  if (dismissed) return null;
 
   const currentRows = executionResult && (effectiveTab && datasets[effectiveTab]) ? datasets[effectiveTab] : [];
   // Real dataset size for the active tab; falls back to the preview row
@@ -311,7 +330,7 @@ export const ResultsPanel: React.FC = () => {
               aria-label={isMaximized ? 'Restore results panel' : 'Maximize results panel'}
               onClick={(e) => {
                 e.stopPropagation();
-                setIsMaximized((v) => !v);
+                setIsMaximized(!isMaximized);
               }}
             >
               {isMaximized ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
@@ -320,6 +339,24 @@ export const ResultsPanel: React.FC = () => {
           <button type="button" className="p-1 hover:bg-muted rounded" aria-label={isResultsPanelExpanded ? 'Collapse results panel' : 'Expand results panel'}>
             {isResultsPanelExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
           </button>
+          {(executionResult || lastRunError || validationIssues.length > 0) && (
+            <button
+              type="button"
+              className="p-1 hover:bg-muted rounded"
+              aria-label="Close preview results"
+              title="Close preview results"
+              onClick={(e) => {
+                e.stopPropagation();
+                setExecutionResult(null);
+                setLastRunError(null);
+                setIsMaximized(false);
+                setMergeWarningsOpen(false);
+                setDismissed(true);
+              }}
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
         </div>
       </div>
 

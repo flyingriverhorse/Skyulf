@@ -7,7 +7,7 @@ import {
   History,
   Rocket,
   Wand2,
-  HelpCircle,
+  Tag,
   Undo2,
   Redo2,
   Keyboard,
@@ -110,7 +110,6 @@ export const Toolbar: React.FC = () => {
   const {
     isRunning,
     isRunningAll,
-    canRunPreview,
     hasMultipleBranches,
     handleRun,
     handleRunAll,
@@ -182,11 +181,12 @@ export const Toolbar: React.FC = () => {
 
   const moreMenuRef = useRef<HTMLDivElement | null>(null);
   const legendRef = useRef<HTMLDivElement | null>(null);
+  const legendPopoverRef = useRef<HTMLDivElement | null>(null);
   const exportMenuRef = useRef<HTMLDivElement | null>(null);
   const recentMenuRef = useRef<HTMLDivElement | null>(null);
   const loadMenuRef = useRef<HTMLDivElement | null>(null);
   useDismissable(showMoreMenu, () => setShowMoreMenu(false), moreMenuRef);
-  useDismissable(showLegend, () => setShowLegend(false), legendRef);
+  useDismissable(showLegend, () => setShowLegend(false), [legendRef, legendPopoverRef]);
   useDismissable(showExportMenu, () => setShowExportMenu(false), exportMenuRef);
   useDismissable(showRecentMenu, () => setShowRecentMenu(false), recentMenuRef);
   useDismissable(showLoadMenu, () => setShowLoadMenu(false), loadMenuRef);
@@ -222,7 +222,11 @@ export const Toolbar: React.FC = () => {
     <>
       {/* Left cluster: legend, keyboard help, command palette, undo/redo.
           Shifts right when the sidebar is collapsed so it doesn't overlap
-          the floating "Expand" button (z-50, left-4/top-4). */}
+          the floating "Expand" button (z-10, left-4/top-4). The cluster
+          stays at z-10 — above canvas nodes, but below modals and the
+          expanded Preview Results panel (z-20). The legend popover renders
+          as a sibling at z-40 so it escapes this stacking context and
+          floats above the results panel. */}
       <div
         ref={legendRef}
         className={`absolute top-4 z-10 flex gap-2 transition-[left] duration-300 ${
@@ -231,7 +235,7 @@ export const Toolbar: React.FC = () => {
       >
         <div className="relative">
           <ToolbarIconButton
-            icon={<HelpCircle className="w-4 h-4" />}
+            icon={<Tag className="w-4 h-4" />}
             onClick={() => setShowLegend((v) => !v)}
             title="Show node badge legend"
             ariaLabel="Show node badge legend"
@@ -284,11 +288,25 @@ export const Toolbar: React.FC = () => {
             variant="danger"
           />
         )}
-        {showLegend && <CanvasLegend onClose={() => setShowLegend(false)} />}
       </div>
+      {/* Legend popover: rendered outside the z-10 cluster so its z-40 can
+          float above the Preview Results panel (z-20) without also lifting
+          the toolbar buttons above modals or the maximized panel. */}
+      {showLegend && (
+        <div
+          ref={legendPopoverRef}
+          className={`absolute top-4 z-40 transition-[left] duration-300 ${
+            isSidebarOpen ? 'left-4' : 'left-16'
+          }`}
+        >
+          <CanvasLegend onClose={() => setShowLegend(false)} />
+        </div>
+      )}
 
       {/* Right cluster: history / load / save / tidy / export / run.
-          max-width keeps the cluster from sliding under the left cluster. */}
+          max-width keeps the cluster from sliding under the left cluster.
+          z-10 like the left cluster: above canvas nodes, below modals and
+          the expanded Preview Results panel. */}
       <div ref={rightClusterRef} className="absolute top-4 right-4 z-10 flex flex-nowrap justify-end gap-2 max-w-[calc(100%-13rem)]">
         {/* Compact overflow menu — collapses secondary actions so the
             cluster never overlaps the left cluster once the live Flow-pane
@@ -592,11 +610,11 @@ export const Toolbar: React.FC = () => {
             </span>
           </button>
         )}
-        {!readOnly && canRunPreview && (
+        {!readOnly && (
           <button
             onClick={() => { void handleRun(); }}
             disabled={isRunning}
-            title="Run Preview (Ctrl+Enter)"
+            title="Run Preview (Ctrl+Enter). Blocked? Click to see what's missing."
             aria-label="Run Preview"
             data-testid="toolbar-run-preview"
             className="flex items-center gap-2 px-3 py-2 text-white rounded-md shadow-sm transition-all disabled:opacity-50"

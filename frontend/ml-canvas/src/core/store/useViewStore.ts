@@ -36,6 +36,16 @@ interface ViewState {
   setPropertiesPanelExpanded: (isExpanded: boolean) => void;
   isResultsPanelExpanded: boolean;
   setResultsPanelExpanded: (isExpanded: boolean) => void;
+  /** Preview Results panel maximize toggle. Lives in the store (not panel-
+   * local state) so the canvas can hide its zoom controls when the panel
+   * covers the whole canvas. */
+  isResultsPanelMaximized: boolean;
+  setResultsPanelMaximized: (isMaximized: boolean) => void;
+  /** True after the user closes the panel with X; the panel stays hidden
+   * until new results arrive or the validation issues change. Shared with
+   * the canvas so the zoom controls stop reserving space for it. */
+  isResultsPanelDismissed: boolean;
+  setResultsPanelDismissed: (isDismissed: boolean) => void;
   readOnlyOverride: ReadOnlyOverride;
   setReadOnlyOverride: (mode: ReadOnlyOverride) => void;
   /** L4 perf overlay: when true, every node card whose last run has a
@@ -55,6 +65,10 @@ export const useViewStore = create<ViewState>((set) => ({
   setPropertiesPanelExpanded: (isExpanded) => set({ isPropertiesPanelExpanded: isExpanded }),
   isResultsPanelExpanded: true,
   setResultsPanelExpanded: (isExpanded) => set({ isResultsPanelExpanded: isExpanded }),
+  isResultsPanelMaximized: false,
+  setResultsPanelMaximized: (isMaximized) => set({ isResultsPanelMaximized: isMaximized }),
+  isResultsPanelDismissed: false,
+  setResultsPanelDismissed: (isDismissed) => set({ isResultsPanelDismissed: isDismissed }),
   readOnlyOverride: 'auto',
   setReadOnlyOverride: (mode) => set({ readOnlyOverride: mode }),
   perfOverlayEnabled: readPerfOverlayPreference(),

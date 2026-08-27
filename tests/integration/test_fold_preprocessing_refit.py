@@ -198,6 +198,8 @@ def test_merged_branches_fall_back_with_warning(noise_target_csv, tmp_path):
 
     assert result.status == "success"
     assert any("Per-fold preprocessing refit skipped" in m and "linear chain" in m for m in logs)
+    metrics = result.node_results["node_training"].metrics
+    assert metrics["fold_refit_fallback"] == "unsupported_graph"
 
 
 def _splitter(node_id: str, inputs: list[str]) -> NodeConfig:
@@ -240,6 +242,7 @@ def test_fork_join_merged_branches_refit_per_fold(noise_target_csv, tmp_path):
         "Per-fold preprocessing refit enabled" in m and "merged branch(es)" in m for m in logs
     ), logs
     metrics = result.node_results["node_training"].metrics
+    assert "fold_refit_fallback" not in metrics
     assert _disc(metrics["cv_roc_auc_mean"]) < 0.65, (
         f"fork-join refit CV should sit near chance, got {metrics['cv_roc_auc_mean']}"
     )
@@ -281,6 +284,8 @@ def test_nested_merge_falls_back_with_warning(noise_target_csv, tmp_path):
         "Per-fold preprocessing refit skipped" in m and "linear transformer chain" in m
         for m in logs
     ), logs
+    metrics = result.node_results["node_training"].metrics
+    assert metrics["fold_refit_fallback"] == "nested_merge"
 
 
 def test_row_count_changing_branch_falls_back_with_warning(noise_target_csv, tmp_path):
@@ -320,6 +325,8 @@ def test_row_count_changing_branch_falls_back_with_warning(noise_target_csv, tmp
     assert any("Per-fold preprocessing refit skipped" in m and "row counts" in m for m in logs), (
         logs
     )
+    metrics = result.node_results["node_training"].metrics
+    assert metrics["fold_refit_fallback"] == "row_changing_branch_step"
 
 
 def test_learning_step_after_splitter_falls_back_with_warning(noise_target_csv, tmp_path):
@@ -346,6 +353,8 @@ def test_learning_step_after_splitter_falls_back_with_warning(noise_target_csv, 
     assert any(
         "Per-fold preprocessing refit skipped" in m and "must end with" in m for m in logs
     ), logs
+    metrics = result.node_results["node_training"].metrics
+    assert metrics["fold_refit_fallback"] == "fork_not_splitter"
 
 
 def _numeric_csv(tmp_path) -> str:
@@ -414,6 +423,8 @@ def test_learning_trunk_step_before_fork_splitter_falls_back(tmp_path):
         "Per-fold preprocessing refit skipped" in m and "before the fork splitter" in m
         for m in logs
     ), logs
+    metrics = result.node_results["node_training"].metrics
+    assert metrics["fold_refit_fallback"] == "learner_before_split"
 
 
 def test_stateless_trunk_step_before_fork_splitter_keeps_refit(tmp_path):
@@ -754,6 +765,8 @@ def test_learning_step_before_splitter_falls_back_with_warning(tmp_path):
         for m in logs
     ), f"expected the pre-splitter fallback warning, logs={logs}"
     assert not any("Per-fold preprocessing refit enabled" in m for m in logs)
+    metrics = result.node_results["node_training"].metrics
+    assert metrics["fold_refit_fallback"] == "learner_before_split"
 
 
 def test_stateless_step_before_splitter_keeps_refit_enabled(tmp_path):
@@ -913,6 +926,8 @@ def test_payload_reconstruction_failure_never_fails_the_run(
         "Per-fold preprocessing refit skipped" in m and "payload reconstruction failed" in m
         for m in logs
     ), f"expected the reconstruction-failure warning, logs={logs}"
+    metrics = result.node_results["node_training"].metrics
+    assert metrics["fold_refit_fallback"] == "payload_reconstruction_failed"
 
 
 def test_validation_split_tuning_refits_per_fold(noise_target_csv, tmp_path):
@@ -1427,9 +1442,10 @@ def _refit_mixin(configs: list[NodeConfig], merge_order: list[str]) -> FeatureEn
 
 def test_fork_join_rejects_fewer_than_two_merged_inputs():
     mixin = _refit_mixin([], ["only_one"])
-    resolved, reason = mixin._try_fork_join_refit(_training(["only_one"]), "target")
+    resolved, reason, code = mixin._try_fork_join_refit(_training(["only_one"]), "target")
     assert resolved is None
     assert "fewer than two merged inputs" in reason
+    assert code == "unsupported_graph"
 
 
 def test_fork_join_rejects_divergent_loaders():
@@ -1442,9 +1458,10 @@ def test_fork_join_rejects_divergent_loaders():
         ],
         ["split_a", "split_b"],
     )
-    resolved, reason = mixin._try_fork_join_refit(_training(["split_a", "split_b"]), "target")
+    resolved, reason, code = mixin._try_fork_join_refit(_training(["split_a", "split_b"]), "target")
     assert resolved is None
     assert "do not share one data loader" in reason
+    assert code == "unsupported_graph"
 
 
 def test_fork_join_rejects_branch_with_no_steps_after_fork():
@@ -1459,9 +1476,12 @@ def test_fork_join_rejects_branch_with_no_steps_after_fork():
         ],
         ["node_split", "woe_a"],
     )
-    resolved, reason = mixin._try_fork_join_refit(_training(["node_split", "woe_a"]), "target")
+    resolved, reason, code = mixin._try_fork_join_refit(
+        _training(["node_split", "woe_a"]), "target"
+    )
     assert resolved is None
     assert "no steps after the fork point" in reason
+    assert code == "unsupported_graph"
 
 
 def test_fork_join_rejects_empty_fork_node():
@@ -1481,6 +1501,137 @@ def test_fork_join_rejects_empty_fork_node():
         ],
         ["woe_a", "woe_b"],
     )
-    resolved, reason = mixin._try_fork_join_refit(_training(["woe_a", "woe_b"]), "target")
+    resolved, reason, code = mixin._try_fork_join_refit(_training(["woe_a", "woe_b"]), "target")
     assert resolved is None
     assert "no splitter fork point" in reason
+    assert code == "fork_not_splitter"
+
+
+# ---------------------------------------------------------------------------
+# Non-numeric fail-fast guard (findings 2026-08-26 §2 Finding 1 / B)
+# ---------------------------------------------------------------------------
+
+
+def _two_string_csv(tmp_path) -> str:
+    """Noise target with two string columns and one numeric feature.
+
+    Branch A encodes both strings; branch B encodes only ``region``, so under
+    pure ``last_wins`` the merged frame still carries the raw ``city`` column.
+    """
+    rng = np.random.default_rng(7)
+    n = 400
+    df = pd.DataFrame(
+        {
+            "city": [f"c{v}" for v in rng.integers(0, 40, size=n)],
+            "region": [f"r{v}" for v in rng.integers(0, 10, size=n)],
+            "f1": rng.normal(size=n),
+            "target": rng.integers(0, 2, size=n),
+        }
+    )
+    path = tmp_path / "two_string.csv"
+    df.to_csv(path, index=False)
+    return str(path)
+
+
+def _woe_columns_node(node_id: str, columns: list[str], regularization: float) -> NodeConfig:
+    return NodeConfig(
+        node_id=node_id,
+        step_type="WOEEncoder",
+        inputs=["node_split"],
+        params={"columns": columns, "regularization": regularization},
+    )
+
+
+def test_fork_join_unencoded_last_branch_fails_fast(tmp_path):
+    """Basic training (fixed mode) must fail fast when the last branch of a
+    fork-join leaves a string column unencoded: post-split merges resolve by
+    pure merge order, so the winning branch's raw column reaches the model.
+    The error names the column instead of surfacing "All trials failed"."""
+    csv = _two_string_csv(tmp_path)
+    nodes = [
+        _loader("node_data", csv),
+        _splitter("node_split", ["node_data"]),
+        _woe_columns_node("woe_a", ["city", "region"], 0.5),
+        _woe_columns_node("woe_b", ["region"], 1.0),
+        _training(["woe_a", "woe_b"]),
+    ]
+    result, _logs = _run(tmp_path, nodes, job_id="guard-unencoded-last-branch")
+
+    assert result.status == "failed"
+    error = result.node_results["node_training"].error
+    assert "non-numeric column(s)" in error
+    assert "city" in error
+    assert "All trials failed" not in error
+
+
+def test_fork_join_unencoded_last_branch_fails_fast_in_tuned_mode(tmp_path):
+    """Same fork-join shape under run_mode='tuned': the guard fires before any
+    search strategy starts, so no fold loop can swallow the failure."""
+    csv = _two_string_csv(tmp_path)
+    nodes = [
+        _loader("node_data", csv),
+        _splitter("node_split", ["node_data"]),
+        _woe_columns_node("woe_a", ["city", "region"], 0.5),
+        _woe_columns_node("woe_b", ["region"], 1.0),
+        _training(
+            ["woe_a", "woe_b"],
+            run_mode="tuned",
+            tuning_config={
+                "strategy": "grid",
+                "metric": "roc_auc",
+                "cv_folds": 2,
+                "cv_enabled": True,
+                "search_space": {"C": [0.1, 1.0]},
+            },
+        ),
+    ]
+    result, _logs = _run(tmp_path, nodes, job_id="guard-unencoded-last-branch-tuned")
+
+    assert result.status == "failed"
+    error = result.node_results["node_training"].error
+    assert "non-numeric column(s)" in error
+    assert "city" in error
+    assert "All trials failed" not in error
+
+
+# ---------------------------------------------------------------------------
+# Per-fold refit audit telemetry (findings 2026-08-26 §3/B)
+# ---------------------------------------------------------------------------
+
+
+def test_refit_audit_telemetry_records_fold_isolation(noise_target_csv, tmp_path):
+    """Linear FE-node path: the audit wrapper records every per-fold call and
+    the isolation invariant (largest fit <= train-split rows) holds."""
+    result, logs = _run(
+        tmp_path,
+        [
+            _loader("node_data", noise_target_csv),
+            NodeConfig(
+                node_id="node_features",
+                step_type=StepType.FEATURE_ENGINEERING,
+                inputs=["node_data"],
+                params={"steps": [SPLITTER_STEP, WOE_STEP]},
+            ),
+            _training(["node_features"]),
+        ],
+        job_id="audit-linear",
+    )
+
+    assert result.status == "success"
+    assert any(m.startswith("Refit audit:") for m in logs), logs
+    audit = result.node_results["node_training"].metrics["fold_refit_audit"]
+    assert audit["isolation_ok"] is True
+    assert audit["fit_calls"] > 0
+    assert 0 < audit["max_fit_rows"] <= audit["train_rows"]
+
+
+def test_refit_audit_telemetry_covers_merged_branch_adapters(noise_target_csv, tmp_path):
+    """Fork-join path: the MergedBranchFoldAdapter is audited identically."""
+    result, logs = _run(tmp_path, _fork_join_nodes(noise_target_csv), job_id="audit-fork-join")
+
+    assert result.status == "success"
+    assert any(m.startswith("Refit audit:") for m in logs), logs
+    audit = result.node_results["node_training"].metrics["fold_refit_audit"]
+    assert audit["isolation_ok"] is True
+    assert audit["fit_calls"] > 0
+    assert audit["max_fit_rows"] <= audit["train_rows"]

@@ -53,7 +53,12 @@ from .feature_selection import (
     VarianceThresholdApplier,
     VarianceThresholdCalculator,
 )
-from .fold_adapter import FeatureEngineerFoldAdapter, MergedBranchFoldAdapter
+from .fold_adapter import (
+    AuditedFoldPreprocessor,
+    FeatureEngineerFoldAdapter,
+    MergedBranchFoldAdapter,
+    frame_rows,
+)
 from .geo import (
     GeoDistanceApplier,
     GeoDistanceCalculator,
@@ -137,8 +142,10 @@ __all__ = [
     "SchemaMismatchError",
     "validate_schema",
     "FeatureEngineer",
+    "AuditedFoldPreprocessor",
     "FeatureEngineerFoldAdapter",
     "MergedBranchFoldAdapter",
+    "frame_rows",
     "SplitCalculator",
     "SplitApplier",
     "TextCleaningCalculator",

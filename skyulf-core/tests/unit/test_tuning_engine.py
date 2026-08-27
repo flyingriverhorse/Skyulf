@@ -1224,14 +1224,18 @@ def test_fit_grid_search_raises_when_all_candidates_fail():
     """Regression test: if EVERY candidate fails on every fold, the tuner must
     raise a clear error instead of silently refitting with untuned defaults
     (previously best_params fell back to {} with best_score=-inf, matching
-    the halving/optuna strategies' behavior for "no trials completed")."""
+    the halving/optuna strategies' behavior for "no trials completed").
+    The error must also carry the first fold's original exception so the
+    failure is actionable (mirrors the optuna/halving "First trial error:"
+    detail)."""
     X, y = _clf_xy()
     tuner = _tuner_clf()
     # Both C values are invalid for LogisticRegression -> every candidate fails.
     cfg = _clf_config(search_space={"C": [-5, -10]}, cv_folds=3)
 
-    with pytest.raises(ValueError, match="All trials failed"):
+    with pytest.raises(ValueError, match="All trials failed") as excinfo:
         tuner.fit(X, y, config=cfg)
+    assert "First trial error:" in str(excinfo.value)
 
 
 # ---------------------------------------------------------------------------
