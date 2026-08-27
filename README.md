@@ -8,6 +8,9 @@
   <a href="https://api.skyulf.com">
     <img src="https://img.shields.io/badge/Try_Live_Demo-api.skyulf.com-3b82f6?style=for-the-badge&logo=rocket&logoColor=white" alt="Live Demo">
   </a>
+  <a href="https://www.skyulf.com">
+    <img src="https://img.shields.io/badge/Website-skyulf.com-f2c025?style=for-the-badge&logo=globe&logoColor=white" alt="Website">
+  </a>
   <br/>
   <sub>🟢&nbsp;no signup required</sub>
 </p>
@@ -15,20 +18,16 @@
 [![Backend License](https://img.shields.io/badge/backend-AGPLv3-blue)](LICENSE)
 [![Frontend License](https://img.shields.io/badge/frontend-AGPLv3-blue)](frontend/ml-canvas/LICENSE)
 [![Core License](https://img.shields.io/badge/skyulf--core-Apache--2.0-green)](skyulf-core/LICENSE)
-[![Commercial](https://img.shields.io/badge/enterprise-support-blueviolet)](COMMERCIAL-LICENSE.md)
 [![Python](https://img.shields.io/badge/python-3.12-blue)](#quick-start)
 [![CI](https://github.com/flyingriverhorse/Skyulf/actions/workflows/pr_check.yml/badge.svg)](https://github.com/flyingriverhorse/Skyulf/actions/workflows/pr_check.yml)
 [![Docs](https://github.com/flyingriverhorse/Skyulf/actions/workflows/docs.yml/badge.svg)](https://github.com/flyingriverhorse/Skyulf/actions/workflows/docs.yml)
-[![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit&logoColor=white)](.pre-commit-config.yaml)
 [![Code style: Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/format.json)](https://github.com/astral-sh/ruff)
 [![Type check: Ty](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ty/main/assets/badge/v0.json)](https://github.com/astral-sh/ty)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
-[![Skyulf](https://img.shields.io/badge/Skyulf-MLOps_Hub-blueviolet)](#key-features)
 [![codecov](https://codecov.io/github/flyingriverhorse/Skyulf/graph/badge.svg?token=47ED2R6ZHC)](https://codecov.io/github/flyingriverhorse/Skyulf)
 [![Codacy Badge](https://app.codacy.com/project/badge/Grade/51e3ad3ce18e41b2922cf62a6dd6ce99)](https://app.codacy.com/gh/flyingriverhorse/Skyulf/dashboard?utm_source=gh&utm_medium=referral&utm_content=&utm_campaign=Badge_grade)
 [![Downloads](https://img.shields.io/pypi/dm/skyulf-core.svg)](https://pypi.org/project/skyulf-core)
 [![issues](https://img.shields.io/github/issues/flyingriverhorse/Skyulf.svg)](https://github.com/flyingriverhorse/Skyulf/issues)
-[![contributors](https://img.shields.io/github/contributors/flyingriverhorse/Skyulf.svg)](https://github.com/flyingriverhorse/Skyulf/graphs/contributors)
 
 > **Skyulf:** The Visual MLOps Builder
 

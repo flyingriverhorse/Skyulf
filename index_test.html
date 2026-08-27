@@ -10,15 +10,16 @@
 
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://www.skyulf.com/">
-    <meta property="og:title" content="Skyulf · Build ML pipelines you can trust">
+    <meta property="og:title" content="Skyulf · Stop trusting your pipeline. Verify it.">
     <meta property="og:description" content="Build machine learning pipelines visually on a canvas, or in plain Python with skyulf-core. Skyulf catches the data leakage that quietly inflates your scores.">
     <meta property="og:image" content="https://www.skyulf.com/static/img/og-image.jpg">
     <meta property="twitter:card" content="summary_large_image">
-    <meta property="twitter:title" content="Skyulf · Build ML pipelines you can trust">
+    <meta property="twitter:title" content="Skyulf · Stop trusting your pipeline. Verify it.">
     <meta property="twitter:description" content="Build machine learning pipelines visually on a canvas, or in plain Python with skyulf-core.">
 
-    <title>Skyulf · Build ML pipelines you can trust</title>
+    <title>Skyulf · Stop trusting your pipeline. Verify it.</title>
     <link rel="icon" type="image/png" href="./static/img/logo.png">
+    <link rel="preload" as="image" href="./static/img/wolf-hero.png">
 
     <script type="application/ld+json">
     {
@@ -31,7 +32,59 @@
       "description": "Skyulf turns scikit-learn into pipelines you can trust. Build them visually on a canvas or with the Apache-2.0 skyulf-core Python library.",
       "author": { "@type": "Organization", "name": "Skyulf", "url": "https://www.skyulf.com" },
       "featureList": "Visual ML Canvas, 35 pipeline nodes, Automated EDA, Data Leakage Detection, Hyperparameter Tuning, Optuna, SHAP Explainability, Model Registry, Model Deployment, Drift Monitoring, Notebook Export, Multi-Branch Pipelines, Audit Log, Ensembles, Text and NLP nodes",
-      "softwareRequirements": "Python 3.12"
+      "softwareRequirements": "Python 3.12",
+      "sameAs": [
+        "https://github.com/flyingriverhorse/Skyulf",
+        "https://pypi.org/project/skyulf-core/"
+      ]
+    }
+    </script>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "What is Skyulf?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Skyulf is two things that share one engine: skyulf-core, a Python library that gives you a single pipeline API over scikit-learn, and a self-hosted workspace where you build that same pipeline on a canvas. It covers the parts a notebook leaves to you: ordering steps so the test set stays untouched, versioning every run, comparing experiments, serving a model and watching it drift." }
+        },
+        {
+          "@type": "Question",
+          "name": "What is the meaning of Skyulf?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Sky is the open space above Earth, where the sun, moon, stars, and clouds live. Ulf means \"wolf\", with Nordic roots, and the wolf is also a strong symbol in Turkic tradition. Together it fits the project: independent and community-driven." }
+        },
+        {
+          "@type": "Question",
+          "name": "Do I have to self-host Skyulf?",
+          "acceptedAnswer": { "@type": "Answer", "text": "You can try the hosted demo first, with nothing to install. For real work you run it yourself with docker compose up, which takes a few minutes and needs no account, no credit card and no per-prediction bill. Because it runs on your machine or your server, your data never has to leave it, which is what makes it usable in hospitals, banks and anywhere else the data legally cannot go to a third party." }
+        },
+        {
+          "@type": "Question",
+          "name": "How is Skyulf different from cloud MLOps platforms?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Cloud platforms require uploading your data to third-party servers and charge based on usage. Skyulf runs on your own hardware or inside your private cloud. No data leaves your network, no usage-based pricing, and no vendor dependencies. You own the infrastructure and the workflow." }
+        },
+        {
+          "@type": "Question",
+          "name": "Is Skyulf really free?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Yes. Skyulf is open source under a split license. skyulf-core, the Python library, is Apache 2.0, so you can use it in anything, including closed-source commercial products. The platform (backend and canvas) is AGPLv3, so improvements to the application itself are shared back." }
+        },
+        {
+          "@type": "Question",
+          "name": "Can I use Skyulf in production?",
+          "acceptedAnswer": { "@type": "Answer", "text": "It is perfect for internal tools, research, and experimentation. The team is working towards a stable v1.0 for critical production workloads." }
+        },
+        {
+          "@type": "Question",
+          "name": "How can I contribute to Skyulf?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Contributions are welcome on GitHub at github.com/flyingriverhorse/Skyulf. Whether it is code, documentation, bug reports, or feature ideas, every contribution helps shape Skyulf." }
+        },
+        {
+          "@type": "Question",
+          "name": "Does Skyulf offer a commercial license?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Building on skyulf-core (Apache 2.0) is free for any use, commercial included. The platform is AGPLv3: running it internally, unmodified, needs nothing from you, but offering a modified version as a public network service means publishing your source, or asking for a commercial exception." }
+        }
+      ]
     }
     </script>
 
@@ -81,6 +134,7 @@
             --peri: #c7d0ff;
             --hero-shade-top: rgba(18, 8, 31, 0.50);
             --hero-shade-mid: rgba(18, 8, 31, 0.22);
+            --hero-shadow: rgba(18, 8, 31, 0.35);
             --scroll-track: #12081f;
             --scroll-thumb: #3d2e52;
         }
@@ -99,6 +153,7 @@
             --peri: #3b4bc4;
             --hero-shade-top: rgba(245, 246, 252, 0.30);
             --hero-shade-mid: rgba(245, 246, 252, 0.08);
+            --hero-shadow: rgba(255, 255, 255, 0.65);
             --scroll-track: #eef0f8;
             --scroll-thumb: #b9bed6;
         }
@@ -242,15 +297,29 @@
                 <a href="#faq" class="text-soft hover:text-gold transition-colors">FAQ</a>
             </div>
             <div class="flex items-center gap-3">
+                <button type="button" id="menu-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="mobile-menu" class="md:hidden w-10 h-10 rounded-full flex items-center justify-center border border-line text-soft hover:text-gold transition-colors">
+                    <span class="msi text-[20px]">menu</span>
+                </button>
                 <a href="./manual/index.html" class="hidden sm:block text-sm font-semibold text-soft hover:text-gold transition-colors">Docs</a>
                 <button type="button" id="theme-toggle" aria-label="Switch to light theme" class="w-10 h-10 rounded-full flex items-center justify-center border border-line text-soft hover:text-gold transition-colors">
                     <span class="msi text-[20px] theme-icon-dark">light_mode</span>
                     <span class="msi text-[20px] theme-icon-light hidden">dark_mode</span>
                 </button>
-                <a href="https://api.skyulf.com/" target="_blank" rel="noopener" class="btn-gold hidden sm:inline-block px-5 py-2 rounded-full text-sm font-bold">Live demo</a>
+                <a href="https://api.skyulf.com/" target="_blank" rel="noopener" class="btn-gold px-4 sm:px-5 py-2 rounded-full text-sm font-bold">Live demo</a>
             </div>
         </div>
     </nav>
+
+    <div id="mobile-menu" class="hidden md:hidden fixed top-20 left-4 right-4 z-40 glass-panel rounded-2xl p-5">
+        <nav aria-label="Mobile" class="grid gap-1 text-sm font-semibold">
+            <a href="#products" class="text-soft hover:text-gold transition-colors px-3 py-2.5 rounded-lg">Canvas or code</a>
+            <a href="#how" class="text-soft hover:text-gold transition-colors px-3 py-2.5 rounded-lg">How it works</a>
+            <a href="#why" class="text-soft hover:text-gold transition-colors px-3 py-2.5 rounded-lg">Why Skyulf</a>
+            <a href="#features" class="text-soft hover:text-gold transition-colors px-3 py-2.5 rounded-lg">Features</a>
+            <a href="#faq" class="text-soft hover:text-gold transition-colors px-3 py-2.5 rounded-lg">FAQ</a>
+            <a href="./manual/index.html" class="text-soft hover:text-gold transition-colors px-3 py-2.5 rounded-lg">Docs</a>
+        </nav>
+    </div>
 
     <main id="content">
     <!-- ============ HERO ============ -->
@@ -260,24 +329,25 @@
         <div class="hero-shade z-[3]" aria-hidden="true"></div>
 
         <div class="relative z-10 w-full max-w-6xl mx-auto px-5 sm:px-8 text-center">
-            <div class="rv in inline-flex items-center gap-2.5 rounded-full border px-4 py-1.5 mb-8 font-mono text-[11px] font-semibold tracking-[0.14em] uppercase" style="border-color: rgba(255,218,217,.4); color: var(--ink); background: var(--panel-60); backdrop-filter: blur(12px);">
+            <a id="version-badge" href="https://github.com/flyingriverhorse/Skyulf/releases" target="_blank" rel="noopener" class="rv in inline-flex items-center gap-2.5 rounded-full border px-4 py-1.5 mb-8 font-mono text-[11px] font-semibold tracking-[0.14em] uppercase transition-colors hover:border-[rgba(255,218,217,.8)]" style="border-color: rgba(255,218,217,.4); color: var(--ink); background: var(--panel-60); backdrop-filter: blur(12px);">
                 <span class="relative w-2 h-2 rounded-full bg-[#f2c025] dot-ping"></span>
-                v0.8.5 — live now
-            </div>
+                <span data-version-label>v0.8.5 — live now</span>
+            </a>
 
             <h1 class="text-ink font-extrabold tracking-tight leading-[1.04] text-4xl sm:text-6xl lg:text-7xl mb-6 drop-shadow-xl">
-                <span class="line"><span class="line-in">Build ML pipelines</span></span>
-                <span class="line"><span class="line-in">you can <em class="text-gold not-italic sm:italic">trust</em>.</span></span>
+                <span class="line"><span class="line-in">Stop trusting your pipeline.</span></span>
+                <span class="line"><span class="line-in"><em class="text-gold not-italic sm:italic">Verify</em> it.</span></span>
             </h1>
 
-            <p class="rv max-w-2xl mx-auto text-base sm:text-lg leading-relaxed mb-4" style="color: var(--soft); text-shadow: 0 1px 12px rgba(18,8,31,.35);">
-                Design them visually on a canvas, or write them in plain Python. Skyulf keeps
-                scikit-learn as the engine and adds what notebooks never gave you: reproducible
-                artifacts, honest validation scores, and a path to production.
+            <p class="rv max-w-2xl mx-auto text-base sm:text-lg leading-relaxed mb-4" style="color: var(--soft); text-shadow: 0 1px 12px var(--hero-shadow);">
+                Draw it. Code it. Ship it. Skyulf keeps scikit-learn as the engine and adds
+                what notebooks never gave you: reproducible artifacts, honest validation
+                scores, and a path to production.
             </p>
-            <p class="rv font-mono text-[11px] sm:text-xs tracking-[0.14em] uppercase mb-9 text-faint">
+            <div class="rv inline-flex items-center gap-2.5 rounded-full border px-4 py-1.5 mb-9 font-mono text-[11px] font-semibold tracking-[0.14em] uppercase" style="border-color: rgba(199,208,255,.35); color: var(--soft); background: var(--panel-60); backdrop-filter: blur(12px);">
+                <span class="msi text-[14px]" style="color: var(--peri);">lock</span>
                 Self-hosted &middot; Apache-2.0 library &middot; your data stays on your machine
-            </p>
+            </div>
 
             <div class="rv flex flex-col sm:flex-row items-center justify-center gap-4 mb-8">
                 <a href="https://api.skyulf.com/" target="_blank" rel="noopener" class="btn-gold w-full sm:w-auto px-8 py-4 rounded-full font-bold text-base flex items-center justify-center gap-2">
@@ -291,6 +361,11 @@
                     GitHub
                 </a>
             </div>
+
+            <p class="rv text-sm text-faint -mt-4 mb-8">
+                No signup and no install &mdash; the demo runs the real app in your browser.
+                <span class="opacity-80">(Free instance, so the first load can take ~30s to wake.)</span>
+            </p>
 
             <div class="rv max-w-md mx-auto flex flex-col items-center gap-3">
                 <div class="w-full glass-panel rounded-xl px-5 py-3 flex items-center justify-between gap-3">
@@ -317,20 +392,20 @@
         <div class="max-w-6xl mx-auto px-5 sm:px-8">
             <dl class="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
                 <div class="rv flex flex-col-reverse">
-                    <dt class="font-mono text-[11px] tracking-[0.14em] uppercase text-faint mt-1">built-in pipeline nodes</dt>
-                    <dd class="text-4xl font-extrabold text-gold" data-count="35">35</dd>
+                    <dt class="h-9 font-mono text-[11px] tracking-[0.14em] uppercase text-faint mt-1">built-in pipeline nodes</dt>
+                    <dd class="h-20 flex items-center justify-center leading-none text-4xl font-extrabold text-gold" data-count="35">35</dd>
                 </div>
                 <div class="rv flex flex-col-reverse">
-                    <dt class="font-mono text-[11px] tracking-[0.14em] uppercase text-faint mt-1">workspaces, EDA to audit log</dt>
-                    <dd class="text-4xl font-extrabold text-gold" data-count="11">11</dd>
+                    <dt class="h-9 font-mono text-[11px] tracking-[0.14em] uppercase text-faint mt-1">workspaces, EDA to audit log</dt>
+                    <dd class="h-20 flex items-center justify-center leading-none text-4xl font-extrabold text-gold" data-count="11">11</dd>
                 </div>
                 <div class="rv flex flex-col-reverse">
-                    <dt class="font-mono text-[11px] tracking-[0.14em] uppercase text-faint mt-1">skyulf-core, use it anywhere</dt>
-                    <dd class="text-4xl font-extrabold text-gold">Apache&#8209;2.0</dd>
+                    <dt class="h-9 font-mono text-[11px] tracking-[0.14em] uppercase text-faint mt-1">skyulf-core, use it anywhere</dt>
+                    <dd class="h-20 flex items-center justify-center leading-none text-4xl font-extrabold text-gold">Apache&#8209;2.0</dd>
                 </div>
                 <div class="rv flex flex-col-reverse">
-                    <dt class="font-mono text-[11px] tracking-[0.14em] uppercase text-faint mt-1">on scikit-learn, pandas &amp; Polars</dt>
-                    <dd class="text-4xl font-extrabold text-gold">3.12</dd>
+                    <dt class="h-9 font-mono text-[11px] tracking-[0.14em] uppercase text-faint mt-1">on scikit-learn, pandas &amp; Polars</dt>
+                    <dd class="h-20 flex items-center justify-center leading-none text-4xl font-extrabold text-gold">Python&nbsp;3.12</dd>
                 </div>
             </dl>
         </div>
@@ -370,8 +445,9 @@
                         <li class="flex gap-2.5"><span class="msi text-gold text-[18px]">check</span> Training runs in the background while you keep working</li>
                         <li class="flex gap-2.5"><span class="msi text-gold text-[18px]">check</span> Export any pipeline to a runnable Jupyter notebook</li>
                     </ul>
-                    <div class="rounded-xl overflow-hidden border border-line cursor-pointer zoomable mb-6">
-                        <img src="./static/img/canvas.jpg" alt="Skyulf visual pipeline canvas with connected nodes" class="w-full h-auto object-cover" loading="lazy" decoding="async">
+                    <div class="grid gap-2 mb-6">
+                        <div class="rounded-xl overflow-hidden border border-line cursor-pointer zoomable"><img src="./static/img/dashboard.jpg" alt="Skyulf dashboard with jobs, deployments and success rate" class="w-full h-auto object-cover" loading="lazy" decoding="async"></div>
+                        <div class="rounded-xl overflow-hidden border border-line cursor-pointer zoomable"><img src="./static/img/canvas.jpg" alt="Skyulf visual pipeline canvas with connected nodes" class="w-full h-auto object-cover" loading="lazy" decoding="async"></div>
                     </div>
                     <div id="run-locally" class="mt-auto scroll-mt-28">
                         <div class="code-surface rounded-xl p-4 font-mono text-sm mb-4 overflow-x-auto">
@@ -406,7 +482,7 @@
                         <li class="flex gap-2.5"><span class="msi text-peri text-[18px]">check</span> Accepts pandas or Polars frames directly</li>
                         <li class="flex gap-2.5"><span class="msi text-peri text-[18px]">check</span> Permissive license, ship it inside your own product</li>
                     </ul>
-                    <details class="mb-6 group">
+                    <details class="mb-6 group" open>
                         <summary class="flex items-center justify-between gap-3 cursor-pointer select-none rounded-xl border border-line px-4 py-2.5 text-sm font-semibold text-ink hover:border-[rgba(242,192,37,.5)] transition list-none">
                             <span>See a runnable example</span>
                             <span class="msi text-[18px] text-faint transition-transform duration-200 group-open:rotate-180">expand_more</span>
@@ -478,7 +554,13 @@ pipeline.save(<span class="text-gold">"tumour.pkl"</span>)  <span class="text-fa
                         <h3 class="text-2xl font-bold text-ink mb-3">Understand the data before you model it</h3>
                         <p class="text-soft leading-relaxed">One click profiles every column: distributions, correlations, outliers, interactions and clusters. Surrogate decision trees and causal discovery show which relationships actually drive your target.</p>
                     </div>
-                    <div class="rounded-xl overflow-hidden border border-line cursor-pointer zoomable hover-lift sm:order-1 sm:mr-4"><img src="./static/img/eda/dashboardeda.jpg" alt="EDA overview dashboard" class="w-full h-auto" loading="lazy" decoding="async"></div>
+                    <div class="rounded-xl overflow-hidden border border-line cursor-pointer zoomable hover-lift sm:order-1 sm:mr-4"><img src="./static/img/eda/dashboardeda.jpg" alt="EDA overview dashboard" class="w-full h-auto" loading="lazy" decoding="async">
+                        <div class="grid grid-cols-3 gap-2 mt-2">
+                            <div class="rounded-lg overflow-hidden border border-line cursor-pointer zoomable"><img src="./static/img/eda/correlations.jpg" alt="Correlation matrix" class="w-full h-auto" loading="lazy" decoding="async"></div>
+                            <div class="rounded-lg overflow-hidden border border-line cursor-pointer zoomable"><img src="./static/img/eda/decisiontree.jpg" alt="Surrogate decision tree" class="w-full h-auto" loading="lazy" decoding="async"></div>
+                            <div class="rounded-lg overflow-hidden border border-line cursor-pointer zoomable"><img src="./static/img/eda/causal.jpg" alt="Causal discovery graph" class="w-full h-auto" loading="lazy" decoding="async"></div>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- 03 Build -->
@@ -528,7 +610,13 @@ pipeline.save(<span class="text-gold">"tumour.pkl"</span>)  <span class="text-fa
                         <h3 class="text-2xl font-bold text-ink mb-3">Find out before your users do</h3>
                         <p class="text-soft leading-relaxed">Models decay because the world moves. Skyulf compares live data against the training baseline column by column and flags what shifted — plus an error log, a slow-node profiler and an audit trail.</p>
                     </div>
-                    <div class="rounded-xl overflow-hidden border border-line cursor-pointer zoomable hover-lift sm:ml-4"><img src="./static/img/drift/drift.jpg" alt="Drift monitoring dashboard" class="w-full h-auto" loading="lazy" decoding="async"></div>
+                    <div class="rounded-xl overflow-hidden border border-line cursor-pointer zoomable hover-lift sm:ml-4"><img src="./static/img/drift/drift.jpg" alt="Drift monitoring dashboard" class="w-full h-auto" loading="lazy" decoding="async">
+                        <div class="grid grid-cols-3 gap-2 mt-2">
+                            <div class="rounded-lg overflow-hidden border border-line cursor-pointer zoomable"><img src="./static/img/drift/drift_report.jpg" alt="Detailed drift report per column" class="w-full h-auto" loading="lazy" decoding="async"></div>
+                            <div class="rounded-lg overflow-hidden border border-line cursor-pointer zoomable"><img src="./static/img/errors.jpg" alt="Error log with pipeline failures" class="w-full h-auto" loading="lazy" decoding="async"></div>
+                            <div class="rounded-lg overflow-hidden border border-line cursor-pointer zoomable"><img src="./static/img/slow_nodes.jpg" alt="Slow node profiling view" class="w-full h-auto" loading="lazy" decoding="async"></div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -639,7 +727,7 @@ pipeline.save(<span class="text-gold">"tumour.pkl"</span>)  <span class="text-fa
             <div class="grid md:grid-cols-2 gap-6">
                 <div class="rv glass-panel rounded-2xl p-6 hover-lift">
                     <div class="flex items-center gap-3 mb-3"><span class="msi text-gold text-[22px]">fact_check</span><h3 class="text-lg font-bold text-ink">Tested where it matters</h3></div>
-                    <p class="text-soft text-sm leading-relaxed">2,266 tests in the library, 1,089 in the backend and 661 in the canvas, plus browser tests that include an accessibility pass. Every pull request also runs lint, a type check, a JavaScript bundle-size budget and two Docker builds.</p>
+                    <p class="text-soft text-sm leading-relaxed">5,787 tests in total: 3,512 in the library, 1,427 in the backend and 848 in the canvas, plus browser tests that include an accessibility pass. Every pull request also runs lint, a type check, a JavaScript bundle-size budget and two Docker builds.</p>
                 </div>
                 <div class="rv glass-panel rounded-2xl p-6 hover-lift">
                     <div class="flex items-center gap-3 mb-3"><span class="msi text-peri text-[22px]">monitoring</span><h3 class="text-lg font-bold text-ink">Drift is measured four ways</h3></div>
@@ -667,56 +755,56 @@ pipeline.save(<span class="text-gold">"tumour.pkl"</span>)  <span class="text-fa
 
             <div class="space-y-4">
                 <div class="rv glass-panel rounded-xl overflow-hidden">
-                    <button class="w-full text-left px-6 py-4 flex items-center justify-between gap-4 group" onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.msi').classList.toggle('rotate-180')">
+                    <button type="button" aria-expanded="false" class="w-full text-left px-6 py-4 flex items-center justify-between gap-4 group" onclick="var nowHidden = this.nextElementSibling.classList.toggle('hidden'); this.setAttribute('aria-expanded', String(!nowHidden)); this.querySelector('.msi').classList.toggle('rotate-180')">
                         <span class="font-bold text-ink group-hover:text-gold transition-colors">What is Skyulf?</span>
                         <span class="msi text-faint transition-transform duration-300">expand_more</span>
                     </button>
                     <div class="hidden px-6 pb-5"><p class="text-soft leading-relaxed">Skyulf is two things that share one engine: <strong class="text-ink">skyulf-core</strong>, a Python library that gives you a single pipeline API over scikit-learn, and a self-hosted workspace where you build that same pipeline on a canvas. It covers the parts a notebook leaves to you: ordering steps so the test set stays untouched, versioning every run, comparing experiments, serving a model and watching it drift.</p></div>
                 </div>
                 <div class="rv glass-panel rounded-xl overflow-hidden">
-                    <button class="w-full text-left px-6 py-4 flex items-center justify-between gap-4 group" onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.msi').classList.toggle('rotate-180')">
+                    <button type="button" aria-expanded="false" class="w-full text-left px-6 py-4 flex items-center justify-between gap-4 group" onclick="var nowHidden = this.nextElementSibling.classList.toggle('hidden'); this.setAttribute('aria-expanded', String(!nowHidden)); this.querySelector('.msi').classList.toggle('rotate-180')">
                         <span class="font-bold text-ink group-hover:text-gold transition-colors">What is the meaning of Skyulf?</span>
                         <span class="msi text-faint transition-transform duration-300">expand_more</span>
                     </button>
                     <div class="hidden px-6 pb-5"><p class="text-soft leading-relaxed">Sky is the open space above Earth, where the sun, moon, stars, and clouds live. Ulf means “wolf,” with Nordic roots, and the wolf is also a strong symbol in Turkic tradition. Together it fits the project: independent and community-driven.</p></div>
                 </div>
                 <div class="rv glass-panel rounded-xl overflow-hidden">
-                    <button class="w-full text-left px-6 py-4 flex items-center justify-between gap-4 group" onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.msi').classList.toggle('rotate-180')">
+                    <button type="button" aria-expanded="false" class="w-full text-left px-6 py-4 flex items-center justify-between gap-4 group" onclick="var nowHidden = this.nextElementSibling.classList.toggle('hidden'); this.setAttribute('aria-expanded', String(!nowHidden)); this.querySelector('.msi').classList.toggle('rotate-180')">
                         <span class="font-bold text-ink group-hover:text-gold transition-colors">Do I have to self-host it?</span>
                         <span class="msi text-faint transition-transform duration-300">expand_more</span>
                     </button>
                     <div class="hidden px-6 pb-5"><p class="text-soft leading-relaxed">You can try the hosted demo first, with nothing to install. For real work you run it yourself with <code class="text-peri">docker compose up</code>, which takes a few minutes and needs no account, no credit card and no per-prediction bill. Because it runs on your machine or your server, your data never has to leave it — which is what makes it usable in hospitals, banks and anywhere else the data legally cannot go to a third party.</p></div>
                 </div>
                 <div class="rv glass-panel rounded-xl overflow-hidden">
-                    <button class="w-full text-left px-6 py-4 flex items-center justify-between gap-4 group" onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.msi').classList.toggle('rotate-180')">
+                    <button type="button" aria-expanded="false" class="w-full text-left px-6 py-4 flex items-center justify-between gap-4 group" onclick="var nowHidden = this.nextElementSibling.classList.toggle('hidden'); this.setAttribute('aria-expanded', String(!nowHidden)); this.querySelector('.msi').classList.toggle('rotate-180')">
                         <span class="font-bold text-ink group-hover:text-gold transition-colors">How is this different from cloud MLOps platforms?</span>
                         <span class="msi text-faint transition-transform duration-300">expand_more</span>
                     </button>
                     <div class="hidden px-6 pb-5"><p class="text-soft leading-relaxed">Cloud platforms require uploading your data to third-party servers and charge based on usage. Skyulf runs on your own hardware or inside your private cloud. No data leaves your network, no usage-based pricing, and no vendor dependencies. You own the infrastructure and the workflow.</p></div>
                 </div>
                 <div class="rv glass-panel rounded-xl overflow-hidden">
-                    <button class="w-full text-left px-6 py-4 flex items-center justify-between gap-4 group" onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.msi').classList.toggle('rotate-180')">
+                    <button type="button" aria-expanded="false" class="w-full text-left px-6 py-4 flex items-center justify-between gap-4 group" onclick="var nowHidden = this.nextElementSibling.classList.toggle('hidden'); this.setAttribute('aria-expanded', String(!nowHidden)); this.querySelector('.msi').classList.toggle('rotate-180')">
                         <span class="font-bold text-ink group-hover:text-gold transition-colors">Is this really free?</span>
                         <span class="msi text-faint transition-transform duration-300">expand_more</span>
                     </button>
                     <div class="hidden px-6 pb-5"><p class="text-soft leading-relaxed">Yes. Skyulf is open source under a split license. <strong class="text-ink">skyulf-core</strong>, the Python library, is <strong class="text-ink">Apache&nbsp;2.0</strong>, so you can use it in anything, including closed-source commercial products. The platform (backend and canvas) is <strong class="text-ink">AGPLv3</strong>, so improvements to the application itself are shared back.</p></div>
                 </div>
                 <div class="rv glass-panel rounded-xl overflow-hidden">
-                    <button class="w-full text-left px-6 py-4 flex items-center justify-between gap-4 group" onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.msi').classList.toggle('rotate-180')">
+                    <button type="button" aria-expanded="false" class="w-full text-left px-6 py-4 flex items-center justify-between gap-4 group" onclick="var nowHidden = this.nextElementSibling.classList.toggle('hidden'); this.setAttribute('aria-expanded', String(!nowHidden)); this.querySelector('.msi').classList.toggle('rotate-180')">
                         <span class="font-bold text-ink group-hover:text-gold transition-colors">Can I use this in production?</span>
                         <span class="msi text-faint transition-transform duration-300">expand_more</span>
                     </button>
                     <div class="hidden px-6 pb-5"><p class="text-soft leading-relaxed">It is perfect for internal tools, research, and experimentation. We are working towards a stable v1.0 for critical production workloads.</p></div>
                 </div>
                 <div class="rv glass-panel rounded-xl overflow-hidden">
-                    <button class="w-full text-left px-6 py-4 flex items-center justify-between gap-4 group" onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.msi').classList.toggle('rotate-180')">
+                    <button type="button" aria-expanded="false" class="w-full text-left px-6 py-4 flex items-center justify-between gap-4 group" onclick="var nowHidden = this.nextElementSibling.classList.toggle('hidden'); this.setAttribute('aria-expanded', String(!nowHidden)); this.querySelector('.msi').classList.toggle('rotate-180')">
                         <span class="font-bold text-ink group-hover:text-gold transition-colors">How can I contribute?</span>
                         <span class="msi text-faint transition-transform duration-300">expand_more</span>
                     </button>
                     <div class="hidden px-6 pb-5"><p class="text-soft leading-relaxed">Contributions are welcome. Start at <a href="https://github.com/flyingriverhorse/skyulf" class="text-peri hover:underline">GitHub</a>. Whether it's code, documentation, bug reports, or feature ideas, every contribution helps shape Skyulf.</p></div>
                 </div>
                 <div class="rv glass-panel rounded-xl overflow-hidden">
-                    <button class="w-full text-left px-6 py-4 flex items-center justify-between gap-4 group" onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.msi').classList.toggle('rotate-180')">
+                    <button type="button" aria-expanded="false" class="w-full text-left px-6 py-4 flex items-center justify-between gap-4 group" onclick="var nowHidden = this.nextElementSibling.classList.toggle('hidden'); this.setAttribute('aria-expanded', String(!nowHidden)); this.querySelector('.msi').classList.toggle('rotate-180')">
                         <span class="font-bold text-ink group-hover:text-gold transition-colors">Do you offer a commercial license?</span>
                         <span class="msi text-faint transition-transform duration-300">expand_more</span>
                     </button>
@@ -730,7 +818,7 @@ pipeline.save(<span class="text-gold">"tumour.pkl"</span>)  <span class="text-fa
     <section class="py-14 overflow-hidden marquee-wrap">
         <p class="text-center font-mono text-[11px] tracking-[0.16em] uppercase text-faint mb-8">Powered by modern open source</p>
         <div class="relative flex overflow-x-hidden">
-            <div class="animate-marquee whitespace-nowrap flex gap-16 items-center font-mono text-xl font-semibold">
+            <div class="animate-marquee whitespace-nowrap flex items-center [&>span]:mr-16 font-mono text-xl font-semibold">
                 <span class="text-gold">Scikit-learn</span><span class="text-peri">Pandas</span><span class="text-rose">FastAPI</span><span class="text-gold">React</span><span class="text-peri">Optuna</span><span class="text-rose">Celery</span><span class="text-gold">Redis</span><span class="text-peri">Polars</span><span class="text-rose">NumPy</span><span class="text-gold">Imbalanced-learn</span><span class="text-peri">SQLAlchemy</span>
                 <span class="text-gold" aria-hidden="true">Scikit-learn</span><span class="text-peri" aria-hidden="true">Pandas</span><span class="text-rose" aria-hidden="true">FastAPI</span><span class="text-gold" aria-hidden="true">React</span><span class="text-peri" aria-hidden="true">Optuna</span><span class="text-rose" aria-hidden="true">Celery</span><span class="text-gold" aria-hidden="true">Redis</span><span class="text-peri" aria-hidden="true">Polars</span><span class="text-rose" aria-hidden="true">NumPy</span><span class="text-gold" aria-hidden="true">Imbalanced-learn</span><span class="text-peri" aria-hidden="true">SQLAlchemy</span>
             </div>
@@ -743,7 +831,7 @@ pipeline.save(<span class="text-gold">"tumour.pkl"</span>)  <span class="text-fa
         <div class="absolute inset-0" style="background: linear-gradient(to bottom, var(--bg), var(--hero-shade-mid) 40%, var(--bg));" aria-hidden="true"></div>
         <div class="relative z-10 max-w-3xl mx-auto px-5 text-center">
             <h2 class="rv text-4xl sm:text-5xl font-extrabold text-ink tracking-tight mb-5 drop-shadow-xl">Ready to build?</h2>
-            <p class="rv text-lg text-soft mb-9" style="text-shadow: 0 1px 12px rgba(18,8,31,.4);">Try the demo in your browser, or install the library and start from your next notebook.</p>
+            <p class="rv text-lg text-soft mb-9" style="text-shadow: 0 1px 12px var(--hero-shadow);">Try the demo in your browser, or install the library and start from your next notebook.</p>
             <div class="rv flex flex-wrap gap-4 justify-center">
                 <a href="https://api.skyulf.com/" target="_blank" rel="noopener" class="btn-gold px-10 py-4 rounded-full font-bold text-lg">Try the live demo</a>
                 <a href="https://github.com/flyingriverhorse/skyulf" target="_blank" rel="noopener" class="btn-ghost glass-panel px-10 py-4 rounded-full font-bold text-lg">View on GitHub</a>
@@ -806,39 +894,93 @@ pipeline.save(<span class="text-gold">"tumour.pkl"</span>)  <span class="text-fa
         <button id="lightbox-close" aria-label="Close image preview" class="absolute top-6 right-6 text-white/70 hover:text-white transition-colors z-50">
             <span class="msi text-[40px]">close</span>
         </button>
-        <div id="lightbox-container" class="lightbox-content relative max-w-[90vw] max-h-[90vh] w-full h-full flex items-center justify-center"></div>
+        <button id="lightbox-prev" aria-label="Previous image" class="absolute left-2 sm:left-6 top-1/2 -translate-y-1/2 w-11 h-11 rounded-full flex items-center justify-center bg-white/10 hover:bg-white/25 text-white/80 hover:text-white transition-colors z-50">
+            <span class="msi text-[28px]">chevron_left</span>
+        </button>
+        <button id="lightbox-next" aria-label="Next image" class="absolute right-2 sm:right-6 top-1/2 -translate-y-1/2 w-11 h-11 rounded-full flex items-center justify-center bg-white/10 hover:bg-white/25 text-white/80 hover:text-white transition-colors z-50">
+            <span class="msi text-[28px]">chevron_right</span>
+        </button>
+        <div id="lightbox-counter" aria-live="polite" class="absolute bottom-6 left-1/2 -translate-x-1/2 font-mono text-xs tracking-[0.2em] text-white/70"></div>
+        <div id="lightbox-container" class="lightbox-content relative max-w-[90vw] max-h-[90vh] w-full h-full flex items-center justify-center px-14"></div>
     </div>
 
     <script>
         document.documentElement.classList.add('js');
+        window.requestAnimationFrame = window.requestAnimationFrame || function (cb) { return window.setTimeout(cb, 16); };
 
         document.addEventListener('DOMContentLoaded', function () {
             var root = document.documentElement;
-            var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+            var reduce = false;
+            try { reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) { /* older engines */ }
 
             // --- Hero line reveal ---
             requestAnimationFrame(function () { requestAnimationFrame(function () { document.body.classList.add('loaded'); }); });
 
             // --- Theme toggle ---
             var themeToggle = document.getElementById('theme-toggle');
-            function paintTheme() {
-                var isLight = root.classList.contains('light');
-                themeToggle.setAttribute('aria-label', isLight ? 'Switch to dark theme' : 'Switch to light theme');
-                document.querySelector('.theme-icon-dark').classList.toggle('hidden', isLight);
-                document.querySelector('.theme-icon-light').classList.toggle('hidden', !isLight);
-                if (window.__constellationPalette) window.__constellationPalette();
-            }
-            themeToggle.addEventListener('click', function () {
-                root.classList.toggle('light');
-                try { localStorage.setItem('skyulf-theme', root.classList.contains('light') ? 'light' : 'dark'); } catch (e) { /* private mode */ }
+            var iconDark = document.querySelector('.theme-icon-dark');
+            var iconLight = document.querySelector('.theme-icon-light');
+            if (themeToggle) {
+                function paintTheme() {
+                    var isLight = root.classList.contains('light');
+                    themeToggle.setAttribute('aria-label', isLight ? 'Switch to dark theme' : 'Switch to light theme');
+                    if (iconDark) iconDark.classList.toggle('hidden', isLight);
+                    if (iconLight) iconLight.classList.toggle('hidden', !isLight);
+                    if (window.__constellationPalette) window.__constellationPalette();
+                }
+                themeToggle.addEventListener('click', function () {
+                    root.classList.toggle('light');
+                    try { localStorage.setItem('skyulf-theme', root.classList.contains('light') ? 'light' : 'dark'); } catch (e) { /* private mode */ }
+                    paintTheme();
+                });
                 paintTheme();
-            });
-            paintTheme();
+            }
+
+            // --- Mobile menu ---
+            var menuToggle = document.getElementById('menu-toggle');
+            var mobileMenu = document.getElementById('mobile-menu');
+            if (menuToggle && mobileMenu) {
+                function setMenu(open) {
+                    mobileMenu.classList.toggle('hidden', !open);
+                    menuToggle.setAttribute('aria-expanded', String(open));
+                    menuToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+                    var icon = menuToggle.querySelector('.msi');
+                    if (icon) icon.textContent = open ? 'close' : 'menu';
+                }
+                menuToggle.addEventListener('click', function (event) {
+                    event.stopPropagation();
+                    setMenu(mobileMenu.classList.contains('hidden'));
+                });
+                mobileMenu.querySelectorAll('a').forEach(function (link) {
+                    link.addEventListener('click', function () { setMenu(false); });
+                });
+                document.addEventListener('keydown', function (event) {
+                    if (event.key === 'Escape' && !mobileMenu.classList.contains('hidden')) setMenu(false);
+                });
+                document.addEventListener('click', function (event) {
+                    if (!mobileMenu.classList.contains('hidden') && !mobileMenu.contains(event.target)) setMenu(false);
+                });
+            }
+
+            // --- Version badge: refresh from PyPI, keep static fallback on failure ---
+            var badge = document.getElementById('version-badge');
+            if (badge && window.fetch) {
+                fetch('https://pypi.org/pypi/skyulf-core/json')
+                    .then(function (res) { return res.ok ? res.json() : null; })
+                    .then(function (data) {
+                        var version = data && data.info && data.info.version;
+                        if (!version) return;
+                        var label = badge.querySelector('[data-version-label]');
+                        if (label) label.textContent = 'v' + version + ' — live on PyPI';
+                    })
+                    .catch(function () { /* offline or blocked: static fallback stays */ });
+            }
 
             // --- Constellation canvas over the hero ---
             var canvas = document.getElementById('constellation');
-            if (canvas && !reduce) {
-                var ctx = canvas.getContext('2d');
+            var ctx = null;
+            try { if (canvas && !reduce && canvas.getContext) ctx = canvas.getContext('2d'); } catch (e) { /* canvas unavailable */ }
+            if (ctx && 'IntersectionObserver' in window) {
                 var hero = canvas.parentElement;
                 var palette = { star: '255, 214, 90', glow: '255, 218, 217', line: '255, 218, 217' };
                 window.__constellationPalette = function () {
@@ -933,7 +1075,7 @@ pipeline.save(<span class="text-gold">"tumour.pkl"</span>)  <span class="text-fa
                         (function step(ts) {
                             if (!t0) t0 = ts;
                             var p = Math.min((ts - t0) / 900, 1);
-                            e.target.textContent = Math.round(target * (1 - Math.pow(1 - p, 3)));
+                            e.target.textContent = Math.round(target * (1 - Math.pow(1 - p, 3))).toLocaleString('en-US');
                             if (p < 1) requestAnimationFrame(step);
                         })(performance.now());
                     });
@@ -951,19 +1093,32 @@ pipeline.save(<span class="text-gold">"tumour.pkl"</span>)  <span class="text-fa
                 });
             });
 
-            // --- Lightbox ---
+            // --- Lightbox with gallery navigation ---
             var lightbox = document.getElementById('lightbox');
             var lightboxContainer = document.getElementById('lightbox-container');
             var lightboxClose = document.getElementById('lightbox-close');
+            var lightboxPrev = document.getElementById('lightbox-prev');
+            var lightboxNext = document.getElementById('lightbox-next');
+            var lightboxCounter = document.getElementById('lightbox-counter');
             var lastFocused = null;
+            var gallery = [];
+            var currentIndex = -1;
 
-            function openLightbox(image) {
-                var clone = image.cloneNode(true);
+            function renderLightbox(index) {
+                if (!gallery.length) return;
+                currentIndex = (index + gallery.length) % gallery.length;
+                var clone = gallery[currentIndex].cloneNode(true);
                 clone.className = 'max-w-full max-h-[85vh] object-contain rounded-lg';
                 clone.removeAttribute('loading');
                 lightboxContainer.innerHTML = '';
                 lightboxContainer.appendChild(clone);
+                if (lightboxCounter) lightboxCounter.textContent = (currentIndex + 1) + ' / ' + gallery.length;
+            }
+            function openLightbox(image) {
+                var idx = gallery.indexOf(image);
+                if (idx === -1) return;
                 lastFocused = document.activeElement;
+                renderLightbox(idx);
                 lightbox.classList.add('active');
                 lightbox.removeAttribute('inert');
                 lightbox.setAttribute('aria-hidden', 'false');
@@ -976,19 +1131,38 @@ pipeline.save(<span class="text-gold">"tumour.pkl"</span>)  <span class="text-fa
                 lightbox.setAttribute('aria-hidden', 'true');
                 document.body.style.overflow = '';
                 lightboxContainer.innerHTML = '';
+                if (lightboxCounter) lightboxCounter.textContent = '';
+                currentIndex = -1;
                 if (lastFocused) lastFocused.focus();
             }
             document.querySelectorAll('.zoomable').forEach(function (wrapper) {
                 var image = wrapper.tagName === 'IMG' ? wrapper : wrapper.querySelector('img');
                 if (!image) return;
+                gallery.push(image);
+                wrapper.setAttribute('tabindex', '0');
+                wrapper.setAttribute('role', 'button');
+                wrapper.setAttribute('aria-label', 'Enlarge: ' + (image.getAttribute('alt') || 'screenshot'));
                 wrapper.addEventListener('click', function () { openLightbox(image); });
+                wrapper.addEventListener('keydown', function (event) {
+                    if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); openLightbox(image); }
+                });
             });
             lightboxClose.addEventListener('click', closeLightbox);
+            if (lightboxPrev) lightboxPrev.addEventListener('click', function () { renderLightbox(currentIndex - 1); });
+            if (lightboxNext) lightboxNext.addEventListener('click', function () { renderLightbox(currentIndex + 1); });
             lightbox.addEventListener('click', function (event) { if (event.target === lightbox) closeLightbox(); });
             document.addEventListener('keydown', function (event) {
                 if (!lightbox.classList.contains('active')) return;
                 if (event.key === 'Escape') closeLightbox();
-                else if (event.key === 'Tab') { event.preventDefault(); lightboxClose.focus(); }
+                else if (event.key === 'ArrowLeft') renderLightbox(currentIndex - 1);
+                else if (event.key === 'ArrowRight') renderLightbox(currentIndex + 1);
+                else if (event.key === 'Tab') {
+                    event.preventDefault();
+                    var focusables = [lightboxClose, lightboxPrev, lightboxNext];
+                    var pos = focusables.indexOf(document.activeElement);
+                    var next = event.shiftKey ? (pos - 1 + focusables.length) % focusables.length : (pos + 1) % focusables.length;
+                    focusables[next].focus();
+                }
             });
         });
     </script>
