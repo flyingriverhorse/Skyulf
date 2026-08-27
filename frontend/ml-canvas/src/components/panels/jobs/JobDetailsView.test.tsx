@@ -434,6 +434,36 @@ describe('JobDetailsView', () => {
     expect(within(dialog).getByText(/held-out rows may have entered a fit/i)).toBeInTheDocument();
   });
 
+  it('shows a score-advisory tile for jobs that fell back to pre-transformed scoring', () => {
+    renderDetails(makeJob({
+      status: 'completed',
+      result: { metrics: { fold_refit_fallback: 'row_changing_branch_step' } },
+    }));
+    const label = screen.getByText('Score Advisory');
+    expect(
+      within(label.parentElement as HTMLElement).getByText('Scores may be optimistic')
+    ).toBeInTheDocument();
+  });
+
+  it('opens the advisory modal explaining the fallback reason on tile click', () => {
+    renderDetails(makeJob({
+      status: 'completed',
+      result: { metrics: { fold_refit_fallback: 'row_changing_branch_step' } },
+    }));
+
+    fireEvent.click(screen.getByRole('button', { name: /Score Advisory/ }));
+
+    const dialog = screen.getByRole('dialog');
+    expect(within(dialog).getByText('row_changing_branch_step')).toBeInTheDocument();
+    expect(within(dialog).getByText(/branches no longer align row-for-row/)).toBeInTheDocument();
+    expect(within(dialog).getByText(/optimistically biased/)).toBeInTheDocument();
+  });
+
+  it('omits the score-advisory tile when the run did not fall back', () => {
+    renderDetails(makeJob({ status: 'completed', result: { metrics: { accuracy: 0.9 } } }));
+    expect(screen.queryByText('Score Advisory')).not.toBeInTheDocument();
+  });
+
   it('opens a verdict modal listing what the gate checked and why exemptions were allowed', () => {
     renderDetails(makeJob({
       status: 'completed',

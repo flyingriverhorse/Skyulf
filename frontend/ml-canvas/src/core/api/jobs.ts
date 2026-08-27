@@ -27,6 +27,17 @@ export interface RefitAuditVerdict {
   isolation_ok?: boolean;
 }
 
+// Stable reason code stamped into job metrics (`fold_refit_fallback`) when
+// CV/tuning fell back to pre-transformed scoring instead of per-fold
+// preprocessing refit. Absent on covered runs.
+export type FoldRefitFallbackCode =
+  | 'nested_merge'
+  | 'fork_not_splitter'
+  | 'learner_before_split'
+  | 'row_changing_branch_step'
+  | 'unsupported_graph'
+  | 'payload_reconstruction_failed';
+
 export interface JobInfo {
   job_id: string;
   pipeline_id: string;
