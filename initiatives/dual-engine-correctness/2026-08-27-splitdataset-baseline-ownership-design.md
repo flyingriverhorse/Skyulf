@@ -2,11 +2,11 @@
 
 **Date:** 2026-08-27 · **Status:** proposal — **parked**; implement only if the Phase 0
 demand gate fires.
-**Parent:** `2026-08-26-holdout-validation-refit-and-merge-findings.md` §2 Finding 1
-(options table, option C) and §4 item 4 ("Defer / park … needs a dedicated design note
-and eager==refit parity tests").
-**Related:** `2026-08-23-task11-merged-branch-fold-refit-plan.md` (merge mirror + its
-"Known constraint" note), `2026-08-23-f15-per-fold-refit-design.md`,
+**Parent:** the holdout-refit findings §2 Finding 1 (options table, option C) and §4
+item 4 ("Defer / park … needs a dedicated design note and eager==refit parity tests") —
+that findings doc shipped and was archived out of this folder.
+**Related:** the task 11 merged-branch plan (merge mirror + its "Known constraint"
+note) and the F-15 per-fold-refit design — both archived; plus
 `2026-08-27-fallback-shapes-per-fold-refit-plan.md` (Phase 0 telemetry pairing),
 `docs/guides/multi_path_pipelines.md`, `docs/user_guide/troubleshooting.md`.
 
