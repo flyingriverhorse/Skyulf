@@ -198,6 +198,8 @@ def test_merged_branches_fall_back_with_warning(noise_target_csv, tmp_path):
 
     assert result.status == "success"
     assert any("Per-fold preprocessing refit skipped" in m and "linear chain" in m for m in logs)
+    metrics = result.node_results["node_training"].metrics
+    assert metrics["fold_refit_fallback"] == "unsupported_graph"
 
 
 def _splitter(node_id: str, inputs: list[str]) -> NodeConfig:
@@ -240,6 +242,7 @@ def test_fork_join_merged_branches_refit_per_fold(noise_target_csv, tmp_path):
         "Per-fold preprocessing refit enabled" in m and "merged branch(es)" in m for m in logs
     ), logs
     metrics = result.node_results["node_training"].metrics
+    assert "fold_refit_fallback" not in metrics
     assert _disc(metrics["cv_roc_auc_mean"]) < 0.65, (
         f"fork-join refit CV should sit near chance, got {metrics['cv_roc_auc_mean']}"
     )
@@ -281,6 +284,8 @@ def test_nested_merge_falls_back_with_warning(noise_target_csv, tmp_path):
         "Per-fold preprocessing refit skipped" in m and "linear transformer chain" in m
         for m in logs
     ), logs
+    metrics = result.node_results["node_training"].metrics
+    assert metrics["fold_refit_fallback"] == "nested_merge"
 
 
 def test_row_count_changing_branch_falls_back_with_warning(noise_target_csv, tmp_path):
@@ -320,6 +325,8 @@ def test_row_count_changing_branch_falls_back_with_warning(noise_target_csv, tmp
     assert any("Per-fold preprocessing refit skipped" in m and "row counts" in m for m in logs), (
         logs
     )
+    metrics = result.node_results["node_training"].metrics
+    assert metrics["fold_refit_fallback"] == "row_changing_branch_step"
 
 
 def test_learning_step_after_splitter_falls_back_with_warning(noise_target_csv, tmp_path):
@@ -346,6 +353,8 @@ def test_learning_step_after_splitter_falls_back_with_warning(noise_target_csv, 
     assert any(
         "Per-fold preprocessing refit skipped" in m and "must end with" in m for m in logs
     ), logs
+    metrics = result.node_results["node_training"].metrics
+    assert metrics["fold_refit_fallback"] == "fork_not_splitter"
 
 
 def _numeric_csv(tmp_path) -> str:
@@ -414,6 +423,8 @@ def test_learning_trunk_step_before_fork_splitter_falls_back(tmp_path):
         "Per-fold preprocessing refit skipped" in m and "before the fork splitter" in m
         for m in logs
     ), logs
+    metrics = result.node_results["node_training"].metrics
+    assert metrics["fold_refit_fallback"] == "learner_before_split"
 
 
 def test_stateless_trunk_step_before_fork_splitter_keeps_refit(tmp_path):
@@ -754,6 +765,8 @@ def test_learning_step_before_splitter_falls_back_with_warning(tmp_path):
         for m in logs
     ), f"expected the pre-splitter fallback warning, logs={logs}"
     assert not any("Per-fold preprocessing refit enabled" in m for m in logs)
+    metrics = result.node_results["node_training"].metrics
+    assert metrics["fold_refit_fallback"] == "learner_before_split"
 
 
 def test_stateless_step_before_splitter_keeps_refit_enabled(tmp_path):
@@ -913,6 +926,8 @@ def test_payload_reconstruction_failure_never_fails_the_run(
         "Per-fold preprocessing refit skipped" in m and "payload reconstruction failed" in m
         for m in logs
     ), f"expected the reconstruction-failure warning, logs={logs}"
+    metrics = result.node_results["node_training"].metrics
+    assert metrics["fold_refit_fallback"] == "payload_reconstruction_failed"
 
 
 def test_validation_split_tuning_refits_per_fold(noise_target_csv, tmp_path):
@@ -1427,9 +1442,10 @@ def _refit_mixin(configs: list[NodeConfig], merge_order: list[str]) -> FeatureEn
 
 def test_fork_join_rejects_fewer_than_two_merged_inputs():
     mixin = _refit_mixin([], ["only_one"])
-    resolved, reason = mixin._try_fork_join_refit(_training(["only_one"]), "target")
+    resolved, reason, code = mixin._try_fork_join_refit(_training(["only_one"]), "target")
     assert resolved is None
     assert "fewer than two merged inputs" in reason
+    assert code == "unsupported_graph"
 
 
 def test_fork_join_rejects_divergent_loaders():
@@ -1442,9 +1458,10 @@ def test_fork_join_rejects_divergent_loaders():
         ],
         ["split_a", "split_b"],
     )
-    resolved, reason = mixin._try_fork_join_refit(_training(["split_a", "split_b"]), "target")
+    resolved, reason, code = mixin._try_fork_join_refit(_training(["split_a", "split_b"]), "target")
     assert resolved is None
     assert "do not share one data loader" in reason
+    assert code == "unsupported_graph"
 
 
 def test_fork_join_rejects_branch_with_no_steps_after_fork():
@@ -1459,9 +1476,12 @@ def test_fork_join_rejects_branch_with_no_steps_after_fork():
         ],
         ["node_split", "woe_a"],
     )
-    resolved, reason = mixin._try_fork_join_refit(_training(["node_split", "woe_a"]), "target")
+    resolved, reason, code = mixin._try_fork_join_refit(
+        _training(["node_split", "woe_a"]), "target"
+    )
     assert resolved is None
     assert "no steps after the fork point" in reason
+    assert code == "unsupported_graph"
 
 
 def test_fork_join_rejects_empty_fork_node():
@@ -1481,9 +1501,10 @@ def test_fork_join_rejects_empty_fork_node():
         ],
         ["woe_a", "woe_b"],
     )
-    resolved, reason = mixin._try_fork_join_refit(_training(["woe_a", "woe_b"]), "target")
+    resolved, reason, code = mixin._try_fork_join_refit(_training(["woe_a", "woe_b"]), "target")
     assert resolved is None
     assert "no splitter fork point" in reason
+    assert code == "fork_not_splitter"
 
 
 # ---------------------------------------------------------------------------

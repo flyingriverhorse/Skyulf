@@ -951,8 +951,9 @@ class NodeRunnersMixin:
         # CV); holdout tuning with a validation split refits on the train rows
         # only and scores candidates against the untouched validation split.
         # Unsupported graphs fall back inside the resolver with an explicit
-        # job-log warning instead of failing the run.
-        fold_preprocessing = self._resolve_fold_preprocessing(node, target_col)
+        # job-log warning instead of failing the run; the stable reason code
+        # is stamped into the node metrics below (demand telemetry).
+        fold_preprocessing, refit_fallback = self._resolve_fold_preprocessing(node, target_col)
 
         # Audit telemetry (findings 2026-08-26 §3/B): record the input row
         # count of every per-fold fit/transform so the run can be audited
@@ -1038,6 +1039,12 @@ class NodeRunnersMixin:
                 metrics["iteration_metric"] = last_point["metric"]
             if last_point.get("direction"):
                 metrics["iteration_direction"] = last_point["direction"]
+
+        # Demand telemetry (fallback-shapes plan Phase 0): a stable reason
+        # code for graphs that fell back to pre-transformed scoring, so we
+        # can count which unsupported shapes users actually hit.
+        if refit_fallback is not None:
+            metrics["fold_refit_fallback"] = refit_fallback
 
         # Cross-Validation on the tuned/fixed model (using best/fixed params)
         cv_metrics = self._run_tuned_cv(

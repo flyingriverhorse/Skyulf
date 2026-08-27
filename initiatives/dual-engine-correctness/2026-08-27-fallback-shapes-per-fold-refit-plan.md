@@ -99,12 +99,18 @@ and produces the demand data that justifies (or kills) the expensive phases.
 1. Count bail reasons: increment per-reason counters in the job metrics
    (`job.metrics["fold_refit_fallback"] = reason`) alongside the existing log
    line. This answers "do users actually hit S1–S5?" with data.
+   **Done (branch 085):** `_try_fork_join_refit` / `_resolve_fold_preprocessing`
+   return a stable reason code, `_run_training_tuned` stamps
+   `metrics["fold_refit_fallback"]`. Codes: `nested_merge` (S1),
+   `fork_not_splitter` (S2), `learner_before_split` (S3+S4),
+   `row_changing_branch_step` (S5), `unsupported_graph`,
+   `payload_reconstruction_failed`.
 2. Optionally fold in the parked **audit telemetry** (findings §3 option B):
    record per-fold fit/transform **row counts** (+ optional content hash) into
    metrics/log, so covered runs are post-hoc auditable.
    **Done (branch 085):** `AuditedFoldPreprocessor` records the counts,
    `_run_training_tuned` logs the isolation verdict and persists
-   `fold_refit_audit` in node metrics. Only the fallback *counters* remain.
+   `fold_refit_audit` in node metrics.
 3. Canvas lint (frontend, cheap): when a training node's upstream matches a
    fallback shape (detectable statically from node/edge structure — multi-input
    node whose branch contains another merge node, or a learner upstream of the
