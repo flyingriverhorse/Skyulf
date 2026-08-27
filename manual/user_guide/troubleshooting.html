@@ -2030,15 +2030,15 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#reintroduced-n-columns-removed-by-an-upstream-drop-columns-step" class="md-nav__link">
+  <a href="#training-frame-contains-n-non-numeric-columns-all-trials-failed-after-a-split" class="md-nav__link">
     <span class="md-ellipsis">
       
-        "…reintroduced N columns removed by an upstream Drop Columns step"
+        "training frame contains N non-numeric column(s)" / "All trials failed" after a Split
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="&#34;…reintroduced N columns removed by an upstream Drop Columns step&#34;">
+    <nav class="md-nav" aria-label="&#34;training frame contains N non-numeric column(s)&#34; / &#34;All trials failed&#34; after a Split">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -2054,6 +2054,45 @@
         
           <li class="md-nav__item">
   <a href="#fix" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fix
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#reintroduced-n-columns-removed-by-an-upstream-drop-columns-step" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        "…reintroduced N columns removed by an upstream Drop Columns step"
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="&#34;…reintroduced N columns removed by an upstream Drop Columns step&#34;">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-it-means_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What it means
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fix_1" class="md-nav__link">
     <span class="md-ellipsis">
       
         Fix
@@ -3419,15 +3458,43 @@ branch's values survive. You lose the work the other branch did on that column.<
 </table>
 <p><strong>Rule of thumb:</strong> if two branches touch the same columns, chain them; if they touch different columns, fanning in is fine.</p>
 <hr />
+<h2 id="training-frame-contains-n-non-numeric-columns-all-trials-failed-after-a-split">"training frame contains N non-numeric column(s)" / "All trials failed" after a Split</h2>
+<p>Training fails with an error like:</p>
+<blockquote>
+<p><em>Node node_training: training frame contains 1 non-numeric column(s): city. Supervised models can only fit numeric features. After a Split, merged branches resolve overlapping columns by merge order — the last connected branch wins every shared column — …</em></p>
+</blockquote>
+<h3 id="what-it-means_1">What it means</h3>
+<p>Your branches fork <strong>after a Split node</strong> and merge back into a training node. In that shape,
+per-column ownership cannot apply — the nearest shared ancestor is the splitter, whose stored
+artifact is a train/test split rather than a frame — so overlapping columns resolve by <strong>pure
+merge order</strong>: with <code>last_wins</code> (the default) the <strong>last connected branch wins every shared
+column</strong>. If an earlier branch encoded a column but the last branch still carries it as raw
+text/categories, the raw version wins and the model receives a non-numeric column.</p>
+<p>Before this guard existed, the same misconfiguration surfaced as the cryptic
+<em>"Hyperparameter tuning failed: All trials failed"</em> because every fold failed inside the model fit.</p>
+<h3 id="fix">Fix</h3>
+<p>Pick one:</p>
+<ol>
+<li><strong>Encode on the winning branch</strong> — add the encoder (WOE / OneHot / Ordinal) to the branch
+   whose version of the column wins (the last connected one under <code>last_wins</code>).</li>
+<li><strong>Make every branch fully numeric</strong> — each branch imputes/encodes/scales on its own, so the
+   merge result is model-ready no matter which branch wins.</li>
+<li><strong>Make branches disjoint</strong> — post-split branches should output non-overlapping columns.</li>
+<li><strong>Drop the column</strong> if it is not needed.</li>
+</ol>
+<p>Text pipelines: after a vectorizer, set <code>drop_original=True</code> (or drop the raw text column) so the
+raw text does not survive into the merge. See also
+<a href="../guides/multi_path_pipelines.html#after-a-split-order-decides-everything">Multi-Path Pipelines — After a Split: Order Decides Everything</a>.</p>
+<hr />
 <h2 id="reintroduced-n-columns-removed-by-an-upstream-drop-columns-step">"…reintroduced N columns removed by an upstream Drop Columns step"</h2>
 <p>A second, different advisory can appear alongside the fan-in banner:</p>
 <blockquote>
 <p><em>MissingIndicator merged a branch that reintroduced 1 column removed by an upstream Drop Columns step: <code>Id</code>. They were dropped again, so any transform applied to them on that branch is discarded.</em></p>
 </blockquote>
-<h3 id="what-it-means_1">What it means</h3>
+<h3 id="what-it-means_2">What it means</h3>
 <p>A Drop Columns / Drop Missing Columns node is treated as authoritative for its <strong>entire</strong> subgraph, not just its own branch. When a sibling branch that bypassed it feeds the same merge, the union would resurrect the dropped columns — so the engine removes them again after merging.</p>
 <p>The consequence is easy to miss: if the <em>other</em> branch applied a transformation to one of those columns, that work is thrown away with the column.</p>
-<h3 id="fix">Fix</h3>
+<h3 id="fix_1">Fix</h3>
 <p>Move the Drop Columns node <strong>after</strong> the merge if you want the columns to survive, or route the transforming branch through the Drop Columns node so both branches agree on which columns exist.</p>
 <hr />
 <h2 id="target-column-not-found-after-encoding">Target column not found after encoding</h2>

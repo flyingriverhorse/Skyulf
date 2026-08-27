@@ -3611,47 +3611,35 @@ Target Encoding Comparison (First 5 values):
 <p><strong>Covered — the per-node guarantee.</strong> The <code>fit()</code> (Calculator) / <code>transform()</code> (Applier) split is enforced for every node: learned preprocessing artifacts are computed only from training-designated data and applied unchanged to validation and test data. The adversarial checks above verify this for imputation, scaling and target encoding.</p>
 <p><strong>Covered — the pipeline-structure gate.</strong> Every node declares whether its <code>fit()</code> learns from the data it is given (<code>learns_from_data</code> on its node metadata), and both the standalone diagnostic (<code>skyulf.validate_leakage_safety</code>) and the pre-execution gate derive their node lists from that registry — there is no hand-maintained allow-list to drift. A pipeline that fits a data-dependent node before its train/test split is rejected by default (<code>on_leakage="raise"</code>; set <code>"warn"</code> or <code>"ignore"</code> to opt out). Unknown nodes fail closed, and a pipeline with no train/test split at all gets an explicit diagnostic stating that the leakage guarantee does not apply to it. The gate is also <em>param-aware</em> for dual-mode nodes: a <code>DropMissingColumns</code> node dropping explicitly named columns, a <code>SimpleImputer</code> with <code>strategy="constant"</code>, a <code>MissingIndicator</code> flagging explicitly named columns, a <code>HashEncoder</code> given an explicit column list, and target-only Label/Ordinal encoding learn nothing from the rows and are allowed before the split — while their data-learning modes (missing-% threshold, statistic strategies, auto-detected missingness/categorical columns, feature encoding) remain gated. <code>SkyulfPipeline.fit()</code> surfaces the same verdict as warnings before training when you fit on an unsplit frame.</p>
 <p><strong>Covered — cross-validation and tuning scores (Skyulf app).</strong> As of
-skyulf-core 0.8.3 the app re-fits preprocessing inside every CV fold and
-every tuning candidate fold (a <code>FoldPreprocessor</code> threaded through
-<code>perform_cross_validation</code>, <code>StatefulEstimator.cross_validate</code> and
-<code>TuningCalculator.fit</code>): each fold's statistics are learned from that fold's
-training rows only, so CV and tuning scores are no longer optimistically
-biased. All five tuning strategies are covered — <code>grid</code>/<code>random</code> via the
-engine's own fold loop, and <code>halving_*</code>/<code>optuna</code> by wrapping preprocessing
-+ model in an sklearn <code>Pipeline</code> so the searcher's internal CV refits per
-fold. Merged-branch graphs in fork-join shape (a shared trunk ending in a
-splitter, parallel transformer branches, one training node) are covered too:
-a <code>MergedBranchFoldAdapter</code> re-runs and re-merges the branches inside every
-fold, reproducing the engine's column-wise merge strategy exactly. The
-measured size of that bias in the leakage-dominated case (a target-aware WOE
-encoder over a pure-noise target, 400 rows / 200 categories): legacy
-full-split scoring reports a CV AUC of <strong>0.867</strong> and a tuning best score of
-<strong>0.867</strong> — pure memorisation of held-out rows — while per-fold refit
-reports <strong>~0.50</strong> across all strategies, exactly chance. On real-signal
-data the honest scores stay close to the old ones (the drop is the bias
-leaving, not the signal). Holdout tuning with an explicit <code>validation_data</code>
-split is covered too: the pre-transform train and validation frames are
-concatenated into one search frame, the chain refits on the train rows only
-through a single <code>PredefinedSplit</code> fold (train rows masked <code>-1</code>, validation
-rows form the one scoring fold), and candidates are scored against the
-untouched validation split — for all five strategies. The shapes that still
-fall back to pre-transformed scoring with an explicit job-log warning:
-merged graphs that are not fork-join (nested merges, row-count-changing
-branches, splitters mid-chain), and any graph with a data-dependent step
-configured before the last splitter (payload reconstruction would re-fit it
-on the full frame). Chains
-that change the row count or the target (resampling, row drops, target
-re-encoding) are leakage-free under <code>halving_*</code>/<code>optuna</code> too: a fold-aware
-estimator runs the chain inside <code>fit</code> on each fold's training rows and maps
-predictions back to the original label space so scorers compare against the
-untouched target. Library users calling CV/tuning directly get
-the same guarantee by passing a preprocessor — e.g. <code>FeatureEngineerFoldAdapter(
-steps_config, target_column)</code> — via the <code>preprocessing</code> parameter; holdout
-tuning additionally needs the pre-transform validation payload via
-<code>validation_frames</code> so candidates can be scored against the untouched
-validation split (without it, holdout falls back to raw-payload scoring with
-an explicit log). Without a preprocessor, CV/tuning scores the
-pre-transformed data and remains an optimistic estimate.</p>
+skyulf-core 0.8.3 preprocessing is re-fit inside every CV fold and every
+tuning fold, so CV and tuning scores are honest estimates:</p>
+<ul>
+<li><strong>All five tuning strategies</strong> (<code>grid</code>, <code>random</code>, <code>halving_grid</code>,
+  <code>halving_random</code>, <code>optuna</code>) re-fit preprocessing per fold.</li>
+<li><strong>Fork-join merged branches</strong> (shared trunk → splitter → parallel branches
+  → one training node) re-run and re-merge per fold. Note: after a Split,
+  overlapping columns resolve by merge order — the last connected branch wins
+  every shared column — so keep branches disjoint or fully numeric (see
+  <a href="../guides/multi_path_pipelines.html#after-a-split-order-decides-everything">Multi-Path Pipelines — After a Split</a>).
+  Training fails fast with an actionable non-numeric-column error otherwise.</li>
+<li><strong>Holdout tuning</strong> with a <code>validation_data</code> split refits on train rows only
+  and scores candidates against the untouched validation frame.</li>
+<li><strong>Row-count/target-changing chains</strong> (resampling, row drops, target
+  re-encoding) are leakage-free under <code>halving_*</code>/<code>optuna</code>.</li>
+<li><strong>Bias size measured</strong>: a target-aware WOE encoder over a pure-noise target
+  scored <strong>0.867</strong> AUC with legacy full-split scoring (pure memorisation) vs
+  <strong>~0.50</strong> (chance) with per-fold refit. On real-signal data the honest
+  scores stay close to the old ones.</li>
+<li><strong>Auditable</strong>: every refit run logs a verification line (also in the
+  <code>fold_refit_audit</code> node metric) — no preprocessing fit saw more rows than
+  the train split, so validation rows provably never entered a fit.</li>
+</ul>
+<p>Not covered (falls back to pre-transformed scoring with an explicit job-log
+warning): non-fork-join merged graphs (nested merges, splitters mid-chain)
+and graphs with a data-dependent step before the last splitter. Library users
+calling CV/tuning directly must pass a preprocessor via the <code>preprocessing</code>
+parameter (e.g. <code>FeatureEngineerFoldAdapter(steps_config, target_column)</code>) —
+plus <code>validation_frames</code> for holdout tuning — or scores stay optimistic.</p>
 
 
 

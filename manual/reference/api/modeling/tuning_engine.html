@@ -3209,18 +3209,7 @@ Wraps the base model applier to provide predictions using the refitted best mode
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>skyulf-core/skyulf/modeling/_tuning/engine.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1526</span>
-<span class="normal">1527</span>
-<span class="normal">1528</span>
-<span class="normal">1529</span>
-<span class="normal">1530</span>
-<span class="normal">1531</span>
-<span class="normal">1532</span>
-<span class="normal">1533</span>
-<span class="normal">1534</span>
-<span class="normal">1535</span>
-<span class="normal">1536</span>
-<span class="normal">1537</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1537</span>
 <span class="normal">1538</span>
 <span class="normal">1539</span>
 <span class="normal">1540</span>
@@ -3244,7 +3233,18 @@ Wraps the base model applier to provide predictions using the refitted best mode
 <span class="normal">1558</span>
 <span class="normal">1559</span>
 <span class="normal">1560</span>
-<span class="normal">1561</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">TuningApplier</span><span class="p">(</span><span class="n">BaseModelApplier</span><span class="p">):</span>
+<span class="normal">1561</span>
+<span class="normal">1562</span>
+<span class="normal">1563</span>
+<span class="normal">1564</span>
+<span class="normal">1565</span>
+<span class="normal">1566</span>
+<span class="normal">1567</span>
+<span class="normal">1568</span>
+<span class="normal">1569</span>
+<span class="normal">1570</span>
+<span class="normal">1571</span>
+<span class="normal">1572</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">TuningApplier</span><span class="p">(</span><span class="n">BaseModelApplier</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Applier for TuningCalculator.</span>
 <span class="sd">    Wraps the base model applier to provide predictions using the refitted best model.</span>
@@ -4757,7 +4757,18 @@ and requires the Optuna integration package.</p>
 <span class="normal">1520</span>
 <span class="normal">1521</span>
 <span class="normal">1522</span>
-<span class="normal">1523</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">TuningCalculator</span><span class="p">(</span><span class="n">BaseModelCalculator</span><span class="p">):</span>
+<span class="normal">1523</span>
+<span class="normal">1524</span>
+<span class="normal">1525</span>
+<span class="normal">1526</span>
+<span class="normal">1527</span>
+<span class="normal">1528</span>
+<span class="normal">1529</span>
+<span class="normal">1530</span>
+<span class="normal">1531</span>
+<span class="normal">1532</span>
+<span class="normal">1533</span>
+<span class="normal">1534</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">TuningCalculator</span><span class="p">(</span><span class="n">BaseModelCalculator</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""Tune a plain ``BaseModelCalculator`` and refit it with the best parameters.</span>
 
 <span class="sd">    ``fit`` accepts a ``TuningConfig`` or dict with ``strategy``, ``metric``,</span>
@@ -5374,6 +5385,7 @@ and requires the Optuna integration package.</p>
         <span class="n">metric</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
         <span class="n">log_callback</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="nb">str</span><span class="p">],</span> <span class="kc">None</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">preprocessing</span><span class="p">:</span> <span class="s2">"FoldPreprocessor | None"</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">fold_errors</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">"""Cross-validates one grid/random-search candidate and returns its mean fold score.</span>
 
@@ -5404,6 +5416,7 @@ and requires the Optuna integration package.</p>
                 <span class="n">metric</span><span class="o">=</span><span class="n">metric</span><span class="p">,</span>
                 <span class="n">log_callback</span><span class="o">=</span><span class="n">log_callback</span><span class="p">,</span>
                 <span class="n">preprocessing</span><span class="o">=</span><span class="n">preprocessing</span><span class="p">,</span>
+                <span class="n">fold_errors</span><span class="o">=</span><span class="n">fold_errors</span><span class="p">,</span>
             <span class="p">)</span>
             <span class="n">fold_scores</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">score</span><span class="p">)</span>
 
@@ -5427,11 +5440,13 @@ and requires the Optuna integration package.</p>
         <span class="n">metric</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
         <span class="n">log_callback</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="nb">str</span><span class="p">],</span> <span class="kc">None</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">preprocessing</span><span class="p">:</span> <span class="s2">"FoldPreprocessor | None"</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">fold_errors</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">"""Fits one candidate on a single CV fold and returns its score, or ``-inf`` on failure.</span>
 
 <span class="sd">        Errors (e.g. incompatible params) are caught and logged rather than raised, so a single</span>
-<span class="sd">        bad fold doesn't abort the whole candidate evaluation.</span>
+<span class="sd">        bad fold doesn't abort the whole candidate evaluation. When ``fold_errors`` is provided,</span>
+<span class="sd">        the first failure message is recorded so the search can surface it if every trial fails.</span>
 <span class="sd">        """</span>
         <span class="c1"># Split</span>
         <span class="n">X_train_fold</span> <span class="o">=</span> <span class="n">X_any</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="n">train_idx</span><span class="p">]</span> <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">X_any</span><span class="p">,</span> <span class="s2">"iloc"</span><span class="p">)</span> <span class="k">else</span> <span class="n">X_any</span><span class="p">[</span><span class="n">train_idx</span><span class="p">]</span>
@@ -5468,6 +5483,8 @@ and requires the Optuna integration package.</p>
                 <span class="p">)</span>
             <span class="k">return</span> <span class="n">score</span>
         <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">fold_errors</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">fold_errors</span><span class="p">:</span>
+                <span class="n">fold_errors</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">))</span>
             <span class="k">if</span> <span class="n">log_callback</span><span class="p">:</span>
                 <span class="n">n_splits</span> <span class="o">=</span> <span class="n">cv</span><span class="o">.</span><span class="n">get_n_splits</span><span class="p">(</span><span class="n">X_arr</span><span class="p">,</span> <span class="n">y_arr</span><span class="p">)</span>
                 <span class="n">log_callback</span><span class="p">(</span>
@@ -5500,6 +5517,7 @@ and requires the Optuna integration package.</p>
         <span class="n">progress_callback</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">,</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span> <span class="nb">dict</span> <span class="o">|</span> <span class="kc">None</span><span class="p">],</span> <span class="kc">None</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">log_callback</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="nb">str</span><span class="p">],</span> <span class="kc">None</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">preprocessing</span><span class="p">:</span> <span class="s2">"FoldPreprocessor | None"</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">fold_errors</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]],</span> <span class="nb">float</span><span class="p">,</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span><span class="p">]:</span>
 <span class="w">        </span><span class="sd">"""Evaluates every candidate via CV, emitting progress/log callbacks, and tracks the best.</span>
 
@@ -5527,6 +5545,7 @@ and requires the Optuna integration package.</p>
                 <span class="n">metric</span><span class="p">,</span>
                 <span class="n">log_callback</span><span class="p">,</span>
                 <span class="n">preprocessing</span><span class="p">,</span>
+                <span class="n">fold_errors</span><span class="p">,</span>
             <span class="p">)</span>
 
             <span class="k">if</span> <span class="n">log_callback</span><span class="p">:</span>
@@ -5570,6 +5589,7 @@ and requires the Optuna integration package.</p>
             <span class="n">log_callback</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Total candidates to evaluate: </span><span class="si">{</span><span class="n">total_candidates</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 
         <span class="c1"># 2. Iterate Candidates</span>
+        <span class="n">fold_errors</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
         <span class="n">trials</span><span class="p">,</span> <span class="n">best_score</span><span class="p">,</span> <span class="n">best_params</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_evaluate_search_candidates</span><span class="p">(</span>
             <span class="n">candidates</span><span class="p">,</span>
             <span class="n">X_for_search</span><span class="p">,</span>
@@ -5580,6 +5600,7 @@ and requires the Optuna integration package.</p>
             <span class="n">progress_callback</span><span class="p">,</span>
             <span class="n">log_callback</span><span class="p">,</span>
             <span class="n">preprocessing</span><span class="p">,</span>
+            <span class="n">fold_errors</span><span class="p">,</span>
         <span class="p">)</span>
 
         <span class="k">if</span> <span class="n">log_callback</span><span class="p">:</span>
@@ -5587,10 +5608,11 @@ and requires the Optuna integration package.</p>
             <span class="n">log_callback</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Best Params: </span><span class="si">{</span><span class="n">best_params</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 
         <span class="k">if</span> <span class="n">best_params</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">detail</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">" First trial error: </span><span class="si">{</span><span class="n">fold_errors</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="si">}</span><span class="s2">"</span> <span class="k">if</span> <span class="n">fold_errors</span> <span class="k">else</span> <span class="s2">""</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
                 <span class="s2">"Hyperparameter tuning failed: All trials failed. "</span>
                 <span class="s2">"This usually means the model failed to train with the provided hyperparameter combinations. "</span>
-                <span class="s2">"Please check your search space and data."</span>
+                <span class="sa">f</span><span class="s2">"Please check your search space and data.</span><span class="si">{</span><span class="n">detail</span><span class="si">}</span><span class="s2">"</span>
             <span class="p">)</span>
 
         <span class="k">return</span> <span class="n">TuningResult</span><span class="p">(</span>
@@ -6537,18 +6559,7 @@ intact.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>skyulf-core/skyulf/modeling/_tuning/engine.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1330</span>
-<span class="normal">1331</span>
-<span class="normal">1332</span>
-<span class="normal">1333</span>
-<span class="normal">1334</span>
-<span class="normal">1335</span>
-<span class="normal">1336</span>
-<span class="normal">1337</span>
-<span class="normal">1338</span>
-<span class="normal">1339</span>
-<span class="normal">1340</span>
-<span class="normal">1341</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1341</span>
 <span class="normal">1342</span>
 <span class="normal">1343</span>
 <span class="normal">1344</span>
@@ -6730,7 +6741,18 @@ intact.</p>
 <span class="normal">1520</span>
 <span class="normal">1521</span>
 <span class="normal">1522</span>
-<span class="normal">1523</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">tune</span><span class="p">(</span>
+<span class="normal">1523</span>
+<span class="normal">1524</span>
+<span class="normal">1525</span>
+<span class="normal">1526</span>
+<span class="normal">1527</span>
+<span class="normal">1528</span>
+<span class="normal">1529</span>
+<span class="normal">1530</span>
+<span class="normal">1531</span>
+<span class="normal">1532</span>
+<span class="normal">1533</span>
+<span class="normal">1534</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">tune</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">X</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
     <span class="n">y</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>

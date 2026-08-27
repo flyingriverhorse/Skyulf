@@ -844,6 +844,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Merge Strategy (Auto-Detected)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#after-a-split-order-decides-everything" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        After a Split: Order Decides Everything
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
         
           <li class="md-nav__item">
@@ -3268,6 +3285,25 @@ Dataset → Encoding   ──┘
   the edge order. The merge strategy is consulted — and the advisory banner shown — only for columns
   that two or more branches both modified.</li>
 </ul>
+<h4 id="after-a-split-order-decides-everything">After a Split: Order Decides Everything</h4>
+<p>!!! warning
+    When branches fork <strong>after a Split node</strong> (fork-join shape), per-column ownership does not
+    apply: the nearest shared ancestor is the splitter, whose stored artifact is a train/test
+    split rather than a frame, so there is no baseline to compare against. Overlapping columns
+    fall back to <strong>pure merge order — the last connected branch wins every shared column</strong>
+    (<code>first_wins</code> mirrors this, keeping the first).</p>
+<pre><code>The practical consequence: an earlier branch's encoding of a column can be silently discarded
+if the last branch still carries that column raw. Training then fails fast with
+*"training frame contains N non-numeric column(s): …"*.
+
+Design post-split merges accordingly:
+
+- Make branches emit **disjoint columns**, or
+- Make **every** branch emit a **fully-numeric frame** (each branch imputes/encodes/scales on
+  its own), so whichever branch wins, the merged result is model-ready.
+- Text pipelines: after a vectorizer, set `drop_original=True` (or drop the raw text column)
+  so the raw text does not survive into the merge.
+</code></pre>
 <h3 id="merge-badge">Merge Badge</h3>
 <p>Nodes with 2+ incoming edges display a blue <strong>⊕ Merge</strong> badge in the header showing the input count. Hover over it for a tooltip: <em>"Merge: combining data from N upstream sources"</em>.</p>
 <h3 id="connection-validation">Connection Validation</h3>
@@ -3291,6 +3327,11 @@ Dataset → Encoding   ──┘
 <td>"No common columns"</td>
 <td>Branches have incompatible schemas</td>
 <td>Ensure branches produce compatible columns</td>
+</tr>
+<tr>
+<td>"training frame contains N non-numeric column(s)"</td>
+<td>After a Split, the winning branch left a column unencoded (ownership is inert post-split; merge order decides)</td>
+<td>Encode the column on the winning branch, drop it, or make branches disjoint / fully numeric</td>
 </tr>
 </tbody>
 </table>
