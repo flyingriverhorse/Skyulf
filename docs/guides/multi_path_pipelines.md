@@ -35,6 +35,27 @@ The training node collects **all** upstream branch outputs via `_resolve_all_inp
   the edge order. The merge strategy is consulted — and the advisory banner shown — only for columns
   that two or more branches both modified.
 
+#### After a Split: Order Decides Everything
+
+!!! warning
+    When branches fork **after a Split node** (fork-join shape), per-column ownership does not
+    apply: the nearest shared ancestor is the splitter, whose stored artifact is a train/test
+    split rather than a frame, so there is no baseline to compare against. Overlapping columns
+    fall back to **pure merge order — the last connected branch wins every shared column**
+    (`first_wins` mirrors this, keeping the first).
+
+    The practical consequence: an earlier branch's encoding of a column can be silently discarded
+    if the last branch still carries that column raw. Training then fails fast with
+    *"training frame contains N non-numeric column(s): …"*.
+
+    Design post-split merges accordingly:
+
+    - Make branches emit **disjoint columns**, or
+    - Make **every** branch emit a **fully-numeric frame** (each branch imputes/encodes/scales on
+      its own), so whichever branch wins, the merged result is model-ready.
+    - Text pipelines: after a vectorizer, set `drop_original=True` (or drop the raw text column)
+      so the raw text does not survive into the merge.
+
 ### Merge Badge
 
 Nodes with 2+ incoming edges display a blue **⊕ Merge** badge in the header showing the input count. Hover over it for a tooltip: *"Merge: combining data from N upstream sources"*.
@@ -49,6 +70,7 @@ Model-to-model connections (e.g., training → training) are **blocked** with an
 |---|---|---|
 | "Empty DataFrame from upstream branch" | A preprocessing branch produced no rows | Check filters/cleaning nodes upstream |
 | "No common columns" | Branches have incompatible schemas | Ensure branches produce compatible columns |
+| "training frame contains N non-numeric column(s)" | After a Split, the winning branch left a column unencoded (ownership is inert post-split; merge order decides) | Encode the column on the winning branch, drop it, or make branches disjoint / fully numeric |
 
 ---
 

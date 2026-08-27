@@ -30,10 +30,12 @@ from backend.realtime.events import JobEvent, publish_job_event
 from backend.realtime.trial_buffer import record_iteration, record_trial
 from skyulf.data.catalog import DataCatalog
 from skyulf.data.dataset import SplitDataset
-from skyulf.engines.registry import EngineRegistry
+from skyulf.engines.registry import EngineName, EngineRegistry
 from skyulf.modeling._tuning.engine import TuningApplier, TuningCalculator
 from skyulf.modeling.base import StatefulEstimator
 from skyulf.modeling.clustering import _select_numeric_features
+from skyulf.modeling.cross_validation import _detect_datetime_columns
+from skyulf.preprocessing import AuditedFoldPreprocessor, frame_rows
 from skyulf.preprocessing.pipeline import FeatureEngineer
 from skyulf.registry import NodeRegistry
 
@@ -304,6 +306,61 @@ class NodeRunnersMixin:
         if isinstance(data, tuple) and len(data) >= 1:
             return self._resolve_train_frame(data[0])
         return data
+
+    def _assert_numeric_training_frame(
+        self,
+        node: NodeConfig,
+        data: Any,
+        target_col: str,
+        tuning_params: dict[str, Any],
+    ) -> None:
+        """Fail fast when a supervised training frame still carries non-numeric columns.
+
+        Without this, leftover object/string columns (e.g. the last branch of a
+        fork-join never encoded a column, discarding an earlier branch's
+        encoding) die inside sklearn with every fold/trial failing, which the
+        tuning engine surfaces only as the cryptic "All trials failed". The
+        eagerly-merged frame inspected here equals what the per-fold refit
+        produces (F-15 eager==refit parity), so one preflight check covers
+        basic training, tuning and CV for every strategy.
+
+        The target column (string labels are legitimate) and the time-series CV
+        time column (dropped inside ``TuningCalculator.fit`` via
+        ``_sort_by_time``) are excluded. Clustering is unaffected — it runs
+        through ``_run_training_direct`` and drops non-numeric columns by design.
+        """
+        frame = self._resolve_train_frame(data)
+        if not hasattr(frame, "columns") or len(frame.columns) == 0:
+            return
+        excluded: set[str] = set()
+        if target_col and target_col in frame.columns:
+            excluded.add(target_col)
+        if tuning_params.get("cv_type") == "time_series_split":
+            time_col = tuning_params.get("cv_time_column")
+            if not time_col:
+                is_polars = EngineRegistry.resolve(frame).name == EngineName.POLARS
+                datetime_cols = _detect_datetime_columns(frame, is_polars)
+                time_col = datetime_cols[0] if datetime_cols else None
+            if time_col and time_col in frame.columns:
+                excluded.add(time_col)
+        _, dropped = _select_numeric_features(frame)
+        offending = [c for c in dropped if c not in excluded]
+        if not offending:
+            return
+        shown = offending[:6]
+        names = ", ".join(str(c) for c in shown)
+        if len(offending) > len(shown):
+            names += f", +{len(offending) - len(shown)} more"
+        raise ValueError(
+            f"Node {node.node_id}: training frame contains {len(offending)} "
+            f"non-numeric column(s): {names}. Supervised models can only fit "
+            "numeric features. After a Split, merged branches resolve "
+            "overlapping columns by merge order — the last connected branch "
+            "wins every shared column — so an earlier branch's encoding of "
+            "these columns may have been discarded. Add an encoder "
+            "(WOE/OneHot/Ordinal) to the winning branch, drop the columns, or "
+            "make each branch emit disjoint columns."
+        )
 
     def _resolve_train_engine(self, data: Any) -> str:
         """Engine the model was actually trained on, detected from the training frame (F-25).
@@ -868,6 +925,10 @@ class NodeRunnersMixin:
             else self._get_input(node, target_col)
         )
 
+        # Fail fast on leftover non-numeric columns before any search loop can
+        # swallow the per-fold sklearn errors as "All trials failed".
+        self._assert_numeric_training_frame(node, data, target_col, tuning_params)
+
         # Create Tuner components
         tuner_calc = TuningCalculator(calculator)
         tuner_applier = TuningApplier(applier)
@@ -892,6 +953,18 @@ class NodeRunnersMixin:
         # Unsupported graphs fall back inside the resolver with an explicit
         # job-log warning instead of failing the run.
         fold_preprocessing = self._resolve_fold_preprocessing(node, target_col)
+
+        # Audit telemetry (findings 2026-08-26 §3/B): record the input row
+        # count of every per-fold fit/transform so the run can be audited
+        # post-hoc. One wrapper covers tuning and post-tuning CV — both
+        # consume the same fold_preprocessing tuple below.
+        refit_audit: AuditedFoldPreprocessor | None = None
+        audit_train_rows: int | None = None
+        if fold_preprocessing is not None:
+            adapter, pre_train, pre_validation = fold_preprocessing
+            refit_audit = AuditedFoldPreprocessor(adapter)
+            audit_train_rows = frame_rows(pre_train[0])
+            fold_preprocessing = (refit_audit, pre_train, pre_validation)
 
         def progress_callback(current, total, score=None, params=None):
             msg = f"Tuning progress: Trial {current}/{total}"
@@ -977,6 +1050,23 @@ class NodeRunnersMixin:
             node,
             fold_preprocessing=fold_preprocessing,
         )
+
+        if refit_audit is not None:
+            audit = refit_audit.summary(train_rows=audit_train_rows)
+            metrics["fold_refit_audit"] = audit
+            if audit["isolation_ok"]:
+                self.log(
+                    f"Refit audit: {audit['fit_calls']} fit / "
+                    f"{audit['transform_calls']} transform fold call(s); largest fit "
+                    f"saw {audit['max_fit_rows']} of {audit['train_rows']} train-split "
+                    "rows — no held-out rows entered a preprocessing fit."
+                )
+            else:
+                self.log(
+                    f"Refit audit WARNING: a preprocessing fit saw "
+                    f"{audit['max_fit_rows']} rows but the train split has only "
+                    f"{audit['train_rows']} — held-out rows may have entered a fit."
+                )
 
         return node.node_id, self._finalize_training_run(
             node,

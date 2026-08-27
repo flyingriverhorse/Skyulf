@@ -137,6 +137,7 @@ const PropertiesContent: React.FC<{
  * Strategy dropdown instead of being buried in each settings panel's footer.
  */
 const MultiInputModeSection: React.FC<{ selectedNode: Node }> = ({ selectedNode }) => {
+  const nodes = useGraphStore((state) => state.nodes);
   const edges = useGraphStore((state) => state.edges);
   const setExecutionMode = useGraphStore((state) => state.setExecutionMode);
 
@@ -144,13 +145,18 @@ const MultiInputModeSection: React.FC<{ selectedNode: Node }> = ({ selectedNode 
 
   // Only modeling nodes opt in to this toggle today.
   const supportsToggle = supportsExecutionModeToggle(definitionType);
-  const incomingSourceCount = new Set(
-    edges.filter((e) => e.target === selectedNode.id).map((e) => e.source)
-  ).size;
+  const incomingSourceIds = edges
+    .filter((e) => e.target === selectedNode.id)
+    .map((e) => e.source)
+    .filter((id, index, arr) => arr.indexOf(id) === index);
+  const incomingSourceCount = incomingSourceIds.length;
 
   if (!supportsToggle || incomingSourceCount < 2) return null;
 
   const current: ExecutionMode = getExecutionMode(selectedNode.data);
+  const lastSource = incomingSourceIds[incomingSourceIds.length - 1]!;
+  const lastLabel =
+    (nodes.find((n) => n.id === lastSource)?.data.label as string | undefined) ?? lastSource;
 
   return (
     <div className="border-t pt-4">
@@ -183,6 +189,13 @@ const MultiInputModeSection: React.FC<{ selectedNode: Node }> = ({ selectedNode 
           Parallel
         </button>
       </div>
+      {current === 'merge' && (
+        <p className="text-xs text-muted-foreground mt-2">
+          If two branches carry the same column, the last connected branch (
+          <span className="font-medium text-foreground">{lastLabel}</span>) wins it by default.
+          After a run detects a conflict, the Merge Strategy dropdown lets you pick the winner.
+        </p>
+      )}
     </div>
   );
 };
@@ -282,6 +295,11 @@ const MergeStrategySection: React.FC<{ selectedNode: Node }> = ({ selectedNode }
         <option value="last_wins">Keep {lastLabel} (last connected, default)</option>
         <option value="first_wins">Keep {firstLabel} (first connected)</option>
       </select>
+      <p className="text-xs text-muted-foreground mt-2">
+        After a Split, ownership doesn’t apply — the winning branch takes every overlapping
+        column. Keep post-split branches disjoint or fully numeric, or training fails on leftover
+        string columns.
+      </p>
     </div>
   );
 };

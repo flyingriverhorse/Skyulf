@@ -215,3 +215,54 @@ class FeatureEngineerFoldAdapter:
     def _validate_payload(self, X: Any) -> None:
         if hasattr(X, "columns") and self._target_column in X.columns:
             raise ValueError(f"target column '{self._target_column}' already present in X")
+
+
+def frame_rows(frame: Any) -> int:
+    """Row count for pandas/polars frames and numpy arrays (-1 if unknowable)."""
+    height = getattr(frame, "height", None)
+    if isinstance(height, int):
+        return height
+    try:
+        return len(frame)
+    except TypeError:
+        return -1
+
+
+class AuditedFoldPreprocessor:
+    """Decorates a :class:`FoldPreprocessor` to record per-fold row counts.
+
+    Every ``fit_transform``/``transform`` call records the number of input
+    rows it received. The isolation invariant a leak-free run must satisfy is
+    ``max(fit_rows) <= train_rows`` — a leaked fit would see the train split
+    plus held-out rows. Exposed via :meth:`summary` so the app can log it and
+    persist it in node metrics for post-hoc audit (findings 2026-08-26 §3/B).
+    """
+
+    def __init__(self, inner: Any):
+        self._inner = inner
+        self.fit_rows: list[int] = []
+        self.transform_rows: list[int] = []
+        self.changes_row_count = getattr(inner, "changes_row_count", False)
+
+    @property
+    def inner(self) -> Any:
+        return self._inner
+
+    def fit_transform(self, X: Any, y: Any) -> tuple[Any, Any]:
+        self.fit_rows.append(frame_rows(X))
+        return self._inner.fit_transform(X, y)
+
+    def transform(self, X: Any, y: Any) -> tuple[Any, Any]:
+        self.transform_rows.append(frame_rows(X))
+        return self._inner.transform(X, y)
+
+    def summary(self, train_rows: int | None = None) -> dict[str, Any]:
+        result: dict[str, Any] = {
+            "fit_calls": len(self.fit_rows),
+            "max_fit_rows": max(self.fit_rows, default=0),
+            "transform_calls": len(self.transform_rows),
+        }
+        if train_rows is not None:
+            result["train_rows"] = train_rows
+            result["isolation_ok"] = result["max_fit_rows"] <= train_rows
+        return result

@@ -15,6 +15,18 @@ export interface LeakageGateVerdict {
   exempted?: Array<{ node_id: string; step_type: string; reason: string }>;
 }
 
+// Per-fold preprocessing audit the training runner stamps into metrics when
+// per-fold refit was active. Absent for legacy jobs and for graphs that fell
+// back to pre-transformed scoring. isolation_ok: no fit saw more rows than
+// the train split, i.e. no held-out row entered a preprocessing fit.
+export interface RefitAuditVerdict {
+  fit_calls: number;
+  max_fit_rows: number;
+  transform_calls: number;
+  train_rows?: number;
+  isolation_ok?: boolean;
+}
+
 export interface JobInfo {
   job_id: string;
   pipeline_id: string;

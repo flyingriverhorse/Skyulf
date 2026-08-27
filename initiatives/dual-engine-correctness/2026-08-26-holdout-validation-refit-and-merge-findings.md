@@ -184,14 +184,17 @@ the `PredefinedSplit` mask trains on `test_fold == -1` (train rows) only, and sc
 Both realities are **enhancements, not fixes**. The leakage-free guarantee already holds and is tested.
 Prioritised:
 
-1. **[Low, do now]** Document the post-split merge-order constraint (Finding 1 / A) — docs + FE helper
+1. **[Done, branch 085]** Document the post-split merge-order constraint (Finding 1 / A) — docs + FE helper
    text, and a one-line note in `2026-08-23-task11-merged-branch-fold-refit-plan.md`.
-2. **[Low–Med, do soon]** Fail-fast guard for non-numeric merged frames before a numeric model
+2. **[Done, branch 085]** Fail-fast guard for non-numeric merged frames before a numeric model
    (Finding 1 / B). Turns "All trials failed" into an actionable error.
-3. **[Optional]** Per-fold refit audit telemetry (Finding 2 / B) — row counts in metrics/log for
-   post-hoc audit. Pair with #2 for an enterprise-trust story.
-4. **[Defer / park]** Ownership across `SplitDataset` baselines (Finding 1 / C). Needs a dedicated
-   design note and eager==refit parity tests; only if demand materialises.
+3. **[Done, branch 085]** Per-fold refit audit telemetry (Finding 2 / B) — `AuditedFoldPreprocessor`
+   (`skyulf-core/skyulf/preprocessing/fold_adapter.py`) records every per-fold fit/transform row
+   count; `_run_training_tuned` logs the isolation verdict ("largest fit saw X of Y train-split
+   rows") and persists `fold_refit_audit` in node metrics. Tests: `test_fold_audit.py` (core),
+   `test_refit_audit_telemetry_*` (integration).
+4. **[Defer / park]** Ownership across `SplitDataset` baselines (Finding 1 / C). Dedicated design
+   note: `2026-08-27-splitdataset-baseline-ownership-design.md`. Only if demand materialises.
 
 **Explicitly not doing:** index normalisation for test convenience (Finding 2 / C).
 

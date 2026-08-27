@@ -137,6 +137,41 @@ In the canvas:
 
 ---
 
+## "training frame contains N non-numeric column(s)" / "All trials failed" after a Split
+
+Training fails with an error like:
+
+> *Node node_training: training frame contains 1 non-numeric column(s): city. Supervised models can only fit numeric features. After a Split, merged branches resolve overlapping columns by merge order — the last connected branch wins every shared column — …*
+
+### What it means
+
+Your branches fork **after a Split node** and merge back into a training node. In that shape,
+per-column ownership cannot apply — the nearest shared ancestor is the splitter, whose stored
+artifact is a train/test split rather than a frame — so overlapping columns resolve by **pure
+merge order**: with `last_wins` (the default) the **last connected branch wins every shared
+column**. If an earlier branch encoded a column but the last branch still carries it as raw
+text/categories, the raw version wins and the model receives a non-numeric column.
+
+Before this guard existed, the same misconfiguration surfaced as the cryptic
+*"Hyperparameter tuning failed: All trials failed"* because every fold failed inside the model fit.
+
+### Fix
+
+Pick one:
+
+1. **Encode on the winning branch** — add the encoder (WOE / OneHot / Ordinal) to the branch
+   whose version of the column wins (the last connected one under `last_wins`).
+2. **Make every branch fully numeric** — each branch imputes/encodes/scales on its own, so the
+   merge result is model-ready no matter which branch wins.
+3. **Make branches disjoint** — post-split branches should output non-overlapping columns.
+4. **Drop the column** if it is not needed.
+
+Text pipelines: after a vectorizer, set `drop_original=True` (or drop the raw text column) so the
+raw text does not survive into the merge. See also
+[Multi-Path Pipelines — After a Split: Order Decides Everything](../guides/multi_path_pipelines.md#after-a-split-order-decides-everything).
+
+---
+
 ## "…reintroduced N columns removed by an upstream Drop Columns step"
 
 A second, different advisory can appear alongside the fan-in banner:

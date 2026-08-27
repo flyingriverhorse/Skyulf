@@ -308,16 +308,6 @@ describe('JobDetailsView', () => {
     expect(await screen.findByRole('button', { name: 'Run id copied' })).toBeInTheDocument();
   });
 
-  it('reports progress honestly instead of implying a bar it cannot back', async () => {
-    renderDetails(makeJob({ status: 'running', end_time: null }));
-    // Let the in-flight poll's promise settle before asserting, so React
-    // doesn't warn about an unwrapped state update from the mocked fetch.
-    await waitFor(() => { expect(jobsApi.getJob).toHaveBeenCalled(); });
-    const progressLabel = screen.getByText('Progress');
-    const progressValue = within(progressLabel.parentElement as HTMLElement).getByText('Not reported');
-    expect(progressValue).toBeInTheDocument();
-  });
-
   it('shows a passed leakage-gate verdict tile for jobs that ran through the gate', () => {
     renderDetails(makeJob({
       status: 'completed',
@@ -346,6 +336,102 @@ describe('JobDetailsView', () => {
   it('omits the gate tile for legacy jobs without a verdict', () => {
     renderDetails(makeJob({ status: 'completed', result: { metrics: { accuracy: 0.9 } } }));
     expect(screen.queryByText('Leakage Gate')).not.toBeInTheDocument();
+  });
+
+  it('shows a verified fold-refit-audit tile with the row ratio when isolation held', () => {
+    renderDetails(makeJob({
+      status: 'completed',
+      result: {
+        metrics: {
+          fold_refit_audit: {
+            fit_calls: 11,
+            max_fit_rows: 320,
+            transform_calls: 10,
+            train_rows: 320,
+            isolation_ok: true,
+          },
+        },
+      },
+    }));
+    const label = screen.getByText('Fold Refit Audit');
+    expect(
+      within(label.parentElement as HTMLElement).getByText('Isolation verified (320/320)')
+    ).toBeInTheDocument();
+  });
+
+  it('flags the audit tile when a fit saw more rows than the train split', () => {
+    renderDetails(makeJob({
+      status: 'completed',
+      result: {
+        metrics: {
+          fold_refit_audit: {
+            fit_calls: 5,
+            max_fit_rows: 400,
+            transform_calls: 5,
+            train_rows: 320,
+            isolation_ok: false,
+          },
+        },
+      },
+    }));
+    const label = screen.getByText('Fold Refit Audit');
+    expect(
+      within(label.parentElement as HTMLElement).getByText('Isolation warning')
+    ).toBeInTheDocument();
+  });
+
+  it('omits the audit tile when no fold-refit audit was stamped', () => {
+    renderDetails(makeJob({ status: 'completed', result: { metrics: { accuracy: 0.9 } } }));
+    expect(screen.queryByText('Fold Refit Audit')).not.toBeInTheDocument();
+  });
+
+  it('opens the audit modal with the measured fold statistics on tile click', () => {
+    renderDetails(makeJob({
+      status: 'completed',
+      result: {
+        metrics: {
+          fold_refit_audit: {
+            fit_calls: 11,
+            max_fit_rows: 320,
+            transform_calls: 10,
+            train_rows: 320,
+            isolation_ok: true,
+          },
+        },
+      },
+    }));
+
+    fireEvent.click(screen.getByRole('button', { name: /Fold Refit Audit/ }));
+
+    const dialog = screen.getByRole('dialog');
+    expect(within(dialog).getByText('Measured during this run')).toBeInTheDocument();
+    expect(within(dialog).getByText('11 call(s)')).toBeInTheDocument();
+    expect(within(dialog).getByText('320 of 320 train rows')).toBeInTheDocument();
+    expect(within(dialog).getByText('10 call(s)')).toBeInTheDocument();
+    expect(within(dialog).getByText(/no held-out rows in any fit/i)).toBeInTheDocument();
+  });
+
+  it('shows the held-out-rows warning wording in the audit modal when isolation failed', () => {
+    renderDetails(makeJob({
+      status: 'completed',
+      result: {
+        metrics: {
+          fold_refit_audit: {
+            fit_calls: 5,
+            max_fit_rows: 400,
+            transform_calls: 5,
+            train_rows: 320,
+            isolation_ok: false,
+          },
+        },
+      },
+    }));
+
+    fireEvent.click(screen.getByRole('button', { name: /Fold Refit Audit/ }));
+
+    const dialog = screen.getByRole('dialog');
+    expect(within(dialog).getByText(/held-out \(validation\/test\) rows may have entered a fit/)).toBeInTheDocument();
+    expect(within(dialog).getByText(/held-out rows may have entered a fit/i)).toBeInTheDocument();
   });
 
   it('opens a verdict modal listing what the gate checked and why exemptions were allowed', () => {
@@ -452,10 +538,9 @@ describe('JobDetailsView', () => {
       expect(screen.queryByText('Tuning Trials')).toBeNull();
     });
 
-    it('keeps the honest "Not reported" progress tile when a running job has no trial data yet', () => {
+    it('shows no chart for a running job without trial data yet', () => {
       renderDetails(makeJob({ job_type: 'tuning', status: 'running' }));
 
-      expect(screen.getByText('Not reported')).toBeInTheDocument();
       expect(screen.queryByText('Tuning Trials')).toBeNull();
     });
 

@@ -1484,3 +1484,133 @@ def test_fork_join_rejects_empty_fork_node():
     resolved, reason = mixin._try_fork_join_refit(_training(["woe_a", "woe_b"]), "target")
     assert resolved is None
     assert "no splitter fork point" in reason
+
+
+# ---------------------------------------------------------------------------
+# Non-numeric fail-fast guard (findings 2026-08-26 §2 Finding 1 / B)
+# ---------------------------------------------------------------------------
+
+
+def _two_string_csv(tmp_path) -> str:
+    """Noise target with two string columns and one numeric feature.
+
+    Branch A encodes both strings; branch B encodes only ``region``, so under
+    pure ``last_wins`` the merged frame still carries the raw ``city`` column.
+    """
+    rng = np.random.default_rng(7)
+    n = 400
+    df = pd.DataFrame(
+        {
+            "city": [f"c{v}" for v in rng.integers(0, 40, size=n)],
+            "region": [f"r{v}" for v in rng.integers(0, 10, size=n)],
+            "f1": rng.normal(size=n),
+            "target": rng.integers(0, 2, size=n),
+        }
+    )
+    path = tmp_path / "two_string.csv"
+    df.to_csv(path, index=False)
+    return str(path)
+
+
+def _woe_columns_node(node_id: str, columns: list[str], regularization: float) -> NodeConfig:
+    return NodeConfig(
+        node_id=node_id,
+        step_type="WOEEncoder",
+        inputs=["node_split"],
+        params={"columns": columns, "regularization": regularization},
+    )
+
+
+def test_fork_join_unencoded_last_branch_fails_fast(tmp_path):
+    """Basic training (fixed mode) must fail fast when the last branch of a
+    fork-join leaves a string column unencoded: post-split merges resolve by
+    pure merge order, so the winning branch's raw column reaches the model.
+    The error names the column instead of surfacing "All trials failed"."""
+    csv = _two_string_csv(tmp_path)
+    nodes = [
+        _loader("node_data", csv),
+        _splitter("node_split", ["node_data"]),
+        _woe_columns_node("woe_a", ["city", "region"], 0.5),
+        _woe_columns_node("woe_b", ["region"], 1.0),
+        _training(["woe_a", "woe_b"]),
+    ]
+    result, _logs = _run(tmp_path, nodes, job_id="guard-unencoded-last-branch")
+
+    assert result.status == "failed"
+    error = result.node_results["node_training"].error
+    assert "non-numeric column(s)" in error
+    assert "city" in error
+    assert "All trials failed" not in error
+
+
+def test_fork_join_unencoded_last_branch_fails_fast_in_tuned_mode(tmp_path):
+    """Same fork-join shape under run_mode='tuned': the guard fires before any
+    search strategy starts, so no fold loop can swallow the failure."""
+    csv = _two_string_csv(tmp_path)
+    nodes = [
+        _loader("node_data", csv),
+        _splitter("node_split", ["node_data"]),
+        _woe_columns_node("woe_a", ["city", "region"], 0.5),
+        _woe_columns_node("woe_b", ["region"], 1.0),
+        _training(
+            ["woe_a", "woe_b"],
+            run_mode="tuned",
+            tuning_config={
+                "strategy": "grid",
+                "metric": "roc_auc",
+                "cv_folds": 2,
+                "cv_enabled": True,
+                "search_space": {"C": [0.1, 1.0]},
+            },
+        ),
+    ]
+    result, _logs = _run(tmp_path, nodes, job_id="guard-unencoded-last-branch-tuned")
+
+    assert result.status == "failed"
+    error = result.node_results["node_training"].error
+    assert "non-numeric column(s)" in error
+    assert "city" in error
+    assert "All trials failed" not in error
+
+
+# ---------------------------------------------------------------------------
+# Per-fold refit audit telemetry (findings 2026-08-26 §3/B)
+# ---------------------------------------------------------------------------
+
+
+def test_refit_audit_telemetry_records_fold_isolation(noise_target_csv, tmp_path):
+    """Linear FE-node path: the audit wrapper records every per-fold call and
+    the isolation invariant (largest fit <= train-split rows) holds."""
+    result, logs = _run(
+        tmp_path,
+        [
+            _loader("node_data", noise_target_csv),
+            NodeConfig(
+                node_id="node_features",
+                step_type=StepType.FEATURE_ENGINEERING,
+                inputs=["node_data"],
+                params={"steps": [SPLITTER_STEP, WOE_STEP]},
+            ),
+            _training(["node_features"]),
+        ],
+        job_id="audit-linear",
+    )
+
+    assert result.status == "success"
+    assert any(m.startswith("Refit audit:") for m in logs), logs
+    audit = result.node_results["node_training"].metrics["fold_refit_audit"]
+    assert audit["isolation_ok"] is True
+    assert audit["fit_calls"] > 0
+    assert 0 < audit["max_fit_rows"] <= audit["train_rows"]
+
+
+def test_refit_audit_telemetry_covers_merged_branch_adapters(noise_target_csv, tmp_path):
+    """Fork-join path: the MergedBranchFoldAdapter is audited identically."""
+    result, logs = _run(tmp_path, _fork_join_nodes(noise_target_csv), job_id="audit-fork-join")
+
+    assert result.status == "success"
+    assert any(m.startswith("Refit audit:") for m in logs), logs
+    audit = result.node_results["node_training"].metrics["fold_refit_audit"]
+    assert audit["isolation_ok"] is True
+    assert audit["fit_calls"] > 0
+    assert audit["max_fit_rows"] <= audit["train_rows"]
