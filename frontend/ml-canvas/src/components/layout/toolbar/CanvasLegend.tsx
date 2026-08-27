@@ -205,12 +205,20 @@ export const CanvasLegend: React.FC<CanvasLegendProps> = ({ onClose }) => (
         <div>
           <div className="font-medium">Winning merge edge</div>
           <div className="text-xs text-muted-foreground">
-            After a preview run, if two branches each modified the same column, the branch
-            whose values survived is rendered thicker in amber with a &quot;WINS MERGE&quot;
-            label. Branches editing different columns never contest one, so no label appears.
+            After a run, if two branches each modified the same column, the branch whose values
+            survived is rendered thicker in amber with a &quot;WINS MERGE&quot; label. The
+            winner follows the merge node&apos;s merge strategy (default: last connected branch
+            wins). Branches editing different columns never contest one, so no label appears.
+            Note: after a Split node, ownership isn&apos;t tracked &mdash; the last connected
+            branch wins every overlapping column regardless of strategy.
           </div>
         </div>
       </li>
     </ul>
+
+    <p className="text-xs text-muted-foreground mt-3 pt-3 border-t">
+      New to branches and merges? Open the pipeline guide &mdash; the round book button in the
+      top bar.
+    </p>
   </div>
 );

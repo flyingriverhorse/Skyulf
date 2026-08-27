@@ -1,9 +1,10 @@
-import React from 'react';
-import { BarChart2, GitBranch, Eye, Pencil, Rocket } from 'lucide-react';
+import React, { useState } from 'react';
+import { BarChart2, BookOpen, GitBranch, Eye, Pencil, Rocket } from 'lucide-react';
 import { useViewStore } from '../../core/store/useViewStore';
 import { useReadOnlyMode } from '../../core/hooks/useReadOnlyMode';
 import { useViewport } from '../../core/hooks/useViewport';
 import { Breadcrumb } from './Breadcrumb';
+import { HelpGuideModal } from './HelpGuideModal';
 import { NotificationCenter } from './NotificationCenter';
 
 export const Navbar: React.FC = () => {
@@ -11,6 +12,7 @@ export const Navbar: React.FC = () => {
   const setReadOnlyOverride = useViewStore((s) => s.setReadOnlyOverride);
   const readOnly = useReadOnlyMode();
   const { isTablet } = useViewport();
+  const [showHelp, setShowHelp] = useState(false);
 
   // Show the read-only chip only on canvas view. Tablet users get an
   // info chip explaining why edit tools are hidden; desktop users only
@@ -81,29 +83,41 @@ export const Navbar: React.FC = () => {
         </button>
       </div>
 
-      {showReadOnlyChip && (
-        <button
-          onClick={toggleReadOnly}
-          title={
-            readOnly
-              ? 'Read-only canvas (tablet view). Click to enable editing.'
-              : 'Editing enabled. Click to switch to read-only.'
-          }
-          className={`absolute right-14 top-1/2 -translate-y-1/2 flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-colors border ${
-            readOnly
-              ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30 hover:bg-amber-500/20'
-              : 'bg-secondary/50 text-muted-foreground border-transparent hover:bg-secondary'
-          }`}
-          aria-pressed={readOnly}
-        >
-          {readOnly ? <Eye className="w-3.5 h-3.5" /> : <Pencil className="w-3.5 h-3.5" />}
-          <span className="hidden sm:inline">{readOnly ? 'Read-only' : 'Editing'}</span>
-        </button>
-      )}
+      <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2">
+        {showReadOnlyChip && (
+          <button
+            onClick={toggleReadOnly}
+            title={
+              readOnly
+                ? 'Read-only canvas (tablet view). Click to enable editing.'
+                : 'Editing enabled. Click to switch to read-only.'
+            }
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-colors border ${
+              readOnly
+                ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30 hover:bg-amber-500/20'
+                : 'bg-secondary/50 text-muted-foreground border-transparent hover:bg-secondary'
+            }`}
+            aria-pressed={readOnly}
+          >
+            {readOnly ? <Eye className="w-3.5 h-3.5" /> : <Pencil className="w-3.5 h-3.5" />}
+            <span className="hidden sm:inline">{readOnly ? 'Read-only' : 'Editing'}</span>
+          </button>
+        )}
 
-      <div className="absolute right-3 top-1/2 -translate-y-1/2">
+        <button
+          onClick={() => setShowHelp(true)}
+          title="How pipelines work — branches, merges, and scoring"
+          aria-label="Pipeline guide"
+          data-testid="navbar-help"
+          className="flex items-center justify-center w-8 h-8 rounded-full bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/30 hover:bg-indigo-500/20 transition-colors focus-ring"
+        >
+          <BookOpen className="w-4 h-4" />
+        </button>
+
         <NotificationCenter />
       </div>
+
+      <HelpGuideModal isOpen={showHelp} onClose={() => setShowHelp(false)} />
     </div>
   );
 };
