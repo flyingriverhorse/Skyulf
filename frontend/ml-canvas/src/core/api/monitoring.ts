@@ -49,7 +49,7 @@ export interface DriftHistoryEntry {
     current_rows?: number;
     drifted_columns_count?: number;
     total_columns?: number;
-    summary?: Record<string, { drifted: boolean; psi?: number; wasserstein?: number; ks_p_value?: number }>;
+    summary?: Record<string, { drifted: boolean; psi?: number; wasserstein?: number; ks_statistic?: number; ks_p_value?: number }>;
     created_at?: string;
     severity: DriftAlertSeverity;
     status: DriftAlertStatus;

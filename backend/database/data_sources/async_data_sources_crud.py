@@ -48,7 +48,7 @@ async def _lookup_existing_on_duplicate(
         if isinstance(existing, dict):
             logger.info(f"Data source already exists in {primary_name}: {row.get('id')}")
             return existing, True
-    except Exception:
+    except Exception:  # noqa: BLE001 - duplicate check is best-effort
         # Ignore if check fails, try insert
         logger.debug(f"Failed to check for existing data source in {primary_name}", exc_info=True)
 
@@ -91,7 +91,7 @@ async def _sync_secondary(
         logger.info(
             f"Successfully synced data source to {secondary_name} (secondary): {row.get('id', 'unknown')}"
         )
-    except Exception:
+    except Exception:  # noqa: BLE001 - secondary DB sync is non-critical
         logger.warning(
             f"Failed to sync data source to {secondary_name} (non-critical): {row.get('id', 'unknown')}"
         )
@@ -208,7 +208,7 @@ async def _sync_secondary_update(
     try:
         await secondary_mod.update_data_source(settings, filter_dict, update_data)
         logger.info(f"Successfully synced update to {secondary_name} (secondary): {filter_dict}")
-    except Exception:
+    except Exception:  # noqa: BLE001 - secondary DB sync is non-critical
         logger.warning(f"Failed to sync update to {secondary_name} (non-critical): {filter_dict}")
 
 
@@ -249,7 +249,7 @@ async def _sync_secondary_delete(
     try:
         await secondary_mod.delete_data_source(settings, filter_dict)
         logger.info(f"Successfully synced delete to {secondary_name} (secondary): {filter_dict}")
-    except Exception:
+    except Exception:  # noqa: BLE001 - secondary DB sync is non-critical
         logger.warning(f"Failed to sync delete to {secondary_name} (non-critical): {filter_dict}")
 
 
@@ -274,7 +274,7 @@ async def _lookup_by_hash(
     """Try a file-hash lookup against `mod`; return None (and log a warning) on failure."""
     try:
         return await mod.select_data_source_by_file_hash(settings, file_hash)
-    except Exception:
+    except Exception:  # noqa: BLE001 - lookup failure falls back to None
         logger.warning(f"{mod_label} file-hash lookup failed", exc_info=True)
         return None
 
@@ -348,7 +348,7 @@ async def get_database_status(settings: Settings) -> dict[str, Any]:
         pg_rows = await pg_q.select_data_sources(settings, None)
         status["postgres"]["connected"] = True
         status["postgres"]["count"] = len(pg_rows) if pg_rows else 0
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - status probe records error
         status["postgres"]["error"] = str(e)
 
     return status

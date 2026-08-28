@@ -67,7 +67,13 @@ export function useDriftReport(thresholds: DriftThresholds) {
                 // threshold as numeric PSI.
                 if ((m.metric === 'psi' || m.metric === 'psi_categorical') && t.psi != null)
                     hasDrift = m.value > t.psi;
-                if (m.metric === 'ks_test_p_value' && t.ks != null) hasDrift = m.value < t.ks;
+                if (m.metric === 'ks_statistic' && t.ks != null) hasDrift = m.value > t.ks;
+                // The p-value rides along for diagnostics but never decides
+                // drift — it shrinks with sample size (see F-12).
+                if (m.metric === 'ks_test_p_value') {
+                    const stat = col.metrics.find(x => x.metric === 'ks_statistic');
+                    if (stat != null) hasDrift = stat.value > (t.ks ?? stat.threshold);
+                }
                 if (m.metric === 'wasserstein_distance' && t.wasserstein != null)
                     hasDrift = m.value > t.wasserstein;
                 if (m.metric === 'kl_divergence' && t.kl != null) hasDrift = m.value > t.kl;

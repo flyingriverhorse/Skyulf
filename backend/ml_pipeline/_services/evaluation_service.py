@@ -128,7 +128,7 @@ class EvaluationService:
                         if not isinstance(split_data, dict):
                             continue
                         EvaluationService._decode_split_labels(split_data, label_encoder)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - best-effort decode; failure silently skipped
             logger.debug(f"Evaluation decode skipped/failed: {e}")
 
     @staticmethod
@@ -192,7 +192,7 @@ class EvaluationService:
                         for cluster_id, counts in crosstab.items()
                         if isinstance(counts, dict)
                     }
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - best-effort decode; failure silently skipped
             logger.debug(f"Reference column decode skipped/failed: {e}")
 
     @staticmethod

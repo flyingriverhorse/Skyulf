@@ -148,8 +148,9 @@ extend-exclude = [
 # UP (pyupgrade), B (bugbear), C4 (comprehensions), SIM (simplify), PERF
 # (perflint) added on top of the original flake8-parity set (E9/F63/F7/F82)
 # plus import sorting (I), now that the codebase targets py312 only.
-# BLE (blind-except) enabled for skyulf-core first (audit finding F-23);
-# backend/ and root tests/ are deferred via per-file-ignores below.
+# BLE (blind-except) enabled repo-wide (audit finding F-23): skyulf-core
+# triaged first, then backend/ and root tests/ — every remaining broad
+# catch carries a justified per-site `# noqa: BLE001 - <reason>` waiver.
 select = ["E9", "F63", "F7", "F82", "I", "UP", "B", "C4", "SIM", "PERF", "BLE"]
 # E203: owned by the formatter. UP042/046/047: StrEnum/PEP 695 need
 # case-by-case review, not blanket enforcement. B008: FastAPI's Depends()
@@ -157,10 +158,6 @@ select = ["E9", "F63", "F7", "F82", "I", "UP", "B", "C4", "SIM", "PERF", "BLE"]
 ignore = ["E203", "UP042", "UP046", "UP047", "B008"]
 
 [tool.ruff.lint.per-file-ignores]
-# BLE001: staged rollout for finding F-23 — skyulf-core is triaged first.
-# backend/ and the root tests/ get their own triage pass later.
-"backend/**" = ["BLE001"]
-"tests/**" = ["BLE001"]
 # E402: these modules append sys.path/set env vars before importing, or wrap
 # optional imports in try/except.
 "backend/ml_pipeline/deployment/api.py" = ["E402"]

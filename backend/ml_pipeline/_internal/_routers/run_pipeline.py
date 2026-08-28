@@ -281,7 +281,7 @@ async def _dispatch_branch_tasks(
         for jid, _ in task_payloads:
             try:
                 await JobManager.attach_celery_task_id(db, jid, task.id)
-            except Exception:
+            except Exception:  # noqa: BLE001 - task-id bookkeeping must not block dispatch
                 logger.warning("Failed to attach celery task id for job %s", jid)
     elif len(task_payloads) == 1:
         background_tasks.add_task(run_pipeline_task, *task_payloads[0])
@@ -357,7 +357,7 @@ async def resubmit_job_from_graph(
         task = run_pipeline_batch_task.delay([(new_job_id, payload)])
         try:
             await JobManager.attach_celery_task_id(db, new_job_id, task.id)
-        except Exception:
+        except Exception:  # noqa: BLE001 - task-id bookkeeping must not block resubmit
             logger.warning("Failed to attach celery task id for retried job %s", new_job_id)
     else:
         background_tasks.add_task(run_pipeline_task, new_job_id, payload)

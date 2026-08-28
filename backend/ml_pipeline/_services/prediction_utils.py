@@ -157,7 +157,7 @@ def decode_int_like(values: list[Any], label_encoder: Any) -> list[Any]:
 
         decoded = label_encoder.inverse_transform(int_arr)
         return decoded.tolist() if hasattr(decoded, "tolist") else list(decoded)
-    except Exception:
+    except Exception:  # noqa: BLE001 - decode failure returns original values safely
         logging.getLogger(__name__).debug(
             "Label decoding failed, returning raw values", exc_info=True
         )

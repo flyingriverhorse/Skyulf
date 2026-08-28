@@ -214,3 +214,67 @@ Easy items batched; hard items one at a time.
   `EnsembleNode.ts` mirror the `random_state: 42` UI default, and
   `pipelineConverter.ts:224` seeds IterativeImputer with `?? 0` — inconsistent
   with core's 42 convention.
+
+### 2026-08-28 — F-21 follow-up: seeds surfaced in the canvas (branch 086)
+
+- Root cause of "only Split and Segmentation show a seed": only the clustering
+  hyperparameter defs declared `random_state`; training/ensemble nodes had the
+  config plumbing but no UI inputs.
+- Core: `HyperparameterField.tunable` flag + shared `random_state_field()`
+  factory (default `DEFAULT_RANDOM_STATE`, never a search-space candidate);
+  seed fields added to every seeded model's defs (tree ensembles/boosting,
+  stochastic linear solvers, SGD, calibration; clustering reuses the factory).
+  Deterministic models (linear regression, KNN, NB, SVC, voting/stacking)
+  correctly expose none.
+- Frontend: **Random State** (Tuning Strategy) + **Fold Split Seed** (CV
+  section, shown when shuffle is on) in `TrainingSettings`
+  (Classification/Regression/Text Classification) and `EnsembleSettings`;
+  basic mode shows the seed under Hyperparameters → Customize; `tunable:
+  false` keeps seeds out of the advanced search space.
+- Backend: `_node_runners.py` literal-42 fallbacks → `DEFAULT_RANDOM_STATE`.
+- Docs: per-node seed table in `configuration.md` (with the honest exceptions:
+  iterative imputer defaults to `0`, internal fixed seeds), "Seeding" section
+  in `modeling_nodes.md`, seeds note in `hyperparameter_tuning.md`.
+- Visual pass: new `e2e/seed-controls.spec.ts` (3 tests) drives the real UI and
+  screenshots confirm the controls; the seed is provably absent from the
+  search space. Two real bugs found and fixed en route: `useSchemaPreview`
+  stored `undefined` maps when the response body was degraded, crashing every
+  node card (hardened with `?? {}` / `?? []`, which also un-broke the
+  pre-existing e2e suite), and an extraneous `playwright@1.62.1` shadowed
+  `@playwright/test`'s 1.59.1, failing every e2e run (removed).
+- Gates: core 3511 passed / 56 skipped; e2e 19/19; vitest 848; tsc, eslint,
+  ruff, ty clean. Committed as `14995bcd`.
+- Still open from the earlier note: `pipelineConverter.ts:224` IterativeImputer
+  `?? 0` (tracked follow-up below).
+
+### 2026-08-28 — Follow-ups batch (branch 086)
+
+Three tracked follow-ups closed in one batch:
+
+- **F-12 frontend follow-up (KS relabel):** the drift pages still labelled the
+  KS threshold/value as "KS p-value" after the backend moved its decision to
+  the statistic. Fixed across `ThresholdsPanel` (label "KS statistic", range
+  widened 0.01–0.5, default 0.1), `DriftTable` (column sorts on
+  `ks_statistic`, new tooltip; expanded row shows statistic vs threshold plus
+  the p-value marked diagnostic-only), `DriftAlertModal` (evidence table gains
+  a KS-statistic column), `csvExport` (both columns exported),
+  `useDriftReport` client re-evaluation (statistic > threshold; the p-value
+  metric mirrors the statistic's verdict), page + panel default thresholds
+  0.05 → 0.1 (matching the backend default), and the alert-summary type.
+- **`pipelineConverter.ts:224` IterativeImputer seed:** the converter no
+  longer force-injects `?? 0` for legacy graphs missing the field — the key
+  is omitted so core's `IterativeImputerCalculator` default stays the single
+  owner (F-21 principle). New regression test pins the omission; the existing
+  test still pins user-set seeds being forwarded.
+- **F-23 staged rollout completed:** the `"backend/**"` / `"tests/**"`
+  BLE001 per-file-ignores are removed; BLE now applies repo-wide. All 121
+  remaining sites (34 ml_pipeline, 23 data/data_ingestion, 46 misc backend,
+  18 root tests) triaged: every catch is deliberate (log+fallback, probes,
+  per-item isolation, best-effort telemetry/cleanup, job/task boundaries,
+  teardown guards) and carries a justified `# noqa: BLE001 - <reason>`;
+  none warranted narrowing. Borderline sites flagged for a future glance:
+  `database/engine.py:256` (migration loop swallows all DDL errors),
+  `artifacts/s3.py:192` (any S3 error degrades to empty listing),
+  `run_pipeline.py:284/360` (failed task-id attach only warns).
+- Gates: ruff check + format clean repo-wide, ty clean, vitest 849/849,
+  DataDriftPage suite 9/9, tsc + eslint clean on all touched frontend files.

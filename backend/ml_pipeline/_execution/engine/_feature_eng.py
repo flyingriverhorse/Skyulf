@@ -119,7 +119,7 @@ class FeatureEngMixin:
         for key in artifact_keys:
             try:
                 fe = self.artifact_store.load(key)
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 - unreadable artifact skipped; merge continues
                 logger.debug(f"Failed to load pipeline artifact {key}: {e}")
                 continue
 
@@ -184,7 +184,7 @@ class FeatureEngMixin:
                 obj = self.artifact_store.load(feature_engineer_artifact_key)
                 if hasattr(obj, "transform"):
                     feature_engineer = obj
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 - load failure keeps existing fallback
                 logger.warning(
                     f"Failed to load feature engineer artifact {feature_engineer_artifact_key}: {e}"
                 )
@@ -228,7 +228,7 @@ class FeatureEngMixin:
                             "transformer_type": t_info["transformer_type"],
                         }
                     )
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 - one bad artifact must not break bundle
                 logger.warning(f"Failed to load transformer artifact {t_info['artifact_key']}: {e}")
 
         return {

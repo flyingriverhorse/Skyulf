@@ -75,7 +75,7 @@ def _emit_trial_event(
     )
     try:
         publish_job_event(event)
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - event publish must not impact training
         logger.warning("trial event publish failed for %s: %s", job_id, exc)
 
 
@@ -111,7 +111,7 @@ def _emit_iteration_event(
     )
     try:
         publish_job_event(event)
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - event publish must not impact training
         logger.warning("iteration event publish failed for %s: %s", job_id, exc)
 
 
@@ -519,7 +519,7 @@ class NodeRunnersMixin:
         """Best-effort recording of data shape metrics; failures are logged, not raised."""
         try:
             self._record_data_shape_metrics(metrics, data, target_col)
-        except Exception:
+        except Exception:  # noqa: BLE001 - best-effort metrics; logged, not raised
             logger.debug("Failed to record data shape metrics for node %s", node_id, exc_info=True)
 
     def _finalize_training_run(

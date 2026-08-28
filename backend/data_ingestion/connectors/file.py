@@ -96,7 +96,7 @@ class LocalFileConnector(BaseConnector):
                 return pl.scan_csv(self.file_path, **self.kwargs)
             if ext == ".parquet":
                 return pl.scan_parquet(self.file_path, **self.kwargs)
-        except Exception:
+        except Exception:  # noqa: BLE001 - lazy scan probe, eager fallback follows
             return None
         return None
 
@@ -145,7 +145,7 @@ class LocalFileConnector(BaseConnector):
         try:
             schema = lf.collect_schema()
             return {col: str(dtype) for col, dtype in schema.items()}
-        except Exception:
+        except Exception:  # noqa: BLE001 - lazy schema probe, eager fallback follows
             return None
 
     async def fetch_data(self, query: str | None = None, limit: int | None = None) -> pl.DataFrame:
@@ -179,7 +179,7 @@ class LocalFileConnector(BaseConnector):
             return None
         try:
             return cast(pl.DataFrame, lf.head(limit).collect())
-        except Exception:
+        except Exception:  # noqa: BLE001 - lazy head probe, eager fallback follows
             return None
 
     async def validate(self) -> bool:

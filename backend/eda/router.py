@@ -327,7 +327,7 @@ async def _load_decomposition_dataframe(
         if isinstance(df, pd.DataFrame):
             try:
                 df = pl.from_pandas(df)
-            except Exception:
+            except Exception:  # noqa: BLE001 - conversion retries with stringified columns
                 # Fallback: convert object cols to string to handle mixed types
                 pdf = cast(Any, df)
                 for col in pdf.columns:

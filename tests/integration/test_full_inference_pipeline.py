@@ -166,7 +166,7 @@ def test_full_inference_pipeline():
     print("Running Training Pipeline...")
     try:
         result = engine.run(config)
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - log engine failure and return
         print(f"Engine run failed with exception: {e}")
         import traceback
 
@@ -185,7 +185,7 @@ def test_full_inference_pipeline():
     # 5. Load Artifact
     try:
         model_artifact = store.load("model")
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - skip artifact load on any failure
         print(f"Could not load model artifact: {e}")
         return
 
@@ -277,7 +277,7 @@ def test_full_inference_pipeline():
             try:
                 res = applier.apply(current_df, params)
                 current_df = res[0] if isinstance(res, tuple) else res
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 - log transform failure and continue
                 print(f"Error applying {t_type}: {e}")
                 import traceback
 

@@ -76,7 +76,7 @@ def _resolve_registry_db_path(settings: Settings) -> Path:
     if d and not d.exists():
         try:
             d.mkdir(parents=True, exist_ok=True)
-        except Exception:
+        except Exception:  # noqa: BLE001 - directory creation is best-effort
             logger.warning(f"Could not create directory {d}")
 
     return dbpath

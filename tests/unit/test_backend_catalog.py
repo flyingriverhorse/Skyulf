@@ -74,7 +74,7 @@ if __name__ == "__main__":
         print("Success Parquet!")
 
         shutil.rmtree(tmp_dir)
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - report failure with traceback
         print(f"FAILED: {e}")
         import traceback
 

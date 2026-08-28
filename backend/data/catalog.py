@@ -150,7 +150,7 @@ class FileSystemCatalog(DataCatalog):
                 return df.head(limit) if limit else df
             df = pd.read_parquet(path)
             return df.head(limit) if limit else df
-        except Exception:
+        except Exception:  # noqa: BLE001 - unreadable format probe, clean ValueError follows
             raise ValueError(f"Unsupported format or file not found: {dataset_id}") from None
 
     def save(self, dataset_id: str, data: Any, **kwargs) -> None:
@@ -311,7 +311,7 @@ class S3Catalog(DataCatalog):
                         return df.head(limit) if limit else df
                     df = pd.read_parquet(cache_path)
                     return df.head(limit) if limit else df
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - best-effort cache validation, logged
             logger.warning(f"Cache validation failed for {path}: {e}")
         return None
 
@@ -351,7 +351,7 @@ class S3Catalog(DataCatalog):
                 df.to_csv(cache_path, index=False)
             else:
                 df.to_parquet(cache_path, index=False)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - best-effort cache write, logged
             logger.warning(f"Failed to write to cache {cache_path}: {e}")
 
     def load(self, dataset_id: str, **kwargs) -> Any:
@@ -408,7 +408,7 @@ class S3Catalog(DataCatalog):
                 data.to_csv(cache_path, index=False)
             else:
                 data.to_parquet(cache_path, index=False)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - best-effort cache update, logged
             logger.warning(f"Failed to update cache after save for {path}: {e}")
 
     def exists(self, dataset_id: str) -> bool:
@@ -471,7 +471,7 @@ class SmartCatalog(DataCatalog):
                         logger.warning(f"SmartCatalog: DataSource {dataset_id} has no path")
                 else:
                     logger.warning(f"SmartCatalog: DataSource {dataset_id} not found")
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 - DB resolution best-effort, fallback follows
                 logger.error(f"SmartCatalog: Error resolving ID {dataset_id}: {e}")
 
         # Return original if not resolved
@@ -540,7 +540,7 @@ class SmartCatalog(DataCatalog):
                 ds = self.session.query(DataSource).filter(DataSource.id == int(dataset_id)).first()
                 if ds:
                     return ds.name
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 - best-effort name lookup, logged
                 logger.warning(f"SmartCatalog: Failed to resolve name for {dataset_id}: {e}")
         return None
 

@@ -103,7 +103,7 @@ class S3Connector(BaseConnector):
         """Attempt to read the schema via scan_csv, returning None instead of raising on failure."""
         try:
             return self._scan_schema(pl.scan_csv, self.path, options)
-        except Exception:
+        except Exception:  # noqa: BLE001 - CSV schema probe, standard flow follows
             return None  # nosec B110 - Expected fallback: CSV extension but try standard flow next
 
     def _raise_classified_schema_error(self, e: Exception) -> None:
@@ -141,7 +141,7 @@ class S3Connector(BaseConnector):
             # Use read_parquet_schema if available or scan
             # scan_parquet is lazy and efficient
             return self._scan_schema(pl.scan_parquet, self.path, options)
-        except Exception:
+        except Exception:  # noqa: BLE001 - parquet probe, CSV fallback follows
             try:
                 return self._scan_schema(pl.scan_csv, self.path, options)
             except Exception as e:
@@ -167,7 +167,7 @@ class S3Connector(BaseConnector):
                     temp_lf = pl.scan_parquet(self.path, storage_options=options)
                     temp_lf.collect_schema()
                     lf = temp_lf
-                except Exception:
+                except Exception:  # noqa: BLE001 - format probe, CSV fallback follows
                     lf = pl.scan_csv(self.path, storage_options=options)
 
             if limit:

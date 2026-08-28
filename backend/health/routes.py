@@ -74,7 +74,7 @@ async def detailed_health_check(settings: Settings = Depends(get_config)):
 
         if not await db_health_check():
             dependencies_healthy = False
-    except Exception:
+    except Exception:  # noqa: BLE001 - health check falls back to unhealthy
         logging.getLogger(__name__).debug("Database health check failed", exc_info=True)
         dependencies_healthy = False
 
@@ -88,7 +88,7 @@ async def detailed_health_check(settings: Settings = Depends(get_config)):
                 socket_connect_timeout=settings.REDIS_HEALTHCHECK_TIMEOUT_SECONDS,
             )
             r.ping()
-        except Exception:
+        except Exception:  # noqa: BLE001 - health check falls back to unhealthy
             logging.getLogger(__name__).debug("Cache health check failed", exc_info=True)
             dependencies_healthy = False
 
@@ -122,7 +122,7 @@ async def readiness_check():
         scaler.fit_transform(X)
         elapsed_ms = round((time.monotonic() - t0) * 1000, 2)
         return {"status": "ready", "fit_ms": elapsed_ms}
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - readiness probe returns 503
         logging.getLogger(__name__).error("Readiness probe failed: %s", exc)
         return JSONResponse(
             status_code=503,

@@ -197,7 +197,7 @@ async def get_dataset_schema(dataset_id: int, session: AsyncSession = Depends(ge
     if ds.source_metadata and "profile" in ds.source_metadata:
         try:
             return _profile_from_cached_metadata(ds.source_metadata["profile"])
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - bad cached profile falls back to sample
             logger.warning(f"Failed to parse cached profile for {dataset_id}: {e}")
 
     return _profile_from_sample(ds, dataset_id)

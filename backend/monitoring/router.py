@@ -60,7 +60,7 @@ async def _fetch_drift_job_rows(db: AsyncSession, job_ids: list[str]) -> dict[st
         result = await db.execute(stmt)
         for row in result.scalars().all():
             db_jobs[str(row.id)] = row
-    except Exception:
+    except Exception:  # noqa: BLE001 - enrichment failure returns partial result
         logger.warning("Could not enrich drift jobs from DB", exc_info=True)
     return db_jobs
 
@@ -72,7 +72,7 @@ def _extract_drift_target_column(db_row: TrainingJob) -> str | None:
         node_id: str = cast(str, db_row.node_id or "")
         _, target_col, _ = extract_job_details(graph, node_id)
         return target_col
-    except Exception:
+    except Exception:  # noqa: BLE001 - optional metadata falls back to None
         return None  # nosec B110 - target column is optional metadata; job listing still succeeds
 
 
@@ -398,7 +398,7 @@ async def _find_deployment_context(db: AsyncSession, job_id: str) -> tuple[int |
         model_version = f"v{job_row.version}" if job_row is not None else None
 
         return (deployment.id if deployment is not None else None), model_version
-    except Exception:
+    except Exception:  # noqa: BLE001 - deployment context is optional
         logger.warning("Could not resolve deployment context for job %s", job_id, exc_info=True)
         return None, None
 
@@ -461,7 +461,7 @@ async def _save_drift_alert(
         await db.commit()
         await db.refresh(check)
         return check
-    except Exception:
+    except Exception:  # noqa: BLE001 - alert persistence is non-fatal
         logger.warning("Failed to save drift alert", exc_info=True)
         await db.rollback()
         return None
@@ -478,7 +478,7 @@ async def _load_feature_importances(db: AsyncSession, job_id: str) -> dict[str, 
             job_metrics: dict[str, Any] = cast(dict[str, Any], row.metrics or {})
             if "feature_importances" in job_metrics:
                 feature_importances = job_metrics["feature_importances"]
-    except Exception:
+    except Exception:  # noqa: BLE001 - feature importances are optional
         logger.warning("Could not load feature importances for job %s", job_id)
     return feature_importances
 

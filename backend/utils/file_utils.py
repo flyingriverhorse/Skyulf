@@ -71,7 +71,7 @@ def safe_delete_path(
 
     try:
         return _delete_immediately(path, files_only=files_only)
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - deletion failure returns False
         logger.error(f"Failed to delete {path}: {e}")
         return False
 
@@ -95,7 +95,7 @@ def _delete_immediately(path: Path, files_only: bool = True) -> bool:
         else:
             logger.warning(f"⚠ Unknown path type: {path}")
             return False
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - deletion failure returns False
         logger.error(f"[ERROR] FAILED TO DELETE {path}: {e}")
         return False
 
@@ -129,10 +129,10 @@ def cleanup_empty_directories(base_path: str | Path) -> int:
                     dir_path.rmdir()
                     logger.info(f"Removed empty directory: {dir_path}")
                     removed_count += 1
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001 - cleanup continues after removal failure
                     logger.error(f"Failed to remove empty directory {dir_path}: {e}")
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - cleanup is best-effort
         logger.error(f"Error during directory cleanup: {e}")
 
     return removed_count
@@ -243,7 +243,7 @@ def cleanup_old_files(
 
     try:
         return _do_cleanup_old_files(directory, max_files, max_age_days, file_pattern)
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - cleanup returns error status
         logger.error(f"Error during file cleanup in {directory}: {e}")
         return {"status": "error", "error": str(e), "files_removed": 0}
 
@@ -298,7 +298,7 @@ def _remove_files_older_than(
                 removed_files.append(str(file_path))
                 removed_count += 1
                 logger.info(f"Removed old file (age): {file_path}")
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 - removal failure is logged, skipped
                 logger.error(f"Failed to remove old file {file_path}: {e}")
     return removed_count, removed_files
 
@@ -318,7 +318,7 @@ def _remove_excess_files(
                 removed_files.append(str(file_path))
                 removed_count += 1
                 logger.info(f"Removed excess file (count): {file_path}")
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 - removal failure is logged, skipped
                 logger.error(f"Failed to remove excess file {file_path}: {e}")
     return removed_count, removed_files
 

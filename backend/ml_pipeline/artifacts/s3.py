@@ -189,7 +189,7 @@ class S3ArtifactStore(ArtifactStore):
             files = self.fs.ls(base_path)
             keys = [key for f in files if (key := self._key_from_listed_path(f)) is not None]
             return keys
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - any S3 error degrades to empty list
             logger.error("Failed to list artifacts in %s: %s", base_path, self._sanitize_error(e))
             return []
 

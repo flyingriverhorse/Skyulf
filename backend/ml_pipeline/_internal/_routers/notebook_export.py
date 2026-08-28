@@ -379,7 +379,7 @@ async def _lookup_dataset_name(dataset_id: str, session: AsyncSession) -> str | 
         result = await session.execute(stmt)
         row = result.scalar_one_or_none()
         return str(row) if row else None
-    except Exception:  # pragma: no cover — non-critical lookup
+    except Exception:  # noqa: BLE001 - non-fatal lookup; None fallback  # pragma: no cover — non-critical lookup
         return None
 
 
@@ -404,7 +404,7 @@ async def _lookup_dataset_file_path(dataset_id: str, session: AsyncSession) -> s
         if path is None:
             return None
         return path.as_posix() if isinstance(path, Path) else str(path)
-    except Exception:  # pragma: no cover — non-critical lookup
+    except Exception:  # noqa: BLE001 - non-fatal lookup; None fallback  # pragma: no cover — non-critical lookup
         return None
 
 

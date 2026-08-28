@@ -124,7 +124,7 @@ async def _fail_report_safely(
             report.status = "FAILED"
             report.error_message = str(error)
             await session.commit()
-    except Exception:
+    except Exception:  # noqa: BLE001 - best-effort FAILED status update
         logger.warning("Failed to update report %s status to FAILED", report_id, exc_info=True)
 
 
@@ -159,7 +159,7 @@ async def _load_dataframe_or_fail(
         return await data_service.load_file(
             file_path, force_type="polars", storage_options=storage_options
         )
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - load failure recorded on report
         report.status = "FAILED"
         report.error_message = f"Failed to load data: {str(e)}"
         await session.commit()
@@ -170,7 +170,7 @@ async def _run_analysis_or_fail(session: AsyncSession, report: EDAReport, df: An
     """Run the EDA analyzer, marking the report FAILED and committing on failure."""
     try:
         return _run_eda_analyzer(df, report.config)
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - analysis failure recorded on report
         report.status = "FAILED"
         report.error_message = f"Analysis failed: {str(e)}"
         await session.commit()
@@ -224,7 +224,7 @@ async def run_eda_analysis(report_id: int, session: AsyncSession):
         await session.commit()
         logger.info(f"EDA Analysis completed for report {report_id}")
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - background task logs and records failure
         logger.error(f"EDA Analysis failed for report {report_id}: {e}")
         await _fail_report_safely(session, report, report_id, e)
 

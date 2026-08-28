@@ -61,7 +61,7 @@ def cleanup_resources():
             celery_app.close()
         except ImportError:
             pass
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - teardown cleanup must not mask test result
         print(f"[pytest] Error closing Celery app: {e}", file=sys.stderr)
 
     # --- Database Cleanup ---
@@ -73,9 +73,9 @@ def cleanup_resources():
             try:
                 # Create a new loop to run the dispose coroutine
                 asyncio.run(async_engine.dispose())
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 - teardown cleanup must not mask test result
                 print(f"[pytest] Could not dispose async_engine: {e}", file=sys.stderr)
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - teardown cleanup must not mask test result
         print(f"[pytest] Error accessing async_engine: {e}", file=sys.stderr)
 
     # --- Thread Debugging ---

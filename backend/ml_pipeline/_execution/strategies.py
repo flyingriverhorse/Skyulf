@@ -102,7 +102,7 @@ class JobStrategy(ABC):
                     output=None,
                     metrics=final_metrics,
                 )
-            except Exception:
+            except Exception:  # noqa: BLE001 - summary fallback; None renders static card
                 summary = None
         return summary
 

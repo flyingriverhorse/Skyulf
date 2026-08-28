@@ -78,6 +78,8 @@ export const DriftAlertModal: React.FC<DriftAlertModalProps> = ({
                       metrics.wasserstein_distance != null
                           ? Number(metrics.wasserstein_distance.toFixed(4))
                           : null,
+                  ks_statistic:
+                      metrics.ks_statistic != null ? Number(metrics.ks_statistic.toFixed(4)) : null,
                   ks_p_value:
                       metrics.ks_test_p_value != null ? Number(metrics.ks_test_p_value.toFixed(4)) : null,
               };
@@ -185,6 +187,7 @@ export const DriftAlertModal: React.FC<DriftAlertModalProps> = ({
                                         { key: 'drifted', label: 'Drifted' },
                                         { key: 'psi', label: 'PSI' },
                                         { key: 'wasserstein', label: 'Wasserstein' },
+                                        { key: 'ks_statistic', label: 'KS statistic' },
                                         { key: 'ks_p_value', label: 'KS p-value' },
                                     ]}
                                     rows={evidenceRows}

@@ -98,6 +98,20 @@ describe('convertGraphToPipelineConfig', () => {
     expect(iter?.params).toMatchObject({ max_iter: 15, estimator: 'BayesianRidge', random_state: 99 });
   });
 
+  it('omits random_state for a legacy iterative node lacking the field (core owns the default)', () => {
+    const nodes = [
+      node('ds', 'dataset_node', { datasetId: 'd1' }),
+      node('iter', 'imputation_node', {
+        method: 'iterative',
+        columns: ['x'],
+      }),
+    ];
+    const edges = [edge('ds', 'iter')];
+    const cfg = convertGraphToPipelineConfig(nodes, edges);
+    const iter = cfg.nodes.find((n) => n.node_id === 'iter');
+    expect(iter?.params).not.toHaveProperty('random_state');
+  });
+
   it('attaches _merge_strategy as an underscore-prefixed param when not "last_wins"', () => {
     const nodes = [
       node('ds', 'dataset_node', { datasetId: 'd1' }),

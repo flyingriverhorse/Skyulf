@@ -41,7 +41,7 @@ const METRIC_KEY_MAP: Record<string, string> = {
     wasserstein: 'wasserstein_distance',
     psi: 'psi',
     kl: 'kl_divergence',
-    ks: 'ks_test_p_value',
+    ks: 'ks_statistic',
 };
 
 const sortRows = (
@@ -251,8 +251,8 @@ export const DriftTable: React.FC<DriftTableProps> = ({
                         {sortHeader(
                             'ks',
                             <MetricTooltip
-                                label="KS P-Value"
-                                tooltip="Kolmogorov-Smirnov Test. p-value < 0.05 indicates the distributions are significantly different."
+                                label="KS Stat"
+                                tooltip="Kolmogorov-Smirnov statistic — maximum distance between the two cumulative distributions (0–1). Unlike the p-value it does not shrink with sample size; values above the threshold (default 0.1) indicate drift."
                                 icon={<Info className="w-3 h-3 text-slate-400" />}
                             />,
                         )}
@@ -297,7 +297,8 @@ export const DriftTable: React.FC<DriftTableProps> = ({
                                 m => m.metric === 'psi' || m.metric === 'psi_categorical',
                             );
                             const kl = col.metrics.find(m => m.metric === 'kl_divergence');
-                            const ks = col.metrics.find(m => m.metric === 'ks_test_p_value');
+                            const ks = col.metrics.find(m => m.metric === 'ks_statistic');
+                            const ksPValue = col.metrics.find(m => m.metric === 'ks_test_p_value');
                             const isExpanded = expandedRows[col.column];
                             const importance = fi?.[col.column];
                             const importanceRank = fi
@@ -376,6 +377,26 @@ export const DriftTable: React.FC<DriftTableProps> = ({
                                         <tr>
                                             <td colSpan={colSpan} className="px-6 py-4 bg-gray-50 dark:bg-slate-900/50">
                                                 <div className="flex flex-col gap-4">
+                                                    {ks && (
+                                                        <div className="text-xs text-gray-600 dark:text-slate-400">
+                                                            KS statistic{' '}
+                                                            <span className="font-semibold tabular-nums">
+                                                                {ks.value.toFixed(4)}
+                                                            </span>{' '}
+                                                            vs threshold {ks.threshold.toFixed(2)}
+                                                            {ksPValue && (
+                                                                <>
+                                                                    {' '}· p-value{' '}
+                                                                    <span className="tabular-nums">
+                                                                        {ksPValue.value < 0.001
+                                                                            ? '< 0.001'
+                                                                            : ksPValue.value.toFixed(3)}
+                                                                    </span>{' '}
+                                                                    (diagnostic only — drift is decided on the statistic)
+                                                                </>
+                                                            )}
+                                                        </div>
+                                                    )}
                                                     {col.suggestions && col.suggestions.length > 0 && (
                                                         <div className="bg-yellow-50 dark:bg-yellow-900/20 p-3 rounded border border-yellow-200 dark:border-yellow-800">
                                                             <div className="flex items-start gap-2">

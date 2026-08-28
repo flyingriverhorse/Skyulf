@@ -253,7 +253,7 @@ async def _run_migrations() -> None:
                 await conn.execute(text(ddl))
             applied += 1
             logger.info("Migration [%s] applied: %s", version, ddl)
-        except Exception:
+        except Exception:  # noqa: BLE001 - idempotent migration skips existing column
             pass  # nosec B110 - Column already exists — idempotent migration, safe to skip
 
     if applied:
@@ -276,6 +276,6 @@ async def health_check() -> bool:
         async with async_engine.begin() as conn:
             await conn.execute(text("SELECT 1"))
         return True
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - health probe returns False
         logger.error(f"Database health check failed: {e}")
         return False

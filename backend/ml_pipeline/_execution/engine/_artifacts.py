@@ -89,7 +89,7 @@ class ArtifactsMixin:
                     name: round(float(val), 6)
                     for name, val in zip(feature_names, importances, strict=True)
                 }
-        except Exception:
+        except Exception:  # noqa: BLE001 - best-effort extraction; None fallback logged
             logger.debug(
                 "Failed to extract feature importances for step_type=%s",
                 type(model).__name__,
@@ -222,5 +222,5 @@ class ArtifactsMixin:
         try:
             train_df = self._normalize_train_frame(data, target_col)
             self._persist_reference_frame(train_df, job_id)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - reference-data save is best-effort
             logger.warning(f"Failed to save reference data: {e}")

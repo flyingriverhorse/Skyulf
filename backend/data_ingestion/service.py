@@ -105,7 +105,7 @@ class DataIngestionService:
                     if path.exists():
                         path.unlink()
                         logger.info(f"Deleted file: {file_path}")
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001 - best-effort file cleanup, logged
                     logger.error(
                         "Orphaned file: failed to delete '%s' while deleting source %s "
                         "(the data source record will still be removed); manual cleanup "

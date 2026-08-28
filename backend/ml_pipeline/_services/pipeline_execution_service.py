@@ -113,7 +113,7 @@ def _make_log_callback(session: Session, job: MLJob, job_id: str, job_logs: list
                         current_step=job.current_step,
                     )
                 )
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001 - log update failure must not abort run
                 logger.warning(f"Failed to update logs: {exc}")
 
     return log_callback
@@ -224,7 +224,7 @@ def execute_pipeline(job_id: str, pipeline_config_dict: dict, session: Session) 
 
         _write_pipeline_result(session, job, strategy, job_id, result, base_artifact_uri)
 
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - job boundary: any error marks job failed
         _handle_execution_exception(session, job_id, exc)
 
 

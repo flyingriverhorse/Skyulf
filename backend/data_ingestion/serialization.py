@@ -169,7 +169,7 @@ class AsyncJSONSafeSerializer:
     async def _handle_fallback(obj: Any) -> Any:
         try:
             return str(obj)
-        except Exception:
+        except Exception:  # noqa: BLE001 - last-resort serialization fallback, logged
             logger.warning(f"Could not serialize object of type {type(obj)}")
             return None
 
@@ -406,7 +406,7 @@ class JSONSafeSerializer:
             try:
                 if obj.isna():
                     return None
-            except Exception:
+            except Exception:  # noqa: BLE001 - defensive isna probe, logged
                 # Some objects might have isna but fail when called or return array
                 logger.debug("Failed to check isna() on pandas object", exc_info=True)
         if hasattr(obj, "tolist"):
@@ -457,7 +457,7 @@ class JSONSafeSerializer:
         try:
             if np.isinf(obj) or np.isnan(obj):
                 return None
-        except Exception:
+        except Exception:  # noqa: BLE001 - defensive numeric guard, logged
             logger.debug("numpy inf/nan check failed for %s", type(obj))
         return obj
 
@@ -487,7 +487,7 @@ class JSONSafeSerializer:
         if hasattr(obj, "to_dict"):
             try:
                 return JSONSafeSerializer.clean_for_json(obj.to_dict("records"))
-            except Exception:
+            except Exception:  # noqa: BLE001 - capability probe, next handler follows
                 logger.debug("to_dict('records') failed for %s", type(obj))
                 return JSONSafeSerializer._NOT_HANDLED
         return JSONSafeSerializer._NOT_HANDLED
@@ -497,7 +497,7 @@ class JSONSafeSerializer:
         if hasattr(obj, "isoformat"):
             try:
                 return obj.isoformat()
-            except Exception:
+            except Exception:  # noqa: BLE001 - capability probe, next handler follows
                 logger.debug("isoformat() failed for %s", type(obj))
                 return JSONSafeSerializer._NOT_HANDLED
         return JSONSafeSerializer._NOT_HANDLED
@@ -508,7 +508,7 @@ class JSONSafeSerializer:
             try:
                 value = float(obj)
                 return None if value != value else value
-            except Exception:
+            except Exception:  # noqa: BLE001 - capability probe, next handler follows
                 logger.debug("float conversion failed for %s", type(obj))
                 return JSONSafeSerializer._NOT_HANDLED
         return JSONSafeSerializer._NOT_HANDLED
@@ -517,7 +517,7 @@ class JSONSafeSerializer:
     def _handle_fallback(obj: Any) -> Any:
         try:
             return str(obj)
-        except Exception:
+        except Exception:  # noqa: BLE001 - last-resort serialization fallback, logged
             logger.debug("str() fallback failed for %s", type(obj))
             return None
 
@@ -633,7 +633,7 @@ class DataTypeConverter:
 
             try:
                 result_df[col] = DataTypeConverter._convert_column(result_df[col], target_type)
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 - per-column isolation, logged
                 logger.warning(f"Failed to convert column {col} to {target_type}: {e}")
 
         return result_df

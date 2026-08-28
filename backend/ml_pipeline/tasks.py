@@ -132,7 +132,7 @@ def run_pipeline_batch_task(branches: list[tuple[str, dict]]) -> None:
             for f in futures:
                 try:
                     f.result()
-                except Exception as exc:
+                except Exception as exc:  # noqa: BLE001 - job boundary: collect branch failures, re-raise first
                     errors.append(exc)
             if errors:
                 # Re-raise the first error; all failures are already logged

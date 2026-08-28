@@ -86,7 +86,7 @@ if __name__ == "__main__":
     try:
         test_eda_features()
         print("\nTest Completed Successfully!")
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - main guard reports script failure
         print(f"\nTest Failed: {e}")
         import traceback
 
