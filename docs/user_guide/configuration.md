@@ -123,4 +123,69 @@ Tuner example:
 }
 ```
 
+#### Reproducibility and seeds
+
+Seeding has exactly one owner: `skyulf.types.DEFAULT_RANDOM_STATE` (currently
+`42`). Every stochastic component (model fitting, CV folds, tuning search,
+splitting, encoding cross-folds) falls back to it, so runs are reproducible
+out of the box. Explicit configuration always wins, in this precedence order:
+
+1. **Node params** — `"params": {"random_state": 7}` on a model/preprocessing
+   node controls that node only. Pass `"random_state": null` to opt out of
+   seeding a specific estimator.
+2. **Tuner config** — `random_state` and `cv_random_state` on the
+   `hyperparameter_tuner` config seed the search, the CV folds, and the final
+   refit.
+3. **`DEFAULT_RANDOM_STATE`** — the shared fallback, injected at model
+   construction.
+
+Two exceptions, both fixed and reproducible:
+
+- **Iterative imputation** defaults its seed to `0` (sklearn's own default for
+  `IterativeImputer`), not `42`. The canvas shows the seed in the imputation
+  settings; set it to `42` if you want every node aligned.
+- **Internal helpers** (feature-selection importance estimators, target/WoE
+  encoding CV folds, profiling analyzers) carry fixed seeds that are not
+  user-configurable — they are implementation details, not pipeline choices.
+
+```python
+# Pin one seed for the whole tuning run:
+{
+  "type": "hyperparameter_tuner",
+  "base_model": {"type": "random_forest_classifier"},
+  "strategy": "random",
+  "search_space": {"n_estimators": [100, 200]},
+  "random_state": 123,
+  "cv_random_state": 123
+}
+```
+
+##### Where to set seeds in the canvas (per node)
+
+| Node | Control | Where in the UI | What it seeds |
+|---|---|---|---|
+| Train/Test Split | Random State | Split settings | Which rows go to train/test/validation |
+| Classification, Regression, Text Classification (basic mode) | Random State | Hyperparameters → Customize | The model's own randomness (bootstrap sampling, tree splits, stochastic solvers, initialization) |
+| Classification, Regression, Text Classification (advanced mode) | Random State | Tuning Strategy section | The tuning search and the final refit |
+| Any training/ensemble node | Fold Split Seed | Cross Validation section | How rows are dealt to CV folds (only when shuffling is on) |
+| Ensemble | Random State | Hyperparameter Tuning section | The ensemble tuning search and refit |
+| Segmentation (K-Means, Mini-Batch K-Means, Gaussian Mixture) | Random State | Hyperparameters → Customize | Centroid/component initialization |
+| Imputation (Iterative only) | Random State | Imputation settings (default `0`) | The iterative imputer's estimator |
+| Resampling (over/undersampling) | Random State | Resampling settings | Synthetic sample generation / sampling |
+
+Notes:
+
+- **Basic mode:** the seed appears in the model's hyperparameter list once you
+  switch on **Customize**; leaving it untouched keeps the default `42`.
+- **Tuning never searches over seeds.** The seed is a fixed control, not a
+  search-space candidate — same seed + same data = identical tuning outcome.
+- **Models without a seed control** are deterministic by construction:
+  Linear Regression, K-Nearest Neighbors, Naive Bayes family, SVC/SVR, BIRCH.
+- **Ensemble base learners** (voting/stacking) are seeded automatically at
+  construction; per-base-learner seeds can be supplied via
+  `base_estimator_params` (API) or by wiring in a model node with a customized
+  Random State.
+- **Opt-out:** in a hand-written config, `"random_state": null` leaves that
+  estimator unseeded (run-to-run variation). The canvas always sends a number.
+
 See "Modeling Nodes" in Reference for details.

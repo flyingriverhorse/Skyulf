@@ -1,6 +1,6 @@
 """Probability-calibration model params (CalibratedClassifierCV)."""
 
-from ._field import HyperparameterField
+from ._field import HyperparameterField, random_state_field
 
 # The calibration method and CV folds are tunable; ``base_estimator`` selects
 # which classifier gets calibrated (resolved to an instance in the node).
@@ -47,4 +47,5 @@ CALIBRATED_CLASSIFIER_PARAMS = [
         max=10,
         description="Number of cross-validation folds used to fit the calibrator.",
     ),
+    random_state_field("Seed for the calibration CV split and the seeded base estimators."),
 ]

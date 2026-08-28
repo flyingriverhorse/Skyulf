@@ -1,5 +1,13 @@
 from typing import Any, TypedDict
 
+# Single owner for seeding: every component that needs a
+# deterministic fallback seed references this constant instead of its own
+# literal. Precedence: explicit user config (`params.random_state`,
+# `TuningConfig.random_state` / `cv_random_state`) always wins; this value
+# is only the reproducibility-by-default fallback injected at model
+# construction (see SklearnCalculator._resolve_fit_params).
+DEFAULT_RANDOM_STATE = 42
+
 
 class PreprocessingStepConfig(TypedDict, total=False):
     """Configuration for a single preprocessing step."""

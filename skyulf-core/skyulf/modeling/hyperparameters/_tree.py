@@ -2,7 +2,7 @@
 Gradient Boosting, AdaBoost, XGBoost, HistGradientBoosting, LightGBM.
 """
 
-from ._field import HyperparameterField
+from ._field import HyperparameterField, random_state_field
 
 # --- Random Forest (Classifier & Regressor share base set) ---
 RANDOM_FOREST_PARAMS = [
@@ -55,6 +55,9 @@ RANDOM_FOREST_PARAMS = [
             {"label": "False", "value": False},
         ],
         description="Whether bootstrap samples are used when building trees.",
+    ),
+    random_state_field(
+        "Seed for bootstrap sampling and tree building. Same data + same seed = identical forest."
     ),
 ]
 
@@ -119,6 +122,7 @@ DECISION_TREE_PARAMS = [
         max=20,
         description="The minimum number of samples required to be at a leaf node.",
     ),
+    random_state_field("Seed for split tie-breaking and feature sub-sampling."),
 ]
 DECISION_TREE_CLASSIFIER_PARAMS = DECISION_TREE_PARAMS + [
     HyperparameterField(
@@ -208,6 +212,7 @@ GRADIENT_BOOSTING_PARAMS = [
         max=20,
         description="Minimum samples required at a leaf node.",
     ),
+    random_state_field("Seed for the row subsampling used when subsample < 1.0."),
 ]
 
 # --- AdaBoost ---
@@ -231,6 +236,7 @@ ADABOOST_PARAMS = [
         max=5.0,
         description="Weight applied to each classifier at each boosting iteration.",
     ),
+    random_state_field("Seed passed to the base estimator's randomness, if it has any."),
 ]
 
 # --- XGBoost ---
@@ -329,6 +335,7 @@ XGBOOST_PARAMS = [
         step=0.1,
         description="L2 regularization term on leaf weights. Default sklearn XGBoost is 1.",
     ),
+    random_state_field("Seed for row/column subsampling when subsample or colsample_bytree < 1.0."),
 ]
 
 # Classifier-only addition: class_weight for imbalanced targets. XGBoost's
@@ -405,6 +412,7 @@ EXTRA_TREES_PARAMS = [
         ],
         description="Whether bootstrap samples are used (False = use full dataset).",
     ),
+    random_state_field("Seed for bootstrap sampling and random split selection."),
 ]
 
 EXTRA_TREES_CLASSIFIER_PARAMS = EXTRA_TREES_PARAMS + [
@@ -509,6 +517,7 @@ HIST_GRADIENT_BOOSTING_PARAMS = [
             "Maximum number of bins for feature discretisation. Higher = more precise but slower."
         ),
     ),
+    random_state_field("Seed for the histogram-based gradient boosting randomness."),
 ]
 
 # --- LightGBM (Classifier & Regressor) ---
@@ -618,6 +627,7 @@ LGBM_PARAMS = [
             "GOSS samples by gradient magnitude."
         ),
     ),
+    random_state_field("Seed for feature/row subsampling (bagging, colsample, DART)."),
 ]
 
 # Classifier-only addition: class_weight for imbalanced targets (regression

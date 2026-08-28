@@ -201,6 +201,14 @@ metrics = estimator.evaluate(dataset=dataset, target_column="target")
 
 > **Important:** Always pass `TuningCalculator(base_calc)` — not the raw base calculator. The `TuningConfig` keyword filter inside `TuningCalculator.fit` reads `strategy`, `n_trials`, `metric`, `search_space`, `cv_*`, etc. directly from the config dict. If you pass the unwrapped base calculator, `tuning_config` is ignored and a single default-param fit runs instead.
 
+> **Seeds:** `random_state` pins the whole tuning run — candidate sampling,
+> per-candidate CV folds, and the final refit of the winner — while
+> `cv_random_state` pins only the post-tuning evaluation folds. Both default
+> to `DEFAULT_RANDOM_STATE` (`42`), so tuning is reproducible out of the box.
+> The seed itself is never a search-space candidate. In the canvas these are
+> the **Random State** field (Tuning Strategy section) and **Fold Split Seed**
+> (Cross Validation section).
+
 ### Built-in console progress (no callback needed)
 
 Instead of writing your own `progress_callback`, set `"progress": True` in the tuning config. Skyulf then attaches a tidy console reporter for core-only runs:

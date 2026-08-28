@@ -68,6 +68,23 @@ pip install skyulf-core[all]
 
 `all` intentionally excludes the native geospatial stack; add `[geo]` only when you need geospatial nodes.
 
+## Compute engines (pandas / Polars)
+
+Skyulf nodes run on a pandas or Polars engine, chosen per call:
+
+- **Auto-detection:** pass a `pandas` or `polars` DataFrame and the matching
+  engine handles it. The quick start below passes a Polars frame, so it runs
+  on the Polars engine.
+- **Fallback default:** when Skyulf must create a frame itself (no input data
+  to inspect), **pandas is the default** — the safer, better-covered path.
+  Polars is opt-in for the fallback:
+
+```python
+from skyulf.engines import EngineRegistry
+
+EngineRegistry.set_active_engine("polars")
+```
+
 ## Quick start
 
 ```python

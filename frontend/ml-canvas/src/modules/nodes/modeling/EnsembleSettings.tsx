@@ -549,6 +549,21 @@ function CrossValidationSection({ config, update, showCV, setShowCV, columns }: 
                 />
                 Shuffle Data
               </label>
+              {config.cv_shuffle !== false && config.cv_type !== 'time_series_split' && (
+                <div>
+                  <span className="flex items-center gap-1 text-xs text-gray-500 mb-1">
+                    Fold Split Seed
+                    <HelpTooltip text="Seed controlling how rows are dealt to folds — same seed = identical fold splits, so CV scores stay comparable across runs." />
+                  </span>
+                  <input
+                    type="number"
+                    min={0}
+                    value={config.cv_random_state ?? 42}
+                    onChange={(e) => { update({ cv_random_state: Number(e.target.value) }); }}
+                    className="w-full border border-gray-300 dark:border-gray-600 rounded p-1.5 text-sm bg-white dark:bg-gray-800 dark:text-gray-100"
+                  />
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -647,6 +662,19 @@ function AdvancedTuningOptions({ config, update }: { config: EnsembleConfig; upd
             min={1}
             value={config.n_trials}
             onChange={(e) => { update({ n_trials: Number(e.target.value) }); }}
+            className="w-full border border-gray-300 dark:border-gray-600 rounded-lg p-2 text-sm bg-white dark:bg-gray-800 dark:text-gray-100"
+          />
+        </div>
+        <div>
+          <span className="flex items-center gap-1 text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+            Random State
+            <HelpTooltip text="Seed for the search and the final refit — same seed + same data = identical tuning outcome." />
+          </span>
+          <input
+            type="number"
+            min={0}
+            value={config.random_state ?? 42}
+            onChange={(e) => { update({ random_state: Number(e.target.value) }); }}
             className="w-full border border-gray-300 dark:border-gray-600 rounded-lg p-2 text-sm bg-white dark:bg-gray-800 dark:text-gray-100"
           />
         </div>

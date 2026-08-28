@@ -146,7 +146,7 @@ class KMeansApplier(_NumericOnlyClusteringApplier):
     name="K-Means",
     category="Modeling",
     description="Partition rows into a fixed number of clusters (segments) by similarity.",
-    params={"n_clusters": 3, "n_init": 10, "random_state": 42},
+    params={"n_clusters": 3, "n_init": 10},
     tags=["clustering", "requires_scaling"],
     learns_from_data=True,
 )
@@ -159,7 +159,6 @@ class KMeansCalculator(_NumericOnlyClusteringCalculatorMixin, SklearnCalculator)
             default_params={
                 "n_clusters": 3,
                 "n_init": 10,
-                "random_state": 42,
             },
             problem_type="clustering",
         )
@@ -179,7 +178,7 @@ class MiniBatchKMeansApplier(_NumericOnlyClusteringApplier):
         "Faster, approximate variant of K-Means that fits on small random "
         "batches — a good choice for larger datasets."
     ),
-    params={"n_clusters": 3, "batch_size": 1024, "n_init": 10, "random_state": 42},
+    params={"n_clusters": 3, "batch_size": 1024, "n_init": 10},
     tags=["clustering", "requires_scaling"],
     learns_from_data=True,
 )
@@ -193,7 +192,6 @@ class MiniBatchKMeansCalculator(_NumericOnlyClusteringCalculatorMixin, SklearnCa
                 "n_clusters": 3,
                 "batch_size": 1024,
                 "n_init": 10,
-                "random_state": 42,
             },
             problem_type="clustering",
         )
@@ -219,7 +217,7 @@ class GaussianMixtureApplier(_NumericOnlyClusteringApplier):
         "Probabilistic clustering that models each segment as a Gaussian "
         "distribution — handles elongated/overlapping clusters better than K-Means."
     ),
-    params={"n_components": 3, "covariance_type": "full", "random_state": 42},
+    params={"n_components": 3, "covariance_type": "full"},
     tags=["clustering", "requires_scaling"],
     learns_from_data=True,
 )
@@ -232,7 +230,6 @@ class GaussianMixtureCalculator(_NumericOnlyClusteringCalculatorMixin, SklearnCa
             default_params={
                 "n_components": 3,
                 "covariance_type": "full",
-                "random_state": 42,
             },
             problem_type="clustering",
         )

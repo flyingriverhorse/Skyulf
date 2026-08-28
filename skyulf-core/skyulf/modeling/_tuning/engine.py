@@ -5,7 +5,7 @@ import logging
 import warnings
 from collections.abc import Callable
 from dataclasses import replace
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, ClassVar, cast
 
 import numpy as np
 import pandas as pd
@@ -13,7 +13,7 @@ from joblib import parallel_backend
 from sklearn.exceptions import ConvergenceWarning
 
 # Explicitly enable experimental halving search cv
-from sklearn.experimental import enable_halving_search_cv  # noqa
+from sklearn.experimental import enable_halving_search_cv
 from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import (
     HalvingGridSearchCV,
@@ -259,8 +259,9 @@ class TuningCalculator(BaseModelCalculator):
         best_params = tuning_result.best_params
         final_params = {**self.model_calculator.default_params, **best_params}
 
-        # Ensure random_state is passed if available in config and not in params
-        if "random_state" not in final_params and hasattr(tuning_config, "random_state"):
+        # The caller's seed must win over the calculator's baked-in default,
+        # but not over a seed the search itself selected.
+        if "random_state" not in best_params and tuning_config.random_state is not None:
             final_params["random_state"] = tuning_config.random_state
 
         if log_callback:
@@ -635,7 +636,7 @@ class TuningCalculator(BaseModelCalculator):
         }
     )
 
-    _METRIC_ALIAS_MAP = {
+    _METRIC_ALIAS_MAP: ClassVar[dict[str, str]] = {
         "mse": "neg_mean_squared_error",
         "mae": "neg_mean_absolute_error",
         "rmse": "neg_root_mean_squared_error",
@@ -713,6 +714,11 @@ class TuningCalculator(BaseModelCalculator):
 
         return metric
 
+    @staticmethod
+    def _seed_params(config: TuningConfig) -> dict[str, Any]:
+        """The caller's seed as a params overlay, for every tuning-path model build."""
+        return {"random_state": config.random_state} if config.random_state is not None else {}
+
     def _evaluate_candidate_cv(
         self,
         candidate_idx: int,
@@ -725,6 +731,7 @@ class TuningCalculator(BaseModelCalculator):
         log_callback: Callable[[str], None] | None,
         preprocessing: "FoldPreprocessor | None" = None,
         fold_errors: list[str] | None = None,
+        seed_params: dict[str, Any] | None = None,
     ) -> float:
         """Cross-validates one grid/random-search candidate and returns its mean fold score.
 
@@ -756,6 +763,7 @@ class TuningCalculator(BaseModelCalculator):
                 log_callback=log_callback,
                 preprocessing=preprocessing,
                 fold_errors=fold_errors,
+                seed_params=seed_params,
             )
             fold_scores.append(score)
 
@@ -780,12 +788,13 @@ class TuningCalculator(BaseModelCalculator):
         log_callback: Callable[[str], None] | None,
         preprocessing: "FoldPreprocessor | None" = None,
         fold_errors: list[str] | None = None,
+        seed_params: dict[str, Any] | None = None,
     ) -> float:
         """Fits one candidate on a single CV fold and returns its score, or ``-inf`` on failure.
 
         Errors (e.g. incompatible params) are caught and logged rather than raised, so a single
         bad fold doesn't abort the whole candidate evaluation. When ``fold_errors`` is provided,
-        the first failure message is recorded so the search can surface it if every trial fails.
+        every failure message is appended so the search can surface them if every trial fails.
         """
         # Split
         X_train_fold = X_any.iloc[train_idx] if hasattr(X_any, "iloc") else X_any[train_idx]
@@ -805,7 +814,7 @@ class TuningCalculator(BaseModelCalculator):
 
             model = self._instantiate_model(
                 model_class,
-                {**self.model_calculator.default_params, **params},
+                {**self.model_calculator.default_params, **(seed_params or {}), **params},
             )
             model.fit(X_train_fold, y_train_fold)
 
@@ -821,8 +830,8 @@ class TuningCalculator(BaseModelCalculator):
                     f"  [Candidate {candidate_idx + 1}] CV Fold {fold_idx + 1}/{n_splits} Score: {score:.4f}"
                 )
             return score
-        except Exception as e:
-            if fold_errors is not None and not fold_errors:
+        except Exception as e:  # noqa: BLE001 - per-fold failures are collected for reporting, must not abort tuning
+            if fold_errors is not None:
                 fold_errors.append(str(e))
             if log_callback:
                 n_splits = cv.get_n_splits(X_arr, y_arr)
@@ -857,6 +866,7 @@ class TuningCalculator(BaseModelCalculator):
         log_callback: Callable[[str], None] | None,
         preprocessing: "FoldPreprocessor | None" = None,
         fold_errors: list[str] | None = None,
+        seed_params: dict[str, Any] | None = None,
     ) -> tuple[list[dict[str, Any]], float, dict[str, Any] | None]:
         """Evaluates every candidate via CV, emitting progress/log callbacks, and tracks the best.
 
@@ -885,6 +895,7 @@ class TuningCalculator(BaseModelCalculator):
                 log_callback,
                 preprocessing,
                 fold_errors,
+                seed_params,
             )
 
             if log_callback:
@@ -940,6 +951,7 @@ class TuningCalculator(BaseModelCalculator):
             log_callback,
             preprocessing,
             fold_errors,
+            self._seed_params(config),
         )
 
         if log_callback:
@@ -947,7 +959,11 @@ class TuningCalculator(BaseModelCalculator):
             log_callback(f"Best Params: {best_params}")
 
         if best_params is None:
-            detail = f" First trial error: {fold_errors[0]}" if fold_errors else ""
+            detail = ""
+            if fold_errors:
+                detail = f" First trial error: {fold_errors[0]}"
+                if len(fold_errors) > 1:
+                    detail += f" ({len(fold_errors) - 1} more fold failures suppressed)"
             raise ValueError(
                 "Hyperparameter tuning failed: All trials failed. "
                 "This usually means the model failed to train with the provided hyperparameter combinations. "
@@ -1231,7 +1247,7 @@ class TuningCalculator(BaseModelCalculator):
                 else:
                     searcher.fit(X_arr, y_arr)
         except Exception as e:
-            logger.error(f"Hyperparameter tuning failed: {str(e)}")
+            logger.exception("Hyperparameter tuning failed")
             error_msg = str(e)
             if "No trials are completed yet" in error_msg:
                 raise ValueError(
@@ -1375,7 +1391,9 @@ class TuningCalculator(BaseModelCalculator):
 
         # ``default_params`` may carry structural args (e.g. an ensemble's
         # resolved ``estimators``); the instantiator filters/routes them safely.
-        base_estimator = self._instantiate_model(model_class, self.model_calculator.default_params)
+        base_estimator = self._instantiate_model(
+            model_class, {**self.model_calculator.default_params, **self._seed_params(config)}
+        )
 
         # halving/optuna searchers run their CV internally, where the engine's
         # per-fold hook cannot reach; wrap preprocessing + model in one

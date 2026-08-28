@@ -26,7 +26,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-import skyulf  # noqa: F401  (side-effect: populate the registry)
+import skyulf
 from skyulf.registry import NodeRegistry
 
 # ---------------------------------------------------------------------------
@@ -146,7 +146,7 @@ def _maybe_call_apply(
             applier.apply(X, params)
         except TypeError:
             applier.apply((X, y), params)
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:  # noqa: BLE001 - smoke harness reports node failures as strings
         return False, f"apply failed: {type(exc).__name__}: {exc}"
     return True, ""
 

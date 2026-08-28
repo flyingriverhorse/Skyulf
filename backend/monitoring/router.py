@@ -267,7 +267,7 @@ async def _load_current_dataframe(file: UploadFile) -> pl.DataFrame:
 # threshold-version snapshot.
 _DEFAULT_DRIFT_THRESHOLDS: dict[str, float] = {
     "psi": 0.2,
-    "ks": 0.05,
+    "ks_statistic": 0.1,
     "wasserstein": 0.1,
     "kl_divergence": 0.1,
 }
@@ -295,7 +295,7 @@ def _build_drift_thresholds(
     if threshold_psi is not None:
         custom_thresholds["psi"] = threshold_psi
     if threshold_ks is not None:
-        custom_thresholds["ks"] = threshold_ks
+        custom_thresholds["ks_statistic"] = threshold_ks
     if threshold_wasserstein is not None:
         custom_thresholds["wasserstein"] = threshold_wasserstein
     if threshold_kl is not None:
@@ -326,7 +326,7 @@ async def _get_or_create_threshold_version(
     def _matches(row: DriftThresholdVersion) -> bool:
         return (
             round(row.psi, 6) == round(effective_thresholds["psi"], 6)
-            and round(row.ks, 6) == round(effective_thresholds["ks"], 6)
+            and round(row.ks, 6) == round(effective_thresholds["ks_statistic"], 6)
             and round(row.wasserstein, 6) == round(effective_thresholds["wasserstein"], 6)
             and round(row.kl_divergence, 6) == round(effective_thresholds["kl_divergence"], 6)
         )
@@ -338,7 +338,7 @@ async def _get_or_create_threshold_version(
     new_version = DriftThresholdVersion(
         version=next_version,
         psi=effective_thresholds["psi"],
-        ks=effective_thresholds["ks"],
+        ks=effective_thresholds["ks_statistic"],
         wasserstein=effective_thresholds["wasserstein"],
         kl_divergence=effective_thresholds["kl_divergence"],
     )
@@ -375,6 +375,7 @@ def _build_drift_column_summary(report) -> dict[str, Any]:
             "drifted": col_drift.drift_detected,
             "psi": metrics_map.get("psi"),
             "wasserstein": metrics_map.get("wasserstein_distance"),
+            "ks_statistic": metrics_map.get("ks_statistic"),
             "ks_p_value": metrics_map.get("ks_test_p_value"),
         }
     return col_summary
@@ -450,7 +451,7 @@ async def _save_drift_alert(
 
         if effective_thresholds is not None:
             check.threshold_psi = effective_thresholds["psi"]
-            check.threshold_ks = effective_thresholds["ks"]
+            check.threshold_ks = effective_thresholds["ks_statistic"]
             check.threshold_wasserstein = effective_thresholds["wasserstein"]
             check.threshold_kl = effective_thresholds["kl_divergence"]
         if threshold_version is not None:

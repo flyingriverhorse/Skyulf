@@ -14,6 +14,7 @@ from sklearn.model_selection import (
 
 from ..engines import SkyulfDataFrame
 from ..engines.sklearn_bridge import SklearnBridge
+from ..types import DEFAULT_RANDOM_STATE
 
 if TYPE_CHECKING:
     from .base import BaseModelApplier, BaseModelCalculator
@@ -76,7 +77,7 @@ def perform_cross_validation(
     n_folds: int = 5,
     cv_type: str = "k_fold",  # k_fold, stratified_k_fold, time_series_split, shuffle_split, nested_cv
     shuffle: bool = True,
-    random_state: int = 42,
+    random_state: int = DEFAULT_RANDOM_STATE,
     time_column: str | None = None,
     progress_callback: Callable[[int, int], None] | None = None,
     log_callback: Callable[[str], None] | None = None,
@@ -413,7 +414,7 @@ def _build_splitter(
     n_folds: int,
     problem_type: str,
     shuffle: bool = True,
-    random_state: int = 42,
+    random_state: int = DEFAULT_RANDOM_STATE,
 ) -> Any:
     """Build a sklearn CV splitter from cv_type string."""
     import logging
@@ -517,7 +518,7 @@ def _run_inner_cv(
                 inner_artifact, X_inner_val, y_inner_val, problem_type
             )
             inner_scores.append(inner_metrics.get(key_metric, 0.0))
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - inner-fold failure becomes NaN, not fatal; logged
             logger.warning(f"Inner fold failed: {e}")
             if log_callback:
                 log_callback(f"Inner fold failed: {e}")
@@ -575,7 +576,7 @@ def _perform_nested_cv(
     config: dict[str, Any],
     n_folds: int = 5,
     shuffle: bool = True,
-    random_state: int = 42,
+    random_state: int = DEFAULT_RANDOM_STATE,
     progress_callback: Callable[[int, int], None] | None = None,
     log_callback: Callable[[str], None] | None = None,
     preprocessing: "FoldPreprocessor | None" = None,

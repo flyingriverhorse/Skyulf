@@ -298,14 +298,14 @@ class StatefulEstimator:
         if isinstance(dataset, tuple):
             # Check if it's (train_df, test_df) or (X, y)
             elem0 = dataset[0]
+            elem1 = dataset[1]
             if (
                 isinstance(elem0, pd.DataFrame)
-                and isinstance(dataset[1], pd.DataFrame)
+                and isinstance(elem1, pd.DataFrame)
                 and target_column in elem0.columns
             ):
                 # It's (train_df, test_df)
-                train_df, test_df = dataset
-                return SplitDataset(train=train_df, test=test_df, validation=None)  # type: ignore
+                return SplitDataset(train=elem0, test=elem1, validation=None)
 
             # Fallback: Treat input as training data (e.g. X, y tuple) and initialize empty test set.
             msg = (

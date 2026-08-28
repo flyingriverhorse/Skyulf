@@ -13,6 +13,7 @@ from ...core.meta.decorators import node_meta
 from ...engines import SkyulfDataFrame
 from ...engines.sklearn_bridge import SklearnBridge
 from ...registry import NodeRegistry
+from ...types import DEFAULT_RANDOM_STATE
 from ...utils import resolve_columns, user_picked_no_columns
 from .._artifacts import TargetEncoderArtifact
 from .._schema import SkyulfSchema
@@ -156,7 +157,7 @@ def _build_target_encoder(
         target_type=target_type,
         cv=cv,
         shuffle=True,
-        random_state=42,
+        random_state=DEFAULT_RANDOM_STATE,
     )
     y_np = _y_to_numpy(y)
 

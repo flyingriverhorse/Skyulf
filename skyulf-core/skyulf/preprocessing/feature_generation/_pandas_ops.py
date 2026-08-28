@@ -182,7 +182,7 @@ def _pandas_datetime_apply(op: dict[str, Any], df_out: Any) -> None:
                 if builder is None:
                     continue
                 df_out[f"{col}_{feat}"] = builder(dt)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - per-column datetime feature failure is logged and skipped
             logger.warning(f"Failed to extract datetime features for column {col}: {e}")
 
 
@@ -236,6 +236,6 @@ def _featgen_apply_pandas(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, 
             if round_digits is not None:
                 result = result.round(round_digits)
             df_out[output_col] = result
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - per-operation failure is logged and skipped
             logger.warning(f"Failed to apply {op_type} operation (index {i}): {e}")
     return df_out, y

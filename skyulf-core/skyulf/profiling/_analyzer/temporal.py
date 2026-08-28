@@ -208,7 +208,7 @@ class TemporalMixin(_AnalyzerState):
                     "is_stationary": float(result[1]) < 0.05,
                     "metric": target_metric,
                 }
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - ADF test is optional; logged
             logger.warning(f"ADF test failed: {e}")
         return None
 
@@ -252,6 +252,6 @@ class TemporalMixin(_AnalyzerState):
                 autocorrelation=acf_stats,
                 stationarity_test=stationarity_test,
             )
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - time-series analysis is optional; logged, returns None
             logger.warning(f"Error in time series analysis: {e}")
             return None

@@ -110,7 +110,7 @@ class DriftCalculator:
         """Merge user-supplied drift thresholds over the defaults."""
         default_thresholds = {
             "psi": 0.2,
-            "ks": 0.05,  # p-value < 0.05 means distributions are different
+            "ks_statistic": 0.1,  # max CDF distance, sample-size robust (unlike the p-value)
             "wasserstein": 0.1,  # Heuristic, depends on scale
             "kl_divergence": 0.1,
         }
@@ -134,7 +134,7 @@ class DriftCalculator:
             try:
                 # Try to cast current to match reference (e.g. Int to Float, or String to Float)
                 curr_series = curr_series.cast(dtype, strict=False)
-            except Exception:
+            except Exception:  # noqa: BLE001 - uncastable column contributes no drift metric
                 # If casting fails completely (unlikely with strict=False), skip
                 return None  # nosec B112
 
@@ -193,14 +193,26 @@ class DriftCalculator:
             is_drifted = True
 
         # 2. KS Test
+        # The drift decision is made on the statistic (max CDF distance), not
+        # the p-value: the p-value shrinks with sample size, so an identical
+        # tiny shift looks significant at n=100k but not at n=100. The p-value
+        # is kept in the report for diagnostics.
         ks_stat, ks_p = ks_2samp(ref_data, curr_data)
-        ks_drift = ks_p < thresholds["ks"]
+        ks_drift = ks_stat > thresholds["ks_statistic"]
+        metrics.append(
+            DriftMetric(
+                metric="ks_statistic",
+                value=float(ks_stat),
+                has_drift=ks_drift,
+                threshold=thresholds["ks_statistic"],
+            )
+        )
         metrics.append(
             DriftMetric(
                 metric="ks_test_p_value",
                 value=float(ks_p),
                 has_drift=ks_drift,
-                threshold=thresholds["ks"],
+                threshold=thresholds["ks_statistic"],
             )
         )
         if ks_drift:
@@ -308,7 +320,7 @@ class DriftCalculator:
             ]
 
             return DriftDistribution(bins=drift_bins)
-        except Exception:
+        except Exception:  # noqa: BLE001 - drift distribution rendering is best-effort; empty-bins fallback
             return DriftDistribution(bins=[])
 
     @staticmethod
@@ -456,7 +468,7 @@ class DriftCalculator:
             )
             return float(psi_value)
 
-        except Exception:
+        except Exception:  # noqa: BLE001 - PSI numeric failure reports no drift (0.0)
             return 0.0
 
     def _calculate_kl(self, reference: np.ndarray, current: np.ndarray, buckets: int = 10) -> float:
@@ -492,5 +504,5 @@ class DriftCalculator:
             curr_percents = np.where(curr_percents == 0, 0.0001, curr_percents)
 
             return float(entropy(curr_percents, ref_percents))
-        except Exception:
+        except Exception:  # noqa: BLE001 - KL numeric failure reports no divergence (0.0)
             return 0.0

@@ -1,5 +1,6 @@
 """Classification evaluation logic."""
 
+import logging
 import warnings
 from typing import Any
 
@@ -18,6 +19,8 @@ from .schemas import (
     CurveData,
     ModelEvaluationReport,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def evaluate_classification_model(
@@ -45,8 +48,10 @@ def evaluate_classification_model(
             with warnings.catch_warnings():
                 warnings.filterwarnings("ignore", message=".*valid feature names.*")
                 y_prob = model.predict_proba(X_test_np)
-        except Exception:
-            pass  # nosec B110 - predict_proba is optional; classes/labels still work without it
+        except Exception:  # noqa: BLE001 - predict_proba is optional and raises many model-specific errors; logged
+            logger.info(
+                "predict_proba unavailable; probability-based outputs skipped", exc_info=True
+            )
 
     # Calculate scalar metrics, reusing the already-computed conversion/predictions
     metrics = calculate_classification_metrics(

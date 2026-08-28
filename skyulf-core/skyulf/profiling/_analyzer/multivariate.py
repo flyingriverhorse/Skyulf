@@ -6,6 +6,7 @@ from typing import Any, cast
 import numpy as np
 import polars as pl
 
+from ...types import DEFAULT_RANDOM_STATE
 from ..schemas import (
     ClusteringAnalysis,
     ClusteringPoint,
@@ -53,7 +54,7 @@ class MultivariateMixin(_AnalyzerState):
             X = X_df.to_numpy()
             if not np.isfinite(X).all():
                 X = np.nan_to_num(X, nan=0.0, posinf=0.0, neginf=0.0)
-        except Exception:
+        except Exception:  # noqa: BLE001 - polars fast path falls back to sklearn imputer on any error
             X = X_df.to_numpy()
             imputer = SimpleImputer(strategy="mean")
             X = imputer.fit_transform(X)
@@ -92,7 +93,7 @@ class MultivariateMixin(_AnalyzerState):
                 X = np.empty((working.height, 0))
             if not np.isfinite(X).all():
                 raise ValueError("non-finite value present after imputation")
-        except Exception:
+        except Exception:  # noqa: BLE001 - polars fast path falls back to sklearn imputer on any error
             X = X_df.to_numpy()
             imputer = SimpleImputer(strategy="mean")
             X = imputer.fit_transform(X)
@@ -127,7 +128,7 @@ class MultivariateMixin(_AnalyzerState):
 
             return X_scaled, sample_df, scaler
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - matrix prep is optional; logged, returns None
             logger.warning(f"Error preparing matrix sample: {e}")
             return None, None, None
 
@@ -211,7 +212,7 @@ class MultivariateMixin(_AnalyzerState):
 
             return points, components_list
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - PCA is optional; logged, returns None
             logger.warning(f"Error calculating PCA: {e}")
             return None, None
 
@@ -275,7 +276,7 @@ class MultivariateMixin(_AnalyzerState):
 
             # k=3 for generic Low/Medium/High discovery in EDA.
             n_clusters = 3
-            kmeans = KMeans(n_clusters=n_clusters, random_state=42, n_init=10)
+            kmeans = KMeans(n_clusters=n_clusters, random_state=DEFAULT_RANDOM_STATE, n_init=10)
             labels = kmeans.fit_predict(X_scaled)
 
             centers_scaled = kmeans.cluster_centers_
@@ -301,7 +302,7 @@ class MultivariateMixin(_AnalyzerState):
                 points=points,
             )
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - clustering is optional; logged, returns None
             logger.warning(f"Error in clustering analysis: {e}")
             return None
 
@@ -373,7 +374,7 @@ class MultivariateMixin(_AnalyzerState):
 
             X = self._impute_matrix_drop_empty(df_numeric)
 
-            clf = IsolationForest(random_state=42, contamination=0.05, n_jobs=-1)
+            clf = IsolationForest(random_state=DEFAULT_RANDOM_STATE, contamination=0.05, n_jobs=-1)
             clf.fit(X)
 
             preds = clf.predict(X)
@@ -397,6 +398,6 @@ class MultivariateMixin(_AnalyzerState):
                 top_outliers=top_outliers,
             )
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - outlier analysis is optional; logged, returns None
             logger.warning(f"Error in outlier detection: {e}")
             return None

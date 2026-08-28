@@ -6,6 +6,7 @@ from typing import Any
 import numpy as np
 import polars as pl
 
+from ...types import DEFAULT_RANDOM_STATE
 from ..schemas import RuleNode, RuleTree
 from ._utils import SKLEARN_AVAILABLE, _AnalyzerState
 
@@ -70,7 +71,7 @@ class RulesMixin(_AnalyzerState):
                 categories=cat_categories or None,
             )
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - rule discovery is optional; logged, returns None
             logger.warning(f"Error in rule discovery: {e}")
             return None
 
@@ -140,7 +141,7 @@ class RulesMixin(_AnalyzerState):
         y_mean = df_sample[target_col].mean()
         y = df_sample[target_col].fill_null(y_mean).to_numpy()
         class_names: list[str] = []
-        clf = regressor_cls(max_depth=4, random_state=42)
+        clf = regressor_cls(max_depth=4, random_state=DEFAULT_RANDOM_STATE)
         return y, class_names, clf
 
     def _prepare_classification_target(
@@ -166,7 +167,7 @@ class RulesMixin(_AnalyzerState):
 
         y = y_series.cast(pl.Categorical).to_physical().to_numpy()
         class_names = y_series.cast(pl.Categorical).cat.get_categories().to_list()
-        clf = classifier_cls(max_depth=4, random_state=42)
+        clf = classifier_cls(max_depth=4, random_state=DEFAULT_RANDOM_STATE)
         return y, class_names, clf
 
     def _extract_feature_importances(self, clf: Any, feature_names: list[str]) -> list[dict]:

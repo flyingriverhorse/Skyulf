@@ -14,4 +14,8 @@ export interface HyperparameterDef {
     depends_on?: { param: string; value: unknown };
     /** These option values can't be combined with any other option in the same search space (e.g. `elasticnet` vs `l1`/`l2`). */
     exclusive_options?: unknown[];
+    /** `false` = fixed-parameter control only (e.g. `random_state`): shown in
+     * basic-mode hyperparameters, hidden from the advanced search space — a
+     * seed is never a sensible tuning target. */
+    tunable?: boolean;
 }

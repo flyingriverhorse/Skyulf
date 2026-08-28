@@ -519,6 +519,20 @@ export const TrainingSettings: React.FC<{
                                     min={1}
                                 />
                             </div>
+
+                            <div>
+                                <div className="flex items-center gap-1.5 mb-1">
+                                    <span className="block text-xs font-medium text-gray-700 dark:text-gray-300">Random State</span>
+                                    <HelpTooltip text="Seed for the search and the final refit — same seed + same data = identical tuning outcome. Applies to every candidate, not just the winner." />
+                                </div>
+                                <input
+                                    type="number"
+                                    value={config.random_state ?? 42}
+                                    onChange={(e) => onChange({ ...config, random_state: Number(e.target.value) })}
+                                    className="w-full border border-gray-300 dark:border-gray-600 rounded-lg p-2 text-sm bg-white dark:bg-gray-800 dark:text-gray-100"
+                                    min={0}
+                                />
+                            </div>
                         </div>
                     </div>
                 </>
@@ -631,6 +645,21 @@ export const TrainingSettings: React.FC<{
                                     />
                                     <label htmlFor="cv_shuffle" className="text-xs text-gray-600 dark:text-gray-400">Shuffle Data</label>
                                 </div>
+                                {config.cv_shuffle !== false && config.cv_type !== 'time_series_split' && (
+                                    <div>
+                                        <div className="flex items-center gap-1.5 mb-1">
+                                            <span className="block text-xs text-gray-500">Fold Split Seed</span>
+                                            <HelpTooltip text="Seed controlling how rows are dealt to folds — same seed = identical fold splits, so CV scores stay comparable across runs." />
+                                        </div>
+                                        <input
+                                            type="number"
+                                            value={config.cv_random_state ?? 42}
+                                            onChange={(e) => onChange({ ...config, cv_random_state: Number(e.target.value) })}
+                                            className="w-full border border-gray-300 dark:border-gray-600 rounded p-1.5 text-sm bg-white dark:bg-gray-800 dark:text-gray-100"
+                                            min={0}
+                                        />
+                                    </div>
+                                )}
                             </div>
                         )}
                     </div>
@@ -774,7 +803,7 @@ export const TrainingSettings: React.FC<{
             </div>
         ) : (
             <div className="space-y-3">
-                {searchSpaceDefs.filter(def => isSearchSpaceParamVisible(def, config.search_space)).map(def => (
+                {searchSpaceDefs.filter(def => def.tunable !== false && isSearchSpaceParamVisible(def, config.search_space)).map(def => (
                     <div key={`${config.model_type}-${def.name}`} className="bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-lg p-3">
                         <SearchSpaceInput
                             def={def}

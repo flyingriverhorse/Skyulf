@@ -43,7 +43,7 @@ class TargetMixin(_AnalyzerState):
 
             return dict(sorted(corrs.items(), key=lambda item: abs(item[1]), reverse=True))
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - target correlations are best-effort; logged
             logger.warning(f"Error calculating target correlations: {e}")
             return {}
 
@@ -95,7 +95,7 @@ class TargetMixin(_AnalyzerState):
                 eta = self._calculate_eta_for_column(target_col, col)
                 if eta is not None:
                     associations[col] = eta
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 - one degenerate column must not wipe out the rest; logged
                 logger.warning(f"Error calculating categorical target association for '{col}': {e}")
                 continue
 
@@ -116,7 +116,7 @@ class TargetMixin(_AnalyzerState):
 
             return interactions
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - target interactions are best-effort; logged
             logger.warning(f"Error calculating target interactions: {e}")
             return []
 
@@ -201,7 +201,7 @@ class TargetMixin(_AnalyzerState):
                 _f_stat, p_val = f_oneway(*groups_data)
                 if not np.isnan(p_val):
                     return float(p_val)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - ANOVA is best-effort; logged
             logger.warning(f"ANOVA failed for {feature}: {e}")
 
         return None

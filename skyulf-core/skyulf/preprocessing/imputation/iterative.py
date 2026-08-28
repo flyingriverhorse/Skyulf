@@ -3,7 +3,7 @@
 from typing import Any
 
 # Enable experimental IterativeImputer
-from sklearn.experimental import enable_iterative_imputer  # noqa
+from sklearn.experimental import enable_iterative_imputer
 from sklearn.impute import IterativeImputer
 
 from ...core.meta.decorators import node_meta

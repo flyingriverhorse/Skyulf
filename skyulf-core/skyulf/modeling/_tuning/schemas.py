@@ -3,6 +3,8 @@
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
+from ...types import DEFAULT_RANDOM_STATE
+
 
 @dataclass
 class TuningConfig:
@@ -22,8 +24,8 @@ class TuningConfig:
         "k_fold", "stratified_k_fold", "time_series_split", "shuffle_split", "nested_cv"
     ] = "k_fold"
     cv_shuffle: bool = True
-    cv_random_state: int = 42
-    random_state: int = 42
+    cv_random_state: int = DEFAULT_RANDOM_STATE
+    random_state: int = DEFAULT_RANDOM_STATE
     # Console progress for core-only use (a self-updating trial line on TTYs
     # plus an end-of-run best/trials summary). Off by default; the backend
     # never sets it and supplies its own progress_callback instead.

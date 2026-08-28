@@ -89,7 +89,7 @@ class ColumnMixin(_AnalyzerState):
             result = self._run_normality_test(sample_data)
             if result is not None:
                 profile.normality_test = result
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - profiling is best-effort; logged
             logger.warning(f"Normality test failed for {col}: {e}")
 
     @staticmethod
@@ -240,7 +240,7 @@ class ColumnMixin(_AnalyzerState):
             ts = self.df[col].dt.timestamp("ms").drop_nulls().to_numpy()  # type: ignore[attr-defined]
             if len(ts) > 0:
                 profile.histogram = self._numpy_histogram_bins(ts)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - profiling is best-effort; logged
             logger.warning(f"Failed to calculate date histogram for {col}: {e}")
 
     def _process_text_column(
@@ -259,7 +259,7 @@ class ColumnMixin(_AnalyzerState):
             lengths = self.df[col].str.len_bytes().drop_nulls().to_numpy()  # type: ignore[attr-defined]
             if len(lengths) > 0:
                 profile.histogram = self._numpy_histogram_bins(lengths)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - profiling is best-effort; logged
             logger.warning(f"Failed to calculate text histogram for {col}: {e}")
 
         if self._check_pii(col):  # type: ignore[attr-defined]

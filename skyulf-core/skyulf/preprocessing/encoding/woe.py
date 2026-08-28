@@ -21,6 +21,7 @@ import pandas as pd
 from ...core.meta.decorators import node_meta
 from ...engines import SkyulfDataFrame
 from ...registry import NodeRegistry
+from ...types import DEFAULT_RANDOM_STATE
 from ...utils import resolve_columns, user_picked_no_columns
 from .._helpers import select_then_to_pandas
 from .._schema import SkyulfSchema
@@ -245,7 +246,7 @@ def _cross_fit_woe_values(
 
     n = len(frame)
     encoded = {col: np.zeros(n, dtype=float) for col in cols}
-    kf = KFold(n_splits=n_folds, shuffle=True, random_state=42)
+    kf = KFold(n_splits=n_folds, shuffle=True, random_state=DEFAULT_RANDOM_STATE)
     for train_idx, hold_idx in kf.split(np.arange(n)):
         mappings = _build_woe_artifact(frame.iloc[train_idx], y_bin[train_idx], cols, reg)[
             "mappings"

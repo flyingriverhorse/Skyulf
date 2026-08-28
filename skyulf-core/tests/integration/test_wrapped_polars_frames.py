@@ -102,13 +102,13 @@ def test_sentence_embedder_accepts_wrapped_polars_frame() -> None:
     try:
         # The module imports sentence_transformers lazily inside _load_model,
         # so probe the optional extra here or fit() would raise ImportError.
-        import sentence_transformers  # noqa: F401  # ty: ignore[unresolved-import]
+        import sentence_transformers  # ty: ignore[unresolved-import]
 
         from skyulf.preprocessing.vectorization.sentence_embedder import (
             SentenceEmbedderApplier,
             SentenceEmbedderCalculator,
         )
-    except Exception as exc:  # optional NLP extra (sentence-transformers/torch)
+    except Exception as exc:  # noqa: BLE001 - optional NLP extra (sentence-transformers/torch)
         pytest.skip(f"sentence_embedder unavailable: {exc}")
 
     raw = pl.DataFrame({"text": ["the cat sat", "the dog ran"]})

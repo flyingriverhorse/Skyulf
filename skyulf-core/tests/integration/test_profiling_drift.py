@@ -23,7 +23,9 @@ def test_calculate_drift_detects_shifted_distribution() -> None:
     assert report.column_drifts["feature"].drift_detected is True
     assert report.drifted_columns_count == 1
     metric_names = {m.metric for m in report.column_drifts["feature"].metrics}
-    assert {"wasserstein_distance", "ks_test_p_value", "psi", "kl_divergence"} == metric_names
+    assert {"wasserstein_distance", "ks_statistic", "ks_test_p_value", "psi", "kl_divergence"} == (
+        metric_names
+    )
 
 
 def test_calculate_drift_still_flags_shift_when_data_contains_nan() -> None:
@@ -196,7 +198,12 @@ def test_calculate_drift_custom_thresholds_override_defaults() -> None:
     current = pl.DataFrame({"feature": rng.normal(0.05, 1, 300)})
 
     lenient_report = DriftCalculator(reference, current).calculate_drift(
-        thresholds={"ks": 0.0, "psi": 100.0, "wasserstein": 100.0, "kl_divergence": 100.0}
+        thresholds={
+            "ks_statistic": 100.0,
+            "psi": 100.0,
+            "wasserstein": 100.0,
+            "kl_divergence": 100.0,
+        }
     )
     assert lenient_report.column_drifts["feature"].drift_detected is False
 
@@ -242,7 +249,7 @@ def test_calculate_drift_moderate_psi_shift_suggestion() -> None:
     current = pl.DataFrame({"feature": rng.normal(0.4, 1, 1000)})
 
     report = DriftCalculator(reference, current).calculate_drift(
-        thresholds={"psi": 0.01, "ks": 0.05, "wasserstein": 100.0, "kl_divergence": 100.0}
+        thresholds={"psi": 0.01, "wasserstein": 100.0, "kl_divergence": 100.0}
     )
     drift = report.column_drifts["feature"]
     metrics = {m.metric: m.value for m in drift.metrics}
@@ -257,11 +264,34 @@ def test_calculate_drift_ks_drift_without_psi_drift_suggestion() -> None:
     current = pl.DataFrame({"feature": rng.normal(0.08, 1, 2000)})
 
     report = DriftCalculator(reference, current).calculate_drift(
-        thresholds={"ks": 0.9, "psi": 100.0, "wasserstein": 100.0, "kl_divergence": 100.0}
+        thresholds={
+            "ks_statistic": 0.01,
+            "psi": 100.0,
+            "wasserstein": 100.0,
+            "kl_divergence": 100.0,
+        }
     )
     drift = report.column_drifts["feature"]
     assert drift.drift_detected is True
     assert any("population stability" in s for s in drift.suggestions)
+
+
+def test_calculate_drift_ignores_significant_p_value_when_statistic_is_small() -> None:
+    """F-12: a negligible shift on a large window produces p < 0.05 but a small KS
+    statistic; the decision is on the statistic, so no drift must be flagged."""
+    rng = np.random.default_rng(11)
+    reference = pl.DataFrame({"feature": rng.normal(0, 1, 50_000)})
+    current = pl.DataFrame({"feature": rng.normal(0.03, 1, 50_000)})
+
+    report = DriftCalculator(reference, current).calculate_drift(
+        thresholds={"wasserstein": 100.0, "psi": 100.0, "kl_divergence": 100.0}
+    )
+    drift = report.column_drifts["feature"]
+    metrics = {m.metric: m for m in drift.metrics}
+    assert metrics["ks_test_p_value"].value < 0.05  # old rule would have fired here
+    assert metrics["ks_statistic"].value < 0.1
+    assert metrics["ks_statistic"].has_drift is False
+    assert drift.drift_detected is False
 
 
 def test_calculate_psi_returns_zero_for_empty_arrays() -> None:
@@ -346,6 +376,10 @@ class TestRealShapedDataset:
         # Both columns retain some non-null rows on each side, so metrics must be computed.
         for column in ("age", "income"):
             metric_names = {m.metric for m in report.column_drifts[column].metrics}
-            assert {"wasserstein_distance", "ks_test_p_value", "psi", "kl_divergence"} == (
-                metric_names
-            )
+            assert {
+                "wasserstein_distance",
+                "ks_statistic",
+                "ks_test_p_value",
+                "psi",
+                "kl_divergence",
+            } == (metric_names)

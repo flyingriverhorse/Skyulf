@@ -894,7 +894,7 @@ def test_optuna_failed_trials_surface_error_in_log_and_message():
     the frontend job detail shows the real cause instead of a generic message.
     """
     pytest.importorskip("optuna")
-    xgb = pytest.importorskip("xgboost")  # noqa: F841
+    xgb = pytest.importorskip("xgboost")
     from skyulf.modeling.classification import XGBClassifierCalculator
 
     X, y_int = _clf_xy(n=40)
@@ -988,7 +988,8 @@ def test_optuna_integration_second_fallback_path_succeeds():
     import types
 
     fake_module = types.ModuleType("optuna.integration.sklearn")
-    setattr(fake_module, "OptunaSearchCV", object())  # noqa: B010 - sentinel marker class
+    # __dict__ assignment: ty flags dynamic attribute sets on ModuleType.
+    fake_module.__dict__["OptunaSearchCV"] = object()
     variant = _load_engine_variant(
         {"optuna.integration": None, "optuna.integration.sklearn": fake_module}
     )
@@ -1004,7 +1005,8 @@ def test_optuna_integration_third_fallback_path_succeeds():
     import types
 
     fake_module = types.ModuleType("optuna_integration.sklearn")
-    setattr(fake_module, "OptunaSearchCV", object())  # noqa: B010 - sentinel marker class
+    # __dict__ assignment: ty flags dynamic attribute sets on ModuleType.
+    fake_module.__dict__["OptunaSearchCV"] = object()
     variant = _load_engine_variant(
         {
             "optuna.integration": None,
@@ -1864,3 +1866,57 @@ def test_no_progress_flag_stays_silent(capsys):
     X, y = _clf_xy()
     _tuner_clf().fit(X, y, _clf_config())
     assert capsys.readouterr().out == ""
+
+
+# ---------------------------------------------------------------------------
+# Seed propagation (F-02) and fold-error collection (F-24)
+# ---------------------------------------------------------------------------
+
+
+def test_config_random_state_reaches_refit_model():
+    """F-02: the caller's seed must win over the calculator's baked-in default
+    at refit time, instead of being silently discarded."""
+    X, y = _clf_xy()
+    for seed in (1, 999):
+        cfg = TuningConfig(
+            strategy="grid",
+            metric="accuracy",
+            search_space={"n_estimators": [10]},
+            cv_folds=2,
+            random_state=seed,
+        )
+        model, _ = TuningCalculator(RandomForestClassifierCalculator()).fit(
+            X, y, config=cfg.__dict__
+        )
+        assert model.random_state == seed
+
+
+def test_search_space_seed_beats_config_seed():
+    """A seed the search itself selects must still take precedence over the
+    caller's config seed."""
+    X, y = _clf_xy()
+    cfg = TuningConfig(
+        strategy="grid",
+        metric="accuracy",
+        search_space={"n_estimators": [10], "random_state": [7]},
+        cv_folds=2,
+        random_state=999,
+    )
+    model, _ = TuningCalculator(RandomForestClassifierCalculator()).fit(X, y, config=cfg.__dict__)
+    assert model.random_state == 7
+
+
+def test_all_trials_failed_reports_suppressed_fold_errors():
+    """F-24: every fold failure is collected, so the all-trials-failed error
+    reports the first error plus how many more were suppressed."""
+    X, y = _clf_xy()
+    # lbfgs (the default solver) rejects the l1 penalty at fit time, so every
+    # fold of every candidate fails.
+    cfg = TuningConfig(
+        strategy="grid",
+        metric="accuracy",
+        search_space={"penalty": ["l1"]},
+        cv_folds=3,
+    )
+    with pytest.raises(ValueError, match="2 more fold failures suppressed"):
+        _tuner_clf().fit(X, y, config=cfg.__dict__)

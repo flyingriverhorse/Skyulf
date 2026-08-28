@@ -263,14 +263,16 @@ class TestSGDClassifier:
 
     def test_calculator_metadata(self) -> None:
         assert SGDClassifierCalculator().problem_type == "classification"
+        # `random_state` is not part of the static defaults: the default seed is
+        # injected at fit-resolution time (`_inject_default_seed`, finding F-21).
         assert SGDClassifierCalculator().default_params == {
             "loss": "log_loss",
             "penalty": "l2",
             "alpha": 0.0001,
             "l1_ratio": 0.15,
             "max_iter": 1000,
-            "random_state": 42,
         }
+        assert SGDClassifierCalculator()._resolve_fit_params({})["random_state"] == 42
 
 
 # ===========================================================================
@@ -302,13 +304,13 @@ class TestClassificationGapsRegistry:
             "method": "sigmoid",
             "cv": 5,
         }
+        # Seed lives in the injected default (F-21), not in the static metadata.
         assert metadata["sgd_classifier"]["params"] == {
             "loss": "log_loss",
             "penalty": "l2",
             "alpha": 0.0001,
             "l1_ratio": 0.15,
             "max_iter": 1000,
-            "random_state": 42,
         }
 
     def test_calculator_problem_types(self) -> None:

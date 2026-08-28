@@ -193,7 +193,7 @@ pytest.importorskip(
     "imblearn", reason="imbalanced-learn not installed — pip install imbalanced-learn"
 )
 
-from skyulf.preprocessing.resampling import (  # noqa: E402
+from skyulf.preprocessing.resampling import (
     OversamplingApplier,
     OversamplingCalculator,
 )

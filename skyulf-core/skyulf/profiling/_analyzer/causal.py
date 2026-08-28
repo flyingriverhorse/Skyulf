@@ -128,6 +128,6 @@ class CausalMixin(_AnalyzerState):
 
             return CausalGraph(nodes=nodes, edges=edges)
 
-        except Exception as e:
-            logger.error(f"Error in causal discovery: {e}")
+        except Exception:
+            logger.exception("Error in causal discovery")
             return None

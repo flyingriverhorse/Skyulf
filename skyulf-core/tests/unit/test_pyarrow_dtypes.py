@@ -17,15 +17,15 @@ import pytest
 
 pa = pytest.importorskip("pyarrow")
 
-from skyulf.preprocessing.encoding.one_hot import (  # noqa: E402
+from skyulf.preprocessing.encoding.one_hot import (
     OneHotEncoderApplier,
     OneHotEncoderCalculator,
 )
-from skyulf.preprocessing.imputation.simple import (  # noqa: E402
+from skyulf.preprocessing.imputation.simple import (
     SimpleImputerApplier,
     SimpleImputerCalculator,
 )
-from skyulf.preprocessing.scaling.standard import (  # noqa: E402
+from skyulf.preprocessing.scaling.standard import (
     StandardScalerApplier,
     StandardScalerCalculator,
 )

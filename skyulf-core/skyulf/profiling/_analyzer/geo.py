@@ -47,7 +47,7 @@ class GeoMixin(_AnalyzerState):
                 centroid_lon=stats[5],
                 sample_points=points,
             )
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - geo analysis is optional; logged, returns None
             logger.warning(f"Error in geospatial analysis: {e}")
             return None
 

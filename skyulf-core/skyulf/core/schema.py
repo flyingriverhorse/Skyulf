@@ -272,7 +272,7 @@ def _extract_pandas_dtypes(df: Any) -> dict[str, str]:
         return {}
     try:
         return {str(name): str(dt) for name, dt in pd_dtypes.items()}
-    except Exception:  # noqa: BLE001 - best-effort schema infer
+    except Exception:  # noqa: BLE001 - defensive dtype probe; empty-schema fallback is intended
         logger.debug("Failed to extract pandas dtypes for schema inference", exc_info=True)
         return {}
 
@@ -284,6 +284,6 @@ def _extract_polars_dtypes(df: Any) -> dict[str, str]:
     try:
         items = schema_attr.items() if hasattr(schema_attr, "items") else schema_attr
         return {str(name): str(dt) for name, dt in items}
-    except Exception:  # noqa: BLE001
+    except Exception:  # noqa: BLE001 - defensive dtype probe; empty-schema fallback is intended
         logger.debug("Failed to extract polars dtypes for schema inference", exc_info=True)
         return {}

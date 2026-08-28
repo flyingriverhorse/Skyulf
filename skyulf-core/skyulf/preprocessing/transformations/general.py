@@ -42,7 +42,7 @@ def _apply_power_to_polars_col(X_out: Any, item: dict[str, Any]) -> Any:
         vals = X_out[col].to_numpy().reshape(-1, 1)
         flat = pt.transform(vals).ravel()
         return X_out.with_columns(pl.Series(flat).alias(col))
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - per-column transform failure is logged; column left unchanged
         logger.warning(f"Failed to apply {method} for column {col}: {e}")
         return X_out
 
@@ -68,7 +68,7 @@ def _apply_power_to_pandas_col(df_out: Any, item: dict[str, Any]) -> Any:
         # sklearn may be configured with transform_output="pandas".
         trans_arr = trans_vals.to_numpy() if hasattr(trans_vals, "to_numpy") else trans_vals
         df_out[col] = np.asarray(trans_arr).ravel()
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - per-column transform failure is logged; column left unchanged
         logger.warning(f"Failed to apply {method} for column {col}: {e}")
     return df_out
 
@@ -183,7 +183,7 @@ class GeneralTransformationCalculator(BaseCalculator):
             if method in _POWER_METHODS:
                 try:
                     extras = _fit_power_for_column(X, col, method, is_polars)
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001 - per-column fit failure is logged; column skipped
                     logger.warning(f"Failed to fit {method} for column {col}: {e}")
                     continue
                 if not extras:

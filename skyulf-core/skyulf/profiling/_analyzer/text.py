@@ -39,7 +39,7 @@ class TextMixin(_AnalyzerState):
                 {"word": row["word"], "count": row["count"]}
                 for row in word_counts.iter_rows(named=True)
             )
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - text stats are best-effort; logged
             logger.warning(f"Error calculating common words for {col}: {e}")
 
         return TextStats(
@@ -100,7 +100,7 @@ class TextMixin(_AnalyzerState):
                 "neutral": counts["neutral"] / total,
                 "negative": counts["negative"] / total,
             }
-        except Exception:
+        except Exception:  # noqa: BLE001 - sentiment analysis is optional (vader); None means unavailable
             return None
 
     def _check_pii(self, col: str) -> bool:

@@ -23,6 +23,7 @@ from ..core.meta.decorators import node_meta
 from ..data.dataset import SplitDataset
 from ..engines import SkyulfDataFrame
 from ..registry import NodeRegistry
+from ..types import DEFAULT_RANDOM_STATE
 from ._artifacts import FeatureTargetSplitArtifact, SplitArtifact
 from ._helpers import is_polars
 from ._schema import SkyulfSchema
@@ -111,7 +112,7 @@ def _build_splitter(params: dict[str, Any]) -> "DataSplitter":
     return DataSplitter(
         test_size=params.get("test_size", 0.2),
         validation_size=params.get("validation_size", 0.0),
-        random_state=params.get("random_state", 42),
+        random_state=params.get("random_state", DEFAULT_RANDOM_STATE),
         shuffle=params.get("shuffle", True),
         stratify_col=stratify_col,
     )
@@ -154,7 +155,7 @@ class SplitApplier(BaseApplier):
     params={
         "test_size": 0.2,
         "validation_size": 0.0,
-        "random_state": 42,
+        "random_state": DEFAULT_RANDOM_STATE,
         "shuffle": True,
         "stratify": False,
         "target_column": "target",
@@ -204,7 +205,7 @@ class DataSplitter:
         self,
         test_size: float = 0.2,
         validation_size: float = 0.0,
-        random_state: int = 42,
+        random_state: int = DEFAULT_RANDOM_STATE,
         shuffle: bool = True,
         stratify_col: str | None = None,
     ):
@@ -334,7 +335,7 @@ class DataSplitter:
             stratify_val = (
                 _safe_stratify_polars(
                     df.get_column(self.stratify_col).gather(tv_idx), "Stratified validation split"
-                )  # noqa: E501
+                )
                 if stratify is not None
                 else None
             )

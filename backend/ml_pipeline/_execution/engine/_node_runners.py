@@ -38,6 +38,7 @@ from skyulf.modeling.cross_validation import _detect_datetime_columns
 from skyulf.preprocessing import AuditedFoldPreprocessor, frame_rows
 from skyulf.preprocessing.pipeline import FeatureEngineer
 from skyulf.registry import NodeRegistry
+from skyulf.types import DEFAULT_RANDOM_STATE
 
 from ..schemas import NodeConfig
 
@@ -662,9 +663,9 @@ class NodeRunnersMixin:
             "cv_folds": node.params.get("cv_folds", 5),
             "cv_type": node.params.get("cv_type", "k_fold"),
             "cv_shuffle": node.params.get("cv_shuffle", True),
-            "cv_random_state": node.params.get("cv_random_state", 42),
+            "cv_random_state": node.params.get("cv_random_state", DEFAULT_RANDOM_STATE),
             "cv_time_column": node.params.get("cv_time_column") or None,
-            "random_state": node.params.get("random_state", 42),
+            "random_state": node.params.get("random_state", DEFAULT_RANDOM_STATE),
         }
 
     def _run_training(
@@ -887,7 +888,7 @@ class NodeRunnersMixin:
                 n_folds=tuning_params.get("cv_folds", 5),
                 cv_type=post_cv_type,
                 shuffle=tuning_params.get("cv_shuffle", True),
-                random_state=tuning_params.get("cv_random_state", 42),
+                random_state=tuning_params.get("cv_random_state", DEFAULT_RANDOM_STATE),
                 time_column=tuning_params.get("cv_time_column") or None,
                 log_callback=self.log,
                 preprocessing=preprocessing,
