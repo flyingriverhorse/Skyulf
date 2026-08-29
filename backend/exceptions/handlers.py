@@ -39,7 +39,7 @@ async def _record_error(
             )
             session.add(event)
             await session.commit()
-    except Exception as persist_err:
+    except Exception as persist_err:  # noqa: BLE001 - error logging is best-effort
         logger.debug("ErrorEvent persist failed: %s", persist_err)
 
 
@@ -77,7 +77,7 @@ def record_pipeline_error(job_id: str, message: str, traceback: str) -> None:
                 session.close()
         finally:
             engine.dispose()
-    except Exception as persist_err:
+    except Exception as persist_err:  # noqa: BLE001 - error logging is best-effort
         logger.debug("ErrorEvent (sync) persist failed: %s", persist_err)
 
 

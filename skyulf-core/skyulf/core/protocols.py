@@ -23,7 +23,7 @@ import pandas as pd
 
 from ..engines import SkyulfDataFrame
 
-__all__ = ["CalculatorProtocol", "ApplierProtocol", "PipelineStep"]
+__all__ = ["ApplierProtocol", "CalculatorProtocol", "PipelineStep"]
 
 
 @runtime_checkable

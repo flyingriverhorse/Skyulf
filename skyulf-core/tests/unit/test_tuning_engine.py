@@ -15,9 +15,10 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import Pipeline
 from tests.utils.test_case_loader import TestCaseLoader
 
+from skyulf.modeling._evaluation.thresholds import apply_thresholds
 from skyulf.modeling._tuning import engine as engine_mod
 from skyulf.modeling._tuning.engine import TuningApplier, TuningCalculator
-from skyulf.modeling._tuning.schemas import TuningConfig
+from skyulf.modeling._tuning.schemas import TuningConfig, TuningResult
 from skyulf.modeling.base import BaseModelCalculator
 from skyulf.modeling.classification import (
     KNeighborsClassifierApplier,
@@ -894,7 +895,7 @@ def test_optuna_failed_trials_surface_error_in_log_and_message():
     the frontend job detail shows the real cause instead of a generic message.
     """
     pytest.importorskip("optuna")
-    xgb = pytest.importorskip("xgboost")  # noqa: F841
+    xgb = pytest.importorskip("xgboost")
     from skyulf.modeling.classification import XGBClassifierCalculator
 
     X, y_int = _clf_xy(n=40)
@@ -988,7 +989,8 @@ def test_optuna_integration_second_fallback_path_succeeds():
     import types
 
     fake_module = types.ModuleType("optuna.integration.sklearn")
-    setattr(fake_module, "OptunaSearchCV", object())  # noqa: B010 - sentinel marker class
+    # __dict__ assignment: ty flags dynamic attribute sets on ModuleType.
+    fake_module.__dict__["OptunaSearchCV"] = object()
     variant = _load_engine_variant(
         {"optuna.integration": None, "optuna.integration.sklearn": fake_module}
     )
@@ -1004,7 +1006,8 @@ def test_optuna_integration_third_fallback_path_succeeds():
     import types
 
     fake_module = types.ModuleType("optuna_integration.sklearn")
-    setattr(fake_module, "OptunaSearchCV", object())  # noqa: B010 - sentinel marker class
+    # __dict__ assignment: ty flags dynamic attribute sets on ModuleType.
+    fake_module.__dict__["OptunaSearchCV"] = object()
     variant = _load_engine_variant(
         {
             "optuna.integration": None,
@@ -1416,7 +1419,7 @@ def test_fit_optuna_strategy_pruners(pruner_name):
 
 def test_fit_optuna_without_optuna_installed_raises(monkeypatch):
     """If HAS_OPTUNA is False, requesting the optuna strategy should raise ImportError."""
-    monkeypatch.setattr(engine_mod, "HAS_OPTUNA", False)
+    monkeypatch.setattr(engine_mod._optuna_state, "has_optuna", False)
     X, y = _clf_xy()
     tuner = TuningCalculator(LogisticRegressionCalculator())
     cfg = TuningConfig(
@@ -1615,6 +1618,217 @@ def test_tuning_applier_predict_proba_without_tuple_artifact_returns_none():
     X_df = pd.DataFrame({"a": [1, 2, 3]})
     proba = applier.predict_proba(X_df, "not-a-tuple-artifact")
     assert proba is None
+
+
+# ---------------------------------------------------------------------------
+# F-13: decision-threshold tuning (tune_threshold)
+# ---------------------------------------------------------------------------
+
+
+def _clf_xy_split(n: int = 200, seed: int = 42):
+    """Binary (X_train, y_train, X_val, y_val) as Numpy arrays."""
+    X, y = _clf_xy(n=n, seed=seed)
+    return X[:160], y[:160], X[160:], y[160:]
+
+
+def test_tune_threshold_default_off():
+    """tune_threshold defaults to False: no thresholds, default decision rule."""
+    X_train, y_train, X_val, y_val = _clf_xy_split()
+    model, result = _tuner_clf().fit(
+        X_train, y_train, config=_clf_config(), validation_data=(X_val, y_val)
+    )
+    assert result.decision_thresholds is None
+    assert result.decision_threshold_metric is None
+
+
+def test_tune_threshold_binary_selects_and_applies():
+    """tune_threshold=True on a binary classifier: a threshold is selected,
+    stored on the result, and applied by the applier's predict()."""
+    X_train, y_train, X_val, y_val = _clf_xy_split()
+    model, result = _tuner_clf().fit(
+        X_train,
+        y_train,
+        config=_clf_config(tune_threshold=True),
+        validation_data=(X_val, y_val),
+    )
+
+    assert result.decision_thresholds is not None
+    assert set(result.decision_thresholds.keys()) == set(np.unique(y_train))
+    assert result.decision_threshold_metric == "accuracy"
+
+    applier = TuningApplier(LogisticRegressionApplier())
+    preds = applier.predict(pd.DataFrame(X_val), (model, result))
+    expected = apply_thresholds(
+        np.asarray(model.predict_proba(X_val)),
+        result.decision_thresholds,
+        classes=model.classes_,
+    )
+    np.testing.assert_array_equal(np.asarray(preds), expected)
+
+
+def test_tune_threshold_probability_metric_falls_back_to_balanced_accuracy():
+    """roc_auc needs probabilities, so the threshold search falls back to
+    balanced_accuracy and records that in decision_threshold_metric."""
+    X_train, y_train, X_val, y_val = _clf_xy_split()
+    model, result = _tuner_clf().fit(
+        X_train,
+        y_train,
+        config=_clf_config(tune_threshold=True, metric="roc_auc"),
+        validation_data=(X_val, y_val),
+    )
+    assert result.decision_thresholds is not None
+    assert result.decision_threshold_metric == "balanced_accuracy"
+
+
+def test_tune_threshold_no_validation_skips():
+    """tune_threshold=True without a validation split skips (thresholds None)."""
+    X, y = _clf_xy()
+    model, result = _tuner_clf().fit(X, y, config=_clf_config(tune_threshold=True))
+    assert result.decision_thresholds is None
+
+
+def test_tune_threshold_multiclass_skips():
+    """tune_threshold=True on a multiclass target skips (binary only)."""
+    X, y = make_classification(
+        n_samples=200,
+        n_features=6,
+        n_informative=4,
+        n_redundant=1,
+        n_classes=3,
+        random_state=42,
+    )
+    X, y = X.astype(float), y.astype(int)
+    model, result = _tuner_clf().fit(
+        X[:160],
+        y[:160],
+        config=_clf_config(tune_threshold=True),
+        validation_data=(X[160:], y[160:]),
+    )
+    assert result.decision_thresholds is None
+
+
+def test_tune_threshold_regression_skips():
+    """tune_threshold=True on a regression problem skips."""
+    X, y = _reg_xy(n=200)
+    cfg = TuningConfig(
+        strategy="grid",
+        metric="r2",
+        search_space={"n_estimators": [10]},
+        cv_folds=3,
+        tune_threshold=True,
+    )
+    tuner = TuningCalculator(RandomForestRegressorCalculator())
+    model, result = tuner.fit(
+        X[:160], y[:160], config=cfg.__dict__, validation_data=(X[160:], y[160:])
+    )
+    assert result.decision_thresholds is None
+
+
+def test_applier_without_thresholds_uses_default_rule():
+    """A TuningResult with no thresholds must leave predict on the base rule."""
+    X_train, y_train, X_val, y_val = _clf_xy_split()
+    model, result = _tuner_clf().fit(
+        X_train, y_train, config=_clf_config(), validation_data=(X_val, y_val)
+    )
+    assert result.decision_thresholds is None
+
+    applier = TuningApplier(LogisticRegressionApplier())
+    X_df = pd.DataFrame(X_val)
+    tuned = applier.predict(X_df, (model, result))
+    base = applier.base_applier.predict(X_df, model)
+    np.testing.assert_array_equal(np.asarray(tuned), np.asarray(base))
+
+
+# ---------------------------------------------------------------------------
+# Binary targets with non-numeric (string) labels: pos_label fix
+# ---------------------------------------------------------------------------
+
+
+def _clf_xy_str_split(n: int = 200, seed: int = 42):
+    """Binary (X_train, y_train, X_val, y_val) with string labels ("no"/"yes")."""
+    X_train, y_train, X_val, y_val = _clf_xy_split(n=n, seed=seed)
+
+    def to_str(arr):
+        return np.where(arr == 1, "yes", "no")
+
+    return X_train, to_str(y_train), X_val, to_str(y_val)
+
+
+def test_resolve_scorer_pins_pos_label_for_string_binary_target():
+    """f1/precision/recall scorers default to pos_label=1, which raises for
+    string labels; _resolve_scorer must pin pos_label to the positive class."""
+    tuner = _tuner_clf()
+    y_str = pd.Series(["no"] * 20 + ["yes"] * 20)
+    for metric in ("f1", "precision", "recall"):
+        scorer = tuner._resolve_scorer(metric, y_str)
+        assert scorer._kwargs.get("pos_label") == "yes"
+
+
+def test_resolve_scorer_keeps_stock_scorer_for_numeric_binary_target():
+    """{0, 1} targets keep the stock scorer (pos_label=1 is already valid)."""
+    tuner = _tuner_clf()
+    y01 = pd.Series([0] * 20 + [1] * 20)
+    stock = tuner._resolve_scorer("f1", y01)
+    assert "pos_label" not in stock._kwargs
+    # Non-pos_label metrics and multiclass targets are never rewritten.
+    y_str = pd.Series(["no"] * 20 + ["yes"] * 20)
+    assert "pos_label" not in tuner._resolve_scorer("accuracy", y_str)._kwargs
+    y_multi = pd.Series(["a"] * 10 + ["b"] * 10 + ["c"] * 10)
+    assert "pos_label" not in tuner._resolve_scorer("f1", y_multi)._kwargs
+
+
+def test_optuna_tuning_completes_on_string_binary_target_with_f1():
+    """Regression: optuna tuning of a string-label binary target with the
+    binary-default 'f1' metric used to fail every trial with
+    'pos_label=1 is not a valid label' and surface as all-NaN trials."""
+    X_train, y_train, X_val, y_val = _clf_xy_str_split()
+    cfg = TuningConfig(
+        strategy="optuna",
+        metric="f1",
+        n_trials=2,
+        cv_enabled=True,
+        cv_folds=3,
+        cv_type="stratified_k_fold",
+        random_state=42,
+        search_space={"C": [0.1, 1.0]},
+    )
+    model, result = _tuner_clf().fit(
+        pd.DataFrame(X_train),
+        pd.Series(y_train),
+        config=cfg,
+        validation_data=(pd.DataFrame(X_val), pd.Series(y_val)),
+    )
+    assert result.best_score is not None
+    assert not np.isnan(result.best_score)
+
+
+def test_grid_tuning_completes_on_string_binary_target_with_f1():
+    """The custom grid/random loop scores folds the same way and must also
+    survive string-label binary targets with binary-default metrics."""
+    X_train, y_train, X_val, y_val = _clf_xy_str_split()
+    model, result = _tuner_clf().fit(
+        pd.DataFrame(X_train),
+        pd.Series(y_train),
+        config=_clf_config(strategy="grid", metric="f1"),
+        validation_data=(pd.DataFrame(X_val), pd.Series(y_val)),
+    )
+    assert result.best_score is not None
+    assert not np.isnan(result.best_score)
+
+
+def test_tune_threshold_seeds_on_string_binary_target():
+    """F-13 threshold seeding with string labels: the f1 hard-label callable
+    must get the model's positive class instead of the pos_label=1 default."""
+    X_train, y_train, X_val, y_val = _clf_xy_str_split()
+    model, result = _tuner_clf().fit(
+        pd.DataFrame(X_train),
+        pd.Series(y_train),
+        config=_clf_config(tune_threshold=True, metric="f1"),
+        validation_data=(pd.DataFrame(X_val), pd.Series(y_val)),
+    )
+    assert result.decision_thresholds is not None
+    assert set(result.decision_thresholds.keys()) == {"no", "yes"}
+    assert result.decision_threshold_metric == "f1"
 
 
 # ---------------------------------------------------------------------------
@@ -1864,3 +2078,57 @@ def test_no_progress_flag_stays_silent(capsys):
     X, y = _clf_xy()
     _tuner_clf().fit(X, y, _clf_config())
     assert capsys.readouterr().out == ""
+
+
+# ---------------------------------------------------------------------------
+# Seed propagation (F-02) and fold-error collection (F-24)
+# ---------------------------------------------------------------------------
+
+
+def test_config_random_state_reaches_refit_model():
+    """F-02: the caller's seed must win over the calculator's baked-in default
+    at refit time, instead of being silently discarded."""
+    X, y = _clf_xy()
+    for seed in (1, 999):
+        cfg = TuningConfig(
+            strategy="grid",
+            metric="accuracy",
+            search_space={"n_estimators": [10]},
+            cv_folds=2,
+            random_state=seed,
+        )
+        model, _ = TuningCalculator(RandomForestClassifierCalculator()).fit(
+            X, y, config=cfg.__dict__
+        )
+        assert model.random_state == seed
+
+
+def test_search_space_seed_beats_config_seed():
+    """A seed the search itself selects must still take precedence over the
+    caller's config seed."""
+    X, y = _clf_xy()
+    cfg = TuningConfig(
+        strategy="grid",
+        metric="accuracy",
+        search_space={"n_estimators": [10], "random_state": [7]},
+        cv_folds=2,
+        random_state=999,
+    )
+    model, _ = TuningCalculator(RandomForestClassifierCalculator()).fit(X, y, config=cfg.__dict__)
+    assert model.random_state == 7
+
+
+def test_all_trials_failed_reports_suppressed_fold_errors():
+    """F-24: every fold failure is collected, so the all-trials-failed error
+    reports the first error plus how many more were suppressed."""
+    X, y = _clf_xy()
+    # lbfgs (the default solver) rejects the l1 penalty at fit time, so every
+    # fold of every candidate fails.
+    cfg = TuningConfig(
+        strategy="grid",
+        metric="accuracy",
+        search_space={"penalty": ["l1"]},
+        cv_folds=3,
+    )
+    with pytest.raises(ValueError, match="2 more fold failures suppressed"):
+        _tuner_clf().fit(X, y, config=cfg.__dict__)

@@ -509,6 +509,14 @@ export const EvaluationView: React.FC<Props> = ({
                     {tuningPreview.split_used === 'test' && (
                       <em className="ml-1">(no validation split available — using test split)</em>
                     )}
+                    {tuningPreview.source === 'training' && (
+                      <span
+                        className="ml-1.5 inline-flex items-center rounded-full bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-200 dark:border-indigo-800 px-1.5 py-0.5 text-[10px] font-medium text-indigo-600 dark:text-indigo-300"
+                        title="These thresholds were selected automatically during model training (Tune decision threshold) and saved here — you can preview new ones, save over them, or clear them."
+                      >
+                        seeded at training
+                      </span>
+                    )}
                   </span>
                   <div className="flex items-center gap-1">
                     <button

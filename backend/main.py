@@ -220,7 +220,7 @@ def _reset_stale_jobs() -> None:
                         "Reset %d stale job(s) in %s to 'failed'", result.rowcount, table
                     )
         engine.dispose()
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - startup cleanup is non-fatal
         logger.warning("Could not reset stale jobs on startup: %s", exc)
 
 
@@ -251,7 +251,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     try:
         await connection_manager.start()
         logger.info("✅ Realtime subscriber started")
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - realtime startup failure is non-fatal
         logger.warning("Realtime subscriber failed to start: %s", exc)
 
     startup_time = time.time() - start_time
@@ -263,7 +263,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     logger.info("🛑 Shutting down FastAPI MLops Application")
     try:
         await connection_manager.stop()
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - shutdown teardown is best-effort
         logger.warning("Realtime subscriber shutdown error: %s", exc)
     await close_db()
     logger.info("✅ Application shutdown complete")
@@ -334,7 +334,7 @@ def _setup_templates_and_static(app: FastAPI) -> None:
     try:
         app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
         logger.info(f"[OK] Static files mounted from: {static_dir}")
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - mount failure must not block startup
         logger.error(f"[ERROR] Failed to mount static files: {e}")
 
     # Mount built frontend assets (/assets/* -> static/ml_canvas/assets/)

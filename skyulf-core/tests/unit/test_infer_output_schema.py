@@ -278,17 +278,17 @@ def test_feature_target_split_unknown_target_passes_through() -> None:
 # ``infer_output_schema`` must return ``None`` so the schema graph
 # treats the downstream chain as opaque rather than guessing wrong.
 
-from skyulf.preprocessing.bucketing import (  # noqa: E402
+from skyulf.preprocessing.bucketing import (
     CustomBinningCalculator,
     GeneralBinningCalculator,
     KBinsDiscretizerCalculator,
 )
-from skyulf.preprocessing.encoding.dummy import DummyEncoderCalculator  # noqa: E402
-from skyulf.preprocessing.feature_generation import (  # noqa: E402
+from skyulf.preprocessing.encoding.dummy import DummyEncoderCalculator
+from skyulf.preprocessing.feature_generation import (
     FeatureGenerationCalculator,
     PolynomialFeaturesCalculator,
 )
-from skyulf.preprocessing.feature_selection import (  # noqa: E402
+from skyulf.preprocessing.feature_selection import (
     CorrelationThresholdCalculator,
     ModelBasedSelectionCalculator,
     UnivariateSelectionCalculator,
@@ -353,7 +353,7 @@ def test_infer_output_schema_contract(calc_cls: type) -> None:
     s = SkyulfSchema.from_columns(["a", "b", "c"], {"a": "float64"})
     try:
         out = calc_cls().infer_output_schema(s, {})
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:  # noqa: BLE001 - contract: any raise is converted into an explicit pytest.fail
         pytest.fail(f"{calc_cls.__name__}.infer_output_schema raised {type(e).__name__}: {e}")
     assert out is None or isinstance(out, SkyulfSchema), (
         f"{calc_cls.__name__} returned {type(out).__name__}, expected SkyulfSchema or None"

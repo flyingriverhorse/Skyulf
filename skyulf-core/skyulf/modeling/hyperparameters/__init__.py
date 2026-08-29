@@ -60,7 +60,7 @@ from ._tree import (
     XGBOOST_PARAMS,
 )
 
-__all__ = [
+__all__ = [  # noqa: RUF022 - deliberate thematic grouping mirroring the API doc
     # Core
     "HyperparameterField",
     "MODEL_HYPERPARAMETERS",

@@ -60,6 +60,7 @@ These keys go inside the `"modeling"` block when `"type"` is `"hyperparameter_tu
 | `cv_folds` | `int` | `5` | Number of CV folds |
 | `cv_type` | `str` | `"k_fold"` | One of `k_fold`, `stratified_k_fold`, `time_series_split`, `shuffle_split`, `nested_cv` |
 | `cv_time_column` | `str\|null` | `null` | Column name to sort by when using `time_series_split`. Auto-detects datetime column if omitted |
+| `tune_threshold` | `bool` | `false` | After tuning a binary classifier, select the decision threshold that maximises `metric` on the validation split and apply it in predictions. See [Threshold Tuning](threshold_tuning.md#integrated-with-hyperparameter-tuning) |
 | `progress` | `bool` | `false` | Console trial progress for core-only runs (see [Built-in console progress](#built-in-console-progress-no-callback-needed)). Ignored when you pass your own `progress_callback` |
 
 ## Strategy-specific params
@@ -200,6 +201,14 @@ metrics = estimator.evaluate(dataset=dataset, target_column="target")
 ```
 
 > **Important:** Always pass `TuningCalculator(base_calc)` — not the raw base calculator. The `TuningConfig` keyword filter inside `TuningCalculator.fit` reads `strategy`, `n_trials`, `metric`, `search_space`, `cv_*`, etc. directly from the config dict. If you pass the unwrapped base calculator, `tuning_config` is ignored and a single default-param fit runs instead.
+
+> **Seeds:** `random_state` pins the whole tuning run — candidate sampling,
+> per-candidate CV folds, and the final refit of the winner — while
+> `cv_random_state` pins only the post-tuning evaluation folds. Both default
+> to `DEFAULT_RANDOM_STATE` (`42`), so tuning is reproducible out of the box.
+> The seed itself is never a search-space candidate. In the canvas these are
+> the **Random State** field (Tuning Strategy section) and **Fold Split Seed**
+> (Cross Validation section).
 
 ### Built-in console progress (no callback needed)
 

@@ -2,18 +2,20 @@
 
 import contextlib
 import logging
+import threading
 import warnings
 from collections.abc import Callable
 from dataclasses import replace
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, ClassVar, cast
 
 import numpy as np
 import pandas as pd
 from joblib import parallel_backend
 from sklearn.exceptions import ConvergenceWarning
 
-# Explicitly enable experimental halving search cv
-from sklearn.experimental import enable_halving_search_cv  # noqa
+# Side-effect import (F401 by design): activates sklearn's experimental
+# HalvingGridSearchCV / HalvingRandomSearchCV used by the halving strategies.
+from sklearn.experimental import enable_halving_search_cv  # noqa: F401
 from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import (
     HalvingGridSearchCV,
@@ -30,6 +32,7 @@ from sklearn.pipeline import Pipeline
 from ..._validation import raise_invalid_choice
 from ...engines import SkyulfDataFrame
 from ...engines.sklearn_bridge import SklearnBridge
+from .._evaluation.thresholds import apply_thresholds, optimize_thresholds
 from .._sklearn_compat import normalize_logistic_regression_params
 from ..base import BaseModelApplier, BaseModelCalculator
 from .fold_pipeline import FoldAwareModelStep
@@ -41,6 +44,7 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+
 # Optuna is an optional, heavyweight dependency only needed when a caller
 # actually requests `strategy="optuna"` tuning. Resolution (including its
 # multi-path sklearn-integration fallback chain) is deferred to
@@ -48,63 +52,87 @@ logger = logging.getLogger(__name__)
 # merely importing `skyulf`/`skyulf.modeling` never imports optuna or emits
 # its "OptunaSearchCV not found" warning for users who never use this
 # strategy.
-HAS_OPTUNA = False
-OptunaSearchCV: Any = None
-optuna: Any = None
-_optuna_load_attempted = False
+#
+# The load state lives on one mutable object (not module globals) so
+# the loader needs no `global` statements and can guard the once-only import
+# with a lock against concurrent tuning runs.
+class _OptunaLoadState:
+    __slots__ = ("attempted", "has_optuna", "optuna_module", "search_cv")
+
+    def __init__(self) -> None:
+        self.attempted = False
+        self.has_optuna = False
+        self.optuna_module: Any = None
+        self.search_cv: Any = None
+
+
+_optuna_state = _OptunaLoadState()
+_optuna_load_lock = threading.Lock()
 
 
 def _ensure_optuna_loaded() -> bool:
     """Lazily import Optuna and resolve its sklearn-compatible OptunaSearchCV
-    integration, memoizing the result so repeated tuning calls don't
-    re-attempt the (multi-path fallback) import every time.
+    integration, memoizing the result under a lock so repeated (possibly
+    concurrent) tuning calls don't re-attempt the multi-path fallback import.
 
-    Populates the module-level ``optuna``/``HAS_OPTUNA``/``OptunaSearchCV``
-    globals on success, so the existing ``_build_optuna_distributions``/
-    ``_build_optuna_sampler``/``_build_optuna_pruner`` helpers (which
-    reference the bare ``optuna`` module name) keep working unchanged, since
-    they're only ever called from ``_build_optuna_searcher`` after it has
-    already called this function.
+    Populates ``_optuna_state`` on success; the ``_build_optuna_*`` helpers
+    read from it, and are only ever called from ``_build_optuna_searcher``
+    after this function has run. The legacy module-level names
+    (``HAS_OPTUNA``/``OptunaSearchCV``/``optuna``/``_optuna_load_attempted``)
+    remain readable via the module ``__getattr__`` below.
     """
-    global HAS_OPTUNA, OptunaSearchCV, optuna, _optuna_load_attempted
-    if _optuna_load_attempted:
-        return HAS_OPTUNA
-    _optuna_load_attempted = True
+    with _optuna_load_lock:
+        if _optuna_state.attempted:
+            return _optuna_state.has_optuna
+        _optuna_state.attempted = True
 
-    try:
-        import optuna as _optuna  # ty: ignore[unresolved-import]
-
-        optuna = _optuna
-        HAS_OPTUNA = True
-    except ImportError:
-        return HAS_OPTUNA
-
-    try:
-        from optuna.integration import (  # ty: ignore[unresolved-import]
-            OptunaSearchCV as _OptunaSearchCV,
-        )
-
-        OptunaSearchCV = _OptunaSearchCV
-    except ImportError:
         try:
-            from optuna.integration.sklearn import (  # ty: ignore[unresolved-import]
+            import optuna as _optuna  # ty: ignore[unresolved-import]
+
+            _optuna_state.optuna_module = _optuna
+            _optuna_state.has_optuna = True
+        except ImportError:
+            return _optuna_state.has_optuna
+
+        try:
+            from optuna.integration import (  # ty: ignore[unresolved-import]
                 OptunaSearchCV as _OptunaSearchCV,
             )
 
-            OptunaSearchCV = _OptunaSearchCV
+            _optuna_state.search_cv = _OptunaSearchCV
         except ImportError:
             try:
-                from optuna_integration.sklearn import (  # ty: ignore[unresolved-import]
+                from optuna.integration.sklearn import (  # ty: ignore[unresolved-import]
                     OptunaSearchCV as _OptunaSearchCV,
                 )
 
-                OptunaSearchCV = _OptunaSearchCV
+                _optuna_state.search_cv = _OptunaSearchCV
             except ImportError:
-                HAS_OPTUNA = False
-                logger.warning(
-                    "Optuna installed but OptunaSearchCV not found. Install 'optuna-integration'."
-                )
-    return HAS_OPTUNA
+                try:
+                    from optuna_integration.sklearn import (  # ty: ignore[unresolved-import]
+                        OptunaSearchCV as _OptunaSearchCV,
+                    )
+
+                    _optuna_state.search_cv = _OptunaSearchCV
+                except ImportError:
+                    _optuna_state.has_optuna = False
+                    logger.warning(
+                        "Optuna installed but OptunaSearchCV not found. Install 'optuna-integration'."
+                    )
+        return _optuna_state.has_optuna
+
+
+def __getattr__(name: str) -> Any:
+    """Read-only views of the optuna load state under its legacy names (F-14)."""
+    if name == "HAS_OPTUNA":
+        return _optuna_state.has_optuna
+    if name == "OptunaSearchCV":
+        return _optuna_state.search_cv
+    if name == "optuna":
+        return _optuna_state.optuna_module
+    if name == "_optuna_load_attempted":
+        return _optuna_state.attempted
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 class TuningCalculator(BaseModelCalculator):
@@ -259,8 +287,9 @@ class TuningCalculator(BaseModelCalculator):
         best_params = tuning_result.best_params
         final_params = {**self.model_calculator.default_params, **best_params}
 
-        # Ensure random_state is passed if available in config and not in params
-        if "random_state" not in final_params and hasattr(tuning_config, "random_state"):
+        # The caller's seed must win over the calculator's baked-in default,
+        # but not over a seed the search itself selected.
+        if "random_state" not in best_params and tuning_config.random_state is not None:
             final_params["random_state"] = tuning_config.random_state
 
         if log_callback:
@@ -307,6 +336,144 @@ class TuningCalculator(BaseModelCalculator):
                 warnings.warn_explicit(w.message, w.category, w.filename, w.lineno)
 
         return model
+
+    # Hard-label (y_true, y_pred) classification metrics that a threshold
+    # search can maximise. Probability-only metrics (roc_auc*, log_loss,
+    # pr_auc*, g_score) cannot be computed from hard labels, so threshold
+    # search falls back to balanced_accuracy for those.
+    def _resolve_threshold_metric(
+        self,
+        metric_name: str,
+        log_callback: Callable[[str], None] | None,
+        pos_label: Any = None,
+    ) -> tuple[Callable[[Any, Any], float], str]:
+        """Map the user's tuning metric to a hard-label callable for the threshold search.
+
+        Returns ``(callable, used_metric_name)``. Probability-only metrics fall
+        back to ``balanced_accuracy`` (with a log), since a threshold sweep only
+        ever produces hard class labels.
+
+        ``pos_label`` (the model's positive class) is pinned into the binary
+        f1/precision/recall callables when given: their sklearn defaults assume
+        ``pos_label=1`` and raise for label spaces without a 1 (string labels).
+        """
+        from sklearn.metrics import (
+            accuracy_score,
+            balanced_accuracy_score,
+            f1_score,
+            matthews_corrcoef,
+            precision_score,
+            recall_score,
+        )
+
+        pos_kwargs = {"pos_label": pos_label} if pos_label is not None else {}
+        hard_label: dict[str, Callable[[Any, Any], float]] = {
+            "accuracy": accuracy_score,
+            "balanced_accuracy": balanced_accuracy_score,
+            "f1": lambda yt, yp: f1_score(yt, yp, zero_division=0, **pos_kwargs),
+            "f1_weighted": lambda yt, yp: f1_score(yt, yp, average="weighted", zero_division=0),
+            "precision": lambda yt, yp: precision_score(yt, yp, zero_division=0, **pos_kwargs),
+            "precision_weighted": lambda yt, yp: precision_score(
+                yt, yp, average="weighted", zero_division=0
+            ),
+            "recall": lambda yt, yp: recall_score(yt, yp, zero_division=0, **pos_kwargs),
+            "recall_weighted": lambda yt, yp: recall_score(
+                yt, yp, average="weighted", zero_division=0
+            ),
+            "matthews_corrcoef": matthews_corrcoef,
+        }
+        if metric_name in hard_label:
+            return hard_label[metric_name], metric_name
+
+        msg = (
+            f"Decision-threshold tuning: metric '{metric_name}' needs predicted "
+            "probabilities, but a threshold sweep only produces hard labels — "
+            "tuning the threshold against 'balanced_accuracy' instead."
+        )
+        logger.info(msg)
+        if log_callback:
+            log_callback(msg)
+        return balanced_accuracy_score, "balanced_accuracy"
+
+    def _tune_decision_thresholds(
+        self,
+        model: Any,
+        tuning_result: TuningResult,
+        tuning_config: TuningConfig,
+        validation_data: tuple[Any, Any] | None,
+        log_callback: Callable[[str], None] | None,
+    ) -> None:
+        """F-13: search a decision threshold on the validation split for a binary
+        classifier and store it on ``tuning_result``.
+
+        Gates: classification problem, a model exposing ``predict_proba`` and
+        ``classes_``, an exactly-binary target, and a provided validation split.
+        Any gate that fails — or any error during the search — logs and leaves
+        ``tuning_result.decision_thresholds`` as ``None`` so ``predict()`` keeps
+        the model's default decision rule; threshold tuning is best-effort and
+        must never abort an otherwise successful tuning run.
+        """
+
+        def _skip(reason: str) -> None:
+            msg = f"Decision-threshold tuning skipped: {reason}"
+            logger.info(msg)
+            if log_callback:
+                log_callback(msg)
+
+        if getattr(self.model_calculator, "problem_type", None) != "classification":
+            _skip("this is not a classification model.")
+            return
+        if validation_data is None:
+            _skip("no validation split was provided.")
+            return
+        if not hasattr(model, "predict_proba"):
+            _skip("the model does not expose predict_proba.")
+            return
+        classes = getattr(model, "classes_", None)
+        if classes is None:
+            _skip("the fitted model does not expose class labels (classes_).")
+            return
+        classes = np.asarray(classes)
+        if len(classes) != 2:
+            _skip(f"only binary classification is supported (found {len(classes)} classes).")
+            return
+
+        try:
+            X_val, y_val = validation_data
+            X_val_np, y_val_np = SklearnBridge.to_sklearn((X_val, y_val))
+            y_proba = np.asarray(model.predict_proba(X_val_np))
+
+            metric_callable, metric_name = self._resolve_threshold_metric(
+                tuning_config.metric, log_callback, pos_label=classes[1]
+            )
+            thresholds = optimize_thresholds(
+                y_val_np,
+                y_proba,
+                metric=metric_callable,
+                classes=classes,
+                strategy="grid",
+            )
+
+            tuning_result.decision_thresholds = thresholds
+            tuning_result.decision_threshold_metric = metric_name
+
+            positive_threshold = thresholds.get(classes[1])
+            msg = (
+                f"Decision-threshold tuning: selected threshold "
+                f"{positive_threshold:.4f} for class '{classes[1]}' "
+                f"(maximising '{metric_name}' on the validation split)."
+            )
+            logger.info(msg)
+            if log_callback:
+                log_callback(msg)
+        except Exception as e:  # noqa: BLE001 - threshold tuning is best-effort; a failure must not abort a successful tuning run
+            msg = (
+                "Decision-threshold tuning failed; predict() keeps the default "
+                f"decision rule. ({e})"
+            )
+            logger.warning(msg)
+            if log_callback:
+                log_callback(msg)
 
     def fit(
         self,
@@ -451,6 +618,14 @@ class TuningCalculator(BaseModelCalculator):
             log_callback,
             iteration_callback=iteration_callback,
         )
+
+        # F-13: optionally search a decision threshold for a binary
+        # classifier on the validation split. Best-effort — a failure logs and
+        # leaves predict() on the default decision rule.
+        if tuning_config.tune_threshold:
+            self._tune_decision_thresholds(
+                model, tuning_result, tuning_config, validation_data, log_callback
+            )
 
         if reporter is not None:
             reporter.finish(tuning_result)
@@ -635,7 +810,7 @@ class TuningCalculator(BaseModelCalculator):
         }
     )
 
-    _METRIC_ALIAS_MAP = {
+    _METRIC_ALIAS_MAP: ClassVar[dict[str, str]] = {
         "mse": "neg_mean_squared_error",
         "mae": "neg_mean_absolute_error",
         "rmse": "neg_root_mean_squared_error",
@@ -713,6 +888,46 @@ class TuningCalculator(BaseModelCalculator):
 
         return metric
 
+    # Binary-default sklearn scorers whose score function takes ``pos_label``.
+    # roc_auc looks like one but isn't: roc_auc_score has no pos_label
+    # parameter (it derives the positive class from the label space), and
+    # multiclass variants (f1_weighted, ...) plus accuracy/balanced_accuracy/
+    # matthews_corrcoef don't take it either.
+    _BINARY_POS_LABEL_METRICS: ClassVar[frozenset[str]] = frozenset({"f1", "precision", "recall"})
+
+    def _resolve_scorer(self, metric: str, y: Any) -> Any:
+        """The sklearn scorer for *metric*, with the binary ``pos_label`` default fixed.
+
+        f1/precision/recall scorers assume ``pos_label=1``; targets whose
+        label space does not contain 1 (e.g. raw string labels the fold-aware
+        wrapper scores against before the chain encodes them) make every fold
+        raise ``pos_label=1 is not a valid label`` and surface as all-NaN trials.
+        Pin ``pos_label`` to the sorted-last class — the same convention
+        ``apply_thresholds`` uses for the positive class — whenever the default
+        cannot match. Numeric targets containing 1 keep the stock scorer.
+        """
+        from sklearn.metrics import get_scorer, make_scorer
+
+        scorer = get_scorer(metric)
+        if getattr(self.model_calculator, "problem_type", None) != "classification":
+            return scorer
+        if metric not in self._BINARY_POS_LABEL_METRICS:
+            return scorer
+        classes = np.unique(np.asarray(y))
+        if classes.size != 2 or 1 in classes.tolist():
+            return scorer
+        pos_label = classes[1].item() if hasattr(classes[1], "item") else classes[1]
+        return make_scorer(
+            scorer._score_func,
+            response_method=scorer._response_method,
+            pos_label=pos_label,
+        )
+
+    @staticmethod
+    def _seed_params(config: TuningConfig) -> dict[str, Any]:
+        """The caller's seed as a params overlay, for every tuning-path model build."""
+        return {"random_state": config.random_state} if config.random_state is not None else {}
+
     def _evaluate_candidate_cv(
         self,
         candidate_idx: int,
@@ -725,6 +940,7 @@ class TuningCalculator(BaseModelCalculator):
         log_callback: Callable[[str], None] | None,
         preprocessing: "FoldPreprocessor | None" = None,
         fold_errors: list[str] | None = None,
+        seed_params: dict[str, Any] | None = None,
     ) -> float:
         """Cross-validates one grid/random-search candidate and returns its mean fold score.
 
@@ -756,6 +972,7 @@ class TuningCalculator(BaseModelCalculator):
                 log_callback=log_callback,
                 preprocessing=preprocessing,
                 fold_errors=fold_errors,
+                seed_params=seed_params,
             )
             fold_scores.append(score)
 
@@ -780,12 +997,13 @@ class TuningCalculator(BaseModelCalculator):
         log_callback: Callable[[str], None] | None,
         preprocessing: "FoldPreprocessor | None" = None,
         fold_errors: list[str] | None = None,
+        seed_params: dict[str, Any] | None = None,
     ) -> float:
         """Fits one candidate on a single CV fold and returns its score, or ``-inf`` on failure.
 
         Errors (e.g. incompatible params) are caught and logged rather than raised, so a single
         bad fold doesn't abort the whole candidate evaluation. When ``fold_errors`` is provided,
-        the first failure message is recorded so the search can surface it if every trial fails.
+        every failure message is appended so the search can surface them if every trial fails.
         """
         # Split
         X_train_fold = X_any.iloc[train_idx] if hasattr(X_any, "iloc") else X_any[train_idx]
@@ -805,14 +1023,13 @@ class TuningCalculator(BaseModelCalculator):
 
             model = self._instantiate_model(
                 model_class,
-                {**self.model_calculator.default_params, **params},
+                {**self.model_calculator.default_params, **(seed_params or {}), **params},
             )
             model.fit(X_train_fold, y_train_fold)
 
-            # Score
-            from sklearn.metrics import get_scorer
-
-            scorer = get_scorer(metric)
+            # Score — resolved against the fold's (post-transform) labels so
+            # binary scorers get a valid pos_label even for string targets.
+            scorer = self._resolve_scorer(metric, y_train_fold)
             score = scorer(model, X_val_fold, y_val_fold)
 
             if log_callback:
@@ -821,8 +1038,8 @@ class TuningCalculator(BaseModelCalculator):
                     f"  [Candidate {candidate_idx + 1}] CV Fold {fold_idx + 1}/{n_splits} Score: {score:.4f}"
                 )
             return score
-        except Exception as e:
-            if fold_errors is not None and not fold_errors:
+        except Exception as e:  # noqa: BLE001 - per-fold failures are collected for reporting, must not abort tuning
+            if fold_errors is not None:
                 fold_errors.append(str(e))
             if log_callback:
                 n_splits = cv.get_n_splits(X_arr, y_arr)
@@ -857,6 +1074,7 @@ class TuningCalculator(BaseModelCalculator):
         log_callback: Callable[[str], None] | None,
         preprocessing: "FoldPreprocessor | None" = None,
         fold_errors: list[str] | None = None,
+        seed_params: dict[str, Any] | None = None,
     ) -> tuple[list[dict[str, Any]], float, dict[str, Any] | None]:
         """Evaluates every candidate via CV, emitting progress/log callbacks, and tracks the best.
 
@@ -885,6 +1103,7 @@ class TuningCalculator(BaseModelCalculator):
                 log_callback,
                 preprocessing,
                 fold_errors,
+                seed_params,
             )
 
             if log_callback:
@@ -940,6 +1159,7 @@ class TuningCalculator(BaseModelCalculator):
             log_callback,
             preprocessing,
             fold_errors,
+            self._seed_params(config),
         )
 
         if log_callback:
@@ -947,7 +1167,11 @@ class TuningCalculator(BaseModelCalculator):
             log_callback(f"Best Params: {best_params}")
 
         if best_params is None:
-            detail = f" First trial error: {fold_errors[0]}" if fold_errors else ""
+            detail = ""
+            if fold_errors:
+                detail = f" First trial error: {fold_errors[0]}"
+                if len(fold_errors) > 1:
+                    detail += f" ({len(fold_errors) - 1} more fold failures suppressed)"
             raise ValueError(
                 "Hyperparameter tuning failed: All trials failed. "
                 "This usually means the model failed to train with the provided hyperparameter combinations. "
@@ -967,7 +1191,7 @@ class TuningCalculator(BaseModelCalculator):
         config: TuningConfig,
         base_estimator: Any,
         cv: Any,
-        metric: str,
+        scoring: Any,
         log_callback: Callable[[str], None] | None,
     ) -> Any:
         """Builds a HalvingGridSearchCV/HalvingRandomSearchCV searcher for the halving strategies."""
@@ -1008,7 +1232,7 @@ class TuningCalculator(BaseModelCalculator):
             return HalvingGridSearchCV(
                 estimator=base_estimator,
                 param_grid=self._clean_search_space(config.search_space),
-                scoring=metric,
+                scoring=scoring,
                 cv=cv,
                 n_jobs=config.n_jobs,
                 random_state=config.random_state,
@@ -1022,7 +1246,7 @@ class TuningCalculator(BaseModelCalculator):
             estimator=base_estimator,
             param_distributions=self._clean_search_space(config.search_space),
             n_candidates=config.n_trials,
-            scoring=metric,
+            scoring=scoring,
             cv=cv,
             n_jobs=config.n_jobs,
             random_state=config.random_state,
@@ -1046,10 +1270,11 @@ class TuningCalculator(BaseModelCalculator):
     @staticmethod
     def _numeric_range_distribution(v: list) -> Any:
         """Builds an Optuna Int/FloatDistribution spanning the min/max of a numeric list."""
+        optuna_mod = _optuna_state.optuna_module
         lo, hi = min(v), max(v)
         if all(isinstance(x, int) for x in v):
-            return optuna.distributions.IntDistribution(lo, hi)
-        return optuna.distributions.FloatDistribution(float(lo), float(hi))
+            return optuna_mod.distributions.IntDistribution(lo, hi)
+        return optuna_mod.distributions.FloatDistribution(float(lo), float(hi))
 
     @staticmethod
     def _distribution_for_value(k: str, v: Any, use_cmaes: bool) -> Any:
@@ -1061,7 +1286,7 @@ class TuningCalculator(BaseModelCalculator):
         if TuningCalculator._is_use_cmaes_numeric_list(v, use_cmaes):
             return TuningCalculator._numeric_range_distribution(v)
         if isinstance(v, list):
-            return optuna.distributions.CategoricalDistribution(v)
+            return _optuna_state.optuna_module.distributions.CategoricalDistribution(v)
         return v
 
     @staticmethod
@@ -1081,30 +1306,34 @@ class TuningCalculator(BaseModelCalculator):
     @staticmethod
     def _build_optuna_sampler(sampler_name: str, random_state: Any) -> Any:
         """Builds the Optuna sampler for the configured sampler name (random/cmaes/tpe)."""
+        optuna_mod = _optuna_state.optuna_module
         if sampler_name == "random":
-            return optuna.samplers.RandomSampler(seed=random_state)
+            return optuna_mod.samplers.RandomSampler(seed=random_state)
         if sampler_name == "cmaes":
             # Suppress the fallback warning for genuinely categorical params
             # (strings, booleans, None) — those can never be continuous and
             # the random fallback for them is expected behaviour.
-            return optuna.samplers.CmaEsSampler(seed=random_state, warn_independent_sampling=False)
-        return optuna.samplers.TPESampler(seed=random_state)
+            return optuna_mod.samplers.CmaEsSampler(
+                seed=random_state, warn_independent_sampling=False
+            )
+        return optuna_mod.samplers.TPESampler(seed=random_state)
 
     @staticmethod
     def _build_optuna_pruner(pruner_name: str) -> Any:
         """Builds the Optuna pruner for the configured pruner name (hyperband/none/median)."""
+        optuna_mod = _optuna_state.optuna_module
         if pruner_name == "hyperband":
-            return optuna.pruners.HyperbandPruner()
+            return optuna_mod.pruners.HyperbandPruner()
         if pruner_name == "none":
-            return optuna.pruners.NopPruner()
-        return optuna.pruners.MedianPruner()
+            return optuna_mod.pruners.NopPruner()
+        return optuna_mod.pruners.MedianPruner()
 
     def _build_optuna_searcher(
         self,
         config: TuningConfig,
         base_estimator: Any,
         cv: Any,
-        metric: str,
+        scoring: Any,
         progress_callback: Callable[[int, int, float | None, dict | None], None] | None,
         log_callback: Callable[[str], None] | None,
     ) -> Any:
@@ -1151,21 +1380,23 @@ class TuningCalculator(BaseModelCalculator):
         pruner_name = strategy_params.get("pruner", "median")
         pruner = self._build_optuna_pruner(pruner_name)
 
-        study = optuna.create_study(sampler=sampler, pruner=pruner, direction="maximize")
+        study = _optuna_state.optuna_module.create_study(
+            sampler=sampler, pruner=pruner, direction="maximize"
+        )
 
         with warnings.catch_warnings():
             warnings.filterwarnings(
                 "ignore",
                 message=r"OptunaSearchCV is experimental.*",
-                category=optuna.exceptions.ExperimentalWarning,
+                category=_optuna_state.optuna_module.exceptions.ExperimentalWarning,
             )
-            return OptunaSearchCV(
+            return _optuna_state.search_cv(
                 estimator=base_estimator,
                 param_distributions=distributions,
                 n_trials=config.n_trials,
                 timeout=config.timeout,
                 cv=cv,
-                scoring=metric,
+                scoring=scoring,
                 n_jobs=config.n_jobs,
                 refit=False,
                 verbose=0,
@@ -1231,7 +1462,7 @@ class TuningCalculator(BaseModelCalculator):
                 else:
                     searcher.fit(X_arr, y_arr)
         except Exception as e:
-            logger.error(f"Hyperparameter tuning failed: {str(e)}")
+            logger.exception("Hyperparameter tuning failed")
             error_msg = str(e)
             if "No trials are completed yet" in error_msg:
                 raise ValueError(
@@ -1375,7 +1606,9 @@ class TuningCalculator(BaseModelCalculator):
 
         # ``default_params`` may carry structural args (e.g. an ensemble's
         # resolved ``estimators``); the instantiator filters/routes them safely.
-        base_estimator = self._instantiate_model(model_class, self.model_calculator.default_params)
+        base_estimator = self._instantiate_model(
+            model_class, {**self.model_calculator.default_params, **self._seed_params(config)}
+        )
 
         # halving/optuna searchers run their CV internally, where the engine's
         # per-fold hook cannot reach; wrap preprocessing + model in one
@@ -1479,14 +1712,26 @@ class TuningCalculator(BaseModelCalculator):
                 log_callback,
                 preprocessing,
             )
-        elif config.strategy in ["halving_grid", "halving_random"]:
-            searcher = self._build_halving_searcher(
-                search_config, estimator, cv, metric, log_callback
+        elif config.strategy in ["halving_grid", "halving_random", "optuna"]:
+            # Searchers score the payload handed to them below: the raw
+            # pre-transform frames when wrapped (the fold-aware step encodes
+            # inside fit but maps predictions back), otherwise the payload
+            # labels. Resolve the scorer against that label space so binary
+            # scorers get a valid pos_label even for string targets.
+            scoring_y = (
+                preprocessing_frames[1]
+                if wrapped and preprocessing_frames is not None
+                else y_for_search
             )
-        elif config.strategy == "optuna":
-            searcher = self._build_optuna_searcher(
-                search_config, estimator, cv, metric, progress_callback, log_callback
-            )
+            scoring = self._resolve_scorer(metric, scoring_y)
+            if config.strategy in ["halving_grid", "halving_random"]:
+                searcher = self._build_halving_searcher(
+                    search_config, estimator, cv, scoring, log_callback
+                )
+            else:
+                searcher = self._build_optuna_searcher(
+                    search_config, estimator, cv, scoring, progress_callback, log_callback
+                )
         else:
             raise_invalid_choice(
                 config.strategy,
@@ -1550,7 +1795,20 @@ class TuningApplier(BaseModelApplier):
     ) -> pd.Series | Any:
         # model_artifact is (fitted_model, tuning_result)
         if isinstance(model_artifact, tuple) and len(model_artifact) == 2:
-            model, _ = model_artifact
+            model, tuning_result = model_artifact
+            thresholds = getattr(tuning_result, "decision_thresholds", None)
+            if (
+                thresholds is not None
+                and hasattr(model, "predict_proba")
+                and hasattr(model, "classes_")
+            ):
+                # F-13: apply the decision thresholds tuned on the validation
+                # split instead of the model's default decision rule.
+                X_np, _ = SklearnBridge.to_sklearn(df)
+                y_proba = model.predict_proba(X_np)
+                preds = apply_thresholds(y_proba, thresholds, classes=model.classes_)
+                index = df.index if hasattr(df, "index") else None
+                return pd.Series(preds, index=index)
             return self.base_applier.predict(df, model)
         # Fallback: artifact isn't the expected (model, tuning_result) tuple
         # (e.g. a plain fitted model, before it's wrapped by the tuner). Return

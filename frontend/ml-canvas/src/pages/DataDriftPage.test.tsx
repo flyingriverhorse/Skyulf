@@ -63,7 +63,8 @@ function alertDetail(overrides: Partial<DriftAlertDetail> = {}): DriftAlertDetai
                 column: 'col_0',
                 metrics: [
                     { metric: 'psi', value: 0.5, has_drift: true, threshold: 0.2 },
-                    { metric: 'ks_test_p_value', value: 0.01, has_drift: true, threshold: 0.05 },
+                    { metric: 'ks_statistic', value: 0.18, has_drift: true, threshold: 0.1 },
+                    { metric: 'ks_test_p_value', value: 0.01, has_drift: true, threshold: 0.1 },
                 ],
                 drift_detected: true,
                 suggestions: [],

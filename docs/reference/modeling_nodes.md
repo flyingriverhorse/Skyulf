@@ -42,6 +42,17 @@ Example (RandomForestClassifier):
 }
 ```
 
+### Seeding
+
+Every `random_state=42` default listed below comes from one place:
+`skyulf.types.DEFAULT_RANDOM_STATE`, injected at model construction. You can
+override it per node with `"params": {"random_state": 7}`, or pass
+`"random_state": null` to leave an estimator unseeded. In the canvas, the same
+control appears as **Random State** under Hyperparameters → Customize (basic
+mode), in the Tuning Strategy section (advanced mode), and as **Fold Split
+Seed** in each node's Cross Validation section. Full precedence rules:
+[Reproducibility and seeds](../user_guide/configuration.md#reproducibility-and-seeds).
+
 ## Classification
 
 ### logistic_regression

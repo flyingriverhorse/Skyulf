@@ -94,3 +94,38 @@ class TestRealShapedDataset:
         assert result.best_score > 0
         assert "C" in result.best_params
         assert hasattr(model, "predict")
+
+    def test_tune_threshold_on_customers_data(self) -> None:
+        """F-13 end-to-end: validation split → threshold selected on it →
+        applier predictions honour the cutoff."""
+        from skyulf.modeling._tuning.engine import TuningApplier
+        from skyulf.modeling.classification import LogisticRegressionApplier
+
+        df = load_sample_dataset("customers")
+        df = df.dropna(subset=["age", "income"])
+        X = df[["age", "income"]]
+        y = df["churned"]
+
+        n_train = int(len(df) * 0.8)
+        X_train, y_train = X.iloc[:n_train], y.iloc[:n_train]
+        X_val, y_val = X.iloc[n_train:], y.iloc[n_train:]
+
+        config = TuningConfig(
+            strategy="grid",
+            metric="f1",
+            search_space={"C": [0.1, 1.0]},
+            cv_folds=2,
+            tune_threshold=True,
+        )
+        model, result = TuningCalculator(LogisticRegressionCalculator()).fit(
+            X_train, y_train, config=config.__dict__, validation_data=(X_val, y_val)
+        )
+
+        assert result.decision_thresholds is not None
+        assert result.decision_threshold_metric == "f1"
+        positive = model.classes_[1]
+        assert 0.0 < result.decision_thresholds[positive] < 1.0
+
+        preds = TuningApplier(LogisticRegressionApplier()).predict(X_val, (model, result))
+        assert len(preds) == len(X_val)
+        assert set(preds.unique()).issubset(set(model.classes_))

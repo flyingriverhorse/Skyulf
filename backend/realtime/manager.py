@@ -55,7 +55,7 @@ class ConnectionManager:
         for ws in clients:
             try:
                 await ws.send_text(message)
-            except Exception:
+            except Exception:  # noqa: BLE001 - dead socket is discarded
                 # Client gone; harvest on next disconnect call. Don't await
                 # close() here — it can block other broadcasts.
                 async with self._lock:
@@ -129,7 +129,7 @@ class ConnectionManager:
                 await self._drain_pubsub(pubsub)
             except asyncio.CancelledError:
                 raise
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001 - subscriber retries with backoff
                 logger.warning("Realtime subscriber error: %s (retry in %.1fs)", exc, backoff)
                 with contextlib.suppress(TimeoutError):
                     await asyncio.wait_for(self._stop.wait(), timeout=backoff)
@@ -159,7 +159,7 @@ class ConnectionManager:
                     continue
                 try:
                     await self.broadcast(_wrap_payload(raw))
-                except Exception as exc:  # pragma: no cover - defensive
+                except Exception as exc:  # noqa: BLE001 - broadcast error must not stop loop  # pragma: no cover - defensive
                     logger.warning("LocalBus broadcast error: %s", exc)
         finally:
             local_bus.detach()

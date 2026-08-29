@@ -6,7 +6,7 @@ actually care about (F1, MCC, balanced accuracy, a custom business metric, …).
 Skyulf can search for **per-class decision thresholds** that maximize a metric
 you supply, evaluated on held-out validation data.
 
-The functionality is available at two levels:
+The functionality is available at three levels:
 
 - **Pipeline level:** `SkyulfPipeline.optimize_thresholds()` +
   `predict(use_tuned_thresholds=True)` — handles preprocessing and
@@ -14,6 +14,10 @@ The functionality is available at two levels:
 - **Array level:** `skyulf.modeling.optimize_thresholds()` /
   `apply_thresholds()` — plain NumPy in/out, for use outside a pipeline (e.g.
   with a raw sklearn estimator).
+- **Tuning-engine integration:** `TuningConfig(tune_threshold=True)` — after
+  hyperparameter tuning, the engine selects the threshold on the validation
+  split and applies it in every subsequent prediction automatically (binary
+  classifiers only). See [Integrated with hyperparameter tuning](#integrated-with-hyperparameter-tuning).
 
 ## Pipeline usage
 
@@ -103,6 +107,63 @@ apply_thresholds(
     classes=None,          # explicit class order; required for 3+ classes with a dict
 ) -> np.ndarray            # 1D array of predicted class labels
 ```
+
+## Integrated with hyperparameter tuning
+
+When a classifier is trained through the tuning engine — a canvas Training node
+in Advanced mode, the `"hyperparameter_tuner"` pipeline model type, or
+`TuningCalculator` directly — set `tune_threshold: true` to have the engine
+pick the decision threshold right after the final refit. It grid-searches the
+positive-class cutoff that maximises your tuning metric on the validation
+split, and every subsequent prediction uses that cutoff instead of the default
+`0.5`:
+
+```python
+config = {
+    "modeling": {
+        "type": "hyperparameter_tuner",
+        "base_model": {"type": "logistic_regression"},
+        "strategy": "random",
+        "search_space": {"C": [0.1, 1.0, 10.0]},
+        "metric": "f1",
+        "tune_threshold": True,
+    },
+}
+```
+
+In the canvas, this is the **Tune decision threshold** checkbox in the
+Training node's Tuning Strategy section (classification models, Advanced
+mode).
+
+The selected threshold is stored on the tuning result
+(`decision_thresholds`, plus `decision_threshold_metric` naming the metric the
+sweep maximised) and surfaces in the job metrics; the model's predictions
+apply it automatically — there is no separate "use tuned thresholds" flag at
+this level.
+
+When the job runs through the backend (canvas Training node), the selected
+threshold is also seeded into the job's saved-threshold store — the same one
+the Experiments / Inference **Threshold Tuning** panel reads — and enabled by
+default. A threshold tuned at training time therefore shows up in the panel
+("Optimized for …, computed from validation split", labelled *seeded at
+training*) and is active for deployed predictions immediately, and the usual
+panel controls apply: toggle it off, replace it with a manual preview, or
+clear it. Predict-time precedence is unchanged: request-level override >
+saved + enabled thresholds > default decision rule.
+
+**Gates** — the engine logs a skip in the job log and predictions keep the
+default decision rule when any of these don't hold:
+
+- the model is a **classifier** exposing `predict_proba`;
+- the target is **binary** (for multiclass, use the pipeline- or array-level
+  APIs above);
+- a **validation split** exists (configure a train/validation split upstream).
+
+Probability-only metrics (`roc_auc`, `log_loss`, `pr_auc`, …) cannot be
+computed from hard labels, so the cutoff sweep maximises `balanced_accuracy`
+instead — the log says so, and `decision_threshold_metric` records it.
+Threshold tuning is best-effort: an error during the sweep never aborts the
+tuning run.
 
 ## How the search works
 

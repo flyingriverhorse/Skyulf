@@ -212,3 +212,52 @@ def test_predict_proba_returns_dataframe_with_classes_as_columns(clf_data):
     assert isinstance(result, pd.DataFrame)
     assert list(result.columns) == [str(c) for c in model.classes_]
     assert all(isinstance(c, str) for c in result.columns)
+
+
+# ---------------------------------------------------------------------------
+# F-21: seeding has exactly one owner (DEFAULT_RANDOM_STATE, injected here)
+# ---------------------------------------------------------------------------
+
+
+def _seed_calculator(model_class, **extra_defaults):
+    return SklearnCalculator(
+        model_class=model_class,
+        default_params=dict(extra_defaults),  # no random_state on purpose
+        problem_type="classification",
+    )
+
+
+def test_seed_injected_when_not_configured(clf_data):
+    """A model whose defaults carry no random_state must still be seeded with
+    the single shared fallback (F-21: seeding has one owner)."""
+    from skyulf.types import DEFAULT_RANDOM_STATE
+
+    X, y = clf_data
+    model = _seed_calculator(LogisticRegression).fit(X, y, {})
+    assert model.random_state == DEFAULT_RANDOM_STATE
+
+
+def test_seed_user_override_wins_over_default(clf_data):
+    X, y = clf_data
+    model = _seed_calculator(LogisticRegression).fit(X, y, {"params": {"random_state": 7}})
+    assert model.random_state == 7
+
+
+def test_seed_explicit_none_is_respected(clf_data):
+    """An explicit ``random_state: None`` means 'unseeded' and must pass through."""
+    X, y = clf_data
+    model = _seed_calculator(LogisticRegression).fit(X, y, {"params": {"random_state": None}})
+    assert model.random_state is None
+
+
+def test_seed_not_injected_for_estimators_without_random_state():
+    """Estimators whose constructor has no random_state (and no **kwargs) must
+    not receive one — otherwise they'd trigger a dropped-param warning."""
+    rng = np.random.RandomState(3)
+    X = pd.DataFrame({"f1": rng.normal(0, 1, 20)})
+    y = pd.Series(X["f1"] + rng.normal(0, 0.1, 20))
+    calc = SklearnCalculator(
+        model_class=LinearRegression, default_params={}, problem_type="regression"
+    )
+    params = calc._resolve_fit_params({})
+    assert "random_state" not in params

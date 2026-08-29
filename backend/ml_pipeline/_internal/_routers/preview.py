@@ -100,7 +100,7 @@ def _count_rows(df: Any) -> int:
         pass
     try:
         return int(len(df))
-    except Exception:
+    except Exception:  # noqa: BLE001 - unknown container types count as zero
         return 0
 
 
@@ -587,7 +587,7 @@ def _generate_recommendations(first_pdf: pd.DataFrame | None) -> list[Recommenda
         profile = DataProfiler.generate_profile(first_pdf)
         advisor = AdvisorEngine()
         return advisor.analyze(profile)
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - recommendations best-effort; empty fallback
         logger.warning("Error generating recommendations: %s", e)
         return []
 

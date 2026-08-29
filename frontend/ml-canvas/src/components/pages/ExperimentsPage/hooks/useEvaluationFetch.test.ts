@@ -28,6 +28,7 @@ const noSavedThresholds: SavedThresholdInfo = {
   metric: null,
   split_used: null,
   computed_at: null,
+  source: null,
   enabled: false,
 };
 
@@ -101,12 +102,16 @@ describe('useEvaluationFetch', () => {
       metric: 'f1_weighted',
       split_used: 'test',
       computed_at: '2026-01-02T00:00:00Z',
+      source: 'training',
       enabled: true,
     };
     vi.spyOn(apiClient, 'get').mockResolvedValue(okResponse(evalFor('A')));
-    vi.spyOn(thresholdTuningApi, 'get').mockResolvedValue(saved);
+    vi.spyOn(thresholdTuningApi, 'get').mockResolvedValueOnce(saved).mockResolvedValue({
+      ...saved,
+      metric: 'recall',
+    });
 
-    const { result } = renderHook(() => useEvaluationFetch([makeJob('a')]));
+    const { result } = renderHook(() => useEvaluationFetch([makeJob('a'), makeJob('b')]));
 
     act(() => {
       void result.current.fetchEvaluationData('a');
@@ -118,10 +123,22 @@ describe('useEvaluationFetch', () => {
         classes: saved.classes,
         metric: saved.metric,
         split_used: saved.split_used,
+        source: 'training',
       });
     });
-    expect(result.current.selectedTuningMetric).toBe('f1_weighted');
+    // f1_weighted is not a preview-endpoint metric — the dropdown keeps its
+    // default instead of blanking out / failing the next Preview.
+    expect(result.current.selectedTuningMetric).toBe('f1');
     expect(result.current.useTunedThresholds).toBe(true);
+
+    // A supported saved metric does take over the dropdown.
+    act(() => {
+      void result.current.fetchEvaluationData('b');
+    });
+    await waitFor(() => {
+      expect(result.current.selectedTuningMetric).toBe('recall');
+    });
+    expect(result.current.tuningPreview?.source).toBe('training');
   });
 
   it('discards a late response for an older job instead of clobbering the newer one', async () => {

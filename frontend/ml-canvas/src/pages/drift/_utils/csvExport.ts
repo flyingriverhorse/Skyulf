@@ -13,6 +13,7 @@ export function exportDriftReportCSV(report: DriftReport, datasetName: string | 
         'Wasserstein',
         'PSI',
         'KL Divergence',
+        'KS Statistic',
         'KS P-Value',
         ...(fi ? ['Importance', 'Risk'] : []),
     ];
@@ -36,6 +37,7 @@ export function exportDriftReportCSV(report: DriftReport, datasetName: string | 
             get('wasserstein_distance'),
             get('psi'),
             get('kl_divergence'),
+            get('ks_statistic'),
             get('ks_test_p_value'),
             ...(fi ? [importance?.toFixed(6) ?? '', risk] : []),
         ];

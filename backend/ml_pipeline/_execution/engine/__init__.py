@@ -304,7 +304,7 @@ class PipelineEngine(ArtifactsMixin, MergeMixin, FeatureEngMixin, NodeRunnersMix
         output: Any = None
         try:
             output = self.artifact_store.load(node.node_id)
-        except Exception:
+        except Exception:  # noqa: BLE001 - best-effort load; failure just skips summary
             logger.debug("summary: output load skipped for %s", node.node_id, exc_info=True)
         input_shape: tuple[int, int] | None = None
         try:
@@ -312,7 +312,7 @@ class PipelineEngine(ArtifactsMixin, MergeMixin, FeatureEngMixin, NodeRunnersMix
                 upstream = self.artifact_store.load(node.inputs[0])
                 if isinstance(upstream, (pd.DataFrame, pl.DataFrame)):
                     input_shape = upstream.shape
-        except Exception:
+        except Exception:  # noqa: BLE001 - upstream shape probe is best-effort
             input_shape = None
         try:
             summary = build_summary(
@@ -324,7 +324,7 @@ class PipelineEngine(ArtifactsMixin, MergeMixin, FeatureEngMixin, NodeRunnersMix
             )
             if summary:
                 metadata["summary"] = summary
-        except Exception:
+        except Exception:  # noqa: BLE001 - summary failure falls back to static card
             logger.debug("summary skipped for node %s", node.node_id, exc_info=True)
         return metadata
 

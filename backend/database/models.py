@@ -133,7 +133,7 @@ class DataSource(Base, TimestampMixin):
         # Safely get creator username
         try:
             creator_name = self.creator.username if self.creator else "Unknown"
-        except Exception:
+        except Exception:  # noqa: BLE001 - creator access falls back to Unknown
             creator_name = "Unknown"
 
         return {

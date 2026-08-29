@@ -115,6 +115,6 @@ def calculate_correlations(df: pl.LazyFrame, numeric_cols: list[str]) -> Correla
 
         return CorrelationMatrix(columns=valid_cols, values=matrix)
 
-    except Exception as e:
-        logger.error(f"Error calculating correlations: {e}")
+    except Exception:
+        logger.exception("Error calculating correlations")
         return None

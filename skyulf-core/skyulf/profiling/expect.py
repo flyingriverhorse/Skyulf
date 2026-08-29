@@ -26,8 +26,8 @@ __all__ = [
     "ExpectationError",
     "expect_columns_exist",
     "expect_no_nulls",
-    "expect_value_range",
     "expect_unique",
+    "expect_value_range",
 ]
 
 

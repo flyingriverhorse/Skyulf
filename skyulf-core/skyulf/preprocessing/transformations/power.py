@@ -82,8 +82,8 @@ class PowerTransformerApplier(BaseApplier):
             X_trans = _power_transform_array(X_vals, params, cols, valid_cols)
             series = [pl.Series(name, X_trans[:, i]) for i, name in enumerate(valid_cols)]
             return X.with_columns(series), _y
-        except Exception as e:
-            logger.error(f"PowerTransformer (Polars) application failed: {e}")
+        except Exception:
+            logger.exception("PowerTransformer (Polars) application failed")
             return X, _y
 
     @staticmethod
@@ -97,11 +97,11 @@ class PowerTransformerApplier(BaseApplier):
 
         df_out = X.copy()
         try:
-            X_vals = df_out[valid_cols].values
+            X_vals = df_out[valid_cols].to_numpy()
             X_trans = _power_transform_array(X_vals, params, cols, valid_cols)
             df_out.loc[:, valid_cols] = np.asarray(X_trans)
-        except Exception as e:
-            logger.error(f"PowerTransformer (Pandas) application failed: {e}")
+        except Exception:
+            logger.exception("PowerTransformer (Pandas) application failed")
         return df_out, _y
 
 

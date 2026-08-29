@@ -143,7 +143,7 @@ async def test_all_transformers(sample_data, tmp_path):
             assert node_res is not None
             assert node_res.status == "success"
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - convert failure into pytest.fail message
             pytest.fail(f"Node {node_id} failed: {str(e)}")
 
 
@@ -211,7 +211,7 @@ async def test_models(sample_data, tmp_path):
             node_res = result.node_results.get("model")
             assert node_res is not None
             assert node_res.status == "success"
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - convert failure into pytest.fail message
             pytest.fail(f"Model {node_id} failed: {str(e)}")
 
 
@@ -262,5 +262,5 @@ async def test_splitters(sample_data, tmp_path):
             node_res = result.node_results.get("t_splitter")
             assert node_res is not None
             assert node_res.status == "success"
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - convert failure into pytest.fail message
             pytest.fail(f"Splitter {node_id} failed: {str(e)}")

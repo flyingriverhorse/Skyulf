@@ -2,7 +2,7 @@
 
 import logging
 from collections.abc import Sequence
-from typing import Any
+from typing import Any, ClassVar
 
 import pandas as pd
 import polars as pl
@@ -35,14 +35,14 @@ class FeatureEngineer:
     # metrics later computed on that "held-out" data. Kept as a single shared
     # constant (rather than duplicated literals) so `transform()`, `_run_step`,
     # and `_collect_step_metrics` can't drift out of sync with each other.
-    _RESAMPLING_TYPES = {"Oversampling", "Undersampling"}
+    _RESAMPLING_TYPES: ClassVar[set[str]] = {"Oversampling", "Undersampling"}
 
     # Row-dropping steps are train-time cleaning only (F-18). Running them at
     # inference would silently vanish requested input rows -- prediction
     # responses carry no row keys, so callers could never tell which inputs
     # lost their prediction. Skipping them means a null row surfaces as a
     # visible model error instead of a silent misalignment.
-    _ROW_DROPPING_TYPES = {"Deduplicate", "DropMissingRows"}
+    _ROW_DROPPING_TYPES: ClassVar[set[str]] = {"Deduplicate", "DropMissingRows"}
 
     def __init__(
         self,
@@ -262,24 +262,29 @@ class FeatureEngineer:
     # ------------------------------------------------------------------
 
     # Transformer-type groups, kept as class constants so dispatch is data-driven.
-    _IMPUTATION_TYPES = {"SimpleImputer", "KNNImputer", "IterativeImputer"}
-    _FEATURE_SELECTION_TYPES = {
+    _IMPUTATION_TYPES: ClassVar[set[str]] = {"SimpleImputer", "KNNImputer", "IterativeImputer"}
+    _FEATURE_SELECTION_TYPES: ClassVar[set[str]] = {
         "feature_selection",
         "UnivariateSelection",
         "ModelBasedSelection",
         "VarianceThreshold",
     }
-    _SCALING_TYPES = {"StandardScaler", "MinMaxScaler", "RobustScaler", "MaxAbsScaler"}
-    _OUTLIER_TYPES = {"IQR", "Winsorize", "ZScore", "EllipticEnvelope"}
-    _BUCKETING_TYPES = {
+    _SCALING_TYPES: ClassVar[set[str]] = {
+        "StandardScaler",
+        "MinMaxScaler",
+        "RobustScaler",
+        "MaxAbsScaler",
+    }
+    _OUTLIER_TYPES: ClassVar[set[str]] = {"IQR", "Winsorize", "ZScore", "EllipticEnvelope"}
+    _BUCKETING_TYPES: ClassVar[set[str]] = {
         "GeneralBinning",
         "EqualWidthBinning",
         "EqualFrequencyBinning",
         "CustomBinning",
         "KBinsDiscretizer",
     }
-    _FEATURE_GEN_TYPES = {"FeatureMath", "FeatureGenerationNode"}
-    _ROW_DROP_TYPES = {
+    _FEATURE_GEN_TYPES: ClassVar[set[str]] = {"FeatureMath", "FeatureGenerationNode"}
+    _ROW_DROP_TYPES: ClassVar[set[str]] = {
         "DropMissingRows",
         "Deduplicate",
         "IQR",
@@ -287,7 +292,7 @@ class FeatureEngineer:
         "EllipticEnvelope",
         "Winsorize",
     }
-    _ENCODER_TYPES = {
+    _ENCODER_TYPES: ClassVar[set[str]] = {
         "OneHotEncoder",
         "LabelEncoder",
         "OrdinalEncoder",
@@ -317,7 +322,7 @@ class FeatureEngineer:
                 self._metrics_from_fitted_params(
                     transformer_type, fitted_params, data_before, current_data, metrics
                 )
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - step metrics are best-effort; logged
             logger.warning(f"Failed to retrieve metrics for step {name}: {e}")
 
         if transformer_type in self._RESAMPLING_TYPES:
@@ -510,7 +515,7 @@ class FeatureEngineer:
             counts = y_res.value_counts().to_dict()
             metrics["class_counts"] = {str(k): int(v) for k, v in counts.items()}
             metrics["total_samples"] = int(len(y_res))
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - resampling metrics are best-effort; logged
             logger.warning(f"Failed to calculate resampling metrics: {e}")
 
     @staticmethod
@@ -564,7 +569,7 @@ class FeatureEngineer:
                     data_before.validation, current_data.validation
                 )
             metrics["values_clipped"] = clipped_count
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - winsorize metrics are best-effort; logged
             logger.warning(f"Failed to calculate values_clipped for Winsorize: {e}")
 
     def _metrics_shape_change(

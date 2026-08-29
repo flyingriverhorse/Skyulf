@@ -19,6 +19,8 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
+from ...types import DEFAULT_RANDOM_STATE
+
 logger = logging.getLogger(__name__)
 
 # Cap on how many rows are kept in the "samples" list returned alongside the
@@ -63,7 +65,7 @@ def _build_explainer(shap_module: Any, model: Any, sample: pd.DataFrame) -> tupl
             model, feature_perturbation="tree_path_dependent"
         )
         return tree_explainer, True
-    except Exception:
+    except Exception:  # noqa: BLE001 - shap raises model-specific errors; explainability is best-effort
         logger.debug(
             "model_type=%s is not a tree-path-dependent-compatible tree model; "
             "falling back to the generic masker-based explainer",
@@ -126,7 +128,7 @@ def _predicted_class_index(model: Any, sample: pd.DataFrame, n_classes: int) -> 
         preds = model.predict(predict_input)
         if classes and len(classes) == n_classes:
             return np.array([classes.index(p) if p in classes else 0 for p in preds], dtype=int)
-    except Exception:
+    except Exception:  # noqa: BLE001 - shap/predict edge cases fall back to class 0; logged
         logger.debug("Falling back to class 0 for per-row SHAP selection", exc_info=True)
     return np.zeros(len(sample), dtype=int)
 
@@ -222,7 +224,7 @@ def _compute_interaction_summary(
 
         explainer = shap.TreeExplainer(model)
         raw = explainer.shap_interaction_values(sample)
-    except Exception:
+    except Exception:  # noqa: BLE001 - interaction values unsupported for many models; logged
         logger.debug(
             "SHAP interaction values unavailable for model_type=%s",
             type(model).__name__,
@@ -318,7 +320,11 @@ def compute_shap_explanation(
         if X is None or X.empty:
             return None
 
-        sample = X.sample(n=max_samples, random_state=42) if len(X) > max_samples else X
+        sample = (
+            X.sample(n=max_samples, random_state=DEFAULT_RANDOM_STATE)
+            if len(X) > max_samples
+            else X
+        )
 
         feature_names = list(sample.columns)
         if not feature_names:
@@ -391,7 +397,7 @@ def compute_shap_explanation(
             "samples": samples,
             "interactions": interactions,
         }
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - explainability is best-effort; failure is logged, not raised (see below)
         # Previously logged at `debug` level, which meant a broken SHAP path
         # was silently indistinguishable from "model type unsupported" —
         # this rotted invisibly for every job until the UI's `shap_explanation`

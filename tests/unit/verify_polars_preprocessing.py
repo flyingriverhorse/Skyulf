@@ -54,7 +54,7 @@ class TestPolarsPreprocessingFull(unittest.TestCase):
             self.assertIn("bin_edges", fit_res)
 
             print("  v Quantile extraction passed")
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - convert failure into test failure message
             self.fail(f"Bucketing failed: {e}")
 
     # --- 2. Cleaning: Text ---

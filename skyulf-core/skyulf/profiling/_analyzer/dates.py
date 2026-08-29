@@ -89,7 +89,7 @@ class DatesMixin(_AnalyzerState):
                     max_months = n_months
                     best_parsed = (None, "datetime_generic")
                     best_method_name = "Generic Datetime"
-        except Exception:
+        except Exception:  # noqa: BLE001 - best-effort parse candidate; other methods still tried
             pass  # nosec B110 - datetime-generic parse is a best-effort candidate, others still tried
 
         try:
@@ -100,7 +100,7 @@ class DatesMixin(_AnalyzerState):
                     max_months = n_months
                     best_parsed = (None, "date_generic")
                     best_method_name = "Generic Date"
-        except Exception:
+        except Exception:  # noqa: BLE001 - best-effort parse candidate; other methods still tried
             pass  # nosec B110 - date-generic parse is a best-effort candidate, others still tried
 
         return best_parsed, max_months, best_method_name
@@ -135,7 +135,7 @@ class DatesMixin(_AnalyzerState):
                         tied_candidates = [fmt]
                     elif n_months == max_months and best_parsed is not None:
                         tied_candidates.append(fmt)
-            except Exception:
+            except Exception:  # noqa: BLE001 - format candidate did not match; next format is tried
                 continue  # nosec B112 - format candidate didn't match; next format is tried
 
         return best_parsed, best_method_name, tied_candidates
@@ -158,7 +158,7 @@ class DatesMixin(_AnalyzerState):
                 self.df = self.df.with_columns(  # type: ignore[attr-defined]
                     pl.col(col).str.to_datetime(format=fmt, strict=False).alias(col)
                 )
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - parse-method cast failure is logged; column left unparsed
             logger.warning(f"Failed to cast column {col} using {best_method_name}: {e}")
 
     def _analyze_date(self, col: str, row: dict) -> DateStats:

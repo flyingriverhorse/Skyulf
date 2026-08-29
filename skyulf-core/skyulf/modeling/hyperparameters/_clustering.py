@@ -1,6 +1,6 @@
 """Clustering (unsupervised) hyperparameters."""
 
-from ._field import HyperparameterField
+from ._field import HyperparameterField, random_state_field
 
 KMEANS_PARAMS = [
     HyperparameterField(
@@ -23,16 +23,7 @@ KMEANS_PARAMS = [
         step=1,
         description="Number of times K-Means runs with different centroid seeds; the best result is kept.",
     ),
-    HyperparameterField(
-        name="random_state",
-        label="Random State",
-        type="number",
-        default=42,
-        min=0,
-        max=10000,
-        step=1,
-        description="Seed for centroid initialization, for reproducible results.",
-    ),
+    random_state_field("Seed for centroid initialization, for reproducible results."),
 ]
 
 MINIBATCH_KMEANS_PARAMS = [
@@ -66,16 +57,7 @@ MINIBATCH_KMEANS_PARAMS = [
         step=1,
         description="Number of times the algorithm runs with different centroid seeds; the best result is kept.",
     ),
-    HyperparameterField(
-        name="random_state",
-        label="Random State",
-        type="number",
-        default=42,
-        min=0,
-        max=10000,
-        step=1,
-        description="Seed for centroid initialization, for reproducible results.",
-    ),
+    random_state_field("Seed for centroid initialization, for reproducible results."),
 ]
 
 GAUSSIAN_MIXTURE_PARAMS = [
@@ -102,16 +84,7 @@ GAUSSIAN_MIXTURE_PARAMS = [
         ],
         description="Shape constraint for each cluster's Gaussian distribution.",
     ),
-    HyperparameterField(
-        name="random_state",
-        label="Random State",
-        type="number",
-        default=42,
-        min=0,
-        max=10000,
-        step=1,
-        description="Seed for initialization, for reproducible results.",
-    ),
+    random_state_field("Seed for initialization, for reproducible results."),
 ]
 
 BIRCH_PARAMS = [

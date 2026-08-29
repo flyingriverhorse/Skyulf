@@ -8,6 +8,7 @@ from sklearn.covariance import EllipticEnvelope
 
 from ...core.meta.decorators import node_meta
 from ...registry import NodeRegistry
+from ...types import DEFAULT_RANDOM_STATE
 from ...utils import detect_numeric_columns, user_picked_no_columns
 from .._artifacts import EllipticEnvelopeArtifact
 from .._helpers import resolve_columns_then_to_pandas
@@ -35,9 +36,28 @@ def _elliptic_filter_pandas(X_pd: Any, models: dict[str, Any]) -> pd.Series:
             col_mask[series.isna()] = True  # keep NaNs; later steps decide
             col_mask.loc[valid_idx] = preds == 1  # 1 == inlier
             mask = mask & col_mask
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - per-column predict failure is logged; column contributes no filtering
             logger.warning(f"EllipticEnvelope predict failed for column {col}: {e}")
     return mask
+
+
+def _coerce_column_to_float(X: Any, col: str) -> Any:
+    """Cast a polars column to Float64; ``None`` when the column is not coercible."""
+    import polars as pl
+
+    try:
+        return X.get_column(col).cast(pl.Float64, strict=False)
+    except Exception:  # noqa: BLE001 - not coercible to numbers: contributes no filtering
+        return None
+
+
+def _predict_inliers(model: Any, values: Any, col: str) -> Any:
+    """Run ``model.predict`` on valid values; log and return ``None`` on failure (fail open)."""
+    try:
+        return model.predict(values.reshape(-1, 1))
+    except Exception as e:  # noqa: BLE001 - per-column predict failure is logged; column contributes no filtering
+        logger.warning(f"EllipticEnvelope predict failed for column {col}: {e}")
+        return None
 
 
 def _elliptic_mask_numpy(X: Any, models: dict[str, Any]) -> Any:
@@ -48,24 +68,20 @@ def _elliptic_mask_numpy(X: Any, models: dict[str, Any]) -> Any:
     skipped, and a failing ``predict`` logs and fails open.
     """
     import numpy as np
-    import polars as pl
 
     mask = np.ones(X.height, dtype=bool)
     for col, model in models.items():
         if col not in X.columns:
             continue
-        try:
-            series = X.get_column(col).cast(pl.Float64, strict=False)
-        except Exception:  # not coercible to numbers: contributes no filtering
+        series = _coerce_column_to_float(X, col)
+        if series is None:
             continue
         arr = series.to_numpy()
         valid = ~np.isnan(arr)
         if not valid.any():
             continue
-        try:
-            preds = model.predict(arr[valid].reshape(-1, 1))
-        except Exception as e:
-            logger.warning(f"EllipticEnvelope predict failed for column {col}: {e}")
+        preds = _predict_inliers(model, arr[valid], col)
+        if preds is None:
             continue
         col_mask = np.ones(X.height, dtype=bool)
         col_mask[valid] = preds == 1  # 1 == inlier
@@ -113,7 +129,7 @@ class EllipticEnvelopeApplier(BaseApplier):
     name="Elliptic Envelope",
     category="Preprocessing",
     description="Detect outliers in a Gaussian distributed dataset.",
-    params={"contamination": 0.01, "columns": [], "random_state": 42},
+    params={"contamination": 0.01, "columns": [], "random_state": DEFAULT_RANDOM_STATE},
     learns_from_data=True,
 )
 class EllipticEnvelopeCalculator(BaseCalculator):
@@ -129,7 +145,7 @@ class EllipticEnvelopeCalculator(BaseCalculator):
             return {}
 
         contamination = config.get("contamination", 0.01)
-        random_state = config.get("random_state", 42)
+        random_state = config.get("random_state", DEFAULT_RANDOM_STATE)
         # TODO(pandas-removal): same per-column coercion/dropna caveat as
         # zscore.py — EllipticEnvelope.fit itself takes numpy fine, but the
         # per-column pd.to_numeric(errors="coerce").dropna() skip-logic for
@@ -149,7 +165,7 @@ class EllipticEnvelopeCalculator(BaseCalculator):
                 model = EllipticEnvelope(contamination=contamination, random_state=random_state)
                 model.fit(series.to_numpy().reshape(-1, 1))
                 models[col] = model
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 - per-column fit failure is logged and recorded in warnings
                 logger.warning(f"EllipticEnvelope fit failed for column {col}: {e}")
                 warnings.append(f"Column '{col}': {str(e)}")
 

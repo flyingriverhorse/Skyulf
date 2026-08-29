@@ -94,7 +94,7 @@ if __name__ == "__main__":
         print("KNN Imputer: PASS")
         test_iterative_imputer()
         print("Iterative Imputer: PASS")
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - report failure with traceback
         print(f"FAILED: {e}")
         import traceback
 

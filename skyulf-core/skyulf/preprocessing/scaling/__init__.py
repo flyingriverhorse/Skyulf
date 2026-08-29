@@ -18,12 +18,12 @@ from .robust import RobustScalerApplier, RobustScalerCalculator
 from .standard import StandardScalerApplier, StandardScalerCalculator
 
 __all__ = [
-    "StandardScalerApplier",
-    "StandardScalerCalculator",
+    "MaxAbsScalerApplier",
+    "MaxAbsScalerCalculator",
     "MinMaxScalerApplier",
     "MinMaxScalerCalculator",
     "RobustScalerApplier",
     "RobustScalerCalculator",
-    "MaxAbsScalerApplier",
-    "MaxAbsScalerCalculator",
+    "StandardScalerApplier",
+    "StandardScalerCalculator",
 ]

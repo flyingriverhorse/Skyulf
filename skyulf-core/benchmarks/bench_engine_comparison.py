@@ -332,7 +332,7 @@ def main() -> None:
         try:
             ok = _parity(name, config, kind, frame_pd)
             pd_t, pl_t = _run_node(name, config, kind, frame_pd)
-        except Exception as e:  # keep the table alive if one node can't run
+        except Exception as e:  # noqa: BLE001 - keep the table alive if one node can't run
             print(f"{label:<22} {'-':>7} {'SKIP':>10} {type(e).__name__}: {e}")
             continue
         speedup = pd_t / pl_t if pl_t > 0 else float("inf")

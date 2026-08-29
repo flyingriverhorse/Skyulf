@@ -2,7 +2,7 @@
 
 [project]
 name = "skyulf"
-version = "0.8.5"
+version = "0.8.6"
 description = "MLOps web application for privacy-preserving ML workflows"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -129,6 +129,11 @@ markers = [
     "integration: requires a live backing service (e.g. Redis) — run via tests/docker/run_integration_tests.ps1|sh",
 ]
 
+[tool.coverage.run]
+# Repo-relative paths in Cobertura XML so CI scanners (SonarCloud, Codecov)
+# resolve reports against the repository root (SonarCloud Python coverage docs).
+relative_files = true
+
 [tool.ruff]
 line-length = 100
 target-version = "py312"
@@ -148,7 +153,10 @@ extend-exclude = [
 # UP (pyupgrade), B (bugbear), C4 (comprehensions), SIM (simplify), PERF
 # (perflint) added on top of the original flake8-parity set (E9/F63/F7/F82)
 # plus import sorting (I), now that the codebase targets py312 only.
-select = ["E9", "F63", "F7", "F82", "I", "UP", "B", "C4", "SIM", "PERF"]
+# BLE (blind-except) enabled repo-wide (audit finding F-23): skyulf-core
+# triaged first, then backend/ and root tests/ — every remaining broad
+# catch carries a justified per-site `# noqa: BLE001 - <reason>` waiver.
+select = ["E9", "F63", "F7", "F82", "I", "UP", "B", "C4", "SIM", "PERF", "BLE"]
 # E203: owned by the formatter. UP042/046/047: StrEnum/PEP 695 need
 # case-by-case review, not blanket enforcement. B008: FastAPI's Depends()
 # default-argument idiom, not a bug.

@@ -1865,6 +1865,11 @@ export const InferencePage: React.FC = () => {
                                         <span>
                                             Computed from <strong>{savedThresholds.split_used ?? 'unknown'}</strong> split
                                         </span>
+                                        {savedThresholds.source === 'training' && (
+                                            <span>
+                                                Seeded at <strong>training time</strong> (Tune decision threshold)
+                                            </span>
+                                        )}
                                         {savedThresholds.computed_at && (
                                             <span>
                                                 Computed at <strong>{new Date(savedThresholds.computed_at).toLocaleString()}</strong>

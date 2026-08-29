@@ -5,6 +5,10 @@ export interface ThresholdPreviewResult {
   classes: number[];
   metric: string;
   split_used: string;
+  /** Provenance, present only when this slot was hydrated from the job's
+   * saved thresholds (e.g. `'training'` when they were seeded at training
+   * time) — a live preview from the optimizer never carries one. */
+  source?: string | null;
 }
 
 export interface ThresholdSavePayload {
@@ -22,6 +26,9 @@ export interface SavedThresholdInfo {
   metric: string | null;
   split_used: string | null;
   computed_at: string | null;
+  /** Where the saved set came from: `'training'` when seeded by
+   * training-time threshold tuning, `null` for manually saved/legacy sets. */
+  source: string | null;
   enabled: boolean;
 }
 

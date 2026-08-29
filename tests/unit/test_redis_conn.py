@@ -11,7 +11,7 @@ def check_port(host, port):
         else:
             print(f"Error: Could not connect to {host}:{port} (Code: {result})")
         sock.close()
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - skip when redis unavailable
         print(f"Exception connecting to {host}:{port}: {e}")
 
 

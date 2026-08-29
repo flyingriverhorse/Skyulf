@@ -62,7 +62,7 @@ class WarningCaptureHandler(logging.Handler):
     def emit(self, record: logging.LogRecord) -> None:  # noqa: D401
         try:
             msg = record.getMessage()
-        except Exception:
+        except Exception:  # noqa: BLE001 - logging handler emit must never raise
             self.handleError(record)
             return
         self._buffer.append(
@@ -92,7 +92,7 @@ class WarningCaptureHandler(logging.Handler):
         for lg in self._attached:
             try:
                 lg.removeHandler(self)
-            except Exception:
+            except Exception:  # noqa: BLE001 - detach cleanup must never raise
                 logger.debug(
                     "Failed to detach warning capture handler from logger %s",
                     lg.name,

@@ -72,7 +72,7 @@ if __name__ == "__main__":
     try:
         test_skyulfdataframe_integration()
         print("\nSUCCESS: SkyulfDataFrame integration verified!")
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - main guard reports script failure
         print(f"\nFAILURE: {e}")
         import traceback
 

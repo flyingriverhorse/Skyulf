@@ -18,14 +18,14 @@ from .tfidf_vectorizer import TfidfVectorizerApplier, TfidfVectorizerCalculator
 from .tokenizer import TokenizerApplier, TokenizerCalculator
 
 __all__ = [
-    "CountVectorizerCalculator",
     "CountVectorizerApplier",
-    "TfidfVectorizerCalculator",
-    "TfidfVectorizerApplier",
-    "HashingVectorizerCalculator",
+    "CountVectorizerCalculator",
     "HashingVectorizerApplier",
-    "TokenizerCalculator",
-    "TokenizerApplier",
-    "SentenceEmbedderCalculator",
+    "HashingVectorizerCalculator",
     "SentenceEmbedderApplier",
+    "SentenceEmbedderCalculator",
+    "TfidfVectorizerApplier",
+    "TfidfVectorizerCalculator",
+    "TokenizerApplier",
+    "TokenizerCalculator",
 ]

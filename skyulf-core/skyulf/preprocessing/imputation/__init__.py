@@ -16,10 +16,10 @@ from .knn import KNNImputerApplier, KNNImputerCalculator
 from .simple import SimpleImputerApplier, SimpleImputerCalculator
 
 __all__ = [
-    "SimpleImputerApplier",
-    "SimpleImputerCalculator",
-    "KNNImputerApplier",
-    "KNNImputerCalculator",
     "IterativeImputerApplier",
     "IterativeImputerCalculator",
+    "KNNImputerApplier",
+    "KNNImputerCalculator",
+    "SimpleImputerApplier",
+    "SimpleImputerCalculator",
 ]

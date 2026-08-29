@@ -5,15 +5,24 @@ Local execution keeps running through :class:`LocalComputeBackend`; a
 distributed backend (e.g. Spark) can later implement the same interface
 without touching node logic. Nothing in the library wires this in by default,
 so behaviour is unchanged until a backend is explicitly installed.
+
+The active backend is held in a :class:`contextvars.ContextVar`: a
+change is visible to the current thread/asyncio task and anything spawned
+from it afterwards, but concurrent pipelines in other contexts cannot
+reconfigure each other mid-run. Use :func:`compute_backend` to scope an
+override to a single block.
 """
 
 from abc import ABC, abstractmethod
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
+from contextvars import ContextVar
 from typing import Any
 
 __all__ = [
     "ComputeBackend",
     "LocalComputeBackend",
+    "compute_backend",
     "get_compute_backend",
     "set_compute_backend",
 ]
@@ -39,15 +48,32 @@ class LocalComputeBackend(ComputeBackend):
         return func(*args, **kwargs)
 
 
-_DEFAULT_BACKEND: ComputeBackend = LocalComputeBackend()
+_DEFAULT_BACKEND: ContextVar[ComputeBackend] = ContextVar(
+    "skyulf_default_compute_backend",
+    default=LocalComputeBackend(),  # noqa: B039 - stateless shared singleton, never mutated
+)
 
 
 def get_compute_backend() -> ComputeBackend:
-    """Return the active compute backend (local by default)."""
-    return _DEFAULT_BACKEND
+    """Return the active compute backend for the current context (local by default)."""
+    return _DEFAULT_BACKEND.get()
 
 
 def set_compute_backend(backend: ComputeBackend) -> None:
-    """Install a compute backend process-wide. Pass a fresh instance to swap engines."""
-    global _DEFAULT_BACKEND
-    _DEFAULT_BACKEND = backend
+    """Install a compute backend for the current context.
+
+    Prefer the :func:`compute_backend` context manager for overrides that
+    should end with the enclosing block; this setter keeps the backend for
+    the lifetime of the current context.
+    """
+    _DEFAULT_BACKEND.set(backend)
+
+
+@contextmanager
+def compute_backend(backend: ComputeBackend) -> Iterator[ComputeBackend]:
+    """Scope ``backend`` to the enclosed block, restoring the prior selection on exit."""
+    token = _DEFAULT_BACKEND.set(backend)
+    try:
+        yield backend
+    finally:
+        _DEFAULT_BACKEND.reset(token)

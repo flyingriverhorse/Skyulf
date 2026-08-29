@@ -777,7 +777,7 @@ class EDAVisualizer:
 
         # Initialize lists for each column found in the first point
         first_point = trend[0]
-        for col in first_point.values:
+        for col in first_point.values:  # noqa: PD011 - pydantic trend-point field, not pandas
             values_map[col] = []
 
         for point in trend:
@@ -786,7 +786,7 @@ class EDAVisualizer:
                 dt = datetime.fromisoformat(point.date)
                 dates.append(dt)
 
-                for col, val in point.values.items():
+                for col, val in point.values.items():  # noqa: PD011 - pydantic trend-point field, not pandas
                     if col in values_map:
                         values_map[col].append(val)
             except ValueError:

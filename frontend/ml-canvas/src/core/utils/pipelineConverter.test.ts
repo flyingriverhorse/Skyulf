@@ -98,6 +98,20 @@ describe('convertGraphToPipelineConfig', () => {
     expect(iter?.params).toMatchObject({ max_iter: 15, estimator: 'BayesianRidge', random_state: 99 });
   });
 
+  it('omits random_state for a legacy iterative node lacking the field (core owns the default)', () => {
+    const nodes = [
+      node('ds', 'dataset_node', { datasetId: 'd1' }),
+      node('iter', 'imputation_node', {
+        method: 'iterative',
+        columns: ['x'],
+      }),
+    ];
+    const edges = [edge('ds', 'iter')];
+    const cfg = convertGraphToPipelineConfig(nodes, edges);
+    const iter = cfg.nodes.find((n) => n.node_id === 'iter');
+    expect(iter?.params).not.toHaveProperty('random_state');
+  });
+
   it('attaches _merge_strategy as an underscore-prefixed param when not "last_wins"', () => {
     const nodes = [
       node('ds', 'dataset_node', { datasetId: 'd1' }),
@@ -188,6 +202,49 @@ describe('convertGraphToPipelineConfig', () => {
       metric: 'accuracy',
       n_trials: 5,
       search_space: { C: [0.1, 1, 10] },
+    });
+  });
+
+  it('forwards tune_threshold=true into tuning_config for an advanced Classification node (F-13)', () => {
+    const nodes = [
+      node('ds', 'dataset_node', { datasetId: 'd1' }),
+      node('tune', 'classification', {
+        run_mode: 'advanced',
+        target_column: 'y',
+        model_type: 'logistic_regression',
+        search_space: { C: [0.1, 1] },
+        search_strategy: 'random',
+        metric: 'f1',
+        n_trials: 3,
+        tune_threshold: true,
+      }),
+    ];
+    const edges = [edge('ds', 'tune')];
+    const cfg = convertGraphToPipelineConfig(nodes, edges);
+    const tune = cfg.nodes.find((n) => n.node_id === 'tune');
+    expect((tune?.params as { tuning_config?: Record<string, unknown> })?.tuning_config).toMatchObject({
+      tune_threshold: true,
+    });
+  });
+
+  it('defaults tune_threshold to false for a legacy advanced node lacking the field (F-13)', () => {
+    const nodes = [
+      node('ds', 'dataset_node', { datasetId: 'd1' }),
+      node('tune', 'classification', {
+        run_mode: 'advanced',
+        target_column: 'y',
+        model_type: 'logistic_regression',
+        search_space: { C: [0.1, 1] },
+        search_strategy: 'random',
+        metric: 'accuracy',
+        n_trials: 3,
+      }),
+    ];
+    const edges = [edge('ds', 'tune')];
+    const cfg = convertGraphToPipelineConfig(nodes, edges);
+    const tune = cfg.nodes.find((n) => n.node_id === 'tune');
+    expect((tune?.params as { tuning_config?: Record<string, unknown> })?.tuning_config).toMatchObject({
+      tune_threshold: false,
     });
   });
 

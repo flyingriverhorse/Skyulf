@@ -7,7 +7,7 @@ This module handles the auto-detection of the appropriate compute engine
 
 import logging
 from enum import StrEnum
-from typing import Any
+from typing import Any, ClassVar
 
 # We import the protocol for type checking, but we don't strictly need it at runtime here
 # to avoid circular imports if engines import protocol.
@@ -54,13 +54,16 @@ class BaseEngine:
 
 
 class EngineRegistry:
-    _engines: dict[str, type[BaseEngine]] = {}
-    _active_engine: str = "pandas"  # Default
+    _engines: ClassVar[dict[str, type[BaseEngine]]] = {}
+    # Deliberate default: pandas is the safer, better-covered path. Polars is
+    # opt-in — either call EngineRegistry.set_active_engine("polars"), or
+    # simply pass Polars data in (resolve() auto-detects from the input).
+    _active_engine: str = "pandas"
 
     # Maps a data object's detected top-level module package to the engine
     # name registered for it. "spark"/"dask" are future-proofing: only used
     # if/when those engines are actually registered in `_engines`.
-    _TOP_LEVEL_TO_ENGINE: dict[str, str] = {
+    _TOP_LEVEL_TO_ENGINE: ClassVar[dict[str, str]] = {
         "polars": "polars",
         "pandas": "pandas",
         "pyspark": "spark",

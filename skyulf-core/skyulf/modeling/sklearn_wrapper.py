@@ -12,6 +12,7 @@ from sklearn.utils.class_weight import compute_sample_weight
 
 from ..engines import SkyulfDataFrame
 from ..engines.sklearn_bridge import SklearnBridge
+from ..types import DEFAULT_RANDOM_STATE
 from .base import BaseModelApplier, BaseModelCalculator
 
 logger = logging.getLogger(__name__)
@@ -134,7 +135,7 @@ class SklearnCalculator(BaseModelCalculator):
         """
         params = self.default_params.copy()
         if not config:
-            return params
+            return self._inject_default_seed(params)
 
         # We support two configuration structures:
         # 1. Nested: {'params': {'C': 1.0, ...}} - Preferred
@@ -165,6 +166,27 @@ class SklearnCalculator(BaseModelCalculator):
         if overrides:
             params.update(overrides)
 
+        return self._inject_default_seed(params)
+
+    def _inject_default_seed(self, params: dict[str, Any]) -> dict[str, Any]:
+        """Single owner for seeding (finding F-21).
+
+        Model defaults no longer carry their own ``random_state`` literals.
+        If the caller didn't configure one, inject ``DEFAULT_RANDOM_STATE``
+        here — but only when the wrapped estimator's constructor accepts it
+        (named parameter or ``**kwargs``), so unsupported estimators don't
+        get a dropped-param warning. An explicit user value (including
+        ``None`` for "unseeded") always wins.
+        """
+        if "random_state" in params:
+            return params
+        sig = inspect.signature(self.model_class)
+        accepts = (
+            any(p.kind == inspect.Parameter.VAR_KEYWORD for p in sig.parameters.values())
+            or "random_state" in sig.parameters
+        )
+        if accepts:
+            params["random_state"] = DEFAULT_RANDOM_STATE
         return params
 
     def _filter_supported_params(self, params: dict[str, Any]) -> dict[str, Any]:

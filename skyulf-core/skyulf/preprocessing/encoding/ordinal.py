@@ -49,7 +49,7 @@ def _apply_features_polars(X: Any, valid_cols: list[str], encoder: Any) -> Any:
 def _apply_features_pandas(X: Any, valid_cols: list[str], encoder: Any) -> Any:
     X_out = X.copy()
     X_subset = _subset_to_str_pandas(X_out, valid_cols)
-    X_input = X_subset.values if hasattr(X_subset, "values") else X_subset
+    X_input = X_subset.to_numpy() if hasattr(X_subset, "to_numpy") else X_subset
     X_out[valid_cols] = encoder.transform(X_input)
     return X_out
 

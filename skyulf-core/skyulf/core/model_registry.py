@@ -12,9 +12,9 @@ from threading import Lock
 from typing import Any
 
 __all__ = [
-    "ModelVersion",
-    "ModelRegistry",
     "InMemoryModelRegistry",
+    "ModelRegistry",
+    "ModelVersion",
 ]
 
 

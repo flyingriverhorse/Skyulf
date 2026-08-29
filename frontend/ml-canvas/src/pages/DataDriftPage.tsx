@@ -22,7 +22,7 @@ import { useDriftReport } from './drift/_hooks/useDriftReport';
 import { useSortConfig } from './drift/_hooks/useSortConfig';
 import { exportDriftReportCSV } from './drift/_utils/csvExport';
 
-const DEFAULT_THRESHOLDS: DriftThresholds = { psi: 0.2, ks: 0.05, wasserstein: 0.1, kl: 0.1 };
+const DEFAULT_THRESHOLDS: DriftThresholds = { psi: 0.2, ks: 0.1, wasserstein: 0.1, kl: 0.1 };
 
 /**
  * Top-level page for data-drift analysis. Owns the user's selections (job,

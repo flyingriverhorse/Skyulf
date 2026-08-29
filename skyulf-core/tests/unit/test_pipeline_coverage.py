@@ -2,9 +2,9 @@
 
 Exercises branches not hit by the existing end-to-end test in test_pipeline.py:
 * `_artifact_digest` pickle-failure fallback to `repr`.
-* `_init_model_estimator` early return, registry-miss fallback to the manual
-  model-type dispatch (including the `hyperparameter_tuner` base-model branch),
-  and the final "unknown model type" error.
+* `_init_model_estimator` early return, registry-only model resolution
+  (including the `hyperparameter_tuner` base-model branch), and the
+  "unknown model type" / "partially registered" error paths.
 * `fit()` taking the `SplitDataset`-passthrough branch and the evaluation
   failure branch.
 * `predict()` raising when the pipeline has no fitted model.
@@ -44,7 +44,7 @@ def test_artifact_digest_falls_back_to_repr_when_pickle_fails() -> None:
 
 
 # ---------------------------------------------------------------------------
-# _init_model_estimator: early return, registry miss + manual dispatch
+# _init_model_estimator: early return, registry-only resolution
 # ---------------------------------------------------------------------------
 
 
@@ -58,8 +58,8 @@ def test_init_model_estimator_returns_early_without_type() -> None:
 def force_registry_miss(monkeypatch):
     """Force NodeRegistry.get_calculator/get_applier to always raise ValueError.
 
-    This simulates a model type that isn't in the registry, forcing
-    SkyulfPipeline's manual model-type dispatch (elif chain) to run.
+    This simulates a model type that isn't in the registry. Since F-10 the
+    registry is the only resolution path, so a miss must surface as an error.
     """
 
     def _raise_calculator(_name):
@@ -77,53 +77,42 @@ def force_registry_miss(monkeypatch):
 
 
 @pytest.mark.parametrize(
-    "model_type,calc_import_name",
+    "model_type",
     [
-        ("logistic_regression", "LogisticRegressionCalculator"),
-        ("random_forest_classifier", "RandomForestClassifierCalculator"),
-        ("ridge_regression", "RidgeRegressionCalculator"),
-        ("random_forest_regressor", "RandomForestRegressorCalculator"),
+        "logistic_regression",
+        "random_forest_classifier",
+        "ridge_regression",
+        "random_forest_regressor",
     ],
 )
-def test_init_model_estimator_manual_dispatch_for_known_types(
-    force_registry_miss, model_type: str, calc_import_name: str
-) -> None:
-    """With the registry forced to miss, each known model_type must resolve via
-    the manual elif dispatch to the matching Calculator/Applier classes."""
-    import skyulf.pipeline as pipeline_module
+def test_init_model_estimator_resolves_known_types_from_registry(model_type: str) -> None:
+    """Each known model_type must resolve its calculator/applier from the
+    NodeRegistry — since F-10 there is no hardcoded fallback map."""
+    expected_calc_cls = NodeRegistry.get_calculator(model_type)
+    expected_applier_cls = NodeRegistry.get_applier(model_type)
 
     pipeline = SkyulfPipeline({"modeling": {"type": model_type}})
     assert pipeline.model_estimator is not None
-    expected_calc_cls = getattr(pipeline_module, calc_import_name)
     assert isinstance(pipeline.model_estimator.calculator, expected_calc_cls)
+    assert isinstance(pipeline.model_estimator.applier, expected_applier_cls)
 
 
 @pytest.mark.parametrize(
-    "base_model_type,base_calc_import_name,base_applier_import_name",
+    "base_model_type",
     [
-        ("logistic_regression", "LogisticRegressionCalculator", "LogisticRegressionApplier"),
-        (
-            "random_forest_classifier",
-            "RandomForestClassifierCalculator",
-            "RandomForestClassifierApplier",
-        ),
-        ("ridge_regression", "RidgeRegressionCalculator", "RidgeRegressionApplier"),
-        (
-            "random_forest_regressor",
-            "RandomForestRegressorCalculator",
-            "RandomForestRegressorApplier",
-        ),
+        "logistic_regression",
+        "random_forest_classifier",
+        "ridge_regression",
+        "random_forest_regressor",
     ],
 )
-def test_init_model_estimator_hyperparameter_tuner_manual_base_dispatch(
-    force_registry_miss,
+def test_init_model_estimator_hyperparameter_tuner_wraps_registry_base_model(
     base_model_type: str,
-    base_calc_import_name: str,
-    base_applier_import_name: str,
 ) -> None:
-    """hyperparameter_tuner must wrap a manually-dispatched base model when the
-    registry lookup fails for the base_model type too — for every known base type."""
-    import skyulf.pipeline as pipeline_module
+    """hyperparameter_tuner must wrap the registry-resolved base model for
+    every known base type."""
+    expected_calc_cls = NodeRegistry.get_calculator(base_model_type)
+    expected_applier_cls = NodeRegistry.get_applier(base_model_type)
 
     pipeline = SkyulfPipeline(
         {
@@ -136,8 +125,6 @@ def test_init_model_estimator_hyperparameter_tuner_manual_base_dispatch(
     assert pipeline.model_estimator is not None
     assert isinstance(pipeline.model_estimator.calculator, TuningCalculator)
     assert isinstance(pipeline.model_estimator.applier, TuningApplier)
-    expected_calc_cls = getattr(pipeline_module, base_calc_import_name)
-    expected_applier_cls = getattr(pipeline_module, base_applier_import_name)
     calculator = cast(TuningCalculator, pipeline.model_estimator.calculator)
     applier = cast(TuningApplier, pipeline.model_estimator.applier)
     assert isinstance(calculator.model_calculator, expected_calc_cls)
@@ -200,10 +187,9 @@ def test_init_model_estimator_unknown_model_type_raises(force_registry_miss) -> 
 @pytest.fixture
 def force_partial_registration(monkeypatch):
     """Simulate a partially-registered node: get_calculator resolves fine but
-    get_applier raises ValueError. Regression test for a bug where the
-    hardcoded fallback map was skipped whenever *any* calculator resolved
-    from the registry, even if its applier didn't, producing a misleading
-    "Unknown model type" error instead of falling back correctly.
+    get_applier raises ValueError. Since F-10 deleted the hardcoded fallback
+    map, this must surface as an explicit "partially registered" error rather
+    than a misleading "Unknown model type".
     """
 
     def _raise_applier(_name):
@@ -214,41 +200,29 @@ def force_partial_registration(monkeypatch):
     )
 
 
-def test_init_model_estimator_falls_back_when_applier_registry_lookup_fails(
+def test_init_model_estimator_partial_registration_raises_explicit_error(
     force_partial_registration,
 ) -> None:
     """If the registry resolves a calculator but not its applier, the pipeline
-    must still fall back to the hardcoded type map instead of raising."""
-    import skyulf.pipeline as pipeline_module
-
-    pipeline = SkyulfPipeline({"modeling": {"type": "logistic_regression"}})
-    assert pipeline.model_estimator is not None
-    assert isinstance(
-        pipeline.model_estimator.calculator, pipeline_module.LogisticRegressionCalculator
-    )
-    assert isinstance(pipeline.model_estimator.applier, pipeline_module.LogisticRegressionApplier)
+    must raise a descriptive error — there is no hardcoded fallback anymore."""
+    with pytest.raises(ValueError, match="only partially registered"):
+        SkyulfPipeline({"modeling": {"type": "logistic_regression"}})
 
 
-def test_init_model_estimator_tuner_falls_back_when_base_applier_registry_lookup_fails(
+def test_init_model_estimator_tuner_partial_base_registration_raises(
     force_partial_registration,
 ) -> None:
     """Same partial-registration guard for the hyperparameter_tuner base-model
-    resolution path."""
-    import skyulf.pipeline as pipeline_module
-
-    pipeline = SkyulfPipeline(
-        {
-            "modeling": {
-                "type": "hyperparameter_tuner",
-                "base_model": {"type": "ridge_regression"},
+    resolution path: an unresolvable base pair is an error, not a fallback."""
+    with pytest.raises(ValueError, match="Unknown base model type for tuner"):
+        SkyulfPipeline(
+            {
+                "modeling": {
+                    "type": "hyperparameter_tuner",
+                    "base_model": {"type": "ridge_regression"},
+                }
             }
-        }
-    )
-    assert pipeline.model_estimator is not None
-    calculator = cast(TuningCalculator, pipeline.model_estimator.calculator)
-    applier = cast(TuningApplier, pipeline.model_estimator.applier)
-    assert isinstance(calculator.model_calculator, pipeline_module.RidgeRegressionCalculator)
-    assert isinstance(applier.base_applier, pipeline_module.RidgeRegressionApplier)
+        )
 
 
 # ---------------------------------------------------------------------------

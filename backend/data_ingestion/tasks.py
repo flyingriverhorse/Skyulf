@@ -170,7 +170,7 @@ def ingest_data_task(source_id: int):
         _mark_ingestion_completed(session, data_source, metadata, profile)
         logger.info(f"Ingestion completed for source {source_id}")
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - task boundary, failure recorded by handler
         _handle_ingestion_failure(session, source_id, e)
     finally:
         session.close()

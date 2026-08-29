@@ -78,6 +78,9 @@ class ThresholdTuningGetResponse(BaseModel):
     metric: str | None = None
     split_used: str | None = None
     computed_at: str | None = None
+    # "training" when seeded by training-time threshold tuning; None for
+    # manually saved/legacy sets.
+    source: str | None = None
     enabled: bool = False
 
 

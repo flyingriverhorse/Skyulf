@@ -84,7 +84,7 @@ def _log_dispatch_failure(
     if isinstance(exc, ValueError):
         logger.debug(message + ": %s", engine, operation, _callable_name(func), exc)
     else:
-        logger.exception(message, engine, operation, _callable_name(func))
+        logger.exception(message, engine, operation, _callable_name(func), exc_info=exc)
 
 
 # Type definitions for the processing functions

@@ -110,9 +110,9 @@ def _bool_expr_from_string_col_polars(col: str) -> Any:
     normalized = pl.col(col).str.strip_chars().str.to_lowercase()
     return (
         pl.when(normalized.is_in(list(_BOOL_TRUE_ALIASES)))
-        .then(True)  # noqa: FBT003
+        .then(True)
         .when(normalized.is_in(list(_BOOL_FALSE_ALIASES)))
-        .then(False)  # noqa: FBT003
+        .then(False)
         .otherwise(None)
         .alias(col)
     )

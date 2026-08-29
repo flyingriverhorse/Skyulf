@@ -89,5 +89,5 @@ def publish_job_event(event: JobEvent) -> None:
     try:
         client = _redis_client_sync()
         client.publish(JOB_EVENTS_CHANNEL, payload)
-    except Exception as exc:  # pragma: no cover - depends on live Redis
+    except Exception as exc:  # noqa: BLE001 - event publish is best-effort  # pragma: no cover - depends on live Redis
         logger.warning("publish_job_event failed for %s: %s", event.job_id, exc)

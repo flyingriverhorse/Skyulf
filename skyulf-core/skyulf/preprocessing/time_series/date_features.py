@@ -73,15 +73,15 @@ def _apply_pandas(X: Any, _y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
 def _polars_feature(col_expr: Any, feature: str) -> Any:
     dt = col_expr.dt
     builders = {
-        "year": lambda: dt.year(),
-        "month": lambda: dt.month(),
-        "day": lambda: dt.day(),
+        "year": dt.year,
+        "month": dt.month,
+        "day": dt.day,
         "dayofweek": lambda: dt.weekday() - 1,
-        "dayofyear": lambda: dt.ordinal_day(),
-        "quarter": lambda: dt.quarter(),
-        "weekofyear": lambda: dt.week(),
-        "hour": lambda: dt.hour(),
-        "minute": lambda: dt.minute(),
+        "dayofyear": dt.ordinal_day,
+        "quarter": dt.quarter,
+        "weekofyear": dt.week,
+        "hour": dt.hour,
+        "minute": dt.minute,
         "is_weekend": lambda: (dt.weekday() >= 6).cast(int),
         "is_month_start": lambda: (dt.day() == 1).cast(int),
         "is_month_end": lambda: (dt.month() != col_expr.dt.offset_by("1d").dt.month()).cast(int),

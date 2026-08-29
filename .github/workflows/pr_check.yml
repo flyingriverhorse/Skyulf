@@ -1,11 +1,14 @@
 # © 2025 Murat Unsal — Skyulf Project
 #
 # Fast static-analysis gate for every PR: lint, format, and type checks
-# across the whole repo (backend + skyulf-core + tests). This intentionally
-# does NOT run the test suites — those live in their own dedicated workflows
-# (backend-tests.yml, skyulf-core-tests.yml, frontend-tests.yml) so each
-# concern can be triaged, re-run, and required independently in branch
-# protection.
+# across the whole repo (backend + skyulf-core + tests). The static checks
+# intentionally do NOT run the test suites — those live in their own dedicated
+# workflows (backend-tests.yml, skyulf-core-tests.yml, frontend-tests.yml) so
+# each concern can be triaged, re-run, and required independently in branch
+# protection. Also carries the SonarCloud (SonarQube Cloud) pipeline: two
+# token-gated coverage jobs produce Cobertura XML in parallel and hand it to
+# the scanner as artifacts, so the scan itself never re-runs the suites. The
+# whole SonarCloud section skips silently when the SONAR_TOKEN secret is absent.
 
 name: PR Check
 
@@ -65,3 +68,160 @@ jobs:
 
       - name: Type check (Ty)
         run: bash .github/scripts/run_check.sh "Ty type check" ty check backend skyulf-core/skyulf skyulf-core/tests run_skyulf.py celery_worker.py
+
+  # SonarCloud does not measure coverage itself — the Cobertura XML must exist
+  # before the scanner runs (Python test coverage docs). These two token-gated
+  # jobs generate it and hand it to the scanner as artifacts, so the scan job
+  # never re-runs the test suites inline.
+  #
+  # Job-level `if:` can only see the github/inputs/needs/vars contexts —
+  # referencing `secrets` there fails workflow validation for the whole file
+  # (no jobs run at all). So this tiny gate job converts "is SONAR_TOKEN set"
+  # into an output the Sonar jobs can gate on with a valid expression; when
+  # the token is absent, all three jobs report *skipped*, not failed.
+  sonar-gate:
+    name: Sonar token gate
+    runs-on: ubuntu-latest
+    outputs:
+      enabled: ${{ steps.detect.outputs.enabled }}
+    env:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+    steps:
+      - name: Detect SONAR_TOKEN
+        id: detect
+        if: ${{ env.SONAR_TOKEN != '' }}
+        run: echo "enabled=true" >> "$GITHUB_OUTPUT"
+
+  backend-coverage:
+    name: Backend coverage (Cobertura XML)
+    runs-on: ubuntu-latest
+    needs: [sonar-gate]
+    if: ${{ needs.sonar-gate.outputs.enabled == 'true' }}
+    services:
+      redis:
+        image: redis
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
+
+      - name: Cache uv
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/uv
+          key: ${{ runner.os }}-uv-3.12-${{ hashFiles('requirements-ci.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-uv-3.12-
+
+      - name: Install dependencies (uv)
+        run: uv pip install --system -q -r requirements-ci.txt
+
+      - name: Generate backend coverage (Cobertura XML)
+        run: >-
+          pytest tests -q --disable-warnings
+          --cov=backend --cov-branch --cov-report=xml:coverage-backend.xml
+
+      # coverage.py writes filenames relative to the --cov source root, but
+      # SonarCloud needs them relative to the repo root (sonar.sources).
+      - name: Make coverage paths repo-relative
+        run: sed -i 's/filename="/filename="backend\//g' coverage-backend.xml
+
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage-backend
+          path: coverage-backend.xml
+
+  skyulf-core-coverage:
+    name: skyulf-core coverage (Cobertura XML)
+    runs-on: ubuntu-latest
+    needs: [sonar-gate]
+    if: ${{ needs.sonar-gate.outputs.enabled == 'true' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
+
+      - name: Cache uv
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/uv
+          key: ${{ runner.os }}-uv-3.12-${{ hashFiles('requirements-ci.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-uv-3.12-
+
+      - name: Install dependencies (uv)
+        run: uv pip install --system -q -r requirements-ci.txt
+
+      - name: Generate skyulf-core coverage (Cobertura XML)
+        run: >-
+          pytest skyulf-core/tests -q --disable-warnings
+          --cov=skyulf-core/skyulf --cov-branch --cov-report=xml:coverage-core.xml
+
+      # Same repo-relative path fix as backend-coverage.
+      - name: Make coverage paths repo-relative
+        run: sed -i 's/filename="/filename="skyulf-core\/skyulf\//g' coverage-core.xml
+
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage-core
+          path: coverage-core.xml
+
+  sonarcloud-scan:
+    name: SonarCloud Scan
+    runs-on: ubuntu-latest
+    needs: [sonar-gate, backend-coverage, skyulf-core-coverage]
+    if: ${{ needs.sonar-gate.outputs.enabled == 'true' }}
+    env:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          # Disabling shallow clones improves the relevancy of reporting
+          fetch-depth: 0
+
+      - name: Download backend coverage
+        uses: actions/download-artifact@v8
+        with:
+          name: coverage-backend
+          path: .
+
+      - name: Download skyulf-core coverage
+        uses: actions/download-artifact@v8
+        with:
+          name: coverage-core
+          path: .
+
+      # Tolerate either extraction layout (repo root vs. per-artifact subdir).
+      - name: Ensure coverage reports are at repo root
+        run: |
+          for f in coverage-backend/coverage-backend.xml coverage-core/coverage-core.xml; do
+            if [ -f "$f" ]; then mv "$f" .; fi
+          done
+          ls -l coverage-backend.xml coverage-core.xml
+
+      - name: SonarQube Scan
+        uses: SonarSource/sonarqube-scan-action@22918119ff8e1ca75a623e15c8296b6ea4fbe28f # v8.2.1

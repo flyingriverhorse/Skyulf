@@ -10,6 +10,9 @@ from ._utils import VADER_AVAILABLE, _AnalyzerState
 
 logger = logging.getLogger(__name__)
 
+# Canonical VADER thresholds: compound >= +0.05 is positive, <= -0.05 negative.
+VADER_COMPOUND_CUTOFF = 0.05
+
 
 class TextMixin(_AnalyzerState):
     """Text helpers for :class:`EDAAnalyzer`."""
@@ -39,7 +42,7 @@ class TextMixin(_AnalyzerState):
                 {"word": row["word"], "count": row["count"]}
                 for row in word_counts.iter_rows(named=True)
             )
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - text stats are best-effort; logged
             logger.warning(f"Error calculating common words for {col}: {e}")
 
         return TextStats(
@@ -61,9 +64,9 @@ class TextMixin(_AnalyzerState):
 
             compound = analyzer.polarity_scores(text)["compound"]
 
-            if compound >= 0.05:
+            if compound >= VADER_COMPOUND_CUTOFF:
                 counts["positive"] += 1
-            elif compound <= -0.05:
+            elif compound <= -VADER_COMPOUND_CUTOFF:
                 counts["negative"] += 1
             else:
                 counts["neutral"] += 1
@@ -100,7 +103,7 @@ class TextMixin(_AnalyzerState):
                 "neutral": counts["neutral"] / total,
                 "negative": counts["negative"] / total,
             }
-        except Exception:
+        except Exception:  # noqa: BLE001 - sentiment analysis is optional (vader); None means unavailable
             return None
 
     def _check_pii(self, col: str) -> bool:

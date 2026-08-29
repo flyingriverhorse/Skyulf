@@ -314,7 +314,7 @@ def run_scenario(label: str, fn):
         fn()
         RESULTS.append((label, True, "OK"))
         print(f"  ✅ PASSED")
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - capture scenario failure as recorded result
         tb = traceback.format_exc()
         RESULTS.append((label, False, str(e)))
         print(f"  ❌ FAILED: {e}")

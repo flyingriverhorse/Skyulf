@@ -18,7 +18,7 @@ Strategies:
 
 import logging
 from collections.abc import Callable
-from typing import Any
+from typing import Any, ClassVar
 
 from sklearn.base import BaseEstimator
 from sklearn.calibration import CalibratedClassifierCV
@@ -72,6 +72,7 @@ except ImportError:
 
 from ..core.meta.decorators import node_meta
 from ..registry import NodeRegistry
+from ..types import DEFAULT_RANDOM_STATE
 from ._sklearn_compat import normalize_logistic_regression_params
 from .classification import LogisticRegressionCalculator
 from .sklearn_wrapper import SklearnApplier, SklearnCalculator
@@ -84,41 +85,55 @@ logger = logging.getLogger(__name__)
 # repeated fits independent of any shared state).
 BASE_ESTIMATORS_CLF: dict[str, Callable[[], BaseEstimator]] = {
     "logistic_regression": lambda: LogisticRegression(max_iter=1000),
-    "random_forest": lambda: RandomForestClassifier(n_estimators=100, random_state=42),
-    "extra_trees": lambda: ExtraTreesClassifier(n_estimators=100, random_state=42),
-    "gradient_boosting": lambda: GradientBoostingClassifier(random_state=42),
-    "hist_gradient_boosting": lambda: HistGradientBoostingClassifier(random_state=42),
-    "adaboost": lambda: AdaBoostClassifier(random_state=42),
-    "decision_tree": lambda: DecisionTreeClassifier(random_state=42),
-    "gaussian_nb": lambda: GaussianNB(),
-    "svc": lambda: SVC(probability=True, random_state=42),
-    "knn": lambda: KNeighborsClassifier(),
+    "random_forest": lambda: RandomForestClassifier(
+        n_estimators=100, random_state=DEFAULT_RANDOM_STATE
+    ),
+    "extra_trees": lambda: ExtraTreesClassifier(
+        n_estimators=100, random_state=DEFAULT_RANDOM_STATE
+    ),
+    "gradient_boosting": lambda: GradientBoostingClassifier(random_state=DEFAULT_RANDOM_STATE),
+    "hist_gradient_boosting": lambda: HistGradientBoostingClassifier(
+        random_state=DEFAULT_RANDOM_STATE
+    ),
+    "adaboost": lambda: AdaBoostClassifier(random_state=DEFAULT_RANDOM_STATE),
+    "decision_tree": lambda: DecisionTreeClassifier(random_state=DEFAULT_RANDOM_STATE),
+    "gaussian_nb": GaussianNB,
+    "svc": lambda: SVC(probability=True, random_state=DEFAULT_RANDOM_STATE),
+    "knn": KNeighborsClassifier,
 }
 
 BASE_ESTIMATORS_REG: dict[str, Callable[[], BaseEstimator]] = {
-    "linear_regression": lambda: LinearRegression(),
-    "ridge": lambda: Ridge(),
-    "lasso": lambda: Lasso(),
-    "elasticnet": lambda: ElasticNet(),
-    "random_forest": lambda: RandomForestRegressor(n_estimators=100, random_state=42),
-    "extra_trees": lambda: ExtraTreesRegressor(n_estimators=100, random_state=42),
-    "gradient_boosting": lambda: GradientBoostingRegressor(random_state=42),
-    "hist_gradient_boosting": lambda: HistGradientBoostingRegressor(random_state=42),
-    "adaboost": lambda: AdaBoostRegressor(random_state=42),
-    "decision_tree": lambda: DecisionTreeRegressor(random_state=42),
-    "svr": lambda: SVR(),
-    "knn": lambda: KNeighborsRegressor(),
+    "linear_regression": LinearRegression,
+    "ridge": Ridge,
+    "lasso": Lasso,
+    "elasticnet": ElasticNet,
+    "random_forest": lambda: RandomForestRegressor(
+        n_estimators=100, random_state=DEFAULT_RANDOM_STATE
+    ),
+    "extra_trees": lambda: ExtraTreesRegressor(n_estimators=100, random_state=DEFAULT_RANDOM_STATE),
+    "gradient_boosting": lambda: GradientBoostingRegressor(random_state=DEFAULT_RANDOM_STATE),
+    "hist_gradient_boosting": lambda: HistGradientBoostingRegressor(
+        random_state=DEFAULT_RANDOM_STATE
+    ),
+    "adaboost": lambda: AdaBoostRegressor(random_state=DEFAULT_RANDOM_STATE),
+    "decision_tree": lambda: DecisionTreeRegressor(random_state=DEFAULT_RANDOM_STATE),
+    "svr": SVR,
+    "knn": KNeighborsRegressor,
 }
 
 # Append the optional boosters only when their library is importable so the
 # selectable set always matches what can actually be constructed at fit time.
 if XGBOOST_AVAILABLE:
-    BASE_ESTIMATORS_CLF["xgboost"] = lambda: XGBClassifier(random_state=42)
-    BASE_ESTIMATORS_REG["xgboost"] = lambda: XGBRegressor(random_state=42)
+    BASE_ESTIMATORS_CLF["xgboost"] = lambda: XGBClassifier(random_state=DEFAULT_RANDOM_STATE)
+    BASE_ESTIMATORS_REG["xgboost"] = lambda: XGBRegressor(random_state=DEFAULT_RANDOM_STATE)
 
 if LIGHTGBM_AVAILABLE:
-    BASE_ESTIMATORS_CLF["lightgbm"] = lambda: LGBMClassifier(random_state=42, verbose=-1)
-    BASE_ESTIMATORS_REG["lightgbm"] = lambda: LGBMRegressor(random_state=42, verbose=-1)
+    BASE_ESTIMATORS_CLF["lightgbm"] = lambda: LGBMClassifier(
+        random_state=DEFAULT_RANDOM_STATE, verbose=-1
+    )
+    BASE_ESTIMATORS_REG["lightgbm"] = lambda: LGBMRegressor(
+        random_state=DEFAULT_RANDOM_STATE, verbose=-1
+    )
 
 
 class _BaseEnsembleCalculator(SklearnCalculator):
@@ -134,7 +149,7 @@ class _BaseEnsembleCalculator(SklearnCalculator):
     applied during basic training and post-tuning cross-validation alike.
     """
 
-    BASE_ESTIMATORS: dict[str, Callable[[], BaseEstimator]] = {}
+    BASE_ESTIMATORS: ClassVar[dict[str, Callable[[], BaseEstimator]]] = {}
     DEFAULT_KEYS: tuple[str, ...] = ()
     DEFAULT_FINAL_KEY: str = ""
     MODEL_KEY: str = ""  # Registry id, e.g. "voting_classifier".

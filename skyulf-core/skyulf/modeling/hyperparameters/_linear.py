@@ -1,6 +1,6 @@
 """Linear models: LogisticRegression, LinearRegression, Ridge, Lasso, ElasticNet."""
 
-from ._field import HyperparameterField
+from ._field import HyperparameterField, random_state_field
 
 # --- Logistic Regression ---
 LOGISTIC_REGRESSION_PARAMS = [
@@ -66,6 +66,7 @@ LOGISTIC_REGRESSION_PARAMS = [
         ),
         depends_on={"param": "penalty", "value": "elasticnet"},
     ),
+    random_state_field("Seed used by stochastic solvers (saga, liblinear shuffling)."),
 ]
 
 # --- Linear Regression ---
@@ -121,6 +122,7 @@ RIDGE_REGRESSION_PARAMS = [
         ],
         description="Whether to calculate the intercept for this model.",
     ),
+    random_state_field("Seed used by the stochastic sag/saga solvers."),
 ]
 
 # --- Lasso Regression ---
@@ -142,6 +144,7 @@ LASSO_REGRESSION_PARAMS = [
         options=[{"label": "Cyclic", "value": "cyclic"}, {"label": "Random", "value": "random"}],
         description="If set to 'random', a random coefficient is updated every iteration.",
     ),
+    random_state_field("Seed for the coefficient update order when selection='random'."),
 ]
 
 # --- ElasticNet Regression ---
@@ -173,6 +176,7 @@ ELASTICNET_REGRESSION_PARAMS = [
         options=[{"label": "Cyclic", "value": "cyclic"}, {"label": "Random", "value": "random"}],
         description="If set to 'random', a random coefficient is updated every iteration.",
     ),
+    random_state_field("Seed for the coefficient update order when selection='random'."),
 ]
 
 
@@ -233,4 +237,5 @@ SGD_CLASSIFIER_PARAMS = [
         step=100,
         description="The maximum number of passes over the training data (epochs).",
     ),
+    random_state_field("Seed for the SGD shuffle and weight initialization."),
 ]

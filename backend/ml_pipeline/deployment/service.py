@@ -49,7 +49,7 @@ def _maybe_decode_predictions(
         # If dtype isn't integer but values might still be numeric strings/floats,
         # try converting.
         return target_encoder.inverse_transform(preds.astype(int))
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - decode failure returns raw predictions
         logger.debug(f"Could not decode predictions via LabelEncoder: {e}")
         return predictions
 
@@ -776,7 +776,7 @@ class DeploymentService:
             info["dataset_id"] = lineage["dataset_id"]
             info["version"] = lineage["version"]
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - enrichment best-effort; info still returned
             logger.warning(f"Failed to extract schema for deployment {deployment.id}: {e}")
 
         return cast(dict[str, Any], info)

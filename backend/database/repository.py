@@ -265,7 +265,7 @@ class DataSourceRepository(BaseRepository[DataSource]):
             )
             result = await self.session.execute(stmt)
             return result.scalars().first()
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 - query failure falls back to None
             logger.warning("Failed querying DataSource by file hash: %s", exc)
             return None
 

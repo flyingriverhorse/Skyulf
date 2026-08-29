@@ -89,7 +89,7 @@ _POLARS_ARITH_BUILDERS: dict[str, Callable[[list[Any], list[float], float], Any 
     "add": _polars_add,
     "subtract": _polars_subtract,
     "multiply": _polars_multiply,
-    "divide": lambda col_exprs, const_vals, eps: _polars_divide(col_exprs, const_vals, eps),
+    "divide": _polars_divide,
 }
 
 
@@ -223,7 +223,7 @@ def _polars_datetime_apply(op: dict[str, Any], X_out: Any) -> Any:
             col_exprs = _build_polars_dt_exprs(col, base_dt, features)
             if col_exprs:
                 X_out = X_out.with_columns(col_exprs)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - per-column datetime feature failure is logged and skipped
             logger.warning(f"Failed to extract datetime features for column {col}: {e}")
     return X_out
 
@@ -289,6 +289,6 @@ def _featgen_apply_polars(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, 
             if round_digits is not None:
                 expr = expr.round(round_digits)
             X_out = X_out.with_columns(expr.alias(output_col))
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - per-operation failure is logged and skipped
             logger.warning(f"Failed to apply {op_type} operation (index {i}): {e}")
     return X_out, y

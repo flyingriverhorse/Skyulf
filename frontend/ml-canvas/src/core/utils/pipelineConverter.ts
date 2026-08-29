@@ -160,6 +160,7 @@ const buildBaseTuningConfig = (data: Record<string, unknown>): Record<string, un
     cv_random_state: data.cv_random_state,
     cv_time_column: data.cv_time_column,
     random_state: data.random_state,
+    tune_threshold: data.tune_threshold ?? false,
 });
 
 export const convertGraphToPipelineConfig = (nodes: Node[], edges: Edge[]): PipelineConfigModel => {
@@ -221,7 +222,12 @@ export const convertGraphToPipelineConfig = (nodes: Node[], edges: Edge[]): Pipe
                   columns: node.data.columns,
                   max_iter: node.data.max_iter,
                   estimator: node.data.estimator,
-                  random_state: node.data.random_state ?? 0
+                  // Legacy graphs may lack the field entirely — omit it
+                  // instead of hardcoding a fallback so core's documented
+                  // default (IterativeImputerCalculator) is the single owner.
+                  ...(node.data.random_state != null
+                      ? { random_state: node.data.random_state }
+                      : {}),
               };
           } else {
               stepType = 'SimpleImputer';

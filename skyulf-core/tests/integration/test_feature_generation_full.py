@@ -285,7 +285,7 @@ class TestDatetimeExtractPolars:
     @pytest.fixture(autouse=True)
     def _result(self) -> None:
         try:
-            import polars as pl  # noqa: F401
+            import polars as pl
         except ImportError:
             pytest.skip("polars not installed")  # ty: ignore[too-many-positional-arguments]
         self.out_pd = _run(

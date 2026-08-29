@@ -45,13 +45,16 @@ export const useSchemaPreview = (): void => {
           // Drop stale responses (a newer request has since been issued).
           if (myRequestId !== requestIdRef.current) return;
 
-          setPredictedSchemas(response.predicted_schemas);
+          // A degraded response (missing keys) must never land in the
+          // store: CustomNodeWrapper indexes these maps per node id and
+          // would crash on `undefined`.
+          setPredictedSchemas(response.predicted_schemas ?? {});
 
           const grouped: Record<
             string,
             Array<{ field: string; column: string; upstream_node_id: string | null }>
           > = {};
-          for (const ref of response.broken_references) {
+          for (const ref of response.broken_references ?? []) {
             const list = grouped[ref.node_id] ?? [];
             list.push({
               field: ref.field,

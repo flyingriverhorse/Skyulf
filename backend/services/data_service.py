@@ -67,7 +67,7 @@ class DataService:
         """Load via Polars, falling back to Pandas (converted to Polars) on failure."""
         try:
             return self._load_polars(path_str, storage_options)
-        except Exception as pl_err:
+        except Exception as pl_err:  # noqa: BLE001 - polars load falls back to pandas
             logger.warning(f"Polars load failed for {path_str}: {pl_err}. Falling back to Pandas.")
             pdf = self._load_pandas(path_str, storage_options)
             return pl.from_pandas(pdf)
@@ -125,7 +125,7 @@ class DataService:
             elif path_str.endswith(".json"):
                 # JSON scan is experimental/limited, use read
                 return pl.read_json(path_str).head(limit).to_dicts()
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - lazy sample falls back to eager load
             logger.warning(
                 f"Polars lazy scan failed for {path_str}: {e}. Falling back to eager load."
             )
@@ -188,7 +188,7 @@ class DataService:
                 pl.from_pandas(data).write_parquet(path_str)
             else:
                 self._save_pandas(data, path_str)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - polars write falls back to pandas
             logger.warning(f"Polars write failed ({e}), falling back to Pandas.")
             self._save_pandas(data, path_str)
 

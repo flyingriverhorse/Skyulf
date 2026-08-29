@@ -1,16 +1,16 @@
 import logging
 import warnings
 from threading import Lock
-from typing import Any
+from typing import Any, ClassVar
 
 logger = logging.getLogger(__name__)
 
 
 class NodeRegistry:
-    _calculators: dict[str, type] = {}
-    _appliers: dict[str, type] = {}
-    _metadata: dict[str, dict[str, Any]] = {}
-    _DEPRECATED_ALIASES: dict[str, str] = {"Split": "TrainTestSplitter"}
+    _calculators: ClassVar[dict[str, type]] = {}
+    _appliers: ClassVar[dict[str, type]] = {}
+    _metadata: ClassVar[dict[str, dict[str, Any]]] = {}
+    _DEPRECATED_ALIASES: ClassVar[dict[str, str]] = {"Split": "TrainTestSplitter"}
     _lock = Lock()
 
     @classmethod

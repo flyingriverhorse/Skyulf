@@ -64,7 +64,7 @@ class TrainingJobManagerBase:
                 from backend.celery_app import celery_app  # noqa: PLC0415
 
                 celery_app.control.revoke(task_id, terminate=True, signal="SIGTERM")
-            except Exception:
+            except Exception:  # noqa: BLE001 - revoke errors must not block cancel
                 # Best-effort: never let revoke errors block the user-visible
                 # cancel.  The status guard in update_status_sync still keeps
                 # the row at CANCELLED even if the worker writes back.

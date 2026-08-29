@@ -31,6 +31,9 @@ export interface TrainingConfig {
   search_strategy: string;
   strategy_params?: Record<string, unknown>;
   random_state: number;
+  // F-13: tune the decision threshold on the validation split after tuning
+  // (binary classification only; off by default).
+  tune_threshold?: boolean;
   // Shared CV section.
   cv_enabled: boolean;
   cv_folds: number;
@@ -187,6 +190,13 @@ export const TrainingSettings: React.FC<{
   // Find currently selected model item to check tags
   const selectedModelItem = availableModels.find(m => m.id === config.model_type);
   const requiresScaling = selectedModelItem?.tags?.includes('requires_scaling');
+
+  // Classification-only options (e.g. decision-threshold tuning): task-scoped
+  // nodes know their task; the generic node falls back to the selected
+  // model's registry tags.
+  const isClassification = task !== undefined
+      ? task !== 'regression'
+      : selectedModelItem?.tags?.includes('classification') ?? false;
 
   // Fetch available models from registry. Shared between both modes — the
   // dedicated Segmentation node has its own model list (see
@@ -519,6 +529,36 @@ export const TrainingSettings: React.FC<{
                                     min={1}
                                 />
                             </div>
+
+                            <div>
+                                <div className="flex items-center gap-1.5 mb-1">
+                                    <span className="block text-xs font-medium text-gray-700 dark:text-gray-300">Random State</span>
+                                    <HelpTooltip text="Seed for the search and the final refit — same seed + same data = identical tuning outcome. Applies to every candidate, not just the winner." />
+                                </div>
+                                <input
+                                    type="number"
+                                    value={config.random_state ?? 42}
+                                    onChange={(e) => onChange({ ...config, random_state: Number(e.target.value) })}
+                                    className="w-full border border-gray-300 dark:border-gray-600 rounded-lg p-2 text-sm bg-white dark:bg-gray-800 dark:text-gray-100"
+                                    min={0}
+                                />
+                            </div>
+
+                            {isClassification && (
+                                <div className="col-span-2 flex items-center gap-2">
+                                    <input
+                                        type="checkbox"
+                                        id="tune_threshold"
+                                        checked={config.tune_threshold ?? false}
+                                        onChange={(e) => onChange({ ...config, tune_threshold: e.target.checked })}
+                                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                    />
+                                    <label htmlFor="tune_threshold" className="text-xs text-gray-600 dark:text-gray-400">
+                                        Tune decision threshold
+                                    </label>
+                                    <HelpTooltip text="After tuning, picks the probability cutoff that maximises your metric on the validation split (binary targets). Predictions then use that cutoff instead of the default 0.5. Needs a validation split; probability-only metrics like ROC AUC fall back to balanced accuracy for the cutoff search." />
+                                </div>
+                            )}
                         </div>
                     </div>
                 </>
@@ -631,6 +671,21 @@ export const TrainingSettings: React.FC<{
                                     />
                                     <label htmlFor="cv_shuffle" className="text-xs text-gray-600 dark:text-gray-400">Shuffle Data</label>
                                 </div>
+                                {config.cv_shuffle !== false && config.cv_type !== 'time_series_split' && (
+                                    <div>
+                                        <div className="flex items-center gap-1.5 mb-1">
+                                            <span className="block text-xs text-gray-500">Fold Split Seed</span>
+                                            <HelpTooltip text="Seed controlling how rows are dealt to folds — same seed = identical fold splits, so CV scores stay comparable across runs." />
+                                        </div>
+                                        <input
+                                            type="number"
+                                            value={config.cv_random_state ?? 42}
+                                            onChange={(e) => onChange({ ...config, cv_random_state: Number(e.target.value) })}
+                                            className="w-full border border-gray-300 dark:border-gray-600 rounded p-1.5 text-sm bg-white dark:bg-gray-800 dark:text-gray-100"
+                                            min={0}
+                                        />
+                                    </div>
+                                )}
                             </div>
                         )}
                     </div>
@@ -774,7 +829,7 @@ export const TrainingSettings: React.FC<{
             </div>
         ) : (
             <div className="space-y-3">
-                {searchSpaceDefs.filter(def => isSearchSpaceParamVisible(def, config.search_space)).map(def => (
+                {searchSpaceDefs.filter(def => def.tunable !== false && isSearchSpaceParamVisible(def, config.search_space)).map(def => (
                     <div key={`${config.model_type}-${def.name}`} className="bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-lg p-3">
                         <SearchSpaceInput
                             def={def}

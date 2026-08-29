@@ -14,12 +14,12 @@ const FIELDS: ReadonlyArray<{
     max: number;
 }> = [
     { key: 'psi', label: 'PSI', step: 0.05, min: 0.01, max: 1 },
-    { key: 'ks', label: 'KS p-value', step: 0.01, min: 0.001, max: 0.2 },
+    { key: 'ks', label: 'KS statistic', step: 0.01, min: 0.01, max: 0.5 },
     { key: 'wasserstein', label: 'Wasserstein', step: 0.05, min: 0.01, max: 1 },
     { key: 'kl', label: 'KL Div', step: 0.05, min: 0.01, max: 1 },
 ];
 
-const DEFAULTS: DriftThresholds = { psi: 0.2, ks: 0.05, wasserstein: 0.1, kl: 0.1 };
+const DEFAULTS: DriftThresholds = { psi: 0.2, ks: 0.1, wasserstein: 0.1, kl: 0.1 };
 
 /** Inline panel with one number input per drift metric and a "reset" link. */
 export const ThresholdsPanel: React.FC<ThresholdsPanelProps> = ({ thresholds, onChange }) => (

@@ -20,7 +20,7 @@ router = APIRouter()
 async def ws_jobs(ws: WebSocket) -> None:
     try:
         await connection_manager.connect(ws)
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - failed accept exits handler
         logger.warning("WS jobs: failed to accept connection: %s", exc)
         return
 
@@ -31,7 +31,7 @@ async def ws_jobs(ws: WebSocket) -> None:
             await ws.receive_text()
     except WebSocketDisconnect:
         pass
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - receive errors end the loop
         logger.warning("WS jobs receive loop ended unexpectedly: %s", exc)
     finally:
         await connection_manager.disconnect(ws)

@@ -102,7 +102,7 @@ class JobStrategy(ABC):
                     output=None,
                     metrics=final_metrics,
                 )
-            except Exception:
+            except Exception:  # noqa: BLE001 - summary fallback; None renders static card
                 summary = None
         return summary
 
@@ -145,6 +145,40 @@ class JobStrategy(ABC):
                 final_metrics["leakage_gate"] = result.leakage_verdict
 
             job.metrics = final_metrics
+            self._seed_tuned_thresholds(job, final_metrics)
+
+    @staticmethod
+    def _seed_tuned_thresholds(job: MLJob, final_metrics: dict) -> None:
+        """Seed training-time decision thresholds into the per-job store.
+
+        When a training/tuning run selected decision thresholds (F-13
+        ``tune_threshold``), copy them into the same ``tuned_thresholds``
+        store the Experiments/Inference threshold panel and deployment read,
+        enabled by default — one lifecycle (preview/save/toggle/clear) for
+        both origins instead of a second invisible source of truth.
+
+        The node runner only emits ``decision_thresholds`` when the tuning
+        engine actually selected a threshold (classification, binary target,
+        ``predict_proba``, validation split all present), so the key's
+        presence is the opt-in-and-succeeded signal. The selection always
+        runs on the validation split.
+        """
+        thresholds = final_metrics.get("decision_thresholds")
+        if not isinstance(thresholds, dict) or not thresholds:
+            return
+        job.tuned_thresholds = {
+            # Dict order preserves the model's classes_ order (the node
+            # runner stringifies keys without re-sorting).
+            "thresholds": thresholds,
+            "classes": list(thresholds.keys()),
+            "metric": final_metrics.get("decision_threshold_metric"),
+            "split_used": "validation",
+            "computed_at": datetime.now(UTC).isoformat(),
+            # Provenance: lets the UI distinguish training-time-seeded
+            # thresholds from ones a user previewed + saved manually.
+            "source": "training",
+        }
+        job.tuned_thresholds_enabled = True
 
     def handle_failure(self, job: MLJob, error_msg: str) -> None:
         """Updates the job with failure information."""

@@ -38,6 +38,7 @@ from skyulf.modeling.cross_validation import _detect_datetime_columns
 from skyulf.preprocessing import AuditedFoldPreprocessor, frame_rows
 from skyulf.preprocessing.pipeline import FeatureEngineer
 from skyulf.registry import NodeRegistry
+from skyulf.types import DEFAULT_RANDOM_STATE
 
 from ..schemas import NodeConfig
 
@@ -74,7 +75,7 @@ def _emit_trial_event(
     )
     try:
         publish_job_event(event)
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - event publish must not impact training
         logger.warning("trial event publish failed for %s: %s", job_id, exc)
 
 
@@ -110,7 +111,7 @@ def _emit_iteration_event(
     )
     try:
         publish_job_event(event)
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - event publish must not impact training
         logger.warning("iteration event publish failed for %s: %s", job_id, exc)
 
 
@@ -518,7 +519,7 @@ class NodeRunnersMixin:
         """Best-effort recording of data shape metrics; failures are logged, not raised."""
         try:
             self._record_data_shape_metrics(metrics, data, target_col)
-        except Exception:
+        except Exception:  # noqa: BLE001 - best-effort metrics; logged, not raised
             logger.debug("Failed to record data shape metrics for node %s", node_id, exc_info=True)
 
     def _finalize_training_run(
@@ -662,9 +663,10 @@ class NodeRunnersMixin:
             "cv_folds": node.params.get("cv_folds", 5),
             "cv_type": node.params.get("cv_type", "k_fold"),
             "cv_shuffle": node.params.get("cv_shuffle", True),
-            "cv_random_state": node.params.get("cv_random_state", 42),
+            "cv_random_state": node.params.get("cv_random_state", DEFAULT_RANDOM_STATE),
             "cv_time_column": node.params.get("cv_time_column") or None,
-            "random_state": node.params.get("random_state", 42),
+            "random_state": node.params.get("random_state", DEFAULT_RANDOM_STATE),
+            "tune_threshold": node.params.get("tune_threshold", False),
         }
 
     def _run_training(
@@ -830,6 +832,14 @@ class NodeRunnersMixin:
                 or tuning_params.get("tuning_config", {}).get("metric")
                 or tuning_params.get("metric"),
             }
+            # F-13: surface the tuned decision thresholds (string keys so the
+            # job metrics stay JSON-serializable regardless of label dtype).
+            thresholds = getattr(tuning_result, "decision_thresholds", None)
+            if thresholds is not None:
+                metrics["decision_thresholds"] = {str(k): v for k, v in thresholds.items()}
+                metrics["decision_threshold_metric"] = getattr(
+                    tuning_result, "decision_threshold_metric", None
+                )
         else:
             metrics = {}
         return tuning_result, metrics
@@ -887,7 +897,7 @@ class NodeRunnersMixin:
                 n_folds=tuning_params.get("cv_folds", 5),
                 cv_type=post_cv_type,
                 shuffle=tuning_params.get("cv_shuffle", True),
-                random_state=tuning_params.get("cv_random_state", 42),
+                random_state=tuning_params.get("cv_random_state", DEFAULT_RANDOM_STATE),
                 time_column=tuning_params.get("cv_time_column") or None,
                 log_callback=self.log,
                 preprocessing=preprocessing,

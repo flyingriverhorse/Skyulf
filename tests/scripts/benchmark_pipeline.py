@@ -120,7 +120,7 @@ def run_benchmark():
             print(f"Fit: {fit_time:.4f}s")
             print(f"Predict: {predict_time:.4f}s")
             results.append({"Mode": "Polars (Wrapped)", "Fit": fit_time, "Predict": predict_time})
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - report benchmark failure and continue
             print(f"Polars benchmark failed: {e}")
 
     # Summary
@@ -140,5 +140,5 @@ def run_benchmark():
 if __name__ == "__main__":
     try:
         run_benchmark()
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - main guard reports benchmark failure
         print(f"Benchmark failure: {e}")

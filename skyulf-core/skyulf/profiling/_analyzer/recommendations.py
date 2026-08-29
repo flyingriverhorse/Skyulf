@@ -3,6 +3,13 @@
 from ..schemas import Alert, ColumnProfile, Recommendation
 from ._utils import _AnalyzerState
 
+# |skew| above this triggers a log/Box-Cox transform recommendation.
+SKEWNESS_TRANSFORM_THRESHOLD = 1.5
+# Class-ratio bands: above the upper band the target is balanced, below the
+# lower band it is imbalanced enough to recommend resampling.
+BALANCED_RATIO_UPPER = 0.8
+IMBALANCED_RATIO_LOWER = 0.2
+
 
 class RecommendationsMixin(_AnalyzerState):
     """Recommendation helpers for :class:`EDAAnalyzer`."""
@@ -61,7 +68,7 @@ class RecommendationsMixin(_AnalyzerState):
         if (
             profile.numeric_stats
             and profile.numeric_stats.skewness
-            and abs(profile.numeric_stats.skewness) > 1.5
+            and abs(profile.numeric_stats.skewness) > SKEWNESS_TRANSFORM_THRESHOLD
         ):
             return [
                 Recommendation(
@@ -156,7 +163,7 @@ class RecommendationsMixin(_AnalyzerState):
     @staticmethod
     def _build_balance_recommendation(target_col: str, ratio: float) -> list[Recommendation]:
         """Build the balanced/imbalanced recommendation for the given class ratio, or [] if neither applies."""
-        if ratio > 0.8:
+        if ratio > BALANCED_RATIO_UPPER:
             return [
                 Recommendation(
                     column=target_col,
@@ -165,7 +172,7 @@ class RecommendationsMixin(_AnalyzerState):
                     suggestion=f"Target classes are well balanced (Ratio: {ratio:.2f}).",
                 )
             ]
-        if ratio < 0.2:
+        if ratio < IMBALANCED_RATIO_LOWER:
             return [
                 Recommendation(
                     column=target_col,

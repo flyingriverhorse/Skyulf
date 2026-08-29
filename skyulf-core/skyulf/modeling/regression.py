@@ -30,10 +30,10 @@ try:
     # does not always silence. Register a no-op logger so all native messages
     # are intercepted by Python and dropped. Safe to call multiple times.
     class _SilentLgbmLogger:
-        def info(self, msg: str) -> None:  # noqa: D401
+        def info(self, msg: str) -> None:
             pass
 
-        def warning(self, msg: str) -> None:  # noqa: D401
+        def warning(self, msg: str) -> None:
             pass
 
     _lgb.register_logger(_SilentLgbmLogger())  # ty: ignore[unresolved-attribute]
@@ -87,7 +87,7 @@ class RidgeRegressionApplier(SklearnApplier):
     name="Ridge Regression",
     category="Modeling",
     description="Linear least squares with l2 regularization.",
-    params={"alpha": 1.0, "solver": "auto", "random_state": 42},
+    params={"alpha": 1.0, "solver": "auto"},
     tags=["requires_scaling", "regression"],
     learns_from_data=True,
 )
@@ -100,7 +100,6 @@ class RidgeRegressionCalculator(SklearnCalculator):
             default_params={
                 "alpha": 1.0,
                 "solver": "auto",
-                "random_state": 42,
             },
             problem_type="regression",
         )
@@ -133,7 +132,6 @@ class RandomForestRegressorCalculator(SklearnCalculator):
                 "min_samples_split": 5,
                 "min_samples_leaf": 2,
                 "n_jobs": -1,
-                "random_state": 42,
             },
             problem_type="regression",
         )
@@ -160,7 +158,7 @@ class LassoRegressionCalculator(SklearnCalculator):
     def __init__(self):
         super().__init__(
             model_class=Lasso,
-            default_params={"alpha": 1.0, "selection": "cyclic", "random_state": 42},
+            default_params={"alpha": 1.0, "selection": "cyclic"},
             problem_type="regression",
         )
 
@@ -190,7 +188,6 @@ class ElasticNetRegressionCalculator(SklearnCalculator):
                 "alpha": 1.0,
                 "l1_ratio": 0.5,
                 "selection": "cyclic",
-                "random_state": 42,
             },
             problem_type="regression",
         )
@@ -278,7 +275,6 @@ class DecisionTreeRegressorCalculator(SklearnCalculator):
                 "max_depth": None,
                 "min_samples_split": 2,
                 "criterion": "squared_error",
-                "random_state": 42,
             },
             problem_type="regression",
         )
@@ -309,7 +305,6 @@ class GradientBoostingRegressorCalculator(SklearnCalculator):
                 "n_estimators": 100,
                 "learning_rate": 0.1,
                 "max_depth": 3,
-                "random_state": 42,
             },
             problem_type="regression",
         )
@@ -339,7 +334,6 @@ class AdaBoostRegressorCalculator(SklearnCalculator):
             default_params={
                 "n_estimators": 50,
                 "learning_rate": 1.0,
-                "random_state": 42,
             },
             problem_type="regression",
         )
@@ -374,7 +368,6 @@ class ExtraTreesRegressorCalculator(SklearnCalculator):
                 "criterion": "squared_error",
                 "bootstrap": False,
                 "n_jobs": -1,
-                "random_state": 42,
             },
             problem_type="regression",
         )
@@ -409,7 +402,6 @@ class HistGradientBoostingRegressorCalculator(SklearnCalculator):
                 "min_samples_leaf": 20,
                 "l2_regularization": 0.0,
                 "max_bins": 255,
-                "random_state": 42,
             },
             problem_type="regression",
         )
@@ -464,7 +456,6 @@ if LIGHTGBM_AVAILABLE:
                     "reg_lambda": 0.0,
                     "boosting_type": "gbdt",
                     "n_jobs": -1,
-                    "random_state": 42,
                     "verbose": -1,
                     "verbosity": -1,
                 },
@@ -533,7 +524,6 @@ if XGBOOST_AVAILABLE:
                     "subsample": 0.8,
                     "colsample_bytree": 0.8,
                     "n_jobs": -1,
-                    "random_state": 42,
                 },
                 problem_type="regression",
             )

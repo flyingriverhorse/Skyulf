@@ -257,7 +257,7 @@ def _bucketing_apply_pandas(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any
             )
             df_out[f"{col}{output_suffix}"] = binned_series
             processed_cols.append(col)
-        except Exception:
+        except Exception:  # noqa: BLE001 - per-column bin failure is logged and column left unbinned
             # Skip columns that fail (e.g. degenerate edges, dtype mismatch),
             # but log so a silently-unbinned column isn't a total mystery.
             logger.warning(
@@ -420,7 +420,7 @@ def _fit_one_column_into_maps(
             custom_labels_map[col] = labels
         if edges is not None:
             bin_edges_map[col] = edges.tolist()
-    except Exception:
+    except Exception:  # noqa: BLE001 - per-column fit failure is logged and column skipped
         # Skip columns whose binning strategy can't be fit (e.g. all-NaN
         # after dropna, degenerate quantiles), but log for visibility.
         logger.warning(

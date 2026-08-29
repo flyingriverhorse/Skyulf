@@ -57,7 +57,7 @@ def _make_threshold_version(version: int, **kwargs) -> MagicMock:
     row = MagicMock()
     row.version = version
     row.psi = kwargs.get("psi", 0.2)
-    row.ks = kwargs.get("ks", 0.05)
+    row.ks = kwargs.get("ks", 0.1)
     row.wasserstein = kwargs.get("wasserstein", 0.1)
     row.kl_divergence = kwargs.get("kl_divergence", 0.1)
     return row
@@ -137,12 +137,17 @@ class TestEffectiveDriftThresholds:
 
     def test_empty_overrides_yield_defaults(self) -> None:
         effective = _effective_drift_thresholds({})
-        assert effective == {"psi": 0.2, "ks": 0.05, "wasserstein": 0.1, "kl_divergence": 0.1}
+        assert effective == {
+            "psi": 0.2,
+            "ks_statistic": 0.1,
+            "wasserstein": 0.1,
+            "kl_divergence": 0.1,
+        }
 
     def test_partial_override_keeps_other_defaults(self) -> None:
         effective = _effective_drift_thresholds({"psi": 0.4})
         assert effective["psi"] == 0.4
-        assert effective["ks"] == 0.05
+        assert effective["ks_statistic"] == 0.1
 
 
 class TestThresholdVersioning:
@@ -152,7 +157,7 @@ class TestThresholdVersioning:
     async def test_first_check_creates_version_one(self) -> None:
         db = _make_db(scalar_one_or_none=None)
         version = await _get_or_create_threshold_version(
-            db, {"psi": 0.2, "ks": 0.05, "wasserstein": 0.1, "kl_divergence": 0.1}
+            db, {"psi": 0.2, "ks_statistic": 0.1, "wasserstein": 0.1, "kl_divergence": 0.1}
         )
         assert version.version == 1
         db.add.assert_called_once()
@@ -162,7 +167,7 @@ class TestThresholdVersioning:
         latest = _make_threshold_version(3)
         db = _make_db(scalar_one_or_none=latest)
         version = await _get_or_create_threshold_version(
-            db, {"psi": 0.2, "ks": 0.05, "wasserstein": 0.1, "kl_divergence": 0.1}
+            db, {"psi": 0.2, "ks_statistic": 0.1, "wasserstein": 0.1, "kl_divergence": 0.1}
         )
         assert version is latest
         db.add.assert_not_called()
@@ -172,7 +177,7 @@ class TestThresholdVersioning:
         latest = _make_threshold_version(3, psi=0.2)
         db = _make_db(scalar_one_or_none=latest)
         version = await _get_or_create_threshold_version(
-            db, {"psi": 0.4, "ks": 0.05, "wasserstein": 0.1, "kl_divergence": 0.1}
+            db, {"psi": 0.4, "ks_statistic": 0.1, "wasserstein": 0.1, "kl_divergence": 0.1}
         )
         # A new version row is created rather than overwriting `latest`.
         assert version is not latest
@@ -195,7 +200,12 @@ class TestSaveDriftAlertExplicitOutcomes:
             dataset_name="sales",
             evaluation_status="completed",
             report=report,
-            effective_thresholds={"psi": 0.2, "ks": 0.05, "wasserstein": 0.1, "kl_divergence": 0.1},
+            effective_thresholds={
+                "psi": 0.2,
+                "ks_statistic": 0.1,
+                "wasserstein": 0.1,
+                "kl_divergence": 0.1,
+            },
         )
         assert alert is not None
         assert alert.evaluation_status == "completed"
@@ -214,7 +224,12 @@ class TestSaveDriftAlertExplicitOutcomes:
             dataset_name="sales",
             evaluation_status="completed",
             report=report,
-            effective_thresholds={"psi": 0.2, "ks": 0.05, "wasserstein": 0.1, "kl_divergence": 0.1},
+            effective_thresholds={
+                "psi": 0.2,
+                "ks_statistic": 0.1,
+                "wasserstein": 0.1,
+                "kl_divergence": 0.1,
+            },
         )
         assert alert is not None
         assert set(alert.column_drifts.keys()) == {"col_0", "col_1"}

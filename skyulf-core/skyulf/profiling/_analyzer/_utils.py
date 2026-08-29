@@ -1,5 +1,6 @@
 """Shared utilities for the analyzer mixins."""
 
+import importlib.util
 from typing import Any, Protocol, cast, runtime_checkable
 
 import polars as pl
@@ -81,43 +82,10 @@ class _AnalyzerState(Protocol):
 
 
 # Optional dependency probes — kept here so each mixin imports a single flag
-# instead of re-running the try/except dance.
+# instead of re-running the try/except dance. `find_spec` answers the
+# "is it installed" question without importing (and initialising) the package.
 
-try:
-    from sklearn.cluster import KMeans
-    from sklearn.decomposition import PCA
-    from sklearn.ensemble import IsolationForest
-    from sklearn.impute import SimpleImputer
-    from sklearn.preprocessing import StandardScaler
-    from sklearn.tree import (
-        DecisionTreeClassifier,
-        DecisionTreeRegressor,
-        _tree,  # noqa: F401  # ty: ignore[unresolved-import]
-    )
-
-    SKLEARN_AVAILABLE = True
-except ImportError:
-    SKLEARN_AVAILABLE = False
-
-try:
-    from scipy.stats import f_oneway, kstest, shapiro
-
-    SCIPY_AVAILABLE = True
-except ImportError:
-    SCIPY_AVAILABLE = False
-
-try:
-    from statsmodels.tsa.stattools import adfuller
-
-    STATSMODELS_AVAILABLE = True
-except ImportError:
-    STATSMODELS_AVAILABLE = False
-
-try:
-    from vaderSentiment.vaderSentiment import (  # noqa: F401  # ty: ignore[unresolved-import]
-        SentimentIntensityAnalyzer,
-    )
-
-    VADER_AVAILABLE = True
-except ImportError:
-    VADER_AVAILABLE = False
+SKLEARN_AVAILABLE = importlib.util.find_spec("sklearn") is not None
+SCIPY_AVAILABLE = importlib.util.find_spec("scipy") is not None
+STATSMODELS_AVAILABLE = importlib.util.find_spec("statsmodels") is not None
+VADER_AVAILABLE = importlib.util.find_spec("vaderSentiment") is not None

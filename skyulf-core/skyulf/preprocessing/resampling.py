@@ -157,7 +157,7 @@ def _import_over_samplers() -> dict[str, Any]:
             RandomOverSampler,
         )
     except ImportError as exc:
-        logger.error("imblearn is required for oversampling. `pip install imbalanced-learn`")
+        logger.exception("imblearn is required for oversampling. `pip install imbalanced-learn`")
         raise ImportError(
             "imblearn is required for oversampling. `pip install imbalanced-learn`"
         ) from exc
@@ -282,7 +282,7 @@ def _import_under_samplers() -> dict[str, Any]:
             TomekLinks,
         )
     except ImportError as exc:
-        logger.error("imblearn is required for undersampling. `pip install imbalanced-learn`")
+        logger.exception("imblearn is required for undersampling. `pip install imbalanced-learn`")
         raise ImportError(
             "imblearn is required for undersampling. `pip install imbalanced-learn`"
         ) from exc

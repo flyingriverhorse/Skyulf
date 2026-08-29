@@ -1,9 +1,9 @@
 # Per-Fold Refit for Fallback Shapes — Investigation & Plan
 
-**Date:** 2026-08-27 · **Status:** proposal (not started) · **Parent:** findings
-`2026-08-26-holdout-validation-refit-and-merge-findings.md` §1 (noise-bias proof),
-F-15 design `2026-08-23-f15-per-fold-refit-design.md`, task 11 plan
-`2026-08-23-task11-merged-branch-fold-refit-plan.md`.
+**Date:** 2026-08-27 · **Status:** Phase 0 telemetry done (branch 085); remaining — Phase 0
+canvas lint, Phases 1–4 gated on demand · **Parent:** the holdout-refit findings §1
+(noise-bias proof), the F-15 per-fold-refit design, and the task 11 merged-branch plan —
+all three shipped and were archived out of this folder.
 
 ## 1. Current state — what falls back today, and where
 

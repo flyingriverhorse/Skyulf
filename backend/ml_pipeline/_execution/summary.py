@@ -199,7 +199,7 @@ def _dtype_breakdown(df: pd.DataFrame) -> str | None:
         if len(parts) >= 2:
             return " · ".join(parts)
         return None
-    except Exception:
+    except Exception:  # noqa: BLE001 - best-effort rendering; None on failure
         return None
 
 
@@ -740,7 +740,7 @@ def build_summary(
             return _render_split(ctx)
         renderer = _RENDERERS.get(family, _render_frame)
         return renderer(ctx)
-    except Exception as exc:  # pragma: no cover - defensive
+    except Exception as exc:  # noqa: BLE001 - summary must never raise  # pragma: no cover - defensive
         logger.debug("summary build failed for step=%s: %s", step_type, exc)
         return None
 

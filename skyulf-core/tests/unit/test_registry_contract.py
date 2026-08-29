@@ -22,7 +22,7 @@ import pandas as pd
 import polars as pl
 import pytest
 
-import skyulf  # noqa: F401 — side-effect: populate the registry
+import skyulf
 from skyulf.engines.polars_engine import SkyulfPolarsWrapper
 from skyulf.preprocessing.dispatcher import (
     apply_dual_engine,
@@ -248,14 +248,14 @@ def _fit_and_apply(
     try:
         calculator = NodeRegistry.get_calculator(node_id)()
         applier = NodeRegistry.get_applier(node_id)()
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - contract harness reports node failures as strings, not harness errors
         return None, None, f"registry lookup: {exc}"
 
     # Fit
     if node_id in _NEEDS_TUPLE_INPUT:
         try:
             params = calculator.fit((X, y), config)
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 - contract harness reports node failures as strings, not harness errors
             return None, None, f"fit: {type(exc).__name__}: {exc}"
     else:
         try:
@@ -263,9 +263,9 @@ def _fit_and_apply(
         except TypeError:
             try:
                 params = calculator.fit((X, y), config)
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001 - contract harness reports node failures as strings, not harness errors
                 return None, None, f"fit: {type(exc).__name__}: {exc}"
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 - contract harness reports node failures as strings, not harness errors
             return None, None, f"fit: {type(exc).__name__}: {exc}"
 
     if not params and node_id not in _FIT_MAY_BE_EMPTY:
@@ -277,9 +277,9 @@ def _fit_and_apply(
     except TypeError:
         try:
             result = applier.apply(X, params)
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 - contract harness reports node failures as strings, not harness errors
             return None, None, f"apply: {type(exc).__name__}: {exc}"
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - contract harness reports node failures as strings, not harness errors
         return None, None, f"apply: {type(exc).__name__}: {exc}"
 
     X_out, y_out = result, y
@@ -506,27 +506,27 @@ def test_wrapped_frame_parity(node_id: str) -> None:
     if node_id in _NEEDS_TUPLE_INPUT:
         try:
             raw_params = calculator.fit((X_pl, y_pl), config)
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 - parity harness converts unexpected fit failures into skips
             pytest.skip(f"{node_id}: raw polars fit failed: {exc}")
     else:
         try:
             raw_params = calculator.fit(X_pl, config)
         except TypeError:
             raw_params = calculator.fit((X_pl, y_pl), config)
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 - parity harness converts unexpected fit failures into skips
             pytest.skip(f"{node_id}: raw polars fit failed: {exc}")
 
     if node_id in _NEEDS_TUPLE_INPUT:
         try:
             wrapped_params = calculator.fit((X_wrapped, y_pl), config)
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 - parity harness converts unexpected fit failures into skips
             pytest.fail(f"{node_id}: wrapped frame fit failed: {exc}")
     else:
         try:
             wrapped_params = calculator.fit(X_wrapped, config)
         except TypeError:
             wrapped_params = calculator.fit((X_wrapped, y_pl), config)
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 - parity harness converts unexpected fit failures into skips
             pytest.fail(f"{node_id}: wrapped frame fit failed: {exc}")
 
     if not raw_params and not wrapped_params:
@@ -553,3 +553,21 @@ def test_registry_size_guard() -> None:
         f"Preprocessing registry shrunk: only {len(preprocessing)} nodes registered"
     )
     assert len(meta) >= 90, f"Total registry shrunk: only {len(meta)} nodes"
+
+
+def test_every_registered_node_resolves_calculator_and_applier() -> None:
+    """F-10: `pipeline.py` resolves models exclusively through the registry —
+    the hardcoded fallback map is gone, so a partial registration (calculator
+    without applier, or vice versa) would surface as a user-facing failure.
+    Walk the whole registry and assert every node has a complete pair."""
+    import warnings
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")  # deprecated-alias lookups ('Split')
+        for node_id in sorted(NodeRegistry.get_all_metadata()):
+            assert NodeRegistry.get_calculator(node_id) is not None, (
+                f"{node_id}: registered without a calculator"
+            )
+            assert NodeRegistry.get_applier(node_id) is not None, (
+                f"{node_id}: registered without an applier"
+            )

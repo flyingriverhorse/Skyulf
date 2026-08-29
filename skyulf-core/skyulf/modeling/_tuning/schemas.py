@@ -3,6 +3,8 @@
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
+from ...types import DEFAULT_RANDOM_STATE
+
 
 @dataclass
 class TuningConfig:
@@ -22,8 +24,8 @@ class TuningConfig:
         "k_fold", "stratified_k_fold", "time_series_split", "shuffle_split", "nested_cv"
     ] = "k_fold"
     cv_shuffle: bool = True
-    cv_random_state: int = 42
-    random_state: int = 42
+    cv_random_state: int = DEFAULT_RANDOM_STATE
+    random_state: int = DEFAULT_RANDOM_STATE
     # Console progress for core-only use (a self-updating trial line on TTYs
     # plus an end-of-run best/trials summary). Off by default; the backend
     # never sets it and supplies its own progress_callback instead.
@@ -35,6 +37,13 @@ class TuningConfig:
     # Parallelism — set by the backend from settings, not by the user directly.
     n_jobs: int = 1
     parallel_backend: str = ""
+    # F-13: after tuning a binary classifier, also search the decision
+    # threshold that maximises the configured metric on the validation split
+    # and apply it in predict(). Off by default so nothing changes silently;
+    # requires a validation split, a classifier with predict_proba, and a
+    # binary target — otherwise it logs a skip and leaves predict on the
+    # default decision rule.
+    tune_threshold: bool = False
 
 
 @dataclass
@@ -46,3 +55,11 @@ class TuningResult:
     n_trials: int
     trials: list[dict[str, Any]]  # List of {params, score}
     scoring_metric: str | None = None  # Actual sklearn metric used (e.g. "f1_weighted")
+    # F-13: per-class decision thresholds selected on the validation split
+    # (populated only when tune_threshold=True and the gates pass). ``None``
+    # means predict() keeps the model's default decision rule.
+    decision_thresholds: dict[Any, float] | None = None
+    # Name of the hard-label metric the thresholds were tuned against (may
+    # differ from the tuning metric when that metric needs probabilities,
+    # e.g. roc_auc falls back to balanced_accuracy).
+    decision_threshold_metric: str | None = None

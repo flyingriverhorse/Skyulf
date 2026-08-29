@@ -153,6 +153,7 @@ describe('useSavedThresholdInfo', () => {
         metric: 'precision',
         split_used: 'test',
         computed_at: null,
+        source: null,
         enabled: true,
       });
     }
@@ -163,6 +164,7 @@ describe('useSavedThresholdInfo', () => {
         metric: 'recall',
         split_used: 'validation',
         computed_at: null,
+        source: null,
         enabled: true,
       });
     }
@@ -184,6 +186,7 @@ describe('InferencePage saved-threshold provenance', () => {
       metric: 'f1',
       split_used: 'validation',
       computed_at: '2026-08-07T12:34:56Z',
+      source: 'training',
       enabled: true,
     } as never);
 
@@ -202,6 +205,9 @@ describe('InferencePage saved-threshold provenance', () => {
     ).not.toHaveLength(0);
     expect(
       screen.getAllByText((_, node) => node?.textContent?.includes('Computed from validation split') ?? false),
+    ).not.toHaveLength(0);
+    expect(
+      screen.getAllByText((_, node) => node?.textContent?.includes('Seeded at training time') ?? false),
     ).not.toHaveLength(0);
     expect(
       screen.getAllByText((_, node) => node?.textContent?.includes('Computed at') ?? false),

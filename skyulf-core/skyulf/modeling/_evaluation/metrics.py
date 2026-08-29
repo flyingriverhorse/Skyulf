@@ -2,9 +2,11 @@
 
 import contextlib
 import importlib
+import logging
 import math
 import numbers
 import warnings
+from collections.abc import Callable
 from typing import Any
 
 import numpy as np
@@ -31,6 +33,8 @@ from sklearn.preprocessing import label_binarize
 from ...engines import SkyulfDataFrame
 from ...modeling.sklearn_wrapper import SklearnBridge
 
+logger = logging.getLogger(__name__)
+
 _imblearn_metrics = None
 with contextlib.suppress(ModuleNotFoundError):
     _imblearn_metrics = importlib.import_module("imblearn.metrics")
@@ -43,6 +47,22 @@ DEFAULT_SILHOUETTE_SAMPLE_SIZE = 10_000
 DEFAULT_SILHOUETTE_RANDOM_STATE = 42
 _NAN_CLUSTER_LABEL = object()
 SilhouetteSampleSize = int | np.integer[Any]
+
+
+def _try_add_metric(
+    metrics: dict[str, float], key: str, fn: Callable[..., Any], *args: Any, **kwargs: Any
+) -> None:
+    """Compute one metric in isolation and add it to ``metrics``.
+
+    A failure omits just this one metric (with a warning naming it) instead of
+    silently dropping it — and whatever would have followed it in a grouped try.
+    ``sanitize_metrics`` strips non-finite values downstream, so a failed metric
+    is omitted rather than recorded as nan.
+    """
+    try:
+        metrics[key] = float(fn(*args, **kwargs))
+    except (ValueError, TypeError) as exc:
+        logger.warning("Metric '%s' failed and was omitted: %s", key, exc)
 
 
 def _validate_silhouette_sample_size(sample_size: Any) -> int:
@@ -184,8 +204,9 @@ def calculate_classification_metrics(
     _add_binary_unweighted_metrics(metrics, model, y_arr, predictions)
 
     if geometric_mean_score is not None:
-        with contextlib.suppress(Exception):
-            metrics["g_score"] = float(geometric_mean_score(y_arr, predictions, average="weighted"))
+        _try_add_metric(
+            metrics, "g_score", geometric_mean_score, y_arr, predictions, average="weighted"
+        )
 
     _add_probability_based_metrics(metrics, model, X_np, y_arr, proba=proba)
 
@@ -198,58 +219,97 @@ def _add_binary_unweighted_metrics(
     """Adds unweighted precision/recall/f1 to ``metrics`` in-place for binary classification.
 
     Determines the actual positive-class label rather than relying on sklearn's default
-    pos_label=1, which raises (silently swallowed below) for non-{0,1} binary labels
-    (e.g. "yes"/"no", {1,2}, {-1,1}) — mirrors the pos_label resolution already used in
-    _evaluation/classification.py. No-op (and swallows errors) outside binary classification.
+    pos_label=1, which raises for non-{0,1} binary labels (e.g. "yes"/"no", {1,2}, {-1,1})
+    — mirrors the pos_label resolution already used in _evaluation/classification.py.
+    No-op outside binary classification; each metric is computed in isolation and a
+    failure omits only that metric (with a warning).
     """
     try:
         unique_classes = np.unique(y_arr)
-        if len(unique_classes) == 2:
-            classes_ = getattr(model, "classes_", None)
-            pos_label = (
-                classes_[1] if classes_ is not None and len(classes_) == 2 else unique_classes[1]
-            )
-            metrics["precision"] = float(
-                precision_score(
-                    y_arr, predictions, average="binary", pos_label=pos_label, zero_division=0
-                )
-            )
-            metrics["recall"] = float(
-                recall_score(
-                    y_arr, predictions, average="binary", pos_label=pos_label, zero_division=0
-                )
-            )
-            metrics["f1"] = float(
-                f1_score(y_arr, predictions, average="binary", pos_label=pos_label, zero_division=0)
-            )
-    except Exception:
-        pass
+    except (ValueError, TypeError) as exc:
+        logger.warning("Binary precision/recall/f1 omitted: could not resolve labels: %s", exc)
+        return
+    if len(unique_classes) != 2:
+        return
+    classes_ = getattr(model, "classes_", None)
+    pos_label = classes_[1] if classes_ is not None and len(classes_) == 2 else unique_classes[1]
+    for key, scorer in (
+        ("precision", precision_score),
+        ("recall", recall_score),
+        ("f1", f1_score),
+    ):
+        _try_add_metric(
+            metrics,
+            key,
+            scorer,
+            y_arr,
+            predictions,
+            average="binary",
+            pos_label=pos_label,
+            zero_division=0,
+        )
+
+
+def _weighted_pr_auc(y_arr: Any, proba: Any, classes: Any) -> float:
+    """Multiclass weighted PR-AUC: binarize labels, then weighted average precision."""
+    y_indicator = label_binarize(y_arr, classes=classes)
+    return average_precision_score(y_indicator, proba, average="weighted")
 
 
 def _add_multiclass_roc_pr_auc_metrics(
     metrics: dict[str, float], y_arr: Any, proba: Any, classes: Any, class_count: int
 ) -> None:
-    """Adds OVR/OVO ROC-AUC variants and weighted PR-AUC to ``metrics`` in-place for multiclass proba."""
-    # OVR variants
-    ovr_weighted = float(
-        roc_auc_score(y_arr, proba, multi_class="ovr", average="weighted", labels=classes)
+    """Adds OVR/OVO ROC-AUC variants and weighted PR-AUC to ``metrics`` in-place for multiclass proba.
+
+    Each metric is computed in isolation so a single failure omits only that
+    metric (with a warning) instead of dropping the whole group.
+    """
+    # OVR variants — the weighted and macro forms share nothing, so compute both
+    # independently; keep the legacy ``roc_auc_weighted`` alias for compat.
+    _try_add_metric(
+        metrics,
+        "roc_auc_ovr_weighted",
+        roc_auc_score,
+        y_arr,
+        proba,
+        multi_class="ovr",
+        average="weighted",
+        labels=classes,
     )
-    metrics["roc_auc_weighted"] = ovr_weighted  # kept for backward compat
-    metrics["roc_auc_ovr_weighted"] = ovr_weighted
-    metrics["roc_auc_ovr"] = float(
-        roc_auc_score(y_arr, proba, multi_class="ovr", average="macro", labels=classes)
+    if "roc_auc_ovr_weighted" in metrics:
+        metrics["roc_auc_weighted"] = metrics["roc_auc_ovr_weighted"]  # kept for backward compat
+    _try_add_metric(
+        metrics,
+        "roc_auc_ovr",
+        roc_auc_score,
+        y_arr,
+        proba,
+        multi_class="ovr",
+        average="macro",
+        labels=classes,
     )
     # OVO variants
-    metrics["roc_auc_ovo"] = float(
-        roc_auc_score(y_arr, proba, multi_class="ovo", average="macro", labels=classes)
+    _try_add_metric(
+        metrics,
+        "roc_auc_ovo",
+        roc_auc_score,
+        y_arr,
+        proba,
+        multi_class="ovo",
+        average="macro",
+        labels=classes,
     )
-    metrics["roc_auc_ovo_weighted"] = float(
-        roc_auc_score(y_arr, proba, multi_class="ovo", average="weighted", labels=classes)
+    _try_add_metric(
+        metrics,
+        "roc_auc_ovo_weighted",
+        roc_auc_score,
+        y_arr,
+        proba,
+        multi_class="ovo",
+        average="weighted",
+        labels=classes,
     )
-    y_indicator = label_binarize(y_arr, classes=classes)
-    metrics["pr_auc_weighted"] = float(
-        average_precision_score(y_indicator, proba, average="weighted")
-    )
+    _try_add_metric(metrics, "pr_auc_weighted", _weighted_pr_auc, y_arr, proba, classes)
 
 
 def _add_roc_pr_auc_metrics(
@@ -257,26 +317,23 @@ def _add_roc_pr_auc_metrics(
 ) -> None:
     """Adds ROC-AUC/PR-AUC metrics (binary or multiclass OVR/OVO) to ``metrics`` in-place.
 
-    Swallows errors so a single failing metric doesn't drop the others already computed.
+    Each metric is computed in isolation so a single failure omits only that
+    metric (with a warning) instead of dropping the others.
     """
-    try:
-        if class_count == 2:
-            metrics["roc_auc"] = float(roc_auc_score(y_arr, proba[:, 1]))
-            metrics["pr_auc"] = float(average_precision_score(y_arr, proba[:, 1]))
-        else:
-            # Explicitly pass the full label set the model was trained on
-            # (`classes`, resolved below) so a CV fold whose validation
-            # split happens not to contain every trained class doesn't
-            # raise "Number of classes in y_true not equal to columns
-            # in y_score" — previously swallowed silently by the
-            # surrounding except, dropping these metrics entirely.
-            classes = getattr(model, "classes_", None)
-            if classes is None or len(classes) != class_count:
-                classes = np.arange(class_count)
+    if class_count == 2:
+        _try_add_metric(metrics, "roc_auc", roc_auc_score, y_arr, proba[:, 1])
+        _try_add_metric(metrics, "pr_auc", average_precision_score, y_arr, proba[:, 1])
+        return
+    # Explicitly pass the full label set the model was trained on
+    # (`classes`, resolved below) so a CV fold whose validation
+    # split happens not to contain every trained class doesn't
+    # raise "Number of classes in y_true not equal to columns
+    # in y_score" — previously dropped these metrics entirely.
+    classes = getattr(model, "classes_", None)
+    if classes is None or len(classes) != class_count:
+        classes = np.arange(class_count)
 
-            _add_multiclass_roc_pr_auc_metrics(metrics, y_arr, proba, classes, class_count)
-    except Exception:
-        pass  # nosec B110 - weighted PR-AUC is an optional extra metric
+    _add_multiclass_roc_pr_auc_metrics(metrics, y_arr, proba, classes, class_count)
 
 
 def _add_probability_based_metrics(
@@ -284,23 +341,25 @@ def _add_probability_based_metrics(
 ) -> None:
     """Adds log-loss, ROC-AUC and PR-AUC metrics to ``metrics`` in-place, using ``predict_proba``.
 
-    No-op if the model doesn't expose ``predict_proba``, or any of these optional metrics
-    fail to compute (errors are swallowed so other metrics are still returned).
+    No-op if the model doesn't expose ``predict_proba`` or it fails (logged, then
+    skipped). Individual metric failures omit only that metric (with a warning)
+    instead of dropping the whole group.
     ``proba`` lets a caller that already called ``model.predict_proba()`` pass the result
     through instead of triggering another redundant inference pass.
     """
-    try:
-        if proba is None and hasattr(model, "predict_proba"):
+    if proba is None and hasattr(model, "predict_proba"):
+        try:
             with warnings.catch_warnings():
                 warnings.filterwarnings("ignore", message=".*valid feature names.*")
                 proba = model.predict_proba(X_np)
-        if proba is not None and proba.ndim == 2 and proba.shape[1] >= 2:
-            class_count = proba.shape[1]
-            with contextlib.suppress(Exception):
-                metrics["log_loss"] = float(log_loss(y_arr, proba))
-            _add_roc_pr_auc_metrics(metrics, model, y_arr, proba, class_count)
-    except Exception:
-        pass  # nosec B110 - multiclass PR-AUC block is optional; other metrics still returned
+        except Exception:  # noqa: BLE001 - predict_proba is optional and raises many model-specific errors; logged
+            logger.info("predict_proba failed; probability-based metrics omitted", exc_info=True)
+            return
+    if proba is None or getattr(proba, "ndim", None) != 2 or proba.shape[1] < 2:
+        return
+    class_count = proba.shape[1]
+    _try_add_metric(metrics, "log_loss", log_loss, y_arr, proba)
+    _add_roc_pr_auc_metrics(metrics, model, y_arr, proba, class_count)
 
 
 def calculate_regression_metrics(

@@ -85,7 +85,7 @@ async def resolve_pipeline_nodes(
             # so the API surface returns the correct status instead of silently
             # allowing execution to proceed with an unresolved dataset.
             raise
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - non-HTTP errors logged; resolution skipped
             # Non-HTTP errors (e.g. DB connection failure) — log and continue;
             # the engine will surface a clearer error if `path` remains unset.
             import logging

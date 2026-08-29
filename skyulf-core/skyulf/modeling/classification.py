@@ -2,7 +2,7 @@
 
 import logging
 from collections.abc import Callable
-from typing import Any
+from typing import Any, ClassVar
 
 from sklearn.base import BaseEstimator
 from sklearn.calibration import CalibratedClassifierCV
@@ -37,10 +37,10 @@ try:
     # does not always silence. Register a no-op logger so all native messages
     # are intercepted by Python and dropped. Safe to call multiple times.
     class _SilentLgbmLogger:
-        def info(self, msg: str) -> None:  # noqa: D401
+        def info(self, msg: str) -> None:
             pass
 
-        def warning(self, msg: str) -> None:  # noqa: D401
+        def warning(self, msg: str) -> None:
             pass
 
     _lgb.register_logger(_SilentLgbmLogger())  # ty: ignore[unresolved-attribute]
@@ -49,6 +49,7 @@ except ImportError:
 
 from ..core.meta.decorators import node_meta
 from ..registry import NodeRegistry
+from ..types import DEFAULT_RANDOM_STATE
 from ._boosting_progress import LightGBMIterationAdapter, XgboostIterationAdapter
 from ._sklearn_compat import normalize_logistic_regression_params
 from .sklearn_wrapper import SklearnApplier, SklearnCalculator
@@ -67,7 +68,7 @@ class LogisticRegressionApplier(SklearnApplier):
     name="Logistic Regression",
     category="Modeling",
     description="Linear model for classification.",
-    params={"max_iter": 1000, "solver": "lbfgs", "random_state": 42},
+    params={"max_iter": 1000, "solver": "lbfgs"},
     # "text": logistic regression on TF-IDF/vectorized features is a common,
     # well-performing baseline for text classification (alongside Naive Bayes
     # and the SGD-based linear SVM approximation below).
@@ -82,7 +83,7 @@ class LogisticRegressionCalculator(SklearnCalculator):
     # search space, which restricts solver to "saga" whenever penalty is
     # varied), so an incompatible combination reaches `fit()` unchecked and
     # would otherwise surface as an opaque sklearn ValueError at model-fit time.
-    _SOLVER_PENALTIES: dict[str, set[Any]] = {
+    _SOLVER_PENALTIES: ClassVar[dict[str, set[Any]]] = {
         "lbfgs": {"l2", None},
         "liblinear": {"l1", "l2"},
         "newton-cg": {"l2", None},
@@ -97,7 +98,6 @@ class LogisticRegressionCalculator(SklearnCalculator):
             default_params={
                 "max_iter": 1000,
                 "solver": "lbfgs",
-                "random_state": 42,
             },
             problem_type="classification",
         )
@@ -213,13 +213,15 @@ class CalibratedClassifierCalculator(SklearnCalculator):
 
     # Map of selectable base estimators → factory. Each must support
     # ``predict_proba`` (or ``decision_function``) so calibration is meaningful.
-    BASE_ESTIMATORS: dict[str, Callable[[], BaseEstimator]] = {
+    BASE_ESTIMATORS: ClassVar[dict[str, Callable[[], BaseEstimator]]] = {
         "logistic_regression": lambda: LogisticRegression(max_iter=1000),
-        "random_forest": lambda: RandomForestClassifier(n_estimators=100, random_state=42),
-        "gradient_boosting": lambda: GradientBoostingClassifier(random_state=42),
-        "decision_tree": lambda: DecisionTreeClassifier(random_state=42),
-        "gaussian_nb": lambda: GaussianNB(),
-        "svc": lambda: SVC(probability=True, random_state=42),
+        "random_forest": lambda: RandomForestClassifier(
+            n_estimators=100, random_state=DEFAULT_RANDOM_STATE
+        ),
+        "gradient_boosting": lambda: GradientBoostingClassifier(random_state=DEFAULT_RANDOM_STATE),
+        "decision_tree": lambda: DecisionTreeClassifier(random_state=DEFAULT_RANDOM_STATE),
+        "gaussian_nb": GaussianNB,
+        "svc": lambda: SVC(probability=True, random_state=DEFAULT_RANDOM_STATE),
     }
 
     def __init__(self):
@@ -309,7 +311,6 @@ class RandomForestClassifierCalculator(SklearnCalculator):
                 "min_samples_split": 5,
                 "min_samples_leaf": 2,
                 "n_jobs": -1,
-                "random_state": 42,
             },
             problem_type="classification",
         )
@@ -341,7 +342,6 @@ class SVCCalculator(SklearnCalculator):
                 "kernel": "rbf",
                 "gamma": "scale",
                 "probability": True,
-                "random_state": 42,
             },
             problem_type="classification",
         )
@@ -403,7 +403,6 @@ class DecisionTreeClassifierCalculator(SklearnCalculator):
                 "max_depth": None,
                 "min_samples_split": 2,
                 "criterion": "gini",
-                "random_state": 42,
             },
             problem_type="classification",
         )
@@ -434,7 +433,6 @@ class GradientBoostingClassifierCalculator(SklearnCalculator):
                 "n_estimators": 100,
                 "learning_rate": 0.1,
                 "max_depth": 3,
-                "random_state": 42,
             },
             problem_type="classification",
         )
@@ -464,7 +462,6 @@ class AdaBoostClassifierCalculator(SklearnCalculator):
             default_params={
                 "n_estimators": 50,
                 "learning_rate": 1.0,
-                "random_state": 42,
             },
             problem_type="classification",
         )
@@ -499,7 +496,6 @@ if XGBOOST_AVAILABLE:
                     "subsample": 0.8,
                     "colsample_bytree": 0.8,
                     "n_jobs": -1,
-                    "random_state": 42,
                 },
                 problem_type="classification",
             )
@@ -550,7 +546,6 @@ class ExtraTreesClassifierCalculator(SklearnCalculator):
                 "criterion": "gini",
                 "bootstrap": False,
                 "n_jobs": -1,
-                "random_state": 42,
             },
             problem_type="classification",
         )
@@ -585,7 +580,6 @@ class HistGradientBoostingClassifierCalculator(SklearnCalculator):
                 "min_samples_leaf": 20,
                 "l2_regularization": 0.0,
                 "max_bins": 255,
-                "random_state": 42,
             },
             problem_type="classification",
         )
@@ -647,7 +641,6 @@ if LIGHTGBM_AVAILABLE:
                     "reg_lambda": 0.0,
                     "boosting_type": "gbdt",
                     "n_jobs": -1,
-                    "random_state": 42,
                     "verbose": -1,
                     "verbosity": -1,
                 },
@@ -734,7 +727,6 @@ class SGDClassifierApplier(SklearnApplier):
         "alpha": 0.0001,
         "l1_ratio": 0.15,
         "max_iter": 1000,
-        "random_state": 42,
     },
     # Text-classification-scoped only (no "classification" tag): SGD with
     # hinge/log loss is a fast linear-SVM/logistic-regression approximation
@@ -757,7 +749,6 @@ class SGDClassifierCalculator(SklearnCalculator):
                 "alpha": 0.0001,
                 "l1_ratio": 0.15,
                 "max_iter": 1000,
-                "random_state": 42,
             },
             problem_type="classification",
         )
