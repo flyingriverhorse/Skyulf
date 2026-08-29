@@ -1,13 +1,10 @@
 """Main Skyulf Pipeline."""
 
-import dataclasses
 import hashlib
-import inspect
 import json
 import logging
 import pickle  # nosec B403 - used only for internal pipeline serialization (see save/load below)
 from collections.abc import Callable
-from types import ModuleType
 from typing import Any, cast
 
 import numpy as np
@@ -21,148 +18,13 @@ from .leakage import OnLeakage, validate_leakage_safety
 from .modeling._evaluation.thresholds import apply_thresholds, optimize_thresholds
 from .modeling._tuning.engine import TuningApplier, TuningCalculator
 from .modeling.base import BaseModelApplier, BaseModelCalculator, StatefulEstimator, extract_xy
+from .pipeline_diagram import build_mermaid_diagram
+from .pipeline_seal import artifact_digest
 from .preprocessing.pipeline import FeatureEngineer
 from .registry import NodeRegistry
 from .types import PipelineConfig
 
 logger = logging.getLogger(__name__)
-
-
-def _mermaid_escape(text: str) -> str:
-    """Escape characters that would break a Mermaid node label."""
-    return text.replace('"', "'").replace("[", "(").replace("]", ")")
-
-
-def _artifact_digest(obj: Any) -> bytes:
-    """Stable semantic digest of a fitted artifact.
-
-    Walks the object's meaningful content — hyperparameters, fitted weights,
-    tree node arrays — instead of its pickle bytes, so the digest is stable
-    across library/pickle-protocol versions and still changes whenever the
-    learned model changes. Raises ``TypeError`` for anything it cannot
-    canonicalize: an artifact that cannot be digested must fail the seal,
-    not silently pass it via ``repr``.
-    """
-    hasher = hashlib.sha256()
-    _feed_canonical(hasher, obj)
-    return hasher.digest()
-
-
-def _feed_canonical(h: Any, obj: Any) -> None:
-    """Recursively feed a type-tagged canonical form of ``obj`` into ``h``."""
-    if obj is None:
-        h.update(b"none")
-        return
-    if isinstance(obj, (bool, np.bool_)):
-        h.update(b"bool:" + (b"1" if obj else b"0"))
-        return
-    if isinstance(obj, (int, np.integer)):
-        h.update(b"int:" + str(int(obj)).encode("utf-8"))
-        return
-    if isinstance(obj, (float, np.floating)):
-        h.update(b"float:" + repr(float(obj)).encode("utf-8"))
-        return
-    if isinstance(obj, complex):
-        h.update(b"complex:" + repr(obj).encode("utf-8"))
-        return
-    if isinstance(obj, str):
-        h.update(b"str:" + obj.encode("utf-8"))
-        return
-    if isinstance(obj, (bytes, bytearray, memoryview)):
-        h.update(b"bytes:" + bytes(obj))
-        return
-    if isinstance(obj, np.ndarray):
-        arr = np.ascontiguousarray(obj)
-        h.update(f"ndarray:{arr.dtype}|{arr.shape}|".encode())
-        h.update(arr.tobytes())
-        return
-    if isinstance(obj, np.random.RandomState):
-        h.update(b"randomstate:")
-        _feed_canonical(h, obj.get_state())
-        return
-    if isinstance(obj, dict):
-        h.update(f"dict:{len(obj)}[".encode())
-        for key in sorted(obj, key=repr):
-            _feed_canonical(h, key)
-            h.update(b"=")
-            _feed_canonical(h, obj[key])
-            h.update(b";")
-        h.update(b"]")
-        return
-    if isinstance(obj, tuple):
-        h.update(f"tuple:{len(obj)}(".encode())
-        for item in obj:
-            _feed_canonical(h, item)
-            h.update(b",")
-        h.update(b")")
-        return
-    if isinstance(obj, list):
-        h.update(f"list:{len(obj)}[".encode())
-        for item in obj:
-            _feed_canonical(h, item)
-            h.update(b",")
-        h.update(b"]")
-        return
-    if isinstance(obj, (set, frozenset)):
-        h.update(f"set:{len(obj)}{{".encode())
-        for item in sorted(obj, key=repr):
-            _feed_canonical(h, item)
-            h.update(b",")
-        h.update(b"}")
-        return
-    if isinstance(obj, type):
-        h.update(
-            b"type:" + obj.__module__.encode("utf-8") + b"." + obj.__qualname__.encode("utf-8")
-        )
-        return
-    if dataclasses.is_dataclass(obj):
-        h.update(b"dataclass:" + type(obj).__qualname__.encode("utf-8") + b"{")
-        for field in dataclasses.fields(obj):
-            h.update(field.name.encode("utf-8") + b"=")
-            _feed_canonical(h, getattr(obj, field.name))
-            h.update(b";")
-        h.update(b"}")
-        return
-    # sklearn decision trees are C-extension objects without a __dict__; walk
-    # the node arrays that fully determine the tree's structure and predictions.
-    if (
-        type(obj).__name__ == "Tree"
-        and hasattr(obj, "node_count")
-        and hasattr(obj, "children_left")
-    ):
-        h.update(f"tree:{obj.node_count}|".encode())
-        for attr in (
-            "children_left",
-            "children_right",
-            "feature",
-            "threshold",
-            "impurity",
-            "n_node_samples",
-            "weighted_n_node_samples",
-            "value",
-        ):
-            _feed_canonical(h, np.asarray(getattr(obj, attr)))
-        return
-    if hasattr(obj, "__dict__"):
-        cls = type(obj)
-        h.update(
-            b"obj:"
-            + cls.__module__.encode("utf-8")
-            + b"."
-            + cls.__qualname__.encode("utf-8")
-            + b"{"
-        )
-        state = vars(obj)
-        for name in sorted(state):
-            value = state[name]
-            if inspect.isroutine(value) or isinstance(value, ModuleType):
-                continue
-            h.update(name.encode("utf-8") + b"=")
-            _feed_canonical(h, value)
-            h.update(b";")
-        h.update(b"}")
-        return
-    raise TypeError(f"Cannot digest object of type {type(obj)!r}: no canonical representation")
 
 
 def _to_pandas(obj: Any) -> Any:
@@ -568,24 +430,7 @@ class SkyulfPipeline:
         Produces a top-down graph ``data -> [preprocessing steps] -> model``.
         Useful in docs and PR descriptions. Pure read-only over ``self.config``.
         """
-        lines = ["flowchart TD", "    data[Input Data]"]
-        prev = "data"
-
-        for i, step in enumerate(self.preprocessing_steps):
-            node = f"pp{i}"
-            name = step.get("name", f"step_{i}")
-            transformer = step.get("transformer", "?")
-            label = _mermaid_escape(f"{name} ({transformer})")
-            lines.append(f"    {node}[{label}]")
-            lines.append(f"    {prev} --> {node}")
-            prev = node
-
-        if self.modeling_config:
-            label = _mermaid_escape(str(self.modeling_config.get("type", "model")))
-            lines.append(f"    model([{label}])")
-            lines.append(f"    {prev} --> model")
-
-        return "\n".join(lines)
+        return build_mermaid_diagram(self.preprocessing_steps, self.modeling_config)
 
     def is_fitted(self) -> bool:
         """True once preprocessing has been fit (or a model has been trained)."""
@@ -611,10 +456,10 @@ class SkyulfPipeline:
         hasher.update(json.dumps(topology, sort_keys=True, default=str).encode("utf-8"))
 
         for step in self.feature_engineer.fitted_steps:
-            hasher.update(_artifact_digest(step.get("artifact")))
+            hasher.update(artifact_digest(step.get("artifact")))
 
         if self.model_estimator is not None and self.model_estimator.model is not None:
-            hasher.update(_artifact_digest(self.model_estimator.model))
+            hasher.update(artifact_digest(self.model_estimator.model))
 
         return hasher.hexdigest()
 

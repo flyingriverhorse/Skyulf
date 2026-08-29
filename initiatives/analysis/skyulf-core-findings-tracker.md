@@ -6,9 +6,9 @@ snapshot, `/Users/BH7043/Skyulf`).
 (3,457 passed, 56 skipped).
 
 The audit predates the 080–086 fix waves. 7 of 31 findings no longer reproduce;
-both partials (F-14, F-31) were closed 2026-08-29. After F-15 (semantic
-reproducibility digest) closed 2026-08-29, 6 remain open: F-30 (deferred
-pending a compat call) and five structural items (F-09, F-08, F-11, F-18, F-19).
+both partials (F-14, F-31) were closed 2026-08-29. After F-19 (pipeline.py
+split) closed 2026-08-29, 5 remain open: F-30 (deferred pending a compat
+call) and four structural items (F-09, F-08, F-11, F-18).
 This file tracks the fix work, few-at-a-time for easy items, one-at-a-time for hard ones.
 
 **Status key:** ⬜ open · 🟨 in progress · ✅ done · ⏭️ parked
@@ -59,7 +59,7 @@ Easy items batched; hard items one at a time.
 | F-08 | 🟠 | Split the `SkyulfDataFrame` protocol | ~3 days | ⬜ |
 | F-11 | 🟠 | Break import cycles (196 deferred imports) | ~2 days | ⬜ |
 | F-18 | 🟡 | Split `_tuning/engine.py` (1,572 lines) | ~2 days | ⬜ |
-| F-19 | 🟡 | Split `pipeline.py` responsibilities | ~1 day | ⬜ |
+| F-19 | 🟡 | Split `pipeline.py` responsibilities | ~1 day | ✅ |
 | F-23 | ⚪ | Enable BLE001 / broad-catch rule | half day | ✅ |
 | F-13 | 🟡 | Wire threshold tuning into TuningConfig | ~1 day | ✅ |
 | F-14 | 🟡 | contextvar scoping for engine/backend globals | ~1 day | ✅ |
@@ -509,4 +509,34 @@ Three tracked follow-ups closed in one batch:
   tree's structure and predictions.
 - Verification: full core suite 3567 passed / 70 skipped (exit 0);
   `ruff check` + `ruff format` clean on the two touched files; `ty check`
+  backend + core + tests exit 0.
+
+### 2026-08-29 — F-19 pipeline.py split (branch 087)
+
+- **F-19** fixed: `skyulf/pipeline.py` no longer mixes four responsibilities.
+  The two self-contained helpers the audit called out moved to leaf modules
+  next to it:
+  - `skyulf/pipeline_seal.py` owns the reproducibility digest — the F-15
+    semantic walker, now public as `artifact_digest` (with the internal
+    `_feed_canonical`). It's a leaf module (hashlib/dataclasses/inspect/numpy
+    only), so no import-cycle risk.
+  - `skyulf/pipeline_diagram.py` owns Mermaid rendering — `build_mermaid_diagram`
+    plus `mermaid_escape`. Also a leaf module (collections.abc/typing only),
+    which is the point the audit made: diagram rendering has no business next
+    to the fit path.
+  - `SkyulfPipeline.to_mermaid()` and `fingerprint()` are now one-line
+    delegates. The fitting, persistence (`save`/`load` pickle), and model-card
+    concerns stay in `pipeline.py`.
+- Behavior unchanged — pure code movement + rename. The old private names
+  `_mermaid_escape`/`_artifact_digest` are gone from `pipeline.py`; only
+  `SkyulfPipeline` is re-exported from `skyulf/__init__.py`, so nothing public
+  broke. Tests updated to import `artifact_digest` from `skyulf.pipeline_seal`.
+- One type fix on the way: `build_mermaid_diagram` takes
+  `Sequence[Mapping[str, Any]]` / `Mapping[str, Any]` rather than `dict`,
+  because `SkyulfPipeline` hands it `PreprocessingStepConfig` / `ModelConfig`
+  TypedDicts, which `ty` correctly refuses to treat as mutable `dict`s.
+- Tests: all pre-existing digest, model-card, and `describe()`/`to_mermaid()`
+  pins pass unchanged (the describe suite exercises the moved diagram builder).
+- Verification: full core suite 3567 passed / 70 skipped (exit 0);
+  `ruff check` + `ruff format` clean on all four touched files; `ty check`
   backend + core + tests exit 0.
