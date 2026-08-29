@@ -403,6 +403,7 @@ async def test_get_saved_returns_empty_shell_when_nothing_saved(async_session):
         "metric": None,
         "split_used": None,
         "computed_at": None,
+        "source": None,
         "enabled": False,
     }
 
@@ -427,6 +428,8 @@ async def test_get_saved_reflects_saved_and_toggled_state(async_session):
     assert result["metric"] == "f1"
     assert result["split_used"] == "validation"
     assert result["computed_at"] is not None
+    # Manually saved sets carry no provenance — only training-time seeding stamps it.
+    assert result["source"] is None
     assert result["enabled"] is True
 
     await ThresholdTuningService.toggle(async_session, "job-5", enabled=False)

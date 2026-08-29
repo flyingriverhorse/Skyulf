@@ -160,6 +160,7 @@ const buildBaseTuningConfig = (data: Record<string, unknown>): Record<string, un
     cv_random_state: data.cv_random_state,
     cv_time_column: data.cv_time_column,
     random_state: data.random_state,
+    tune_threshold: data.tune_threshold ?? false,
 });
 
 export const convertGraphToPipelineConfig = (nodes: Node[], edges: Edge[]): PipelineConfigModel => {

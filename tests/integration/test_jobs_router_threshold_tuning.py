@@ -5,6 +5,7 @@ Covers `POST /api/pipeline/jobs/{job_id}/thresholds/preview`,
 `DELETE .../thresholds`.
 """
 
+import json
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -187,6 +188,7 @@ async def test_get_endpoint_returns_disabled_shell_before_any_save(async_session
         "metric": None,
         "split_used": None,
         "computed_at": None,
+        "source": None,
         "enabled": False,
     }
 
@@ -219,11 +221,44 @@ async def test_get_endpoint_reflects_state_after_save_and_toggle(async_session, 
     saved = get_response.json()
     assert saved["enabled"] is True
     assert saved["metric"] == "f1"
+    assert saved["source"] is None
     assert set(saved["thresholds"].keys()) == {"0", "1", "2"}
 
     client.post(f"{BASE}/jobs/job-1/thresholds/toggle", json={"enabled": False})
     get_response = client.get(f"{BASE}/jobs/job-1/thresholds")
     assert get_response.json()["enabled"] is False
+
+
+@pytest.mark.asyncio
+async def test_get_endpoint_exposes_training_seed_source(async_session, client):
+    """GET .../thresholds must surface the seeded 'training' source so the UI
+    can label training-time thresholds (the response model used to strip it)."""
+    await _insert_job(async_session, "job-1")
+    seeded = json.dumps(
+        {
+            "thresholds": {"0": 0.6, "1": 0.4},
+            "classes": ["0", "1"],
+            "metric": "f1",
+            "split_used": "validation",
+            "computed_at": "2026-08-28T21:45:32+00:00",
+            "source": "training",
+        }
+    )
+    await async_session.execute(
+        text(
+            "UPDATE training_jobs SET tuned_thresholds = :t, tuned_thresholds_enabled = 1"
+            " WHERE id = 'job-1'"
+        ),
+        {"t": seeded},
+    )
+    await async_session.commit()
+
+    response = client.get(f"{BASE}/jobs/job-1/thresholds")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["source"] == "training"
+    assert body["enabled"] is True
+    assert body["thresholds"] == {"0": 0.6, "1": 0.4}
 
 
 def test_save_endpoint_returns_400_for_missing_job(client):

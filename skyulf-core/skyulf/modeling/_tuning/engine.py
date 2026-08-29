@@ -30,6 +30,7 @@ from sklearn.pipeline import Pipeline
 from ..._validation import raise_invalid_choice
 from ...engines import SkyulfDataFrame
 from ...engines.sklearn_bridge import SklearnBridge
+from .._evaluation.thresholds import apply_thresholds, optimize_thresholds
 from .._sklearn_compat import normalize_logistic_regression_params
 from ..base import BaseModelApplier, BaseModelCalculator
 from .fold_pipeline import FoldAwareModelStep
@@ -309,6 +310,144 @@ class TuningCalculator(BaseModelCalculator):
 
         return model
 
+    # Hard-label (y_true, y_pred) classification metrics that a threshold
+    # search can maximise. Probability-only metrics (roc_auc*, log_loss,
+    # pr_auc*, g_score) cannot be computed from hard labels, so threshold
+    # search falls back to balanced_accuracy for those.
+    def _resolve_threshold_metric(
+        self,
+        metric_name: str,
+        log_callback: Callable[[str], None] | None,
+        pos_label: Any = None,
+    ) -> tuple[Callable[[Any, Any], float], str]:
+        """Map the user's tuning metric to a hard-label callable for the threshold search.
+
+        Returns ``(callable, used_metric_name)``. Probability-only metrics fall
+        back to ``balanced_accuracy`` (with a log), since a threshold sweep only
+        ever produces hard class labels.
+
+        ``pos_label`` (the model's positive class) is pinned into the binary
+        f1/precision/recall callables when given: their sklearn defaults assume
+        ``pos_label=1`` and raise for label spaces without a 1 (string labels).
+        """
+        from sklearn.metrics import (
+            accuracy_score,
+            balanced_accuracy_score,
+            f1_score,
+            matthews_corrcoef,
+            precision_score,
+            recall_score,
+        )
+
+        pos_kwargs = {"pos_label": pos_label} if pos_label is not None else {}
+        hard_label: dict[str, Callable[[Any, Any], float]] = {
+            "accuracy": accuracy_score,
+            "balanced_accuracy": balanced_accuracy_score,
+            "f1": lambda yt, yp: f1_score(yt, yp, zero_division=0, **pos_kwargs),
+            "f1_weighted": lambda yt, yp: f1_score(yt, yp, average="weighted", zero_division=0),
+            "precision": lambda yt, yp: precision_score(yt, yp, zero_division=0, **pos_kwargs),
+            "precision_weighted": lambda yt, yp: precision_score(
+                yt, yp, average="weighted", zero_division=0
+            ),
+            "recall": lambda yt, yp: recall_score(yt, yp, zero_division=0, **pos_kwargs),
+            "recall_weighted": lambda yt, yp: recall_score(
+                yt, yp, average="weighted", zero_division=0
+            ),
+            "matthews_corrcoef": matthews_corrcoef,
+        }
+        if metric_name in hard_label:
+            return hard_label[metric_name], metric_name
+
+        msg = (
+            f"Decision-threshold tuning: metric '{metric_name}' needs predicted "
+            "probabilities, but a threshold sweep only produces hard labels — "
+            "tuning the threshold against 'balanced_accuracy' instead."
+        )
+        logger.info(msg)
+        if log_callback:
+            log_callback(msg)
+        return balanced_accuracy_score, "balanced_accuracy"
+
+    def _tune_decision_thresholds(
+        self,
+        model: Any,
+        tuning_result: TuningResult,
+        tuning_config: TuningConfig,
+        validation_data: tuple[Any, Any] | None,
+        log_callback: Callable[[str], None] | None,
+    ) -> None:
+        """F-13: search a decision threshold on the validation split for a binary
+        classifier and store it on ``tuning_result``.
+
+        Gates: classification problem, a model exposing ``predict_proba`` and
+        ``classes_``, an exactly-binary target, and a provided validation split.
+        Any gate that fails — or any error during the search — logs and leaves
+        ``tuning_result.decision_thresholds`` as ``None`` so ``predict()`` keeps
+        the model's default decision rule; threshold tuning is best-effort and
+        must never abort an otherwise successful tuning run.
+        """
+
+        def _skip(reason: str) -> None:
+            msg = f"Decision-threshold tuning skipped: {reason}"
+            logger.info(msg)
+            if log_callback:
+                log_callback(msg)
+
+        if getattr(self.model_calculator, "problem_type", None) != "classification":
+            _skip("this is not a classification model.")
+            return
+        if validation_data is None:
+            _skip("no validation split was provided.")
+            return
+        if not hasattr(model, "predict_proba"):
+            _skip("the model does not expose predict_proba.")
+            return
+        classes = getattr(model, "classes_", None)
+        if classes is None:
+            _skip("the fitted model does not expose class labels (classes_).")
+            return
+        classes = np.asarray(classes)
+        if len(classes) != 2:
+            _skip(f"only binary classification is supported (found {len(classes)} classes).")
+            return
+
+        try:
+            X_val, y_val = validation_data
+            X_val_np, y_val_np = SklearnBridge.to_sklearn((X_val, y_val))
+            y_proba = np.asarray(model.predict_proba(X_val_np))
+
+            metric_callable, metric_name = self._resolve_threshold_metric(
+                tuning_config.metric, log_callback, pos_label=classes[1]
+            )
+            thresholds = optimize_thresholds(
+                y_val_np,
+                y_proba,
+                metric=metric_callable,
+                classes=classes,
+                strategy="grid",
+            )
+
+            tuning_result.decision_thresholds = thresholds
+            tuning_result.decision_threshold_metric = metric_name
+
+            positive_threshold = thresholds.get(classes[1])
+            msg = (
+                f"Decision-threshold tuning: selected threshold "
+                f"{positive_threshold:.4f} for class '{classes[1]}' "
+                f"(maximising '{metric_name}' on the validation split)."
+            )
+            logger.info(msg)
+            if log_callback:
+                log_callback(msg)
+        except Exception as e:  # noqa: BLE001 - threshold tuning is best-effort; a failure must not abort a successful tuning run
+            msg = (
+                "Decision-threshold tuning failed; predict() keeps the default "
+                f"decision rule. ({e})"
+            )
+            logger.warning(msg)
+            if log_callback:
+                log_callback(msg)
+
     def fit(
         self,
         X: pd.DataFrame | SkyulfDataFrame,
@@ -452,6 +591,14 @@ class TuningCalculator(BaseModelCalculator):
             log_callback,
             iteration_callback=iteration_callback,
         )
+
+        # F-13: optionally search a decision threshold for a binary
+        # classifier on the validation split. Best-effort — a failure logs and
+        # leaves predict() on the default decision rule.
+        if tuning_config.tune_threshold:
+            self._tune_decision_thresholds(
+                model, tuning_result, tuning_config, validation_data, log_callback
+            )
 
         if reporter is not None:
             reporter.finish(tuning_result)
@@ -714,6 +861,41 @@ class TuningCalculator(BaseModelCalculator):
 
         return metric
 
+    # Binary-default sklearn scorers whose score function takes ``pos_label``.
+    # roc_auc looks like one but isn't: roc_auc_score has no pos_label
+    # parameter (it derives the positive class from the label space), and
+    # multiclass variants (f1_weighted, ...) plus accuracy/balanced_accuracy/
+    # matthews_corrcoef don't take it either.
+    _BINARY_POS_LABEL_METRICS: ClassVar[frozenset[str]] = frozenset({"f1", "precision", "recall"})
+
+    def _resolve_scorer(self, metric: str, y: Any) -> Any:
+        """The sklearn scorer for *metric*, with the binary ``pos_label`` default fixed.
+
+        f1/precision/recall scorers assume ``pos_label=1``; targets whose
+        label space does not contain 1 (e.g. raw string labels the fold-aware
+        wrapper scores against before the chain encodes them) make every fold
+        raise ``pos_label=1 is not a valid label`` and surface as all-NaN trials.
+        Pin ``pos_label`` to the sorted-last class — the same convention
+        ``apply_thresholds`` uses for the positive class — whenever the default
+        cannot match. Numeric targets containing 1 keep the stock scorer.
+        """
+        from sklearn.metrics import get_scorer, make_scorer
+
+        scorer = get_scorer(metric)
+        if getattr(self.model_calculator, "problem_type", None) != "classification":
+            return scorer
+        if metric not in self._BINARY_POS_LABEL_METRICS:
+            return scorer
+        classes = np.unique(np.asarray(y))
+        if classes.size != 2 or 1 in classes.tolist():
+            return scorer
+        pos_label = classes[1].item() if hasattr(classes[1], "item") else classes[1]
+        return make_scorer(
+            scorer._score_func,
+            response_method=scorer._response_method,
+            pos_label=pos_label,
+        )
+
     @staticmethod
     def _seed_params(config: TuningConfig) -> dict[str, Any]:
         """The caller's seed as a params overlay, for every tuning-path model build."""
@@ -818,10 +1000,9 @@ class TuningCalculator(BaseModelCalculator):
             )
             model.fit(X_train_fold, y_train_fold)
 
-            # Score
-            from sklearn.metrics import get_scorer
-
-            scorer = get_scorer(metric)
+            # Score — resolved against the fold's (post-transform) labels so
+            # binary scorers get a valid pos_label even for string targets.
+            scorer = self._resolve_scorer(metric, y_train_fold)
             score = scorer(model, X_val_fold, y_val_fold)
 
             if log_callback:
@@ -983,7 +1164,7 @@ class TuningCalculator(BaseModelCalculator):
         config: TuningConfig,
         base_estimator: Any,
         cv: Any,
-        metric: str,
+        scoring: Any,
         log_callback: Callable[[str], None] | None,
     ) -> Any:
         """Builds a HalvingGridSearchCV/HalvingRandomSearchCV searcher for the halving strategies."""
@@ -1024,7 +1205,7 @@ class TuningCalculator(BaseModelCalculator):
             return HalvingGridSearchCV(
                 estimator=base_estimator,
                 param_grid=self._clean_search_space(config.search_space),
-                scoring=metric,
+                scoring=scoring,
                 cv=cv,
                 n_jobs=config.n_jobs,
                 random_state=config.random_state,
@@ -1038,7 +1219,7 @@ class TuningCalculator(BaseModelCalculator):
             estimator=base_estimator,
             param_distributions=self._clean_search_space(config.search_space),
             n_candidates=config.n_trials,
-            scoring=metric,
+            scoring=scoring,
             cv=cv,
             n_jobs=config.n_jobs,
             random_state=config.random_state,
@@ -1120,7 +1301,7 @@ class TuningCalculator(BaseModelCalculator):
         config: TuningConfig,
         base_estimator: Any,
         cv: Any,
-        metric: str,
+        scoring: Any,
         progress_callback: Callable[[int, int, float | None, dict | None], None] | None,
         log_callback: Callable[[str], None] | None,
     ) -> Any:
@@ -1181,7 +1362,7 @@ class TuningCalculator(BaseModelCalculator):
                 n_trials=config.n_trials,
                 timeout=config.timeout,
                 cv=cv,
-                scoring=metric,
+                scoring=scoring,
                 n_jobs=config.n_jobs,
                 refit=False,
                 verbose=0,
@@ -1497,14 +1678,26 @@ class TuningCalculator(BaseModelCalculator):
                 log_callback,
                 preprocessing,
             )
-        elif config.strategy in ["halving_grid", "halving_random"]:
-            searcher = self._build_halving_searcher(
-                search_config, estimator, cv, metric, log_callback
+        elif config.strategy in ["halving_grid", "halving_random", "optuna"]:
+            # Searchers score the payload handed to them below: the raw
+            # pre-transform frames when wrapped (the fold-aware step encodes
+            # inside fit but maps predictions back), otherwise the payload
+            # labels. Resolve the scorer against that label space so binary
+            # scorers get a valid pos_label even for string targets.
+            scoring_y = (
+                preprocessing_frames[1]
+                if wrapped and preprocessing_frames is not None
+                else y_for_search
             )
-        elif config.strategy == "optuna":
-            searcher = self._build_optuna_searcher(
-                search_config, estimator, cv, metric, progress_callback, log_callback
-            )
+            scoring = self._resolve_scorer(metric, scoring_y)
+            if config.strategy in ["halving_grid", "halving_random"]:
+                searcher = self._build_halving_searcher(
+                    search_config, estimator, cv, scoring, log_callback
+                )
+            else:
+                searcher = self._build_optuna_searcher(
+                    search_config, estimator, cv, scoring, progress_callback, log_callback
+                )
         else:
             raise_invalid_choice(
                 config.strategy,
@@ -1568,7 +1761,20 @@ class TuningApplier(BaseModelApplier):
     ) -> pd.Series | Any:
         # model_artifact is (fitted_model, tuning_result)
         if isinstance(model_artifact, tuple) and len(model_artifact) == 2:
-            model, _ = model_artifact
+            model, tuning_result = model_artifact
+            thresholds = getattr(tuning_result, "decision_thresholds", None)
+            if (
+                thresholds is not None
+                and hasattr(model, "predict_proba")
+                and hasattr(model, "classes_")
+            ):
+                # F-13: apply the decision thresholds tuned on the validation
+                # split instead of the model's default decision rule.
+                X_np, _ = SklearnBridge.to_sklearn(df)
+                y_proba = model.predict_proba(X_np)
+                preds = apply_thresholds(y_proba, thresholds, classes=model.classes_)
+                index = df.index if hasattr(df, "index") else None
+                return pd.Series(preds, index=index)
             return self.base_applier.predict(df, model)
         # Fallback: artifact isn't the expected (model, tuning_result) tuple
         # (e.g. a plain fitted model, before it's wrapped by the tuner). Return

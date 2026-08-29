@@ -60,6 +60,7 @@ These keys go inside the `"modeling"` block when `"type"` is `"hyperparameter_tu
 | `cv_folds` | `int` | `5` | Number of CV folds |
 | `cv_type` | `str` | `"k_fold"` | One of `k_fold`, `stratified_k_fold`, `time_series_split`, `shuffle_split`, `nested_cv` |
 | `cv_time_column` | `str\|null` | `null` | Column name to sort by when using `time_series_split`. Auto-detects datetime column if omitted |
+| `tune_threshold` | `bool` | `false` | After tuning a binary classifier, select the decision threshold that maximises `metric` on the validation split and apply it in predictions. See [Threshold Tuning](threshold_tuning.md#integrated-with-hyperparameter-tuning) |
 | `progress` | `bool` | `false` | Console trial progress for core-only runs (see [Built-in console progress](#built-in-console-progress-no-callback-needed)). Ignored when you pass your own `progress_callback` |
 
 ## Strategy-specific params

@@ -161,6 +161,7 @@ class ThresholdTuningService:
                 "metric": None,
                 "split_used": None,
                 "computed_at": None,
+                "source": None,
                 "enabled": False,
             }
 
@@ -171,6 +172,7 @@ class ThresholdTuningService:
             "metric": saved.get("metric"),
             "split_used": saved.get("split_used"),
             "computed_at": saved.get("computed_at"),
+            "source": saved.get("source"),
             "enabled": bool(job.tuned_thresholds_enabled),
         }
 

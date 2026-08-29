@@ -205,6 +205,49 @@ describe('convertGraphToPipelineConfig', () => {
     });
   });
 
+  it('forwards tune_threshold=true into tuning_config for an advanced Classification node (F-13)', () => {
+    const nodes = [
+      node('ds', 'dataset_node', { datasetId: 'd1' }),
+      node('tune', 'classification', {
+        run_mode: 'advanced',
+        target_column: 'y',
+        model_type: 'logistic_regression',
+        search_space: { C: [0.1, 1] },
+        search_strategy: 'random',
+        metric: 'f1',
+        n_trials: 3,
+        tune_threshold: true,
+      }),
+    ];
+    const edges = [edge('ds', 'tune')];
+    const cfg = convertGraphToPipelineConfig(nodes, edges);
+    const tune = cfg.nodes.find((n) => n.node_id === 'tune');
+    expect((tune?.params as { tuning_config?: Record<string, unknown> })?.tuning_config).toMatchObject({
+      tune_threshold: true,
+    });
+  });
+
+  it('defaults tune_threshold to false for a legacy advanced node lacking the field (F-13)', () => {
+    const nodes = [
+      node('ds', 'dataset_node', { datasetId: 'd1' }),
+      node('tune', 'classification', {
+        run_mode: 'advanced',
+        target_column: 'y',
+        model_type: 'logistic_regression',
+        search_space: { C: [0.1, 1] },
+        search_strategy: 'random',
+        metric: 'accuracy',
+        n_trials: 3,
+      }),
+    ];
+    const edges = [edge('ds', 'tune')];
+    const cfg = convertGraphToPipelineConfig(nodes, edges);
+    const tune = cfg.nodes.find((n) => n.node_id === 'tune');
+    expect((tune?.params as { tuning_config?: Record<string, unknown> })?.tuning_config).toMatchObject({
+      tune_threshold: false,
+    });
+  });
+
   it('emits a canonical training/tuned step for a Regression node with run_mode=advanced', () => {
     const nodes = [
       node('ds', 'dataset_node', { datasetId: 'd1' }),

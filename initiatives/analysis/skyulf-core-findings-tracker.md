@@ -6,8 +6,8 @@ snapshot, `/Users/BH7043/Skyulf`).
 (3,457 passed, 56 skipped).
 
 The audit predates the 080–086 fix waves. 7 of 31 findings no longer reproduce;
-3 are partial; 21 are live. This file tracks the fix work, few-at-a-time for easy
-items, one-at-a-time for hard ones.
+2 are partial; 21 are live (F-13 was partial at triage and is now fully fixed).
+This file tracks the fix work, few-at-a-time for easy items, one-at-a-time for hard ones.
 
 **Status key:** ⬜ open · 🟨 in progress · ✅ done · ⏭️ parked
 
@@ -30,7 +30,6 @@ items, one-at-a-time for hard ones.
 
 | ID | Status | State |
 |---|---|---|
-| F-13 | ⬜ | Threshold tuning reachable via `Pipeline.optimize_thresholds()` / `predict(use_tuned_thresholds=True)`, but not wired into `TuningConfig`/default path |
 | F-14 | ⬜ | `global` statements 9 → 3; no contextvar/context-manager scoping yet |
 | F-31 | ⬜ | `_AnalyzerState` now used; dispatcher `logger.exception` consolidated but relies on caller context |
 
@@ -60,7 +59,7 @@ Easy items batched; hard items one at a time.
 | F-18 | 🟡 | Split `_tuning/engine.py` (1,572 lines) | ~2 days | ⬜ |
 | F-19 | 🟡 | Split `pipeline.py` responsibilities | ~1 day | ⬜ |
 | F-23 | ⚪ | Enable BLE001 / broad-catch rule | half day | ✅ |
-| F-13 | 🟡 | Wire threshold tuning into TuningConfig | ~1 day | ⬜ |
+| F-13 | 🟡 | Wire threshold tuning into TuningConfig | ~1 day | ✅ |
 | F-14 | 🟡 | contextvar scoping for engine/backend globals | ~1 day | ⬜ |
 
 ## Log
@@ -278,3 +277,102 @@ Three tracked follow-ups closed in one batch:
   `run_pipeline.py:284/360` (failed task-id attach only warns).
 - Gates: ruff check + format clean repo-wide, ty clean, vitest 849/849,
   DataDriftPage suite 9/9, tsc + eslint clean on all touched frontend files.
+
+### 2026-08-28 — F-13 threshold tuning wired into TuningConfig (branch 086)
+
+- **F-13** fixed end-to-end: threshold tuning is now reachable from the tuning
+  engine, not just `SkyulfPipeline`. Gated behind `TuningConfig.tune_threshold`
+  (default `false` — nothing changes unless a job opts in).
+- Core (`modeling/_tuning/`): after `_refit_best_model`, the engine grid-searches
+  the positive-class cutoff maximising the tuning metric on the validation split
+  (`_tune_decision_thresholds`, best-effort — any failure logs and keeps the
+  default decision rule). Gates: classifier with `predict_proba` + `classes_`,
+  exactly 2 classes, validation split present; every skip is logged.
+  Probability-only metrics (`roc_auc*`, `log_loss`, `pr_auc*`) fall back to
+  `balanced_accuracy` with a log. Result stored on
+  `TuningResult.decision_thresholds` / `.decision_threshold_metric`;
+  `TuningApplier.predict` applies them via the existing `apply_thresholds`
+  machinery.
+- Backend (`_node_runners.py`): fixed mode forwards
+  `tune_threshold` from node params; tuned mode flows automatically through
+  `tuning_config`; `_extract_tuning_metrics` persists the tuned thresholds
+  (string keys, JSON-safe) + metric into job metrics.
+- Frontend: `buildBaseTuningConfig` forwards `tune_threshold ?? false`;
+  Training node gains a **Tune decision threshold** checkbox (Advanced mode,
+  classification models only — task prop or registry tag decides).
+- Tests: 7 new engine tests (off-by-default, select+apply equivalence with
+  `apply_thresholds`, roc_auc fallback, no-validation/multiclass/regression
+  skips, default-rule passthrough) + 1 integration test on `customers.csv`;
+  2 converter tests pin forwarding and the legacy default.
+- Docs: `user_guide/threshold_tuning.md` gains the tuning-engine level (gates,
+  fallback, best-effort semantics); `hyperparameter_tuning.md` config table
+  gains the `tune_threshold` row.
+- Gates: core suite 3519 passed / 56 skipped, ruff check + format clean,
+  `ty` exit 0, vitest 851/851, tsc + eslint clean on touched frontend files,
+  plus a hermetic e2e spec (`threshold-tuning.spec.ts`, 2/2): checkbox renders
+  in Classification advanced mode (off by default, toggleable) and is absent
+  for Regression.
+
+### 2026-08-28 — F-13 follow-up: training-time thresholds seed the job store (branch 086)
+
+- Gap closed: deployment and the Experiments/Inference **Threshold Tuning**
+  panel read only the DB store (`training_jobs.tuned_thresholds` +
+  `tuned_thresholds_enabled`), so a threshold selected at training time was
+  invisible there. Now `JobStrategy.handle_success` seeds that store from the
+  job metrics' `decision_thresholds` (emitted only when the tuning engine
+  actually selected one), enabled by default — one lifecycle
+  (preview/save/toggle/clear, override > saved+enabled > default) for both
+  origins. `split_used` is always `"validation"` (core gates on it); class
+  order preserves `classes_`.
+- Tests: 4 new strategy tests (seed shape + enabled flag via both strategies,
+  no-op without thresholds, no-op for empty dict).
+- Docs: `user_guide/threshold_tuning.md` documents the seeding + precedence.
+- Gates: full backend suite 1431 passed, `ty` exit 0, ruff check + format
+  clean on touched files.
+- Provenance follow-up: seeded stores stamp `"source": "training"`;
+  `get_saved` forwards it; the Experiments Tuning tab shows a *seeded at
+  training* badge and the Inference override panel a matching line. Seeding
+  also stops clobbering the Tuning-tab metric dropdown with metrics the
+  preview endpoint doesn't support (e.g. `f1_weighted`) — only supported
+  metrics take over the dropdown. Vitest 851/851, tsc + eslint clean.
+- Verified along the way: the Experiments **Threshold Slider** tab is
+  client-side exploration only (OvR rule `P(class) >= t`, same convention as
+  core's binary `apply_thresholds`; multiclass charts mirror the scaled-argmax
+  rule) and explicitly saves nothing — real predictions only change via the
+  Threshold Tuning tab's save/enable flow.
+
+### 2026-08-28 — F-13 demo fallout: binary string-label tuning fix + source through the API (branch 086)
+
+- Bug found while demoing F-13 seeding with a real binary tuning job:
+  **tuning a binary target whose labels don't contain 1 (e.g. raw string
+  labels) with f1/precision/recall failed every trial as NaN** ("All trials
+  failed… The value nan is not acceptable"). Root cause: the per-fold
+  preprocessing wrapper (F-15) scores candidates against the raw
+  pre-transform labels, and sklearn's binary scorers default to
+  `pos_label=1` → `pos_label=1 is not a valid label` → searchers record the
+  fold failure as NaN. Multiclass was masked because `_resolve_metric` maps
+  f1 → f1_weighted (no pos_label).
+- Fix in `skyulf-core/skyulf/modeling/_tuning/engine.py`: new
+  `_resolve_scorer(metric, y)` pins `pos_label` to the sorted-last class
+  (the same positive-class convention as `apply_thresholds`) for
+  f1/precision/recall when the target is binary and its labels don't
+  contain 1; used by the optuna/halving searcher builds (against the label
+  space the searcher actually scores — the raw frames when wrapped) and by
+  the grid/random custom loop (against the post-transform fold labels).
+  Numeric {0,1} targets keep the stock scorer; roc_auc needs no fix (its
+  score function has no pos_label parameter).
+- The F-13 threshold search's hard-label f1/precision/recall callables now
+  pin the model's positive class for the same reason — string-label targets
+  used to silently skip seeding inside the best-effort catch.
+- Bridge follow-up: `ThresholdTuningGetResponse` lacked `source`, so FastAPI
+  stripped the provenance from GET /thresholds and the *seeded at training*
+  badge could never render; field added.
+- Tests: 5 core tests (scorer pinning units, optuna/grid e2e on string
+  labels, F-13 seeding on string labels) + router tests updated (shell
+  includes `source`; a seeded store exposes `source: "training"` through GET).
+- Gates: core suite 3524 passed / 56 skipped, backend suite 1432 passed,
+  `ty` exit 0, ruff check + format clean on touched files.
+- Demo: registered `Iris Binary (demo)` (versicolor vs virginica) and ran a
+  tuned RF job (optuna, f1, tune_threshold=true) — completed with thresholds
+  {0: 0.7255, 1: 0.2745} seeded + enabled, visible in Experiments with the
+  *seeded at training* badge (backend restarted to pick up the code).

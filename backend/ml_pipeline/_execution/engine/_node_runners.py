@@ -666,6 +666,7 @@ class NodeRunnersMixin:
             "cv_random_state": node.params.get("cv_random_state", DEFAULT_RANDOM_STATE),
             "cv_time_column": node.params.get("cv_time_column") or None,
             "random_state": node.params.get("random_state", DEFAULT_RANDOM_STATE),
+            "tune_threshold": node.params.get("tune_threshold", False),
         }
 
     def _run_training(
@@ -831,6 +832,14 @@ class NodeRunnersMixin:
                 or tuning_params.get("tuning_config", {}).get("metric")
                 or tuning_params.get("metric"),
             }
+            # F-13: surface the tuned decision thresholds (string keys so the
+            # job metrics stay JSON-serializable regardless of label dtype).
+            thresholds = getattr(tuning_result, "decision_thresholds", None)
+            if thresholds is not None:
+                metrics["decision_thresholds"] = {str(k): v for k, v in thresholds.items()}
+                metrics["decision_threshold_metric"] = getattr(
+                    tuning_result, "decision_threshold_metric", None
+                )
         else:
             metrics = {}
         return tuning_result, metrics

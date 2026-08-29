@@ -31,6 +31,9 @@ export interface TrainingConfig {
   search_strategy: string;
   strategy_params?: Record<string, unknown>;
   random_state: number;
+  // F-13: tune the decision threshold on the validation split after tuning
+  // (binary classification only; off by default).
+  tune_threshold?: boolean;
   // Shared CV section.
   cv_enabled: boolean;
   cv_folds: number;
@@ -187,6 +190,13 @@ export const TrainingSettings: React.FC<{
   // Find currently selected model item to check tags
   const selectedModelItem = availableModels.find(m => m.id === config.model_type);
   const requiresScaling = selectedModelItem?.tags?.includes('requires_scaling');
+
+  // Classification-only options (e.g. decision-threshold tuning): task-scoped
+  // nodes know their task; the generic node falls back to the selected
+  // model's registry tags.
+  const isClassification = task !== undefined
+      ? task !== 'regression'
+      : selectedModelItem?.tags?.includes('classification') ?? false;
 
   // Fetch available models from registry. Shared between both modes — the
   // dedicated Segmentation node has its own model list (see
@@ -533,6 +543,22 @@ export const TrainingSettings: React.FC<{
                                     min={0}
                                 />
                             </div>
+
+                            {isClassification && (
+                                <div className="col-span-2 flex items-center gap-2">
+                                    <input
+                                        type="checkbox"
+                                        id="tune_threshold"
+                                        checked={config.tune_threshold ?? false}
+                                        onChange={(e) => onChange({ ...config, tune_threshold: e.target.checked })}
+                                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                    />
+                                    <label htmlFor="tune_threshold" className="text-xs text-gray-600 dark:text-gray-400">
+                                        Tune decision threshold
+                                    </label>
+                                    <HelpTooltip text="After tuning, picks the probability cutoff that maximises your metric on the validation split (binary targets). Predictions then use that cutoff instead of the default 0.5. Needs a validation split; probability-only metrics like ROC AUC fall back to balanced accuracy for the cutoff search." />
+                                </div>
+                            )}
                         </div>
                     </div>
                 </>

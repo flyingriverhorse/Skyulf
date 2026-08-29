@@ -12,6 +12,11 @@ import type { JobInfo } from '../../../../core/api/jobs';
 import type { EvaluationData } from '../types';
 import { getJobScoringMetric, mapJobMetricToDropdown, type ThresholdMetric } from '../utils/jobMeta';
 
+/** Metric values the Threshold Tuning dropdown offers and the backend
+ * preview endpoint accepts — must stay in sync with the `<option>` list in
+ * EvaluationView and `_SUPPORTED_METRICS` in threshold_tuning_service.py. */
+const TUNING_METRIC_OPTIONS = ['accuracy', 'f1', 'precision', 'recall', 'balanced_accuracy', 'roc_auc'];
+
 /**
  * Owns the evaluation data load for the active job plus the
  * threshold-tuning panel state that is reset/hydrated alongside it.
@@ -97,8 +102,14 @@ export function useEvaluationFetch(jobs: JobInfo[]) {
           classes: saved.classes,
           metric: saved.metric,
           split_used: saved.split_used,
+          source: saved.source,
         });
-        setSelectedTuningMetric(saved.metric);
+        // The dropdown only offers the metrics the preview endpoint
+        // supports; seeded sets can carry others (e.g. f1_weighted), which
+        // would blank the select and make the next Preview 400.
+        if (TUNING_METRIC_OPTIONS.includes(saved.metric)) {
+          setSelectedTuningMetric(saved.metric);
+        }
         setUseTunedThresholds(saved.enabled);
       }
     } catch (err: unknown) {
