@@ -1819,6 +1819,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#integrated-with-hyperparameter-tuning" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Integrated with hyperparameter tuning
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#how-the-search-works" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3171,7 +3182,7 @@ binary — is rarely optimal for imbalanced classes or for a metric you
 actually care about (F1, MCC, balanced accuracy, a custom business metric, …).
 Skyulf can search for <strong>per-class decision thresholds</strong> that maximize a metric
 you supply, evaluated on held-out validation data.</p>
-<p>The functionality is available at two levels:</p>
+<p>The functionality is available at three levels:</p>
 <ul>
 <li><strong>Pipeline level:</strong> <code>SkyulfPipeline.optimize_thresholds()</code> +
   <code>predict(use_tuned_thresholds=True)</code> — handles preprocessing and
@@ -3179,6 +3190,10 @@ you supply, evaluated on held-out validation data.</p>
 <li><strong>Array level:</strong> <code>skyulf.modeling.optimize_thresholds()</code> /
   <code>apply_thresholds()</code> — plain NumPy in/out, for use outside a pipeline (e.g.
   with a raw sklearn estimator).</li>
+<li><strong>Tuning-engine integration:</strong> <code>TuningConfig(tune_threshold=True)</code> — after
+  hyperparameter tuning, the engine selects the threshold on the validation
+  split and applies it in every subsequent prediction automatically (binary
+  classifiers only). See <a href="#integrated-with-hyperparameter-tuning">Integrated with hyperparameter tuning</a>.</li>
 </ul>
 <h2 id="pipeline-usage">Pipeline usage</h2>
 <p>Tune against explicit, out-of-sample validation data — <strong>never</strong> the
@@ -3251,6 +3266,55 @@ y_pred = apply_thresholds(model.predict_proba(X_test), thresholds)
     classes=None,          # explicit class order; required for 3+ classes with a dict
 ) -&gt; np.ndarray            # 1D array of predicted class labels
 </code></pre>
+<h2 id="integrated-with-hyperparameter-tuning">Integrated with hyperparameter tuning</h2>
+<p>When a classifier is trained through the tuning engine — a canvas Training node
+in Advanced mode, the <code>"hyperparameter_tuner"</code> pipeline model type, or
+<code>TuningCalculator</code> directly — set <code>tune_threshold: true</code> to have the engine
+pick the decision threshold right after the final refit. It grid-searches the
+positive-class cutoff that maximises your tuning metric on the validation
+split, and every subsequent prediction uses that cutoff instead of the default
+<code>0.5</code>:</p>
+<pre><code class="language-python">config = {
+    &quot;modeling&quot;: {
+        &quot;type&quot;: &quot;hyperparameter_tuner&quot;,
+        &quot;base_model&quot;: {&quot;type&quot;: &quot;logistic_regression&quot;},
+        &quot;strategy&quot;: &quot;random&quot;,
+        &quot;search_space&quot;: {&quot;C&quot;: [0.1, 1.0, 10.0]},
+        &quot;metric&quot;: &quot;f1&quot;,
+        &quot;tune_threshold&quot;: True,
+    },
+}
+</code></pre>
+<p>In the canvas, this is the <strong>Tune decision threshold</strong> checkbox in the
+Training node's Tuning Strategy section (classification models, Advanced
+mode).</p>
+<p>The selected threshold is stored on the tuning result
+(<code>decision_thresholds</code>, plus <code>decision_threshold_metric</code> naming the metric the
+sweep maximised) and surfaces in the job metrics; the model's predictions
+apply it automatically — there is no separate "use tuned thresholds" flag at
+this level.</p>
+<p>When the job runs through the backend (canvas Training node), the selected
+threshold is also seeded into the job's saved-threshold store — the same one
+the Experiments / Inference <strong>Threshold Tuning</strong> panel reads — and enabled by
+default. A threshold tuned at training time therefore shows up in the panel
+("Optimized for …, computed from validation split", labelled <em>seeded at
+training</em>) and is active for deployed predictions immediately, and the usual
+panel controls apply: toggle it off, replace it with a manual preview, or
+clear it. Predict-time precedence is unchanged: request-level override &gt;
+saved + enabled thresholds &gt; default decision rule.</p>
+<p><strong>Gates</strong> — the engine logs a skip in the job log and predictions keep the
+default decision rule when any of these don't hold:</p>
+<ul>
+<li>the model is a <strong>classifier</strong> exposing <code>predict_proba</code>;</li>
+<li>the target is <strong>binary</strong> (for multiclass, use the pipeline- or array-level
+  APIs above);</li>
+<li>a <strong>validation split</strong> exists (configure a train/validation split upstream).</li>
+</ul>
+<p>Probability-only metrics (<code>roc_auc</code>, <code>log_loss</code>, <code>pr_auc</code>, …) cannot be
+computed from hard labels, so the cutoff sweep maximises <code>balanced_accuracy</code>
+instead — the log says so, and <code>decision_threshold_metric</code> records it.
+Threshold tuning is best-effort: an error during the sweep never aborts the
+tuning run.</p>
 <h2 id="how-the-search-works">How the search works</h2>
 <table>
 <thead>

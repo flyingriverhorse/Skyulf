@@ -4666,7 +4666,12 @@ callers should fall back to runtime introspection.</p>
 <span class="normal">616</span>
 <span class="normal">617</span>
 <span class="normal">618</span>
-<span class="normal">619</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">FeatureEngineer</span><span class="p">:</span>
+<span class="normal">619</span>
+<span class="normal">620</span>
+<span class="normal">621</span>
+<span class="normal">622</span>
+<span class="normal">623</span>
+<span class="normal">624</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">FeatureEngineer</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Orchestrates a sequence of feature engineering steps.</span>
 
@@ -4681,14 +4686,14 @@ callers should fall back to runtime introspection.</p>
     <span class="c1"># metrics later computed on that "held-out" data. Kept as a single shared</span>
     <span class="c1"># constant (rather than duplicated literals) so `transform()`, `_run_step`,</span>
     <span class="c1"># and `_collect_step_metrics` can't drift out of sync with each other.</span>
-    <span class="n">_RESAMPLING_TYPES</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"Oversampling"</span><span class="p">,</span> <span class="s2">"Undersampling"</span><span class="p">}</span>
+    <span class="n">_RESAMPLING_TYPES</span><span class="p">:</span> <span class="n">ClassVar</span><span class="p">[</span><span class="nb">set</span><span class="p">[</span><span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"Oversampling"</span><span class="p">,</span> <span class="s2">"Undersampling"</span><span class="p">}</span>
 
     <span class="c1"># Row-dropping steps are train-time cleaning only (F-18). Running them at</span>
     <span class="c1"># inference would silently vanish requested input rows -- prediction</span>
     <span class="c1"># responses carry no row keys, so callers could never tell which inputs</span>
     <span class="c1"># lost their prediction. Skipping them means a null row surfaces as a</span>
     <span class="c1"># visible model error instead of a silent misalignment.</span>
-    <span class="n">_ROW_DROPPING_TYPES</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"Deduplicate"</span><span class="p">,</span> <span class="s2">"DropMissingRows"</span><span class="p">}</span>
+    <span class="n">_ROW_DROPPING_TYPES</span><span class="p">:</span> <span class="n">ClassVar</span><span class="p">[</span><span class="nb">set</span><span class="p">[</span><span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"Deduplicate"</span><span class="p">,</span> <span class="s2">"DropMissingRows"</span><span class="p">}</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
@@ -4908,24 +4913,29 @@ callers should fall back to runtime introspection.</p>
     <span class="c1"># ------------------------------------------------------------------</span>
 
     <span class="c1"># Transformer-type groups, kept as class constants so dispatch is data-driven.</span>
-    <span class="n">_IMPUTATION_TYPES</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"SimpleImputer"</span><span class="p">,</span> <span class="s2">"KNNImputer"</span><span class="p">,</span> <span class="s2">"IterativeImputer"</span><span class="p">}</span>
-    <span class="n">_FEATURE_SELECTION_TYPES</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="n">_IMPUTATION_TYPES</span><span class="p">:</span> <span class="n">ClassVar</span><span class="p">[</span><span class="nb">set</span><span class="p">[</span><span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"SimpleImputer"</span><span class="p">,</span> <span class="s2">"KNNImputer"</span><span class="p">,</span> <span class="s2">"IterativeImputer"</span><span class="p">}</span>
+    <span class="n">_FEATURE_SELECTION_TYPES</span><span class="p">:</span> <span class="n">ClassVar</span><span class="p">[</span><span class="nb">set</span><span class="p">[</span><span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="p">{</span>
         <span class="s2">"feature_selection"</span><span class="p">,</span>
         <span class="s2">"UnivariateSelection"</span><span class="p">,</span>
         <span class="s2">"ModelBasedSelection"</span><span class="p">,</span>
         <span class="s2">"VarianceThreshold"</span><span class="p">,</span>
     <span class="p">}</span>
-    <span class="n">_SCALING_TYPES</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"StandardScaler"</span><span class="p">,</span> <span class="s2">"MinMaxScaler"</span><span class="p">,</span> <span class="s2">"RobustScaler"</span><span class="p">,</span> <span class="s2">"MaxAbsScaler"</span><span class="p">}</span>
-    <span class="n">_OUTLIER_TYPES</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"IQR"</span><span class="p">,</span> <span class="s2">"Winsorize"</span><span class="p">,</span> <span class="s2">"ZScore"</span><span class="p">,</span> <span class="s2">"EllipticEnvelope"</span><span class="p">}</span>
-    <span class="n">_BUCKETING_TYPES</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="n">_SCALING_TYPES</span><span class="p">:</span> <span class="n">ClassVar</span><span class="p">[</span><span class="nb">set</span><span class="p">[</span><span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s2">"StandardScaler"</span><span class="p">,</span>
+        <span class="s2">"MinMaxScaler"</span><span class="p">,</span>
+        <span class="s2">"RobustScaler"</span><span class="p">,</span>
+        <span class="s2">"MaxAbsScaler"</span><span class="p">,</span>
+    <span class="p">}</span>
+    <span class="n">_OUTLIER_TYPES</span><span class="p">:</span> <span class="n">ClassVar</span><span class="p">[</span><span class="nb">set</span><span class="p">[</span><span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"IQR"</span><span class="p">,</span> <span class="s2">"Winsorize"</span><span class="p">,</span> <span class="s2">"ZScore"</span><span class="p">,</span> <span class="s2">"EllipticEnvelope"</span><span class="p">}</span>
+    <span class="n">_BUCKETING_TYPES</span><span class="p">:</span> <span class="n">ClassVar</span><span class="p">[</span><span class="nb">set</span><span class="p">[</span><span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="p">{</span>
         <span class="s2">"GeneralBinning"</span><span class="p">,</span>
         <span class="s2">"EqualWidthBinning"</span><span class="p">,</span>
         <span class="s2">"EqualFrequencyBinning"</span><span class="p">,</span>
         <span class="s2">"CustomBinning"</span><span class="p">,</span>
         <span class="s2">"KBinsDiscretizer"</span><span class="p">,</span>
     <span class="p">}</span>
-    <span class="n">_FEATURE_GEN_TYPES</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"FeatureMath"</span><span class="p">,</span> <span class="s2">"FeatureGenerationNode"</span><span class="p">}</span>
-    <span class="n">_ROW_DROP_TYPES</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="n">_FEATURE_GEN_TYPES</span><span class="p">:</span> <span class="n">ClassVar</span><span class="p">[</span><span class="nb">set</span><span class="p">[</span><span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"FeatureMath"</span><span class="p">,</span> <span class="s2">"FeatureGenerationNode"</span><span class="p">}</span>
+    <span class="n">_ROW_DROP_TYPES</span><span class="p">:</span> <span class="n">ClassVar</span><span class="p">[</span><span class="nb">set</span><span class="p">[</span><span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="p">{</span>
         <span class="s2">"DropMissingRows"</span><span class="p">,</span>
         <span class="s2">"Deduplicate"</span><span class="p">,</span>
         <span class="s2">"IQR"</span><span class="p">,</span>
@@ -4933,7 +4943,7 @@ callers should fall back to runtime introspection.</p>
         <span class="s2">"EllipticEnvelope"</span><span class="p">,</span>
         <span class="s2">"Winsorize"</span><span class="p">,</span>
     <span class="p">}</span>
-    <span class="n">_ENCODER_TYPES</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="n">_ENCODER_TYPES</span><span class="p">:</span> <span class="n">ClassVar</span><span class="p">[</span><span class="nb">set</span><span class="p">[</span><span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="p">{</span>
         <span class="s2">"OneHotEncoder"</span><span class="p">,</span>
         <span class="s2">"LabelEncoder"</span><span class="p">,</span>
         <span class="s2">"OrdinalEncoder"</span><span class="p">,</span>
@@ -4963,7 +4973,7 @@ callers should fall back to runtime introspection.</p>
                 <span class="bp">self</span><span class="o">.</span><span class="n">_metrics_from_fitted_params</span><span class="p">(</span>
                     <span class="n">transformer_type</span><span class="p">,</span> <span class="n">fitted_params</span><span class="p">,</span> <span class="n">data_before</span><span class="p">,</span> <span class="n">current_data</span><span class="p">,</span> <span class="n">metrics</span>
                 <span class="p">)</span>
-        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>  <span class="c1"># noqa: BLE001 - step metrics are best-effort; logged</span>
             <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Failed to retrieve metrics for step </span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 
         <span class="k">if</span> <span class="n">transformer_type</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_RESAMPLING_TYPES</span><span class="p">:</span>
@@ -5156,7 +5166,7 @@ callers should fall back to runtime introspection.</p>
             <span class="n">counts</span> <span class="o">=</span> <span class="n">y_res</span><span class="o">.</span><span class="n">value_counts</span><span class="p">()</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()</span>
             <span class="n">metrics</span><span class="p">[</span><span class="s2">"class_counts"</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="nb">str</span><span class="p">(</span><span class="n">k</span><span class="p">):</span> <span class="nb">int</span><span class="p">(</span><span class="n">v</span><span class="p">)</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">counts</span><span class="o">.</span><span class="n">items</span><span class="p">()}</span>
             <span class="n">metrics</span><span class="p">[</span><span class="s2">"total_samples"</span><span class="p">]</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">y_res</span><span class="p">))</span>
-        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>  <span class="c1"># noqa: BLE001 - resampling metrics are best-effort; logged</span>
             <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Failed to calculate resampling metrics: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 
     <span class="nd">@staticmethod</span>
@@ -5210,7 +5220,7 @@ callers should fall back to runtime introspection.</p>
                     <span class="n">data_before</span><span class="o">.</span><span class="n">validation</span><span class="p">,</span> <span class="n">current_data</span><span class="o">.</span><span class="n">validation</span>
                 <span class="p">)</span>
             <span class="n">metrics</span><span class="p">[</span><span class="s2">"values_clipped"</span><span class="p">]</span> <span class="o">=</span> <span class="n">clipped_count</span>
-        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>  <span class="c1"># noqa: BLE001 - winsorize metrics are best-effort; logged</span>
             <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Failed to calculate values_clipped for Winsorize: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">_metrics_shape_change</span><span class="p">(</span>
@@ -7957,8 +7967,7 @@ exposing matching <code>fit</code>/<code>apply</code> methods, works without sub
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>skyulf-core/skyulf/preprocessing/encoding/target.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">300</span>
-<span class="normal">301</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">301</span>
 <span class="normal">302</span>
 <span class="normal">303</span>
 <span class="normal">304</span>
@@ -8019,7 +8028,8 @@ exposing matching <code>fit</code>/<code>apply</code> methods, works without sub
 <span class="normal">359</span>
 <span class="normal">360</span>
 <span class="normal">361</span>
-<span class="normal">362</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">"TargetEncoder"</span><span class="p">,</span> <span class="n">TargetEncoderApplier</span><span class="p">)</span>
+<span class="normal">362</span>
+<span class="normal">363</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">"TargetEncoder"</span><span class="p">,</span> <span class="n">TargetEncoderApplier</span><span class="p">)</span>
 <span class="nd">@node_meta</span><span class="p">(</span>
     <span class="nb">id</span><span class="o">=</span><span class="s2">"TargetEncoder"</span><span class="p">,</span>
     <span class="n">name</span><span class="o">=</span><span class="s2">"Target Encoder"</span><span class="p">,</span>
@@ -8114,8 +8124,7 @@ exposing matching <code>fit</code>/<code>apply</code> methods, works without sub
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>skyulf-core/skyulf/preprocessing/encoding/target.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">324</span>
-<span class="normal">325</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">325</span>
 <span class="normal">326</span>
 <span class="normal">327</span>
 <span class="normal">328</span>
@@ -8130,7 +8139,8 @@ exposing matching <code>fit</code>/<code>apply</code> methods, works without sub
 <span class="normal">337</span>
 <span class="normal">338</span>
 <span class="normal">339</span>
-<span class="normal">340</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">fit_transform_train</span><span class="p">(</span>
+<span class="normal">340</span>
+<span class="normal">341</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">fit_transform_train</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span> <span class="n">df</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span> <span class="o">|</span> <span class="n">SkyulfDataFrame</span> <span class="o">|</span> <span class="nb">tuple</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">TargetEncoderArtifact</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
 <span class="w">    </span><span class="sd">"""Fit sklearn TargetEncoder and cross-fit the pipeline training rows."""</span>

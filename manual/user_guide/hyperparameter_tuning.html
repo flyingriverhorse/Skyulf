@@ -3395,6 +3395,12 @@
 <td>Column name to sort by when using <code>time_series_split</code>. Auto-detects datetime column if omitted</td>
 </tr>
 <tr>
+<td><code>tune_threshold</code></td>
+<td><code>bool</code></td>
+<td><code>false</code></td>
+<td>After tuning a binary classifier, select the decision threshold that maximises <code>metric</code> on the validation split and apply it in predictions. See <a href="threshold_tuning.html#integrated-with-hyperparameter-tuning">Threshold Tuning</a></td>
+</tr>
+<tr>
 <td><code>progress</code></td>
 <td><code>bool</code></td>
 <td><code>false</code></td>
@@ -3574,6 +3580,13 @@ metrics = estimator.evaluate(dataset=dataset, target_column=&quot;target&quot;)
 </code></pre>
 <blockquote>
 <p><strong>Important:</strong> Always pass <code>TuningCalculator(base_calc)</code> — not the raw base calculator. The <code>TuningConfig</code> keyword filter inside <code>TuningCalculator.fit</code> reads <code>strategy</code>, <code>n_trials</code>, <code>metric</code>, <code>search_space</code>, <code>cv_*</code>, etc. directly from the config dict. If you pass the unwrapped base calculator, <code>tuning_config</code> is ignored and a single default-param fit runs instead.</p>
+<p><strong>Seeds:</strong> <code>random_state</code> pins the whole tuning run — candidate sampling,
+per-candidate CV folds, and the final refit of the winner — while
+<code>cv_random_state</code> pins only the post-tuning evaluation folds. Both default
+to <code>DEFAULT_RANDOM_STATE</code> (<code>42</code>), so tuning is reproducible out of the box.
+The seed itself is never a search-space candidate. In the canvas these are
+the <strong>Random State</strong> field (Tuning Strategy section) and <strong>Fold Split Seed</strong>
+(Cross Validation section).</p>
 </blockquote>
 <h3 id="built-in-console-progress-no-callback-needed">Built-in console progress (no callback needed)</h3>
 <p>Instead of writing your own <code>progress_callback</code>, set <code>"progress": True</code> in the tuning config. Skyulf then attaches a tidy console reporter for core-only runs:</p>

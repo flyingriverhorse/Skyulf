@@ -3087,6 +3087,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#skyulf.modeling._tuning.engine.__getattr__" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        __getattr__
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -3209,42 +3220,55 @@ Wraps the base model applier to provide predictions using the refitted best mode
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>skyulf-core/skyulf/modeling/_tuning/engine.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1537</span>
-<span class="normal">1538</span>
-<span class="normal">1539</span>
-<span class="normal">1540</span>
-<span class="normal">1541</span>
-<span class="normal">1542</span>
-<span class="normal">1543</span>
-<span class="normal">1544</span>
-<span class="normal">1545</span>
-<span class="normal">1546</span>
-<span class="normal">1547</span>
-<span class="normal">1548</span>
-<span class="normal">1549</span>
-<span class="normal">1550</span>
-<span class="normal">1551</span>
-<span class="normal">1552</span>
-<span class="normal">1553</span>
-<span class="normal">1554</span>
-<span class="normal">1555</span>
-<span class="normal">1556</span>
-<span class="normal">1557</span>
-<span class="normal">1558</span>
-<span class="normal">1559</span>
-<span class="normal">1560</span>
-<span class="normal">1561</span>
-<span class="normal">1562</span>
-<span class="normal">1563</span>
-<span class="normal">1564</span>
-<span class="normal">1565</span>
-<span class="normal">1566</span>
-<span class="normal">1567</span>
-<span class="normal">1568</span>
-<span class="normal">1569</span>
-<span class="normal">1570</span>
-<span class="normal">1571</span>
-<span class="normal">1572</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">TuningApplier</span><span class="p">(</span><span class="n">BaseModelApplier</span><span class="p">):</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1782</span>
+<span class="normal">1783</span>
+<span class="normal">1784</span>
+<span class="normal">1785</span>
+<span class="normal">1786</span>
+<span class="normal">1787</span>
+<span class="normal">1788</span>
+<span class="normal">1789</span>
+<span class="normal">1790</span>
+<span class="normal">1791</span>
+<span class="normal">1792</span>
+<span class="normal">1793</span>
+<span class="normal">1794</span>
+<span class="normal">1795</span>
+<span class="normal">1796</span>
+<span class="normal">1797</span>
+<span class="normal">1798</span>
+<span class="normal">1799</span>
+<span class="normal">1800</span>
+<span class="normal">1801</span>
+<span class="normal">1802</span>
+<span class="normal">1803</span>
+<span class="normal">1804</span>
+<span class="normal">1805</span>
+<span class="normal">1806</span>
+<span class="normal">1807</span>
+<span class="normal">1808</span>
+<span class="normal">1809</span>
+<span class="normal">1810</span>
+<span class="normal">1811</span>
+<span class="normal">1812</span>
+<span class="normal">1813</span>
+<span class="normal">1814</span>
+<span class="normal">1815</span>
+<span class="normal">1816</span>
+<span class="normal">1817</span>
+<span class="normal">1818</span>
+<span class="normal">1819</span>
+<span class="normal">1820</span>
+<span class="normal">1821</span>
+<span class="normal">1822</span>
+<span class="normal">1823</span>
+<span class="normal">1824</span>
+<span class="normal">1825</span>
+<span class="normal">1826</span>
+<span class="normal">1827</span>
+<span class="normal">1828</span>
+<span class="normal">1829</span>
+<span class="normal">1830</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">TuningApplier</span><span class="p">(</span><span class="n">BaseModelApplier</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Applier for TuningCalculator.</span>
 <span class="sd">    Wraps the base model applier to provide predictions using the refitted best model.</span>
@@ -3260,7 +3284,20 @@ Wraps the base model applier to provide predictions using the refitted best mode
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span> <span class="o">|</span> <span class="n">Any</span><span class="p">:</span>
         <span class="c1"># model_artifact is (fitted_model, tuning_result)</span>
         <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">model_artifact</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">)</span> <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="n">model_artifact</span><span class="p">)</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
-            <span class="n">model</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">model_artifact</span>
+            <span class="n">model</span><span class="p">,</span> <span class="n">tuning_result</span> <span class="o">=</span> <span class="n">model_artifact</span>
+            <span class="n">thresholds</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">tuning_result</span><span class="p">,</span> <span class="s2">"decision_thresholds"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+            <span class="k">if</span> <span class="p">(</span>
+                <span class="n">thresholds</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+                <span class="ow">and</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="s2">"predict_proba"</span><span class="p">)</span>
+                <span class="ow">and</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="s2">"classes_"</span><span class="p">)</span>
+            <span class="p">):</span>
+                <span class="c1"># F-13: apply the decision thresholds tuned on the validation</span>
+                <span class="c1"># split instead of the model's default decision rule.</span>
+                <span class="n">X_np</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">SklearnBridge</span><span class="o">.</span><span class="n">to_sklearn</span><span class="p">(</span><span class="n">df</span><span class="p">)</span>
+                <span class="n">y_proba</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">predict_proba</span><span class="p">(</span><span class="n">X_np</span><span class="p">)</span>
+                <span class="n">preds</span> <span class="o">=</span> <span class="n">apply_thresholds</span><span class="p">(</span><span class="n">y_proba</span><span class="p">,</span> <span class="n">thresholds</span><span class="p">,</span> <span class="n">classes</span><span class="o">=</span><span class="n">model</span><span class="o">.</span><span class="n">classes_</span><span class="p">)</span>
+                <span class="n">index</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">index</span> <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="s2">"index"</span><span class="p">)</span> <span class="k">else</span> <span class="kc">None</span>
+                <span class="k">return</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">(</span><span class="n">preds</span><span class="p">,</span> <span class="n">index</span><span class="o">=</span><span class="n">index</span><span class="p">)</span>
             <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">base_applier</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">model</span><span class="p">)</span>
         <span class="c1"># Fallback: artifact isn't the expected (model, tuning_result) tuple</span>
         <span class="c1"># (e.g. a plain fitted model, before it's wrapped by the tuner). Return</span>
@@ -3344,35 +3381,7 @@ and requires the Optuna integration package.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>skyulf-core/skyulf/modeling/_tuning/engine.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 110</span>
-<span class="normal"> 111</span>
-<span class="normal"> 112</span>
-<span class="normal"> 113</span>
-<span class="normal"> 114</span>
-<span class="normal"> 115</span>
-<span class="normal"> 116</span>
-<span class="normal"> 117</span>
-<span class="normal"> 118</span>
-<span class="normal"> 119</span>
-<span class="normal"> 120</span>
-<span class="normal"> 121</span>
-<span class="normal"> 122</span>
-<span class="normal"> 123</span>
-<span class="normal"> 124</span>
-<span class="normal"> 125</span>
-<span class="normal"> 126</span>
-<span class="normal"> 127</span>
-<span class="normal"> 128</span>
-<span class="normal"> 129</span>
-<span class="normal"> 130</span>
-<span class="normal"> 131</span>
-<span class="normal"> 132</span>
-<span class="normal"> 133</span>
-<span class="normal"> 134</span>
-<span class="normal"> 135</span>
-<span class="normal"> 136</span>
-<span class="normal"> 137</span>
-<span class="normal"> 138</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 138</span>
 <span class="normal"> 139</span>
 <span class="normal"> 140</span>
 <span class="normal"> 141</span>
@@ -4768,7 +4777,252 @@ and requires the Optuna integration package.</p>
 <span class="normal">1531</span>
 <span class="normal">1532</span>
 <span class="normal">1533</span>
-<span class="normal">1534</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">TuningCalculator</span><span class="p">(</span><span class="n">BaseModelCalculator</span><span class="p">):</span>
+<span class="normal">1534</span>
+<span class="normal">1535</span>
+<span class="normal">1536</span>
+<span class="normal">1537</span>
+<span class="normal">1538</span>
+<span class="normal">1539</span>
+<span class="normal">1540</span>
+<span class="normal">1541</span>
+<span class="normal">1542</span>
+<span class="normal">1543</span>
+<span class="normal">1544</span>
+<span class="normal">1545</span>
+<span class="normal">1546</span>
+<span class="normal">1547</span>
+<span class="normal">1548</span>
+<span class="normal">1549</span>
+<span class="normal">1550</span>
+<span class="normal">1551</span>
+<span class="normal">1552</span>
+<span class="normal">1553</span>
+<span class="normal">1554</span>
+<span class="normal">1555</span>
+<span class="normal">1556</span>
+<span class="normal">1557</span>
+<span class="normal">1558</span>
+<span class="normal">1559</span>
+<span class="normal">1560</span>
+<span class="normal">1561</span>
+<span class="normal">1562</span>
+<span class="normal">1563</span>
+<span class="normal">1564</span>
+<span class="normal">1565</span>
+<span class="normal">1566</span>
+<span class="normal">1567</span>
+<span class="normal">1568</span>
+<span class="normal">1569</span>
+<span class="normal">1570</span>
+<span class="normal">1571</span>
+<span class="normal">1572</span>
+<span class="normal">1573</span>
+<span class="normal">1574</span>
+<span class="normal">1575</span>
+<span class="normal">1576</span>
+<span class="normal">1577</span>
+<span class="normal">1578</span>
+<span class="normal">1579</span>
+<span class="normal">1580</span>
+<span class="normal">1581</span>
+<span class="normal">1582</span>
+<span class="normal">1583</span>
+<span class="normal">1584</span>
+<span class="normal">1585</span>
+<span class="normal">1586</span>
+<span class="normal">1587</span>
+<span class="normal">1588</span>
+<span class="normal">1589</span>
+<span class="normal">1590</span>
+<span class="normal">1591</span>
+<span class="normal">1592</span>
+<span class="normal">1593</span>
+<span class="normal">1594</span>
+<span class="normal">1595</span>
+<span class="normal">1596</span>
+<span class="normal">1597</span>
+<span class="normal">1598</span>
+<span class="normal">1599</span>
+<span class="normal">1600</span>
+<span class="normal">1601</span>
+<span class="normal">1602</span>
+<span class="normal">1603</span>
+<span class="normal">1604</span>
+<span class="normal">1605</span>
+<span class="normal">1606</span>
+<span class="normal">1607</span>
+<span class="normal">1608</span>
+<span class="normal">1609</span>
+<span class="normal">1610</span>
+<span class="normal">1611</span>
+<span class="normal">1612</span>
+<span class="normal">1613</span>
+<span class="normal">1614</span>
+<span class="normal">1615</span>
+<span class="normal">1616</span>
+<span class="normal">1617</span>
+<span class="normal">1618</span>
+<span class="normal">1619</span>
+<span class="normal">1620</span>
+<span class="normal">1621</span>
+<span class="normal">1622</span>
+<span class="normal">1623</span>
+<span class="normal">1624</span>
+<span class="normal">1625</span>
+<span class="normal">1626</span>
+<span class="normal">1627</span>
+<span class="normal">1628</span>
+<span class="normal">1629</span>
+<span class="normal">1630</span>
+<span class="normal">1631</span>
+<span class="normal">1632</span>
+<span class="normal">1633</span>
+<span class="normal">1634</span>
+<span class="normal">1635</span>
+<span class="normal">1636</span>
+<span class="normal">1637</span>
+<span class="normal">1638</span>
+<span class="normal">1639</span>
+<span class="normal">1640</span>
+<span class="normal">1641</span>
+<span class="normal">1642</span>
+<span class="normal">1643</span>
+<span class="normal">1644</span>
+<span class="normal">1645</span>
+<span class="normal">1646</span>
+<span class="normal">1647</span>
+<span class="normal">1648</span>
+<span class="normal">1649</span>
+<span class="normal">1650</span>
+<span class="normal">1651</span>
+<span class="normal">1652</span>
+<span class="normal">1653</span>
+<span class="normal">1654</span>
+<span class="normal">1655</span>
+<span class="normal">1656</span>
+<span class="normal">1657</span>
+<span class="normal">1658</span>
+<span class="normal">1659</span>
+<span class="normal">1660</span>
+<span class="normal">1661</span>
+<span class="normal">1662</span>
+<span class="normal">1663</span>
+<span class="normal">1664</span>
+<span class="normal">1665</span>
+<span class="normal">1666</span>
+<span class="normal">1667</span>
+<span class="normal">1668</span>
+<span class="normal">1669</span>
+<span class="normal">1670</span>
+<span class="normal">1671</span>
+<span class="normal">1672</span>
+<span class="normal">1673</span>
+<span class="normal">1674</span>
+<span class="normal">1675</span>
+<span class="normal">1676</span>
+<span class="normal">1677</span>
+<span class="normal">1678</span>
+<span class="normal">1679</span>
+<span class="normal">1680</span>
+<span class="normal">1681</span>
+<span class="normal">1682</span>
+<span class="normal">1683</span>
+<span class="normal">1684</span>
+<span class="normal">1685</span>
+<span class="normal">1686</span>
+<span class="normal">1687</span>
+<span class="normal">1688</span>
+<span class="normal">1689</span>
+<span class="normal">1690</span>
+<span class="normal">1691</span>
+<span class="normal">1692</span>
+<span class="normal">1693</span>
+<span class="normal">1694</span>
+<span class="normal">1695</span>
+<span class="normal">1696</span>
+<span class="normal">1697</span>
+<span class="normal">1698</span>
+<span class="normal">1699</span>
+<span class="normal">1700</span>
+<span class="normal">1701</span>
+<span class="normal">1702</span>
+<span class="normal">1703</span>
+<span class="normal">1704</span>
+<span class="normal">1705</span>
+<span class="normal">1706</span>
+<span class="normal">1707</span>
+<span class="normal">1708</span>
+<span class="normal">1709</span>
+<span class="normal">1710</span>
+<span class="normal">1711</span>
+<span class="normal">1712</span>
+<span class="normal">1713</span>
+<span class="normal">1714</span>
+<span class="normal">1715</span>
+<span class="normal">1716</span>
+<span class="normal">1717</span>
+<span class="normal">1718</span>
+<span class="normal">1719</span>
+<span class="normal">1720</span>
+<span class="normal">1721</span>
+<span class="normal">1722</span>
+<span class="normal">1723</span>
+<span class="normal">1724</span>
+<span class="normal">1725</span>
+<span class="normal">1726</span>
+<span class="normal">1727</span>
+<span class="normal">1728</span>
+<span class="normal">1729</span>
+<span class="normal">1730</span>
+<span class="normal">1731</span>
+<span class="normal">1732</span>
+<span class="normal">1733</span>
+<span class="normal">1734</span>
+<span class="normal">1735</span>
+<span class="normal">1736</span>
+<span class="normal">1737</span>
+<span class="normal">1738</span>
+<span class="normal">1739</span>
+<span class="normal">1740</span>
+<span class="normal">1741</span>
+<span class="normal">1742</span>
+<span class="normal">1743</span>
+<span class="normal">1744</span>
+<span class="normal">1745</span>
+<span class="normal">1746</span>
+<span class="normal">1747</span>
+<span class="normal">1748</span>
+<span class="normal">1749</span>
+<span class="normal">1750</span>
+<span class="normal">1751</span>
+<span class="normal">1752</span>
+<span class="normal">1753</span>
+<span class="normal">1754</span>
+<span class="normal">1755</span>
+<span class="normal">1756</span>
+<span class="normal">1757</span>
+<span class="normal">1758</span>
+<span class="normal">1759</span>
+<span class="normal">1760</span>
+<span class="normal">1761</span>
+<span class="normal">1762</span>
+<span class="normal">1763</span>
+<span class="normal">1764</span>
+<span class="normal">1765</span>
+<span class="normal">1766</span>
+<span class="normal">1767</span>
+<span class="normal">1768</span>
+<span class="normal">1769</span>
+<span class="normal">1770</span>
+<span class="normal">1771</span>
+<span class="normal">1772</span>
+<span class="normal">1773</span>
+<span class="normal">1774</span>
+<span class="normal">1775</span>
+<span class="normal">1776</span>
+<span class="normal">1777</span>
+<span class="normal">1778</span>
+<span class="normal">1779</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">TuningCalculator</span><span class="p">(</span><span class="n">BaseModelCalculator</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""Tune a plain ``BaseModelCalculator`` and refit it with the best parameters.</span>
 
 <span class="sd">    ``fit`` accepts a ``TuningConfig`` or dict with ``strategy``, ``metric``,</span>
@@ -4920,8 +5174,9 @@ and requires the Optuna integration package.</p>
         <span class="n">best_params</span> <span class="o">=</span> <span class="n">tuning_result</span><span class="o">.</span><span class="n">best_params</span>
         <span class="n">final_params</span> <span class="o">=</span> <span class="p">{</span><span class="o">**</span><span class="bp">self</span><span class="o">.</span><span class="n">model_calculator</span><span class="o">.</span><span class="n">default_params</span><span class="p">,</span> <span class="o">**</span><span class="n">best_params</span><span class="p">}</span>
 
-        <span class="c1"># Ensure random_state is passed if available in config and not in params</span>
-        <span class="k">if</span> <span class="s2">"random_state"</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">final_params</span> <span class="ow">and</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">tuning_config</span><span class="p">,</span> <span class="s2">"random_state"</span><span class="p">):</span>
+        <span class="c1"># The caller's seed must win over the calculator's baked-in default,</span>
+        <span class="c1"># but not over a seed the search itself selected.</span>
+        <span class="k">if</span> <span class="s2">"random_state"</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">best_params</span> <span class="ow">and</span> <span class="n">tuning_config</span><span class="o">.</span><span class="n">random_state</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
             <span class="n">final_params</span><span class="p">[</span><span class="s2">"random_state"</span><span class="p">]</span> <span class="o">=</span> <span class="n">tuning_config</span><span class="o">.</span><span class="n">random_state</span>
 
         <span class="k">if</span> <span class="n">log_callback</span><span class="p">:</span>
@@ -4968,6 +5223,144 @@ and requires the Optuna integration package.</p>
                 <span class="n">warnings</span><span class="o">.</span><span class="n">warn_explicit</span><span class="p">(</span><span class="n">w</span><span class="o">.</span><span class="n">message</span><span class="p">,</span> <span class="n">w</span><span class="o">.</span><span class="n">category</span><span class="p">,</span> <span class="n">w</span><span class="o">.</span><span class="n">filename</span><span class="p">,</span> <span class="n">w</span><span class="o">.</span><span class="n">lineno</span><span class="p">)</span>
 
         <span class="k">return</span> <span class="n">model</span>
+
+    <span class="c1"># Hard-label (y_true, y_pred) classification metrics that a threshold</span>
+    <span class="c1"># search can maximise. Probability-only metrics (roc_auc*, log_loss,</span>
+    <span class="c1"># pr_auc*, g_score) cannot be computed from hard labels, so threshold</span>
+    <span class="c1"># search falls back to balanced_accuracy for those.</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_resolve_threshold_metric</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">metric_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">log_callback</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="nb">str</span><span class="p">],</span> <span class="kc">None</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">pos_label</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Callable</span><span class="p">[[</span><span class="n">Any</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span> <span class="nb">float</span><span class="p">],</span> <span class="nb">str</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">"""Map the user's tuning metric to a hard-label callable for the threshold search.</span>
+
+<span class="sd">        Returns ``(callable, used_metric_name)``. Probability-only metrics fall</span>
+<span class="sd">        back to ``balanced_accuracy`` (with a log), since a threshold sweep only</span>
+<span class="sd">        ever produces hard class labels.</span>
+
+<span class="sd">        ``pos_label`` (the model's positive class) is pinned into the binary</span>
+<span class="sd">        f1/precision/recall callables when given: their sklearn defaults assume</span>
+<span class="sd">        ``pos_label=1`` and raise for label spaces without a 1 (string labels).</span>
+<span class="sd">        """</span>
+        <span class="kn">from</span><span class="w"> </span><span class="nn">sklearn.metrics</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+            <span class="n">accuracy_score</span><span class="p">,</span>
+            <span class="n">balanced_accuracy_score</span><span class="p">,</span>
+            <span class="n">f1_score</span><span class="p">,</span>
+            <span class="n">matthews_corrcoef</span><span class="p">,</span>
+            <span class="n">precision_score</span><span class="p">,</span>
+            <span class="n">recall_score</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="n">pos_kwargs</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"pos_label"</span><span class="p">:</span> <span class="n">pos_label</span><span class="p">}</span> <span class="k">if</span> <span class="n">pos_label</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="p">{}</span>
+        <span class="n">hard_label</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Callable</span><span class="p">[[</span><span class="n">Any</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span> <span class="nb">float</span><span class="p">]]</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s2">"accuracy"</span><span class="p">:</span> <span class="n">accuracy_score</span><span class="p">,</span>
+            <span class="s2">"balanced_accuracy"</span><span class="p">:</span> <span class="n">balanced_accuracy_score</span><span class="p">,</span>
+            <span class="s2">"f1"</span><span class="p">:</span> <span class="k">lambda</span> <span class="n">yt</span><span class="p">,</span> <span class="n">yp</span><span class="p">:</span> <span class="n">f1_score</span><span class="p">(</span><span class="n">yt</span><span class="p">,</span> <span class="n">yp</span><span class="p">,</span> <span class="n">zero_division</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="o">**</span><span class="n">pos_kwargs</span><span class="p">),</span>
+            <span class="s2">"f1_weighted"</span><span class="p">:</span> <span class="k">lambda</span> <span class="n">yt</span><span class="p">,</span> <span class="n">yp</span><span class="p">:</span> <span class="n">f1_score</span><span class="p">(</span><span class="n">yt</span><span class="p">,</span> <span class="n">yp</span><span class="p">,</span> <span class="n">average</span><span class="o">=</span><span class="s2">"weighted"</span><span class="p">,</span> <span class="n">zero_division</span><span class="o">=</span><span class="mi">0</span><span class="p">),</span>
+            <span class="s2">"precision"</span><span class="p">:</span> <span class="k">lambda</span> <span class="n">yt</span><span class="p">,</span> <span class="n">yp</span><span class="p">:</span> <span class="n">precision_score</span><span class="p">(</span><span class="n">yt</span><span class="p">,</span> <span class="n">yp</span><span class="p">,</span> <span class="n">zero_division</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="o">**</span><span class="n">pos_kwargs</span><span class="p">),</span>
+            <span class="s2">"precision_weighted"</span><span class="p">:</span> <span class="k">lambda</span> <span class="n">yt</span><span class="p">,</span> <span class="n">yp</span><span class="p">:</span> <span class="n">precision_score</span><span class="p">(</span>
+                <span class="n">yt</span><span class="p">,</span> <span class="n">yp</span><span class="p">,</span> <span class="n">average</span><span class="o">=</span><span class="s2">"weighted"</span><span class="p">,</span> <span class="n">zero_division</span><span class="o">=</span><span class="mi">0</span>
+            <span class="p">),</span>
+            <span class="s2">"recall"</span><span class="p">:</span> <span class="k">lambda</span> <span class="n">yt</span><span class="p">,</span> <span class="n">yp</span><span class="p">:</span> <span class="n">recall_score</span><span class="p">(</span><span class="n">yt</span><span class="p">,</span> <span class="n">yp</span><span class="p">,</span> <span class="n">zero_division</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="o">**</span><span class="n">pos_kwargs</span><span class="p">),</span>
+            <span class="s2">"recall_weighted"</span><span class="p">:</span> <span class="k">lambda</span> <span class="n">yt</span><span class="p">,</span> <span class="n">yp</span><span class="p">:</span> <span class="n">recall_score</span><span class="p">(</span>
+                <span class="n">yt</span><span class="p">,</span> <span class="n">yp</span><span class="p">,</span> <span class="n">average</span><span class="o">=</span><span class="s2">"weighted"</span><span class="p">,</span> <span class="n">zero_division</span><span class="o">=</span><span class="mi">0</span>
+            <span class="p">),</span>
+            <span class="s2">"matthews_corrcoef"</span><span class="p">:</span> <span class="n">matthews_corrcoef</span><span class="p">,</span>
+        <span class="p">}</span>
+        <span class="k">if</span> <span class="n">metric_name</span> <span class="ow">in</span> <span class="n">hard_label</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">hard_label</span><span class="p">[</span><span class="n">metric_name</span><span class="p">],</span> <span class="n">metric_name</span>
+
+        <span class="n">msg</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="sa">f</span><span class="s2">"Decision-threshold tuning: metric '</span><span class="si">{</span><span class="n">metric_name</span><span class="si">}</span><span class="s2">' needs predicted "</span>
+            <span class="s2">"probabilities, but a threshold sweep only produces hard labels — "</span>
+            <span class="s2">"tuning the threshold against 'balanced_accuracy' instead."</span>
+        <span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">log_callback</span><span class="p">:</span>
+            <span class="n">log_callback</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">balanced_accuracy_score</span><span class="p">,</span> <span class="s2">"balanced_accuracy"</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_tune_decision_thresholds</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">model</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
+        <span class="n">tuning_result</span><span class="p">:</span> <span class="n">TuningResult</span><span class="p">,</span>
+        <span class="n">tuning_config</span><span class="p">:</span> <span class="n">TuningConfig</span><span class="p">,</span>
+        <span class="n">validation_data</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">log_callback</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="nb">str</span><span class="p">],</span> <span class="kc">None</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""F-13: search a decision threshold on the validation split for a binary</span>
+<span class="sd">        classifier and store it on ``tuning_result``.</span>
+
+<span class="sd">        Gates: classification problem, a model exposing ``predict_proba`` and</span>
+<span class="sd">        ``classes_``, an exactly-binary target, and a provided validation split.</span>
+<span class="sd">        Any gate that fails — or any error during the search — logs and leaves</span>
+<span class="sd">        ``tuning_result.decision_thresholds`` as ``None`` so ``predict()`` keeps</span>
+<span class="sd">        the model's default decision rule; threshold tuning is best-effort and</span>
+<span class="sd">        must never abort an otherwise successful tuning run.</span>
+<span class="sd">        """</span>
+
+        <span class="k">def</span><span class="w"> </span><span class="nf">_skip</span><span class="p">(</span><span class="n">reason</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">msg</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"Decision-threshold tuning skipped: </span><span class="si">{</span><span class="n">reason</span><span class="si">}</span><span class="s2">"</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">log_callback</span><span class="p">:</span>
+                <span class="n">log_callback</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">model_calculator</span><span class="p">,</span> <span class="s2">"problem_type"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span> <span class="o">!=</span> <span class="s2">"classification"</span><span class="p">:</span>
+            <span class="n">_skip</span><span class="p">(</span><span class="s2">"this is not a classification model."</span><span class="p">)</span>
+            <span class="k">return</span>
+        <span class="k">if</span> <span class="n">validation_data</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">_skip</span><span class="p">(</span><span class="s2">"no validation split was provided."</span><span class="p">)</span>
+            <span class="k">return</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="s2">"predict_proba"</span><span class="p">):</span>
+            <span class="n">_skip</span><span class="p">(</span><span class="s2">"the model does not expose predict_proba."</span><span class="p">)</span>
+            <span class="k">return</span>
+        <span class="n">classes</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="s2">"classes_"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">classes</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">_skip</span><span class="p">(</span><span class="s2">"the fitted model does not expose class labels (classes_)."</span><span class="p">)</span>
+            <span class="k">return</span>
+        <span class="n">classes</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">classes</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">classes</span><span class="p">)</span> <span class="o">!=</span> <span class="mi">2</span><span class="p">:</span>
+            <span class="n">_skip</span><span class="p">(</span><span class="sa">f</span><span class="s2">"only binary classification is supported (found </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">classes</span><span class="p">)</span><span class="si">}</span><span class="s2"> classes)."</span><span class="p">)</span>
+            <span class="k">return</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">X_val</span><span class="p">,</span> <span class="n">y_val</span> <span class="o">=</span> <span class="n">validation_data</span>
+            <span class="n">X_val_np</span><span class="p">,</span> <span class="n">y_val_np</span> <span class="o">=</span> <span class="n">SklearnBridge</span><span class="o">.</span><span class="n">to_sklearn</span><span class="p">((</span><span class="n">X_val</span><span class="p">,</span> <span class="n">y_val</span><span class="p">))</span>
+            <span class="n">y_proba</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">model</span><span class="o">.</span><span class="n">predict_proba</span><span class="p">(</span><span class="n">X_val_np</span><span class="p">))</span>
+
+            <span class="n">metric_callable</span><span class="p">,</span> <span class="n">metric_name</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_resolve_threshold_metric</span><span class="p">(</span>
+                <span class="n">tuning_config</span><span class="o">.</span><span class="n">metric</span><span class="p">,</span> <span class="n">log_callback</span><span class="p">,</span> <span class="n">pos_label</span><span class="o">=</span><span class="n">classes</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+            <span class="p">)</span>
+            <span class="n">thresholds</span> <span class="o">=</span> <span class="n">optimize_thresholds</span><span class="p">(</span>
+                <span class="n">y_val_np</span><span class="p">,</span>
+                <span class="n">y_proba</span><span class="p">,</span>
+                <span class="n">metric</span><span class="o">=</span><span class="n">metric_callable</span><span class="p">,</span>
+                <span class="n">classes</span><span class="o">=</span><span class="n">classes</span><span class="p">,</span>
+                <span class="n">strategy</span><span class="o">=</span><span class="s2">"grid"</span><span class="p">,</span>
+            <span class="p">)</span>
+
+            <span class="n">tuning_result</span><span class="o">.</span><span class="n">decision_thresholds</span> <span class="o">=</span> <span class="n">thresholds</span>
+            <span class="n">tuning_result</span><span class="o">.</span><span class="n">decision_threshold_metric</span> <span class="o">=</span> <span class="n">metric_name</span>
+
+            <span class="n">positive_threshold</span> <span class="o">=</span> <span class="n">thresholds</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">classes</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+            <span class="n">msg</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="sa">f</span><span class="s2">"Decision-threshold tuning: selected threshold "</span>
+                <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">positive_threshold</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2"> for class '</span><span class="si">{</span><span class="n">classes</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="si">}</span><span class="s2">' "</span>
+                <span class="sa">f</span><span class="s2">"(maximising '</span><span class="si">{</span><span class="n">metric_name</span><span class="si">}</span><span class="s2">' on the validation split)."</span>
+            <span class="p">)</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">log_callback</span><span class="p">:</span>
+                <span class="n">log_callback</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>  <span class="c1"># noqa: BLE001 - threshold tuning is best-effort; a failure must not abort a successful tuning run</span>
+            <span class="n">msg</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="s2">"Decision-threshold tuning failed; predict() keeps the default "</span>
+                <span class="sa">f</span><span class="s2">"decision rule. (</span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">)"</span>
+            <span class="p">)</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">log_callback</span><span class="p">:</span>
+                <span class="n">log_callback</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">fit</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
@@ -5112,6 +5505,14 @@ and requires the Optuna integration package.</p>
             <span class="n">log_callback</span><span class="p">,</span>
             <span class="n">iteration_callback</span><span class="o">=</span><span class="n">iteration_callback</span><span class="p">,</span>
         <span class="p">)</span>
+
+        <span class="c1"># F-13: optionally search a decision threshold for a binary</span>
+        <span class="c1"># classifier on the validation split. Best-effort — a failure logs and</span>
+        <span class="c1"># leaves predict() on the default decision rule.</span>
+        <span class="k">if</span> <span class="n">tuning_config</span><span class="o">.</span><span class="n">tune_threshold</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_tune_decision_thresholds</span><span class="p">(</span>
+                <span class="n">model</span><span class="p">,</span> <span class="n">tuning_result</span><span class="p">,</span> <span class="n">tuning_config</span><span class="p">,</span> <span class="n">validation_data</span><span class="p">,</span> <span class="n">log_callback</span>
+            <span class="p">)</span>
 
         <span class="k">if</span> <span class="n">reporter</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
             <span class="n">reporter</span><span class="o">.</span><span class="n">finish</span><span class="p">(</span><span class="n">tuning_result</span><span class="p">)</span>
@@ -5296,7 +5697,7 @@ and requires the Optuna integration package.</p>
         <span class="p">}</span>
     <span class="p">)</span>
 
-    <span class="n">_METRIC_ALIAS_MAP</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="n">_METRIC_ALIAS_MAP</span><span class="p">:</span> <span class="n">ClassVar</span><span class="p">[</span><span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="p">{</span>
         <span class="s2">"mse"</span><span class="p">:</span> <span class="s2">"neg_mean_squared_error"</span><span class="p">,</span>
         <span class="s2">"mae"</span><span class="p">:</span> <span class="s2">"neg_mean_absolute_error"</span><span class="p">,</span>
         <span class="s2">"rmse"</span><span class="p">:</span> <span class="s2">"neg_root_mean_squared_error"</span><span class="p">,</span>
@@ -5374,6 +5775,46 @@ and requires the Optuna integration package.</p>
 
         <span class="k">return</span> <span class="n">metric</span>
 
+    <span class="c1"># Binary-default sklearn scorers whose score function takes ``pos_label``.</span>
+    <span class="c1"># roc_auc looks like one but isn't: roc_auc_score has no pos_label</span>
+    <span class="c1"># parameter (it derives the positive class from the label space), and</span>
+    <span class="c1"># multiclass variants (f1_weighted, ...) plus accuracy/balanced_accuracy/</span>
+    <span class="c1"># matthews_corrcoef don't take it either.</span>
+    <span class="n">_BINARY_POS_LABEL_METRICS</span><span class="p">:</span> <span class="n">ClassVar</span><span class="p">[</span><span class="nb">frozenset</span><span class="p">[</span><span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="nb">frozenset</span><span class="p">({</span><span class="s2">"f1"</span><span class="p">,</span> <span class="s2">"precision"</span><span class="p">,</span> <span class="s2">"recall"</span><span class="p">})</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_resolve_scorer</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">metric</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">y</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""The sklearn scorer for *metric*, with the binary ``pos_label`` default fixed.</span>
+
+<span class="sd">        f1/precision/recall scorers assume ``pos_label=1``; targets whose</span>
+<span class="sd">        label space does not contain 1 (e.g. raw string labels the fold-aware</span>
+<span class="sd">        wrapper scores against before the chain encodes them) make every fold</span>
+<span class="sd">        raise ``pos_label=1 is not a valid label`` and surface as all-NaN trials.</span>
+<span class="sd">        Pin ``pos_label`` to the sorted-last class — the same convention</span>
+<span class="sd">        ``apply_thresholds`` uses for the positive class — whenever the default</span>
+<span class="sd">        cannot match. Numeric targets containing 1 keep the stock scorer.</span>
+<span class="sd">        """</span>
+        <span class="kn">from</span><span class="w"> </span><span class="nn">sklearn.metrics</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_scorer</span><span class="p">,</span> <span class="n">make_scorer</span>
+
+        <span class="n">scorer</span> <span class="o">=</span> <span class="n">get_scorer</span><span class="p">(</span><span class="n">metric</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">model_calculator</span><span class="p">,</span> <span class="s2">"problem_type"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span> <span class="o">!=</span> <span class="s2">"classification"</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">scorer</span>
+        <span class="k">if</span> <span class="n">metric</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_BINARY_POS_LABEL_METRICS</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">scorer</span>
+        <span class="n">classes</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">unique</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">y</span><span class="p">))</span>
+        <span class="k">if</span> <span class="n">classes</span><span class="o">.</span><span class="n">size</span> <span class="o">!=</span> <span class="mi">2</span> <span class="ow">or</span> <span class="mi">1</span> <span class="ow">in</span> <span class="n">classes</span><span class="o">.</span><span class="n">tolist</span><span class="p">():</span>
+            <span class="k">return</span> <span class="n">scorer</span>
+        <span class="n">pos_label</span> <span class="o">=</span> <span class="n">classes</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">item</span><span class="p">()</span> <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">classes</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="s2">"item"</span><span class="p">)</span> <span class="k">else</span> <span class="n">classes</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+        <span class="k">return</span> <span class="n">make_scorer</span><span class="p">(</span>
+            <span class="n">scorer</span><span class="o">.</span><span class="n">_score_func</span><span class="p">,</span>
+            <span class="n">response_method</span><span class="o">=</span><span class="n">scorer</span><span class="o">.</span><span class="n">_response_method</span><span class="p">,</span>
+            <span class="n">pos_label</span><span class="o">=</span><span class="n">pos_label</span><span class="p">,</span>
+        <span class="p">)</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_seed_params</span><span class="p">(</span><span class="n">config</span><span class="p">:</span> <span class="n">TuningConfig</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">"""The caller's seed as a params overlay, for every tuning-path model build."""</span>
+        <span class="k">return</span> <span class="p">{</span><span class="s2">"random_state"</span><span class="p">:</span> <span class="n">config</span><span class="o">.</span><span class="n">random_state</span><span class="p">}</span> <span class="k">if</span> <span class="n">config</span><span class="o">.</span><span class="n">random_state</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="p">{}</span>
+
     <span class="k">def</span><span class="w"> </span><span class="nf">_evaluate_candidate_cv</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">candidate_idx</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
@@ -5386,6 +5827,7 @@ and requires the Optuna integration package.</p>
         <span class="n">log_callback</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="nb">str</span><span class="p">],</span> <span class="kc">None</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">preprocessing</span><span class="p">:</span> <span class="s2">"FoldPreprocessor | None"</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">fold_errors</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">seed_params</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">"""Cross-validates one grid/random-search candidate and returns its mean fold score.</span>
 
@@ -5417,6 +5859,7 @@ and requires the Optuna integration package.</p>
                 <span class="n">log_callback</span><span class="o">=</span><span class="n">log_callback</span><span class="p">,</span>
                 <span class="n">preprocessing</span><span class="o">=</span><span class="n">preprocessing</span><span class="p">,</span>
                 <span class="n">fold_errors</span><span class="o">=</span><span class="n">fold_errors</span><span class="p">,</span>
+                <span class="n">seed_params</span><span class="o">=</span><span class="n">seed_params</span><span class="p">,</span>
             <span class="p">)</span>
             <span class="n">fold_scores</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">score</span><span class="p">)</span>
 
@@ -5441,12 +5884,13 @@ and requires the Optuna integration package.</p>
         <span class="n">log_callback</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="nb">str</span><span class="p">],</span> <span class="kc">None</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">preprocessing</span><span class="p">:</span> <span class="s2">"FoldPreprocessor | None"</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">fold_errors</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">seed_params</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">"""Fits one candidate on a single CV fold and returns its score, or ``-inf`` on failure.</span>
 
 <span class="sd">        Errors (e.g. incompatible params) are caught and logged rather than raised, so a single</span>
 <span class="sd">        bad fold doesn't abort the whole candidate evaluation. When ``fold_errors`` is provided,</span>
-<span class="sd">        the first failure message is recorded so the search can surface it if every trial fails.</span>
+<span class="sd">        every failure message is appended so the search can surface them if every trial fails.</span>
 <span class="sd">        """</span>
         <span class="c1"># Split</span>
         <span class="n">X_train_fold</span> <span class="o">=</span> <span class="n">X_any</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="n">train_idx</span><span class="p">]</span> <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">X_any</span><span class="p">,</span> <span class="s2">"iloc"</span><span class="p">)</span> <span class="k">else</span> <span class="n">X_any</span><span class="p">[</span><span class="n">train_idx</span><span class="p">]</span>
@@ -5466,14 +5910,13 @@ and requires the Optuna integration package.</p>
 
             <span class="n">model</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_instantiate_model</span><span class="p">(</span>
                 <span class="n">model_class</span><span class="p">,</span>
-                <span class="p">{</span><span class="o">**</span><span class="bp">self</span><span class="o">.</span><span class="n">model_calculator</span><span class="o">.</span><span class="n">default_params</span><span class="p">,</span> <span class="o">**</span><span class="n">params</span><span class="p">},</span>
+                <span class="p">{</span><span class="o">**</span><span class="bp">self</span><span class="o">.</span><span class="n">model_calculator</span><span class="o">.</span><span class="n">default_params</span><span class="p">,</span> <span class="o">**</span><span class="p">(</span><span class="n">seed_params</span> <span class="ow">or</span> <span class="p">{}),</span> <span class="o">**</span><span class="n">params</span><span class="p">},</span>
             <span class="p">)</span>
             <span class="n">model</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X_train_fold</span><span class="p">,</span> <span class="n">y_train_fold</span><span class="p">)</span>
 
-            <span class="c1"># Score</span>
-            <span class="kn">from</span><span class="w"> </span><span class="nn">sklearn.metrics</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_scorer</span>
-
-            <span class="n">scorer</span> <span class="o">=</span> <span class="n">get_scorer</span><span class="p">(</span><span class="n">metric</span><span class="p">)</span>
+            <span class="c1"># Score — resolved against the fold's (post-transform) labels so</span>
+            <span class="c1"># binary scorers get a valid pos_label even for string targets.</span>
+            <span class="n">scorer</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_resolve_scorer</span><span class="p">(</span><span class="n">metric</span><span class="p">,</span> <span class="n">y_train_fold</span><span class="p">)</span>
             <span class="n">score</span> <span class="o">=</span> <span class="n">scorer</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">X_val_fold</span><span class="p">,</span> <span class="n">y_val_fold</span><span class="p">)</span>
 
             <span class="k">if</span> <span class="n">log_callback</span><span class="p">:</span>
@@ -5482,8 +5925,8 @@ and requires the Optuna integration package.</p>
                     <span class="sa">f</span><span class="s2">"  [Candidate </span><span class="si">{</span><span class="n">candidate_idx</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">1</span><span class="si">}</span><span class="s2">] CV Fold </span><span class="si">{</span><span class="n">fold_idx</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">1</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">n_splits</span><span class="si">}</span><span class="s2"> Score: </span><span class="si">{</span><span class="n">score</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">"</span>
                 <span class="p">)</span>
             <span class="k">return</span> <span class="n">score</span>
-        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
-            <span class="k">if</span> <span class="n">fold_errors</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">fold_errors</span><span class="p">:</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>  <span class="c1"># noqa: BLE001 - per-fold failures are collected for reporting, must not abort tuning</span>
+            <span class="k">if</span> <span class="n">fold_errors</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
                 <span class="n">fold_errors</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">))</span>
             <span class="k">if</span> <span class="n">log_callback</span><span class="p">:</span>
                 <span class="n">n_splits</span> <span class="o">=</span> <span class="n">cv</span><span class="o">.</span><span class="n">get_n_splits</span><span class="p">(</span><span class="n">X_arr</span><span class="p">,</span> <span class="n">y_arr</span><span class="p">)</span>
@@ -5518,6 +5961,7 @@ and requires the Optuna integration package.</p>
         <span class="n">log_callback</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="nb">str</span><span class="p">],</span> <span class="kc">None</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">preprocessing</span><span class="p">:</span> <span class="s2">"FoldPreprocessor | None"</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">fold_errors</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">seed_params</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]],</span> <span class="nb">float</span><span class="p">,</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span><span class="p">]:</span>
 <span class="w">        </span><span class="sd">"""Evaluates every candidate via CV, emitting progress/log callbacks, and tracks the best.</span>
 
@@ -5546,6 +5990,7 @@ and requires the Optuna integration package.</p>
                 <span class="n">log_callback</span><span class="p">,</span>
                 <span class="n">preprocessing</span><span class="p">,</span>
                 <span class="n">fold_errors</span><span class="p">,</span>
+                <span class="n">seed_params</span><span class="p">,</span>
             <span class="p">)</span>
 
             <span class="k">if</span> <span class="n">log_callback</span><span class="p">:</span>
@@ -5601,6 +6046,7 @@ and requires the Optuna integration package.</p>
             <span class="n">log_callback</span><span class="p">,</span>
             <span class="n">preprocessing</span><span class="p">,</span>
             <span class="n">fold_errors</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_seed_params</span><span class="p">(</span><span class="n">config</span><span class="p">),</span>
         <span class="p">)</span>
 
         <span class="k">if</span> <span class="n">log_callback</span><span class="p">:</span>
@@ -5608,7 +6054,11 @@ and requires the Optuna integration package.</p>
             <span class="n">log_callback</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Best Params: </span><span class="si">{</span><span class="n">best_params</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 
         <span class="k">if</span> <span class="n">best_params</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="n">detail</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">" First trial error: </span><span class="si">{</span><span class="n">fold_errors</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="si">}</span><span class="s2">"</span> <span class="k">if</span> <span class="n">fold_errors</span> <span class="k">else</span> <span class="s2">""</span>
+            <span class="n">detail</span> <span class="o">=</span> <span class="s2">""</span>
+            <span class="k">if</span> <span class="n">fold_errors</span><span class="p">:</span>
+                <span class="n">detail</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">" First trial error: </span><span class="si">{</span><span class="n">fold_errors</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="si">}</span><span class="s2">"</span>
+                <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">fold_errors</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+                    <span class="n">detail</span> <span class="o">+=</span> <span class="sa">f</span><span class="s2">" (</span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">fold_errors</span><span class="p">)</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="mi">1</span><span class="si">}</span><span class="s2"> more fold failures suppressed)"</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
                 <span class="s2">"Hyperparameter tuning failed: All trials failed. "</span>
                 <span class="s2">"This usually means the model failed to train with the provided hyperparameter combinations. "</span>
@@ -5628,7 +6078,7 @@ and requires the Optuna integration package.</p>
         <span class="n">config</span><span class="p">:</span> <span class="n">TuningConfig</span><span class="p">,</span>
         <span class="n">base_estimator</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
         <span class="n">cv</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
-        <span class="n">metric</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">scoring</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
         <span class="n">log_callback</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="nb">str</span><span class="p">],</span> <span class="kc">None</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">"""Builds a HalvingGridSearchCV/HalvingRandomSearchCV searcher for the halving strategies."""</span>
@@ -5669,7 +6119,7 @@ and requires the Optuna integration package.</p>
             <span class="k">return</span> <span class="n">HalvingGridSearchCV</span><span class="p">(</span>
                 <span class="n">estimator</span><span class="o">=</span><span class="n">base_estimator</span><span class="p">,</span>
                 <span class="n">param_grid</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_clean_search_space</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">search_space</span><span class="p">),</span>
-                <span class="n">scoring</span><span class="o">=</span><span class="n">metric</span><span class="p">,</span>
+                <span class="n">scoring</span><span class="o">=</span><span class="n">scoring</span><span class="p">,</span>
                 <span class="n">cv</span><span class="o">=</span><span class="n">cv</span><span class="p">,</span>
                 <span class="n">n_jobs</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">n_jobs</span><span class="p">,</span>
                 <span class="n">random_state</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">random_state</span><span class="p">,</span>
@@ -5683,7 +6133,7 @@ and requires the Optuna integration package.</p>
             <span class="n">estimator</span><span class="o">=</span><span class="n">base_estimator</span><span class="p">,</span>
             <span class="n">param_distributions</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_clean_search_space</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">search_space</span><span class="p">),</span>
             <span class="n">n_candidates</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">n_trials</span><span class="p">,</span>
-            <span class="n">scoring</span><span class="o">=</span><span class="n">metric</span><span class="p">,</span>
+            <span class="n">scoring</span><span class="o">=</span><span class="n">scoring</span><span class="p">,</span>
             <span class="n">cv</span><span class="o">=</span><span class="n">cv</span><span class="p">,</span>
             <span class="n">n_jobs</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">n_jobs</span><span class="p">,</span>
             <span class="n">random_state</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">random_state</span><span class="p">,</span>
@@ -5707,10 +6157,11 @@ and requires the Optuna integration package.</p>
     <span class="nd">@staticmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">_numeric_range_distribution</span><span class="p">(</span><span class="n">v</span><span class="p">:</span> <span class="nb">list</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">"""Builds an Optuna Int/FloatDistribution spanning the min/max of a numeric list."""</span>
+        <span class="n">optuna_mod</span> <span class="o">=</span> <span class="n">_optuna_state</span><span class="o">.</span><span class="n">optuna_module</span>
         <span class="n">lo</span><span class="p">,</span> <span class="n">hi</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">v</span><span class="p">),</span> <span class="nb">max</span><span class="p">(</span><span class="n">v</span><span class="p">)</span>
         <span class="k">if</span> <span class="nb">all</span><span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="nb">int</span><span class="p">)</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">v</span><span class="p">):</span>
-            <span class="k">return</span> <span class="n">optuna</span><span class="o">.</span><span class="n">distributions</span><span class="o">.</span><span class="n">IntDistribution</span><span class="p">(</span><span class="n">lo</span><span class="p">,</span> <span class="n">hi</span><span class="p">)</span>
-        <span class="k">return</span> <span class="n">optuna</span><span class="o">.</span><span class="n">distributions</span><span class="o">.</span><span class="n">FloatDistribution</span><span class="p">(</span><span class="nb">float</span><span class="p">(</span><span class="n">lo</span><span class="p">),</span> <span class="nb">float</span><span class="p">(</span><span class="n">hi</span><span class="p">))</span>
+            <span class="k">return</span> <span class="n">optuna_mod</span><span class="o">.</span><span class="n">distributions</span><span class="o">.</span><span class="n">IntDistribution</span><span class="p">(</span><span class="n">lo</span><span class="p">,</span> <span class="n">hi</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">optuna_mod</span><span class="o">.</span><span class="n">distributions</span><span class="o">.</span><span class="n">FloatDistribution</span><span class="p">(</span><span class="nb">float</span><span class="p">(</span><span class="n">lo</span><span class="p">),</span> <span class="nb">float</span><span class="p">(</span><span class="n">hi</span><span class="p">))</span>
 
     <span class="nd">@staticmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">_distribution_for_value</span><span class="p">(</span><span class="n">k</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">v</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">use_cmaes</span><span class="p">:</span> <span class="nb">bool</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
@@ -5722,7 +6173,7 @@ and requires the Optuna integration package.</p>
         <span class="k">if</span> <span class="n">TuningCalculator</span><span class="o">.</span><span class="n">_is_use_cmaes_numeric_list</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="n">use_cmaes</span><span class="p">):</span>
             <span class="k">return</span> <span class="n">TuningCalculator</span><span class="o">.</span><span class="n">_numeric_range_distribution</span><span class="p">(</span><span class="n">v</span><span class="p">)</span>
         <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="nb">list</span><span class="p">):</span>
-            <span class="k">return</span> <span class="n">optuna</span><span class="o">.</span><span class="n">distributions</span><span class="o">.</span><span class="n">CategoricalDistribution</span><span class="p">(</span><span class="n">v</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">_optuna_state</span><span class="o">.</span><span class="n">optuna_module</span><span class="o">.</span><span class="n">distributions</span><span class="o">.</span><span class="n">CategoricalDistribution</span><span class="p">(</span><span class="n">v</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">v</span>
 
     <span class="nd">@staticmethod</span>
@@ -5742,30 +6193,34 @@ and requires the Optuna integration package.</p>
     <span class="nd">@staticmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">_build_optuna_sampler</span><span class="p">(</span><span class="n">sampler_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">random_state</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">"""Builds the Optuna sampler for the configured sampler name (random/cmaes/tpe)."""</span>
+        <span class="n">optuna_mod</span> <span class="o">=</span> <span class="n">_optuna_state</span><span class="o">.</span><span class="n">optuna_module</span>
         <span class="k">if</span> <span class="n">sampler_name</span> <span class="o">==</span> <span class="s2">"random"</span><span class="p">:</span>
-            <span class="k">return</span> <span class="n">optuna</span><span class="o">.</span><span class="n">samplers</span><span class="o">.</span><span class="n">RandomSampler</span><span class="p">(</span><span class="n">seed</span><span class="o">=</span><span class="n">random_state</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">optuna_mod</span><span class="o">.</span><span class="n">samplers</span><span class="o">.</span><span class="n">RandomSampler</span><span class="p">(</span><span class="n">seed</span><span class="o">=</span><span class="n">random_state</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">sampler_name</span> <span class="o">==</span> <span class="s2">"cmaes"</span><span class="p">:</span>
             <span class="c1"># Suppress the fallback warning for genuinely categorical params</span>
             <span class="c1"># (strings, booleans, None) — those can never be continuous and</span>
             <span class="c1"># the random fallback for them is expected behaviour.</span>
-            <span class="k">return</span> <span class="n">optuna</span><span class="o">.</span><span class="n">samplers</span><span class="o">.</span><span class="n">CmaEsSampler</span><span class="p">(</span><span class="n">seed</span><span class="o">=</span><span class="n">random_state</span><span class="p">,</span> <span class="n">warn_independent_sampling</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
-        <span class="k">return</span> <span class="n">optuna</span><span class="o">.</span><span class="n">samplers</span><span class="o">.</span><span class="n">TPESampler</span><span class="p">(</span><span class="n">seed</span><span class="o">=</span><span class="n">random_state</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">optuna_mod</span><span class="o">.</span><span class="n">samplers</span><span class="o">.</span><span class="n">CmaEsSampler</span><span class="p">(</span>
+                <span class="n">seed</span><span class="o">=</span><span class="n">random_state</span><span class="p">,</span> <span class="n">warn_independent_sampling</span><span class="o">=</span><span class="kc">False</span>
+            <span class="p">)</span>
+        <span class="k">return</span> <span class="n">optuna_mod</span><span class="o">.</span><span class="n">samplers</span><span class="o">.</span><span class="n">TPESampler</span><span class="p">(</span><span class="n">seed</span><span class="o">=</span><span class="n">random_state</span><span class="p">)</span>
 
     <span class="nd">@staticmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">_build_optuna_pruner</span><span class="p">(</span><span class="n">pruner_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">"""Builds the Optuna pruner for the configured pruner name (hyperband/none/median)."""</span>
+        <span class="n">optuna_mod</span> <span class="o">=</span> <span class="n">_optuna_state</span><span class="o">.</span><span class="n">optuna_module</span>
         <span class="k">if</span> <span class="n">pruner_name</span> <span class="o">==</span> <span class="s2">"hyperband"</span><span class="p">:</span>
-            <span class="k">return</span> <span class="n">optuna</span><span class="o">.</span><span class="n">pruners</span><span class="o">.</span><span class="n">HyperbandPruner</span><span class="p">()</span>
+            <span class="k">return</span> <span class="n">optuna_mod</span><span class="o">.</span><span class="n">pruners</span><span class="o">.</span><span class="n">HyperbandPruner</span><span class="p">()</span>
         <span class="k">if</span> <span class="n">pruner_name</span> <span class="o">==</span> <span class="s2">"none"</span><span class="p">:</span>
-            <span class="k">return</span> <span class="n">optuna</span><span class="o">.</span><span class="n">pruners</span><span class="o">.</span><span class="n">NopPruner</span><span class="p">()</span>
-        <span class="k">return</span> <span class="n">optuna</span><span class="o">.</span><span class="n">pruners</span><span class="o">.</span><span class="n">MedianPruner</span><span class="p">()</span>
+            <span class="k">return</span> <span class="n">optuna_mod</span><span class="o">.</span><span class="n">pruners</span><span class="o">.</span><span class="n">NopPruner</span><span class="p">()</span>
+        <span class="k">return</span> <span class="n">optuna_mod</span><span class="o">.</span><span class="n">pruners</span><span class="o">.</span><span class="n">MedianPruner</span><span class="p">()</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">_build_optuna_searcher</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">config</span><span class="p">:</span> <span class="n">TuningConfig</span><span class="p">,</span>
         <span class="n">base_estimator</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
         <span class="n">cv</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
-        <span class="n">metric</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">scoring</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
         <span class="n">progress_callback</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">,</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span> <span class="nb">dict</span> <span class="o">|</span> <span class="kc">None</span><span class="p">],</span> <span class="kc">None</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">log_callback</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="nb">str</span><span class="p">],</span> <span class="kc">None</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
@@ -5812,21 +6267,23 @@ and requires the Optuna integration package.</p>
         <span class="n">pruner_name</span> <span class="o">=</span> <span class="n">strategy_params</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"pruner"</span><span class="p">,</span> <span class="s2">"median"</span><span class="p">)</span>
         <span class="n">pruner</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_build_optuna_pruner</span><span class="p">(</span><span class="n">pruner_name</span><span class="p">)</span>
 
-        <span class="n">study</span> <span class="o">=</span> <span class="n">optuna</span><span class="o">.</span><span class="n">create_study</span><span class="p">(</span><span class="n">sampler</span><span class="o">=</span><span class="n">sampler</span><span class="p">,</span> <span class="n">pruner</span><span class="o">=</span><span class="n">pruner</span><span class="p">,</span> <span class="n">direction</span><span class="o">=</span><span class="s2">"maximize"</span><span class="p">)</span>
+        <span class="n">study</span> <span class="o">=</span> <span class="n">_optuna_state</span><span class="o">.</span><span class="n">optuna_module</span><span class="o">.</span><span class="n">create_study</span><span class="p">(</span>
+            <span class="n">sampler</span><span class="o">=</span><span class="n">sampler</span><span class="p">,</span> <span class="n">pruner</span><span class="o">=</span><span class="n">pruner</span><span class="p">,</span> <span class="n">direction</span><span class="o">=</span><span class="s2">"maximize"</span>
+        <span class="p">)</span>
 
         <span class="k">with</span> <span class="n">warnings</span><span class="o">.</span><span class="n">catch_warnings</span><span class="p">():</span>
             <span class="n">warnings</span><span class="o">.</span><span class="n">filterwarnings</span><span class="p">(</span>
                 <span class="s2">"ignore"</span><span class="p">,</span>
                 <span class="n">message</span><span class="o">=</span><span class="sa">r</span><span class="s2">"OptunaSearchCV is experimental.*"</span><span class="p">,</span>
-                <span class="n">category</span><span class="o">=</span><span class="n">optuna</span><span class="o">.</span><span class="n">exceptions</span><span class="o">.</span><span class="n">ExperimentalWarning</span><span class="p">,</span>
+                <span class="n">category</span><span class="o">=</span><span class="n">_optuna_state</span><span class="o">.</span><span class="n">optuna_module</span><span class="o">.</span><span class="n">exceptions</span><span class="o">.</span><span class="n">ExperimentalWarning</span><span class="p">,</span>
             <span class="p">)</span>
-            <span class="k">return</span> <span class="n">OptunaSearchCV</span><span class="p">(</span>
+            <span class="k">return</span> <span class="n">_optuna_state</span><span class="o">.</span><span class="n">search_cv</span><span class="p">(</span>
                 <span class="n">estimator</span><span class="o">=</span><span class="n">base_estimator</span><span class="p">,</span>
                 <span class="n">param_distributions</span><span class="o">=</span><span class="n">distributions</span><span class="p">,</span>
                 <span class="n">n_trials</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">n_trials</span><span class="p">,</span>
                 <span class="n">timeout</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">timeout</span><span class="p">,</span>
                 <span class="n">cv</span><span class="o">=</span><span class="n">cv</span><span class="p">,</span>
-                <span class="n">scoring</span><span class="o">=</span><span class="n">metric</span><span class="p">,</span>
+                <span class="n">scoring</span><span class="o">=</span><span class="n">scoring</span><span class="p">,</span>
                 <span class="n">n_jobs</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">n_jobs</span><span class="p">,</span>
                 <span class="n">refit</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
                 <span class="n">verbose</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span>
@@ -5892,7 +6349,7 @@ and requires the Optuna integration package.</p>
                 <span class="k">else</span><span class="p">:</span>
                     <span class="n">searcher</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X_arr</span><span class="p">,</span> <span class="n">y_arr</span><span class="p">)</span>
         <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
-            <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Hyperparameter tuning failed: </span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">)</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">exception</span><span class="p">(</span><span class="s2">"Hyperparameter tuning failed"</span><span class="p">)</span>
             <span class="n">error_msg</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">)</span>
             <span class="k">if</span> <span class="s2">"No trials are completed yet"</span> <span class="ow">in</span> <span class="n">error_msg</span><span class="p">:</span>
                 <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
@@ -6036,7 +6493,9 @@ and requires the Optuna integration package.</p>
 
         <span class="c1"># ``default_params`` may carry structural args (e.g. an ensemble's</span>
         <span class="c1"># resolved ``estimators``); the instantiator filters/routes them safely.</span>
-        <span class="n">base_estimator</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_instantiate_model</span><span class="p">(</span><span class="n">model_class</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">model_calculator</span><span class="o">.</span><span class="n">default_params</span><span class="p">)</span>
+        <span class="n">base_estimator</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_instantiate_model</span><span class="p">(</span>
+            <span class="n">model_class</span><span class="p">,</span> <span class="p">{</span><span class="o">**</span><span class="bp">self</span><span class="o">.</span><span class="n">model_calculator</span><span class="o">.</span><span class="n">default_params</span><span class="p">,</span> <span class="o">**</span><span class="bp">self</span><span class="o">.</span><span class="n">_seed_params</span><span class="p">(</span><span class="n">config</span><span class="p">)}</span>
+        <span class="p">)</span>
 
         <span class="c1"># halving/optuna searchers run their CV internally, where the engine's</span>
         <span class="c1"># per-fold hook cannot reach; wrap preprocessing + model in one</span>
@@ -6140,14 +6599,26 @@ and requires the Optuna integration package.</p>
                 <span class="n">log_callback</span><span class="p">,</span>
                 <span class="n">preprocessing</span><span class="p">,</span>
             <span class="p">)</span>
-        <span class="k">elif</span> <span class="n">config</span><span class="o">.</span><span class="n">strategy</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">"halving_grid"</span><span class="p">,</span> <span class="s2">"halving_random"</span><span class="p">]:</span>
-            <span class="n">searcher</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_build_halving_searcher</span><span class="p">(</span>
-                <span class="n">search_config</span><span class="p">,</span> <span class="n">estimator</span><span class="p">,</span> <span class="n">cv</span><span class="p">,</span> <span class="n">metric</span><span class="p">,</span> <span class="n">log_callback</span>
+        <span class="k">elif</span> <span class="n">config</span><span class="o">.</span><span class="n">strategy</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">"halving_grid"</span><span class="p">,</span> <span class="s2">"halving_random"</span><span class="p">,</span> <span class="s2">"optuna"</span><span class="p">]:</span>
+            <span class="c1"># Searchers score the payload handed to them below: the raw</span>
+            <span class="c1"># pre-transform frames when wrapped (the fold-aware step encodes</span>
+            <span class="c1"># inside fit but maps predictions back), otherwise the payload</span>
+            <span class="c1"># labels. Resolve the scorer against that label space so binary</span>
+            <span class="c1"># scorers get a valid pos_label even for string targets.</span>
+            <span class="n">scoring_y</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="n">preprocessing_frames</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+                <span class="k">if</span> <span class="n">wrapped</span> <span class="ow">and</span> <span class="n">preprocessing_frames</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+                <span class="k">else</span> <span class="n">y_for_search</span>
             <span class="p">)</span>
-        <span class="k">elif</span> <span class="n">config</span><span class="o">.</span><span class="n">strategy</span> <span class="o">==</span> <span class="s2">"optuna"</span><span class="p">:</span>
-            <span class="n">searcher</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_build_optuna_searcher</span><span class="p">(</span>
-                <span class="n">search_config</span><span class="p">,</span> <span class="n">estimator</span><span class="p">,</span> <span class="n">cv</span><span class="p">,</span> <span class="n">metric</span><span class="p">,</span> <span class="n">progress_callback</span><span class="p">,</span> <span class="n">log_callback</span>
-            <span class="p">)</span>
+            <span class="n">scoring</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_resolve_scorer</span><span class="p">(</span><span class="n">metric</span><span class="p">,</span> <span class="n">scoring_y</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">config</span><span class="o">.</span><span class="n">strategy</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">"halving_grid"</span><span class="p">,</span> <span class="s2">"halving_random"</span><span class="p">]:</span>
+                <span class="n">searcher</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_build_halving_searcher</span><span class="p">(</span>
+                    <span class="n">search_config</span><span class="p">,</span> <span class="n">estimator</span><span class="p">,</span> <span class="n">cv</span><span class="p">,</span> <span class="n">scoring</span><span class="p">,</span> <span class="n">log_callback</span>
+                <span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">searcher</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_build_optuna_searcher</span><span class="p">(</span>
+                    <span class="n">search_config</span><span class="p">,</span> <span class="n">estimator</span><span class="p">,</span> <span class="n">cv</span><span class="p">,</span> <span class="n">scoring</span><span class="p">,</span> <span class="n">progress_callback</span><span class="p">,</span> <span class="n">log_callback</span>
+                <span class="p">)</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="n">raise_invalid_choice</span><span class="p">(</span>
                 <span class="n">config</span><span class="o">.</span><span class="n">strategy</span><span class="p">,</span>
@@ -6242,154 +6713,162 @@ intact.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>skyulf-core/skyulf/modeling/_tuning/engine.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">311</span>
-<span class="normal">312</span>
-<span class="normal">313</span>
-<span class="normal">314</span>
-<span class="normal">315</span>
-<span class="normal">316</span>
-<span class="normal">317</span>
-<span class="normal">318</span>
-<span class="normal">319</span>
-<span class="normal">320</span>
-<span class="normal">321</span>
-<span class="normal">322</span>
-<span class="normal">323</span>
-<span class="normal">324</span>
-<span class="normal">325</span>
-<span class="normal">326</span>
-<span class="normal">327</span>
-<span class="normal">328</span>
-<span class="normal">329</span>
-<span class="normal">330</span>
-<span class="normal">331</span>
-<span class="normal">332</span>
-<span class="normal">333</span>
-<span class="normal">334</span>
-<span class="normal">335</span>
-<span class="normal">336</span>
-<span class="normal">337</span>
-<span class="normal">338</span>
-<span class="normal">339</span>
-<span class="normal">340</span>
-<span class="normal">341</span>
-<span class="normal">342</span>
-<span class="normal">343</span>
-<span class="normal">344</span>
-<span class="normal">345</span>
-<span class="normal">346</span>
-<span class="normal">347</span>
-<span class="normal">348</span>
-<span class="normal">349</span>
-<span class="normal">350</span>
-<span class="normal">351</span>
-<span class="normal">352</span>
-<span class="normal">353</span>
-<span class="normal">354</span>
-<span class="normal">355</span>
-<span class="normal">356</span>
-<span class="normal">357</span>
-<span class="normal">358</span>
-<span class="normal">359</span>
-<span class="normal">360</span>
-<span class="normal">361</span>
-<span class="normal">362</span>
-<span class="normal">363</span>
-<span class="normal">364</span>
-<span class="normal">365</span>
-<span class="normal">366</span>
-<span class="normal">367</span>
-<span class="normal">368</span>
-<span class="normal">369</span>
-<span class="normal">370</span>
-<span class="normal">371</span>
-<span class="normal">372</span>
-<span class="normal">373</span>
-<span class="normal">374</span>
-<span class="normal">375</span>
-<span class="normal">376</span>
-<span class="normal">377</span>
-<span class="normal">378</span>
-<span class="normal">379</span>
-<span class="normal">380</span>
-<span class="normal">381</span>
-<span class="normal">382</span>
-<span class="normal">383</span>
-<span class="normal">384</span>
-<span class="normal">385</span>
-<span class="normal">386</span>
-<span class="normal">387</span>
-<span class="normal">388</span>
-<span class="normal">389</span>
-<span class="normal">390</span>
-<span class="normal">391</span>
-<span class="normal">392</span>
-<span class="normal">393</span>
-<span class="normal">394</span>
-<span class="normal">395</span>
-<span class="normal">396</span>
-<span class="normal">397</span>
-<span class="normal">398</span>
-<span class="normal">399</span>
-<span class="normal">400</span>
-<span class="normal">401</span>
-<span class="normal">402</span>
-<span class="normal">403</span>
-<span class="normal">404</span>
-<span class="normal">405</span>
-<span class="normal">406</span>
-<span class="normal">407</span>
-<span class="normal">408</span>
-<span class="normal">409</span>
-<span class="normal">410</span>
-<span class="normal">411</span>
-<span class="normal">412</span>
-<span class="normal">413</span>
-<span class="normal">414</span>
-<span class="normal">415</span>
-<span class="normal">416</span>
-<span class="normal">417</span>
-<span class="normal">418</span>
-<span class="normal">419</span>
-<span class="normal">420</span>
-<span class="normal">421</span>
-<span class="normal">422</span>
-<span class="normal">423</span>
-<span class="normal">424</span>
-<span class="normal">425</span>
-<span class="normal">426</span>
-<span class="normal">427</span>
-<span class="normal">428</span>
-<span class="normal">429</span>
-<span class="normal">430</span>
-<span class="normal">431</span>
-<span class="normal">432</span>
-<span class="normal">433</span>
-<span class="normal">434</span>
-<span class="normal">435</span>
-<span class="normal">436</span>
-<span class="normal">437</span>
-<span class="normal">438</span>
-<span class="normal">439</span>
-<span class="normal">440</span>
-<span class="normal">441</span>
-<span class="normal">442</span>
-<span class="normal">443</span>
-<span class="normal">444</span>
-<span class="normal">445</span>
-<span class="normal">446</span>
-<span class="normal">447</span>
-<span class="normal">448</span>
-<span class="normal">449</span>
-<span class="normal">450</span>
-<span class="normal">451</span>
-<span class="normal">452</span>
-<span class="normal">453</span>
-<span class="normal">454</span>
-<span class="normal">455</span>
-<span class="normal">456</span>
-<span class="normal">457</span>
-<span class="normal">458</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">fit</span><span class="p">(</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">478</span>
+<span class="normal">479</span>
+<span class="normal">480</span>
+<span class="normal">481</span>
+<span class="normal">482</span>
+<span class="normal">483</span>
+<span class="normal">484</span>
+<span class="normal">485</span>
+<span class="normal">486</span>
+<span class="normal">487</span>
+<span class="normal">488</span>
+<span class="normal">489</span>
+<span class="normal">490</span>
+<span class="normal">491</span>
+<span class="normal">492</span>
+<span class="normal">493</span>
+<span class="normal">494</span>
+<span class="normal">495</span>
+<span class="normal">496</span>
+<span class="normal">497</span>
+<span class="normal">498</span>
+<span class="normal">499</span>
+<span class="normal">500</span>
+<span class="normal">501</span>
+<span class="normal">502</span>
+<span class="normal">503</span>
+<span class="normal">504</span>
+<span class="normal">505</span>
+<span class="normal">506</span>
+<span class="normal">507</span>
+<span class="normal">508</span>
+<span class="normal">509</span>
+<span class="normal">510</span>
+<span class="normal">511</span>
+<span class="normal">512</span>
+<span class="normal">513</span>
+<span class="normal">514</span>
+<span class="normal">515</span>
+<span class="normal">516</span>
+<span class="normal">517</span>
+<span class="normal">518</span>
+<span class="normal">519</span>
+<span class="normal">520</span>
+<span class="normal">521</span>
+<span class="normal">522</span>
+<span class="normal">523</span>
+<span class="normal">524</span>
+<span class="normal">525</span>
+<span class="normal">526</span>
+<span class="normal">527</span>
+<span class="normal">528</span>
+<span class="normal">529</span>
+<span class="normal">530</span>
+<span class="normal">531</span>
+<span class="normal">532</span>
+<span class="normal">533</span>
+<span class="normal">534</span>
+<span class="normal">535</span>
+<span class="normal">536</span>
+<span class="normal">537</span>
+<span class="normal">538</span>
+<span class="normal">539</span>
+<span class="normal">540</span>
+<span class="normal">541</span>
+<span class="normal">542</span>
+<span class="normal">543</span>
+<span class="normal">544</span>
+<span class="normal">545</span>
+<span class="normal">546</span>
+<span class="normal">547</span>
+<span class="normal">548</span>
+<span class="normal">549</span>
+<span class="normal">550</span>
+<span class="normal">551</span>
+<span class="normal">552</span>
+<span class="normal">553</span>
+<span class="normal">554</span>
+<span class="normal">555</span>
+<span class="normal">556</span>
+<span class="normal">557</span>
+<span class="normal">558</span>
+<span class="normal">559</span>
+<span class="normal">560</span>
+<span class="normal">561</span>
+<span class="normal">562</span>
+<span class="normal">563</span>
+<span class="normal">564</span>
+<span class="normal">565</span>
+<span class="normal">566</span>
+<span class="normal">567</span>
+<span class="normal">568</span>
+<span class="normal">569</span>
+<span class="normal">570</span>
+<span class="normal">571</span>
+<span class="normal">572</span>
+<span class="normal">573</span>
+<span class="normal">574</span>
+<span class="normal">575</span>
+<span class="normal">576</span>
+<span class="normal">577</span>
+<span class="normal">578</span>
+<span class="normal">579</span>
+<span class="normal">580</span>
+<span class="normal">581</span>
+<span class="normal">582</span>
+<span class="normal">583</span>
+<span class="normal">584</span>
+<span class="normal">585</span>
+<span class="normal">586</span>
+<span class="normal">587</span>
+<span class="normal">588</span>
+<span class="normal">589</span>
+<span class="normal">590</span>
+<span class="normal">591</span>
+<span class="normal">592</span>
+<span class="normal">593</span>
+<span class="normal">594</span>
+<span class="normal">595</span>
+<span class="normal">596</span>
+<span class="normal">597</span>
+<span class="normal">598</span>
+<span class="normal">599</span>
+<span class="normal">600</span>
+<span class="normal">601</span>
+<span class="normal">602</span>
+<span class="normal">603</span>
+<span class="normal">604</span>
+<span class="normal">605</span>
+<span class="normal">606</span>
+<span class="normal">607</span>
+<span class="normal">608</span>
+<span class="normal">609</span>
+<span class="normal">610</span>
+<span class="normal">611</span>
+<span class="normal">612</span>
+<span class="normal">613</span>
+<span class="normal">614</span>
+<span class="normal">615</span>
+<span class="normal">616</span>
+<span class="normal">617</span>
+<span class="normal">618</span>
+<span class="normal">619</span>
+<span class="normal">620</span>
+<span class="normal">621</span>
+<span class="normal">622</span>
+<span class="normal">623</span>
+<span class="normal">624</span>
+<span class="normal">625</span>
+<span class="normal">626</span>
+<span class="normal">627</span>
+<span class="normal">628</span>
+<span class="normal">629</span>
+<span class="normal">630</span>
+<span class="normal">631</span>
+<span class="normal">632</span>
+<span class="normal">633</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">fit</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">X</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span> <span class="o">|</span> <span class="n">SkyulfDataFrame</span><span class="p">,</span>
     <span class="n">y</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span> <span class="o">|</span> <span class="n">Any</span><span class="p">,</span>
@@ -6533,6 +7012,14 @@ intact.</p>
         <span class="n">iteration_callback</span><span class="o">=</span><span class="n">iteration_callback</span><span class="p">,</span>
     <span class="p">)</span>
 
+    <span class="c1"># F-13: optionally search a decision threshold for a binary</span>
+    <span class="c1"># classifier on the validation split. Best-effort — a failure logs and</span>
+    <span class="c1"># leaves predict() on the default decision rule.</span>
+    <span class="k">if</span> <span class="n">tuning_config</span><span class="o">.</span><span class="n">tune_threshold</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_tune_decision_thresholds</span><span class="p">(</span>
+            <span class="n">model</span><span class="p">,</span> <span class="n">tuning_result</span><span class="p">,</span> <span class="n">tuning_config</span><span class="p">,</span> <span class="n">validation_data</span><span class="p">,</span> <span class="n">log_callback</span>
+        <span class="p">)</span>
+
     <span class="k">if</span> <span class="n">reporter</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
         <span class="n">reporter</span><span class="o">.</span><span class="n">finish</span><span class="p">(</span><span class="n">tuning_result</span><span class="p">)</span>
 
@@ -6559,200 +7046,214 @@ intact.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>skyulf-core/skyulf/modeling/_tuning/engine.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1341</span>
-<span class="normal">1342</span>
-<span class="normal">1343</span>
-<span class="normal">1344</span>
-<span class="normal">1345</span>
-<span class="normal">1346</span>
-<span class="normal">1347</span>
-<span class="normal">1348</span>
-<span class="normal">1349</span>
-<span class="normal">1350</span>
-<span class="normal">1351</span>
-<span class="normal">1352</span>
-<span class="normal">1353</span>
-<span class="normal">1354</span>
-<span class="normal">1355</span>
-<span class="normal">1356</span>
-<span class="normal">1357</span>
-<span class="normal">1358</span>
-<span class="normal">1359</span>
-<span class="normal">1360</span>
-<span class="normal">1361</span>
-<span class="normal">1362</span>
-<span class="normal">1363</span>
-<span class="normal">1364</span>
-<span class="normal">1365</span>
-<span class="normal">1366</span>
-<span class="normal">1367</span>
-<span class="normal">1368</span>
-<span class="normal">1369</span>
-<span class="normal">1370</span>
-<span class="normal">1371</span>
-<span class="normal">1372</span>
-<span class="normal">1373</span>
-<span class="normal">1374</span>
-<span class="normal">1375</span>
-<span class="normal">1376</span>
-<span class="normal">1377</span>
-<span class="normal">1378</span>
-<span class="normal">1379</span>
-<span class="normal">1380</span>
-<span class="normal">1381</span>
-<span class="normal">1382</span>
-<span class="normal">1383</span>
-<span class="normal">1384</span>
-<span class="normal">1385</span>
-<span class="normal">1386</span>
-<span class="normal">1387</span>
-<span class="normal">1388</span>
-<span class="normal">1389</span>
-<span class="normal">1390</span>
-<span class="normal">1391</span>
-<span class="normal">1392</span>
-<span class="normal">1393</span>
-<span class="normal">1394</span>
-<span class="normal">1395</span>
-<span class="normal">1396</span>
-<span class="normal">1397</span>
-<span class="normal">1398</span>
-<span class="normal">1399</span>
-<span class="normal">1400</span>
-<span class="normal">1401</span>
-<span class="normal">1402</span>
-<span class="normal">1403</span>
-<span class="normal">1404</span>
-<span class="normal">1405</span>
-<span class="normal">1406</span>
-<span class="normal">1407</span>
-<span class="normal">1408</span>
-<span class="normal">1409</span>
-<span class="normal">1410</span>
-<span class="normal">1411</span>
-<span class="normal">1412</span>
-<span class="normal">1413</span>
-<span class="normal">1414</span>
-<span class="normal">1415</span>
-<span class="normal">1416</span>
-<span class="normal">1417</span>
-<span class="normal">1418</span>
-<span class="normal">1419</span>
-<span class="normal">1420</span>
-<span class="normal">1421</span>
-<span class="normal">1422</span>
-<span class="normal">1423</span>
-<span class="normal">1424</span>
-<span class="normal">1425</span>
-<span class="normal">1426</span>
-<span class="normal">1427</span>
-<span class="normal">1428</span>
-<span class="normal">1429</span>
-<span class="normal">1430</span>
-<span class="normal">1431</span>
-<span class="normal">1432</span>
-<span class="normal">1433</span>
-<span class="normal">1434</span>
-<span class="normal">1435</span>
-<span class="normal">1436</span>
-<span class="normal">1437</span>
-<span class="normal">1438</span>
-<span class="normal">1439</span>
-<span class="normal">1440</span>
-<span class="normal">1441</span>
-<span class="normal">1442</span>
-<span class="normal">1443</span>
-<span class="normal">1444</span>
-<span class="normal">1445</span>
-<span class="normal">1446</span>
-<span class="normal">1447</span>
-<span class="normal">1448</span>
-<span class="normal">1449</span>
-<span class="normal">1450</span>
-<span class="normal">1451</span>
-<span class="normal">1452</span>
-<span class="normal">1453</span>
-<span class="normal">1454</span>
-<span class="normal">1455</span>
-<span class="normal">1456</span>
-<span class="normal">1457</span>
-<span class="normal">1458</span>
-<span class="normal">1459</span>
-<span class="normal">1460</span>
-<span class="normal">1461</span>
-<span class="normal">1462</span>
-<span class="normal">1463</span>
-<span class="normal">1464</span>
-<span class="normal">1465</span>
-<span class="normal">1466</span>
-<span class="normal">1467</span>
-<span class="normal">1468</span>
-<span class="normal">1469</span>
-<span class="normal">1470</span>
-<span class="normal">1471</span>
-<span class="normal">1472</span>
-<span class="normal">1473</span>
-<span class="normal">1474</span>
-<span class="normal">1475</span>
-<span class="normal">1476</span>
-<span class="normal">1477</span>
-<span class="normal">1478</span>
-<span class="normal">1479</span>
-<span class="normal">1480</span>
-<span class="normal">1481</span>
-<span class="normal">1482</span>
-<span class="normal">1483</span>
-<span class="normal">1484</span>
-<span class="normal">1485</span>
-<span class="normal">1486</span>
-<span class="normal">1487</span>
-<span class="normal">1488</span>
-<span class="normal">1489</span>
-<span class="normal">1490</span>
-<span class="normal">1491</span>
-<span class="normal">1492</span>
-<span class="normal">1493</span>
-<span class="normal">1494</span>
-<span class="normal">1495</span>
-<span class="normal">1496</span>
-<span class="normal">1497</span>
-<span class="normal">1498</span>
-<span class="normal">1499</span>
-<span class="normal">1500</span>
-<span class="normal">1501</span>
-<span class="normal">1502</span>
-<span class="normal">1503</span>
-<span class="normal">1504</span>
-<span class="normal">1505</span>
-<span class="normal">1506</span>
-<span class="normal">1507</span>
-<span class="normal">1508</span>
-<span class="normal">1509</span>
-<span class="normal">1510</span>
-<span class="normal">1511</span>
-<span class="normal">1512</span>
-<span class="normal">1513</span>
-<span class="normal">1514</span>
-<span class="normal">1515</span>
-<span class="normal">1516</span>
-<span class="normal">1517</span>
-<span class="normal">1518</span>
-<span class="normal">1519</span>
-<span class="normal">1520</span>
-<span class="normal">1521</span>
-<span class="normal">1522</span>
-<span class="normal">1523</span>
-<span class="normal">1524</span>
-<span class="normal">1525</span>
-<span class="normal">1526</span>
-<span class="normal">1527</span>
-<span class="normal">1528</span>
-<span class="normal">1529</span>
-<span class="normal">1530</span>
-<span class="normal">1531</span>
-<span class="normal">1532</span>
-<span class="normal">1533</span>
-<span class="normal">1534</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">tune</span><span class="p">(</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1572</span>
+<span class="normal">1573</span>
+<span class="normal">1574</span>
+<span class="normal">1575</span>
+<span class="normal">1576</span>
+<span class="normal">1577</span>
+<span class="normal">1578</span>
+<span class="normal">1579</span>
+<span class="normal">1580</span>
+<span class="normal">1581</span>
+<span class="normal">1582</span>
+<span class="normal">1583</span>
+<span class="normal">1584</span>
+<span class="normal">1585</span>
+<span class="normal">1586</span>
+<span class="normal">1587</span>
+<span class="normal">1588</span>
+<span class="normal">1589</span>
+<span class="normal">1590</span>
+<span class="normal">1591</span>
+<span class="normal">1592</span>
+<span class="normal">1593</span>
+<span class="normal">1594</span>
+<span class="normal">1595</span>
+<span class="normal">1596</span>
+<span class="normal">1597</span>
+<span class="normal">1598</span>
+<span class="normal">1599</span>
+<span class="normal">1600</span>
+<span class="normal">1601</span>
+<span class="normal">1602</span>
+<span class="normal">1603</span>
+<span class="normal">1604</span>
+<span class="normal">1605</span>
+<span class="normal">1606</span>
+<span class="normal">1607</span>
+<span class="normal">1608</span>
+<span class="normal">1609</span>
+<span class="normal">1610</span>
+<span class="normal">1611</span>
+<span class="normal">1612</span>
+<span class="normal">1613</span>
+<span class="normal">1614</span>
+<span class="normal">1615</span>
+<span class="normal">1616</span>
+<span class="normal">1617</span>
+<span class="normal">1618</span>
+<span class="normal">1619</span>
+<span class="normal">1620</span>
+<span class="normal">1621</span>
+<span class="normal">1622</span>
+<span class="normal">1623</span>
+<span class="normal">1624</span>
+<span class="normal">1625</span>
+<span class="normal">1626</span>
+<span class="normal">1627</span>
+<span class="normal">1628</span>
+<span class="normal">1629</span>
+<span class="normal">1630</span>
+<span class="normal">1631</span>
+<span class="normal">1632</span>
+<span class="normal">1633</span>
+<span class="normal">1634</span>
+<span class="normal">1635</span>
+<span class="normal">1636</span>
+<span class="normal">1637</span>
+<span class="normal">1638</span>
+<span class="normal">1639</span>
+<span class="normal">1640</span>
+<span class="normal">1641</span>
+<span class="normal">1642</span>
+<span class="normal">1643</span>
+<span class="normal">1644</span>
+<span class="normal">1645</span>
+<span class="normal">1646</span>
+<span class="normal">1647</span>
+<span class="normal">1648</span>
+<span class="normal">1649</span>
+<span class="normal">1650</span>
+<span class="normal">1651</span>
+<span class="normal">1652</span>
+<span class="normal">1653</span>
+<span class="normal">1654</span>
+<span class="normal">1655</span>
+<span class="normal">1656</span>
+<span class="normal">1657</span>
+<span class="normal">1658</span>
+<span class="normal">1659</span>
+<span class="normal">1660</span>
+<span class="normal">1661</span>
+<span class="normal">1662</span>
+<span class="normal">1663</span>
+<span class="normal">1664</span>
+<span class="normal">1665</span>
+<span class="normal">1666</span>
+<span class="normal">1667</span>
+<span class="normal">1668</span>
+<span class="normal">1669</span>
+<span class="normal">1670</span>
+<span class="normal">1671</span>
+<span class="normal">1672</span>
+<span class="normal">1673</span>
+<span class="normal">1674</span>
+<span class="normal">1675</span>
+<span class="normal">1676</span>
+<span class="normal">1677</span>
+<span class="normal">1678</span>
+<span class="normal">1679</span>
+<span class="normal">1680</span>
+<span class="normal">1681</span>
+<span class="normal">1682</span>
+<span class="normal">1683</span>
+<span class="normal">1684</span>
+<span class="normal">1685</span>
+<span class="normal">1686</span>
+<span class="normal">1687</span>
+<span class="normal">1688</span>
+<span class="normal">1689</span>
+<span class="normal">1690</span>
+<span class="normal">1691</span>
+<span class="normal">1692</span>
+<span class="normal">1693</span>
+<span class="normal">1694</span>
+<span class="normal">1695</span>
+<span class="normal">1696</span>
+<span class="normal">1697</span>
+<span class="normal">1698</span>
+<span class="normal">1699</span>
+<span class="normal">1700</span>
+<span class="normal">1701</span>
+<span class="normal">1702</span>
+<span class="normal">1703</span>
+<span class="normal">1704</span>
+<span class="normal">1705</span>
+<span class="normal">1706</span>
+<span class="normal">1707</span>
+<span class="normal">1708</span>
+<span class="normal">1709</span>
+<span class="normal">1710</span>
+<span class="normal">1711</span>
+<span class="normal">1712</span>
+<span class="normal">1713</span>
+<span class="normal">1714</span>
+<span class="normal">1715</span>
+<span class="normal">1716</span>
+<span class="normal">1717</span>
+<span class="normal">1718</span>
+<span class="normal">1719</span>
+<span class="normal">1720</span>
+<span class="normal">1721</span>
+<span class="normal">1722</span>
+<span class="normal">1723</span>
+<span class="normal">1724</span>
+<span class="normal">1725</span>
+<span class="normal">1726</span>
+<span class="normal">1727</span>
+<span class="normal">1728</span>
+<span class="normal">1729</span>
+<span class="normal">1730</span>
+<span class="normal">1731</span>
+<span class="normal">1732</span>
+<span class="normal">1733</span>
+<span class="normal">1734</span>
+<span class="normal">1735</span>
+<span class="normal">1736</span>
+<span class="normal">1737</span>
+<span class="normal">1738</span>
+<span class="normal">1739</span>
+<span class="normal">1740</span>
+<span class="normal">1741</span>
+<span class="normal">1742</span>
+<span class="normal">1743</span>
+<span class="normal">1744</span>
+<span class="normal">1745</span>
+<span class="normal">1746</span>
+<span class="normal">1747</span>
+<span class="normal">1748</span>
+<span class="normal">1749</span>
+<span class="normal">1750</span>
+<span class="normal">1751</span>
+<span class="normal">1752</span>
+<span class="normal">1753</span>
+<span class="normal">1754</span>
+<span class="normal">1755</span>
+<span class="normal">1756</span>
+<span class="normal">1757</span>
+<span class="normal">1758</span>
+<span class="normal">1759</span>
+<span class="normal">1760</span>
+<span class="normal">1761</span>
+<span class="normal">1762</span>
+<span class="normal">1763</span>
+<span class="normal">1764</span>
+<span class="normal">1765</span>
+<span class="normal">1766</span>
+<span class="normal">1767</span>
+<span class="normal">1768</span>
+<span class="normal">1769</span>
+<span class="normal">1770</span>
+<span class="normal">1771</span>
+<span class="normal">1772</span>
+<span class="normal">1773</span>
+<span class="normal">1774</span>
+<span class="normal">1775</span>
+<span class="normal">1776</span>
+<span class="normal">1777</span>
+<span class="normal">1778</span>
+<span class="normal">1779</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">tune</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">X</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
     <span class="n">y</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
@@ -6789,7 +7290,9 @@ intact.</p>
 
     <span class="c1"># ``default_params`` may carry structural args (e.g. an ensemble's</span>
     <span class="c1"># resolved ``estimators``); the instantiator filters/routes them safely.</span>
-    <span class="n">base_estimator</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_instantiate_model</span><span class="p">(</span><span class="n">model_class</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">model_calculator</span><span class="o">.</span><span class="n">default_params</span><span class="p">)</span>
+    <span class="n">base_estimator</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_instantiate_model</span><span class="p">(</span>
+        <span class="n">model_class</span><span class="p">,</span> <span class="p">{</span><span class="o">**</span><span class="bp">self</span><span class="o">.</span><span class="n">model_calculator</span><span class="o">.</span><span class="n">default_params</span><span class="p">,</span> <span class="o">**</span><span class="bp">self</span><span class="o">.</span><span class="n">_seed_params</span><span class="p">(</span><span class="n">config</span><span class="p">)}</span>
+    <span class="p">)</span>
 
     <span class="c1"># halving/optuna searchers run their CV internally, where the engine's</span>
     <span class="c1"># per-fold hook cannot reach; wrap preprocessing + model in one</span>
@@ -6893,14 +7396,26 @@ intact.</p>
             <span class="n">log_callback</span><span class="p">,</span>
             <span class="n">preprocessing</span><span class="p">,</span>
         <span class="p">)</span>
-    <span class="k">elif</span> <span class="n">config</span><span class="o">.</span><span class="n">strategy</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">"halving_grid"</span><span class="p">,</span> <span class="s2">"halving_random"</span><span class="p">]:</span>
-        <span class="n">searcher</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_build_halving_searcher</span><span class="p">(</span>
-            <span class="n">search_config</span><span class="p">,</span> <span class="n">estimator</span><span class="p">,</span> <span class="n">cv</span><span class="p">,</span> <span class="n">metric</span><span class="p">,</span> <span class="n">log_callback</span>
+    <span class="k">elif</span> <span class="n">config</span><span class="o">.</span><span class="n">strategy</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">"halving_grid"</span><span class="p">,</span> <span class="s2">"halving_random"</span><span class="p">,</span> <span class="s2">"optuna"</span><span class="p">]:</span>
+        <span class="c1"># Searchers score the payload handed to them below: the raw</span>
+        <span class="c1"># pre-transform frames when wrapped (the fold-aware step encodes</span>
+        <span class="c1"># inside fit but maps predictions back), otherwise the payload</span>
+        <span class="c1"># labels. Resolve the scorer against that label space so binary</span>
+        <span class="c1"># scorers get a valid pos_label even for string targets.</span>
+        <span class="n">scoring_y</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="n">preprocessing_frames</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+            <span class="k">if</span> <span class="n">wrapped</span> <span class="ow">and</span> <span class="n">preprocessing_frames</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+            <span class="k">else</span> <span class="n">y_for_search</span>
         <span class="p">)</span>
-    <span class="k">elif</span> <span class="n">config</span><span class="o">.</span><span class="n">strategy</span> <span class="o">==</span> <span class="s2">"optuna"</span><span class="p">:</span>
-        <span class="n">searcher</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_build_optuna_searcher</span><span class="p">(</span>
-            <span class="n">search_config</span><span class="p">,</span> <span class="n">estimator</span><span class="p">,</span> <span class="n">cv</span><span class="p">,</span> <span class="n">metric</span><span class="p">,</span> <span class="n">progress_callback</span><span class="p">,</span> <span class="n">log_callback</span>
-        <span class="p">)</span>
+        <span class="n">scoring</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_resolve_scorer</span><span class="p">(</span><span class="n">metric</span><span class="p">,</span> <span class="n">scoring_y</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">config</span><span class="o">.</span><span class="n">strategy</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">"halving_grid"</span><span class="p">,</span> <span class="s2">"halving_random"</span><span class="p">]:</span>
+            <span class="n">searcher</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_build_halving_searcher</span><span class="p">(</span>
+                <span class="n">search_config</span><span class="p">,</span> <span class="n">estimator</span><span class="p">,</span> <span class="n">cv</span><span class="p">,</span> <span class="n">scoring</span><span class="p">,</span> <span class="n">log_callback</span>
+            <span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">searcher</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_build_optuna_searcher</span><span class="p">(</span>
+                <span class="n">search_config</span><span class="p">,</span> <span class="n">estimator</span><span class="p">,</span> <span class="n">cv</span><span class="p">,</span> <span class="n">scoring</span><span class="p">,</span> <span class="n">progress_callback</span><span class="p">,</span> <span class="n">log_callback</span>
+            <span class="p">)</span>
     <span class="k">else</span><span class="p">:</span>
         <span class="n">raise_invalid_choice</span><span class="p">(</span>
             <span class="n">config</span><span class="o">.</span><span class="n">strategy</span><span class="p">,</span>
@@ -6960,6 +7475,49 @@ intact.</p>
 
 </div>
 
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="skyulf.modeling._tuning.engine.__getattr__" class="doc doc-heading">
+            <code class="highlight language-python"><span class="fm">__getattr__</span><span class="p">(</span><span class="n">name</span><span class="p">)</span></code>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Read-only views of the optuna load state under its legacy names (F-14).</p>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>skyulf-core/skyulf/modeling/_tuning/engine.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">125</span>
+<span class="normal">126</span>
+<span class="normal">127</span>
+<span class="normal">128</span>
+<span class="normal">129</span>
+<span class="normal">130</span>
+<span class="normal">131</span>
+<span class="normal">132</span>
+<span class="normal">133</span>
+<span class="normal">134</span>
+<span class="normal">135</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__getattr__</span><span class="p">(</span><span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Read-only views of the optuna load state under its legacy names (F-14)."""</span>
+    <span class="k">if</span> <span class="n">name</span> <span class="o">==</span> <span class="s2">"HAS_OPTUNA"</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">_optuna_state</span><span class="o">.</span><span class="n">has_optuna</span>
+    <span class="k">if</span> <span class="n">name</span> <span class="o">==</span> <span class="s2">"OptunaSearchCV"</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">_optuna_state</span><span class="o">.</span><span class="n">search_cv</span>
+    <span class="k">if</span> <span class="n">name</span> <span class="o">==</span> <span class="s2">"optuna"</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">_optuna_state</span><span class="o">.</span><span class="n">optuna_module</span>
+    <span class="k">if</span> <span class="n">name</span> <span class="o">==</span> <span class="s2">"_optuna_load_attempted"</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">_optuna_state</span><span class="o">.</span><span class="n">attempted</span>
+    <span class="k">raise</span> <span class="ne">AttributeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"module </span><span class="si">{</span><span class="vm">__name__</span><span class="si">!r}</span><span class="s2"> has no attribute </span><span class="si">{</span><span class="n">name</span><span class="si">!r}</span><span class="s2">"</span><span class="p">)</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
 
 
 

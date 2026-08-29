@@ -2031,6 +2031,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#seeding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Seeding
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -3507,6 +3518,15 @@
   &quot;params&quot;: {&quot;n_estimators&quot;: 50, &quot;random_state&quot;: 42}
 }
 </code></pre>
+<h3 id="seeding">Seeding</h3>
+<p>Every <code>random_state=42</code> default listed below comes from one place:
+<code>skyulf.types.DEFAULT_RANDOM_STATE</code>, injected at model construction. You can
+override it per node with <code>"params": {"random_state": 7}</code>, or pass
+<code>"random_state": null</code> to leave an estimator unseeded. In the canvas, the same
+control appears as <strong>Random State</strong> under Hyperparameters → Customize (basic
+mode), in the Tuning Strategy section (advanced mode), and as <strong>Fold Split
+Seed</strong> in each node's Cross Validation section. Full precedence rules:
+<a href="../user_guide/configuration.html#reproducibility-and-seeds">Reproducibility and seeds</a>.</p>
 <h2 id="classification">Classification</h2>
 <h3 id="logistic_regression">logistic_regression</h3>
 <p>Backed by <code>sklearn.linear_model.LogisticRegression</code>.</p>
