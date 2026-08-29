@@ -148,5 +148,6 @@ def test_param_summary_truncates_overlong_detail_lines():
     from skyulf.pipeline.diagram import params_summary
 
     text = params_summary({"first": "x" * 24, "second": "y" * 24, "third": "z" * 24})
+    assert text is not None
     assert len(text) == 72
     assert text.endswith("…")
