@@ -63,8 +63,48 @@ Easy items batched; hard items one at a time.
 | F-23 | ⚪ | Enable BLE001 / broad-catch rule | half day | ✅ |
 | F-13 | 🟡 | Wire threshold tuning into TuningConfig | ~1 day | ✅ |
 | F-14 | 🟡 | contextvar scoping for engine/backend globals | ~1 day | ✅ |
+| F-32 | 🟡 | Pipeline persistence pickle → joblib ([plan](skyulf-core-joblib-migration-plan.md)) | ~1.5 days | ⏭️ planned — awaiting go/no-go |
+| F-33 | 🟡 | ONNX export & serving, core + backend + frontend ([plan](skyulf-core-onnx-support-plan.md)) | ~1 week (phases 1-3) | ⏭️ planned — awaiting go/no-go |
+| F-34 | 🟡 | MLflow integration on the three `core/` seams ([plan](skyulf-core-mlflow-integration-plan.md)) | ~1 week (phases 1-3) | ⏭️ planned — awaiting go/no-go |
+
+## Planning initiatives (awaiting go/no-go)
+
+User-requested detailed plans for work beyond the finding list. Each doc
+covers current state, design, phases, risks, and open decision points.
+
+| Initiative | Plan doc | Est. | Status |
+|---|---|---|---|
+| Pipeline persistence pickle → joblib | [`skyulf-core-joblib-migration-plan.md`](skyulf-core-joblib-migration-plan.md) | ~1.5 days | ⏭️ planned |
+| ONNX export & serving (core + backend + frontend) | [`skyulf-core-onnx-support-plan.md`](skyulf-core-onnx-support-plan.md) | ~1 week (phases 1-3) | ⏭️ planned |
+| MLflow integration on the three `core/` seams (F-27 groundwork) | [`skyulf-core-mlflow-integration-plan.md`](skyulf-core-mlflow-integration-plan.md) | ~1 week (phases 1-3) | ⏭️ planned |
 
 ## Log
+
+### 2026-08-29 — Planning initiatives (branch 087)
+
+- Three detailed plan documents added to `initiatives/analysis/`, all
+  grounded in code verified the same day:
+  - **joblib migration** — the blast radius is one site: `SkyulfPipeline.save/load`
+    is the only raw pickle left in core (backend artifact stores are already
+    joblib; the F-14 serializer seam defaults to joblib). Plan routes save/load
+    through the seam with a legacy-pickle read fallback; fingerprint (F-15) is
+    content-addressed and unaffected. Honest scope note: joblib is pickle-protocol
+    internally, so this is consistency + efficiency, not a security fix — the
+    ONNX plan owns the untrusted-input story.
+  - **ONNX export & serving** — optional `[onnx]` extra, registry-metadata-driven
+    `export_formats` (the F-10 lesson: no second hardcoded map), export parity
+    gate tied to the F-15 fingerprint, backend artifact + download wiring,
+    frontend capability-aware UI. Support matrix per model family; preprocessing
+    export explicitly out of scope for phases 1-2.
+  - **MLflow integration** — the "80% ready" claim unpacked: the three
+    `core/` seams (compute/serialization/model_registry, F-27) plus F-14
+    ContextVar scoping are the prepared surface; zero MLflow code exists.
+    Plan maps job↔run, wires the roadmap's R6.4 fit-callback, keeps tracking
+    best-effort (never fails a job), and links rather than mirrors MLflow UI
+    in the frontend. `mlflow-skinny` (tracking) vs full `mlflow` (packaging)
+    capability split called out.
+- No code changed — plans only; each doc ends with explicit decision points
+  for the user.
 
 ### 2026-08-28 — Batch 1 (branch 086)
 
