@@ -1,7 +1,7 @@
 """Coverage-focused tests for skyulf.pipeline (the top-level SkyulfPipeline).
 
 Exercises branches not hit by the existing end-to-end test in test_pipeline.py:
-* `artifact_digest` (moved to `skyulf.pipeline_seal` in the F-19 split): the
+* `artifact_digest` (moved into `skyulf.pipeline.seal` in the F-19 split): the
   F-15 semantic digest's determinism, weight sensitivity, tree structures,
   tuned ``(model, TuningResult)`` tuples, and the fail-loud ``TypeError``
   that replaced the old ``repr`` fallback.
@@ -24,11 +24,11 @@ from sklearn.linear_model import LogisticRegression
 from skyulf.modeling._tuning.engine import TuningApplier, TuningCalculator
 from skyulf.modeling._tuning.schemas import TuningResult
 from skyulf.pipeline import SkyulfPipeline
-from skyulf.pipeline_seal import artifact_digest
+from skyulf.pipeline.seal import artifact_digest
 from skyulf.registry import NodeRegistry
 
 # ---------------------------------------------------------------------------
-# artifact_digest (skyulf.pipeline_seal)
+# artifact_digest (skyulf.pipeline.seal)
 # ---------------------------------------------------------------------------
 
 

@@ -540,3 +540,11 @@ Three tracked follow-ups closed in one batch:
 - Verification: full core suite 3567 passed / 70 skipped (exit 0);
   `ruff check` + `ruff format` clean on all four touched files; `ty check`
   backend + core + tests exit 0.
+- Follow-up (2026-08-29, user-approved): the three modules were grouped into
+  a `skyulf/pipeline/` package — `_pipeline.py` (orchestrator), `seal.py`
+  (`artifact_digest`), `diagram.py` (`build_mermaid_diagram`) — to keep the
+  top-level package uncluttered. `pipeline/__init__.py` re-exports only
+  `SkyulfPipeline`, so `from skyulf.pipeline import SkyulfPipeline` stays the
+  public contract; pickle compatibility is preserved because both the old
+  `skyulf.pipeline` and new `skyulf.pipeline._pipeline` paths resolve.
+  Re-verified: full core suite 3567 passed / 70 skipped (exit 0), ruff + ty clean.
