@@ -374,10 +374,19 @@
                         <span class="msi text-[18px]">content_copy</span>
                     </button>
                 </div>
-                <div class="flex items-center gap-3">
-                    <a href="https://pepy.tech/projects/skyulf-core" target="_blank" rel="noopener"><img src="https://static.pepy.tech/personalized-badge/skyulf-core?period=monthly&units=INTERNATIONAL_SYSTEM&left_color=BLACK&right_color=GREEN&left_text=downloads%2Fmonth" alt="PyPI Downloads" class="h-5"></a>
-                    <a href="https://pepy.tech/projects/skyulf-core" target="_blank" rel="noopener"><img src="https://static.pepy.tech/personalized-badge/skyulf-core?period=total&units=INTERNATIONAL_SYSTEM&left_color=GREY&right_color=BLUE&left_text=Total_Downloads" alt="PyPI Downloads" class="h-5"></a>
-                    <a href="https://github.com/flyingriverhorse/skyulf" target="_blank" rel="noopener"><img src="https://img.shields.io/github/stars/flyingriverhorse/skyulf?style=flat-square&color=f59e0b&label=stars" alt="GitHub stars" class="h-5"></a>
+                <div class="flex flex-wrap items-center justify-center gap-3">
+                    <a href="https://github.com/flyingriverhorse/skyulf" target="_blank" rel="noopener" title="GitHub stars" class="inline-flex items-center gap-2 rounded-full border px-3.5 py-1.5 font-mono text-[11px] font-semibold tracking-[0.14em] uppercase transition-colors hover:border-[rgba(255,218,217,.8)]" style="border-color: var(--line); color: var(--soft); background: var(--panel-60); backdrop-filter: blur(12px);">
+                        <span class="msi text-[14px]" style="color: var(--gold-text);">star</span>
+                        <span data-github-stars>47</span> stars
+                    </a>
+                    <a href="https://pypistats.org/packages/skyulf-core" target="_blank" rel="noopener" title="PyPI downloads per month" class="inline-flex items-center gap-2 rounded-full border px-3.5 py-1.5 font-mono text-[11px] font-semibold tracking-[0.14em] uppercase transition-colors hover:border-[rgba(199,208,255,.8)]" style="border-color: var(--line); color: var(--soft); background: var(--panel-60); backdrop-filter: blur(12px);">
+                        <span class="msi text-[14px]" style="color: var(--peri);">download</span>
+                        <span data-pypi-monthly>1.1k</span> / month
+                    </a>
+                    <a href="https://github.com/flyingriverhorse/skyulf/blob/master/LICENSE" target="_blank" rel="noopener" title="Apache-2.0 license" class="inline-flex items-center gap-2 rounded-full border px-3.5 py-1.5 font-mono text-[11px] font-semibold tracking-[0.14em] uppercase transition-colors hover:border-[rgba(255,218,217,.8)]" style="border-color: var(--line); color: var(--soft); background: var(--panel-60); backdrop-filter: blur(12px);">
+                        <span class="msi text-[14px]" style="color: var(--gold-text);">shield</span>
+                        Apache-2.0
+                    </a>
                 </div>
             </div>
         </div>
@@ -972,6 +981,36 @@ pipeline.save(<span class="text-gold">"tumour.pkl"</span>)  <span class="text-fa
                         if (!version) return;
                         var label = badge.querySelector('[data-version-label]');
                         if (label) label.textContent = 'v' + version + ' — live on PyPI';
+                    })
+                    .catch(function () { /* offline or blocked: static fallback stays */ });
+            }
+
+            // --- Stat pills: refresh stars + monthly downloads, keep static fallback on failure ---
+            function formatStat(value) {
+                try {
+                    return new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 }).format(value);
+                } catch (e) { return String(value); }
+            }
+            var starsLabel = document.querySelector('[data-github-stars]');
+            if (starsLabel && window.fetch) {
+                fetch('https://api.github.com/repos/flyingriverhorse/skyulf')
+                    .then(function (res) { return res.ok ? res.json() : null; })
+                    .then(function (data) {
+                        var stars = data && data.stargazers_count;
+                        if (typeof stars !== 'number') return;
+                        starsLabel.textContent = formatStat(stars);
+                    })
+                    .catch(function () { /* offline or blocked: static fallback stays */ });
+            }
+            var monthlyLabel = document.querySelector('[data-pypi-monthly]');
+            if (monthlyLabel && window.fetch) {
+                fetch('https://pypistats.org/api/packages/skyulf-core/recent')
+                    .then(function (res) { return res.ok ? res.json() : null; })
+                    .then(function (data) {
+                        var payload = (data && data.data) || data;
+                        var monthly = payload && payload.last_month;
+                        if (typeof monthly !== 'number') return;
+                        monthlyLabel.textContent = formatStat(monthly);
                     })
                     .catch(function () { /* offline or blocked: static fallback stays */ });
             }
