@@ -11,6 +11,10 @@ from ._utils import STATSMODELS_AVAILABLE, _AnalyzerState, _collect
 
 logger = logging.getLogger(__name__)
 
+# Standard significance level: below it the ADF test rejects the unit-root
+# null hypothesis and the series is considered stationary.
+ADF_STATIONARITY_ALPHA = 0.05
+
 
 class TemporalMixin(_AnalyzerState):
     """Time-series helpers for :class:`EDAAnalyzer`."""
@@ -205,7 +209,7 @@ class TemporalMixin(_AnalyzerState):
                 return {
                     "test_statistic": float(result[0]),
                     "p_value": float(result[1]),
-                    "is_stationary": float(result[1]) < 0.05,
+                    "is_stationary": float(result[1]) < ADF_STATIONARITY_ALPHA,
                     "metric": target_metric,
                 }
         except Exception as e:  # noqa: BLE001 - ADF test is optional; logged

@@ -30,18 +30,18 @@ except PackageNotFoundError:  # pragma: no cover - package not installed (e.g. r
     __version__ = "0.0.0+unknown"
 
 __all__ = [
-    "SkyulfPipeline",
-    "SplitDataset",
-    "FeatureEngineer",
-    "NodeRegistry",
-    "validate_leakage_safety",
+    "DatasetProfile",
+    "DriftCalculator",
     "EDAAnalyzer",
     "EDAVisualizer",
     "ExpectationError",
-    "DatasetProfile",
-    "DriftCalculator",
+    "FeatureEngineer",
+    "NodeRegistry",
+    "SkyulfPipeline",
+    "SplitDataset",
     "expect_columns_exist",
     "expect_no_nulls",
     "expect_unique",
     "expect_value_range",
+    "validate_leakage_safety",
 ]

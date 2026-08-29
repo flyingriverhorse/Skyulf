@@ -6,7 +6,8 @@ snapshot, `/Users/BH7043/Skyulf`).
 (3,457 passed, 56 skipped).
 
 The audit predates the 080–086 fix waves. 7 of 31 findings no longer reproduce;
-2 are partial; 21 are live (F-13 was partial at triage and is now fully fixed).
+both partials (F-14, F-31) were closed 2026-08-29; 19 are live (F-13 was
+partial at triage and is now fully fixed).
 This file tracks the fix work, few-at-a-time for easy items, one-at-a-time for hard ones.
 
 **Status key:** ⬜ open · 🟨 in progress · ✅ done · ⏭️ parked
@@ -30,8 +31,8 @@ This file tracks the fix work, few-at-a-time for easy items, one-at-a-time for h
 
 | ID | Status | State |
 |---|---|---|
-| F-14 | ⬜ | `global` statements 9 → 3; no contextvar/context-manager scoping yet |
-| F-31 | ⬜ | `_AnalyzerState` now used; dispatcher `logger.exception` consolidated but relies on caller context |
+| F-14 | ✅ | All `global` statements gone (9 → 0): compute/serializer seams on `ContextVar` + scoped context managers; optuna lazy-loader moved to a locked state object with a PEP 562 compat `__getattr__` |
+| F-31 | ✅ | dispatcher `logger.exception` passes `exc_info=exc`; `_AnalyzerState` used; RUF022/PLW0108/PD011 cleared (factories/noqas justified); statistical thresholds named as constants |
 
 ## Live — fix queue
 
@@ -60,7 +61,7 @@ Easy items batched; hard items one at a time.
 | F-19 | 🟡 | Split `pipeline.py` responsibilities | ~1 day | ⬜ |
 | F-23 | ⚪ | Enable BLE001 / broad-catch rule | half day | ✅ |
 | F-13 | 🟡 | Wire threshold tuning into TuningConfig | ~1 day | ✅ |
-| F-14 | 🟡 | contextvar scoping for engine/backend globals | ~1 day | ⬜ |
+| F-14 | 🟡 | contextvar scoping for engine/backend globals | ~1 day | ✅ |
 
 ## Log
 
@@ -376,3 +377,53 @@ Three tracked follow-ups closed in one batch:
   tuned RF job (optuna, f1, tune_threshold=true) — completed with thresholds
   {0: 0.7255, 1: 0.2745} seeded + enabled, visible in Experiments with the
   *seeded at training* badge (backend restarted to pick up the code).
+
+### 2026-08-29 — F-31 + F-14 batch (branch 086)
+
+- **F-31** closed:
+  - `dispatcher._log_dispatch_failure` now passes `exc_info=exc` explicitly —
+    the traceback no longer depends on the caller being inside an `except`
+    block.
+  - RUF022: 22 `__all__` blocks auto-sorted; the one remaining
+    (`hyperparameters/__init__.py`) keeps its deliberate thematic grouping
+    behind a justified noqa.
+  - PLW0108 (20): 3 genuine pass-through lambdas inlined (pandas/polars
+    `divide` builders, tokenizer `" ".join`); the 17 factory lambdas reduced
+    to bare class/bound-method references (zero-arg `lambda: X()` ≡ `X`).
+  - PD011 (10): duck-typed `.values` unwrap patterns converted to
+    `.to_numpy()` (same pandas object set carries both); direct accesses
+    swapped too. Two `visualizer.py` sites are pydantic trend-point fields,
+    not pandas — justified noqas.
+  - PLR2004 scoped per the audit ("the ones inside statistical thresholds"):
+    named constants for PSI bands (`PSI_CRITICAL`/`PSI_MODERATE`, drift.py),
+    normality α (`NORMALITY_ALPHA`), ADF stationarity α
+    (`ADF_STATIONARITY_ALPHA`), VADER cutoff (`VADER_COMPOUND_CUTOFF`),
+    skew trigger + class-balance bands (`SKEWNESS_TRANSFORM_THRESHOLD`,
+    `BALANCED_RATIO_UPPER`, `IMBALANCED_RATIO_LOWER`), VIF bands + leakage
+    corr (`VIF_SEVERE`, `VIF_NOTABLE`, `LEAKAGE_CORR_THRESHOLD`). The
+    remaining ~119 are operational counts/structural checks (row caps, lat/lon
+    bounds, `len < 2` guards) — intentionally left; PLR2004 stays out of the
+    enabled ruleset.
+- **F-14** closed — PLW0603 is now empty (0 `global` statements):
+  - `core/compute.py` + `core/serialization.py`: the seams now hold their
+    active backend/serializer in `ContextVar`s; setters kept (set the current
+    context), new `compute_backend(...)` / `model_serializer(...)` context
+    managers scope an override to one block with token-reset on exit, both
+    exported from `skyulf.core`. Concurrent pipelines in separate
+    threads/tasks can no longer reconfigure each other mid-run.
+  - `modeling/_tuning/engine.py`: the optuna lazy-load quad-globals moved to
+    one `_OptunaLoadState` object guarded by a `threading.Lock` (concurrent
+    tuning runs can't race the multi-path import); a PEP 562 module
+    `__getattr__` keeps the legacy `HAS_OPTUNA`/`OptunaSearchCV`/`optuna`/
+    `_optuna_load_attempted` names readable (the variant-module tests pin
+    them). One stale test pin updated: the "optuna not installed" test now
+    patches `_optuna_state.has_optuna` instead of the legacy module attr.
+  - Deliberately out of scope: `EngineRegistry._active_engine` is a class
+    attribute (no `global` statement, not counted by PLW0603), opt-in, and
+    never called by the backend — converting it to a ContextVar would change
+    cross-thread propagation semantics for no current benefit.
+- Tests: 4 new seam tests (context-manager scope/restore, restore-on-error,
+  cross-context isolation for compute; scope/restore for serializer).
+- Verification: ruff check + format clean repo-wide, `ty check` exit 0,
+  targeted suites green (profiling+preprocessing 269, seams+tuning 131),
+  full core suite 3514 passed / 70 skipped (exit 0).

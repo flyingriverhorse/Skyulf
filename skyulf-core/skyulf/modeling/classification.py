@@ -220,7 +220,7 @@ class CalibratedClassifierCalculator(SklearnCalculator):
         ),
         "gradient_boosting": lambda: GradientBoostingClassifier(random_state=DEFAULT_RANDOM_STATE),
         "decision_tree": lambda: DecisionTreeClassifier(random_state=DEFAULT_RANDOM_STATE),
-        "gaussian_nb": lambda: GaussianNB(),
+        "gaussian_nb": GaussianNB,
         "svc": lambda: SVC(probability=True, random_state=DEFAULT_RANDOM_STATE),
     }
 

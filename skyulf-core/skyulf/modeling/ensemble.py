@@ -97,16 +97,16 @@ BASE_ESTIMATORS_CLF: dict[str, Callable[[], BaseEstimator]] = {
     ),
     "adaboost": lambda: AdaBoostClassifier(random_state=DEFAULT_RANDOM_STATE),
     "decision_tree": lambda: DecisionTreeClassifier(random_state=DEFAULT_RANDOM_STATE),
-    "gaussian_nb": lambda: GaussianNB(),
+    "gaussian_nb": GaussianNB,
     "svc": lambda: SVC(probability=True, random_state=DEFAULT_RANDOM_STATE),
-    "knn": lambda: KNeighborsClassifier(),
+    "knn": KNeighborsClassifier,
 }
 
 BASE_ESTIMATORS_REG: dict[str, Callable[[], BaseEstimator]] = {
-    "linear_regression": lambda: LinearRegression(),
-    "ridge": lambda: Ridge(),
-    "lasso": lambda: Lasso(),
-    "elasticnet": lambda: ElasticNet(),
+    "linear_regression": LinearRegression,
+    "ridge": Ridge,
+    "lasso": Lasso,
+    "elasticnet": ElasticNet,
     "random_forest": lambda: RandomForestRegressor(
         n_estimators=100, random_state=DEFAULT_RANDOM_STATE
     ),
@@ -117,8 +117,8 @@ BASE_ESTIMATORS_REG: dict[str, Callable[[], BaseEstimator]] = {
     ),
     "adaboost": lambda: AdaBoostRegressor(random_state=DEFAULT_RANDOM_STATE),
     "decision_tree": lambda: DecisionTreeRegressor(random_state=DEFAULT_RANDOM_STATE),
-    "svr": lambda: SVR(),
-    "knn": lambda: KNeighborsRegressor(),
+    "svr": SVR,
+    "knn": KNeighborsRegressor,
 }
 
 # Append the optional boosters only when their library is importable so the

@@ -63,7 +63,7 @@ def _apply_power_to_pandas_col(df_out: Any, item: dict[str, Any]) -> Any:
             scaler_params=item.get("scaler_params"),
         )
         series = pd.to_numeric(df_out[col], errors="coerce")
-        vals = series.values.reshape(-1, 1)
+        vals = series.to_numpy().reshape(-1, 1)
         trans_vals = pt.transform(vals)
         # sklearn may be configured with transform_output="pandas".
         trans_arr = trans_vals.to_numpy() if hasattr(trans_vals, "to_numpy") else trans_vals

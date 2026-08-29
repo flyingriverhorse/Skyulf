@@ -11,15 +11,15 @@ from .schemas import Alert, ColumnProfile, DatasetProfile
 from .visualizer import EDAVisualizer
 
 __all__ = [
+    "Alert",
+    "ColumnDrift",
+    "ColumnProfile",
+    "DatasetProfile",
+    "DriftCalculator",
+    "DriftMetric",
+    "DriftReport",
     "EDAAnalyzer",
     "EDAVisualizer",
-    "DatasetProfile",
-    "ColumnProfile",
-    "Alert",
-    "DriftCalculator",
-    "DriftReport",
-    "ColumnDrift",
-    "DriftMetric",
     "ExpectationError",
     "expect_columns_exist",
     "expect_no_nulls",

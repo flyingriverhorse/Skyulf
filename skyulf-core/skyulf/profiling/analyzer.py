@@ -36,6 +36,13 @@ __all__ = ["EDAAnalyzer"]
 
 logger = logging.getLogger(__name__)
 
+# VIF interpretation bands (standard convention): above 10 multicollinearity
+# is severe, above 5 it is notable.
+VIF_SEVERE = 10.0
+VIF_NOTABLE = 5.0
+# |correlation| with the numeric target above this flags possible leakage.
+LEAKAGE_CORR_THRESHOLD = 0.95
+
 
 class EDAAnalyzer(
     DatesMixin,
@@ -316,7 +323,7 @@ class EDAAnalyzer(
         if not vif_data:
             return
         for col, val in vif_data.items():
-            if val > 10.0:
+            if val > VIF_SEVERE:
                 alerts.append(
                     Alert(
                         type="Multicollinearity",
@@ -326,7 +333,7 @@ class EDAAnalyzer(
                         severity="warning",
                     )
                 )
-            elif val > 5.0:
+            elif val > VIF_NOTABLE:
                 alerts.append(
                     Alert(
                         type="Multicollinearity",
@@ -358,7 +365,7 @@ class EDAAnalyzer(
     ) -> None:
         """Flag features suspiciously highly correlated with a numeric target (possible leakage)."""
         for col, corr in target_correlations.items():
-            if abs(corr) > 0.95 and col != target_col:
+            if abs(corr) > LEAKAGE_CORR_THRESHOLD and col != target_col:
                 alerts.append(
                     Alert(
                         column=col,

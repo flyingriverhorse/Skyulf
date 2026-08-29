@@ -93,7 +93,7 @@ def _target_apply_pandas(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, A
         return X, y
 
     X_subset = X[valid_cols]
-    X_input = X_subset.values if hasattr(X_subset, "values") else X_subset
+    X_input = X_subset.to_numpy() if hasattr(X_subset, "to_numpy") else X_subset
     encoded = encoder.transform(X_input)
     return _replace_target_encoded_pandas(X, y, valid_cols, encoded)
 

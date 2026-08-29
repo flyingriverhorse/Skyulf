@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import Any
 
-__all__ = ["WarningCategory", "SkyulfWarning"]
+__all__ = ["SkyulfWarning", "WarningCategory"]
 
 
 class WarningCategory(StrEnum):

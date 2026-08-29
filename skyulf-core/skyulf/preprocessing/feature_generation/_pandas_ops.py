@@ -100,7 +100,7 @@ _PANDAS_ARITH_BUILDERS: dict[
     "add": _pandas_add,
     "subtract": _pandas_subtract,
     "multiply": _pandas_multiply,
-    "divide": lambda s, c, idx, eps: _pandas_divide(s, c, idx, eps),
+    "divide": _pandas_divide,
 }
 
 

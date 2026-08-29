@@ -2,8 +2,9 @@
 
 from typing import Any
 
-# Enable experimental IterativeImputer
-from sklearn.experimental import enable_iterative_imputer
+# Side-effect import (F401 by design): activates sklearn's experimental
+# IterativeImputer so the import below succeeds.
+from sklearn.experimental import enable_iterative_imputer  # noqa: F401
 from sklearn.impute import IterativeImputer
 
 from ...core.meta.decorators import node_meta

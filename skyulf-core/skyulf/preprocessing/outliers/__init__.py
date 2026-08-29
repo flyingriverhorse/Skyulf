@@ -19,14 +19,14 @@ from .winsorize import WinsorizeApplier, WinsorizeCalculator
 from .zscore import ZScoreApplier, ZScoreCalculator
 
 __all__ = [
-    "IQRApplier",
-    "IQRCalculator",
-    "ZScoreApplier",
-    "ZScoreCalculator",
-    "WinsorizeApplier",
-    "WinsorizeCalculator",
-    "ManualBoundsApplier",
-    "ManualBoundsCalculator",
     "EllipticEnvelopeApplier",
     "EllipticEnvelopeCalculator",
+    "IQRApplier",
+    "IQRCalculator",
+    "ManualBoundsApplier",
+    "ManualBoundsCalculator",
+    "WinsorizeApplier",
+    "WinsorizeCalculator",
+    "ZScoreApplier",
+    "ZScoreCalculator",
 ]

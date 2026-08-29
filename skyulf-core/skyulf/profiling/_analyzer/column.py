@@ -18,6 +18,9 @@ from ._utils import _INT_DTYPES, SCIPY_AVAILABLE, _AnalyzerState, _dtype_to_sema
 
 logger = logging.getLogger(__name__)
 
+# Standard significance level for rejecting the normality null hypothesis.
+NORMALITY_ALPHA = 0.05
+
 
 class ColumnMixin(_AnalyzerState):
     """Single-column analysis dispatch."""
@@ -72,7 +75,7 @@ class ColumnMixin(_AnalyzerState):
             test_name=test_name,
             statistic=float(stat),
             p_value=float(p_value),
-            is_normal=float(p_value) > 0.05,
+            is_normal=float(p_value) > NORMALITY_ALPHA,
         )
 
     def _add_normality_test(self, col: str, profile: ColumnProfile) -> None:

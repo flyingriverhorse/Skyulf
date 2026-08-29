@@ -10,10 +10,10 @@ from .power import PowerTransformerApplier, PowerTransformerCalculator
 from .simple import SimpleTransformationApplier, SimpleTransformationCalculator
 
 __all__ = [
+    "GeneralTransformationApplier",
+    "GeneralTransformationCalculator",
     "PowerTransformerApplier",
     "PowerTransformerCalculator",
     "SimpleTransformationApplier",
     "SimpleTransformationCalculator",
-    "GeneralTransformationApplier",
-    "GeneralTransformationCalculator",
 ]

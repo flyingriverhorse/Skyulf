@@ -9,6 +9,11 @@ try:
 except ImportError:
     SCIPY_AVAILABLE = False
 
+# PSI interpretation bands (standard convention): above the critical band the
+# shift is severe enough to retrain; above the moderate band it warrants monitoring.
+PSI_CRITICAL = 0.25
+PSI_MODERATE = 0.1
+
 
 class DriftMetric(BaseModel):
     metric: str
@@ -267,11 +272,11 @@ class DriftCalculator:
         psi_drift = drift_flags["psi_drift"]
         wd_drift = drift_flags["wd_drift"]
 
-        if psi_val > 0.25:
+        if psi_val > PSI_CRITICAL:
             suggestions.append(
                 "Critical population shift detected (PSI > 0.25). Immediate model retraining is recommended."
             )
-        elif psi_val > 0.1:
+        elif psi_val > PSI_MODERATE:
             suggestions.append(
                 "Moderate population shift detected. Monitor model performance closely."
             )
@@ -361,7 +366,7 @@ class DriftCalculator:
         """Build the user-facing suggestion messages for a categorical PSI drift result."""
         suggestions: list[str] = []
         if psi_drift:
-            if psi_val > 0.25:
+            if psi_val > PSI_CRITICAL:
                 suggestions.append(
                     "Critical category-distribution shift detected (PSI > 0.25). "
                     "Immediate model retraining is recommended."

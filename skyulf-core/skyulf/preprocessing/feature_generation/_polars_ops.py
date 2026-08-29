@@ -89,7 +89,7 @@ _POLARS_ARITH_BUILDERS: dict[str, Callable[[list[Any], list[float], float], Any 
     "add": _polars_add,
     "subtract": _polars_subtract,
     "multiply": _polars_multiply,
-    "divide": lambda col_exprs, const_vals, eps: _polars_divide(col_exprs, const_vals, eps),
+    "divide": _polars_divide,
 }
 
 

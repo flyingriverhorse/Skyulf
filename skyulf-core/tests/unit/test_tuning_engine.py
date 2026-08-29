@@ -1419,7 +1419,7 @@ def test_fit_optuna_strategy_pruners(pruner_name):
 
 def test_fit_optuna_without_optuna_installed_raises(monkeypatch):
     """If HAS_OPTUNA is False, requesting the optuna strategy should raise ImportError."""
-    monkeypatch.setattr(engine_mod, "HAS_OPTUNA", False)
+    monkeypatch.setattr(engine_mod._optuna_state, "has_optuna", False)
     X, y = _clf_xy()
     tuner = TuningCalculator(LogisticRegressionCalculator())
     cfg = TuningConfig(

@@ -26,8 +26,8 @@ def _polynomial_compute(
     )
     poly.fit(X_subset)
     transformed = poly.transform(X_subset)
-    if hasattr(transformed, "values"):
-        transformed = transformed.values
+    if hasattr(transformed, "to_numpy"):
+        transformed = transformed.to_numpy()
     feature_names = poly.get_feature_names_out(valid_cols)
 
     include_input = params.get("include_input_features", False)

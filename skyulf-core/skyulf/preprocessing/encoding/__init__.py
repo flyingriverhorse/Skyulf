@@ -25,8 +25,6 @@ from .target import TargetEncoderApplier, TargetEncoderCalculator
 from .woe import WOEEncoderApplier, WOEEncoderCalculator
 
 __all__ = [
-    "detect_categorical_columns",
-    "_exclude_target_column",
     "DummyEncoderApplier",
     "DummyEncoderCalculator",
     "HashEncoderApplier",
@@ -41,4 +39,6 @@ __all__ = [
     "TargetEncoderCalculator",
     "WOEEncoderApplier",
     "WOEEncoderCalculator",
+    "_exclude_target_column",
+    "detect_categorical_columns",
 ]

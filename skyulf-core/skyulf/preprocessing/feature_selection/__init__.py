@@ -12,14 +12,14 @@ from .univariate import UnivariateSelectionApplier, UnivariateSelectionCalculato
 from .variance import VarianceThresholdApplier, VarianceThresholdCalculator
 
 __all__ = [
-    "VarianceThresholdApplier",
-    "VarianceThresholdCalculator",
     "CorrelationThresholdApplier",
     "CorrelationThresholdCalculator",
-    "UnivariateSelectionApplier",
-    "UnivariateSelectionCalculator",
-    "ModelBasedSelectionApplier",
-    "ModelBasedSelectionCalculator",
     "FeatureSelectionApplier",
     "FeatureSelectionCalculator",
+    "ModelBasedSelectionApplier",
+    "ModelBasedSelectionCalculator",
+    "UnivariateSelectionApplier",
+    "UnivariateSelectionCalculator",
+    "VarianceThresholdApplier",
+    "VarianceThresholdCalculator",
 ]

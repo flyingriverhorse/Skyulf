@@ -10,6 +10,9 @@ from ._utils import VADER_AVAILABLE, _AnalyzerState
 
 logger = logging.getLogger(__name__)
 
+# Canonical VADER thresholds: compound >= +0.05 is positive, <= -0.05 negative.
+VADER_COMPOUND_CUTOFF = 0.05
+
 
 class TextMixin(_AnalyzerState):
     """Text helpers for :class:`EDAAnalyzer`."""
@@ -61,9 +64,9 @@ class TextMixin(_AnalyzerState):
 
             compound = analyzer.polarity_scores(text)["compound"]
 
-            if compound >= 0.05:
+            if compound >= VADER_COMPOUND_CUTOFF:
                 counts["positive"] += 1
-            elif compound <= -0.05:
+            elif compound <= -VADER_COMPOUND_CUTOFF:
                 counts["negative"] += 1
             else:
                 counts["neutral"] += 1

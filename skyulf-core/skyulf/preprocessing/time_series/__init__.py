@@ -14,10 +14,10 @@ from .lag import LagFeaturesApplier, LagFeaturesCalculator
 from .rolling import RollingAggregateApplier, RollingAggregateCalculator
 
 __all__ = [
+    "DateFeaturesApplier",
+    "DateFeaturesCalculator",
     "LagFeaturesApplier",
     "LagFeaturesCalculator",
     "RollingAggregateApplier",
     "RollingAggregateCalculator",
-    "DateFeaturesApplier",
-    "DateFeaturesCalculator",
 ]

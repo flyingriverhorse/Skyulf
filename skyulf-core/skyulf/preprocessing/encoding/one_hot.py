@@ -44,8 +44,8 @@ def _to_dense(encoded_array: Any) -> Any:
     """Densify sparse sklearn output and unwrap pandas wrappers."""
     if hasattr(encoded_array, "toarray"):
         return encoded_array.toarray()
-    if hasattr(encoded_array, "values"):
-        return encoded_array.values
+    if hasattr(encoded_array, "to_numpy"):
+        return encoded_array.to_numpy()
     return encoded_array
 
 
@@ -85,7 +85,7 @@ def _onehot_apply_pandas(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, A
     if include_missing:
         X_subset = X_subset.fillna(_MISSING_TOKEN)
 
-    X_input = X_subset.values if hasattr(X_subset, "values") else X_subset
+    X_input = X_subset.to_numpy() if hasattr(X_subset, "to_numpy") else X_subset
     encoded = _to_dense(encoder.transform(X_input))
     encoded_df = pd.DataFrame(encoded, columns=feature_names, index=X_out.index)
     X_out = pd.concat(cast(Any, [X_out, encoded_df]), axis=1)
