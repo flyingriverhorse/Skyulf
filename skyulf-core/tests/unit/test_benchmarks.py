@@ -16,7 +16,7 @@ per-engine regressions independently.
 
 import os
 import sys
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 import pandas as pd
@@ -33,13 +33,22 @@ from skyulf.preprocessing.feature_selection.correlation import CorrelationThresh
 from skyulf.profiling._analyzer.multivariate import MultivariateMixin
 from skyulf.utils import detect_numeric_columns, resolve_columns
 
-try:
+if TYPE_CHECKING:
+    # ty >= 0.0.70 types `pl` as `module polars | None` after the defensive
+    # fallback below and rejects every `pl.DataFrame` use site; the static
+    # import first keeps type-checking against the real module while runtime
+    # keeps the fallback.
     import polars as pl
 
     _ENGINES = ["pandas", "polars"]
-except ImportError:  # pragma: no cover - polars is a core dep, kept defensive
-    pl = None  # ty: ignore[invalid-assignment]
-    _ENGINES = ["pandas"]
+else:
+    try:
+        import polars as pl
+
+        _ENGINES = ["pandas", "polars"]
+    except ImportError:  # pragma: no cover - polars is a core dep, kept defensive
+        pl = None  # ty: ignore[invalid-assignment]
+        _ENGINES = ["pandas"]
 
 # Skip the whole module unless the user explicitly asks for benchmarks. Without
 # the plugin's ``--benchmark-only`` flag the ``benchmark`` fixture still runs the
