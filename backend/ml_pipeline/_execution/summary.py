@@ -23,6 +23,7 @@ from dataclasses import dataclass
 from typing import Any
 
 import pandas as pd
+import polars as pl
 
 from skyulf.data.dataset import SplitDataset
 
@@ -167,25 +168,43 @@ def _fmt_int(value: int) -> str:
 
 def _shape_of(payload: Any) -> tuple[int, int] | None:
     """Return ``(rows, cols)`` for anything frame-shaped; ``None`` otherwise."""
-    if isinstance(payload, pd.DataFrame):
+    if isinstance(payload, (pd.DataFrame, pl.DataFrame)):
         return payload.shape
     if isinstance(payload, tuple) and len(payload) >= 1:
         first = payload[0]
-        if isinstance(first, pd.DataFrame):
+        if isinstance(first, (pd.DataFrame, pl.DataFrame)):
             extra = 1 if len(payload) >= 2 else 0
             return (first.shape[0], first.shape[1] + extra)
     return None
 
 
-def _dtype_breakdown(df: pd.DataFrame) -> str | None:
+def _polars_dtype_counts(df: pl.DataFrame) -> tuple[int, int, int, int]:
+    """Count (numeric, categorical, datetime, bool) columns of a polars frame."""
+    num = cat = dt = bo = 0
+    for dtype in df.schema.values():
+        if dtype == pl.Boolean:
+            bo += 1
+        elif dtype.is_numeric():
+            num += 1
+        elif dtype.is_temporal():
+            dt += 1
+        elif isinstance(dtype, (pl.String, pl.Categorical, pl.Enum)):
+            cat += 1
+    return num, cat, dt, bo
+
+
+def _dtype_breakdown(df: pd.DataFrame | pl.DataFrame) -> str | None:
     """Return ``"10 num · 2 cat"`` style breakdown when a DataFrame has a
     meaningful mix of dtypes. ``None`` when it's all one kind (avoids
     redundant noise)."""
     try:
-        num = int(df.select_dtypes(include="number").shape[1])
-        cat = int(df.select_dtypes(include=["object", "category", "string"]).shape[1])
-        dt = int(df.select_dtypes(include="datetime").shape[1])
-        bo = int(df.select_dtypes(include="bool").shape[1])
+        if isinstance(df, pl.DataFrame):
+            num, cat, dt, bo = _polars_dtype_counts(df)
+        else:
+            num = int(df.select_dtypes(include="number").shape[1])
+            cat = int(df.select_dtypes(include=["object", "category", "string"]).shape[1])
+            dt = int(df.select_dtypes(include="datetime").shape[1])
+            bo = int(df.select_dtypes(include="bool").shape[1])
         parts = []
         if num:
             parts.append(f"{num} num")
@@ -283,7 +302,7 @@ def _scaler_label(step_type: Any) -> str:
     return _SCALER_LABEL.get(_normalize(step_type), "scaled")
 
 
-def _loader_or_snapshot(out: pd.DataFrame) -> str:
+def _loader_or_snapshot(out: pd.DataFrame | pl.DataFrame) -> str:
     """Loader / snapshot phrasing — adds dtype mix when meaningful."""
     rows, cols = out.shape
     breakdown = _dtype_breakdown(out)
@@ -363,7 +382,7 @@ def _delta_baseline_phrase(
 def _frame_branch(
     family: str,
     step_type: Any,
-    out: pd.DataFrame,
+    out: pd.DataFrame | pl.DataFrame,
     in_shape: tuple[int, int] | None,
     params: Mapping[str, Any],
 ) -> str:
@@ -653,7 +672,7 @@ def _render_frame(ctx: SummaryContext) -> str | None:
     sampling — _frame_branch already dispatches on family for the
     actual phrasing.
     """
-    if isinstance(ctx.output, pd.DataFrame):
+    if isinstance(ctx.output, (pd.DataFrame, pl.DataFrame)):
         family = _family_of(ctx.step_type)
         return _frame_branch(family, ctx.step_type, ctx.output, ctx.input_shape, ctx.params)
     return None

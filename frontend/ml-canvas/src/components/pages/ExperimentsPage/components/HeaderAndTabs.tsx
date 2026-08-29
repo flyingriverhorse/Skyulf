@@ -1,6 +1,6 @@
 import React from 'react';
 
-export type ExperimentsView = 'charts' | 'table' | 'evaluation' | 'importance' | 'shap' | 'diff' | 'segmentation';
+export type ExperimentsView = 'charts' | 'table' | 'evaluation' | 'importance' | 'shap' | 'diff' | 'diagram' | 'segmentation';
 
 interface HeaderProps {
   datasets: { id: string; name: string }[];
@@ -55,6 +55,7 @@ interface TabsProps {
   hasFeatureImportances: boolean;
   hasShapSummary: boolean;
   hasSegmentation: boolean;
+  hasPipelineDiagram: boolean;
 }
 
 const TAB_BASE = 'px-4 py-2 text-sm font-medium border-b-2 transition-colors';
@@ -64,7 +65,7 @@ const tabClass = (active: boolean) => `${TAB_BASE} ${
     : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
 }`;
 
-export const ViewTabs: React.FC<TabsProps> = ({ activeView, setActiveView, hasFeatureImportances, hasShapSummary, hasSegmentation }) => (
+export const ViewTabs: React.FC<TabsProps> = ({ activeView, setActiveView, hasFeatureImportances, hasShapSummary, hasSegmentation, hasPipelineDiagram }) => (
   <div className="flex border-b border-gray-200 dark:border-gray-700">
     <button className={tabClass(activeView === 'charts')} onClick={() => { setActiveView('charts'); }}>
       Visual Comparison
@@ -82,6 +83,15 @@ export const ViewTabs: React.FC<TabsProps> = ({ activeView, setActiveView, hasFe
     >
       Pipeline Diff
     </button>
+    {hasPipelineDiagram && (
+      <button
+        className={tabClass(activeView === 'diagram')}
+        onClick={() => { setActiveView('diagram'); }}
+        data-testid="experiments-tab-diagram"
+      >
+        Pipeline Diagram
+      </button>
+    )}
     {hasFeatureImportances && (
       <button className={tabClass(activeView === 'importance')} onClick={() => { setActiveView('importance'); }}>
         Feature Importance

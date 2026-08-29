@@ -101,6 +101,36 @@ class TestBasicTrainingStrategy(unittest.TestCase):
 
         self.assertNotIn("leakage_gate", self.job.metrics)
 
+    def test_handle_success_persists_pipeline_diagram(self):
+        """The mermaid topology diagram rides on job.metrics for the
+        Experiments diagram tab."""
+        node_res = NodeExecutionResult(
+            node_id="node_1", status="success", metrics={"accuracy": 0.9}
+        )
+        pipeline_res = PipelineExecutionResult(
+            pipeline_id="pipe_123",
+            status="success",
+            node_results={"node_1": node_res},
+        )
+        pipeline_res.pipeline_diagram = 'flowchart TD\n    data["Input Data"]'
+
+        self.strategy.handle_success(self.job, pipeline_res)
+
+        self.assertEqual(self.job.metrics["pipeline_diagram"], pipeline_res.pipeline_diagram)
+
+    def test_handle_success_omits_pipeline_diagram_when_absent(self):
+        """Legacy runs carry no diagram; the key must not appear."""
+        node_res = NodeExecutionResult(
+            node_id="node_1", status="success", metrics={"accuracy": 0.9}
+        )
+        pipeline_res = PipelineExecutionResult(
+            pipeline_id="pipe_123", status="success", node_results={"node_1": node_res}
+        )
+
+        self.strategy.handle_success(self.job, pipeline_res)
+
+        self.assertNotIn("pipeline_diagram", self.job.metrics)
+
     def test_handle_success_collects_nested_step_dropped_columns(self):
         """Nested preprocessing step details must still feed dropped_columns rollups."""
         node_res = NodeExecutionResult(

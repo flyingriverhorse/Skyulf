@@ -196,6 +196,29 @@ def build_skyulf_config(preprocess: list[_NodeIn], model: _NodeIn | None) -> dic
     return {"preprocessing": steps, "modeling": modeling}
 
 
+def pipeline_diagram_md(preprocess: list[_NodeIn], model: _NodeIn | None) -> str:
+    """Markdown cell with a mermaid flowchart of the exported topology.
+
+    Reuses the core builder so the notebook diagram matches
+    `SkyulfPipeline.to_mermaid()` and the Experiments page exactly.
+    """
+    from skyulf.pipeline.diagram import build_mermaid_diagram, mermaid_markdown
+
+    def display_name(n: _NodeIn) -> str:
+        display = n.params.get("_display_name")
+        if isinstance(display, str) and display.strip():
+            return display.strip()
+        return n.step_type
+
+    steps = [
+        {"name": display_name(n), "transformer": n.step_type, "params": n.params}
+        for n in preprocess
+    ]
+    modeling = {"type": _model_algorithm(model)} if model is not None else {}
+    diagram = build_mermaid_diagram(steps, modeling)
+    return f"## Pipeline topology\n\n{mermaid_markdown(diagram)}"
+
+
 # ---------------------------------------------------------------------------
 # Compact mode cells
 # ---------------------------------------------------------------------------

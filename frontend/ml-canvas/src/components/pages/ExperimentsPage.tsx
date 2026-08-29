@@ -25,6 +25,7 @@ import { MetricsComparisonChart } from './ExperimentsPage/components/MetricsComp
 import { JobListSidebar } from './ExperimentsPage/components/JobListSidebar';
 import { EvaluationView } from './ExperimentsPage/components/EvaluationView';
 import { SegmentationView } from './ExperimentsPage/components/SegmentationView';
+import { PipelineDiagramView } from './ExperimentsPage/components/PipelineDiagramView';
 import { ExperimentsHeader, ViewTabs, type ExperimentsView } from './ExperimentsPage/components/HeaderAndTabs';
 
 // Local helper: split a metric key into split-prefix and base name.
@@ -499,6 +500,15 @@ export const ExperimentsPage: React.FC = () => {
     () => selectedJobs.some(j => getTaskForModelType(j.model_type, registryItems) === 'segmentation'),
     [selectedJobs, registryItems]
   );
+  // Mermaid topology diagram stamped onto job metrics at run time by the
+  // backend (`_execution/diagram.py`); absent for legacy runs.
+  const hasPipelineDiagram = useMemo(
+    () => selectedJobs.some(job => {
+      const m = (job.metrics || job.result?.metrics || {}) as Record<string, unknown>;
+      return typeof m.pipeline_diagram === 'string' && m.pipeline_diagram.length > 0;
+    }),
+    [selectedJobs]
+  );
   // Per-run availability for the Segmentation tab (EXP-003): we don't fetch
   // clustering results eagerly for every selected run, so `hasArtifact` is
   // conservatively true whenever the run's task supports clustering — the
@@ -591,6 +601,7 @@ export const ExperimentsPage: React.FC = () => {
                 hasFeatureImportances={hasFeatureImportances}
                 hasShapSummary={hasShapSummary}
                 hasSegmentation={hasSegmentation}
+                hasPipelineDiagram={hasPipelineDiagram}
               />
 
               <BranchComparisonCard selectedJobs={selectedJobs} getDuration={formatDuration} />
@@ -677,6 +688,10 @@ export const ExperimentsPage: React.FC = () => {
 
               {activeView === 'diff' && (
                 <PipelineDiffView jobs={selectedJobs} />
+              )}
+
+              {activeView === 'diagram' && hasPipelineDiagram && (
+                <PipelineDiagramView jobs={selectedJobs} />
               )}
 
               {activeView === 'importance' && hasFeatureImportances && (

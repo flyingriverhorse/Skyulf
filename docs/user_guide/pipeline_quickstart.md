@@ -101,3 +101,38 @@ with tempfile.TemporaryDirectory() as tmp:
 print("Preds after reload:")
 print(preds2)
 ```
+
+## Inspecting a pipeline
+
+A fitted (or unfitted) pipeline is fully introspectable — useful for logs,
+docs, PR descriptions, and model registries:
+
+```python
+print(pipeline.describe())
+# Human-readable summary: each preprocessing step with its params, then the model.
+
+print(pipeline.to_mermaid())
+# Mermaid flowchart of the topology (data -> steps -> model).
+# Paste into GitHub docs/PRs, or render with any mermaid viewer.
+
+card = pipeline.export_model_card()
+# JSON-friendly dict: schema_version, fitted, fingerprint, preprocessing
+# lineage, model + params, fit metrics, and `diagram` (the same mermaid
+# string as to_mermaid()). Intended for audit logs and registries.
+```
+
+The same surfaces appear across the platform:
+
+- **Experiments page** — every completed run persists its mermaid topology
+  (`metrics.pipeline_diagram`); select runs and open the **Pipeline Diagram** tab.
+- **Notebook export** — exported notebooks embed the topology as a rendered
+  "Pipeline topology" markdown cell (compact and full modes).
+
+Diagram labels are human-readable — internal node ids are never shown. Each
+node gets the step's display name, and a second line with the most relevant
+detail: a digest of the step params for config diagrams (`strategy: mean`),
+or the run's one-line summary for completed jobs (`acc 0.87 · f1 0.84`).
+Model nodes show the algorithm in readable form (`Random Forest Classifier`).
+
+Mermaid labels are always emitted double-quoted, so node names containing
+parentheses, brackets, or quotes stay parseable.

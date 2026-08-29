@@ -1,7 +1,7 @@
 {
   "name": "ml-canvas",
   "private": true,
-  "version": "0.8.6",
+  "version": "0.8.7",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -47,6 +47,7 @@
     "html-to-image": "^1.11.13",
     "leaflet": "^1.9.4",
     "lucide-react": "^0.363.0",
+    "mermaid": "^11.17.2",
     "plotly.js-gl3d-dist-min": "^3.5.0",
     "react": "^18.2.0",
     "react-chartjs-2": "^5.3.1",

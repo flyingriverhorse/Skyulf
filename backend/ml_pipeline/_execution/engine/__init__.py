@@ -296,6 +296,9 @@ class PipelineEngine(ArtifactsMixin, MergeMixin, FeatureEngMixin, NodeRunnersMix
         to its static description.
         """
         metadata: dict[str, Any] = {}
+        display = (node.params or {}).get("_display_name")
+        if isinstance(display, str) and display.strip():
+            metadata["display_name"] = display.strip()
         # Output / upstream loads are best-effort and isolated from
         # the summary call - for trainers and tuners the summary
         # comes purely from `metrics`, so a failed model load (e.g.

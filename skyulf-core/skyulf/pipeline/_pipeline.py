@@ -21,7 +21,7 @@ from ..modeling.base import BaseModelApplier, BaseModelCalculator, StatefulEstim
 from ..preprocessing.pipeline import FeatureEngineer
 from ..registry import NodeRegistry
 from ..types import PipelineConfig
-from .diagram import build_mermaid_diagram
+from .diagram import build_mermaid_diagram, mermaid_markdown
 from .seal import artifact_digest
 
 logger = logging.getLogger(__name__)
@@ -432,6 +432,18 @@ class SkyulfPipeline:
         """
         return build_mermaid_diagram(self.preprocessing_steps, self.modeling_config)
 
+    def to_mermaid_markdown(self, heading: str | None = "Pipeline topology") -> str:
+        """Return the diagram as a Markdown snippet with a ``mermaid`` fence.
+
+        Includes a heading by default; pass ``heading=None`` for just the
+        fenced block. Renders natively on GitHub, in VS Code previews, and
+        in Jupyter markdown cells.
+        """
+        block = mermaid_markdown(self.to_mermaid())
+        if heading is None:
+            return block
+        return f"# {heading}\n\n{block}"
+
     def is_fitted(self) -> bool:
         """True once preprocessing has been fit (or a model has been trained)."""
         if self.feature_engineer.fitted_steps:
@@ -467,8 +479,9 @@ class SkyulfPipeline:
         """Return a structured, JSON-friendly summary of the pipeline.
 
         Captures lineage (preprocessing chain), the model and its hyperparameters,
-        the reproducibility fingerprint, and the metrics from the last :meth:`fit`
-        (``None`` if never fitted). Intended for audit logs and model registries.
+        the reproducibility fingerprint, the metrics from the last :meth:`fit`
+        (``None`` if never fitted), and a Mermaid ``flowchart`` of the topology
+        under ``"diagram"``. Intended for audit logs and model registries.
         """
         model: dict[str, Any] | None = None
         if self.modeling_config:
@@ -491,6 +504,7 @@ class SkyulfPipeline:
             ],
             "model": model,
             "metrics": self._fit_metrics,
+            "diagram": self.to_mermaid(),
         }
 
     def save(self, path: str):

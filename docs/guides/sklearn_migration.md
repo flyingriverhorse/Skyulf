@@ -118,7 +118,7 @@ Python. Skyulf gives you the same information without touching internals:
 print(pipeline.describe())      # human-readable step-by-step summary
 print(pipeline.to_mermaid())    # Mermaid flowchart string (paste into docs/PRs)
 print(pipeline.fingerprint())   # deterministic SHA-256 over topology + fitted artifacts
-print(pipeline.export_model_card())  # structured dict: lineage, params, metrics, fingerprint
+print(pipeline.export_model_card())  # structured dict: lineage, params, metrics, fingerprint, mermaid diagram
 ```
 
 `fingerprint()` in particular has no direct sklearn equivalent — it's a
