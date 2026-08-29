@@ -55,19 +55,20 @@ def apply_text_dual_engine(
 
     # Polars input arrives either as a raw pl.DataFrame or as a
     # SkyulfPolarsWrapper (documented public input type). The wrapper lives
-    # under `skyulf.*` and holds the real frame in `._df`, so a plain module
-    # check misses it and would hand the wrapper itself to `fn` (F-09).
+    # under `skyulf.*` and exposes the real frame via `to_native()`, so a
+    # plain module check misses it and would hand the wrapper itself to `fn`
+    # (F-09).
     was_wrapped = (
         type(X).__module__.startswith("skyulf")
-        and hasattr(X, "_df")
-        and type(X._df).__module__.startswith("polars")
+        and hasattr(X, "to_native")
+        and type(X.to_native()).__module__.startswith("polars")
     )
     was_polars = (
         hasattr(X, "to_pandas") and type(X).__module__.startswith("polars")
     ) or was_wrapped
 
     if was_polars and polars_fn is not None:
-        X_pl = X._df if was_wrapped else X
+        X_pl = X.to_native() if was_wrapped else X
         X_out_pl = polars_fn(X_pl, params)
         if X_out_pl is not None:
             if was_wrapped:

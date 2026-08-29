@@ -53,6 +53,17 @@ async def test_save_artifact_converts_pandas_via_polars(tmp_path) -> None:
     assert pl.read_parquet(path)["a"].to_list() == [1, 2]
 
 
+async def test_save_artifact_writes_wrapped_polars_native(tmp_path) -> None:
+    """A SkyulfPolarsWrapper must be written via its native polars frame
+    (unwrap, no pandas round-trip), pinning the wrapper save path."""
+    from skyulf.engines.polars_engine import SkyulfPolarsWrapper
+
+    path = tmp_path / "out.parquet"
+    wrapper = SkyulfPolarsWrapper(pl.DataFrame({"a": [1, 2]}))
+    await DataService().save_artifact(wrapper, path)
+    assert pl.read_parquet(path)["a"].to_list() == [1, 2]
+
+
 def test_should_use_polars_respects_force_type() -> None:
     service = DataService()
     assert service._should_use_polars(None) is True

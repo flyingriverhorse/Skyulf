@@ -72,6 +72,25 @@ def test_wrapper_to_pandas_converts(pl_df):
     assert pdf["a"].tolist() == [1, 2, 3]
 
 
+def test_wrapper_to_native_returns_native_polars_frame(pl_df):
+    """to_native() must return the underlying polars frame as-is (same object,
+    no conversion) — the documented replacement for the private ``._df``."""
+    wrapper = SkyulfPolarsWrapper(pl_df)
+    native = wrapper.to_native()
+    assert isinstance(native, pl.DataFrame)
+    assert native is pl_df
+
+
+def test_wrapper_to_native_differs_from_to_pandas(pl_df):
+    """to_native() hands back the polars frame; to_pandas() converts to pandas.
+    For a polars-backed wrapper they must yield different types."""
+    import pandas as pd
+
+    wrapper = SkyulfPolarsWrapper(pl_df)
+    assert isinstance(wrapper.to_native(), pl.DataFrame)
+    assert isinstance(wrapper.to_pandas(), pd.DataFrame)
+
+
 def test_wrapper_to_arrow_roundtrips(pl_df):
     """to_arrow() should produce an Arrow table with matching row count."""
     wrapper = SkyulfPolarsWrapper(pl_df)

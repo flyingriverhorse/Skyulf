@@ -119,8 +119,8 @@ def _pack_polars_output(X: Any, y: Any) -> Any:
     if isinstance(X, pl.DataFrame):
         raw_df = X
         is_wrapped = False
-    elif hasattr(X, "_df"):
-        raw_df = X._df
+    elif hasattr(X, "to_native"):
+        raw_df = X.to_native()
         is_wrapped = True
 
     # Merge

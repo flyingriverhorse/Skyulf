@@ -67,6 +67,9 @@ class SkyulfPolarsWrapper:
             expr = pl.lit(values).alias(name)
         return SkyulfPolarsWrapper(self._df.with_columns(expr))
 
+    def to_native(self) -> Any:
+        return self._df
+
     def to_pandas(self) -> Any:
         return self._df.to_pandas()
 

@@ -125,16 +125,16 @@ class EngineRegistry:
         "my_pandas_wrapper" module.
 
         Our own engine wrappers (SkyulfPandasWrapper/SkyulfPolarsWrapper,
-        under `skyulf.engines.*`) hold the real dataframe in `._df`; unwrap
-        and re-check *only* in that case so detection is based on the
-        underlying library. We deliberately don't do this unconditionally
-        for any object with a `._df` attribute, since e.g. polars' DataFrame
-        itself has an internal `._df` (its Rust-backed handle) that would
-        otherwise be mistakenly "unwrapped".
+        under `skyulf.engines.*`) hold the real dataframe behind a public
+        `to_native()` accessor; unwrap and re-check *only* in that case so
+        detection is based on the underlying library. Only our wrappers
+        define `to_native()` (raw polars/pandas frames have no such method),
+        so it is a reliable wrapper discriminator and we never touch polars'
+        own internal `._df` handle.
         """
         top_level = type(data).__module__.split(".", 1)[0]
-        if top_level == "skyulf" and hasattr(data, "_df"):
-            top_level = type(data._df).__module__.split(".", 1)[0]
+        if top_level == "skyulf" and hasattr(data, "to_native"):
+            top_level = type(data.to_native()).__module__.split(".", 1)[0]
         return top_level
 
     @classmethod

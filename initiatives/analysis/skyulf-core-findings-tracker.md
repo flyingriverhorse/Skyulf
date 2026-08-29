@@ -6,8 +6,9 @@ snapshot, `/Users/BH7043/Skyulf`).
 (3,457 passed, 56 skipped).
 
 The audit predates the 080–086 fix waves. 7 of 31 findings no longer reproduce;
-both partials (F-14, F-31) were closed 2026-08-29; 19 are live (F-13 was
-partial at triage and is now fully fixed).
+both partials (F-14, F-31) were closed 2026-08-29. After F-07 (public
+`to_native()`) closed 2026-08-29, 7 remain open: F-30 (deferred pending a
+compat call) and six structural items (F-15, F-09, F-08, F-11, F-18, F-19).
 This file tracks the fix work, few-at-a-time for easy items, one-at-a-time for hard ones.
 
 **Status key:** ⬜ open · 🟨 in progress · ✅ done · ⏭️ parked
@@ -53,7 +54,7 @@ Easy items batched; hard items one at a time.
 | F-17 | 🟡 | 20 mutable class attrs need `ClassVar` | ~2 h | ✅ |
 | F-10 | 🟠 | `_HARDCODED_MODEL_MAP` shadows registry | half day | ✅ |
 | F-15 | 🟡 | Pickle-based reproducibility digest | ~1 day | ⬜ |
-| F-07 | 🟠 | `._df` unwrapping → public `to_native()` | ~1 day | ⬜ |
+| F-07 | 🟠 | `._df` unwrapping → public `to_native()` | ~1 day | ✅ |
 | F-09 | 🟠 | Dual-engine dispatch mapping (Spark prereq) | ~2 days | ⬜ |
 | F-08 | 🟠 | Split the `SkyulfDataFrame` protocol | ~3 days | ⬜ |
 | F-11 | 🟠 | Break import cycles (196 deferred imports) | ~2 days | ⬜ |
@@ -427,3 +428,41 @@ Three tracked follow-ups closed in one batch:
 - Verification: ruff check + format clean repo-wide, `ty check` exit 0,
   targeted suites green (profiling+preprocessing 269, seams+tuning 131),
   full core suite 3514 passed / 70 skipped (exit 0).
+
+### 2026-08-29 — F-07 public `to_native()` unwrap (branch 086)
+
+- **F-07** fixed: the engine wrappers no longer have their private `._df`
+  reached into from outside. Added a public, documented `to_native()` to
+  `SkyulfPandasWrapper`, `SkyulfPolarsWrapper`, and the `SkyulfDataFrame`
+  protocol. Semantics: `to_native()` returns the backing frame **as-is**
+  (no conversion); `to_pandas()` always yields pandas — the two coincide for
+  a pandas-backed wrapper but differ for a polars-backed one (identity vs.
+  convert). `_df` stays as the internal storage attribute; `to_native()` is
+  the single public escape hatch the audit asked for.
+- Routed all 8 external core `._df` sites through it (SLF001 `_df` 8 → 0):
+  `utils.py` `_pack_polars_output` (detection now `hasattr(X, "to_native")`),
+  `engines/registry.py` `_detect_top_level_package` (same detection; docstring
+  updated — only our wrappers define `to_native()`, so the old polars-internal-
+  `._df` caution no longer applies), `preprocessing/dispatcher.py`,
+  `preprocessing/feature_selection/correlation.py`, `profiling/expect.py`,
+  `modeling/_evaluation/clustering.py`, and both detection+unwrap in
+  `preprocessing/vectorization/_common.py`. Also routed the identical
+  backend anti-pattern `backend/services/data_service.py` `_save_polars_native`
+  (was `data._df.write_parquet`).
+- Behavior is unchanged — pure API addition + rerouting. `hasattr(x, "to_native")`
+  is a reliable wrapper discriminator (raw pandas/polars frames have no such
+  method), so every detection branch still only fires for our wrappers.
+- Tests: 3 regression tests pin `to_native()` returns the native frame by
+  identity for both engines and that it differs in type from `to_pandas()` for
+  a polars wrapper (`test_engines_pandas.py`, `test_engines_polars.py`); 1
+  end-to-end test pins a `SkyulfPolarsWrapper` saves through
+  `DataService.save_artifact` (`tests/unit/test_data_service.py`).
+- Verification: `ruff check .` clean repo-wide, `ruff format --check` clean on
+  all 14 touched files (34 pre-existing unformatted files untouched, out of
+  scope), `ty check` exit 0, full core suite 3561 passed / 70 skipped (exit 0),
+  backend/root unit suite 829 passed (exit 0).
+- Note: `to_native()` is now the one seam where a future "you are unwrapping a
+  distributed frame" warning can live (the F-09/Spark hook the audit pointed at);
+  no warning added yet — there is no third engine. The remaining 13 SLF001s
+  (`_scaler`, `_score_func`, `_SOLVER_PENALTIES`, etc.) are unrelated private
+  accesses, not `._df`, and stay out of this finding's scope.

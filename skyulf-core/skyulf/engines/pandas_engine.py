@@ -55,6 +55,9 @@ class SkyulfPandasWrapper:
         values = _to_positional_values(values, self._df.index)
         return SkyulfPandasWrapper(self._df.assign(**{name: values}))
 
+    def to_native(self) -> pd.DataFrame:
+        return self._df
+
     def to_pandas(self) -> pd.DataFrame:
         return self._df
 

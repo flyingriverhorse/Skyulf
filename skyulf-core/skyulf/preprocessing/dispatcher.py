@@ -33,7 +33,7 @@ def _unwrap_polars_wrapper(X: Any) -> tuple[Any, bool]:
     the caller's engine.
     """
     if isinstance(X, SkyulfPolarsWrapper):
-        return X._df, True
+        return X.to_native(), True
     return X, False
 
 

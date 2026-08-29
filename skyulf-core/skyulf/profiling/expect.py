@@ -49,7 +49,7 @@ def _as_polars(df: Any) -> pl.DataFrame | None:
     if isinstance(df, pl.DataFrame):
         return df
     if isinstance(df, SkyulfPolarsWrapper):
-        return df._df
+        return df.to_native()
     return None
 
 
