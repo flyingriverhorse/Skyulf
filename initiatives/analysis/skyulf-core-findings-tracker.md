@@ -6,9 +6,9 @@ snapshot, `/Users/BH7043/Skyulf`).
 (3,457 passed, 56 skipped).
 
 The audit predates the 080–086 fix waves. 7 of 31 findings no longer reproduce;
-both partials (F-14, F-31) were closed 2026-08-29. After F-07 (public
-`to_native()`) closed 2026-08-29, 7 remain open: F-30 (deferred pending a
-compat call) and six structural items (F-15, F-09, F-08, F-11, F-18, F-19).
+both partials (F-14, F-31) were closed 2026-08-29. After F-15 (semantic
+reproducibility digest) closed 2026-08-29, 6 remain open: F-30 (deferred
+pending a compat call) and five structural items (F-09, F-08, F-11, F-18, F-19).
 This file tracks the fix work, few-at-a-time for easy items, one-at-a-time for hard ones.
 
 **Status key:** ⬜ open · 🟨 in progress · ✅ done · ⏭️ parked
@@ -53,7 +53,7 @@ Easy items batched; hard items one at a time.
 | F-29 | ⚪ | Stale/blanket noqa cleanup | mechanical | ✅ |
 | F-17 | 🟡 | 20 mutable class attrs need `ClassVar` | ~2 h | ✅ |
 | F-10 | 🟠 | `_HARDCODED_MODEL_MAP` shadows registry | half day | ✅ |
-| F-15 | 🟡 | Pickle-based reproducibility digest | ~1 day | ⬜ |
+| F-15 | 🟡 | Pickle-based reproducibility digest | ~1 day | ✅ |
 | F-07 | 🟠 | `._df` unwrapping → public `to_native()` | ~1 day | ✅ |
 | F-09 | 🟠 | Dual-engine dispatch mapping (Spark prereq) | ~2 days | ⬜ |
 | F-08 | 🟠 | Split the `SkyulfDataFrame` protocol | ~3 days | ⬜ |
@@ -466,3 +466,47 @@ Three tracked follow-ups closed in one batch:
   no warning added yet — there is no third engine. The remaining 13 SLF001s
   (`_scaler`, `_score_func`, `_SOLVER_PENALTIES`, etc.) are unrelated private
   accesses, not `._df`, and stay out of this finding's scope.
+
+### 2026-08-29 — F-15 semantic reproducibility digest (branch 087)
+
+- **F-15** fixed: `_artifact_digest` (`skyulf/pipeline.py`) no longer pickles.
+  A type-tagged recursive canonical walk (`_feed_canonical`) now feeds the
+  SHA-256: scalars + numpy scalars, `ndarray` as `dtype|shape|tobytes()`
+  (contiguous), `np.random.RandomState` via `get_state()`, dict (keys sorted
+  by `repr`, insertion-order insensitive), tuple/list (order-sensitive, distinct
+  tags), set/frozenset (sorted), classes (module.qualname), dataclasses
+  (field-by-field), sklearn `_tree.Tree` (C extension, no `__dict__` — walked
+  via `node_count` + its 8 node arrays), and any generic object via sorted
+  `vars()` (routines and modules skipped). This covers fitted estimators
+  (constructor params + every fitted attr, incl. `coef_`, `tree_`, nested
+  `estimators_`), preprocessing artifact dicts, and tuned
+  `(model, TuningResult)` tuples.
+- The `repr` fallback is gone, per the audit: anything the walk cannot
+  canonicalize raises `TypeError` — an artifact that cannot be digested fails
+  the seal instead of silently passing it.
+- Version stability flipped: the digest no longer embeds pickle module
+  paths/protocol, so a sklearn or pickle-protocol bump no longer changes a
+  byte-identical model's digest (`fingerprint()` docstring updated
+  accordingly). Preprocessing artifacts were already JSON-like dicts, so their
+  digests stay content-addressed.
+- **Scope decision (documented, deviating from the audit):** the audit's
+  "plus the training-data digest" component was deliberately **not**
+  implemented. The seal's contract — "same hash ⇒ same predictions" — is fully
+  served by topology + learned weights + hyperparameters; the weights already
+  absorb any training-data influence. A training-data digest would need a
+  canonical choice that doesn't exist (pre- vs post-preprocessing frame, target
+  inclusion, split selection), and it isn't available at predict time, so it
+  could never be verified where the seal is checked.
+- Tests: the old repr-fallback test in `test_pipeline_coverage.py` was
+  replaced by seven pins — digest determinism, weight sensitivity with
+  identical hyperparameters (the old collision), fail-loud `TypeError`, dict
+  key-order insensitivity, Tree-structure coverage, tuned-tuple coverage, and
+  an end-to-end RandomForest `fingerprint()` determinism + data-sensitivity
+  test. All pre-existing `test_pipeline_card.py` fingerprint pins still pass.
+- Detail: this env's sklearn `_tree.Tree` has no `children_default` attribute;
+  the walk covers `children_left/right`, `feature`, `threshold`, `impurity`,
+  `n_node_samples`, `weighted_n_node_samples`, `value` — enough to pin the
+  tree's structure and predictions.
+- Verification: full core suite 3567 passed / 70 skipped (exit 0);
+  `ruff check` + `ruff format` clean on the two touched files; `ty check`
+  backend + core + tests exit 0.

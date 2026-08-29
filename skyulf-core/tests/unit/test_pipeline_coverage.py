@@ -1,7 +1,9 @@
 """Coverage-focused tests for skyulf.pipeline (the top-level SkyulfPipeline).
 
 Exercises branches not hit by the existing end-to-end test in test_pipeline.py:
-* `_artifact_digest` pickle-failure fallback to `repr`.
+* `_artifact_digest` semantic (F-15): determinism, weight sensitivity,
+  tree structures, tuned ``(model, TuningResult)`` tuples, and the
+  fail-loud ``TypeError`` that replaced the old ``repr`` fallback.
 * `_init_model_estimator` early return, registry-only model resolution
   (including the `hyperparameter_tuner` base-model branch), and the
   "unknown model type" / "partially registered" error paths.
@@ -12,10 +14,14 @@ Exercises branches not hit by the existing end-to-end test in test_pipeline.py:
 
 from typing import Any, cast
 
+import numpy as np
 import pandas as pd
 import pytest
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.linear_model import LogisticRegression
 
 from skyulf.modeling._tuning.engine import TuningApplier, TuningCalculator
+from skyulf.modeling._tuning.schemas import TuningResult
 from skyulf.pipeline import SkyulfPipeline, _artifact_digest
 from skyulf.registry import NodeRegistry
 
@@ -24,23 +30,97 @@ from skyulf.registry import NodeRegistry
 # ---------------------------------------------------------------------------
 
 
-class _Unpicklable:
-    """An object whose pickling always fails, forcing the `repr` fallback."""
-
-    def __reduce__(self):
-        raise TypeError("cannot pickle this object")
-
-    def __repr__(self) -> str:
-        return "<_Unpicklable sentinel>"
+def _small_xy() -> tuple[np.ndarray, np.ndarray]:
+    rng = np.random.default_rng(0)
+    X = rng.normal(size=(40, 3))
+    y = (X[:, 0] + X[:, 1] > 0).astype(int)
+    return X, y
 
 
-def test_artifact_digest_falls_back_to_repr_when_pickle_fails() -> None:
-    """_artifact_digest must hash `repr(obj)` when pickling raises."""
-    import hashlib
+def test_artifact_digest_is_deterministic_for_same_estimator() -> None:
+    X, y = _small_xy()
+    est = LogisticRegression(random_state=42).fit(X, y)
+    assert _artifact_digest(est) == _artifact_digest(est)
 
-    obj = _Unpicklable()
-    digest = _artifact_digest(obj)
-    assert digest == hashlib.sha256(repr(obj).encode("utf-8")).digest()
+
+def test_artifact_digest_detects_different_weights_same_hyperparams() -> None:
+    """Identical hyperparameters but different fitted weights must digest
+    differently — this is the collision the old ``repr`` fallback caused."""
+    X, y = _small_xy()
+    same = LogisticRegression(random_state=42).fit(X, y)
+    flipped = LogisticRegression(random_state=42).fit(X, 1 - y)
+    assert same.get_params() == flipped.get_params()
+    assert not (same.coef_ == flipped.coef_).all()
+    assert _artifact_digest(same) != _artifact_digest(flipped)
+
+
+def test_artifact_digest_raises_on_undigestible_object() -> None:
+    """No silent ``repr`` fallback: an artifact without a canonical
+    representation must fail the seal, not pass it."""
+
+    class _Opaque:
+        def __init__(self) -> None:
+            self.gen = (i for i in range(3))
+
+    with pytest.raises(TypeError):
+        _artifact_digest(_Opaque())
+
+
+def test_artifact_digest_is_key_order_insensitive_for_dicts() -> None:
+    """Preprocessing artifacts are config dicts; insertion order must not
+    matter for the seal."""
+    assert _artifact_digest({"a": 1, "b": 2.0, "c": [1, 2]}) == _artifact_digest(
+        {"c": [1, 2], "b": 2.0, "a": 1}
+    )
+    assert _artifact_digest({"a": 1}) != _artifact_digest({"a": 2})
+
+
+def test_artifact_digest_covers_tree_structures() -> None:
+    """sklearn Tree objects are C extensions without ``__dict__``; the digest
+    must walk their node arrays."""
+    X, y = _small_xy()
+    rf = RandomForestClassifier(n_estimators=3, random_state=42).fit(X, y)
+    assert _artifact_digest(rf) == _artifact_digest(rf)
+    other = RandomForestClassifier(n_estimators=3, random_state=43).fit(X, y)
+    assert _artifact_digest(rf) != _artifact_digest(other)
+
+
+def test_artifact_digest_covers_tuned_model_tuples() -> None:
+    """Tuned models are stored as ``(estimator, TuningResult)``; both halves
+    must feed the digest."""
+    X, y = _small_xy()
+    est = LogisticRegression(random_state=42).fit(X, y)
+    result = TuningResult(best_params={"C": 1.0}, best_score=0.9, n_trials=1, trials=[])
+    assert _artifact_digest((est, result)) == _artifact_digest((est, result))
+    changed = TuningResult(best_params={"C": 10.0}, best_score=0.9, n_trials=1, trials=[])
+    assert _artifact_digest((est, result)) != _artifact_digest((est, changed))
+
+
+def test_fingerprint_of_tree_pipeline_is_deterministic_and_data_sensitive() -> None:
+    """End-to-end: a RandomForest pipeline's fingerprint must be stable across
+    identical fits and change when the training data changes."""
+    config = {
+        "preprocessing": [],
+        "modeling": {"type": "random_forest_classifier", "node_id": "m1", "n_estimators": 5},
+    }
+    frame = pd.DataFrame(
+        {
+            "a": [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0],
+            "b": [10.0, 9.0, 8.0, 7.0, 6.0, 5.0, 4.0, 3.0, 2.0, 1.0],
+            "target": [0, 1, 0, 1, 0, 1, 0, 1, 0, 1],
+        }
+    )
+    p1 = SkyulfPipeline(config)
+    p1.fit(frame, target_column="target")
+    p2 = SkyulfPipeline(config)
+    p2.fit(frame, target_column="target")
+    assert p1.fingerprint() == p2.fingerprint()
+
+    flipped = frame.copy()
+    flipped["target"] = 1 - flipped["target"]
+    p3 = SkyulfPipeline(config)
+    p3.fit(flipped, target_column="target")
+    assert p1.fingerprint() != p3.fingerprint()
 
 
 # ---------------------------------------------------------------------------
