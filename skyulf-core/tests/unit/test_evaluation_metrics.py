@@ -381,3 +381,53 @@ def test_metric_failure_is_omitted_not_nan(caplog, monkeypatch, binary_data):
     assert "pr_auc" not in metrics
     assert not any(isinstance(v, float) and math.isnan(v) for v in metrics.values())
     assert "roc_auc" in metrics
+
+
+class TestFailureBranches:
+    """Direct coverage of the isolated-failure branches (Codecov patch follow-up)."""
+
+    def test_try_add_metric_value_error_omits_and_warns(self, caplog):
+        import logging
+
+        def boom(*args, **kwargs):
+            raise ValueError("bad input")
+
+        metrics = {}
+        with caplog.at_level(logging.WARNING):
+            metrics_mod._try_add_metric(metrics, "score", boom, 1, 2)
+
+        assert "score" not in metrics
+        assert any("score" in rec.message for rec in caplog.records)
+
+    def test_try_add_metric_type_error_omits_and_warns(self, caplog):
+        import logging
+
+        def boom(*args, **kwargs):
+            raise TypeError("wrong types")
+
+        metrics = {"other": 1.0}
+        with caplog.at_level(logging.WARNING):
+            metrics_mod._try_add_metric(metrics, "score", boom)
+
+        assert metrics == {"other": 1.0}
+
+    def test_probability_metrics_predict_proba_failure_is_noop(self):
+        class BrokenProba:
+            def predict_proba(self, X):
+                raise RuntimeError("model-specific failure")
+
+        metrics = {"accuracy": 0.9}
+        metrics_mod._add_probability_based_metrics(
+            metrics, BrokenProba(), np.zeros((4, 2)), np.array([0, 1, 0, 1])
+        )
+        assert metrics == {"accuracy": 0.9}
+
+    def test_binary_unweighted_label_resolution_failure_is_noop(self, caplog):
+        import logging
+
+        metrics = {"accuracy": 0.8}
+        y_arr = np.array([1, "a"], dtype=object)  # np.unique raises TypeError
+        with caplog.at_level(logging.WARNING):
+            metrics_mod._add_binary_unweighted_metrics(metrics, None, y_arr, y_arr)
+
+        assert metrics == {"accuracy": 0.8}
