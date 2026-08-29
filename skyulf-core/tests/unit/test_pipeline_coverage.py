@@ -98,6 +98,55 @@ def test_artifact_digest_covers_tuned_model_tuples() -> None:
     assert artifact_digest((est, result)) != artifact_digest((est, changed))
 
 
+def test_artifact_digest_covers_scalar_and_buffer_types() -> None:
+    """Each canonical type tag must be exercised: complex, byte buffers,
+    sets, and numpy scalar variants."""
+    assert artifact_digest(1 + 2j) != artifact_digest(1 + 3j)
+    assert artifact_digest(b"abc") == artifact_digest(bytearray(b"abc"))
+    assert artifact_digest(b"abc") == artifact_digest(memoryview(b"abc"))
+    assert artifact_digest(b"abc") != artifact_digest(b"abd")
+    assert artifact_digest({1, 2, 3}) == artifact_digest(frozenset({3, 2, 1}))
+    assert artifact_digest({1, 2}) != artifact_digest({1, 3})
+    assert artifact_digest(np.int64(7)) == artifact_digest(7)
+    assert artifact_digest(np.float64(0.5)) == artifact_digest(0.5)
+    assert artifact_digest(np.bool_(True)) == artifact_digest(True)
+
+
+def test_artifact_digest_covers_random_state_and_classes() -> None:
+    """RandomState digests via its state tuple; classes digest by identity."""
+    rs_a = np.random.RandomState(42)
+    rs_b = np.random.RandomState(42)
+    rs_c = np.random.RandomState(7)
+    assert artifact_digest(rs_a) == artifact_digest(rs_b)
+    assert artifact_digest(rs_a) != artifact_digest(rs_c)
+
+    class _Marker:
+        pass
+
+    assert artifact_digest(_Marker) == artifact_digest(_Marker)
+    assert artifact_digest(_Marker) != artifact_digest(int)
+
+
+def test_artifact_digest_skips_routine_and_module_attributes() -> None:
+    """Methods and imported modules on an object must be skipped, while real
+    state still feeds the digest."""
+    import json as _json
+
+    class _Holder:
+        def __init__(self) -> None:
+            self.value = 3
+            self.mod = _json
+            self.fn = _json.dumps
+
+        def method(self) -> int:
+            return self.value
+
+    base = _Holder()
+    assert artifact_digest(base) == artifact_digest(_Holder())
+    base.value = 4
+    assert artifact_digest(base) != artifact_digest(_Holder())
+
+
 def test_fingerprint_of_tree_pipeline_is_deterministic_and_data_sensitive() -> None:
     """End-to-end: a RandomForest pipeline's fingerprint must be stable across
     identical fits and change when the training data changes."""

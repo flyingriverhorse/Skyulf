@@ -38,6 +38,10 @@ class TestShapeOf:
     def test_non_frame_is_none(self):
         assert _shape_of("nope") is None
 
+    def test_tuple_with_polars_frame_counts_y_column(self):
+        # A (X, y) tuple whose X is a polars frame must count y as one extra column.
+        assert _shape_of((pl.DataFrame({"a": [1, 2]}), [0, 1])) == (2, 2)
+
 
 class TestDtypeBreakdown:
     def test_mixed_polars_frame(self):
@@ -51,6 +55,16 @@ class TestDtypeBreakdown:
             {"a": [1, 2], "when": [pd.Timestamp("2026-01-01"), pd.Timestamp("2026-01-02")]}
         )
         assert _dtype_breakdown(df) == "1 num · 1 dt"
+
+    def test_categorical_and_enum_count_as_cat(self):
+        df = pl.DataFrame(
+            {
+                "n": [1, 2],
+                "c": pl.Series(["a", "b"], dtype=pl.Categorical),
+                "e": pl.Series(["x", "y"], dtype=pl.Enum(["x", "y"])),
+            }
+        )
+        assert _dtype_breakdown(df) == "1 num · 2 cat"
 
 
 class TestBuildSummaryPolars:

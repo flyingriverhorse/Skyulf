@@ -116,3 +116,37 @@ def test_to_mermaid_labels_are_quoted_and_quotes_escaped():
     }
     diagram = SkyulfPipeline(cfg).to_mermaid()
     assert '    pp0["weird[1] (a\'b (x))"]' in diagram
+
+
+def test_param_summary_truncates_long_lists_and_values():
+    from skyulf.pipeline.diagram import params_summary
+
+    # More than six list items collapse to six + an ellipsis marker.
+    text = params_summary({"cols": list("abcdefgh")})
+    assert text == "cols: a, b, c, d, e, f, …"
+
+    # A single value longer than 24 chars is cut with an ellipsis.
+    text = params_summary({"pattern": "x" * 40})
+    assert text == "pattern: " + "x" * 23 + "…"
+
+
+def test_param_summary_caps_at_three_entries():
+    from skyulf.pipeline.diagram import params_summary
+
+    text = params_summary({"a": 1, "b": 2, "c": 3, "d": 4})
+    assert text == "a: 1 · b: 2 · c: 3"
+    assert "d:" not in text
+
+
+def test_param_summary_returns_none_when_everything_is_skipped():
+    from skyulf.pipeline.diagram import params_summary
+
+    assert params_summary({"_hidden": 1, "empty": None, "nested": {"a": 1}}) is None
+
+
+def test_param_summary_truncates_overlong_detail_lines():
+    from skyulf.pipeline.diagram import params_summary
+
+    text = params_summary({"first": "x" * 24, "second": "y" * 24, "third": "z" * 24})
+    assert len(text) == 72
+    assert text.endswith("…")

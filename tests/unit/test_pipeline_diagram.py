@@ -111,6 +111,16 @@ class TestBuildPipelineDiagram(unittest.TestCase):
         assert "filled 12 values" in diagram
         assert "strategy" not in diagram
 
+    def test_build_failure_returns_none_instead_of_blocking_the_run(self):
+        from unittest.mock import patch
+
+        results = {"scale": _node("scale", "standard_scaler")}
+        with patch(
+            "backend.ml_pipeline._execution.diagram.build_mermaid_diagram",
+            side_effect=RuntimeError("mermaid broke"),
+        ):
+            assert build_pipeline_diagram(results) is None
+
 
 class TestNotebookDiagramCell(unittest.TestCase):
     def test_diagram_md_wraps_a_mermaid_fence_with_steps_and_model(self):
