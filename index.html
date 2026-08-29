@@ -383,9 +383,9 @@
                         <span class="msi text-[14px]" style="color: var(--peri);">download</span>
                         <span data-pypi-monthly>1.1k</span> / month
                     </a>
-                    <a href="https://github.com/flyingriverhorse/skyulf/blob/master/LICENSE" target="_blank" rel="noopener" title="Apache-2.0 license" class="inline-flex items-center gap-2 rounded-full border px-3.5 py-1.5 font-mono text-[11px] font-semibold tracking-[0.14em] uppercase transition-colors hover:border-[rgba(255,218,217,.8)]" style="border-color: var(--line); color: var(--soft); background: var(--panel-60); backdrop-filter: blur(12px);">
-                        <span class="msi text-[14px]" style="color: var(--gold-text);">shield</span>
-                        Apache-2.0
+                    <a href="https://pepy.tech/projects/skyulf-core" target="_blank" rel="noopener" title="Total PyPI downloads" class="inline-flex items-center gap-2 rounded-full border px-3.5 py-1.5 font-mono text-[11px] font-semibold tracking-[0.14em] uppercase transition-colors hover:border-[rgba(255,218,217,.8)]" style="border-color: var(--line); color: var(--soft); background: var(--panel-60); backdrop-filter: blur(12px);">
+                        <span class="msi text-[14px]" style="color: var(--rose);">cloud_download</span>
+                        <span data-pepy-total>22k</span> total
                     </a>
                 </div>
             </div>
@@ -1011,6 +1011,20 @@ pipeline.save(<span class="text-gold">"tumour.pkl"</span>)  <span class="text-fa
                         var monthly = payload && payload.last_month;
                         if (typeof monthly !== 'number') return;
                         monthlyLabel.textContent = formatStat(monthly);
+                    })
+                    .catch(function () { /* offline or blocked: static fallback stays */ });
+            }
+            var totalLabel = document.querySelector('[data-pepy-total]');
+            if (totalLabel && window.fetch) {
+                // pepy serves the badge as a CORS-enabled SVG; the last text node is the count
+                fetch('https://static.pepy.tech/personalized-badge/skyulf-core?period=total&units=INTERNATIONAL_SYSTEM&left_color=GREY&right_color=BLUE&left_text=Total_Downloads')
+                    .then(function (res) { return res.ok ? res.text() : null; })
+                    .then(function (svg) {
+                        if (!svg) return;
+                        var texts = svg.match(/<text[^>]*>[^<]*<\/text>/g);
+                        if (!texts || !texts.length) return;
+                        var value = texts[texts.length - 1].replace(/<[^>]+>/g, '').trim();
+                        if (value) totalLabel.textContent = value;
                     })
                     .catch(function () { /* offline or blocked: static fallback stays */ });
             }

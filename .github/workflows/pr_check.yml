@@ -5,7 +5,8 @@
 # does NOT run the test suites — those live in their own dedicated workflows
 # (backend-tests.yml, skyulf-core-tests.yml, frontend-tests.yml) so each
 # concern can be triaged, re-run, and required independently in branch
-# protection.
+# protection. Also carries the SonarCloud (SonarQube Cloud) scan job, which
+# skips itself silently when the SONAR_TOKEN secret is absent.
 
 name: PR Check
 
@@ -65,3 +66,20 @@ jobs:
 
       - name: Type check (Ty)
         run: bash .github/scripts/run_check.sh "Ty type check" ty check backend skyulf-core/skyulf skyulf-core/tests run_skyulf.py celery_worker.py
+
+  sonarcloud-scan:
+    name: SonarCloud Scan
+    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    env:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          # Disabling shallow clones improves the relevancy of reporting
+          fetch-depth: 0
+
+      - name: SonarQube Scan
+        if: ${{ env.SONAR_TOKEN != '' }}
+        uses: SonarSource/sonarqube-scan-action@v8.2.1
