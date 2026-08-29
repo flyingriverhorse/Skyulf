@@ -129,6 +129,11 @@ markers = [
     "integration: requires a live backing service (e.g. Redis) — run via tests/docker/run_integration_tests.ps1|sh",
 ]
 
+[tool.coverage.run]
+# Repo-relative paths in Cobertura XML so CI scanners (SonarCloud, Codecov)
+# resolve reports against the repository root (SonarCloud Python coverage docs).
+relative_files = true
+
 [tool.ruff]
 line-length = 100
 target-version = "py312"

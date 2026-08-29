@@ -124,9 +124,11 @@ async def readiness_check():
         return {"status": "ready", "fit_ms": elapsed_ms}
     except Exception as exc:  # noqa: BLE001 - readiness probe returns 503
         logging.getLogger(__name__).error("Readiness probe failed: %s", exc)
+        # Generic client-facing message: the exception detail stays in the
+        # server log only (CodeQL py/stack-trace-exposure).
         return JSONResponse(
             status_code=503,
-            content={"status": "not_ready", "error": str(exc)},
+            content={"status": "not_ready", "error": "readiness check failed"},
         )
 
 
