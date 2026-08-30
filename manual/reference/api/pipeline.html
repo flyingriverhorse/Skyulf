@@ -2294,6 +2294,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#skyulf.pipeline.SkyulfPipeline.to_mermaid_markdown" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        to_mermaid_markdown
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#skyulf.pipeline.SkyulfPipeline.validate_leakage_safety" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3276,8 +3287,24 @@
 
 
               <details class="mkdocstrings-source">
-                <summary>Source code in <code>skyulf-core/skyulf/pipeline.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 56</span>
+                <summary>Source code in <code>skyulf-core/skyulf/pipeline/_pipeline.py</code></summary>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 40</span>
+<span class="normal"> 41</span>
+<span class="normal"> 42</span>
+<span class="normal"> 43</span>
+<span class="normal"> 44</span>
+<span class="normal"> 45</span>
+<span class="normal"> 46</span>
+<span class="normal"> 47</span>
+<span class="normal"> 48</span>
+<span class="normal"> 49</span>
+<span class="normal"> 50</span>
+<span class="normal"> 51</span>
+<span class="normal"> 52</span>
+<span class="normal"> 53</span>
+<span class="normal"> 54</span>
+<span class="normal"> 55</span>
+<span class="normal"> 56</span>
 <span class="normal"> 57</span>
 <span class="normal"> 58</span>
 <span class="normal"> 59</span>
@@ -3741,25 +3768,7 @@
 <span class="normal">517</span>
 <span class="normal">518</span>
 <span class="normal">519</span>
-<span class="normal">520</span>
-<span class="normal">521</span>
-<span class="normal">522</span>
-<span class="normal">523</span>
-<span class="normal">524</span>
-<span class="normal">525</span>
-<span class="normal">526</span>
-<span class="normal">527</span>
-<span class="normal">528</span>
-<span class="normal">529</span>
-<span class="normal">530</span>
-<span class="normal">531</span>
-<span class="normal">532</span>
-<span class="normal">533</span>
-<span class="normal">534</span>
-<span class="normal">535</span>
-<span class="normal">536</span>
-<span class="normal">537</span>
-<span class="normal">538</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">SkyulfPipeline</span><span class="p">:</span>
+<span class="normal">520</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">SkyulfPipeline</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    End-to-end ML Pipeline.</span>
 
@@ -4152,24 +4161,19 @@
 <span class="sd">        Produces a top-down graph ``data -&gt; [preprocessing steps] -&gt; model``.</span>
 <span class="sd">        Useful in docs and PR descriptions. Pure read-only over ``self.config``.</span>
 <span class="sd">        """</span>
-        <span class="n">lines</span> <span class="o">=</span> <span class="p">[</span><span class="s2">"flowchart TD"</span><span class="p">,</span> <span class="s2">"    data[Input Data]"</span><span class="p">]</span>
-        <span class="n">prev</span> <span class="o">=</span> <span class="s2">"data"</span>
+        <span class="k">return</span> <span class="n">build_mermaid_diagram</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">preprocessing_steps</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">modeling_config</span><span class="p">)</span>
 
-        <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">step</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">preprocessing_steps</span><span class="p">):</span>
-            <span class="n">node</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"pp</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">"</span>
-            <span class="n">name</span> <span class="o">=</span> <span class="n">step</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"name"</span><span class="p">,</span> <span class="sa">f</span><span class="s2">"step_</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
-            <span class="n">transformer</span> <span class="o">=</span> <span class="n">step</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"transformer"</span><span class="p">,</span> <span class="s2">"?"</span><span class="p">)</span>
-            <span class="n">label</span> <span class="o">=</span> <span class="n">_mermaid_escape</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2"> (</span><span class="si">{</span><span class="n">transformer</span><span class="si">}</span><span class="s2">)"</span><span class="p">)</span>
-            <span class="n">lines</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">"    </span><span class="si">{</span><span class="n">node</span><span class="si">}</span><span class="s2">[</span><span class="si">{</span><span class="n">label</span><span class="si">}</span><span class="s2">]"</span><span class="p">)</span>
-            <span class="n">lines</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">"    </span><span class="si">{</span><span class="n">prev</span><span class="si">}</span><span class="s2"> --&gt; </span><span class="si">{</span><span class="n">node</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
-            <span class="n">prev</span> <span class="o">=</span> <span class="n">node</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">to_mermaid_markdown</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">heading</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="s2">"Pipeline topology"</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Return the diagram as a Markdown snippet with a ``mermaid`` fence.</span>
 
-        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">modeling_config</span><span class="p">:</span>
-            <span class="n">label</span> <span class="o">=</span> <span class="n">_mermaid_escape</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">modeling_config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"type"</span><span class="p">,</span> <span class="s2">"model"</span><span class="p">)))</span>
-            <span class="n">lines</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">"    model([</span><span class="si">{</span><span class="n">label</span><span class="si">}</span><span class="s2">])"</span><span class="p">)</span>
-            <span class="n">lines</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">"    </span><span class="si">{</span><span class="n">prev</span><span class="si">}</span><span class="s2"> --&gt; model"</span><span class="p">)</span>
-
-        <span class="k">return</span> <span class="s2">"</span><span class="se">\n</span><span class="s2">"</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">lines</span><span class="p">)</span>
+<span class="sd">        Includes a heading by default; pass ``heading=None`` for just the</span>
+<span class="sd">        fenced block. Renders natively on GitHub, in VS Code previews, and</span>
+<span class="sd">        in Jupyter markdown cells.</span>
+<span class="sd">        """</span>
+        <span class="n">block</span> <span class="o">=</span> <span class="n">mermaid_markdown</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">to_mermaid</span><span class="p">())</span>
+        <span class="k">if</span> <span class="n">heading</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">block</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">"# </span><span class="si">{</span><span class="n">heading</span><span class="si">}</span><span class="se">\n\n</span><span class="si">{</span><span class="n">block</span><span class="si">}</span><span class="s2">"</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">is_fitted</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">"""True once preprocessing has been fit (or a model has been trained)."""</span>
@@ -4183,8 +4187,9 @@
 <span class="sd">        The hash covers the pipeline graph (preprocessing + modeling config) and,</span>
 <span class="sd">        once fitted, every fitted artifact and the trained model. Two pipelines</span>
 <span class="sd">        with the same hash produce the same predictions, so callers can prove</span>
-<span class="sd">        "this prediction came from exactly this pipeline". The digest changes</span>
-<span class="sd">        across library versions by design (artifacts pickle differently).</span>
+<span class="sd">        "this prediction came from exactly this pipeline". The digest is</span>
+<span class="sd">        semantic (hyperparameters + fitted weights, not pickle bytes), so it is</span>
+<span class="sd">        stable across library and pickle-protocol versions.</span>
 <span class="sd">        """</span>
         <span class="n">hasher</span> <span class="o">=</span> <span class="n">hashlib</span><span class="o">.</span><span class="n">sha256</span><span class="p">()</span>
         <span class="n">topology</span> <span class="o">=</span> <span class="p">{</span>
@@ -4194,10 +4199,10 @@
         <span class="n">hasher</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">topology</span><span class="p">,</span> <span class="n">sort_keys</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="nb">str</span><span class="p">)</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="s2">"utf-8"</span><span class="p">))</span>
 
         <span class="k">for</span> <span class="n">step</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">feature_engineer</span><span class="o">.</span><span class="n">fitted_steps</span><span class="p">:</span>
-            <span class="n">hasher</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">_artifact_digest</span><span class="p">(</span><span class="n">step</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"artifact"</span><span class="p">)))</span>
+            <span class="n">hasher</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">artifact_digest</span><span class="p">(</span><span class="n">step</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"artifact"</span><span class="p">)))</span>
 
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">model_estimator</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">model_estimator</span><span class="o">.</span><span class="n">model</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="n">hasher</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">_artifact_digest</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">model_estimator</span><span class="o">.</span><span class="n">model</span><span class="p">))</span>
+            <span class="n">hasher</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">artifact_digest</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">model_estimator</span><span class="o">.</span><span class="n">model</span><span class="p">))</span>
 
         <span class="k">return</span> <span class="n">hasher</span><span class="o">.</span><span class="n">hexdigest</span><span class="p">()</span>
 
@@ -4205,8 +4210,9 @@
 <span class="w">        </span><span class="sd">"""Return a structured, JSON-friendly summary of the pipeline.</span>
 
 <span class="sd">        Captures lineage (preprocessing chain), the model and its hyperparameters,</span>
-<span class="sd">        the reproducibility fingerprint, and the metrics from the last :meth:`fit`</span>
-<span class="sd">        (``None`` if never fitted). Intended for audit logs and model registries.</span>
+<span class="sd">        the reproducibility fingerprint, the metrics from the last :meth:`fit`</span>
+<span class="sd">        (``None`` if never fitted), and a Mermaid ``flowchart`` of the topology</span>
+<span class="sd">        under ``"diagram"``. Intended for audit logs and model registries.</span>
 <span class="sd">        """</span>
         <span class="n">model</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">modeling_config</span><span class="p">:</span>
@@ -4229,6 +4235,7 @@
             <span class="p">],</span>
             <span class="s2">"model"</span><span class="p">:</span> <span class="n">model</span><span class="p">,</span>
             <span class="s2">"metrics"</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_fit_metrics</span><span class="p">,</span>
+            <span class="s2">"diagram"</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">to_mermaid</span><span class="p">(),</span>
         <span class="p">}</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">save</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
@@ -4305,29 +4312,29 @@
 
 
             <details class="mkdocstrings-source">
-              <summary>Source code in <code>skyulf-core/skyulf/pipeline.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">69</span>
+              <summary>Source code in <code>skyulf-core/skyulf/pipeline/_pipeline.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">53</span>
+<span class="normal">54</span>
+<span class="normal">55</span>
+<span class="normal">56</span>
+<span class="normal">57</span>
+<span class="normal">58</span>
+<span class="normal">59</span>
+<span class="normal">60</span>
+<span class="normal">61</span>
+<span class="normal">62</span>
+<span class="normal">63</span>
+<span class="normal">64</span>
+<span class="normal">65</span>
+<span class="normal">66</span>
+<span class="normal">67</span>
+<span class="normal">68</span>
+<span class="normal">69</span>
 <span class="normal">70</span>
 <span class="normal">71</span>
 <span class="normal">72</span>
 <span class="normal">73</span>
-<span class="normal">74</span>
-<span class="normal">75</span>
-<span class="normal">76</span>
-<span class="normal">77</span>
-<span class="normal">78</span>
-<span class="normal">79</span>
-<span class="normal">80</span>
-<span class="normal">81</span>
-<span class="normal">82</span>
-<span class="normal">83</span>
-<span class="normal">84</span>
-<span class="normal">85</span>
-<span class="normal">86</span>
-<span class="normal">87</span>
-<span class="normal">88</span>
-<span class="normal">89</span>
-<span class="normal">90</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="n">PipelineConfig</span> <span class="o">|</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]):</span>
+<span class="normal">74</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="n">PipelineConfig</span> <span class="o">|</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]):</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Initialize the pipeline.</span>
 
@@ -4373,8 +4380,24 @@ to call before or after :meth:<code>fit</code>. Handy in notebooks and CI logs.<
 
 
             <details class="mkdocstrings-source">
-              <summary>Source code in <code>skyulf-core/skyulf/pipeline.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">407</span>
+              <summary>Source code in <code>skyulf-core/skyulf/pipeline/_pipeline.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">391</span>
+<span class="normal">392</span>
+<span class="normal">393</span>
+<span class="normal">394</span>
+<span class="normal">395</span>
+<span class="normal">396</span>
+<span class="normal">397</span>
+<span class="normal">398</span>
+<span class="normal">399</span>
+<span class="normal">400</span>
+<span class="normal">401</span>
+<span class="normal">402</span>
+<span class="normal">403</span>
+<span class="normal">404</span>
+<span class="normal">405</span>
+<span class="normal">406</span>
+<span class="normal">407</span>
 <span class="normal">408</span>
 <span class="normal">409</span>
 <span class="normal">410</span>
@@ -4388,23 +4411,7 @@ to call before or after :meth:<code>fit</code>. Handy in notebooks and CI logs.<
 <span class="normal">418</span>
 <span class="normal">419</span>
 <span class="normal">420</span>
-<span class="normal">421</span>
-<span class="normal">422</span>
-<span class="normal">423</span>
-<span class="normal">424</span>
-<span class="normal">425</span>
-<span class="normal">426</span>
-<span class="normal">427</span>
-<span class="normal">428</span>
-<span class="normal">429</span>
-<span class="normal">430</span>
-<span class="normal">431</span>
-<span class="normal">432</span>
-<span class="normal">433</span>
-<span class="normal">434</span>
-<span class="normal">435</span>
-<span class="normal">436</span>
-<span class="normal">437</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">describe</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="normal">421</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">describe</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""Return a human-readable, multi-line summary of the pipeline.</span>
 
 <span class="sd">    Renders the preprocessing chain (in order) and the model stage with</span>
@@ -4454,13 +4461,34 @@ to call before or after :meth:<code>fit</code>. Handy in notebooks and CI logs.<
 
         <p>Return a structured, JSON-friendly summary of the pipeline.</p>
 <p>Captures lineage (preprocessing chain), the model and its hyperparameters,
-the reproducibility fingerprint, and the metrics from the last :meth:<code>fit</code>
-(<code>None</code> if never fitted). Intended for audit logs and model registries.</p>
+the reproducibility fingerprint, the metrics from the last :meth:<code>fit</code>
+(<code>None</code> if never fitted), and a Mermaid <code>flowchart</code> of the topology
+under <code>"diagram"</code>. Intended for audit logs and model registries.</p>
 
 
             <details class="mkdocstrings-source">
-              <summary>Source code in <code>skyulf-core/skyulf/pipeline.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">498</span>
+              <summary>Source code in <code>skyulf-core/skyulf/pipeline/_pipeline.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">478</span>
+<span class="normal">479</span>
+<span class="normal">480</span>
+<span class="normal">481</span>
+<span class="normal">482</span>
+<span class="normal">483</span>
+<span class="normal">484</span>
+<span class="normal">485</span>
+<span class="normal">486</span>
+<span class="normal">487</span>
+<span class="normal">488</span>
+<span class="normal">489</span>
+<span class="normal">490</span>
+<span class="normal">491</span>
+<span class="normal">492</span>
+<span class="normal">493</span>
+<span class="normal">494</span>
+<span class="normal">495</span>
+<span class="normal">496</span>
+<span class="normal">497</span>
+<span class="normal">498</span>
 <span class="normal">499</span>
 <span class="normal">500</span>
 <span class="normal">501</span>
@@ -4470,30 +4498,13 @@ the reproducibility fingerprint, and the metrics from the last :meth:<code>fit</
 <span class="normal">505</span>
 <span class="normal">506</span>
 <span class="normal">507</span>
-<span class="normal">508</span>
-<span class="normal">509</span>
-<span class="normal">510</span>
-<span class="normal">511</span>
-<span class="normal">512</span>
-<span class="normal">513</span>
-<span class="normal">514</span>
-<span class="normal">515</span>
-<span class="normal">516</span>
-<span class="normal">517</span>
-<span class="normal">518</span>
-<span class="normal">519</span>
-<span class="normal">520</span>
-<span class="normal">521</span>
-<span class="normal">522</span>
-<span class="normal">523</span>
-<span class="normal">524</span>
-<span class="normal">525</span>
-<span class="normal">526</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">export_model_card</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+<span class="normal">508</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">export_model_card</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
 <span class="w">    </span><span class="sd">"""Return a structured, JSON-friendly summary of the pipeline.</span>
 
 <span class="sd">    Captures lineage (preprocessing chain), the model and its hyperparameters,</span>
-<span class="sd">    the reproducibility fingerprint, and the metrics from the last :meth:`fit`</span>
-<span class="sd">    (``None`` if never fitted). Intended for audit logs and model registries.</span>
+<span class="sd">    the reproducibility fingerprint, the metrics from the last :meth:`fit`</span>
+<span class="sd">    (``None`` if never fitted), and a Mermaid ``flowchart`` of the topology</span>
+<span class="sd">    under ``"diagram"``. Intended for audit logs and model registries.</span>
 <span class="sd">    """</span>
     <span class="n">model</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
     <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">modeling_config</span><span class="p">:</span>
@@ -4516,6 +4527,7 @@ the reproducibility fingerprint, and the metrics from the last :meth:<code>fit</
         <span class="p">],</span>
         <span class="s2">"model"</span><span class="p">:</span> <span class="n">model</span><span class="p">,</span>
         <span class="s2">"metrics"</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_fit_metrics</span><span class="p">,</span>
+        <span class="s2">"diagram"</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">to_mermaid</span><span class="p">(),</span>
     <span class="p">}</span>
 </code></pre></div></td></tr></table></div>
             </details>
@@ -4538,42 +4550,45 @@ the reproducibility fingerprint, and the metrics from the last :meth:<code>fit</
 <p>The hash covers the pipeline graph (preprocessing + modeling config) and,
 once fitted, every fitted artifact and the trained model. Two pipelines
 with the same hash produce the same predictions, so callers can prove
-"this prediction came from exactly this pipeline". The digest changes
-across library versions by design (artifacts pickle differently).</p>
+"this prediction came from exactly this pipeline". The digest is
+semantic (hyperparameters + fitted weights, not pickle bytes), so it is
+stable across library and pickle-protocol versions.</p>
 
 
             <details class="mkdocstrings-source">
-              <summary>Source code in <code>skyulf-core/skyulf/pipeline.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">474</span>
+              <summary>Source code in <code>skyulf-core/skyulf/pipeline/_pipeline.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">453</span>
+<span class="normal">454</span>
+<span class="normal">455</span>
+<span class="normal">456</span>
+<span class="normal">457</span>
+<span class="normal">458</span>
+<span class="normal">459</span>
+<span class="normal">460</span>
+<span class="normal">461</span>
+<span class="normal">462</span>
+<span class="normal">463</span>
+<span class="normal">464</span>
+<span class="normal">465</span>
+<span class="normal">466</span>
+<span class="normal">467</span>
+<span class="normal">468</span>
+<span class="normal">469</span>
+<span class="normal">470</span>
+<span class="normal">471</span>
+<span class="normal">472</span>
+<span class="normal">473</span>
+<span class="normal">474</span>
 <span class="normal">475</span>
-<span class="normal">476</span>
-<span class="normal">477</span>
-<span class="normal">478</span>
-<span class="normal">479</span>
-<span class="normal">480</span>
-<span class="normal">481</span>
-<span class="normal">482</span>
-<span class="normal">483</span>
-<span class="normal">484</span>
-<span class="normal">485</span>
-<span class="normal">486</span>
-<span class="normal">487</span>
-<span class="normal">488</span>
-<span class="normal">489</span>
-<span class="normal">490</span>
-<span class="normal">491</span>
-<span class="normal">492</span>
-<span class="normal">493</span>
-<span class="normal">494</span>
-<span class="normal">495</span>
-<span class="normal">496</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">fingerprint</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="normal">476</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">fingerprint</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""Return a deterministic SHA-256 over topology + fitted artifacts.</span>
 
 <span class="sd">    The hash covers the pipeline graph (preprocessing + modeling config) and,</span>
 <span class="sd">    once fitted, every fitted artifact and the trained model. Two pipelines</span>
 <span class="sd">    with the same hash produce the same predictions, so callers can prove</span>
-<span class="sd">    "this prediction came from exactly this pipeline". The digest changes</span>
-<span class="sd">    across library versions by design (artifacts pickle differently).</span>
+<span class="sd">    "this prediction came from exactly this pipeline". The digest is</span>
+<span class="sd">    semantic (hyperparameters + fitted weights, not pickle bytes), so it is</span>
+<span class="sd">    stable across library and pickle-protocol versions.</span>
 <span class="sd">    """</span>
     <span class="n">hasher</span> <span class="o">=</span> <span class="n">hashlib</span><span class="o">.</span><span class="n">sha256</span><span class="p">()</span>
     <span class="n">topology</span> <span class="o">=</span> <span class="p">{</span>
@@ -4583,10 +4598,10 @@ across library versions by design (artifacts pickle differently).</p>
     <span class="n">hasher</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">topology</span><span class="p">,</span> <span class="n">sort_keys</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="nb">str</span><span class="p">)</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="s2">"utf-8"</span><span class="p">))</span>
 
     <span class="k">for</span> <span class="n">step</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">feature_engineer</span><span class="o">.</span><span class="n">fitted_steps</span><span class="p">:</span>
-        <span class="n">hasher</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">_artifact_digest</span><span class="p">(</span><span class="n">step</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"artifact"</span><span class="p">)))</span>
+        <span class="n">hasher</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">artifact_digest</span><span class="p">(</span><span class="n">step</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"artifact"</span><span class="p">)))</span>
 
     <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">model_estimator</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">model_estimator</span><span class="o">.</span><span class="n">model</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-        <span class="n">hasher</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">_artifact_digest</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">model_estimator</span><span class="o">.</span><span class="n">model</span><span class="p">))</span>
+        <span class="n">hasher</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">artifact_digest</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">model_estimator</span><span class="o">.</span><span class="n">model</span><span class="p">))</span>
 
     <span class="k">return</span> <span class="n">hasher</span><span class="o">.</span><span class="n">hexdigest</span><span class="p">()</span>
 </code></pre></div></td></tr></table></div>
@@ -4685,8 +4700,24 @@ across library versions by design (artifacts pickle differently).</p>
 
 
             <details class="mkdocstrings-source">
-              <summary>Source code in <code>skyulf-core/skyulf/pipeline.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">151</span>
+              <summary>Source code in <code>skyulf-core/skyulf/pipeline/_pipeline.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">135</span>
+<span class="normal">136</span>
+<span class="normal">137</span>
+<span class="normal">138</span>
+<span class="normal">139</span>
+<span class="normal">140</span>
+<span class="normal">141</span>
+<span class="normal">142</span>
+<span class="normal">143</span>
+<span class="normal">144</span>
+<span class="normal">145</span>
+<span class="normal">146</span>
+<span class="normal">147</span>
+<span class="normal">148</span>
+<span class="normal">149</span>
+<span class="normal">150</span>
+<span class="normal">151</span>
 <span class="normal">152</span>
 <span class="normal">153</span>
 <span class="normal">154</span>
@@ -4739,23 +4770,7 @@ across library versions by design (artifacts pickle differently).</p>
 <span class="normal">201</span>
 <span class="normal">202</span>
 <span class="normal">203</span>
-<span class="normal">204</span>
-<span class="normal">205</span>
-<span class="normal">206</span>
-<span class="normal">207</span>
-<span class="normal">208</span>
-<span class="normal">209</span>
-<span class="normal">210</span>
-<span class="normal">211</span>
-<span class="normal">212</span>
-<span class="normal">213</span>
-<span class="normal">214</span>
-<span class="normal">215</span>
-<span class="normal">216</span>
-<span class="normal">217</span>
-<span class="normal">218</span>
-<span class="normal">219</span>
-<span class="normal">220</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">fit</span><span class="p">(</span>
+<span class="normal">204</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">fit</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">data</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span> <span class="o">|</span> <span class="n">pl</span><span class="o">.</span><span class="n">DataFrame</span> <span class="o">|</span> <span class="n">SkyulfDataFrame</span> <span class="o">|</span> <span class="n">SplitDataset</span><span class="p">,</span>
     <span class="n">target_column</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
@@ -4953,8 +4968,24 @@ train/test split (e.g. no Splitter node configured).</p>
 
 
             <details class="mkdocstrings-source">
-              <summary>Source code in <code>skyulf-core/skyulf/pipeline.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">222</span>
+              <summary>Source code in <code>skyulf-core/skyulf/pipeline/_pipeline.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">206</span>
+<span class="normal">207</span>
+<span class="normal">208</span>
+<span class="normal">209</span>
+<span class="normal">210</span>
+<span class="normal">211</span>
+<span class="normal">212</span>
+<span class="normal">213</span>
+<span class="normal">214</span>
+<span class="normal">215</span>
+<span class="normal">216</span>
+<span class="normal">217</span>
+<span class="normal">218</span>
+<span class="normal">219</span>
+<span class="normal">220</span>
+<span class="normal">221</span>
+<span class="normal">222</span>
 <span class="normal">223</span>
 <span class="normal">224</span>
 <span class="normal">225</span>
@@ -4983,23 +5014,7 @@ train/test split (e.g. no Splitter node configured).</p>
 <span class="normal">248</span>
 <span class="normal">249</span>
 <span class="normal">250</span>
-<span class="normal">251</span>
-<span class="normal">252</span>
-<span class="normal">253</span>
-<span class="normal">254</span>
-<span class="normal">255</span>
-<span class="normal">256</span>
-<span class="normal">257</span>
-<span class="normal">258</span>
-<span class="normal">259</span>
-<span class="normal">260</span>
-<span class="normal">261</span>
-<span class="normal">262</span>
-<span class="normal">263</span>
-<span class="normal">264</span>
-<span class="normal">265</span>
-<span class="normal">266</span>
-<span class="normal">267</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_fitted_split</span><span class="p">(</span>
+<span class="normal">251</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_fitted_split</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">data</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span> <span class="o">|</span> <span class="n">pl</span><span class="o">.</span><span class="n">DataFrame</span> <span class="o">|</span> <span class="n">SkyulfDataFrame</span> <span class="o">|</span> <span class="n">SplitDataset</span><span class="p">,</span>
     <span class="n">target_column</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
@@ -5066,12 +5081,12 @@ train/test split (e.g. no Splitter node configured).</p>
 
 
             <details class="mkdocstrings-source">
-              <summary>Source code in <code>skyulf-core/skyulf/pipeline.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">468</span>
-<span class="normal">469</span>
-<span class="normal">470</span>
-<span class="normal">471</span>
-<span class="normal">472</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">is_fitted</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+              <summary>Source code in <code>skyulf-core/skyulf/pipeline/_pipeline.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">447</span>
+<span class="normal">448</span>
+<span class="normal">449</span>
+<span class="normal">450</span>
+<span class="normal">451</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">is_fitted</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""True once preprocessing has been fit (or a model has been trained)."""</span>
     <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">feature_engineer</span><span class="o">.</span><span class="n">fitted_steps</span><span class="p">:</span>
         <span class="k">return</span> <span class="kc">True</span>
@@ -5101,12 +5116,12 @@ train/test split (e.g. no Splitter node configured).</p>
 
 
             <details class="mkdocstrings-source">
-              <summary>Source code in <code>skyulf-core/skyulf/pipeline.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">534</span>
-<span class="normal">535</span>
-<span class="normal">536</span>
-<span class="normal">537</span>
-<span class="normal">538</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@classmethod</span>
+              <summary>Source code in <code>skyulf-core/skyulf/pipeline/_pipeline.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">516</span>
+<span class="normal">517</span>
+<span class="normal">518</span>
+<span class="normal">519</span>
+<span class="normal">520</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@classmethod</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">load</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">path</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"SkyulfPipeline"</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""Load the pipeline from a file."""</span>
     <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="s2">"rb"</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
@@ -5305,8 +5320,24 @@ model doesn't support <code>predict_proba</code>.</p>
 
 
             <details class="mkdocstrings-source">
-              <summary>Source code in <code>skyulf-core/skyulf/pipeline.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">283</span>
+              <summary>Source code in <code>skyulf-core/skyulf/pipeline/_pipeline.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">267</span>
+<span class="normal">268</span>
+<span class="normal">269</span>
+<span class="normal">270</span>
+<span class="normal">271</span>
+<span class="normal">272</span>
+<span class="normal">273</span>
+<span class="normal">274</span>
+<span class="normal">275</span>
+<span class="normal">276</span>
+<span class="normal">277</span>
+<span class="normal">278</span>
+<span class="normal">279</span>
+<span class="normal">280</span>
+<span class="normal">281</span>
+<span class="normal">282</span>
+<span class="normal">283</span>
 <span class="normal">284</span>
 <span class="normal">285</span>
 <span class="normal">286</span>
@@ -5357,23 +5388,7 @@ model doesn't support <code>predict_proba</code>.</p>
 <span class="normal">331</span>
 <span class="normal">332</span>
 <span class="normal">333</span>
-<span class="normal">334</span>
-<span class="normal">335</span>
-<span class="normal">336</span>
-<span class="normal">337</span>
-<span class="normal">338</span>
-<span class="normal">339</span>
-<span class="normal">340</span>
-<span class="normal">341</span>
-<span class="normal">342</span>
-<span class="normal">343</span>
-<span class="normal">344</span>
-<span class="normal">345</span>
-<span class="normal">346</span>
-<span class="normal">347</span>
-<span class="normal">348</span>
-<span class="normal">349</span>
-<span class="normal">350</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">optimize_thresholds</span><span class="p">(</span>
+<span class="normal">334</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">optimize_thresholds</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">X_val</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span> <span class="o">|</span> <span class="n">SkyulfDataFrame</span><span class="p">,</span>
     <span class="n">y_val</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span> <span class="o">|</span> <span class="n">Any</span><span class="p">,</span>
@@ -5572,8 +5587,24 @@ was never called on this instance.</p>
 
 
             <details class="mkdocstrings-source">
-              <summary>Source code in <code>skyulf-core/skyulf/pipeline.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">352</span>
+              <summary>Source code in <code>skyulf-core/skyulf/pipeline/_pipeline.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">336</span>
+<span class="normal">337</span>
+<span class="normal">338</span>
+<span class="normal">339</span>
+<span class="normal">340</span>
+<span class="normal">341</span>
+<span class="normal">342</span>
+<span class="normal">343</span>
+<span class="normal">344</span>
+<span class="normal">345</span>
+<span class="normal">346</span>
+<span class="normal">347</span>
+<span class="normal">348</span>
+<span class="normal">349</span>
+<span class="normal">350</span>
+<span class="normal">351</span>
+<span class="normal">352</span>
 <span class="normal">353</span>
 <span class="normal">354</span>
 <span class="normal">355</span>
@@ -5610,23 +5641,7 @@ was never called on this instance.</p>
 <span class="normal">386</span>
 <span class="normal">387</span>
 <span class="normal">388</span>
-<span class="normal">389</span>
-<span class="normal">390</span>
-<span class="normal">391</span>
-<span class="normal">392</span>
-<span class="normal">393</span>
-<span class="normal">394</span>
-<span class="normal">395</span>
-<span class="normal">396</span>
-<span class="normal">397</span>
-<span class="normal">398</span>
-<span class="normal">399</span>
-<span class="normal">400</span>
-<span class="normal">401</span>
-<span class="normal">402</span>
-<span class="normal">403</span>
-<span class="normal">404</span>
-<span class="normal">405</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">predict</span><span class="p">(</span>
+<span class="normal">389</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">predict</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">data</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span> <span class="o">|</span> <span class="n">SkyulfDataFrame</span><span class="p">,</span>
     <span class="n">use_tuned_thresholds</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
@@ -5701,12 +5716,12 @@ was never called on this instance.</p>
 
 
             <details class="mkdocstrings-source">
-              <summary>Source code in <code>skyulf-core/skyulf/pipeline.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">528</span>
-<span class="normal">529</span>
-<span class="normal">530</span>
-<span class="normal">531</span>
-<span class="normal">532</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">save</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
+              <summary>Source code in <code>skyulf-core/skyulf/pipeline/_pipeline.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">510</span>
+<span class="normal">511</span>
+<span class="normal">512</span>
+<span class="normal">513</span>
+<span class="normal">514</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">save</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""Save the pipeline to a file."""</span>
     <span class="c1"># We can use pickle to save the whole object since we removed external dependencies</span>
     <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="s2">"wb"</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
@@ -5734,54 +5749,66 @@ Useful in docs and PR descriptions. Pure read-only over <code>self.config</code>
 
 
             <details class="mkdocstrings-source">
-              <summary>Source code in <code>skyulf-core/skyulf/pipeline.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">443</span>
-<span class="normal">444</span>
-<span class="normal">445</span>
-<span class="normal">446</span>
-<span class="normal">447</span>
-<span class="normal">448</span>
-<span class="normal">449</span>
-<span class="normal">450</span>
-<span class="normal">451</span>
-<span class="normal">452</span>
-<span class="normal">453</span>
-<span class="normal">454</span>
-<span class="normal">455</span>
-<span class="normal">456</span>
-<span class="normal">457</span>
-<span class="normal">458</span>
-<span class="normal">459</span>
-<span class="normal">460</span>
-<span class="normal">461</span>
-<span class="normal">462</span>
-<span class="normal">463</span>
-<span class="normal">464</span>
-<span class="normal">465</span>
-<span class="normal">466</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">to_mermaid</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+              <summary>Source code in <code>skyulf-core/skyulf/pipeline/_pipeline.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">427</span>
+<span class="normal">428</span>
+<span class="normal">429</span>
+<span class="normal">430</span>
+<span class="normal">431</span>
+<span class="normal">432</span>
+<span class="normal">433</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">to_mermaid</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""Render the pipeline as a Mermaid ``flowchart`` string.</span>
 
 <span class="sd">    Produces a top-down graph ``data -&gt; [preprocessing steps] -&gt; model``.</span>
 <span class="sd">    Useful in docs and PR descriptions. Pure read-only over ``self.config``.</span>
 <span class="sd">    """</span>
-    <span class="n">lines</span> <span class="o">=</span> <span class="p">[</span><span class="s2">"flowchart TD"</span><span class="p">,</span> <span class="s2">"    data[Input Data]"</span><span class="p">]</span>
-    <span class="n">prev</span> <span class="o">=</span> <span class="s2">"data"</span>
+    <span class="k">return</span> <span class="n">build_mermaid_diagram</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">preprocessing_steps</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">modeling_config</span><span class="p">)</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
 
-    <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">step</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">preprocessing_steps</span><span class="p">):</span>
-        <span class="n">node</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"pp</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">"</span>
-        <span class="n">name</span> <span class="o">=</span> <span class="n">step</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"name"</span><span class="p">,</span> <span class="sa">f</span><span class="s2">"step_</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
-        <span class="n">transformer</span> <span class="o">=</span> <span class="n">step</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"transformer"</span><span class="p">,</span> <span class="s2">"?"</span><span class="p">)</span>
-        <span class="n">label</span> <span class="o">=</span> <span class="n">_mermaid_escape</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2"> (</span><span class="si">{</span><span class="n">transformer</span><span class="si">}</span><span class="s2">)"</span><span class="p">)</span>
-        <span class="n">lines</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">"    </span><span class="si">{</span><span class="n">node</span><span class="si">}</span><span class="s2">[</span><span class="si">{</span><span class="n">label</span><span class="si">}</span><span class="s2">]"</span><span class="p">)</span>
-        <span class="n">lines</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">"    </span><span class="si">{</span><span class="n">prev</span><span class="si">}</span><span class="s2"> --&gt; </span><span class="si">{</span><span class="n">node</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
-        <span class="n">prev</span> <span class="o">=</span> <span class="n">node</span>
+</div>
 
-    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">modeling_config</span><span class="p">:</span>
-        <span class="n">label</span> <span class="o">=</span> <span class="n">_mermaid_escape</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">modeling_config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"type"</span><span class="p">,</span> <span class="s2">"model"</span><span class="p">)))</span>
-        <span class="n">lines</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">"    model([</span><span class="si">{</span><span class="n">label</span><span class="si">}</span><span class="s2">])"</span><span class="p">)</span>
-        <span class="n">lines</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">"    </span><span class="si">{</span><span class="n">prev</span><span class="si">}</span><span class="s2"> --&gt; model"</span><span class="p">)</span>
+<div class="doc doc-object doc-function">
 
-    <span class="k">return</span> <span class="s2">"</span><span class="se">\n</span><span class="s2">"</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">lines</span><span class="p">)</span>
+
+<h3 id="skyulf.pipeline.SkyulfPipeline.to_mermaid_markdown" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">to_mermaid_markdown</span><span class="p">(</span><span class="n">heading</span><span class="o">=</span><span class="s1">'Pipeline topology'</span><span class="p">)</span></code>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Return the diagram as a Markdown snippet with a <code>mermaid</code> fence.</p>
+<p>Includes a heading by default; pass <code>heading=None</code> for just the
+fenced block. Renders natively on GitHub, in VS Code previews, and
+in Jupyter markdown cells.</p>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>skyulf-core/skyulf/pipeline/_pipeline.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">435</span>
+<span class="normal">436</span>
+<span class="normal">437</span>
+<span class="normal">438</span>
+<span class="normal">439</span>
+<span class="normal">440</span>
+<span class="normal">441</span>
+<span class="normal">442</span>
+<span class="normal">443</span>
+<span class="normal">444</span>
+<span class="normal">445</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">to_mermaid_markdown</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">heading</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="s2">"Pipeline topology"</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Return the diagram as a Markdown snippet with a ``mermaid`` fence.</span>
+
+<span class="sd">    Includes a heading by default; pass ``heading=None`` for just the</span>
+<span class="sd">    fenced block. Renders natively on GitHub, in VS Code previews, and</span>
+<span class="sd">    in Jupyter markdown cells.</span>
+<span class="sd">    """</span>
+    <span class="n">block</span> <span class="o">=</span> <span class="n">mermaid_markdown</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">to_mermaid</span><span class="p">())</span>
+    <span class="k">if</span> <span class="n">heading</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">block</span>
+    <span class="k">return</span> <span class="sa">f</span><span class="s2">"# </span><span class="si">{</span><span class="n">heading</span><span class="si">}</span><span class="se">\n\n</span><span class="si">{</span><span class="n">block</span><span class="si">}</span><span class="s2">"</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -5803,10 +5830,10 @@ Useful in docs and PR descriptions. Pure read-only over <code>self.config</code>
 
 
             <details class="mkdocstrings-source">
-              <summary>Source code in <code>skyulf-core/skyulf/pipeline.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">439</span>
-<span class="normal">440</span>
-<span class="normal">441</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">validate_leakage_safety</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">on_leakage</span><span class="p">:</span> <span class="n">OnLeakage</span> <span class="o">=</span> <span class="s2">"raise"</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+              <summary>Source code in <code>skyulf-core/skyulf/pipeline/_pipeline.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">423</span>
+<span class="normal">424</span>
+<span class="normal">425</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">validate_leakage_safety</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">on_leakage</span><span class="p">:</span> <span class="n">OnLeakage</span> <span class="o">=</span> <span class="s2">"raise"</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
 <span class="w">    </span><span class="sd">"""Diagnose preprocessing steps ordered before the train/test split."""</span>
     <span class="k">return</span> <span class="n">validate_leakage_safety</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">config</span><span class="p">,</span> <span class="n">on_leakage</span><span class="o">=</span><span class="n">on_leakage</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>

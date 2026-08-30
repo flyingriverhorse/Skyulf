@@ -1868,6 +1868,28 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#reproducibility-fingerprint" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reproducibility fingerprint
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#security-note" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Security note
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -3183,6 +3205,33 @@ with tempfile.TemporaryDirectory() as tmp:
 
 print(preds)
 </code></pre>
+<h2 id="reproducibility-fingerprint">Reproducibility fingerprint</h2>
+<p><code>pipeline.fingerprint()</code> returns a deterministic SHA-256 over the pipeline's
+topology <strong>and</strong> its fitted artifacts:</p>
+<pre><code class="language-python">print(pipeline.fingerprint())  # 64-char hex, e.g. &quot;9f2c4e...&quot;
+</code></pre>
+<ul>
+<li>Two pipelines with the same fingerprint produce the same predictions —
+  callers can prove "this prediction came from exactly this pipeline".</li>
+<li>The digest is <strong>semantic</strong> (<code>skyulf.pipeline.seal.artifact_digest</code> walks
+  hyperparameters + fitted weights, tree structures, tuned-model tuples,
+  numpy arrays and RNG state), not pickle bytes — so it is stable across
+  library, platform, and pickle-protocol versions.</li>
+<li>Objects without a canonical representation raise <code>TypeError</code> (fail-loud)
+  instead of silently hashing a <code>repr</code>.</li>
+</ul>
+<p>The fingerprint is also part of <code>export_model_card()</code>, alongside the
+preprocessing lineage, model params, fit metrics, and a Mermaid <code>diagram</code>.</p>
+<h2 id="security-note">Security note</h2>
+<p><code>pickle.load</code> (and <code>joblib.load</code>, which is pickle under the hood) can execute
+arbitrary code from a malicious file. Treat pipeline files like executables:</p>
+<ul>
+<li>Only load artifacts you produced yourself or received from a trusted store.</li>
+<li>The platform's artifact store (local/S3) only ever loads artifacts it wrote
+  for its own jobs.</li>
+<li>Prefer <code>fingerprint()</code> comparisons over re-loading when you only need to
+  verify identity.</li>
+</ul>
 
 
 

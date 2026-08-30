@@ -1521,6 +1521,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#inspecting-a-pipeline" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Inspecting a pipeline
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -3201,6 +3212,35 @@ with tempfile.TemporaryDirectory() as tmp:
 print(&quot;Preds after reload:&quot;)
 print(preds2)
 </code></pre>
+<h2 id="inspecting-a-pipeline">Inspecting a pipeline</h2>
+<p>A fitted (or unfitted) pipeline is fully introspectable — useful for logs,
+docs, PR descriptions, and model registries:</p>
+<pre><code class="language-python">print(pipeline.describe())
+# Human-readable summary: each preprocessing step with its params, then the model.
+
+print(pipeline.to_mermaid())
+# Mermaid flowchart of the topology (data -&gt; steps -&gt; model).
+# Paste into GitHub docs/PRs, or render with any mermaid viewer.
+
+card = pipeline.export_model_card()
+# JSON-friendly dict: schema_version, fitted, fingerprint, preprocessing
+# lineage, model + params, fit metrics, and `diagram` (the same mermaid
+# string as to_mermaid()). Intended for audit logs and registries.
+</code></pre>
+<p>The same surfaces appear across the platform:</p>
+<ul>
+<li><strong>Experiments page</strong> — every completed run persists its mermaid topology
+  (<code>metrics.pipeline_diagram</code>); select runs and open the <strong>Pipeline Diagram</strong> tab.</li>
+<li><strong>Notebook export</strong> — exported notebooks embed the topology as a rendered
+  "Pipeline topology" markdown cell (compact and full modes).</li>
+</ul>
+<p>Diagram labels are human-readable — internal node ids are never shown. Each
+node gets the step's display name, and a second line with the most relevant
+detail: a digest of the step params for config diagrams (<code>strategy: mean</code>),
+or the run's one-line summary for completed jobs (<code>acc 0.87 · f1 0.84</code>).
+Model nodes show the algorithm in readable form (<code>Random Forest Classifier</code>).</p>
+<p>Mermaid labels are always emitted double-quoted, so node names containing
+parentheses, brackets, or quotes stay parseable.</p>
 
 
 
