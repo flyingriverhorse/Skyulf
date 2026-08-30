@@ -21,7 +21,9 @@ from ._common import _select_subset_pandas, _select_subset_polars
 class MaxAbsScalerApplier(BaseApplier):
     @apply_method
     def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
-        return apply_dual_engine(X, params, self._apply_polars, self._apply_pandas)
+        return apply_dual_engine(
+            X, params, {"polars": self._apply_polars, "pandas": self._apply_pandas}
+        )
 
     @staticmethod
     def _apply_polars(X: Any, _y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
@@ -74,7 +76,7 @@ class MaxAbsScalerCalculator(BaseCalculator):
             return cast(MaxAbsScalerArtifact, {})
         return cast(
             MaxAbsScalerArtifact,
-            fit_dual_engine(X, config, self._fit_polars, self._fit_pandas),
+            fit_dual_engine(X, config, {"polars": self._fit_polars, "pandas": self._fit_pandas}),
         )
 
     @staticmethod

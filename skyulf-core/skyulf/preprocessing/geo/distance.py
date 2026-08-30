@@ -136,7 +136,9 @@ def _validate_geo_distance_method_unit(method: str, unit: str) -> None:
 class GeoDistanceApplier(BaseApplier):
     @apply_method
     def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
-        return apply_dual_engine(X, params, _geo_distance_apply_polars, _geo_distance_apply_pandas)
+        return apply_dual_engine(
+            X, params, {"polars": _geo_distance_apply_polars, "pandas": _geo_distance_apply_pandas}
+        )
 
 
 @NodeRegistry.register("GeoDistance", GeoDistanceApplier)

@@ -113,8 +113,7 @@ class LabelEncoderApplier(BaseApplier):
         return apply_dual_engine(
             (X, y) if y is not None else X,
             params,
-            polars_func=_label_apply_polars,
-            pandas_func=_label_apply_pandas,
+            {"polars": _label_apply_polars, "pandas": _label_apply_pandas},
         )
 
 
@@ -302,8 +301,7 @@ class LabelEncoderCalculator(BaseCalculator):
             fit_dual_engine(
                 (X, y) if y is not None else X,
                 config,
-                polars_func=_label_fit_polars,
-                pandas_func=_label_fit_pandas,
+                {"polars": _label_fit_polars, "pandas": _label_fit_pandas},
             ),
         )
 

@@ -139,8 +139,7 @@ class OrdinalEncoderApplier(BaseApplier):
         return apply_dual_engine(
             (X, y) if y is not None else X,
             params,
-            polars_func=_ordinal_apply_polars,
-            pandas_func=_ordinal_apply_pandas,
+            {"polars": _ordinal_apply_polars, "pandas": _ordinal_apply_pandas},
         )
 
 
@@ -331,8 +330,7 @@ class OrdinalEncoderCalculator(BaseCalculator):
             fit_dual_engine(
                 (X, y) if y is not None else X,
                 config,
-                polars_func=_ordinal_fit_polars,
-                pandas_func=_ordinal_fit_pandas,
+                {"polars": _ordinal_fit_polars, "pandas": _ordinal_fit_pandas},
             ),
         )
 

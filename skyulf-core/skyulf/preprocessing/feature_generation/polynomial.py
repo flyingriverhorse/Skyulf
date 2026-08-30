@@ -82,7 +82,9 @@ def _polynomial_apply_pandas(X: Any, _y: Any, params: dict[str, Any]) -> tuple[A
 class PolynomialFeaturesApplier(BaseApplier):
     @apply_method
     def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
-        return apply_dual_engine(X, params, _polynomial_apply_polars, _polynomial_apply_pandas)
+        return apply_dual_engine(
+            X, params, {"polars": _polynomial_apply_polars, "pandas": _polynomial_apply_pandas}
+        )
 
 
 @NodeRegistry.register("PolynomialFeatures", PolynomialFeaturesApplier)

@@ -73,8 +73,7 @@ class DropMissingRowsApplier(BaseApplier):
         return apply_dual_engine(
             (X, y) if y is not None else X,
             params,
-            _drop_missing_rows_apply_polars,
-            _drop_missing_rows_apply_pandas,
+            {"polars": _drop_missing_rows_apply_polars, "pandas": _drop_missing_rows_apply_pandas},
         )
 
 

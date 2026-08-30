@@ -99,8 +99,7 @@ class OneHotEncoderApplier(BaseApplier):
         return apply_dual_engine(
             (X, y) if y is not None else X,
             params,
-            polars_func=_onehot_apply_polars,
-            pandas_func=_onehot_apply_pandas,
+            {"polars": _onehot_apply_polars, "pandas": _onehot_apply_pandas},
         )
 
 
@@ -226,8 +225,7 @@ class OneHotEncoderCalculator(BaseCalculator):
             fit_dual_engine(
                 (X, y) if y is not None else X,
                 config,
-                polars_func=_onehot_fit_polars,
-                pandas_func=_onehot_fit_pandas,
+                {"polars": _onehot_fit_polars, "pandas": _onehot_fit_pandas},
             ),
         )
 

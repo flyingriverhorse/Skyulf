@@ -1,9 +1,15 @@
 """Dual-engine dispatch for preprocessing nodes.
 
 This module owns the *control flow* that lets a single node run on either the
-Polars or the Pandas engine: ``apply_dual_engine`` (and its fit counterpart)
-unpacks the pipeline input, selects the engine-specific implementation, and
-repacks the output. It is the single place that branches on the engine.
+Polars or the Pandas engine: ``apply_dual_engine`` (and its fit counterparts)
+unpacks the pipeline input, selects the engine-specific implementation from a
+mapping keyed by engine name, and repacks the output. It is the single place
+that branches on the engine.
+
+An engine with no registered implementation fails loudly with
+``NotImplementedError`` instead of being silently collected to pandas (F-09):
+pulling a distributed frame to the driver is a decision callers must make
+explicitly, never a dispatch default.
 
 Boundary with ``_helpers.py``: leaf utilities used *inside* the engine branches
 (column resolution, ``is_polars`` / ``to_pandas``, safe scaling) live in
@@ -13,7 +19,7 @@ helpers never dispatch a whole node.
 
 import logging
 from collections.abc import Callable, Mapping
-from typing import Any
+from typing import Any, TypeVar
 
 import pandas as pd
 
@@ -98,12 +104,30 @@ TrainTransformFunction = Callable[
     tuple[Mapping[str, Any], Any, Any | None],
 ]
 
+_ImplFunc = TypeVar("_ImplFunc", bound=Callable[..., Any])
+
+
+def _resolve_impl(
+    implementations: Mapping[str, _ImplFunc], engine: EngineName, operation: str
+) -> _ImplFunc:
+    """Select the implementation for ``engine`` or fail loudly (F-09).
+
+    Raised *before* any frame conversion: an unmapped engine must never be
+    silently collected to pandas.
+    """
+    func = implementations.get(engine)
+    if func is None:
+        raise NotImplementedError(
+            f"No '{engine}' implementation registered for '{operation}' "
+            f"(available: {', '.join(sorted(implementations))})"
+        )
+    return func
+
 
 def apply_dual_engine(
     df: pd.DataFrame | SkyulfDataFrame | tuple[Any, ...] | Any,
     params: dict[str, Any],
-    polars_func: ApplyFunction,
-    pandas_func: ApplyFunction,
+    implementations: Mapping[str, ApplyFunction],
 ) -> Any:
     """
     Dispatcher to handle boilerplate for dual-engine Appliers.
@@ -111,41 +135,49 @@ def apply_dual_engine(
     Args:
         df: Input data (DataFrame or Tuple).
         params: Configuration parameters.
-        polars_func: Function to execute if engine is Polars.
+        implementations: Engine-specific implementations keyed by engine name,
+                     e.g. ``{"polars": fn_pl, "pandas": fn_pd}``.
                      Signature: (X, y, params) -> (X_out, y_out)
-        pandas_func: Function to execute if engine is Pandas.
-                     Signature: (X, y, params) -> (X_out, y_out)
-                     Note: Input X is guaranteed to be a Pandas DataFrame/Series here.
+                     Note: On the pandas path, input X is guaranteed to be a
+                     Pandas DataFrame/Series here.
 
     Returns:
         Packed output matching the input format.
+
+    Raises:
+        NotImplementedError: If no implementation is registered for the input's
+            engine, or the engine has no input-preparation path yet.
     """
     X, y, is_tuple = unpack_pipeline_input(df)
     _check_xy_engine_parity(X, y)
     engine = get_engine(X)
+    func = _resolve_impl(implementations, engine.name, "apply")
 
     if engine.name == EngineName.POLARS:
-        # Polars path
-        # Unwrap SkyulfPolarsWrapper so polars_func sees a raw pl.DataFrame
-        # (native pl APIs crash on the wrapper, F-09); re-wrap afterwards
-        # so the output keeps the caller's engine.
-        X_pl, was_wrapped = _unwrap_polars_wrapper(X)
+        # Unwrap SkyulfPolarsWrapper so the implementation sees a raw
+        # pl.DataFrame (native pl APIs crash on the wrapper, F-09); re-wrap
+        # afterwards so the output keeps the caller's engine.
+        X_prep, was_wrapped = _unwrap_polars_wrapper(X)
         try:
-            X_out, y_out = polars_func(X_pl, y, params)
+            X_out, y_out = func(X_prep, y, params)
         except Exception as exc:
-            _log_dispatch_failure(exc, "Polars", "apply", polars_func)
+            _log_dispatch_failure(exc, "Polars", "apply", func)
             raise
         X_out = _rewrap_polars_output(X_out, was_wrapped)
-    else:
-        # Pandas path
+    elif engine.name == EngineName.PANDAS:
         # Ensure X is pandas
-        X_pd = X.to_pandas() if hasattr(X, "to_pandas") else X
-
+        X_prep = X.to_pandas() if hasattr(X, "to_pandas") else X
         try:
-            X_out, y_out = pandas_func(X_pd, y, params)
+            X_out, y_out = func(X_prep, y, params)
         except Exception as exc:
-            _log_dispatch_failure(exc, "Pandas", "apply", pandas_func)
+            _log_dispatch_failure(exc, "Pandas", "apply", func)
             raise
+    else:
+        # Registered engine with an implementation but no input-preparation
+        # path: fail loudly rather than silently collecting to pandas (F-09).
+        raise NotImplementedError(
+            f"No '{engine.name}' input-preparation path in apply_dual_engine yet"
+        )
 
     return pack_pipeline_output(X_out, y_out, is_tuple)
 
@@ -153,8 +185,7 @@ def apply_dual_engine(
 def fit_dual_engine(
     df: pd.DataFrame | SkyulfDataFrame | tuple[Any, ...] | Any,
     params: dict[str, Any],
-    polars_func: FitFunction,
-    pandas_func: FitFunction,
+    implementations: Mapping[str, FitFunction],
 ) -> dict[str, Any]:
     """
     Dispatcher to handle boilerplate for dual-engine Calculators.
@@ -162,57 +193,83 @@ def fit_dual_engine(
     Args:
         df: Inputs.
         params: Config.
-        polars_func: (X, y, params) -> Dict[Result]
-        pandas_func: (X, y, params) -> Dict[Result]
+        implementations: Engine-specific implementations keyed by engine name,
+                     e.g. ``{"polars": fn_pl, "pandas": fn_pd}``.
+                     Signature: (X, y, params) -> Dict[Result]
 
     Returns:
         Dictionary of fitted parameters.
+
+    Raises:
+        NotImplementedError: If no implementation is registered for the input's
+            engine, or the engine has no input-preparation path yet.
     """
     X, y, _ = unpack_pipeline_input(df)
     _check_xy_engine_parity(X, y)
     engine = get_engine(X)
+    func = _resolve_impl(implementations, engine.name, "fit")
 
     if engine.name == EngineName.POLARS:
-        X_pl, _ = _unwrap_polars_wrapper(X)
+        X_prep, _ = _unwrap_polars_wrapper(X)
         try:
-            return dict(polars_func(X_pl, y, params))
+            return dict(func(X_prep, y, params))
         except Exception as exc:
-            _log_dispatch_failure(exc, "Polars", "fit", polars_func)
+            _log_dispatch_failure(exc, "Polars", "fit", func)
+            raise
+    elif engine.name == EngineName.PANDAS:
+        X_prep = X.to_pandas() if hasattr(X, "to_pandas") else X
+        try:
+            return dict(func(X_prep, y, params))
+        except Exception as exc:
+            _log_dispatch_failure(exc, "Pandas", "fit", func)
             raise
     else:
-        X_pd = X.to_pandas() if hasattr(X, "to_pandas") else X
-        try:
-            return dict(pandas_func(X_pd, y, params))
-        except Exception as exc:
-            _log_dispatch_failure(exc, "Pandas", "fit", pandas_func)
-            raise
+        raise NotImplementedError(
+            f"No '{engine.name}' input-preparation path in fit_dual_engine yet"
+        )
 
 
 def fit_transform_train_dual_engine(
     df: pd.DataFrame | SkyulfDataFrame | tuple[Any, ...] | Any,
     params: dict[str, Any],
-    polars_func: TrainTransformFunction,
-    pandas_func: TrainTransformFunction,
+    implementations: Mapping[str, TrainTransformFunction],
 ) -> tuple[dict[str, Any], Any]:
-    """Dispatch an optional fit+train-transform hook across supported engines."""
+    """Dispatch an optional fit+train-transform hook across supported engines.
+
+    Args:
+        df: Inputs.
+        params: Config.
+        implementations: Engine-specific implementations keyed by engine name,
+                     e.g. ``{"polars": fn_pl, "pandas": fn_pd}``.
+                     Signature: (X, y, params) -> (Dict[Result], X_out, y_out)
+
+    Raises:
+        NotImplementedError: If no implementation is registered for the input's
+            engine, or the engine has no input-preparation path yet.
+    """
     X, y, is_tuple = unpack_pipeline_input(df)
     _check_xy_engine_parity(X, y)
     engine = get_engine(X)
+    func = _resolve_impl(implementations, engine.name, "fit_transform_train")
 
     if engine.name == EngineName.POLARS:
-        X_pl, was_wrapped = _unwrap_polars_wrapper(X)
+        X_prep, was_wrapped = _unwrap_polars_wrapper(X)
         try:
-            artifact, X_out, y_out = polars_func(X_pl, y, params)
+            artifact, X_out, y_out = func(X_prep, y, params)
         except Exception as exc:
-            _log_dispatch_failure(exc, "Polars", "fit_transform_train", polars_func)
+            _log_dispatch_failure(exc, "Polars", "fit_transform_train", func)
             raise
         X_out = _rewrap_polars_output(X_out, was_wrapped)
-    else:
-        X_pd = X.to_pandas() if hasattr(X, "to_pandas") else X
+    elif engine.name == EngineName.PANDAS:
+        X_prep = X.to_pandas() if hasattr(X, "to_pandas") else X
         try:
-            artifact, X_out, y_out = pandas_func(X_pd, y, params)
+            artifact, X_out, y_out = func(X_prep, y, params)
         except Exception as exc:
-            _log_dispatch_failure(exc, "Pandas", "fit_transform_train", pandas_func)
+            _log_dispatch_failure(exc, "Pandas", "fit_transform_train", func)
             raise
+    else:
+        raise NotImplementedError(
+            f"No '{engine.name}' input-preparation path in fit_transform_train_dual_engine yet"
+        )
 
     return dict(artifact), pack_pipeline_output(X_out, y_out, is_tuple)

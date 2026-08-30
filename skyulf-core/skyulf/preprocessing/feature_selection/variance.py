@@ -17,7 +17,9 @@ from ._common import _drop_selected_pandas, _drop_selected_polars
 class VarianceThresholdApplier(BaseApplier):
     @apply_method
     def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
-        return apply_dual_engine(X, params, _drop_selected_polars, _drop_selected_pandas)
+        return apply_dual_engine(
+            X, params, {"polars": _drop_selected_polars, "pandas": _drop_selected_pandas}
+        )
 
 
 @NodeRegistry.register("VarianceThreshold", VarianceThresholdApplier)

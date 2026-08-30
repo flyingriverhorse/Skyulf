@@ -147,7 +147,9 @@ def _polars_correlation_columns_to_drop(
 class CorrelationThresholdApplier(BaseApplier):
     @apply_method
     def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
-        return apply_dual_engine(X, params, _corr_drop_polars, _corr_drop_pandas)
+        return apply_dual_engine(
+            X, params, {"polars": _corr_drop_polars, "pandas": _corr_drop_pandas}
+        )
 
 
 @NodeRegistry.register("CorrelationThreshold", CorrelationThresholdApplier)

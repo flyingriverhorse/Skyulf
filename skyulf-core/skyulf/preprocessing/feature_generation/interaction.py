@@ -145,7 +145,9 @@ def _build_interaction_feature_names(
 class FeatureInteractionApplier(BaseApplier):
     @apply_method
     def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
-        return apply_dual_engine(X, params, _interaction_apply_polars, _interaction_apply_pandas)
+        return apply_dual_engine(
+            X, params, {"polars": _interaction_apply_polars, "pandas": _interaction_apply_pandas}
+        )
 
 
 @NodeRegistry.register("FeatureInteraction", FeatureInteractionApplier)

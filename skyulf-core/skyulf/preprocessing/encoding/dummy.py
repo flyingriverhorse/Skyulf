@@ -105,8 +105,7 @@ class DummyEncoderApplier(BaseApplier):
         return apply_dual_engine(
             (X, y) if y is not None else X,
             params,
-            polars_func=_dummy_apply_polars,
-            pandas_func=_dummy_apply_pandas,
+            {"polars": _dummy_apply_polars, "pandas": _dummy_apply_pandas},
         )
 
 
@@ -168,8 +167,7 @@ class DummyEncoderCalculator(BaseCalculator):
             fit_dual_engine(
                 (X, y) if y is not None else X,
                 config,
-                polars_func=_dummy_fit_polars,
-                pandas_func=_dummy_fit_pandas,
+                {"polars": _dummy_fit_polars, "pandas": _dummy_fit_pandas},
             ),
         )
 

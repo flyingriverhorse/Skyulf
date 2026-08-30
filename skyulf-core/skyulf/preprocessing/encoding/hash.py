@@ -90,8 +90,7 @@ class HashEncoderApplier(BaseApplier):
         return apply_dual_engine(
             (X, y) if y is not None else X,
             params,
-            polars_func=_hash_apply_polars,
-            pandas_func=_hash_apply_pandas,
+            {"polars": _hash_apply_polars, "pandas": _hash_apply_pandas},
         )
 
 

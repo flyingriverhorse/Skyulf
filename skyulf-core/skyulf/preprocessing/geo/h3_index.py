@@ -112,7 +112,9 @@ def _validate_h3_resolution(resolution: Any) -> None:
 class H3IndexApplier(BaseApplier):
     @apply_method
     def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
-        return apply_dual_engine(X, params, _h3_index_apply_polars, _h3_index_apply_pandas)
+        return apply_dual_engine(
+            X, params, {"polars": _h3_index_apply_polars, "pandas": _h3_index_apply_pandas}
+        )
 
 
 @NodeRegistry.register("H3Index", H3IndexApplier)
