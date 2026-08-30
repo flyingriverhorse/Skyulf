@@ -17,9 +17,15 @@ class EDAVisualizer:
     def summary(self):
         """Prints a rich terminal dashboard summary."""
         try:
-            from rich.console import Console  # ty: ignore[unresolved-import]
-            from rich.panel import Panel  # ty: ignore[unresolved-import]
-            from rich.table import Table  # ty: ignore[unresolved-import]
+            from rich.console import (
+                Console,  # ty: ignore[unresolved-import]  # noqa: PLC0415 - optional viz extra
+            )
+            from rich.panel import (
+                Panel,  # ty: ignore[unresolved-import]  # noqa: PLC0415 - optional viz extra
+            )
+            from rich.table import (
+                Table,  # ty: ignore[unresolved-import]  # noqa: PLC0415 - optional viz extra
+            )
         except ImportError:
             print("Please install 'rich' to use the terminal summary: pip install skyulf-core[viz]")
             return
@@ -392,7 +398,9 @@ class EDAVisualizer:
 
         console.print(f"\n[bold]10. Decision Tree Rules ({metric_name}: {acc_str})[/bold]")
 
-        from rich.tree import Tree  # ty: ignore[unresolved-import]
+        from rich.tree import (
+            Tree,  # ty: ignore[unresolved-import]  # noqa: PLC0415 - optional viz extra
+        )
 
         nodes_map = {n.id: n for n in self.profile.rule_tree.nodes}
 
@@ -485,7 +493,7 @@ class EDAVisualizer:
     def plot(self):
         """Generates and shows all available plots using Matplotlib."""
         try:
-            import matplotlib.pyplot as plt  # ty: ignore[unresolved-import]
+            import matplotlib.pyplot as plt  # ty: ignore[unresolved-import]  # noqa: PLC0415 - optional viz extra
         except ImportError:
             print("Please install 'matplotlib' to use plotting: pip install skyulf-core[viz]")
             return
@@ -536,7 +544,7 @@ class EDAVisualizer:
         plt.grid(axis="y", alpha=0.3)
 
     def _plot_distributions(self):
-        import matplotlib.pyplot as plt  # ty: ignore[unresolved-import]
+        import matplotlib.pyplot as plt  # ty: ignore[unresolved-import]  # noqa: PLC0415 - optional viz extra
 
         numeric_cols = [
             (name, col)
@@ -560,7 +568,7 @@ class EDAVisualizer:
         if not self.profile.correlations:
             return
 
-        import matplotlib.pyplot as plt  # ty: ignore[unresolved-import]
+        import matplotlib.pyplot as plt  # ty: ignore[unresolved-import]  # noqa: PLC0415 - optional viz extra
 
         cols = self.profile.correlations.columns
         matrix = self.profile.correlations.values
@@ -585,7 +593,7 @@ class EDAVisualizer:
         if not self.profile.correlations_with_target:
             return
 
-        import matplotlib.pyplot as plt  # ty: ignore[unresolved-import]
+        import matplotlib.pyplot as plt  # ty: ignore[unresolved-import]  # noqa: PLC0415 - optional viz extra
 
         cols = self.profile.correlations_with_target.columns
         matrix = self.profile.correlations_with_target.values
@@ -634,7 +642,7 @@ class EDAVisualizer:
         if not self.profile.target_interactions:
             return
 
-        import matplotlib.pyplot as plt  # ty: ignore[unresolved-import]
+        import matplotlib.pyplot as plt  # ty: ignore[unresolved-import]  # noqa: PLC0415 - optional viz extra
 
         boxplots = [i for i in self.profile.target_interactions if i.plot_type == "boxplot"]
         if not boxplots:
@@ -677,10 +685,12 @@ class EDAVisualizer:
         if self.df is None:
             return
 
-        import matplotlib.pyplot as plt  # ty: ignore[unresolved-import]
+        import matplotlib.pyplot as plt  # ty: ignore[unresolved-import]  # noqa: PLC0415 - optional viz extra
 
         try:
-            from pandas.plotting import scatter_matrix
+            from pandas.plotting import (
+                scatter_matrix,  # noqa: PLC0415 - requires optional viz extra (matplotlib)
+            )
         except ImportError:
             return
 
@@ -719,7 +729,7 @@ class EDAVisualizer:
         if not self.profile.pca_data:
             return
 
-        import matplotlib.pyplot as plt  # ty: ignore[unresolved-import]
+        import matplotlib.pyplot as plt  # ty: ignore[unresolved-import]  # noqa: PLC0415 - optional viz extra
 
         x = [p.x for p in self.profile.pca_data]
         y = [p.y for p in self.profile.pca_data]
@@ -750,7 +760,7 @@ class EDAVisualizer:
         if not self.profile.geospatial or not self.profile.geospatial.sample_points:
             return
 
-        import matplotlib.pyplot as plt  # ty: ignore[unresolved-import]
+        import matplotlib.pyplot as plt  # ty: ignore[unresolved-import]  # noqa: PLC0415 - optional viz extra
 
         lats = [p.lat for p in self.profile.geospatial.sample_points]
         lons = [p.lon for p in self.profile.geospatial.sample_points]
@@ -798,7 +808,7 @@ class EDAVisualizer:
         if not self.profile.timeseries or not self.profile.timeseries.trend:
             return
 
-        import matplotlib.pyplot as plt  # ty: ignore[unresolved-import]
+        import matplotlib.pyplot as plt  # ty: ignore[unresolved-import]  # noqa: PLC0415 - optional viz extra
 
         dates, values_map = self._timeseries_series(self.profile.timeseries.trend)
 

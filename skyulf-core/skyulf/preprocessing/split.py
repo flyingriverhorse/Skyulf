@@ -16,6 +16,7 @@ both :class:`DataSplitter` methods and :class:`FeatureTargetSplitApplier`.
 import logging
 from typing import Any, cast
 
+import numpy as np
 import pandas as pd
 import polars as pl
 from sklearn.model_selection import train_test_split
@@ -283,8 +284,6 @@ class DataSplitter:
 
     def _split_indices(self, n: int, stratify: Any) -> tuple[Any, Any]:
         """Split row positions ``0..n-1``; same partitioning as splitting rows."""
-        import numpy as np
-
         return train_test_split(
             np.arange(n),
             test_size=self.test_size,

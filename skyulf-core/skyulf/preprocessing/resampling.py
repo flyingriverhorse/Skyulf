@@ -147,8 +147,10 @@ def _resample_pandas(
 def _import_over_samplers() -> dict[str, Any]:
     """Lazy import of imblearn oversampling classes."""
     try:
-        from imblearn.combine import SMOTETomek
-        from imblearn.over_sampling import (
+        from imblearn.combine import (
+            SMOTETomek,  # noqa: PLC0415 - optional preprocessing-imbalanced extra
+        )
+        from imblearn.over_sampling import (  # noqa: PLC0415 - optional preprocessing-imbalanced extra
             ADASYN,
             SMOTE,
             SVMSMOTE,
@@ -275,7 +277,7 @@ class OversamplingCalculator(BaseCalculator):
 def _import_under_samplers() -> dict[str, Any]:
     """Lazy import of imblearn undersampling classes."""
     try:
-        from imblearn.under_sampling import (
+        from imblearn.under_sampling import (  # noqa: PLC0415 - optional preprocessing-imbalanced extra
             EditedNearestNeighbours,
             NearMiss,
             RandomUnderSampler,

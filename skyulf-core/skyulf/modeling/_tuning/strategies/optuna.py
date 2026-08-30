@@ -56,7 +56,7 @@ def _ensure_optuna_loaded() -> bool:
         _optuna_state.attempted = True
 
         try:
-            import optuna as _optuna  # ty: ignore[unresolved-import]
+            import optuna as _optuna  # ty: ignore[unresolved-import]  # noqa: PLC0415 - optional tuning extra; lazy loader pinned by F-14
 
             _optuna_state.optuna_module = _optuna
             _optuna_state.has_optuna = True
@@ -64,21 +64,21 @@ def _ensure_optuna_loaded() -> bool:
             return _optuna_state.has_optuna
 
         try:
-            from optuna.integration import (  # ty: ignore[unresolved-import]
+            from optuna.integration import (  # ty: ignore[unresolved-import]  # noqa: PLC0415 - optional tuning extra; lazy loader pinned by F-14
                 OptunaSearchCV as _OptunaSearchCV,
             )
 
             _optuna_state.search_cv = _OptunaSearchCV
         except ImportError:
             try:
-                from optuna.integration.sklearn import (  # ty: ignore[unresolved-import]
+                from optuna.integration.sklearn import (  # ty: ignore[unresolved-import]  # noqa: PLC0415 - optional tuning extra; lazy loader pinned by F-14
                     OptunaSearchCV as _OptunaSearchCV,
                 )
 
                 _optuna_state.search_cv = _OptunaSearchCV
             except ImportError:
                 try:
-                    from optuna_integration.sklearn import (  # ty: ignore[unresolved-import]
+                    from optuna_integration.sklearn import (  # ty: ignore[unresolved-import]  # noqa: PLC0415 - optional tuning extra; lazy loader pinned by F-14
                         OptunaSearchCV as _OptunaSearchCV,
                     )
 
