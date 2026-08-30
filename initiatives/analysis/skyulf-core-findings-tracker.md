@@ -7,8 +7,9 @@ snapshot, `/Users/BH7043/Skyulf`).
 
 The audit predates the 080–086 fix waves. 7 of 31 findings no longer reproduce;
 both partials (F-14, F-31) were closed 2026-08-29. After F-19 (pipeline.py
-split) closed 2026-08-29, 5 remain open: F-30 (deferred pending a compat
-call) and four structural items (F-09, F-08, F-11, F-18).
+split) closed 2026-08-29 and F-18 (`_tuning/engine.py` split) + F-11 (import
+cycles / deferred imports) closed 2026-08-30, 3 remain open: F-30 (deferred
+pending a compat call) and two structural items (F-09, F-08).
 This file tracks the fix work, few-at-a-time for easy items, one-at-a-time for hard ones.
 
 **Status key:** ⬜ open · 🟨 in progress · ✅ done · ⏭️ parked
@@ -57,7 +58,7 @@ Easy items batched; hard items one at a time.
 | F-07 | 🟠 | `._df` unwrapping → public `to_native()` | ~1 day | ✅ |
 | F-09 | 🟠 | Dual-engine dispatch mapping (Spark prereq) | ~2 days | ⬜ |
 | F-08 | 🟠 | Split the `SkyulfDataFrame` protocol | ~3 days | ⬜ |
-| F-11 | 🟠 | Break import cycles (196 deferred imports) | ~2 days | ⬜ |
+| F-11 | 🟠 | Break import cycles (196 deferred imports) | ~2 days | ✅ 2026-08-30 — 173 PLC0415 sites: 144 hoisted, 29 waived (optional extras), 1 cycle broken; PLC0415 now enforced |
 | F-18 | 🟡 | Split `_tuning/engine.py` (1,572 lines) | ~2 days | ✅ |
 | F-19 | 🟡 | Split `pipeline.py` responsibilities | ~1 day | ✅ |
 | F-23 | ⚪ | Enable BLE001 / broad-catch rule | half day | ✅ |
@@ -636,3 +637,50 @@ Three tracked follow-ups closed in one batch:
   1541 passed (exit 0); `ruff check .` clean; `ty check` backend + core +
   tests + entry points exit 0. Also fixed the stale "see engine.py" pointer in
   `requirements-ci.txt` to point at `strategies/optuna.py`.
+
+### 2026-08-30 — F-11 import cycle broken, 173 deferred imports eliminated (branch 088, commits 176dd0b3 → aca50d57)
+
+- **F-11** fixed: `ruff --select PLC0415` counted **173 function-level
+  imports** in `skyulf-core/skyulf/`; 144 hoisted to module level, 29 waived
+  (genuinely optional extras), and the one real import cycle broken. Zero
+  behavior change — imports moved, never rewritten (except the monkeypatch-safe
+  attribute form below). One commit per batch for bisectability.
+- **Cycle** (`176dd0b3`): `modeling/base → cross_validation/_evaluation →
+  _evaluation/__init__ → classification/clustering/regression/metrics →
+  modeling.sklearn_wrapper → base`. Broken by one re-pointed edge: the four
+  `_evaluation` modules now import `SklearnBridge` from the leaf
+  `engines.sklearn_bridge` instead of `modeling.sklearn_wrapper`; `base.py`
+  then hoists `perform_cross_validation` + the three `evaluate_*` imports.
+  Fresh-process import probes (`base`, `cross_validation`,
+  `_evaluation.classification`, `_tuning.engine`) guard against the
+  partial-init crash conftest imports would mask.
+- **Hoists** (`49d37546`, `310c6745`, `9ac26008`): internal no-cycle +
+  stdlib deferrals (stale "circular dependency" comments deleted), all
+  hard-dependency deferrals (sklearn/scipy/statsmodels/joblib/pyarrow/pandas),
+  and all 93 deferred `import polars as pl` sites (polars is a hard dep
+  already loaded at package init). Monkeypatch-sensitive files use
+  module-attribute form so test patches of third-party attributes still bind:
+  `_evaluation/metrics.py` → `sklearn_metrics.*`, `_analyzer/column.py` +
+  `_analyzer/target.py` → `scipy_stats.*`, `_analyzer/temporal.py` →
+  `stattools.adfuller` (try/except kept around the call).
+  `SKLEARN_AVAILABLE`/degradation gates untouched; `profiling/drift.py`
+  SCIPY_AVAILABLE pattern untouched (integration-pinned).
+- **Waivers** (`2cc222ef`, fixup folded into `aca50d57`): 29 sites keep
+  function-local imports with the repo's `# noqa: PLC0415 - <reason>`
+  convention — matplotlib ×9, rich ×4, shap ×4, optuna loader ×4 (F-14
+  lazy-loader contract), imblearn ×3, sentence_transformers, vaderSentiment,
+  causallearn, h3, scatter_matrix. Waiver syntax that satisfies both linters:
+  `noqa` must sit on the import *statement* line (member-line noqa inside
+  parenthesized imports does not suppress), `ty: ignore[unresolved-import]`
+  may sit on the preceding line.
+- **Enforcement** (`aca50d57`): `PLC0415` added to `[tool.ruff.lint] select`;
+  backend/**, tests/**, skyulf-core/tests/**, benchmarks, docs examples and
+  root entry points exempted via per-file-ignores (scope is the published
+  library). Rule needs ruff ≥0.12, so the pin bumped to `ruff>=0.15,<1.0` in
+  pyproject.toml + requirements-ci.txt in the same commit (matches the
+  pre-commit hook v0.15.16; uv.lock keeps 0.15.16).
+- Verification per batch + at the end: full core suite 3578 passed / 70
+  skipped; backend/root suite 1541 passed; `ruff check --select PLC0415 .` →
+  0 errors; `ruff check .` + `ruff format --check` clean; `ty check` exit 0
+  on backend + core + tests + entry points; fresh-process import probes for
+  the cycle-sensitive modules all import clean.
