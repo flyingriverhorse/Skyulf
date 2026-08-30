@@ -43,8 +43,9 @@ def _load_model(model_name: str) -> Any:
     if model_name in _MODEL_CACHE:
         return _MODEL_CACHE[model_name]
     try:
-        from sentence_transformers import (
-            SentenceTransformer,  # ty: ignore[unresolved-import]  # noqa: PLC0415 - optional nlp extra
+        # ty: ignore[unresolved-import]
+        from sentence_transformers import (  # noqa: PLC0415 - optional nlp extra
+            SentenceTransformer,
         )
     except ImportError as exc:  # pragma: no cover - depends on optional extra
         raise ImportError(_INSTALL_HINT) from exc

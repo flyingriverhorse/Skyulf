@@ -103,8 +103,8 @@ dev = [
     "syrupy>=4.0.0",
     "pytest-benchmark>=5.0.0,<6.0.0",
 
-    # Linters/formatters/typecheckers
-    "ruff>=0.8,<1.0",
+    # Linters/formatters/typecheckers (>=0.15: PLC0415 rule, audit finding F-11)
+    "ruff>=0.15,<1.0",
 
     # Dev helpers
     "factory-boy>=3.3.0,<4.0.0",
@@ -156,7 +156,11 @@ extend-exclude = [
 # BLE (blind-except) enabled repo-wide (audit finding F-23): skyulf-core
 # triaged first, then backend/ and root tests/ — every remaining broad
 # catch carries a justified per-site `# noqa: BLE001 - <reason>` waiver.
-select = ["E9", "F63", "F7", "F82", "I", "UP", "B", "C4", "SIM", "PERF", "BLE"]
+# PLC0415 (import-outside-top-level) enforced in the published library
+# skyulf-core/skyulf/ (audit finding F-11): 173 deferred imports hoisted,
+# 29 optional-extra imports waived per-site. Tests, entry points and
+# backend stay exempt via per-file-ignores below.
+select = ["E9", "F63", "F7", "F82", "I", "UP", "B", "C4", "SIM", "PERF", "BLE", "PLC0415"]
 # E203: owned by the formatter. UP042/046/047: StrEnum/PEP 695 need
 # case-by-case review, not blanket enforcement. B008: FastAPI's Depends()
 # default-argument idiom, not a bug.
@@ -173,6 +177,16 @@ ignore = ["E203", "UP042", "UP046", "UP047", "B008"]
 "skyulf-core/skyulf/profiling/analyzer.py" = ["E402"]
 # Notebook zip() pairs two same-length lists; out of scope for tooling.
 "skyulf-core/examples/05_leakage_proof_titanic.ipynb" = ["B905"]
+# PLC0415 (F-11): function-level imports are legitimate in tests, entry
+# points, backend glue and benchmarks; enforcement scope is skyulf-core/skyulf/.
+"backend/**" = ["PLC0415"]
+"tests/**" = ["PLC0415"]
+"skyulf-core/tests/**" = ["PLC0415"]
+"skyulf-core/benchmarks/**" = ["PLC0415"]
+"docs/examples/**" = ["PLC0415"]
+"skyulf-core/examples/**" = ["PLC0415"]
+"run_skyulf.py" = ["PLC0415"]
+"celery_worker.py" = ["PLC0415"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["skyulf", "backend"]

@@ -147,8 +147,8 @@ def _resample_pandas(
 def _import_over_samplers() -> dict[str, Any]:
     """Lazy import of imblearn oversampling classes."""
     try:
-        from imblearn.combine import (
-            SMOTETomek,  # noqa: PLC0415 - optional preprocessing-imbalanced extra
+        from imblearn.combine import (  # noqa: PLC0415 - optional preprocessing-imbalanced extra
+            SMOTETomek,
         )
         from imblearn.over_sampling import (  # noqa: PLC0415 - optional preprocessing-imbalanced extra
             ADASYN,

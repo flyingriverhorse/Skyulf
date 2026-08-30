@@ -17,15 +17,14 @@ class EDAVisualizer:
     def summary(self):
         """Prints a rich terminal dashboard summary."""
         try:
-            from rich.console import (
-                Console,  # ty: ignore[unresolved-import]  # noqa: PLC0415 - optional viz extra
-            )
-            from rich.panel import (
-                Panel,  # ty: ignore[unresolved-import]  # noqa: PLC0415 - optional viz extra
-            )
-            from rich.table import (
-                Table,  # ty: ignore[unresolved-import]  # noqa: PLC0415 - optional viz extra
-            )
+            # ty: ignore[unresolved-import]
+            from rich.console import Console  # noqa: PLC0415 - optional viz extra
+
+            # ty: ignore[unresolved-import]
+            from rich.panel import Panel  # noqa: PLC0415 - optional viz extra
+
+            # ty: ignore[unresolved-import]
+            from rich.table import Table  # noqa: PLC0415 - optional viz extra
         except ImportError:
             print("Please install 'rich' to use the terminal summary: pip install skyulf-core[viz]")
             return
@@ -398,9 +397,8 @@ class EDAVisualizer:
 
         console.print(f"\n[bold]10. Decision Tree Rules ({metric_name}: {acc_str})[/bold]")
 
-        from rich.tree import (
-            Tree,  # ty: ignore[unresolved-import]  # noqa: PLC0415 - optional viz extra
-        )
+        # ty: ignore[unresolved-import]
+        from rich.tree import Tree  # noqa: PLC0415 - optional viz extra
 
         nodes_map = {n.id: n for n in self.profile.rule_tree.nodes}
 
@@ -688,9 +686,7 @@ class EDAVisualizer:
         import matplotlib.pyplot as plt  # ty: ignore[unresolved-import]  # noqa: PLC0415 - optional viz extra
 
         try:
-            from pandas.plotting import (
-                scatter_matrix,  # noqa: PLC0415 - requires optional viz extra (matplotlib)
-            )
+            from pandas.plotting import scatter_matrix  # noqa: PLC0415 - optional viz extra
         except ImportError:
             return
 
