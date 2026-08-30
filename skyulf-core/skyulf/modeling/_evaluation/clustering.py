@@ -8,7 +8,7 @@ import polars as pl
 
 from ...engines import SkyulfDataFrame
 from ...engines.polars_engine import POLARS_NUMERIC_BOOL_DTYPES, SkyulfPolarsWrapper
-from ...modeling.sklearn_wrapper import SklearnBridge
+from ...engines.sklearn_bridge import SklearnBridge
 from .common import sanitize_metrics
 from .metrics import calculate_clustering_metrics
 from .schemas import ClusterCentroid, ClusteringEvaluation, ModelEvaluationReport

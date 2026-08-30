@@ -31,7 +31,7 @@ from sklearn.metrics import (
 from sklearn.preprocessing import label_binarize
 
 from ...engines import SkyulfDataFrame
-from ...modeling.sklearn_wrapper import SklearnBridge
+from ...engines.sklearn_bridge import SklearnBridge
 
 logger = logging.getLogger(__name__)
 
