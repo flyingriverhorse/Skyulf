@@ -17,6 +17,7 @@ from typing import Any, cast
 
 import numpy as np
 import pandas as pd
+import polars as pl
 from sklearn.model_selection import KFold
 
 from ...core.meta.decorators import node_meta
@@ -60,8 +61,6 @@ def _string_keys_with_nan(series: Any) -> Any:
 
 
 def _woe_apply_polars(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
-    import polars as pl
-
     valid_cols, mappings = _resolve_apply_inputs(X, params)
     if not valid_cols:
         return X, y
@@ -193,8 +192,6 @@ def _categorical_frame_for_fit(X: Any, cols: list[str]) -> Any:
     ends up falling back to ``default`` at apply time.
     """
     if hasattr(X, "fill_null"):  # polars DataFrame
-        import polars as pl
-
         exprs = [pl.col(col).cast(pl.Utf8).fill_null("nan") for col in cols]
         return X.select(exprs).to_pandas()
     return select_then_to_pandas(X, cols)[cols]
@@ -301,8 +298,6 @@ def _woe_fit_transform_train_polars(
     X: Any, y: Any, config: dict[str, Any]
 ) -> tuple[Mapping[str, Any], Any, Any]:
     """Fit the full-data artifact and cross-fit the Polars training rows."""
-    import polars as pl
-
     artifact, cols, encoded = _woe_fit_transform_train_common(X, y, config)
     if encoded is None:
         return artifact, X, y

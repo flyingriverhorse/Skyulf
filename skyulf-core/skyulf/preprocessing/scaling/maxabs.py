@@ -3,6 +3,7 @@
 from typing import Any, cast
 
 import numpy as np
+import polars as pl
 from sklearn.preprocessing import MaxAbsScaler
 
 from ...core.meta.decorators import node_meta
@@ -24,8 +25,6 @@ class MaxAbsScalerApplier(BaseApplier):
 
     @staticmethod
     def _apply_polars(X: Any, _y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
-        import polars as pl
-
         cols = params.get("columns", [])
         scale = params.get("scale")
         valid = resolve_valid_columns(X, cols)

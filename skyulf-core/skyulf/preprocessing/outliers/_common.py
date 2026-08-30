@@ -3,12 +3,11 @@
 from typing import Any
 
 import pandas as pd
+import polars as pl
 
 
 def _filter_y_polars(y: Any, mask_series: Any) -> Any:
     """Apply a Polars boolean mask to ``y`` if it is a Polars Series/DataFrame."""
-    import polars as pl
-
     if y is None:
         return None
     if isinstance(y, (pl.Series, pl.DataFrame)):

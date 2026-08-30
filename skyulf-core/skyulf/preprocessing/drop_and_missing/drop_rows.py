@@ -2,6 +2,8 @@
 
 from typing import Any
 
+import polars as pl
+
 from ...core.meta.decorators import node_meta
 from ...registry import NodeRegistry
 from .._artifacts import DropMissingRowsArtifact
@@ -16,8 +18,6 @@ def _polars_missing_expr(X: Any, col: str) -> Any:
     dtypes) NaN, so missing-row detection matches pandas' ``isna()``, which
     treats float NaN as missing too.
     """
-    import polars as pl
-
     expr = pl.col(col).is_null()
     if X.schema[col].is_float():
         expr = expr | pl.col(col).is_nan()
@@ -26,8 +26,6 @@ def _polars_missing_expr(X: Any, col: str) -> Any:
 
 def _polars_dropna_filter(X: Any, check_cols: list, how: str, threshold: int | None) -> Any:
     """Build the polars filter for dropna with optional threshold/how."""
-    import polars as pl
-
     missing = [_polars_missing_expr(X, c) for c in check_cols]
     not_missing = [~m for m in missing]
     if threshold is not None:

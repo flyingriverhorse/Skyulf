@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Any, cast
 
 import numpy as np
 import pandas as pd
+import polars as pl
 from sklearn.model_selection import (
     KFold,
     ShuffleSplit,
@@ -283,8 +284,6 @@ def _run_cv_fold(
 def _detect_datetime_columns(X: Any, is_polars: bool) -> list[str]:
     """Return the list of datetime-like column names in X, for either engine."""
     if is_polars:
-        import polars as pl
-
         return [
             col
             for col, dtype in zip(X.columns, X.dtypes, strict=True)
@@ -315,8 +314,6 @@ def _sort_polars_by_column(X: Any, y: Any, sort_col: str) -> tuple:
     """Sort a Polars X/y pair by sort_col and drop that column from X."""
     # Sort y in lockstep by attaching it as a temporary column so the
     # same row order is applied to both X and y, then split apart.
-    import polars as pl
-
     y_series = y if hasattr(y, "name") else pl.Series("__cv_y__", y)
     y_name = getattr(y_series, "name", None) or "__cv_y__"
     combined = X.with_columns(y_series.alias(y_name))

@@ -5,6 +5,7 @@ from collections.abc import Mapping
 from typing import Any, cast
 
 import pandas as pd
+import polars as pl
 
 from ...core.meta.decorators import node_meta
 from ...registry import NodeRegistry
@@ -64,8 +65,6 @@ def _pandas_col_to_str(series: Any) -> Any:
 
 
 def _dummy_apply_polars(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
-    import polars as pl
-
     valid_cols = _resolve_valid_cols(X, params)
     if not valid_cols:
         return X, y
@@ -130,8 +129,6 @@ def _build_dummy_artifact(
 
 
 def _dummy_fit_polars(X: Any, y: Any, config: dict[str, Any]) -> Mapping[str, Any]:
-    import polars as pl
-
     cols = resolve_columns(X, config, detect_categorical_columns)
     cols = _exclude_target_column(cols, config, "DummyEncoder", y)
 

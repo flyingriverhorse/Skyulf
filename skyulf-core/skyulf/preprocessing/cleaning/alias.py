@@ -4,6 +4,8 @@ import re
 import string
 from typing import Any
 
+import polars as pl
+
 from ...core.meta.decorators import node_meta
 from ...registry import NodeRegistry
 from ...utils import resolve_columns, user_picked_no_columns
@@ -64,8 +66,6 @@ class AliasReplacementApplier(BaseApplier):
 
     @staticmethod
     def _apply_polars(X: Any, _y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
-        import polars as pl
-
         valid = resolve_valid_columns(X, params.get("columns", []))
         if not valid:
             return X, _y

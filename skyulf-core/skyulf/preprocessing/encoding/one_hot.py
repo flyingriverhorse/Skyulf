@@ -6,6 +6,7 @@ from typing import Any, cast
 
 import numpy as np
 import pandas as pd
+import polars as pl
 from sklearn.preprocessing import OneHotEncoder
 
 from ...core.meta.decorators import node_meta
@@ -50,8 +51,6 @@ def _to_dense(encoded_array: Any) -> Any:
 
 
 def _onehot_apply_polars(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
-    import polars as pl
-
     valid_cols, encoder, feature_names = _validate_apply_params(X, params)
     if not valid_cols:
         return X, y

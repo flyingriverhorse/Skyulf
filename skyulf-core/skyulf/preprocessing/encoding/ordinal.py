@@ -5,6 +5,7 @@ from typing import Any, cast
 
 import numpy as np
 import pandas as pd
+import polars as pl
 from sklearn.preprocessing import OrdinalEncoder
 
 from ...core.meta.decorators import node_meta
@@ -32,8 +33,6 @@ def _resolve_apply_inputs(X: Any, params: dict[str, Any]) -> tuple[list[str], An
 
 
 def _apply_features_polars(X: Any, valid_cols: list[str], encoder: Any) -> Any:
-    import polars as pl
-
     # `fill_null("nan")` mirrors the pandas path's `.astype(str)` ("NaN" ->
     # "nan"), so polars nulls reuse the fitted "nan" class instead of drifting
     # into unknown_value (F-07).
@@ -77,8 +76,6 @@ def _target_to_str_array(y: Any) -> Any:
     # helpers in this module) to use `isinstance(y, pl.Series)` rather than
     # duck-typing on `hasattr(y, "fill_null")`, which could misroute any
     # unrelated object that happens to expose a `fill_null` method.
-    import polars as pl
-
     if isinstance(y, pl.Series):
         return y.cast(pl.Utf8).fill_null("nan").to_numpy().reshape(-1, 1)
     raw = y.to_numpy() if hasattr(y, "to_numpy") else np.asarray(y)
@@ -90,8 +87,6 @@ def _target_to_str_array(y: Any) -> Any:
 
 
 def _apply_target_polars(y: Any, enc: OrdinalEncoder) -> Any:
-    import polars as pl
-
     y_arr = _target_to_str_array(y)
     encoded = enc.transform(y_arr).flatten()
     y_name = y.name if hasattr(y, "name") else "target"
@@ -193,8 +188,6 @@ def _resolve_target_categories(raw_order: Any, n_features: int) -> str | list[li
 
 
 def _build_subset_polars(X: Any, feature_cols: list[str]) -> Any:
-    import polars as pl
-
     # Same fill_null("nan") normalisation as _apply_features_polars so fit
     # categories and apply-time strings agree for missing values (F-07).
     return X.select(feature_cols).select(

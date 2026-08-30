@@ -14,6 +14,7 @@ from typing import Any
 
 import numpy as np
 import pandas as pd
+import polars as pl
 
 from ...core.meta.decorators import node_meta
 from ...registry import NodeRegistry
@@ -98,8 +99,6 @@ def _embed_apply_pandas(
 def _embed_apply_polars(X: Any, params: dict[str, Any]) -> Any:
     """Native-Polars embed apply; returns ``None`` to fall back to pandas when
     a text column is not String dtype."""
-    import polars as pl
-
     cols: list[str] = params.get("columns", [])
     output_columns: list[str] = params.get("output_columns", [])
     model_name: str = params.get("model_name", "all-MiniLM-L6-v2")

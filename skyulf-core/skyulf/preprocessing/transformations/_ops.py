@@ -9,44 +9,33 @@ from typing import Any
 
 import numpy as np
 import pandas as pd
+import polars as pl
 
 
 def _polars_log(item: dict[str, Any]) -> Any:
-    import polars as pl
-
     col = item["column"]
     return pl.when(pl.col(col) < 0).then(None).otherwise(pl.col(col)).log1p()
 
 
 def _polars_sqrt(item: dict[str, Any]) -> Any:
-    import polars as pl
-
     col = item["column"]
     return pl.when(pl.col(col) < 0).then(None).otherwise(pl.col(col)).sqrt()
 
 
 def _polars_cbrt(item: dict[str, Any]) -> Any:
-    import polars as pl
-
     return pl.col(item["column"]).cbrt()
 
 
 def _polars_reciprocal(item: dict[str, Any]) -> Any:
-    import polars as pl
-
     col = item["column"]
     return 1.0 / pl.when(pl.col(col) == 0).then(None).otherwise(pl.col(col))
 
 
 def _polars_square(item: dict[str, Any]) -> Any:
-    import polars as pl
-
     return pl.col(item["column"]).pow(2)
 
 
 def _polars_exp(item: dict[str, Any]) -> Any:
-    import polars as pl
-
     threshold = item.get("clip_threshold", 700)
     return pl.col(item["column"]).clip(upper_bound=threshold).exp()
 

@@ -17,6 +17,7 @@ import logging
 from typing import Any, cast
 
 import pandas as pd
+import polars as pl
 from sklearn.model_selection import train_test_split
 
 from ..core.meta.decorators import node_meta
@@ -51,8 +52,6 @@ def _back_to_engine(data: Any, was_polars: bool) -> Any:
     if data is None or not was_polars:
         return data
     if isinstance(data, (pd.DataFrame, pd.Series)):
-        import polars as pl
-
         return pl.from_pandas(data)
     return data
 
@@ -424,8 +423,6 @@ class DataSplitter:
 
 
 def _split_xy_one_polars(data: Any, target_col: str) -> tuple[Any, Any]:
-    import polars as pl
-
     if target_col not in data.columns:
         raise ValueError(f"Target column '{target_col}' not found in dataset")
     y = data.select(pl.col(target_col)).to_series()

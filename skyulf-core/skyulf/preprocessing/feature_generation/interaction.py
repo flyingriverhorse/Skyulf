@@ -10,6 +10,7 @@ from itertools import combinations, combinations_with_replacement
 from typing import Any, cast
 
 import pandas as pd
+import polars as pl
 
 from ..._validation import raise_invalid_choice
 from ...core.artifacts import FeatureInteractionArtifact
@@ -90,8 +91,6 @@ def _interaction_apply_pandas(X: Any, _y: Any, params: dict[str, Any]) -> tuple[
 
 def _build_interaction_exprs(X: Any, combos: list[tuple]) -> list:
     """Build polars expressions for each valid interaction combination, casting to Float64."""
-    import polars as pl
-
     exprs = []
     for combo in combos:
         if not all(col in X.columns for col in combo):
@@ -105,8 +104,6 @@ def _build_interaction_exprs(X: Any, combos: list[tuple]) -> list:
 
 def _interaction_apply_polars(X: Any, _y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
     """Compute interaction columns and append them to a polars DataFrame."""
-    import polars as pl
-
     combos = [tuple(c) for c in params.get("combinations", [])]
     exprs = _build_interaction_exprs(X, combos)
 

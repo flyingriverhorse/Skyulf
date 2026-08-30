@@ -3,6 +3,7 @@
 from typing import Any
 
 import pandas as pd
+import polars as pl
 
 from ...core.meta.decorators import node_meta
 from ...registry import NodeRegistry
@@ -57,8 +58,6 @@ def _polars_dtype_kind(dtype: Any) -> str:
 
 
 def _polars_mapping_exprs(X: Any, valid: list[str], mapping: dict[str, Any]) -> list[Any]:
-    import polars as pl
-
     is_nested = any(isinstance(v, dict) for v in mapping.values())
     schema = X.schema
     exprs: list[Any] = []
@@ -72,8 +71,6 @@ def _polars_mapping_exprs(X: Any, valid: list[str], mapping: dict[str, Any]) -> 
 
 
 def _polars_to_replace_exprs(valid: list[str], to_replace: Any, value: Any) -> list[Any]:
-    import polars as pl
-
     exprs: list[Any] = []
     is_map = _is_mapping_like(to_replace)
     for col in valid:

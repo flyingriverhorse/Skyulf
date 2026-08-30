@@ -10,6 +10,7 @@ from typing import Any, cast
 
 import numpy as np
 import pandas as pd
+import polars as pl
 
 from ..._validation import raise_invalid_choice
 from ...core.artifacts import GeoDistanceArtifact
@@ -85,8 +86,6 @@ def _geo_distance_apply_pandas(X: Any, _y: Any, params: dict[str, Any]) -> tuple
 
 def _geo_distance_apply_polars(X: Any, _y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
     """Compute the configured distance and append it as a new polars column."""
-    import polars as pl
-
     lat1_col, lon1_col = params["lat1_col"], params["lon1_col"]
     lat2_col, lon2_col = params["lat2_col"], params["lon2_col"]
     if not all(c in X.columns for c in (lat1_col, lon1_col, lat2_col, lon2_col)):

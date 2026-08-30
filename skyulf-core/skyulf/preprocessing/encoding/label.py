@@ -5,6 +5,7 @@ from collections.abc import Mapping
 from typing import Any, cast
 
 import numpy as np
+import polars as pl
 from sklearn.preprocessing import LabelEncoder
 
 from ...core.meta.decorators import node_meta
@@ -35,8 +36,6 @@ def _le_mapping_str(le: LabelEncoder) -> dict[str, int]:
 def _build_polars_feature_exprs(
     X: Any, cols: list[str], encoders: dict[str, Any], missing_code: Any
 ) -> list[Any]:
-    import polars as pl
-
     # `fill_null("nan")` mirrors the pandas path's `.astype(str)`, which turns
     # NaN into the literal "nan" string that the fitted LabelEncoder learned a
     # class for. Without this, polars nulls would always fall back to
@@ -57,8 +56,6 @@ def _build_polars_feature_exprs(
 
 
 def _label_apply_polars(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
-    import polars as pl
-
     encoders: dict[str, Any] = params.get("encoders", {})
     cols: list[str] | None = params.get("columns")
     missing_code = params.get("missing_code", -1)
@@ -150,8 +147,6 @@ def _y_to_str_array(y: Any) -> Any:
     # helpers in this module) to use `isinstance(y, pl.Series)` rather than
     # duck-typing on `hasattr(y, "fill_null")`, which could misroute any
     # unrelated object that happens to expose a `fill_null` method.
-    import polars as pl
-
     if isinstance(y, pl.Series):
         return y.cast(pl.Utf8).fill_null("nan").to_numpy()
     if hasattr(y, "to_numpy"):
@@ -166,8 +161,6 @@ def _fit_le_on_array(arr: Any) -> LabelEncoder:
 
 
 def _polars_col_to_str_array(X: Any, col: str) -> Any:
-    import polars as pl
-
     # `fill_null("nan")` before `.to_numpy()` matches `_build_polars_feature_exprs`'s
     # apply-time representation exactly, so fit and apply agree regardless of
     # whether nulls are present in a given batch.

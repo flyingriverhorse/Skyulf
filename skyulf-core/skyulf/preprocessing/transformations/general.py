@@ -5,6 +5,7 @@ from typing import Any
 
 import numpy as np
 import pandas as pd
+import polars as pl
 from sklearn.preprocessing import PowerTransformer
 
 from ...core.meta.decorators import node_meta
@@ -24,8 +25,6 @@ _POWER_METHODS = {"box-cox", "yeo-johnson"}
 
 def _apply_power_to_polars_col(X_out: Any, item: dict[str, Any]) -> Any:
     """Apply a fitted Box-Cox / Yeo-Johnson to one Polars column in place."""
-    import polars as pl
-
     col = item["column"]
     method = item["method"]
     lambdas = item.get("lambdas")

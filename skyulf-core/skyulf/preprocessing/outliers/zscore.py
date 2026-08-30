@@ -3,6 +3,7 @@
 from typing import Any
 
 import pandas as pd
+import polars as pl
 
 from ...core.meta.decorators import node_meta
 from ...registry import NodeRegistry
@@ -27,8 +28,6 @@ class ZScoreApplier(BaseApplier):
 
     @staticmethod
     def _apply_polars(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
-        import polars as pl
-
         stats = params.get("stats", {})
         threshold = params.get("threshold", 3.0)
         if not stats:

@@ -12,6 +12,7 @@ coordinate columns as numpy arrays (the frame itself is never converted).
 from typing import Any, cast
 
 import pandas as pd
+import polars as pl
 
 from ...core.artifacts import H3IndexArtifact
 from ...core.meta.decorators import node_meta
@@ -71,8 +72,6 @@ def _h3_index_apply_polars(X: Any, _y: Any, params: dict[str, Any]) -> tuple[Any
     Only the two coordinate columns cross into numpy; the rest of the frame is
     never converted, so unrelated column dtypes are preserved.
     """
-    import polars as pl
-
     lat_col, lon_col = params["lat_col"], params["lon_col"]
     if lat_col not in X.columns or lon_col not in X.columns:
         return X, _y

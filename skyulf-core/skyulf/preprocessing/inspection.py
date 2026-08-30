@@ -8,6 +8,7 @@ collect engine-specific summary statistics, so they route through
 from typing import Any, cast
 
 import pandas as pd
+import polars as pl
 
 from ..core.meta.decorators import node_meta
 from ..engines import SkyulfDataFrame
@@ -41,8 +42,6 @@ def _extract_polars_numeric_stats(X: Any, numeric_cols: list) -> dict[str, dict[
 
 
 def _profile_fit_polars(X: Any, _y: Any, _config: dict[str, Any]) -> DatasetProfileArtifact:
-    import polars as pl
-
     profile: dict[str, Any] = {
         "rows": len(X),
         "columns": len(X.columns),

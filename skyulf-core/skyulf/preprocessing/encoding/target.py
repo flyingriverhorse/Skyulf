@@ -6,6 +6,7 @@ from typing import Any, cast
 
 import numpy as np
 import pandas as pd
+import polars as pl
 from sklearn.preprocessing import LabelEncoder, TargetEncoder
 from sklearn.utils.multiclass import type_of_target
 
@@ -43,8 +44,6 @@ def _replace_target_encoded_polars(
     X: Any, y: Any, valid_cols: list[str], encoded: Any
 ) -> tuple[Any, Any]:
     """Replace encoded columns in a Polars frame."""
-    import polars as pl
-
     n_feats = len(valid_cols)
     if encoded.shape[1] == n_feats:
         new_cols = [pl.Series(col, encoded[:, i]) for i, col in enumerate(valid_cols)]

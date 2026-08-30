@@ -3,6 +3,7 @@
 from typing import Any
 
 import pandas as pd
+import polars as pl
 
 from ...core.meta.decorators import node_meta
 from ...registry import NodeRegistry
@@ -15,8 +16,6 @@ from ._common import _apply_pandas_mask, _filter_y_polars
 
 def _manual_bounds_col_mask_polars(col: str, bound: dict[str, Any]) -> Any:
     """Build a Polars per-column inlier mask from optional lower/upper bounds."""
-    import polars as pl
-
     lower = bound.get("lower")
     upper = bound.get("upper")
     col_mask = pl.lit(True)
@@ -51,8 +50,6 @@ class ManualBoundsApplier(BaseApplier):
 
     @staticmethod
     def _apply_polars(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
-        import polars as pl
-
         bounds = params.get("bounds", {})
         if not bounds:
             return X, y

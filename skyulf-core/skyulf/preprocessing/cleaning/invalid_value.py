@@ -4,6 +4,7 @@ from typing import Any
 
 import numpy as np
 import pandas as pd
+import polars as pl
 
 from ...core.meta.decorators import node_meta
 from ...registry import NodeRegistry
@@ -24,8 +25,6 @@ def _invalid_rule_polars(
     max_value: Any,
 ) -> Any:
     """Apply a single invalid-value rule to a Polars expression."""
-    import polars as pl
-
     if rule in ("negative", "negative_to_nan"):
         return pl.when(expr < 0).then(final_replacement).otherwise(expr)
     if rule == "zero":
@@ -67,8 +66,6 @@ def _invalid_rule_pandas_mask(
 def _invalid_inf_replacement_polars(
     expr: Any, replace_inf: bool, replace_neg_inf: bool, final_replacement: Any
 ) -> Any:
-    import polars as pl
-
     if replace_inf:
         expr = pl.when(expr == float("inf")).then(final_replacement).otherwise(expr)
     if replace_neg_inf:
@@ -117,8 +114,6 @@ class InvalidValueReplacementApplier(BaseApplier):
 
     @staticmethod
     def _apply_polars(X: Any, _y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
-        import polars as pl
-
         valid = resolve_valid_columns(X, params.get("columns", []))
         if not valid:
             return X, _y

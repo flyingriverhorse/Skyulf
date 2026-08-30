@@ -3,6 +3,7 @@
 from typing import Any
 
 import pandas as pd
+import polars as pl
 
 from ...core.meta.decorators import node_meta
 from ...engines import SkyulfDataFrame
@@ -39,8 +40,6 @@ def _polars_rolling_exprs(
     min_periods: int,
     group_by: list[str] | None,
 ) -> list:
-    import polars as pl
-
     exprs = []
     for col in columns:
         if col not in available:
