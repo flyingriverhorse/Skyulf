@@ -58,7 +58,7 @@ Easy items batched; hard items one at a time.
 | F-09 | 🟠 | Dual-engine dispatch mapping (Spark prereq) | ~2 days | ⬜ |
 | F-08 | 🟠 | Split the `SkyulfDataFrame` protocol | ~3 days | ⬜ |
 | F-11 | 🟠 | Break import cycles (196 deferred imports) | ~2 days | ⬜ |
-| F-18 | 🟡 | Split `_tuning/engine.py` (1,572 lines) | ~2 days | ⬜ |
+| F-18 | 🟡 | Split `_tuning/engine.py` (1,572 lines) | ~2 days | ✅ |
 | F-19 | 🟡 | Split `pipeline.py` responsibilities | ~1 day | ✅ |
 | F-23 | ⚪ | Enable BLE001 / broad-catch rule | half day | ✅ |
 | F-13 | 🟡 | Wire threshold tuning into TuningConfig | ~1 day | ✅ |
@@ -588,3 +588,51 @@ Three tracked follow-ups closed in one batch:
   public contract; pickle compatibility is preserved because both the old
   `skyulf.pipeline` and new `skyulf.pipeline._pipeline` paths resolve.
   Re-verified: full core suite 3567 passed / 70 skipped (exit 0), ruff + ty clean.
+
+### 2026-08-30 — F-18 `_tuning/engine.py` split (branch 087)
+
+- **F-18** fixed: `skyulf/modeling/_tuning/engine.py` (1,830 lines, the
+  largest file in the library) no longer mixes six responsibilities. It is now
+  a ~700-line orchestrator (`fit`/`tune` + `TuningApplier` + config/validation
+  helpers), with the other five concerns in sibling leaf modules:
+  - `params.py` — search-space cleaning, flat/nested param splitting,
+    signature filtering, model instantiation, seed overlays.
+  - `splitters.py` — the whole CV splitter builder family
+    (`build_cv_splitter`, predefined-split/holdout/shuffle-split/stratified
+    variants, `select_cv_by_type`, nested inner CV).
+  - `metrics.py` — metric validation, alias map, multiclass weighting,
+    `resolve_metric` + `resolve_scorer` (pos_label pinning).
+  - `grid_random.py` — candidate generation and the per-fold scoring loop
+    (`evaluate_candidate_cv`, `fit_and_score_candidate_fold`,
+    `evaluate_search_candidates`, `run_grid_or_random_search`).
+  - `refit.py` — best-model refit, threshold-metric resolution,
+    decision-threshold tuning.
+  - `strategies/` package — `halving.py` (HalvingGrid/Random builders,
+    load-bearing `enable_halving_search_cv` side-effect import kept before the
+    Halving imports), `optuna.py` (the F-14 lazy loader + state object +
+    distribution/sampler/pruner/searcher builders + PEP 562 legacy-name
+    `__getattr__`), `runner.py` (searcher fit/extract/trials/error translation).
+- Behavior unchanged — pure code movement. The public `TuningCalculator` /
+  `TuningApplier` surface is untouched; test-pinned private methods
+  (`_refit_best_model`, `_fit_and_score_candidate_fold`,
+  `_run_grid_or_random_search`, `_resolve_scorer`, `_collect_trials`,
+  `_strip_model_prefix`, `_is_multiclass_target`, `_instantiate_model`,
+  `_clean_search_space`, `_resolve_threshold_metric`,
+  `_tune_decision_thresholds`) remain as one-line delegates. Engine re-exports
+  `_optuna_state`/`_OptunaLoadState`/`_ensure_optuna_loaded` and keeps a
+  module `__getattr__` for the legacy `HAS_OPTUNA`/`OptunaSearchCV`/`optuna`
+  views. `model_calculator` is threaded whole into grid_random/refit (never
+  destructured) so the deliberately-failing fold/refit branch tests keep
+  raising inside their try blocks.
+- Stale test pins retargeted (same coverage): halving-spy helper and fake
+  searcher patches → `strategies.halving`/`strategies.runner` module
+  functions; fresh-exec optuna import-fallback variants → exec
+  `strategies/optuna.py`; KFold/ShuffleSplit capture patches → `splitters`;
+  loader-fallback tests → the `strategies.optuna` module's own state;
+  round5/round6 candidate/evaluate spies → `grid_random` module functions.
+- Verification: targeted suites (tuning engine, failure branches, round5/6
+  patch coverage, boosting progress, three tuning integration suites) all
+  green; full core suite 3578 passed / 70 skipped (exit 0); backend/root suite
+  1541 passed (exit 0); `ruff check .` clean; `ty check` backend + core +
+  tests + entry points exit 0. Also fixed the stale "see engine.py" pointer in
+  `requirements-ci.txt` to point at `strategies/optuna.py`.
