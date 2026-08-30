@@ -47,6 +47,20 @@ class SkyulfDataFrame(Protocol):
     # Engine-specific ops (select/drop/with_column) reached via `__getattr__`.
 
     # Bridges
+    def to_native(self) -> Any:
+        """
+        Return the underlying engine-native frame (a ``pandas.DataFrame`` or
+        ``polars.DataFrame``) without any conversion.
+
+        This is the documented way to escape the wrapper when native-engine
+        APIs are required (e.g. ``pl.concat``, ``write_parquet``). It replaces
+        reaching into the private ``._df`` attribute. Unlike ``to_pandas()``,
+        which always yields a pandas frame (a no-op for pandas-backed data but
+        a conversion/copy for polars-backed data), ``to_native()`` hands back
+        whatever engine backs the wrapper, as-is.
+        """
+        ...
+
     def to_pandas(self) -> pd.DataFrame:
         """Convert to a Pandas DataFrame."""
         ...

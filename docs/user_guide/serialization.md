@@ -77,3 +77,35 @@ with tempfile.TemporaryDirectory() as tmp:
 
 print(preds)
 ```
+
+## Reproducibility fingerprint
+
+`pipeline.fingerprint()` returns a deterministic SHA-256 over the pipeline's
+topology **and** its fitted artifacts:
+
+```python
+print(pipeline.fingerprint())  # 64-char hex, e.g. "9f2c4e..."
+```
+
+- Two pipelines with the same fingerprint produce the same predictions —
+  callers can prove "this prediction came from exactly this pipeline".
+- The digest is **semantic** (`skyulf.pipeline.seal.artifact_digest` walks
+  hyperparameters + fitted weights, tree structures, tuned-model tuples,
+  numpy arrays and RNG state), not pickle bytes — so it is stable across
+  library, platform, and pickle-protocol versions.
+- Objects without a canonical representation raise `TypeError` (fail-loud)
+  instead of silently hashing a `repr`.
+
+The fingerprint is also part of `export_model_card()`, alongside the
+preprocessing lineage, model params, fit metrics, and a Mermaid `diagram`.
+
+## Security note
+
+`pickle.load` (and `joblib.load`, which is pickle under the hood) can execute
+arbitrary code from a malicious file. Treat pipeline files like executables:
+
+- Only load artifacts you produced yourself or received from a trusted store.
+- The platform's artifact store (local/S3) only ever loads artifacts it wrote
+  for its own jobs.
+- Prefer `fingerprint()` comparisons over re-loading when you only need to
+  verify identity.

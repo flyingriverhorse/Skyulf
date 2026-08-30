@@ -53,6 +53,46 @@ async def test_save_artifact_converts_pandas_via_polars(tmp_path) -> None:
     assert pl.read_parquet(path)["a"].to_list() == [1, 2]
 
 
+async def test_save_artifact_writes_wrapped_polars_native(tmp_path) -> None:
+    """A SkyulfPolarsWrapper must be written via its native polars frame
+    (unwrap, no pandas round-trip), pinning the wrapper save path."""
+    from skyulf.engines.polars_engine import SkyulfPolarsWrapper
+
+    path = tmp_path / "out.parquet"
+    wrapper = SkyulfPolarsWrapper(pl.DataFrame({"a": [1, 2]}))
+    await DataService().save_artifact(wrapper, path)
+    assert pl.read_parquet(path)["a"].to_list() == [1, 2]
+
+
+def test_save_polars_native_unwraps_via_to_native(tmp_path) -> None:
+    """A Polars-routed object without its own ``write_parquet`` must be
+    unwrapped through the public ``to_native()`` accessor."""
+
+    class _NoWriteParquet:
+        def __init__(self) -> None:
+            self._frame = pl.DataFrame({"a": [3, 4]})
+
+        def to_native(self) -> pl.DataFrame:
+            return self._frame
+
+    path = tmp_path / "out.parquet"
+    DataService()._save_polars_native(_NoWriteParquet(), str(path))
+    assert pl.read_parquet(path)["a"].to_list() == [3, 4]
+
+
+def test_save_polars_native_falls_back_to_pandas_conversion(tmp_path) -> None:
+    """When the unwrapped frame lacks ``write_parquet`` (should not happen
+    for PolarsEngine data), the defensive path converts via pandas."""
+
+    class _OddNative:
+        def to_native(self) -> pd.DataFrame:
+            return pd.DataFrame({"a": [5, 6]})
+
+    path = tmp_path / "out.parquet"
+    DataService()._save_polars_native(_OddNative(), str(path))
+    assert pl.read_parquet(path)["a"].to_list() == [5, 6]
+
+
 def test_should_use_polars_respects_force_type() -> None:
     service = DataService()
     assert service._should_use_polars(None) is True

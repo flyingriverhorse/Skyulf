@@ -144,6 +144,11 @@ class JobStrategy(ABC):
             if result.leakage_verdict is not None:
                 final_metrics["leakage_gate"] = result.leakage_verdict
 
+            # Mermaid topology diagram for the Experiments "Pipeline Diagram"
+            # tab; legacy/preview runs carry none and the tab stays hidden.
+            if result.pipeline_diagram:
+                final_metrics["pipeline_diagram"] = result.pipeline_diagram
+
             job.metrics = final_metrics
             self._seed_tuned_thresholds(job, final_metrics)
 

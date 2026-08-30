@@ -50,7 +50,8 @@ def test_is_fitted_flag():
 
 
 def test_export_model_card_structure():
-    card = SkyulfPipeline(_CONFIG).export_model_card()
+    pipe = SkyulfPipeline(_CONFIG)
+    card = pipe.export_model_card()
     assert card["schema_version"] == "1.0"
     assert card["fitted"] is False
     assert card["metrics"] is None
@@ -58,6 +59,8 @@ def test_export_model_card_structure():
     assert card["model"]["params"]["C"] == 1.0
     assert card["preprocessing"][0]["transformer"] == "StandardScaler"
     assert isinstance(card["fingerprint"], str) and len(card["fingerprint"]) == 64
+    assert card["diagram"] == pipe.to_mermaid()
+    assert card["diagram"].startswith("flowchart TD")
 
 
 def test_export_model_card_after_fit_has_metrics():

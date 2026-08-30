@@ -169,12 +169,16 @@ class DataService:
         """Write already-Polars(-wrapped) data directly via `write_parquet`."""
         if hasattr(data, "write_parquet"):
             data.write_parquet(path_str)
-        elif hasattr(data, "_df") and hasattr(data._df, "write_parquet"):
-            data._df.write_parquet(path_str)
+            return
+        # Unwrap a Skyulf engine wrapper via its public accessor so we write
+        # the native polars frame directly (replaces the old `._df` reach-in).
+        native = data.to_native() if hasattr(data, "to_native") else data
+        if hasattr(native, "write_parquet"):
+            native.write_parquet(path_str)
         else:
             # Should not happen if engine is PolarsEngine
             logger.warning("PolarsEngine detected but write_parquet missing. Converting...")
-            pl.from_pandas(data).write_parquet(path_str)
+            pl.from_pandas(native).write_parquet(path_str)
 
     def _save_via_polars_conversion(self, data: Any, path_str: str) -> None:
         """Convert non-Polars data (Pandas/Arrow-capable) to Polars for a fast write."""

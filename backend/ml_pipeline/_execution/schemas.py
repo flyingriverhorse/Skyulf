@@ -131,6 +131,11 @@ class PipelineExecutionResult:
     # "level": "warning"|"info", "message": str}`. Captured by the
     # `WarningCaptureHandler` attached during `PipelineEngine.run`.
     node_warnings: list[dict[str, Any]] = field(default_factory=list)
+    # Mermaid flowchart of the executed node chain, built by
+    # `_execution.diagram.build_pipeline_diagram`; persisted onto
+    # `job.metrics["pipeline_diagram"]` for the Experiments diagram tab.
+    # None when the diagram could not be built (advisory, never fatal).
+    pipeline_diagram: str | None = None
     # Pre-execution schema predictions (C7 Phase B). One entry per node;
     # value is ``{"columns": [...], "dtypes": {...}}`` when the node's
     # Calculator overrides ``infer_output_schema`` and an upstream schema

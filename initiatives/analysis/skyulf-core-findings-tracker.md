@@ -6,8 +6,9 @@ snapshot, `/Users/BH7043/Skyulf`).
 (3,457 passed, 56 skipped).
 
 The audit predates the 080–086 fix waves. 7 of 31 findings no longer reproduce;
-both partials (F-14, F-31) were closed 2026-08-29; 19 are live (F-13 was
-partial at triage and is now fully fixed).
+both partials (F-14, F-31) were closed 2026-08-29. After F-19 (pipeline.py
+split) closed 2026-08-29, 5 remain open: F-30 (deferred pending a compat
+call) and four structural items (F-09, F-08, F-11, F-18).
 This file tracks the fix work, few-at-a-time for easy items, one-at-a-time for hard ones.
 
 **Status key:** ⬜ open · 🟨 in progress · ✅ done · ⏭️ parked
@@ -52,18 +53,58 @@ Easy items batched; hard items one at a time.
 | F-29 | ⚪ | Stale/blanket noqa cleanup | mechanical | ✅ |
 | F-17 | 🟡 | 20 mutable class attrs need `ClassVar` | ~2 h | ✅ |
 | F-10 | 🟠 | `_HARDCODED_MODEL_MAP` shadows registry | half day | ✅ |
-| F-15 | 🟡 | Pickle-based reproducibility digest | ~1 day | ⬜ |
-| F-07 | 🟠 | `._df` unwrapping → public `to_native()` | ~1 day | ⬜ |
+| F-15 | 🟡 | Pickle-based reproducibility digest | ~1 day | ✅ |
+| F-07 | 🟠 | `._df` unwrapping → public `to_native()` | ~1 day | ✅ |
 | F-09 | 🟠 | Dual-engine dispatch mapping (Spark prereq) | ~2 days | ⬜ |
 | F-08 | 🟠 | Split the `SkyulfDataFrame` protocol | ~3 days | ⬜ |
 | F-11 | 🟠 | Break import cycles (196 deferred imports) | ~2 days | ⬜ |
 | F-18 | 🟡 | Split `_tuning/engine.py` (1,572 lines) | ~2 days | ⬜ |
-| F-19 | 🟡 | Split `pipeline.py` responsibilities | ~1 day | ⬜ |
+| F-19 | 🟡 | Split `pipeline.py` responsibilities | ~1 day | ✅ |
 | F-23 | ⚪ | Enable BLE001 / broad-catch rule | half day | ✅ |
 | F-13 | 🟡 | Wire threshold tuning into TuningConfig | ~1 day | ✅ |
 | F-14 | 🟡 | contextvar scoping for engine/backend globals | ~1 day | ✅ |
+| F-32 | 🟡 | Pipeline persistence pickle → joblib ([plan](skyulf-core-joblib-migration-plan.md)) | ~1.5 days | ⏭️ planned — awaiting go/no-go |
+| F-33 | 🟡 | ONNX export & serving, core + backend + frontend ([plan](skyulf-core-onnx-support-plan.md)) | ~1 week (phases 1-3) | ⏭️ planned — awaiting go/no-go |
+| F-34 | 🟡 | MLflow integration on the three `core/` seams ([plan](skyulf-core-mlflow-integration-plan.md)) | ~1 week (phases 1-3) | ⏭️ planned — awaiting go/no-go |
+
+## Planning initiatives (awaiting go/no-go)
+
+User-requested detailed plans for work beyond the finding list. Each doc
+covers current state, design, phases, risks, and open decision points.
+
+| Initiative | Plan doc | Est. | Status |
+|---|---|---|---|
+| Pipeline persistence pickle → joblib | [`skyulf-core-joblib-migration-plan.md`](skyulf-core-joblib-migration-plan.md) | ~1.5 days | ⏭️ planned |
+| ONNX export & serving (core + backend + frontend) | [`skyulf-core-onnx-support-plan.md`](skyulf-core-onnx-support-plan.md) | ~1 week (phases 1-3) | ⏭️ planned |
+| MLflow integration on the three `core/` seams (F-27 groundwork) | [`skyulf-core-mlflow-integration-plan.md`](skyulf-core-mlflow-integration-plan.md) | ~1 week (phases 1-3) | ⏭️ planned |
 
 ## Log
+
+### 2026-08-29 — Planning initiatives (branch 087)
+
+- Three detailed plan documents added to `initiatives/analysis/`, all
+  grounded in code verified the same day:
+  - **joblib migration** — the blast radius is one site: `SkyulfPipeline.save/load`
+    is the only raw pickle left in core (backend artifact stores are already
+    joblib; the F-14 serializer seam defaults to joblib). Plan routes save/load
+    through the seam with a legacy-pickle read fallback; fingerprint (F-15) is
+    content-addressed and unaffected. Honest scope note: joblib is pickle-protocol
+    internally, so this is consistency + efficiency, not a security fix — the
+    ONNX plan owns the untrusted-input story.
+  - **ONNX export & serving** — optional `[onnx]` extra, registry-metadata-driven
+    `export_formats` (the F-10 lesson: no second hardcoded map), export parity
+    gate tied to the F-15 fingerprint, backend artifact + download wiring,
+    frontend capability-aware UI. Support matrix per model family; preprocessing
+    export explicitly out of scope for phases 1-2.
+  - **MLflow integration** — the "80% ready" claim unpacked: the three
+    `core/` seams (compute/serialization/model_registry, F-27) plus F-14
+    ContextVar scoping are the prepared surface; zero MLflow code exists.
+    Plan maps job↔run, wires the roadmap's R6.4 fit-callback, keeps tracking
+    best-effort (never fails a job), and links rather than mirrors MLflow UI
+    in the frontend. `mlflow-skinny` (tracking) vs full `mlflow` (packaging)
+    capability split called out.
+- No code changed — plans only; each doc ends with explicit decision points
+  for the user.
 
 ### 2026-08-28 — Batch 1 (branch 086)
 
@@ -427,3 +468,123 @@ Three tracked follow-ups closed in one batch:
 - Verification: ruff check + format clean repo-wide, `ty check` exit 0,
   targeted suites green (profiling+preprocessing 269, seams+tuning 131),
   full core suite 3514 passed / 70 skipped (exit 0).
+
+### 2026-08-29 — F-07 public `to_native()` unwrap (branch 086)
+
+- **F-07** fixed: the engine wrappers no longer have their private `._df`
+  reached into from outside. Added a public, documented `to_native()` to
+  `SkyulfPandasWrapper`, `SkyulfPolarsWrapper`, and the `SkyulfDataFrame`
+  protocol. Semantics: `to_native()` returns the backing frame **as-is**
+  (no conversion); `to_pandas()` always yields pandas — the two coincide for
+  a pandas-backed wrapper but differ for a polars-backed one (identity vs.
+  convert). `_df` stays as the internal storage attribute; `to_native()` is
+  the single public escape hatch the audit asked for.
+- Routed all 8 external core `._df` sites through it (SLF001 `_df` 8 → 0):
+  `utils.py` `_pack_polars_output` (detection now `hasattr(X, "to_native")`),
+  `engines/registry.py` `_detect_top_level_package` (same detection; docstring
+  updated — only our wrappers define `to_native()`, so the old polars-internal-
+  `._df` caution no longer applies), `preprocessing/dispatcher.py`,
+  `preprocessing/feature_selection/correlation.py`, `profiling/expect.py`,
+  `modeling/_evaluation/clustering.py`, and both detection+unwrap in
+  `preprocessing/vectorization/_common.py`. Also routed the identical
+  backend anti-pattern `backend/services/data_service.py` `_save_polars_native`
+  (was `data._df.write_parquet`).
+- Behavior is unchanged — pure API addition + rerouting. `hasattr(x, "to_native")`
+  is a reliable wrapper discriminator (raw pandas/polars frames have no such
+  method), so every detection branch still only fires for our wrappers.
+- Tests: 3 regression tests pin `to_native()` returns the native frame by
+  identity for both engines and that it differs in type from `to_pandas()` for
+  a polars wrapper (`test_engines_pandas.py`, `test_engines_polars.py`); 1
+  end-to-end test pins a `SkyulfPolarsWrapper` saves through
+  `DataService.save_artifact` (`tests/unit/test_data_service.py`).
+- Verification: `ruff check .` clean repo-wide, `ruff format --check` clean on
+  all 14 touched files (34 pre-existing unformatted files untouched, out of
+  scope), `ty check` exit 0, full core suite 3561 passed / 70 skipped (exit 0),
+  backend/root unit suite 829 passed (exit 0).
+- Note: `to_native()` is now the one seam where a future "you are unwrapping a
+  distributed frame" warning can live (the F-09/Spark hook the audit pointed at);
+  no warning added yet — there is no third engine. The remaining 13 SLF001s
+  (`_scaler`, `_score_func`, `_SOLVER_PENALTIES`, etc.) are unrelated private
+  accesses, not `._df`, and stay out of this finding's scope.
+
+### 2026-08-29 — F-15 semantic reproducibility digest (branch 087)
+
+- **F-15** fixed: `_artifact_digest` (`skyulf/pipeline.py`) no longer pickles.
+  A type-tagged recursive canonical walk (`_feed_canonical`) now feeds the
+  SHA-256: scalars + numpy scalars, `ndarray` as `dtype|shape|tobytes()`
+  (contiguous), `np.random.RandomState` via `get_state()`, dict (keys sorted
+  by `repr`, insertion-order insensitive), tuple/list (order-sensitive, distinct
+  tags), set/frozenset (sorted), classes (module.qualname), dataclasses
+  (field-by-field), sklearn `_tree.Tree` (C extension, no `__dict__` — walked
+  via `node_count` + its 8 node arrays), and any generic object via sorted
+  `vars()` (routines and modules skipped). This covers fitted estimators
+  (constructor params + every fitted attr, incl. `coef_`, `tree_`, nested
+  `estimators_`), preprocessing artifact dicts, and tuned
+  `(model, TuningResult)` tuples.
+- The `repr` fallback is gone, per the audit: anything the walk cannot
+  canonicalize raises `TypeError` — an artifact that cannot be digested fails
+  the seal instead of silently passing it.
+- Version stability flipped: the digest no longer embeds pickle module
+  paths/protocol, so a sklearn or pickle-protocol bump no longer changes a
+  byte-identical model's digest (`fingerprint()` docstring updated
+  accordingly). Preprocessing artifacts were already JSON-like dicts, so their
+  digests stay content-addressed.
+- **Scope decision (documented, deviating from the audit):** the audit's
+  "plus the training-data digest" component was deliberately **not**
+  implemented. The seal's contract — "same hash ⇒ same predictions" — is fully
+  served by topology + learned weights + hyperparameters; the weights already
+  absorb any training-data influence. A training-data digest would need a
+  canonical choice that doesn't exist (pre- vs post-preprocessing frame, target
+  inclusion, split selection), and it isn't available at predict time, so it
+  could never be verified where the seal is checked.
+- Tests: the old repr-fallback test in `test_pipeline_coverage.py` was
+  replaced by seven pins — digest determinism, weight sensitivity with
+  identical hyperparameters (the old collision), fail-loud `TypeError`, dict
+  key-order insensitivity, Tree-structure coverage, tuned-tuple coverage, and
+  an end-to-end RandomForest `fingerprint()` determinism + data-sensitivity
+  test. All pre-existing `test_pipeline_card.py` fingerprint pins still pass.
+- Detail: this env's sklearn `_tree.Tree` has no `children_default` attribute;
+  the walk covers `children_left/right`, `feature`, `threshold`, `impurity`,
+  `n_node_samples`, `weighted_n_node_samples`, `value` — enough to pin the
+  tree's structure and predictions.
+- Verification: full core suite 3567 passed / 70 skipped (exit 0);
+  `ruff check` + `ruff format` clean on the two touched files; `ty check`
+  backend + core + tests exit 0.
+
+### 2026-08-29 — F-19 pipeline.py split (branch 087)
+
+- **F-19** fixed: `skyulf/pipeline.py` no longer mixes four responsibilities.
+  The two self-contained helpers the audit called out moved to leaf modules
+  next to it:
+  - `skyulf/pipeline_seal.py` owns the reproducibility digest — the F-15
+    semantic walker, now public as `artifact_digest` (with the internal
+    `_feed_canonical`). It's a leaf module (hashlib/dataclasses/inspect/numpy
+    only), so no import-cycle risk.
+  - `skyulf/pipeline_diagram.py` owns Mermaid rendering — `build_mermaid_diagram`
+    plus `mermaid_escape`. Also a leaf module (collections.abc/typing only),
+    which is the point the audit made: diagram rendering has no business next
+    to the fit path.
+  - `SkyulfPipeline.to_mermaid()` and `fingerprint()` are now one-line
+    delegates. The fitting, persistence (`save`/`load` pickle), and model-card
+    concerns stay in `pipeline.py`.
+- Behavior unchanged — pure code movement + rename. The old private names
+  `_mermaid_escape`/`_artifact_digest` are gone from `pipeline.py`; only
+  `SkyulfPipeline` is re-exported from `skyulf/__init__.py`, so nothing public
+  broke. Tests updated to import `artifact_digest` from `skyulf.pipeline_seal`.
+- One type fix on the way: `build_mermaid_diagram` takes
+  `Sequence[Mapping[str, Any]]` / `Mapping[str, Any]` rather than `dict`,
+  because `SkyulfPipeline` hands it `PreprocessingStepConfig` / `ModelConfig`
+  TypedDicts, which `ty` correctly refuses to treat as mutable `dict`s.
+- Tests: all pre-existing digest, model-card, and `describe()`/`to_mermaid()`
+  pins pass unchanged (the describe suite exercises the moved diagram builder).
+- Verification: full core suite 3567 passed / 70 skipped (exit 0);
+  `ruff check` + `ruff format` clean on all four touched files; `ty check`
+  backend + core + tests exit 0.
+- Follow-up (2026-08-29, user-approved): the three modules were grouped into
+  a `skyulf/pipeline/` package — `_pipeline.py` (orchestrator), `seal.py`
+  (`artifact_digest`), `diagram.py` (`build_mermaid_diagram`) — to keep the
+  top-level package uncluttered. `pipeline/__init__.py` re-exports only
+  `SkyulfPipeline`, so `from skyulf.pipeline import SkyulfPipeline` stays the
+  public contract; pickle compatibility is preserved because both the old
+  `skyulf.pipeline` and new `skyulf.pipeline._pipeline` paths resolve.
+  Re-verified: full core suite 3567 passed / 70 skipped (exit 0), ruff + ty clean.

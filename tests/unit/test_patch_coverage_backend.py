@@ -368,6 +368,40 @@ class TestPipelineEngineMetadataBranches:
         )
         assert engine._build_node_metadata(node, {}) == {}
 
+    def test_build_node_metadata_captures_display_name_from_params(self):
+        from typing import cast
+
+        from backend.ml_pipeline._execution.engine import PipelineEngine
+        from backend.ml_pipeline._execution.schemas import NodeConfig
+
+        class ExplodingStore:
+            def load(self, key):
+                raise RuntimeError("artifact unreadable")
+
+        engine = object.__new__(PipelineEngine)
+        engine.artifact_store = cast("Any", ExplodingStore())
+        node = cast(
+            "NodeConfig",
+            SimpleNamespace(
+                node_id="n1",
+                inputs=[],
+                step_type="transformer",
+                params={"_display_name": "  My Node  "},
+            ),
+        )
+        assert engine._build_node_metadata(node, {}) == {"display_name": "My Node"}
+
+        blank = cast(
+            "NodeConfig",
+            SimpleNamespace(
+                node_id="n2",
+                inputs=[],
+                step_type="transformer",
+                params={"_display_name": "   "},
+            ),
+        )
+        assert engine._build_node_metadata(blank, {}) == {}
+
 
 class TestFeatureEngMixinFailureBranches:
     @staticmethod

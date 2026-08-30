@@ -310,7 +310,8 @@ def _build_compact_notebook(
             nb.compact_summary_md(
                 cfg, dataset_id, dataset_name, preprocess, feat_target, train_test, model
             )
-        )
+        ),
+        nb.md_cell(nb.pipeline_diagram_md(full_chain, model)),
     ]
     cells.extend(
         nb.compact_load_cells(data_path, target_col, resolved_from_db=db_file_path is not None)
@@ -346,12 +347,14 @@ def _build_full_notebook(
         )
     loader, preprocess, feat_target, train_test, model = _classify(nodes)
     data_path = _resolve_dataset_path(loader, dataset_name, db_file_path)
+    diagram_chain = [n for n in (feat_target, train_test) if n is not None] + preprocess
     cells: list[dict[str, Any]] = [
         nb.md_cell(
             nb.full_summary_md(
                 cfg, dataset_id, dataset_name, nodes, preprocess, feat_target, train_test, model
             )
-        )
+        ),
+        nb.md_cell(nb.pipeline_diagram_md(diagram_chain, model)),
     ]
     cells.extend(nb.full_intro_cells(data_path, resolved_from_db=db_file_path is not None))
     if not preprocess:

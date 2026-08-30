@@ -29,7 +29,7 @@ def _as_polars_frame(X: Any) -> pl.DataFrame | None:
     if isinstance(X, pl.DataFrame):
         return X
     if isinstance(X, SkyulfPolarsWrapper):
-        return X._df
+        return X.to_native()
     return None
 
 

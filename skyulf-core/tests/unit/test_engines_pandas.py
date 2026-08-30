@@ -93,6 +93,16 @@ def test_wrapper_to_pandas_returns_same_object(df):
     assert wrapper.to_pandas() is df
 
 
+def test_wrapper_to_native_returns_same_object(df):
+    """to_native() must return the underlying pandas frame unchanged — the
+    documented replacement for the private ``._df``. For the pandas wrapper it
+    coincides with to_pandas(), giving one engine-agnostic unwrap seam."""
+    wrapper = SkyulfPandasWrapper(df)
+    native = wrapper.to_native()
+    assert isinstance(native, pd.DataFrame)
+    assert native is df
+
+
 def test_wrapper_to_arrow_roundtrips(df):
     """to_arrow() should produce a pyarrow Table with matching data."""
     wrapper = SkyulfPandasWrapper(df)

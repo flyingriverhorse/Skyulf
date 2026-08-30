@@ -15,6 +15,7 @@ from datetime import UTC, datetime
 from sqlalchemy.orm import Session
 
 from backend.database.models import DataSource, MLJob
+from backend.ml_pipeline._execution.diagram import build_pipeline_diagram
 from backend.ml_pipeline._execution.engine import PipelineEngine
 from backend.ml_pipeline._execution.schemas import (
     NodeConfig,
@@ -213,6 +214,11 @@ def execute_pipeline(job_id: str, pipeline_config_dict: dict, session: Session) 
 
         # 5. Execute.
         result = engine.run(pipeline_config, job_id=job_id, dataset_name=dataset_name)
+        result.pipeline_diagram = build_pipeline_diagram(
+            result.node_results,
+            model_type=job.model_type,
+            node_params={n.node_id: n.params or {} for n in pipeline_config.nodes},
+        )
 
         # 6. Write result — but respect a concurrent cancellation.
         job.logs = job_logs
