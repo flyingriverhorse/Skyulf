@@ -589,7 +589,7 @@ Three tracked follow-ups closed in one batch:
   `skyulf.pipeline` and new `skyulf.pipeline._pipeline` paths resolve.
   Re-verified: full core suite 3567 passed / 70 skipped (exit 0), ruff + ty clean.
 
-### 2026-08-30 — F-18 `_tuning/engine.py` split (branch 087)
+### 2026-08-30 — F-18 `_tuning/engine.py` split (branch 088, commit d5d55684)
 
 - **F-18** fixed: `skyulf/modeling/_tuning/engine.py` (1,830 lines, the
   largest file in the library) no longer mixes six responsibilities. It is now
