@@ -4,6 +4,7 @@ import logging
 from typing import Any, cast
 
 import numpy as np
+import polars as pl
 from sklearn.preprocessing import StandardScaler
 
 from ...core.meta.decorators import node_meta
@@ -45,8 +46,6 @@ class StandardScalerApplier(BaseApplier):
 
     @staticmethod
     def _apply_polars(X: Any, _y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
-        import polars as pl
-
         cols = params.get("columns", [])
         mean = params.get("mean")
         scale = params.get("scale")

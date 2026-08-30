@@ -5,6 +5,7 @@ from typing import Any
 
 import numpy as np
 import pandas as pd
+import polars as pl
 from sklearn.preprocessing import PowerTransformer
 
 from ...core.meta.decorators import node_meta
@@ -68,8 +69,6 @@ class PowerTransformerApplier(BaseApplier):
 
     @staticmethod
     def _apply_polars(X: Any, _y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
-        import polars as pl
-
         cols = params.get("columns", [])
         if params.get("lambdas") is None:
             return X, _y

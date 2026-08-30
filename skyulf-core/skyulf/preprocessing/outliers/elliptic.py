@@ -3,7 +3,9 @@
 import logging
 from typing import Any
 
+import numpy as np
 import pandas as pd
+import polars as pl
 from sklearn.covariance import EllipticEnvelope
 
 from ...core.meta.decorators import node_meta
@@ -43,8 +45,6 @@ def _elliptic_filter_pandas(X_pd: Any, models: dict[str, Any]) -> pd.Series:
 
 def _coerce_column_to_float(X: Any, col: str) -> Any:
     """Cast a polars column to Float64; ``None`` when the column is not coercible."""
-    import polars as pl
-
     try:
         return X.get_column(col).cast(pl.Float64, strict=False)
     except Exception:  # noqa: BLE001 - not coercible to numbers: contributes no filtering
@@ -67,8 +67,6 @@ def _elliptic_mask_numpy(X: Any, models: dict[str, Any]) -> Any:
     (later steps decide), columns absent from *X* or without valid values are
     skipped, and a failing ``predict`` logs and fails open.
     """
-    import numpy as np
-
     mask = np.ones(X.height, dtype=bool)
     for col, model in models.items():
         if col not in X.columns:
@@ -101,8 +99,6 @@ class EllipticEnvelopeApplier(BaseApplier):
 
     @staticmethod
     def _apply_polars(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
-        import polars as pl
-
         models = params.get("models", {})
         if not models:
             return X, y

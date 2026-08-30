@@ -2,6 +2,8 @@
 
 from typing import Any, cast
 
+import polars as pl
+
 from ...core.meta.decorators import node_meta
 from ...registry import NodeRegistry
 from .._artifacts import DropMissingColumnsArtifact
@@ -41,8 +43,6 @@ def _resolve_threshold(raw: Any) -> float | None:
 
 def _high_missing_cols_polars(X: Any, threshold_pct: float) -> list:
     """Polars: list of columns whose missing-% >= ``threshold_pct``."""
-    import polars as pl
-
     total = X.height or 1
     # pandas' isna() counts NaN as missing; polars' null_count() does not, so
     # float columns need an explicit NaN count to keep both engines in parity

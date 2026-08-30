@@ -220,7 +220,7 @@ def _compute_interaction_summary(
     Returns `None` if the model isn't tree-based or computation fails.
     """
     try:
-        import shap  # ty: ignore[unresolved-import]
+        import shap  # ty: ignore[unresolved-import]  # noqa: PLC0415 - optional explainability extra
 
         explainer = shap.TreeExplainer(model)
         raw = explainer.shap_interaction_values(sample)
@@ -296,8 +296,8 @@ def compute_shap_explanation(
         }
     """
     try:
-        import shap  # ty: ignore[unresolved-import]
-        import shap.maskers  # ty: ignore[unresolved-import]
+        import shap  # ty: ignore[unresolved-import]  # noqa: PLC0415 - optional explainability extra
+        import shap.maskers  # ty: ignore[unresolved-import]  # noqa: PLC0415 - optional explainability extra
     except ImportError:
         return None
 
@@ -308,7 +308,7 @@ def compute_shap_explanation(
     # working across SHAP versions instead of silently returning `None`.
     _shap_exceptions: Any = None
     try:
-        import shap.utils._exceptions  # ty: ignore[unresolved-import]
+        import shap.utils._exceptions  # ty: ignore[unresolved-import]  # noqa: PLC0415 - optional explainability extra
 
         _shap_exceptions = shap.utils._exceptions
     except ImportError:

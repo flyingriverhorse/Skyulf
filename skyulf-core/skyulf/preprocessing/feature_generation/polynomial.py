@@ -4,6 +4,7 @@ from typing import Any, cast
 
 import numpy as np
 import pandas as pd
+import polars as pl
 from sklearn.preprocessing import PolynomialFeatures
 
 from ...core.meta.decorators import node_meta
@@ -45,8 +46,6 @@ def _polynomial_compute(
 
 
 def _polynomial_apply_polars(X: Any, _y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
-    import polars as pl
-
     valid_cols = [c for c in params.get("columns", []) if c in X.columns]
     if not valid_cols:
         return X, _y

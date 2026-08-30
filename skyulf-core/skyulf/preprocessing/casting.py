@@ -9,6 +9,7 @@ from typing import Any
 
 import numpy as np
 import pandas as pd
+import polars as pl
 
 from ..core.meta.decorators import node_meta
 from ..registry import NodeRegistry
@@ -55,8 +56,6 @@ _BOOL_FALSE_ALIASES = ("false", "no", "0", "off", "n", "f")
 
 def _resolve_polars_dtype(dtype_str: str) -> Any:
     """Map a string dtype to a Polars type, or ``None`` if unsupported."""
-    import polars as pl
-
     # Use a small alias table so the function stays low-CCN. Datetime variants
     # ("date", "datetime[...]") are handled by the prefix check below.
     table = {
@@ -105,8 +104,6 @@ def _bool_expr_from_string_col_polars(col: str) -> Any:
     table; unrecognized values become null (the caller decides whether to
     raise on that, mirroring `coerce_on_error`).
     """
-    import polars as pl
-
     normalized = pl.col(col).str.strip_chars().str.to_lowercase()
     return (
         pl.when(normalized.is_in(list(_BOOL_TRUE_ALIASES)))
@@ -125,8 +122,6 @@ def _build_polars_cast_exprs(
 
     Raises ``ValueError`` in strict mode when a target dtype string is unsupported.
     """
-    import polars as pl
-
     exprs = []
     string_bool_cols: list[str] = []
     for col, target_dtype in type_map.items():

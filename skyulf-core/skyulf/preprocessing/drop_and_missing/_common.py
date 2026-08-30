@@ -2,6 +2,8 @@
 
 from typing import Any
 
+import polars as pl
+
 
 def _polars_filter_y_by_kept_indices(y: Any, kept_indices: Any) -> Any:
     """Filter ``y`` (Polars Series / DataFrame) to the rows kept in ``X``.
@@ -10,8 +12,6 @@ def _polars_filter_y_by_kept_indices(y: Any, kept_indices: Any) -> Any:
     a filter on ``X``. Used by Deduplicate + DropMissingRows so dropping rows
     in ``X`` propagates to a paired ``y``.
     """
-    import polars as pl
-
     if y is None:
         return None
     if isinstance(y, pl.DataFrame):

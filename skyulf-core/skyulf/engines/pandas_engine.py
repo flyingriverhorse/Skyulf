@@ -3,6 +3,7 @@ from typing import Any
 
 import numpy as np
 import pandas as pd
+import pyarrow as pa
 
 from .protocol import SkyulfDataFrame
 from .registry import BaseEngine, EngineName, EngineRegistry
@@ -62,8 +63,6 @@ class SkyulfPandasWrapper:
         return self._df
 
     def to_arrow(self) -> Any:
-        import pyarrow as pa  # lazy import — optional dependency
-
         return pa.Table.from_pandas(self._df)
 
     def copy(self) -> "SkyulfDataFrame":

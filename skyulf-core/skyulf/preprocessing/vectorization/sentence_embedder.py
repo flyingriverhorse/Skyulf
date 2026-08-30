@@ -12,13 +12,21 @@ encodes text into ``{src}__emb__{i}`` float columns.  Models are cached per
 import logging
 from typing import Any
 
+import numpy as np
 import pandas as pd
+import polars as pl
 
 from ...core.meta.decorators import node_meta
 from ...registry import NodeRegistry
 from .._artifacts import SentenceEmbedderArtifact
 from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
-from ._common import _join_text_columns, apply_text_dual_engine, resolve_fit_text_valid_columns
+from ._common import (
+    _drop_and_concat_polars,
+    _join_text_columns,
+    _join_text_columns_polars,
+    apply_text_dual_engine,
+    resolve_fit_text_valid_columns,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +43,10 @@ def _load_model(model_name: str) -> Any:
     if model_name in _MODEL_CACHE:
         return _MODEL_CACHE[model_name]
     try:
-        from sentence_transformers import SentenceTransformer  # ty: ignore[unresolved-import]
+        # ty: ignore[unresolved-import]
+        from sentence_transformers import (  # noqa: PLC0415 - optional nlp extra
+            SentenceTransformer,
+        )
     except ImportError as exc:  # pragma: no cover - depends on optional extra
         raise ImportError(_INSTALL_HINT) from exc
 
@@ -91,11 +102,6 @@ def _embed_apply_pandas(
 def _embed_apply_polars(X: Any, params: dict[str, Any]) -> Any:
     """Native-Polars embed apply; returns ``None`` to fall back to pandas when
     a text column is not String dtype."""
-    import numpy as np
-    import polars as pl
-
-    from ._common import _drop_and_concat_polars, _join_text_columns_polars
-
     cols: list[str] = params.get("columns", [])
     output_columns: list[str] = params.get("output_columns", [])
     model_name: str = params.get("model_name", "all-MiniLM-L6-v2")

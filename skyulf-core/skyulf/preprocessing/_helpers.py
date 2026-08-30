@@ -19,8 +19,9 @@ from typing import Any
 
 import numpy as np
 import pandas as pd
+import polars as pl
 
-from ..engines import EngineName, SkyulfDataFrame, get_engine
+from ..engines import POLARS_NUMERIC_DTYPES, EngineName, SkyulfDataFrame, get_engine
 from ..utils import resolve_columns
 
 
@@ -161,8 +162,6 @@ def auto_detect_text_columns(df: pd.DataFrame | SkyulfDataFrame) -> list[str]:
     """Return string-like columns from either a Pandas or Polars frame."""
     engine = get_engine(df)
     if engine.name == EngineName.POLARS:
-        import polars as pl
-
         return [
             c
             for c, t in zip(df.columns, df.dtypes, strict=True)
@@ -175,8 +174,6 @@ def auto_detect_numeric_columns(df: pd.DataFrame | SkyulfDataFrame) -> list[str]
     """Return numeric columns from either a Pandas or Polars frame."""
     engine = get_engine(df)
     if engine.name == EngineName.POLARS:
-        from ..engines import POLARS_NUMERIC_DTYPES
-
         return [c for c, t in zip(df.columns, df.dtypes, strict=True) if t in POLARS_NUMERIC_DTYPES]
     return list(df.select_dtypes(include=["number"]).columns)
 
@@ -185,8 +182,6 @@ def auto_detect_datetime_columns(df: pd.DataFrame | SkyulfDataFrame) -> list[str
     """Return datetime/date columns from either a Pandas or Polars frame."""
     engine = get_engine(df)
     if engine.name == EngineName.POLARS:
-        import polars as pl
-
         return [
             c
             for c, t in zip(df.columns, df.dtypes, strict=True)

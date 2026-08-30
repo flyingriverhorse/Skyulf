@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 
 from ...engines import SkyulfDataFrame
-from ...modeling.sklearn_wrapper import SklearnBridge
+from ...engines.sklearn_bridge import SklearnBridge
 from .common import sanitize_metrics
 from .metrics import calculate_regression_metrics
 from .schemas import ModelEvaluationReport, RegressionEvaluation, ResidualsData

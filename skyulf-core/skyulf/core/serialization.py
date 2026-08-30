@@ -19,6 +19,8 @@ from contextvars import ContextVar
 from pathlib import Path
 from typing import Any
 
+import joblib
+
 __all__ = [
     "JoblibModelSerializer",
     "ModelSerializer",
@@ -52,13 +54,9 @@ class JoblibModelSerializer(ModelSerializer):
     format = "joblib"
 
     def dump(self, model: Any, path: PathLike) -> None:
-        import joblib
-
         joblib.dump(model, path)
 
     def load(self, path: PathLike) -> Any:
-        import joblib
-
         return joblib.load(path)
 
 

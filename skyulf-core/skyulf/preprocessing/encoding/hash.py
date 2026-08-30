@@ -4,6 +4,8 @@ import hashlib
 import logging
 from typing import Any
 
+import polars as pl
+
 from ...core.meta.decorators import node_meta
 from ...registry import NodeRegistry
 from ...utils import resolve_columns, user_picked_no_columns
@@ -31,8 +33,6 @@ def _hash_apply_polars(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, Any
     encoding (F-11). Hashing once per *unique* value keeps this cheap on
     low-cardinality categorical columns.
     """
-    import polars as pl
-
     valid_cols = _resolve_valid_cols(X, params)
     if not valid_cols:
         return X, y

@@ -2,6 +2,8 @@
 
 from typing import Any, cast
 
+import polars as pl
+
 from ...core.meta.decorators import node_meta
 from ...registry import NodeRegistry
 from .._artifacts import MissingIndicatorArtifact
@@ -13,8 +15,6 @@ _DEFAULT_FLAG_SUFFIX = "_missing"
 
 
 def _missing_indicator_apply_polars(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
-    import polars as pl
-
     cols = params.get("columns", [])
     if not cols:
         return X, y
@@ -54,8 +54,6 @@ class MissingIndicatorApplier(BaseApplier):
 
 
 def _missing_cols_polars(X: Any) -> list:
-    import polars as pl
-
     schema = X.schema
     exprs = []
     for c in X.columns:

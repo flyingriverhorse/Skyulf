@@ -4,6 +4,7 @@ import importlib.util
 import sys
 import typing
 import warnings
+from pathlib import Path
 from typing import Any
 
 import numpy as np
@@ -17,8 +18,11 @@ from tests.utils.test_case_loader import TestCaseLoader
 
 from skyulf.modeling._evaluation.thresholds import apply_thresholds
 from skyulf.modeling._tuning import engine as engine_mod
+from skyulf.modeling._tuning import splitters as splitters_mod
 from skyulf.modeling._tuning.engine import TuningApplier, TuningCalculator
 from skyulf.modeling._tuning.schemas import TuningConfig, TuningResult
+from skyulf.modeling._tuning.strategies import halving as halving_mod
+from skyulf.modeling._tuning.strategies import runner as runner_mod
 from skyulf.modeling.base import BaseModelCalculator
 from skyulf.modeling.classification import (
     KNeighborsClassifierApplier,
@@ -582,24 +586,24 @@ def _tune_with_spied_halving_build(
     if extracted is None:
         extracted = ({"model__estimator__C": 1.0}, 0.9)
 
-    def fake_build(self, search_config, estimator, cv, metric, log_callback):
+    def fake_build(search_config, estimator, cv, metric, log_callback):
         built["estimator"] = estimator
         built["cv"] = cv
         return object()
 
-    def fake_execute(self, searcher, X_arr, y_arr, config, log_callback=None):
+    def fake_execute(searcher, X_arr, y_arr, config, log_callback=None):
         built["X"], built["y"] = X_arr, y_arr
         return []
 
-    monkeypatch.setattr(TuningCalculator, "_build_halving_searcher", fake_build)
-    monkeypatch.setattr(TuningCalculator, "_execute_search", fake_execute)
+    monkeypatch.setattr(halving_mod, "build_halving_searcher", fake_build)
+    monkeypatch.setattr(runner_mod, "execute_search", fake_execute)
     monkeypatch.setattr(
-        TuningCalculator,
-        "_extract_best_result",
-        lambda self, searcher, first_trial_error=None: extracted,
+        runner_mod,
+        "extract_best_result",
+        lambda searcher, first_trial_error=None: extracted,
     )
-    monkeypatch.setattr(TuningCalculator, "_collect_trials", lambda self, searcher, config: [])
-    monkeypatch.setattr(TuningCalculator, "_log_final_completion", lambda self, *a: None)
+    monkeypatch.setattr(runner_mod, "collect_trials", lambda searcher, config: [])
+    monkeypatch.setattr(runner_mod, "log_final_completion", lambda *a: None)
 
     X, y = _clf_xy(n=60)
     if frames == "default":
@@ -922,12 +926,13 @@ def test_optuna_failed_trials_surface_error_in_log_and_message():
 # ---------------------------------------------------------------------------
 
 
-def _load_engine_variant(extra_sys_modules: dict[str, Any], resolve_optuna: bool = True):
-    """Execute engine.py's module source fresh, under a distinct module
-    object (not registered in ``sys.modules`` under the canonical name), so
-    the optuna-import fallback branches can be exercised without touching —
+def _load_optuna_variant(extra_sys_modules: dict[str, Any], resolve_optuna: bool = True):
+    """Execute ``strategies/optuna.py``'s module source fresh, under a distinct
+    module object (not registered in ``sys.modules`` under the canonical name),
+    so the optuna-import fallback branches can be exercised without touching —
     or corrupting coverage tracking of — the real cached
-    ``skyulf.modeling._tuning.engine`` module used by the rest of the suite.
+    ``skyulf.modeling._tuning.strategies.optuna`` module used by the rest of
+    the suite.
 
     When ``resolve_optuna`` is True (the default), ``_ensure_optuna_loaded()``
     is called on the fresh variant *while the injected ``extra_sys_modules``
@@ -945,8 +950,9 @@ def _load_engine_variant(extra_sys_modules: dict[str, Any], resolve_optuna: bool
         saved[name] = sys.modules.get(name, sentinel)
         sys.modules[name] = mod
     try:
+        optuna_module_path = Path(engine_mod.__file__).parent / "strategies" / "optuna.py"
         spec = importlib.util.spec_from_file_location(
-            "skyulf.modeling._tuning.engine", engine_mod.__file__
+            "skyulf.modeling._tuning.strategies.optuna", optuna_module_path
         )
         assert spec is not None and spec.loader is not None
         module = importlib.util.module_from_spec(spec)
@@ -964,14 +970,14 @@ def _load_engine_variant(extra_sys_modules: dict[str, Any], resolve_optuna: bool
 
 def test_optuna_import_failure_disables_optuna():
     """If 'optuna' itself cannot be imported, HAS_OPTUNA should end up False."""
-    variant = _load_engine_variant({"optuna": None})
+    variant = _load_optuna_variant({"optuna": None})
     assert variant.HAS_OPTUNA is False
 
 
 def test_optuna_integration_import_all_fallbacks_fail():
     """If optuna is present but none of the integration import paths work,
     HAS_OPTUNA should be reset to False and a warning logged."""
-    variant = _load_engine_variant(
+    variant = _load_optuna_variant(
         {
             "optuna.integration": None,
             "optuna.integration.sklearn": None,
@@ -991,7 +997,7 @@ def test_optuna_integration_second_fallback_path_succeeds():
     fake_module = types.ModuleType("optuna.integration.sklearn")
     # __dict__ assignment: ty flags dynamic attribute sets on ModuleType.
     fake_module.__dict__["OptunaSearchCV"] = object()
-    variant = _load_engine_variant(
+    variant = _load_optuna_variant(
         {"optuna.integration": None, "optuna.integration.sklearn": fake_module}
     )
     assert variant.HAS_OPTUNA is True
@@ -1008,7 +1014,7 @@ def test_optuna_integration_third_fallback_path_succeeds():
     fake_module = types.ModuleType("optuna_integration.sklearn")
     # __dict__ assignment: ty flags dynamic attribute sets on ModuleType.
     fake_module.__dict__["OptunaSearchCV"] = object()
-    variant = _load_engine_variant(
+    variant = _load_optuna_variant(
         {
             "optuna.integration": None,
             "optuna.integration.sklearn": None,
@@ -1025,7 +1031,7 @@ def test_importing_engine_does_not_eagerly_resolve_optuna():
     "OptunaSearchCV not found" warning — only calling `_ensure_optuna_loaded()`
     (from `_build_optuna_searcher`, i.e. only when strategy='optuna' is
     actually requested) should trigger resolution."""
-    variant = _load_engine_variant({"optuna": None}, resolve_optuna=False)
+    variant = _load_optuna_variant({"optuna": None}, resolve_optuna=False)
     assert variant.HAS_OPTUNA is False
     assert variant.OptunaSearchCV is None
     assert variant._optuna_load_attempted is False
@@ -1517,7 +1523,7 @@ class _FakeSearcher:
 
 def _run_with_fake_halving_grid_searcher(monkeypatch, fake_searcher):
     """Force the halving_grid branch to use `fake_searcher` and run tune()."""
-    monkeypatch.setattr(engine_mod, "HalvingGridSearchCV", lambda **kwargs: fake_searcher)
+    monkeypatch.setattr(halving_mod, "HalvingGridSearchCV", lambda **kwargs: fake_searcher)
     X, y = _clf_xy(n=60)
     tuner = _tuner_clf()
     cfg = TuningConfig(
@@ -1843,7 +1849,7 @@ def test_tune_search_phase_honors_cv_random_state(monkeypatch):
     cfg = _clf_config(cv_random_state=123, random_state=999)  # default cv_type="k_fold"
 
     captured: dict[str, Any] = {}
-    real_kfold = engine_mod.KFold
+    real_kfold = splitters_mod.KFold
 
     class _CapturingKFold(real_kfold):
         def __init__(self, *args, **kwargs):
@@ -1851,7 +1857,7 @@ def test_tune_search_phase_honors_cv_random_state(monkeypatch):
             captured["random_state"] = kwargs.get("random_state")
             super().__init__(*args, **kwargs)
 
-    monkeypatch.setattr(engine_mod, "KFold", _CapturingKFold)
+    monkeypatch.setattr(splitters_mod, "KFold", _CapturingKFold)
 
     tuner.fit(X, y, config=cfg)
 
@@ -1867,7 +1873,7 @@ def test_tune_search_phase_honors_cv_shuffle_false(monkeypatch):
     cfg = _clf_config(cv_shuffle=False, cv_random_state=123)  # default cv_type="k_fold"
 
     captured: dict[str, Any] = {}
-    real_kfold = engine_mod.KFold
+    real_kfold = splitters_mod.KFold
 
     class _CapturingKFold(real_kfold):
         def __init__(self, *args, **kwargs):
@@ -1875,7 +1881,7 @@ def test_tune_search_phase_honors_cv_shuffle_false(monkeypatch):
             captured["random_state"] = kwargs.get("random_state")
             super().__init__(*args, **kwargs)
 
-    monkeypatch.setattr(engine_mod, "KFold", _CapturingKFold)
+    monkeypatch.setattr(splitters_mod, "KFold", _CapturingKFold)
 
     # Should not raise despite cv_random_state being set, since shuffle=False
     # must force random_state=None internally.
@@ -1892,14 +1898,14 @@ def test_tune_search_phase_shuffle_split_honors_cv_random_state(monkeypatch):
     cfg = _clf_config(cv_type="shuffle_split", cv_random_state=77, random_state=999)
 
     captured: dict[str, Any] = {}
-    real_shuffle_split = engine_mod.ShuffleSplit
+    real_shuffle_split = splitters_mod.ShuffleSplit
 
     class _CapturingShuffleSplit(real_shuffle_split):
         def __init__(self, *args, **kwargs):
             captured["random_state"] = kwargs.get("random_state")
             super().__init__(*args, **kwargs)
 
-    monkeypatch.setattr(engine_mod, "ShuffleSplit", _CapturingShuffleSplit)
+    monkeypatch.setattr(splitters_mod, "ShuffleSplit", _CapturingShuffleSplit)
 
     tuner.fit(X, y, config=cfg)
 

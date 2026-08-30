@@ -1,4 +1,5 @@
 import logging
+import warnings
 from typing import cast
 
 import numpy as np
@@ -104,8 +105,6 @@ def calculate_correlations(df: pl.LazyFrame, numeric_cols: list[str]) -> Correla
             return None
 
         # Suppress numpy warnings that might occur during correlation calculation
-        import warnings
-
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", RuntimeWarning)
             corr_df = subset_clean.corr()

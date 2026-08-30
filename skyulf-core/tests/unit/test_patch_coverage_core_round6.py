@@ -12,7 +12,7 @@ import pandas as pd
 import pytest
 from sklearn.model_selection import KFold
 
-from skyulf.modeling._tuning import engine as engine_mod
+from skyulf.modeling._tuning import grid_random as grid_random_mod
 from skyulf.modeling._tuning.engine import TuningCalculator
 from skyulf.modeling._tuning.schemas import TuningConfig
 from skyulf.modeling.classification import LogisticRegressionCalculator
@@ -24,13 +24,13 @@ _Y = pd.Series([0, 1, 0, 1])
 def test_all_trials_failed_with_single_fold_error(monkeypatch):
     tuner = TuningCalculator(LogisticRegressionCalculator())
 
-    def fake_evaluate(self, *args, **kwargs):
-        # fold_errors is the 10th positional arg of _evaluate_search_candidates
+    def fake_evaluate(*args, **kwargs):
+        # fold_errors is the 10th positional arg of evaluate_search_candidates
         fold_errors = args[9] if len(args) >= 10 else kwargs["fold_errors"]
         fold_errors.append("single fold boom")
         return [], -float("inf"), None
 
-    monkeypatch.setattr(engine_mod.TuningCalculator, "_evaluate_search_candidates", fake_evaluate)
+    monkeypatch.setattr(grid_random_mod, "evaluate_search_candidates", fake_evaluate)
     config = TuningConfig(strategy="grid", search_space={"max_iter": [2]}, cv_folds=2)
     with pytest.raises(ValueError, match="First trial error: single fold boom") as excinfo:
         tuner._run_grid_or_random_search(

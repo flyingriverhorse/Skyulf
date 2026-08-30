@@ -3,6 +3,8 @@
 import logging
 from typing import Any
 
+import polars as pl
+
 from ...engines import EngineName, get_engine
 
 logger = logging.getLogger(__name__)
@@ -129,8 +131,6 @@ def _exclude_target_column(
 def detect_categorical_columns(df: Any) -> list[str]:
     engine = get_engine(df)
     if engine.name == EngineName.POLARS:
-        import polars as pl
-
         df_pl: Any = df
         return [
             c

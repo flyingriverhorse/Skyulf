@@ -10,7 +10,7 @@ from sklearn.metrics import confusion_matrix, precision_recall_curve, roc_curve
 from sklearn.preprocessing import label_binarize
 
 from ...engines import SkyulfDataFrame
-from ...modeling.sklearn_wrapper import SklearnBridge
+from ...engines.sklearn_bridge import SklearnBridge
 from .common import downsample_curve, sanitize_metrics
 from .metrics import calculate_classification_metrics
 from .schemas import (

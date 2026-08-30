@@ -12,6 +12,7 @@ from typing import Any, Literal, cast
 
 import numpy as np
 import pandas as pd
+import polars as pl
 from sklearn.preprocessing import KBinsDiscretizer
 
 from ..core.meta.decorators import node_meta
@@ -35,8 +36,6 @@ logger = logging.getLogger(__name__)
 
 def _polars_cut_expr(col: str, sorted_edges: list[float], labels: Any, include_lowest: bool) -> Any:
     """Build a single polars ``cut`` expression for one column."""
-    import polars as pl
-
     breaks = sorted_edges[1:-1]
     cut = pl.col(col).cut(breaks=breaks, labels=labels, left_closed=False, include_breaks=False)
     # pd.cut yields NaN outside [edges[0], edges[-1]], but polars cut() has
@@ -79,8 +78,6 @@ def _polars_one_col_expr(
     precision: int,
 ) -> Any:
     """Build the polars cut-expression for a single column, or ``None`` if degenerate."""
-    import polars as pl
-
     sorted_edges = sorted(set(edges))
     if len(sorted_edges) < 2:
         return None

@@ -5,6 +5,7 @@ from collections.abc import Callable
 from typing import Any
 
 import pandas as pd
+import polars as pl
 
 from ...core.meta.decorators import node_meta
 from ...registry import NodeRegistry
@@ -65,8 +66,6 @@ def _regex_polars(expr: Any, mode: str, pattern: str | None, repl: str) -> Any:
     if mode == "extract_digits":
         return expr.str.extract(r"(\d+)", 1)
     if mode == "normalize_slash_dates":
-        import polars as pl
-
         return expr.map_elements(_normalize_slash_dates_text, return_dtype=pl.String)
     if mode == "custom" and pattern:
         return expr.str.replace_all(pattern, repl)
@@ -139,8 +138,6 @@ class TextCleaningApplier(BaseApplier):
 
     @staticmethod
     def _apply_polars(X: Any, _y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
-        import polars as pl
-
         cols = params.get("columns", [])
         operations = params.get("operations", [])
         valid = resolve_valid_columns(X, cols)

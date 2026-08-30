@@ -80,7 +80,7 @@ class TextMixin(_AnalyzerState):
             return None
 
         try:
-            from vaderSentiment.vaderSentiment import (  # ty: ignore[unresolved-import]
+            from vaderSentiment.vaderSentiment import (  # ty: ignore[unresolved-import]  # noqa: PLC0415 - optional text extra
                 SentimentIntensityAnalyzer,
             )
 

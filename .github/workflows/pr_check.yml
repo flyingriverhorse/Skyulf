@@ -135,10 +135,16 @@ jobs:
           pytest tests -q --disable-warnings
           --cov=backend --cov-branch --cov-report=xml:coverage-backend.xml
 
-      # coverage.py writes filenames relative to the --cov source root, but
-      # SonarCloud needs them relative to the repo root (sonar.sources).
+      # coverage.py writes filenames relative to the --cov source root
+      # (<source>backend</source>), so prefix them to be repo-relative for
+      # SonarCloud. Sonar's Cobertura parser resolves every filename against
+      # the report's <source> element, so <source> must be reset to the repo
+      # root ('.') — otherwise filenames get double-prefixed and every
+      # coverage measure is dropped as unresolvable.
       - name: Make coverage paths repo-relative
-        run: sed -i 's/filename="/filename="backend\//g' coverage-backend.xml
+        run: |
+          sed -i 's/filename="/filename="backend\//g' coverage-backend.xml
+          sed -i 's|<source>.*</source>|<source>.</source>|' coverage-backend.xml
 
       - name: Upload coverage artifact
         uses: actions/upload-artifact@v7
@@ -179,9 +185,12 @@ jobs:
           pytest skyulf-core/tests -q --disable-warnings
           --cov=skyulf-core/skyulf --cov-branch --cov-report=xml:coverage-core.xml
 
-      # Same repo-relative path fix as backend-coverage.
+      # Same repo-relative path fix as backend-coverage: prefix filenames and
+      # reset <source> to the repo root so Sonar's parser resolves them.
       - name: Make coverage paths repo-relative
-        run: sed -i 's/filename="/filename="skyulf-core\/skyulf\//g' coverage-core.xml
+        run: |
+          sed -i 's/filename="/filename="skyulf-core\/skyulf\//g' coverage-core.xml
+          sed -i 's|<source>.*</source>|<source>.</source>|' coverage-core.xml
 
       - name: Upload coverage artifact
         uses: actions/upload-artifact@v7

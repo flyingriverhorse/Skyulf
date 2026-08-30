@@ -12,6 +12,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 import polars as pl
+from sklearn import metrics as sklearn_metrics
 from sklearn.metrics import (
     accuracy_score,
     average_precision_score,
@@ -31,7 +32,7 @@ from sklearn.metrics import (
 from sklearn.preprocessing import label_binarize
 
 from ...engines import SkyulfDataFrame
-from ...modeling.sklearn_wrapper import SklearnBridge
+from ...engines.sklearn_bridge import SklearnBridge
 
 logger = logging.getLogger(__name__)
 
@@ -415,12 +416,6 @@ def calculate_clustering_metrics(
     (no ground-truth target), so they can be computed on any split a KMeans
     model has genuinely predicted on (train/test/validation alike).
     """
-    from sklearn.metrics import (
-        calinski_harabasz_score,
-        davies_bouldin_score,
-        silhouette_score,
-    )
-
     X_np, _ = SklearnBridge.to_sklearn((X, None))
     labels_np = np.asarray(labels).ravel()
     silhouette_sample_size = _validate_silhouette_sample_size(silhouette_sample_size)
@@ -453,9 +448,15 @@ def calculate_clustering_metrics(
         )
         sampled_X = X_np[sampled_indices]
         sampled_labels = labels_np[sampled_indices]
-        metrics["silhouette_score"] = float(silhouette_score(sampled_X, sampled_labels))
+        metrics["silhouette_score"] = float(
+            sklearn_metrics.silhouette_score(sampled_X, sampled_labels)
+        )
         metrics["silhouette_sample_size"] = float(len(sampled_indices))
-        metrics["calinski_harabasz_score"] = float(calinski_harabasz_score(X_np, labels_np))
-        metrics["davies_bouldin_score"] = float(davies_bouldin_score(X_np, labels_np))
+        metrics["calinski_harabasz_score"] = float(
+            sklearn_metrics.calinski_harabasz_score(X_np, labels_np)
+        )
+        metrics["davies_bouldin_score"] = float(
+            sklearn_metrics.davies_bouldin_score(X_np, labels_np)
+        )
 
     return metrics

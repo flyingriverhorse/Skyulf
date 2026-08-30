@@ -78,15 +78,13 @@ class TestTuningEngineCallbackAndErrorBranches:
         assert score == -float("inf")
 
     def test_all_trials_failed_with_empty_fold_errors(self, monkeypatch):
-        from skyulf.modeling._tuning import engine as engine_mod
+        from skyulf.modeling._tuning import grid_random as grid_random_mod
         from skyulf.modeling.classification import LogisticRegressionCalculator
 
         tuner = TuningCalculator(LogisticRegressionCalculator())
         # Zero candidates -> best_params stays None without a single fold
         # error being collected, exercising the detail-less failure message.
-        monkeypatch.setattr(
-            engine_mod.TuningCalculator, "_generate_search_candidates", lambda self, config: []
-        )
+        monkeypatch.setattr(grid_random_mod, "generate_search_candidates", lambda config: [])
         X = pd.DataFrame({"a": [1.0, 2.0, 3.0, 4.0], "b": [4.0, 3.0, 2.0, 1.0]})
         y = pd.Series([0, 1, 0, 1])
         config = TuningConfig(strategy="grid", search_space={"max_iter": [2]}, cv_folds=2)

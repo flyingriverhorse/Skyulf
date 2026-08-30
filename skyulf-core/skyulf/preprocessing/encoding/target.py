@@ -6,7 +6,8 @@ from typing import Any, cast
 
 import numpy as np
 import pandas as pd
-from sklearn.preprocessing import TargetEncoder
+import polars as pl
+from sklearn.preprocessing import LabelEncoder, TargetEncoder
 from sklearn.utils.multiclass import type_of_target
 
 from ...core.meta.decorators import node_meta
@@ -43,8 +44,6 @@ def _replace_target_encoded_polars(
     X: Any, y: Any, valid_cols: list[str], encoded: Any
 ) -> tuple[Any, Any]:
     """Replace encoded columns in a Polars frame."""
-    import polars as pl
-
     n_feats = len(valid_cols)
     if encoded.shape[1] == n_feats:
         new_cols = [pl.Series(col, encoded[:, i]) for i, col in enumerate(valid_cols)]
@@ -148,8 +147,6 @@ def _build_target_encoder(
     X_subset: Any, y: Any, config: dict[str, Any], *, cv: int = 5
 ) -> tuple[TargetEncoder, Any]:
     """Build the sklearn encoder and normalize the target array."""
-    from sklearn.preprocessing import LabelEncoder
-
     _ = X_subset
     target_type = config.get("target_type", "auto")
     encoder = TargetEncoder(

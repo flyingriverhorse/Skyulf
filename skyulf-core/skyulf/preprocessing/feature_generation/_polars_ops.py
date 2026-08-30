@@ -4,6 +4,8 @@ import logging
 from collections.abc import Callable
 from typing import Any
 
+import polars as pl
+
 from ._common import (
     DEFAULT_EPSILON,
     SEASON_BY_MONTH,
@@ -19,8 +21,6 @@ logger = logging.getLogger(__name__)
 
 
 def _polars_arith_terms(op: dict[str, Any], existing: list[str]) -> tuple[list[Any], list[float]]:
-    import polars as pl
-
     valid = [
         c for c in op.get("input_columns", []) + op.get("secondary_columns", []) if c in existing
     ]
@@ -31,14 +31,10 @@ def _polars_arith_terms(op: dict[str, Any], existing: list[str]) -> tuple[list[A
 
 
 def _polars_add(col_exprs: list[Any], const_vals: list[float], _epsilon: float) -> Any:
-    import polars as pl
-
     return pl.sum_horizontal(col_exprs) + sum(const_vals) if col_exprs else pl.lit(sum(const_vals))
 
 
 def _polars_subtract(col_exprs: list[Any], const_vals: list[float], _epsilon: float) -> Any:
-    import polars as pl
-
     expr = col_exprs[0] if col_exprs else pl.lit(0.0)
     for e in col_exprs[1:]:
         expr = expr - e
@@ -48,8 +44,6 @@ def _polars_subtract(col_exprs: list[Any], const_vals: list[float], _epsilon: fl
 
 
 def _polars_multiply(col_exprs: list[Any], const_vals: list[float], _epsilon: float) -> Any:
-    import polars as pl
-
     expr = pl.lit(1.0)
     for e in col_exprs:
         expr = expr * e
@@ -59,8 +53,6 @@ def _polars_multiply(col_exprs: list[Any], const_vals: list[float], _epsilon: fl
 
 
 def _polars_divide(col_exprs: list[Any], const_vals: list[float], epsilon: float) -> Any | None:
-    import polars as pl
-
     if col_exprs:
         expr = col_exprs[0]
         others = col_exprs[1:]
@@ -103,8 +95,6 @@ def _polars_arith(op: dict[str, Any], existing: list[str], epsilon: float) -> An
 
 
 def _polars_ratio(op: dict[str, Any], existing: list[str], epsilon: float) -> Any | None:
-    import polars as pl
-
     nums = [
         pl.col(c).cast(pl.Float64).fill_null(0)
         for c in op.get("input_columns", [])
@@ -123,8 +113,6 @@ def _polars_ratio(op: dict[str, Any], existing: list[str], epsilon: float) -> An
 
 
 def _polars_similarity(op: dict[str, Any], existing: list[str], _eps: float) -> Any | None:
-    import polars as pl
-
     pair = _resolve_similarity_pair(op, existing)
     if pair is None:
         return None
@@ -154,15 +142,11 @@ _POLARS_DT_FEATURES: dict[str, Callable[[Any], Any]] = {}
 
 def _polars_season(d: Any) -> Any:
     """Map a datetime expr's month to its meteorological season name."""
-    import polars as pl
-
     return d.dt.month().replace_strict(SEASON_BY_MONTH, return_dtype=pl.String)
 
 
 def _polars_time_of_day(d: Any) -> Any:
     """Bucket a datetime expr's hour into a time-of-day label."""
-    import polars as pl
-
     hour = d.dt.hour()
     expr = pl.lit(TIME_OF_DAY_DEFAULT)
     for lo, hi, label in reversed(TIME_OF_DAY_BUCKETS):
@@ -171,8 +155,6 @@ def _polars_time_of_day(d: Any) -> Any:
 
 
 def _register_polars_dt() -> None:
-    import polars as pl
-
     _POLARS_DT_FEATURES.update(
         {
             "year": lambda d: d.dt.year(),
@@ -208,8 +190,6 @@ def _build_polars_dt_exprs(col: str, base_dt: Any, features: list[str]) -> list[
 
 def _polars_datetime_apply(op: dict[str, Any], X_out: Any) -> Any:
     """Materialise datetime-extract feature columns onto ``X_out`` (Polars)."""
-    import polars as pl
-
     if not _POLARS_DT_FEATURES:
         _register_polars_dt()
 
@@ -241,8 +221,6 @@ _POLARS_AGG_BUILDERS: dict[str, Callable[[Any], Any]] = {
 
 def _polars_group_agg(op: dict[str, Any], existing: list[str], _epsilon: float) -> Any | None:
     """Group-by aggregation broadcast back per row via Polars window ``over``."""
-    import polars as pl
-
     resolved = _resolve_group_agg_cols(op, existing)
     if resolved is None:
         return None

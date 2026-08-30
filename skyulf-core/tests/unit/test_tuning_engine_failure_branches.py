@@ -21,6 +21,7 @@ from sklearn.datasets import make_classification
 from skyulf.modeling._tuning import engine as engine_mod
 from skyulf.modeling._tuning.engine import TuningCalculator
 from skyulf.modeling._tuning.schemas import TuningConfig, TuningResult
+from skyulf.modeling._tuning.strategies import optuna as optuna_mod
 
 
 class TestModuleGetattrLegacyViews:
@@ -44,16 +45,16 @@ class TestModuleGetattrLegacyViews:
 
 class TestEnsureOptunaLoadedFallbacks:
     def test_missing_optuna_package_marks_unavailable(self, monkeypatch):
-        monkeypatch.setattr(engine_mod, "_optuna_state", engine_mod._OptunaLoadState())
+        monkeypatch.setattr(optuna_mod, "_optuna_state", engine_mod._OptunaLoadState())
         # `import optuna` treats a None sys.modules entry as a failed import.
         monkeypatch.setitem(sys.modules, "optuna", None)
 
-        assert engine_mod._ensure_optuna_loaded() is False
-        assert engine_mod._optuna_state.attempted is True
-        assert engine_mod._optuna_state.has_optuna is False
+        assert optuna_mod._ensure_optuna_loaded() is False
+        assert optuna_mod._optuna_state.attempted is True
+        assert optuna_mod._optuna_state.has_optuna is False
 
     def test_integration_fallback_chain_warns_when_no_searchcv(self, monkeypatch, caplog):
-        monkeypatch.setattr(engine_mod, "_optuna_state", engine_mod._OptunaLoadState())
+        monkeypatch.setattr(optuna_mod, "_optuna_state", engine_mod._OptunaLoadState())
         # Bar the first two integration import paths; the third
         # (optuna_integration) must also fail to reach the warning branch.
         monkeypatch.setitem(
@@ -75,10 +76,10 @@ class TestEnsureOptunaLoadedFallbacks:
         )
 
         with caplog.at_level(logging.WARNING):
-            assert engine_mod._ensure_optuna_loaded() is False
+            assert optuna_mod._ensure_optuna_loaded() is False
         assert "OptunaSearchCV not found" in caplog.text
         # Memoized: a second call reuses the state without re-importing.
-        assert engine_mod._ensure_optuna_loaded() is False
+        assert optuna_mod._ensure_optuna_loaded() is False
 
 
 class TestParamHelpers:

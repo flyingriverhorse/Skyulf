@@ -7,8 +7,9 @@ snapshot, `/Users/BH7043/Skyulf`).
 
 The audit predates the 080–086 fix waves. 7 of 31 findings no longer reproduce;
 both partials (F-14, F-31) were closed 2026-08-29. After F-19 (pipeline.py
-split) closed 2026-08-29, 5 remain open: F-30 (deferred pending a compat
-call) and four structural items (F-09, F-08, F-11, F-18).
+split) closed 2026-08-29 and F-18 (`_tuning/engine.py` split) + F-11 (import
+cycles / deferred imports) closed 2026-08-30, 3 remain open: F-30 (deferred
+pending a compat call) and two structural items (F-09, F-08).
 This file tracks the fix work, few-at-a-time for easy items, one-at-a-time for hard ones.
 
 **Status key:** ⬜ open · 🟨 in progress · ✅ done · ⏭️ parked
@@ -57,8 +58,8 @@ Easy items batched; hard items one at a time.
 | F-07 | 🟠 | `._df` unwrapping → public `to_native()` | ~1 day | ✅ |
 | F-09 | 🟠 | Dual-engine dispatch mapping (Spark prereq) | ~2 days | ⬜ |
 | F-08 | 🟠 | Split the `SkyulfDataFrame` protocol | ~3 days | ⬜ |
-| F-11 | 🟠 | Break import cycles (196 deferred imports) | ~2 days | ⬜ |
-| F-18 | 🟡 | Split `_tuning/engine.py` (1,572 lines) | ~2 days | ⬜ |
+| F-11 | 🟠 | Break import cycles (196 deferred imports) | ~2 days | ✅ 2026-08-30 — 173 PLC0415 sites: 144 hoisted, 29 waived (optional extras), 1 cycle broken; PLC0415 now enforced |
+| F-18 | 🟡 | Split `_tuning/engine.py` (1,572 lines) | ~2 days | ✅ |
 | F-19 | 🟡 | Split `pipeline.py` responsibilities | ~1 day | ✅ |
 | F-23 | ⚪ | Enable BLE001 / broad-catch rule | half day | ✅ |
 | F-13 | 🟡 | Wire threshold tuning into TuningConfig | ~1 day | ✅ |
@@ -588,3 +589,98 @@ Three tracked follow-ups closed in one batch:
   public contract; pickle compatibility is preserved because both the old
   `skyulf.pipeline` and new `skyulf.pipeline._pipeline` paths resolve.
   Re-verified: full core suite 3567 passed / 70 skipped (exit 0), ruff + ty clean.
+
+### 2026-08-30 — F-18 `_tuning/engine.py` split (branch 088, commit d5d55684)
+
+- **F-18** fixed: `skyulf/modeling/_tuning/engine.py` (1,830 lines, the
+  largest file in the library) no longer mixes six responsibilities. It is now
+  a ~700-line orchestrator (`fit`/`tune` + `TuningApplier` + config/validation
+  helpers), with the other five concerns in sibling leaf modules:
+  - `params.py` — search-space cleaning, flat/nested param splitting,
+    signature filtering, model instantiation, seed overlays.
+  - `splitters.py` — the whole CV splitter builder family
+    (`build_cv_splitter`, predefined-split/holdout/shuffle-split/stratified
+    variants, `select_cv_by_type`, nested inner CV).
+  - `metrics.py` — metric validation, alias map, multiclass weighting,
+    `resolve_metric` + `resolve_scorer` (pos_label pinning).
+  - `grid_random.py` — candidate generation and the per-fold scoring loop
+    (`evaluate_candidate_cv`, `fit_and_score_candidate_fold`,
+    `evaluate_search_candidates`, `run_grid_or_random_search`).
+  - `refit.py` — best-model refit, threshold-metric resolution,
+    decision-threshold tuning.
+  - `strategies/` package — `halving.py` (HalvingGrid/Random builders,
+    load-bearing `enable_halving_search_cv` side-effect import kept before the
+    Halving imports), `optuna.py` (the F-14 lazy loader + state object +
+    distribution/sampler/pruner/searcher builders + PEP 562 legacy-name
+    `__getattr__`), `runner.py` (searcher fit/extract/trials/error translation).
+- Behavior unchanged — pure code movement. The public `TuningCalculator` /
+  `TuningApplier` surface is untouched; test-pinned private methods
+  (`_refit_best_model`, `_fit_and_score_candidate_fold`,
+  `_run_grid_or_random_search`, `_resolve_scorer`, `_collect_trials`,
+  `_strip_model_prefix`, `_is_multiclass_target`, `_instantiate_model`,
+  `_clean_search_space`, `_resolve_threshold_metric`,
+  `_tune_decision_thresholds`) remain as one-line delegates. Engine re-exports
+  `_optuna_state`/`_OptunaLoadState`/`_ensure_optuna_loaded` and keeps a
+  module `__getattr__` for the legacy `HAS_OPTUNA`/`OptunaSearchCV`/`optuna`
+  views. `model_calculator` is threaded whole into grid_random/refit (never
+  destructured) so the deliberately-failing fold/refit branch tests keep
+  raising inside their try blocks.
+- Stale test pins retargeted (same coverage): halving-spy helper and fake
+  searcher patches → `strategies.halving`/`strategies.runner` module
+  functions; fresh-exec optuna import-fallback variants → exec
+  `strategies/optuna.py`; KFold/ShuffleSplit capture patches → `splitters`;
+  loader-fallback tests → the `strategies.optuna` module's own state;
+  round5/round6 candidate/evaluate spies → `grid_random` module functions.
+- Verification: targeted suites (tuning engine, failure branches, round5/6
+  patch coverage, boosting progress, three tuning integration suites) all
+  green; full core suite 3578 passed / 70 skipped (exit 0); backend/root suite
+  1541 passed (exit 0); `ruff check .` clean; `ty check` backend + core +
+  tests + entry points exit 0. Also fixed the stale "see engine.py" pointer in
+  `requirements-ci.txt` to point at `strategies/optuna.py`.
+
+### 2026-08-30 — F-11 import cycle broken, 173 deferred imports eliminated (branch 088, commits 176dd0b3 → aca50d57)
+
+- **F-11** fixed: `ruff --select PLC0415` counted **173 function-level
+  imports** in `skyulf-core/skyulf/`; 144 hoisted to module level, 29 waived
+  (genuinely optional extras), and the one real import cycle broken. Zero
+  behavior change — imports moved, never rewritten (except the monkeypatch-safe
+  attribute form below). One commit per batch for bisectability.
+- **Cycle** (`176dd0b3`): `modeling/base → cross_validation/_evaluation →
+  _evaluation/__init__ → classification/clustering/regression/metrics →
+  modeling.sklearn_wrapper → base`. Broken by one re-pointed edge: the four
+  `_evaluation` modules now import `SklearnBridge` from the leaf
+  `engines.sklearn_bridge` instead of `modeling.sklearn_wrapper`; `base.py`
+  then hoists `perform_cross_validation` + the three `evaluate_*` imports.
+  Fresh-process import probes (`base`, `cross_validation`,
+  `_evaluation.classification`, `_tuning.engine`) guard against the
+  partial-init crash conftest imports would mask.
+- **Hoists** (`49d37546`, `310c6745`, `9ac26008`): internal no-cycle +
+  stdlib deferrals (stale "circular dependency" comments deleted), all
+  hard-dependency deferrals (sklearn/scipy/statsmodels/joblib/pyarrow/pandas),
+  and all 93 deferred `import polars as pl` sites (polars is a hard dep
+  already loaded at package init). Monkeypatch-sensitive files use
+  module-attribute form so test patches of third-party attributes still bind:
+  `_evaluation/metrics.py` → `sklearn_metrics.*`, `_analyzer/column.py` +
+  `_analyzer/target.py` → `scipy_stats.*`, `_analyzer/temporal.py` →
+  `stattools.adfuller` (try/except kept around the call).
+  `SKLEARN_AVAILABLE`/degradation gates untouched; `profiling/drift.py`
+  SCIPY_AVAILABLE pattern untouched (integration-pinned).
+- **Waivers** (`2cc222ef`, fixup folded into `aca50d57`): 29 sites keep
+  function-local imports with the repo's `# noqa: PLC0415 - <reason>`
+  convention — matplotlib ×9, rich ×4, shap ×4, optuna loader ×4 (F-14
+  lazy-loader contract), imblearn ×3, sentence_transformers, vaderSentiment,
+  causallearn, h3, scatter_matrix. Waiver syntax that satisfies both linters:
+  `noqa` must sit on the import *statement* line (member-line noqa inside
+  parenthesized imports does not suppress), `ty: ignore[unresolved-import]`
+  may sit on the preceding line.
+- **Enforcement** (`aca50d57`): `PLC0415` added to `[tool.ruff.lint] select`;
+  backend/**, tests/**, skyulf-core/tests/**, benchmarks, docs examples and
+  root entry points exempted via per-file-ignores (scope is the published
+  library). Rule needs ruff ≥0.12, so the pin bumped to `ruff>=0.15,<1.0` in
+  pyproject.toml + requirements-ci.txt in the same commit (matches the
+  pre-commit hook v0.15.16; uv.lock keeps 0.15.16).
+- Verification per batch + at the end: full core suite 3578 passed / 70
+  skipped; backend/root suite 1541 passed; `ruff check --select PLC0415 .` →
+  0 errors; `ruff check .` + `ruff format --check` clean; `ty check` exit 0
+  on backend + core + tests + entry points; fresh-process import probes for
+  the cycle-sensitive modules all import clean.

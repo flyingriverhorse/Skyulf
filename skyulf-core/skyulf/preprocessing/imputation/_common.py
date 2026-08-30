@@ -3,6 +3,8 @@
 import logging
 from typing import Any
 
+import pandas as pd
+import polars as pl
 from sklearn.ensemble import ExtraTreesRegressor
 from sklearn.linear_model import BayesianRidge
 from sklearn.neighbors import KNeighborsRegressor
@@ -25,8 +27,6 @@ def _resolve_simple_columns(X: Any, config: dict[str, Any], strategy: str) -> li
 
 def _polars_stat_for_strategy(strategy: str, fill_value: Any) -> Any:
     """Return the Polars expression-builder used to compute the per-column fill value."""
-    import polars as pl
-
     if strategy == "constant":
         return None  # handled by caller
     if strategy == "mean":
@@ -57,8 +57,6 @@ def _compute_polars_fill_values(
 
 
 def _polars_missing_counts(X_pl: Any, cols: list[str]) -> tuple[dict[str, int], int]:
-    import polars as pl
-
     # pandas' isna() counts NaN as missing; polars' null_count() does not, so
     # float columns need an explicit NaN count to keep the artifact in parity.
     exprs = [
@@ -79,8 +77,6 @@ def _sklearn_transform_subset(X: Any, cols: list[str], imputer: Any, is_polars: 
     Returns the transformed frame (Polars or Pandas, matching the input).
     """
     if is_polars:
-        import polars as pl
-
         X_subset = X.select(cols)
         X_np, _ = SklearnBridge.to_sklearn(X_subset)
         X_transformed = imputer.transform(X_np)
@@ -88,8 +84,6 @@ def _sklearn_transform_subset(X: Any, cols: list[str], imputer: Any, is_polars: 
             X_transformed = X_transformed.to_numpy()
         new_cols = [pl.Series(col, X_transformed[:, i]) for i, col in enumerate(cols)]
         return X.with_columns(new_cols)
-
-    import pandas as pd
 
     X_out = X.copy()
     X_subset = X_out[cols].copy()

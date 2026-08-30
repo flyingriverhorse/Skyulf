@@ -75,6 +75,7 @@ from ..registry import NodeRegistry
 from ..types import DEFAULT_RANDOM_STATE
 from ._sklearn_compat import normalize_logistic_regression_params
 from .classification import LogisticRegressionCalculator
+from .hyperparameters import build_ensemble_search_space, get_default_search_space
 from .sklearn_wrapper import SklearnApplier, SklearnCalculator
 
 logger = logging.getLogger(__name__)
@@ -246,10 +247,6 @@ class _BaseEnsembleCalculator(SklearnCalculator):
         ``tune_base_models`` is set, each chosen base learner's grid is expanded
         into nested ``<name>__<param>`` keys (plus ``final_estimator__<param>``).
         """
-        # Lazy import avoids a circular dependency (the hyperparameters package
-        # imports the ensemble PARAM definitions at module load).
-        from .hyperparameters import build_ensemble_search_space, get_default_search_space
-
         src = config.get("params") if isinstance(config.get("params"), dict) else config
         src = src or {}
         if not src.get("tune_base_models"):

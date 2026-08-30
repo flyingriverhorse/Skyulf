@@ -3,6 +3,7 @@
 from typing import Any
 
 import pandas as pd
+import polars as pl
 
 from ...core.meta.decorators import node_meta
 from ...engines import SkyulfDataFrame
@@ -97,8 +98,6 @@ def _polars_base_expr(col: str, dtype: Any) -> Any:
     ordinary date strings like "2021-01-01". String/Utf8 columns must instead go
     through ``str.to_datetime`` so common date formats are parsed correctly.
     """
-    import polars as pl
-
     if dtype in (pl.Utf8, pl.String):
         return pl.col(col).str.to_datetime(strict=False)
     return pl.col(col).cast(pl.Datetime, strict=False)

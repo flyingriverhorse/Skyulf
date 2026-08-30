@@ -115,7 +115,7 @@ class CausalMixin(_AnalyzerState):
             data = df_numeric.to_numpy()
 
             try:
-                from causallearn.search.ConstraintBased.PC import (  # ty: ignore[unresolved-import]
+                from causallearn.search.ConstraintBased.PC import (  # ty: ignore[unresolved-import]  # noqa: PLC0415 - optional eda extra
                     pc,
                 )
             except ImportError:

@@ -1,5 +1,7 @@
 """Regression models."""
 
+import warnings
+
 from sklearn.ensemble import (
     AdaBoostRegressor,
     ExtraTreesRegressor,
@@ -422,8 +424,6 @@ if LIGHTGBM_AVAILABLE:
         """
 
         def predict(self, df, model_artifact):
-            import warnings
-
             with warnings.catch_warnings():
                 warnings.filterwarnings("ignore", message=".*valid feature names.*")
                 return super().predict(df, model_artifact)
@@ -472,8 +472,6 @@ if LIGHTGBM_AVAILABLE:
             validation_data=None,
             iteration_callback=None,
         ):
-            import warnings
-
             with warnings.catch_warnings():
                 warnings.filterwarnings("ignore", message=".*valid feature names.*")
                 return super().fit(

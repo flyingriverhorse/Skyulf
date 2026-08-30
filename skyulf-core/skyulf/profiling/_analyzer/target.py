@@ -1,9 +1,11 @@
 """Target-feature association: correlations, eta², box-plot interactions."""
 
 import logging
+import warnings
 
 import numpy as np
 import polars as pl
+from scipy import stats as scipy_stats
 
 from ..schemas import BoxPlotStats, CategoryBoxPlot, TargetInteraction
 from ._utils import SCIPY_AVAILABLE, _AnalyzerState, _collect
@@ -17,8 +19,6 @@ class TargetMixin(_AnalyzerState):
     def _collect_target_correlations(self, target_col: str, features: list[str]) -> pl.DataFrame:
         """Collect per-feature Pearson correlation with the target, suppressing constant-column warnings."""
         exprs = [pl.corr(col, target_col).alias(col) for col in features]
-
-        import warnings
 
         # corrcoef on constant columns emits a divide-by-zero RuntimeWarning.
         with warnings.catch_warnings():
@@ -193,12 +193,10 @@ class TargetMixin(_AnalyzerState):
             return None
 
         try:
-            from scipy.stats import f_oneway
-
             groups_data = self._collect_anova_groups(group_col, value_col)
 
             if len(groups_data) > 1:
-                _f_stat, p_val = f_oneway(*groups_data)
+                _f_stat, p_val = scipy_stats.f_oneway(*groups_data)
                 if not np.isnan(p_val):
                     return float(p_val)
         except Exception as e:  # noqa: BLE001 - ANOVA is best-effort; logged

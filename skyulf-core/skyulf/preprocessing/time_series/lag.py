@@ -3,6 +3,7 @@
 from typing import Any
 
 import pandas as pd
+import polars as pl
 
 from ...core.meta.decorators import node_meta
 from ...engines import SkyulfDataFrame
@@ -21,8 +22,6 @@ def _lag_name(col: str, lag: int) -> str:
 def _polars_lag_exprs(
     columns: list[str], available: list[str], lags: list[int], group_by: list[str] | None
 ) -> list:
-    import polars as pl
-
     exprs = []
     for col in columns:
         if col not in available:
@@ -52,8 +51,6 @@ def _apply_polars(X: Any, _y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
         X_out = X_out.with_columns(exprs)
     if params.get("drop_na"):
         if _y is not None:
-            import polars as pl
-
             null_mask = pl.any_horizontal([pl.col(c).is_null() for c in X_out.columns])
             mask_series = X_out.select(null_mask.alias("__null")).get_column("__null")
             X_out = X_out.filter(~mask_series)

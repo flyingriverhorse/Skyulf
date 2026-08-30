@@ -10,6 +10,10 @@ import polars as pl
 from .._validation import raise_invalid_choice
 from ..data.dataset import SplitDataset
 from ..engines import EngineName, SkyulfDataFrame, get_engine
+from ._evaluation.classification import evaluate_classification_model
+from ._evaluation.clustering import evaluate_clustering_model
+from ._evaluation.regression import evaluate_regression_model
+from .cross_validation import perform_cross_validation
 from .fold_preprocessing import FoldPreprocessor
 
 logger = logging.getLogger(__name__)
@@ -225,9 +229,6 @@ class StatefulEstimator:
         """
         Performs cross-validation on the training split.
         """
-        # Import here to avoid circular dependency if any
-        from .cross_validation import perform_cross_validation
-
         X_train, y_train = self._extract_xy(dataset.train, target_column)
 
         return perform_cross_validation(
@@ -597,11 +598,6 @@ class StatefulEstimator:
         (there is no ground-truth target), computed by the caller via
         ``self.applier.predict(X, self.model)``.
         """
-        # Import here to avoid circular dependency
-        from ._evaluation.classification import evaluate_classification_model
-        from ._evaluation.clustering import evaluate_clustering_model
-        from ._evaluation.regression import evaluate_regression_model
-
         if problem_type == "classification":
             return evaluate_classification_model(
                 model=model_to_evaluate, dataset_name=split_name, X_test=X, y_test=y

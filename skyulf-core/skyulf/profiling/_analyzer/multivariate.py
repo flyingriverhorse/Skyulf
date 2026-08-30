@@ -5,6 +5,11 @@ from typing import Any, cast
 
 import numpy as np
 import polars as pl
+from sklearn.cluster import KMeans
+from sklearn.decomposition import PCA
+from sklearn.ensemble import IsolationForest
+from sklearn.impute import SimpleImputer
+from sklearn.preprocessing import StandardScaler
 
 from ...types import DEFAULT_RANDOM_STATE
 from ..schemas import (
@@ -45,8 +50,6 @@ class MultivariateMixin(_AnalyzerState):
     @staticmethod
     def _impute_matrix(X_df: pl.DataFrame) -> np.ndarray:
         """Mean-impute (Polars fast path, sklearn fallback) and return a finite numpy matrix."""
-        from sklearn.impute import SimpleImputer
-
         try:
             # Polars fill_null is faster than sklearn's imputer; fall back if it errors.
             # Trailing fill_null(0) covers all-null columns where mean is also null.
@@ -72,8 +75,6 @@ class MultivariateMixin(_AnalyzerState):
         detection's `IsolationForest` doesn't need column alignment across calls,
         so all-null/all-NaN columns are dropped exactly like sklearn would.
         """
-        from sklearn.impute import SimpleImputer
-
         try:
             # NaN-as-value and Polars null are both "missing" for SimpleImputer, so
             # normalize NaN to null before checking for all-missing columns.
@@ -113,8 +114,6 @@ class MultivariateMixin(_AnalyzerState):
         if not SKLEARN_AVAILABLE:
             return None, None, None
         try:
-            from sklearn.preprocessing import StandardScaler
-
             sample_df = self._sample_matrix_df(numeric_cols, target_col, limit)
 
             if sample_df.height < 5:
@@ -185,8 +184,6 @@ class MultivariateMixin(_AnalyzerState):
     ) -> tuple[list[PCAPoint] | None, list[PCAComponent] | None]:
         """3-component PCA projection + per-component top loadings."""
         try:
-            from sklearn.decomposition import PCA
-
             X_scaled, sample_df, _ = self._prepare_matrix_sample(
                 numeric_cols, target_col=target_col, limit=5000
             )
@@ -264,9 +261,6 @@ class MultivariateMixin(_AnalyzerState):
     ) -> ClusteringAnalysis | None:
         """KMeans (k=3) post-hoc segmentation, projected to 2D via PCA for plotting."""
         try:
-            from sklearn.cluster import KMeans
-            from sklearn.decomposition import PCA
-
             X_scaled, sample_df, scaler = self._prepare_matrix_sample(
                 numeric_cols, target_col=target_col, limit=5000
             )
@@ -367,8 +361,6 @@ class MultivariateMixin(_AnalyzerState):
     def _detect_outliers(self, numeric_cols: list[str]) -> OutlierAnalysis | None:
         """Isolation-Forest outlier detection with per-feature deviation explanations."""
         try:
-            from sklearn.ensemble import IsolationForest
-
             limit = 50000
             df_numeric = self._sample_numeric_for_outliers(numeric_cols, limit)
 
