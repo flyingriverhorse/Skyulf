@@ -5,6 +5,11 @@ from typing import Any
 
 import numpy as np
 import polars as pl
+from sklearn.tree import (  # ty: ignore[unresolved-import]
+    DecisionTreeClassifier,
+    DecisionTreeRegressor,
+    _tree,  # ty: ignore[unresolved-import]
+)
 
 from ...types import DEFAULT_RANDOM_STATE
 from ..schemas import RuleNode, RuleTree
@@ -26,12 +31,6 @@ class RulesMixin(_AnalyzerState):
         if not SKLEARN_AVAILABLE:
             return None
         try:
-            from sklearn.tree import (  # ty: ignore[unresolved-import]
-                DecisionTreeClassifier,
-                DecisionTreeRegressor,
-                _tree,  # ty: ignore[unresolved-import]
-            )
-
             limit = 100000
             df_sample = self.df.select(  # type: ignore[attr-defined]
                 feature_cols + [target_col]

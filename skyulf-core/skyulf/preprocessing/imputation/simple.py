@@ -2,6 +2,7 @@
 
 from typing import Any, cast
 
+import pandas as pd
 from sklearn.impute import SimpleImputer
 
 from ...core.meta.decorators import node_meta
@@ -60,8 +61,6 @@ class SimpleImputerApplier(BaseApplier):
 
     @staticmethod
     def _apply_pandas(X: Any, _y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
-        import pandas as pd
-
         cols = params.get("columns", [])
         fill_values = params.get("fill_values", {})
         if not cols:

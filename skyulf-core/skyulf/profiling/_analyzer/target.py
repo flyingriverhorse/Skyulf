@@ -5,6 +5,7 @@ import warnings
 
 import numpy as np
 import polars as pl
+from scipy import stats as scipy_stats
 
 from ..schemas import BoxPlotStats, CategoryBoxPlot, TargetInteraction
 from ._utils import SCIPY_AVAILABLE, _AnalyzerState, _collect
@@ -192,12 +193,10 @@ class TargetMixin(_AnalyzerState):
             return None
 
         try:
-            from scipy.stats import f_oneway
-
             groups_data = self._collect_anova_groups(group_col, value_col)
 
             if len(groups_data) > 1:
-                _f_stat, p_val = f_oneway(*groups_data)
+                _f_stat, p_val = scipy_stats.f_oneway(*groups_data)
                 if not np.isnan(p_val):
                     return float(p_val)
         except Exception as e:  # noqa: BLE001 - ANOVA is best-effort; logged

@@ -5,6 +5,7 @@ from typing import Any, cast
 
 import numpy as np
 import polars as pl
+from statsmodels.tsa import stattools
 
 from ..schemas import SeasonalityStats, TimeSeriesAnalysis, TimeSeriesPoint
 from ._utils import STATSMODELS_AVAILABLE, _AnalyzerState, _collect
@@ -196,8 +197,6 @@ class TemporalMixin(_AnalyzerState):
         if not (STATSMODELS_AVAILABLE and cols_to_track):
             return None
         try:
-            from statsmodels.tsa.stattools import adfuller
-
             target_metric = cols_to_track[0]
             series = trend_df[target_metric].to_numpy().copy()
             mask = np.isnan(series)
@@ -205,7 +204,7 @@ class TemporalMixin(_AnalyzerState):
                 series[mask] = np.nanmean(series)
 
             if len(series) > 20:
-                result = adfuller(series)
+                result = stattools.adfuller(series)
                 return {
                     "test_statistic": float(result[0]),
                     "p_value": float(result[1]),

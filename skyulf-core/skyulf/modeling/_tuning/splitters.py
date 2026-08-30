@@ -11,6 +11,7 @@ import numpy as np
 import pandas as pd
 from sklearn.model_selection import (
     KFold,
+    PredefinedSplit,
     ShuffleSplit,
     StratifiedKFold,
     TimeSeriesSplit,
@@ -53,8 +54,6 @@ def build_predefined_split_cv(
     ``validation_data`` as the single test fold (0), so the searcher trains on ``X`` and
     validates on ``validation_data``.
     """
-    from sklearn.model_selection import PredefinedSplit
-
     X_val, y_val = validation_data
 
     # Concatenate Train and Val (Numpy arrays)
@@ -82,7 +81,6 @@ def build_predefined_split_cv_frames(
     single scoring fold (0): the preprocessing chain refits on train rows
     only and candidates score against untouched validation rows.
     """
-    from sklearn.model_selection import PredefinedSplit
 
     def _as_pandas(frame: Any) -> Any:
         return frame.to_pandas() if hasattr(frame, "to_pandas") else frame

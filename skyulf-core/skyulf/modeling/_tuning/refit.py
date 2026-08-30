@@ -12,6 +12,14 @@ from typing import Any
 
 import numpy as np
 from sklearn.exceptions import ConvergenceWarning
+from sklearn.metrics import (
+    accuracy_score,
+    balanced_accuracy_score,
+    f1_score,
+    matthews_corrcoef,
+    precision_score,
+    recall_score,
+)
 
 from ...engines.sklearn_bridge import SklearnBridge
 from .._evaluation.thresholds import optimize_thresholds
@@ -103,15 +111,6 @@ def resolve_threshold_metric(
     f1/precision/recall callables when given: their sklearn defaults assume
     ``pos_label=1`` and raise for label spaces without a 1 (string labels).
     """
-    from sklearn.metrics import (
-        accuracy_score,
-        balanced_accuracy_score,
-        f1_score,
-        matthews_corrcoef,
-        precision_score,
-        recall_score,
-    )
-
     pos_kwargs = {"pos_label": pos_label} if pos_label is not None else {}
     hard_label: dict[str, Callable[[Any, Any], float]] = {
         "accuracy": accuracy_score,

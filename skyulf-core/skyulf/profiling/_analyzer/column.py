@@ -4,6 +4,7 @@ import logging
 
 import numpy as np
 import polars as pl
+from scipy import stats as scipy_stats
 
 from ..distributions import calculate_histogram
 from ..schemas import (
@@ -57,18 +58,16 @@ class ColumnMixin(_AnalyzerState):
     @staticmethod
     def _run_normality_test(sample_data: np.ndarray) -> NormalityTestResult | None:
         """Run Shapiro-Wilk (small samples) or Kolmogorov-Smirnov (large samples) on prepared sample data."""
-        from scipy.stats import kstest, shapiro
-
         if not (len(sample_data) > 20 and np.std(sample_data) > 1e-10):
             return None
 
         if len(sample_data) < 5000:
-            stat, p_value = shapiro(sample_data)
+            stat, p_value = scipy_stats.shapiro(sample_data)
             test_name = "Shapiro-Wilk"
         else:
             # Fit normal to data first; otherwise KS would test against N(0,1).
             mean, std = np.mean(sample_data), np.std(sample_data)
-            stat, p_value = kstest(sample_data, "norm", args=(mean, std))
+            stat, p_value = scipy_stats.kstest(sample_data, "norm", args=(mean, std))
             test_name = "Kolmogorov-Smirnov"
 
         return NormalityTestResult(

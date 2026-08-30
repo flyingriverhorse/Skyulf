@@ -3,6 +3,7 @@
 import logging
 from typing import Any
 
+import pandas as pd
 from sklearn.ensemble import ExtraTreesRegressor
 from sklearn.linear_model import BayesianRidge
 from sklearn.neighbors import KNeighborsRegressor
@@ -88,8 +89,6 @@ def _sklearn_transform_subset(X: Any, cols: list[str], imputer: Any, is_polars: 
             X_transformed = X_transformed.to_numpy()
         new_cols = [pl.Series(col, X_transformed[:, i]) for i, col in enumerate(cols)]
         return X.with_columns(new_cols)
-
-    import pandas as pd
 
     X_out = X.copy()
     X_subset = X_out[cols].copy()

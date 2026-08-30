@@ -10,6 +10,7 @@ from typing import Any
 
 import numpy as np
 import pandas as pd
+from sklearn.metrics import get_scorer, make_scorer
 
 from .schemas import TuningConfig
 
@@ -133,8 +134,6 @@ def resolve_scorer(metric: str, y: Any, problem_type: str | None) -> Any:
     ``apply_thresholds`` uses for the positive class — whenever the default
     cannot match. Numeric targets containing 1 keep the stock scorer.
     """
-    from sklearn.metrics import get_scorer, make_scorer
-
     scorer = get_scorer(metric)
     if problem_type != "classification":
         return scorer

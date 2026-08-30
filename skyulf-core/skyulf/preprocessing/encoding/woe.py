@@ -17,6 +17,7 @@ from typing import Any, cast
 
 import numpy as np
 import pandas as pd
+from sklearn.model_selection import KFold
 
 from ...core.meta.decorators import node_meta
 from ...engines import SkyulfDataFrame
@@ -242,8 +243,6 @@ def _cross_fit_woe_values(
     A category absent from a fold's complement falls back to the apply-time
     default (0.0), matching unseen-category behaviour at serving time.
     """
-    from sklearn.model_selection import KFold
-
     n = len(frame)
     encoded = {col: np.zeros(n, dtype=float) for col in cols}
     kf = KFold(n_splits=n_folds, shuffle=True, random_state=DEFAULT_RANDOM_STATE)

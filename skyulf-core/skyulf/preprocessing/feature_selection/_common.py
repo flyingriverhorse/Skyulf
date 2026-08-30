@@ -25,6 +25,7 @@ from sklearn.feature_selection import (
     r_regression,
 )
 from sklearn.linear_model import LinearRegression, LogisticRegression
+from sklearn.preprocessing import MinMaxScaler
 
 from ...utils import detect_numeric_columns, resolve_columns
 from .._artifacts import UnivariateSelectionArtifact
@@ -267,8 +268,6 @@ def _maybe_chi2_rescale(X_np: np.ndarray, score_func_name: str | None) -> np.nda
         "Chi-squared statistic requires non-negative feature values. "
         "Applying MinMaxScaler to features for selection."
     )
-    from sklearn.preprocessing import MinMaxScaler
-
     return MinMaxScaler().fit_transform(X_np)
 
 
