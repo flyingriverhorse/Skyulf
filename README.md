@@ -13,6 +13,11 @@
   </a>
   <br/>
   <sub>🟢&nbsp;no signup required</sub>
+  <br/>
+  <br/>
+  <a href="https://pepy.tech/projects/skyulf-core">
+    <img src="https://img.shields.io/pepy/dt/skyulf-core?style=for-the-badge&label=Total%20Downloads&color=green" alt="PyPI Total Downloads">
+  </a>
 </p>
 
 [![Backend License](https://img.shields.io/badge/backend-AGPLv3-blue)](LICENSE)
@@ -27,7 +32,6 @@
 [![codecov](https://codecov.io/github/flyingriverhorse/Skyulf/graph/badge.svg?token=47ED2R6ZHC)](https://codecov.io/github/flyingriverhorse/Skyulf)
 [![Codacy Badge](https://app.codacy.com/project/badge/Grade/51e3ad3ce18e41b2922cf62a6dd6ce99)](https://app.codacy.com/gh/flyingriverhorse/Skyulf/dashboard?utm_source=gh&utm_medium=referral&utm_content=&utm_campaign=Badge_grade)
 [![PyPI Downloads](https://static.pepy.tech/personalized-badge/skyulf-core?period=monthly&units=INTERNATIONAL_SYSTEM&left_color=BLACK&right_color=GREEN&left_text=downloads%2Fmonth)](https://pepy.tech/projects/skyulf-core)
-[![PyPI Downloads](https://static.pepy.tech/personalized-badge/skyulf-core?period=total&units=INTERNATIONAL_SYSTEM&left_color=GREY&right_color=BLUE&left_text=Total_Downloads)](https://pepy.tech/projects/skyulf-core)
 [![issues](https://img.shields.io/github/issues/flyingriverhorse/Skyulf.svg)](https://github.com/flyingriverhorse/Skyulf/issues)
 
 > **Skyulf:** The Visual MLOps Builder
