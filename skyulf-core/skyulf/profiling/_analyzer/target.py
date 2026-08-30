@@ -1,6 +1,7 @@
 """Target-feature association: correlations, eta², box-plot interactions."""
 
 import logging
+import warnings
 
 import numpy as np
 import polars as pl
@@ -17,8 +18,6 @@ class TargetMixin(_AnalyzerState):
     def _collect_target_correlations(self, target_col: str, features: list[str]) -> pl.DataFrame:
         """Collect per-feature Pearson correlation with the target, suppressing constant-column warnings."""
         exprs = [pl.corr(col, target_col).alias(col) for col in features]
-
-        import warnings
 
         # corrcoef on constant columns emits a divide-by-zero RuntimeWarning.
         with warnings.catch_warnings():

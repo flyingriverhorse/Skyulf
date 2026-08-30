@@ -9,8 +9,7 @@ import logging
 from enum import StrEnum
 from typing import Any, ClassVar
 
-# We import the protocol for type checking, but we don't strictly need it at runtime here
-# to avoid circular imports if engines import protocol.
+# protocol.py is a leaf module (no engine imports), so this top-level import is safe.
 from .protocol import SkyulfDataFrame
 
 logger = logging.getLogger(__name__)

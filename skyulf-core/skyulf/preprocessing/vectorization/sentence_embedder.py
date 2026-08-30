@@ -12,13 +12,20 @@ encodes text into ``{src}__emb__{i}`` float columns.  Models are cached per
 import logging
 from typing import Any
 
+import numpy as np
 import pandas as pd
 
 from ...core.meta.decorators import node_meta
 from ...registry import NodeRegistry
 from .._artifacts import SentenceEmbedderArtifact
 from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
-from ._common import _join_text_columns, apply_text_dual_engine, resolve_fit_text_valid_columns
+from ._common import (
+    _drop_and_concat_polars,
+    _join_text_columns,
+    _join_text_columns_polars,
+    apply_text_dual_engine,
+    resolve_fit_text_valid_columns,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -91,10 +98,7 @@ def _embed_apply_pandas(
 def _embed_apply_polars(X: Any, params: dict[str, Any]) -> Any:
     """Native-Polars embed apply; returns ``None`` to fall back to pandas when
     a text column is not String dtype."""
-    import numpy as np
     import polars as pl
-
-    from ._common import _drop_and_concat_polars, _join_text_columns_polars
 
     cols: list[str] = params.get("columns", [])
     output_columns: list[str] = params.get("output_columns", [])

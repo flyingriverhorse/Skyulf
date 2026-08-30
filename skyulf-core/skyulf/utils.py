@@ -10,7 +10,7 @@ import polars as pl
 from skyulf.engines import EngineName
 
 from .data.dataset import SplitDataset
-from .engines import SkyulfDataFrame, get_engine
+from .engines import POLARS_NUMERIC_DTYPES, SkyulfDataFrame, get_engine
 
 logger = logging.getLogger(__name__)
 
@@ -219,8 +219,6 @@ def _is_binary_numeric(series: pd.Series | Any) -> bool:
 
 def _polars_numeric_dtype_cols(frame: Any) -> list[str]:
     """List the columns of a Polars frame whose dtype is numeric (float/int/uint)."""
-    from .engines import POLARS_NUMERIC_DTYPES
-
     return [
         c for c, t in zip(frame.columns, frame.dtypes, strict=True) if t in POLARS_NUMERIC_DTYPES
     ]

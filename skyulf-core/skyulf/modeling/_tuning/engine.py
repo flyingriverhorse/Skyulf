@@ -27,6 +27,7 @@ from ...engines import SkyulfDataFrame
 from ...engines.sklearn_bridge import SklearnBridge
 from .._evaluation.thresholds import apply_thresholds
 from ..base import BaseModelApplier, BaseModelCalculator
+from ..cross_validation import _sort_by_time
 from . import splitters
 from .fold_pipeline import FoldAwareModelStep
 from .grid_random import fit_and_score_candidate_fold, run_grid_or_random_search
@@ -338,8 +339,6 @@ class TuningCalculator(BaseModelCalculator):
         # without it, tuning with cv_type="time_series_split" silently leaks
         # the time column and evaluates folds out of chronological order.
         if tuning_config.cv_type == "time_series_split" and hasattr(X, "columns"):
-            from ..cross_validation import _sort_by_time
-
             X, y = _sort_by_time(X, y, tuning_config.cv_time_column, log_callback, logger)
 
         # Convert data to Numpy for tuning

@@ -15,8 +15,10 @@ Boundary with ``dispatcher.py``:
 from collections.abc import Callable
 from typing import Any
 
+import numpy as np
 import pandas as pd
 
+from ...engines.polars_engine import SkyulfPolarsWrapper
 from ...utils import pack_pipeline_output, unpack_pipeline_input
 from .._helpers import resolve_valid_columns
 
@@ -72,8 +74,6 @@ def apply_text_dual_engine(
         X_out_pl = polars_fn(X_pl, params)
         if X_out_pl is not None:
             if was_wrapped:
-                from ...engines.polars_engine import SkyulfPolarsWrapper
-
                 X_out_pl = SkyulfPolarsWrapper(X_out_pl)
             return pack_pipeline_output(X_out_pl, y, is_tuple)
 
@@ -87,8 +87,6 @@ def apply_text_dual_engine(
 
         X_out = pl.from_pandas(X_out_pd)
         if was_wrapped:
-            from ...engines.polars_engine import SkyulfPolarsWrapper
-
             X_out = SkyulfPolarsWrapper(X_out)
 
     return pack_pipeline_output(X_out, y_out, is_tuple)
@@ -250,7 +248,6 @@ def _sklearn_vectorizer_apply_polars(X: Any, params: dict[str, Any]) -> Any:
     the frame itself is never converted. Returns ``None`` to request a
     fallback to the pandas path when a text column is not String dtype.
     """
-    import numpy as np
     import polars as pl
 
     cols: list[str] = params.get("columns", [])

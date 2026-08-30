@@ -1,5 +1,6 @@
 """Cross-validation logic for V2 modeling."""
 
+import logging
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any, cast
 
@@ -12,7 +13,7 @@ from sklearn.model_selection import (
     TimeSeriesSplit,
 )
 
-from ..engines import SkyulfDataFrame
+from ..engines import EngineName, SkyulfDataFrame, get_engine
 from ..engines.sklearn_bridge import SklearnBridge
 from ..types import DEFAULT_RANDOM_STATE
 
@@ -25,6 +26,8 @@ from ._evaluation.metrics import (
     calculate_classification_metrics,
     calculate_regression_metrics,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def _aggregate_single_metric(
@@ -107,9 +110,6 @@ def perform_cross_validation(
     Returns:
         Dict containing aggregated metrics and per-fold details.
     """
-    import logging
-
-    logger = logging.getLogger(__name__)
     problem_type = calculator.problem_type
 
     if log_callback:
@@ -363,8 +363,6 @@ def _sort_by_time(
     sorting AND never dropped the time column from features, leaking it
     directly into training.
     """
-    from ..engines import EngineName, get_engine
-
     is_polars = get_engine(X).name == EngineName.POLARS
 
     sort_col = time_column
@@ -417,10 +415,6 @@ def _build_splitter(
     random_state: int = DEFAULT_RANDOM_STATE,
 ) -> Any:
     """Build a sklearn CV splitter from cv_type string."""
-    import logging
-
-    logger = logging.getLogger(__name__)
-
     if cv_type == "time_series_split":
         return TimeSeriesSplit(n_splits=n_folds)
     elif cv_type == "shuffle_split":
@@ -594,9 +588,6 @@ def _perform_nested_cv(
     outer fold. Real inner-loop hyperparameter selection is out of scope for
     this function.
     """
-    import logging
-
-    logger = logging.getLogger(__name__)
     problem_type = calculator.problem_type
     inner_folds = min(3, n_folds - 1) if n_folds > 2 else 2
 

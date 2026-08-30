@@ -1,3 +1,5 @@
+from datetime import datetime
+
 import polars as pl
 
 from .schemas import DatasetProfile
@@ -770,8 +772,6 @@ class EDAVisualizer:
     @staticmethod
     def _timeseries_series(trend):
         """Parse timeseries trend points into (dates, values_map) for plotting, skipping bad dates."""
-        from datetime import datetime
-
         dates = []
         values_map = {}  # col -> list of values
 
