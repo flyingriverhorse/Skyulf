@@ -20,7 +20,7 @@ _SANCTIONED = {
 # Matches an actual ``if <x>.name == EngineName.POLARS`` statement, not docstrings.
 _INLINE_DISPATCH = re.compile(r"^\s*(?:el)?if\s+\w+\.name\s*==\s*EngineName\.POLARS")
 
-_PREPROCESSING_DIR = Path(__file__).resolve().parent.parent / "skyulf" / "preprocessing"
+_PREPROCESSING_DIR = Path(__file__).resolve().parent.parent.parent / "skyulf" / "preprocessing"
 
 
 def _is_sanctioned(path: Path) -> bool:
