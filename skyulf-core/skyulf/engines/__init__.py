@@ -5,7 +5,7 @@ from .polars_engine import (
     PolarsEngine,
     SkyulfPolarsWrapper,
 )
-from .protocol import SkyulfDataFrame
+from .protocol import PandasBackedFrame, PolarsBackedFrame, SkyulfDataFrame
 from .registry import BaseEngine, EngineName, EngineRegistry, get_engine
 
 __all__ = [
@@ -14,7 +14,9 @@ __all__ = [
     "BaseEngine",
     "EngineName",
     "EngineRegistry",
+    "PandasBackedFrame",
     "PandasEngine",
+    "PolarsBackedFrame",
     "PolarsEngine",
     "SkyulfDataFrame",
     "SkyulfPolarsWrapper",

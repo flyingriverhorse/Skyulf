@@ -26,7 +26,9 @@ class DropMissingColumnsApplier(BaseApplier):
     @apply_method
     def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
         return apply_dual_engine(
-            X, params, _drop_missing_cols_apply_polars, _drop_missing_cols_apply_pandas
+            X,
+            params,
+            {"polars": _drop_missing_cols_apply_polars, "pandas": _drop_missing_cols_apply_pandas},
         )
 
 
@@ -119,6 +121,8 @@ class DropMissingColumnsCalculator(BaseCalculator):
         return cast(
             DropMissingColumnsArtifact,
             fit_dual_engine(
-                df, config, _drop_missing_cols_fit_polars, _drop_missing_cols_fit_pandas
+                df,
+                config,
+                {"polars": _drop_missing_cols_fit_polars, "pandas": _drop_missing_cols_fit_pandas},
             ),
         )

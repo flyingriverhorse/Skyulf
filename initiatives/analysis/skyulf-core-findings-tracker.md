@@ -8,8 +8,9 @@ snapshot, `/Users/BH7043/Skyulf`).
 The audit predates the 080–086 fix waves. 7 of 31 findings no longer reproduce;
 both partials (F-14, F-31) were closed 2026-08-29. After F-19 (pipeline.py
 split) closed 2026-08-29 and F-18 (`_tuning/engine.py` split) + F-11 (import
-cycles / deferred imports) closed 2026-08-30, 3 remain open: F-30 (deferred
-pending a compat call) and two structural items (F-09, F-08).
+cycles / deferred imports) + F-09 (engine-keyed dual-engine dispatch) closed
+2026-08-30, 2 remain open: F-30 (deferred pending a compat call) and one
+structural item (F-08).
 This file tracks the fix work, few-at-a-time for easy items, one-at-a-time for hard ones.
 
 **Status key:** ⬜ open · 🟨 in progress · ✅ done · ⏭️ parked
@@ -56,8 +57,8 @@ Easy items batched; hard items one at a time.
 | F-10 | 🟠 | `_HARDCODED_MODEL_MAP` shadows registry | half day | ✅ |
 | F-15 | 🟡 | Pickle-based reproducibility digest | ~1 day | ✅ |
 | F-07 | 🟠 | `._df` unwrapping → public `to_native()` | ~1 day | ✅ |
-| F-09 | 🟠 | Dual-engine dispatch mapping (Spark prereq) | ~2 days | ⬜ |
-| F-08 | 🟠 | Split the `SkyulfDataFrame` protocol | ~3 days | ⬜ |
+| F-09 | 🟠 | Dual-engine dispatch mapping (Spark prereq) | ~2 days | ✅ 2026-08-30 — dispatchers take an engine-keyed mapping, unmapped engines raise `NotImplementedError` before any `to_pandas()`; 63 call sites migrated; vacuous guard test fixed |
+| F-08 | 🟠 | Split the `SkyulfDataFrame` protocol | ~3 days | ✅ 2026-08-30 — strict base protocol (no `__getattr__`) + `PandasBackedFrame`/`PolarsBackedFrame` sub-protocols; ~41 engine-specific sites now type-checked via casts; zero runtime change (3584 tests pass) |
 | F-11 | 🟠 | Break import cycles (196 deferred imports) | ~2 days | ✅ 2026-08-30 — 173 PLC0415 sites: 144 hoisted, 29 waived (optional extras), 1 cycle broken; PLC0415 now enforced |
 | F-18 | 🟡 | Split `_tuning/engine.py` (1,572 lines) | ~2 days | ✅ |
 | F-19 | 🟡 | Split `pipeline.py` responsibilities | ~1 day | ✅ |
@@ -684,3 +685,52 @@ Three tracked follow-ups closed in one batch:
   0 errors; `ruff check .` + `ruff format --check` clean; `ty check` exit 0
   on backend + core + tests + entry points; fresh-process import probes for
   the cycle-sensitive modules all import clean.
+
+### 2026-08-30 — F-09 engine-keyed dual-engine dispatch (branch 089, commits a9f9a687 + fb1896b2)
+
+- **F-09** fixed: `apply_dual_engine` / `fit_dual_engine` /
+  `fit_transform_train_dual_engine` took two positional callables and routed
+  every non-polars frame through a silent `X.to_pandas()` collect. Since
+  `EngineRegistry._TOP_LEVEL_TO_ENGINE` already maps `"pyspark" -> "spark"`,
+  a Spark frame would have been detected, routed, and silently pulled to the
+  driver — fatal at scale. New signatures take an engine-keyed mapping:
+  `apply_dual_engine(df, params, {"polars": fn, "pandas": fn})`.
+- **Two loud failure points** (both before any conversion): (1) an engine
+  with no entry in the mapping raises `NotImplementedError` naming the
+  available keys; (2) a mapped engine with no input-preparation branch
+  raises a second `NotImplementedError`, so a future `"spark"` key cannot
+  ride a generic `else` into silent pandas collection. A third engine is now
+  additive (`O(1)` dispatcher change) instead of invasive.
+- **Guard test repaired first** (`a9f9a687`):
+  `test_no_inline_engine_dispatch.py` computed its scan dir with one
+  `.parent` too few and had been passing **vacuously** (it scanned a
+  nonexistent `tests/skyulf/preprocessing`). With the corrected path it
+  scans all 87 real node files; the three sanctioned files
+  (`dispatcher.py`, `_helpers.py`, `encoding/_common.py`) were already the
+  only matches, so it went green immediately.
+- **Migration** (`fb1896b2`): all 63 core call sites across 46 files under
+  `preprocessing/` migrated to the mapping form via a deterministic
+  AST-based rewrite script (46 `apply_dual_engine`, 15 `fit_dual_engine`,
+  2 `fit_transform_train_dual_engine`). `encoding/woe.py` shares one fit
+  function under both keys; `resampling.py` lambdas moved into the dict
+  unchanged. Breaking internal-API change with no shim (the dispatchers are
+  not re-exported). Deliberately out of scope:
+  `vectorization/_common.py::apply_text_dual_engine` (intentional
+  pandas-first text path, no `get_engine`) and the non-dispatcher inline
+  branches (`utils.py`, `transformations/general.py`, `modeling/*`) — those
+  belong to F-08.
+- **Tests**: `test_preprocessing_dispatcher.py` rewritten to the mapping
+  signature (21 existing tests) plus 6 new tests: unmapped-engine raise,
+  available-keys message, raise-before-any-`to_pandas()` guarantee (spy
+  frame asserts 0 conversions), the no-prep-path second raise, fit parity,
+  and the same-function-under-both-keys pattern. Dead dispatcher imports
+  pruned from `test_registry_contract.py`.
+- **Verification**: targeted unit tests 204 passed; full core suite 3584
+  passed / 70 skipped (registry-contract suite fits every node on pandas +
+  polars + wrapped frames — catches any mistyped mapping key); backend/root
+  suite 1541 passed; `ruff check .` + `ruff format --check` clean;
+  `ty check backend skyulf-core/skyulf skyulf-core/tests run_skyulf.py
+  celery_worker.py` exit 0. Pre-commit hooks (ruff, ruff format, ty) all
+  passed on the atomic commit.
+- **Changelog**: `Unreleased` section in `changelog/0.8.x.md` documents the
+  breaking internal-API change and the deliberate exclusions.

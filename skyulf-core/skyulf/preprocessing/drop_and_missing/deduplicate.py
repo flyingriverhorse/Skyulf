@@ -55,8 +55,7 @@ class DeduplicateApplier(BaseApplier):
         return apply_dual_engine(
             (X, y) if y is not None else X,
             params,
-            _dedup_apply_polars,
-            _dedup_apply_pandas,
+            {"polars": _dedup_apply_polars, "pandas": _dedup_apply_pandas},
         )
 
 

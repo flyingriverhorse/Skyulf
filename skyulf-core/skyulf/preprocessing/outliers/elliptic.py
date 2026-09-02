@@ -95,7 +95,9 @@ class EllipticEnvelopeApplier(BaseApplier):
         # unfiltered when X rows are removed). Omit the wrap when y is None
         # to avoid apply_dual_engine's tuple-with-no-y warning log.
         input_data = (X, y) if y is not None else X
-        return apply_dual_engine(input_data, params, self._apply_polars, self._apply_pandas)
+        return apply_dual_engine(
+            input_data, params, {"polars": self._apply_polars, "pandas": self._apply_pandas}
+        )
 
     @staticmethod
     def _apply_polars(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, Any]:

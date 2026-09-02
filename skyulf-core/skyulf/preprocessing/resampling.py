@@ -228,8 +228,14 @@ class OversamplingApplier(BaseApplier):
         return apply_dual_engine(
             (X, y) if y is not None else X,
             params,
-            polars_func=lambda Xi, yi, p: _resample_polars(Xi, yi, p, _build_oversampler, "smote"),
-            pandas_func=lambda Xi, yi, p: _resample_pandas(Xi, yi, p, _build_oversampler, "smote"),
+            {
+                "polars": lambda Xi, yi, p: _resample_polars(
+                    Xi, yi, p, _build_oversampler, "smote"
+                ),
+                "pandas": lambda Xi, yi, p: _resample_pandas(
+                    Xi, yi, p, _build_oversampler, "smote"
+                ),
+            },
         )
 
 
@@ -332,12 +338,14 @@ class UndersamplingApplier(BaseApplier):
         return apply_dual_engine(
             (X, y) if y is not None else X,
             params,
-            polars_func=lambda Xi, yi, p: _resample_polars(
-                Xi, yi, p, _build_undersampler, "random_under_sampling"
-            ),
-            pandas_func=lambda Xi, yi, p: _resample_pandas(
-                Xi, yi, p, _build_undersampler, "random_under_sampling"
-            ),
+            {
+                "polars": lambda Xi, yi, p: _resample_polars(
+                    Xi, yi, p, _build_undersampler, "random_under_sampling"
+                ),
+                "pandas": lambda Xi, yi, p: _resample_pandas(
+                    Xi, yi, p, _build_undersampler, "random_under_sampling"
+                ),
+            },
         )
 
 

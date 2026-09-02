@@ -407,8 +407,7 @@ class StatefulEstimator:
 
         # Test Predictions
         test_df = dataset.test[0] if isinstance(dataset.test, tuple) else dataset.test
-        # is_test_empty: pandas uses `.empty`, Polars uses `.is_empty()`
-        is_test_empty = test_df.empty if hasattr(test_df, "empty") else test_df.is_empty()
+        is_test_empty = len(test_df) == 0
 
         if not is_test_empty:
             X_test = self._extract_split_features(dataset.test, target_column)
@@ -578,6 +577,7 @@ class StatefulEstimator:
         y_proba_df = self.applier.predict_proba(X, self.model)
         if y_proba_df is None:
             return None
+        y_proba_df = cast(pd.DataFrame, y_proba_df)
         return {
             "classes": y_proba_df.columns.tolist(),
             "values": y_proba_df.to_numpy().tolist(),

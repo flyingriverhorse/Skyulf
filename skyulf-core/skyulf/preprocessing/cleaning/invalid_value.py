@@ -110,7 +110,9 @@ def _normalize_rule(
 class InvalidValueReplacementApplier(BaseApplier):
     @apply_method
     def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
-        return apply_dual_engine(X, params, self._apply_polars, self._apply_pandas)
+        return apply_dual_engine(
+            X, params, {"polars": self._apply_polars, "pandas": self._apply_pandas}
+        )
 
     @staticmethod
     def _apply_polars(X: Any, _y: Any, params: dict[str, Any]) -> tuple[Any, Any]:

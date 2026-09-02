@@ -373,7 +373,9 @@ def _casting_apply_pandas(X: Any, y: Any, params: dict[str, Any]) -> Any:
 class CastingApplier(BaseApplier):
     @apply_method
     def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
-        return apply_dual_engine(X, params, _casting_apply_polars, _casting_apply_pandas)
+        return apply_dual_engine(
+            X, params, {"polars": _casting_apply_polars, "pandas": _casting_apply_pandas}
+        )
 
 
 @NodeRegistry.register("Casting", CastingApplier)

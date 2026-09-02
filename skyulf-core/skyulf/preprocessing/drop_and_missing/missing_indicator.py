@@ -49,7 +49,9 @@ class MissingIndicatorApplier(BaseApplier):
     @apply_method
     def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
         return apply_dual_engine(
-            X, params, _missing_indicator_apply_polars, _missing_indicator_apply_pandas
+            X,
+            params,
+            {"polars": _missing_indicator_apply_polars, "pandas": _missing_indicator_apply_pandas},
         )
 
 
@@ -123,6 +125,8 @@ class MissingIndicatorCalculator(BaseCalculator):
         return cast(
             MissingIndicatorArtifact,
             fit_dual_engine(
-                df, config, _missing_indicator_fit_polars, _missing_indicator_fit_pandas
+                df,
+                config,
+                {"polars": _missing_indicator_fit_polars, "pandas": _missing_indicator_fit_pandas},
             ),
         )

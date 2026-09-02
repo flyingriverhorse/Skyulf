@@ -99,8 +99,7 @@ class WOEEncoderApplier(BaseApplier):
         return apply_dual_engine(
             (X, y) if y is not None else X,
             params,
-            polars_func=_woe_apply_polars,
-            pandas_func=_woe_apply_pandas,
+            {"polars": _woe_apply_polars, "pandas": _woe_apply_pandas},
         )
 
 
@@ -325,10 +324,7 @@ class WOEEncoderCalculator(BaseCalculator):
         return cast(
             Mapping[str, Any],
             fit_dual_engine(
-                (X, y) if y is not None else X,
-                config,
-                polars_func=_woe_fit,
-                pandas_func=_woe_fit,
+                (X, y) if y is not None else X, config, {"polars": _woe_fit, "pandas": _woe_fit}
             ),
         )
 
@@ -342,8 +338,7 @@ class WOEEncoderCalculator(BaseCalculator):
         artifact, transformed = fit_transform_train_dual_engine(
             df,
             config,
-            polars_func=_woe_fit_transform_train_polars,
-            pandas_func=_woe_fit_transform_train_pandas,
+            {"polars": _woe_fit_transform_train_polars, "pandas": _woe_fit_transform_train_pandas},
         )
         return artifact, transformed
 

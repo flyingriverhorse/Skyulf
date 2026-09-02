@@ -18,7 +18,9 @@ from ._polars_ops import _featgen_apply_polars
 class FeatureGenerationApplier(BaseApplier):
     @apply_method
     def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
-        return apply_dual_engine(X, params, _featgen_apply_polars, _featgen_apply_pandas)
+        return apply_dual_engine(
+            X, params, {"polars": _featgen_apply_polars, "pandas": _featgen_apply_pandas}
+        )
 
 
 @NodeRegistry.register("FeatureGeneration", FeatureGenerationApplier)

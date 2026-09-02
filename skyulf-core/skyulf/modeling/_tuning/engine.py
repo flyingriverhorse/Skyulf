@@ -15,7 +15,7 @@ import logging
 import warnings
 from collections.abc import Callable
 from dataclasses import replace
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 import numpy as np
 import pandas as pd
@@ -698,7 +698,7 @@ class TuningApplier(BaseModelApplier):
                 X_np, _ = SklearnBridge.to_sklearn(df)
                 y_proba = model.predict_proba(X_np)
                 preds = apply_thresholds(y_proba, thresholds, classes=model.classes_)
-                index = df.index if hasattr(df, "index") else None
+                index = cast(pd.DataFrame, df).index if hasattr(df, "index") else None
                 return pd.Series(preds, index=index)
             return self.base_applier.predict(df, model)
         # Fallback: artifact isn't the expected (model, tuning_result) tuple
@@ -707,7 +707,7 @@ class TuningApplier(BaseModelApplier):
         # crashing - `df.index` doesn't exist on a Polars DataFrame, so build
         # the placeholder in an engine-aware way.
         if hasattr(df, "index"):
-            return pd.Series(np.nan, index=df.index)
+            return pd.Series(np.nan, index=cast(pd.DataFrame, df).index)
         return pd.Series(np.full(len(df), np.nan))
 
     def predict_proba(

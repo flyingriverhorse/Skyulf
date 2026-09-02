@@ -103,8 +103,7 @@ class TargetEncoderApplier(BaseApplier):
         return apply_dual_engine(
             (X, y) if y is not None else X,
             params,
-            polars_func=_target_apply_polars,
-            pandas_func=_target_apply_pandas,
+            {"polars": _target_apply_polars, "pandas": _target_apply_pandas},
         )
 
 
@@ -314,8 +313,7 @@ class TargetEncoderCalculator(BaseCalculator):
             fit_dual_engine(
                 (X, y) if y is not None else X,
                 config,
-                polars_func=_target_fit_polars,
-                pandas_func=_target_fit_pandas,
+                {"polars": _target_fit_polars, "pandas": _target_fit_pandas},
             ),
         )
 
@@ -329,8 +327,10 @@ class TargetEncoderCalculator(BaseCalculator):
         artifact, transformed = fit_transform_train_dual_engine(
             df,
             config,
-            polars_func=_target_fit_transform_train_polars,
-            pandas_func=_target_fit_transform_train_pandas,
+            {
+                "polars": _target_fit_transform_train_polars,
+                "pandas": _target_fit_transform_train_pandas,
+            },
         )
         return cast(
             TargetEncoderArtifact,

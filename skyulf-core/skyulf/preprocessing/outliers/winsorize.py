@@ -23,7 +23,9 @@ class WinsorizeApplier(BaseApplier):
         # filters rows, but the wrap keeps behavior consistent with the other
         # outlier nodes and avoids losing y from the returned tuple.
         input_data = (X, y) if y is not None else X
-        return apply_dual_engine(input_data, params, self._apply_polars, self._apply_pandas)
+        return apply_dual_engine(
+            input_data, params, {"polars": self._apply_polars, "pandas": self._apply_pandas}
+        )
 
     @staticmethod
     def _apply_polars(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, Any]:

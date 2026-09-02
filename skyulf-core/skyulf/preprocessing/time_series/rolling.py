@@ -127,7 +127,9 @@ class RollingAggregateApplier(BaseApplier):
     @apply_method
     def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
         return apply_dual_engine(
-            (X, _y) if _y is not None else X, params, _apply_polars, _apply_pandas
+            (X, _y) if _y is not None else X,
+            params,
+            {"polars": _apply_polars, "pandas": _apply_pandas},
         )
 
 
