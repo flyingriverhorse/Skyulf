@@ -3229,7 +3229,8 @@ continue to work unchanged.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>skyulf-core/skyulf/preprocessing/encoding/target.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">298</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">297</span>
+<span class="normal">298</span>
 <span class="normal">299</span>
 <span class="normal">300</span>
 <span class="normal">301</span>
@@ -3310,8 +3311,7 @@ continue to work unchanged.</p>
             <span class="n">fit_dual_engine</span><span class="p">(</span>
                 <span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">)</span> <span class="k">if</span> <span class="n">y</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">X</span><span class="p">,</span>
                 <span class="n">config</span><span class="p">,</span>
-                <span class="n">polars_func</span><span class="o">=</span><span class="n">_target_fit_polars</span><span class="p">,</span>
-                <span class="n">pandas_func</span><span class="o">=</span><span class="n">_target_fit_pandas</span><span class="p">,</span>
+                <span class="p">{</span><span class="s2">"polars"</span><span class="p">:</span> <span class="n">_target_fit_polars</span><span class="p">,</span> <span class="s2">"pandas"</span><span class="p">:</span> <span class="n">_target_fit_pandas</span><span class="p">},</span>
             <span class="p">),</span>
         <span class="p">)</span>
 
@@ -3325,8 +3325,10 @@ continue to work unchanged.</p>
         <span class="n">artifact</span><span class="p">,</span> <span class="n">transformed</span> <span class="o">=</span> <span class="n">fit_transform_train_dual_engine</span><span class="p">(</span>
             <span class="n">df</span><span class="p">,</span>
             <span class="n">config</span><span class="p">,</span>
-            <span class="n">polars_func</span><span class="o">=</span><span class="n">_target_fit_transform_train_polars</span><span class="p">,</span>
-            <span class="n">pandas_func</span><span class="o">=</span><span class="n">_target_fit_transform_train_pandas</span><span class="p">,</span>
+            <span class="p">{</span>
+                <span class="s2">"polars"</span><span class="p">:</span> <span class="n">_target_fit_transform_train_polars</span><span class="p">,</span>
+                <span class="s2">"pandas"</span><span class="p">:</span> <span class="n">_target_fit_transform_train_pandas</span><span class="p">,</span>
+            <span class="p">},</span>
         <span class="p">)</span>
         <span class="k">return</span> <span class="n">cast</span><span class="p">(</span>
             <span class="n">TargetEncoderArtifact</span><span class="p">,</span>
@@ -3386,7 +3388,9 @@ continue to work unchanged.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>skyulf-core/skyulf/preprocessing/encoding/target.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">322</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">320</span>
+<span class="normal">321</span>
+<span class="normal">322</span>
 <span class="normal">323</span>
 <span class="normal">324</span>
 <span class="normal">325</span>
@@ -3412,8 +3416,10 @@ continue to work unchanged.</p>
     <span class="n">artifact</span><span class="p">,</span> <span class="n">transformed</span> <span class="o">=</span> <span class="n">fit_transform_train_dual_engine</span><span class="p">(</span>
         <span class="n">df</span><span class="p">,</span>
         <span class="n">config</span><span class="p">,</span>
-        <span class="n">polars_func</span><span class="o">=</span><span class="n">_target_fit_transform_train_polars</span><span class="p">,</span>
-        <span class="n">pandas_func</span><span class="o">=</span><span class="n">_target_fit_transform_train_pandas</span><span class="p">,</span>
+        <span class="p">{</span>
+            <span class="s2">"polars"</span><span class="p">:</span> <span class="n">_target_fit_transform_train_polars</span><span class="p">,</span>
+            <span class="s2">"pandas"</span><span class="p">:</span> <span class="n">_target_fit_transform_train_pandas</span><span class="p">,</span>
+        <span class="p">},</span>
     <span class="p">)</span>
     <span class="k">return</span> <span class="n">cast</span><span class="p">(</span>
         <span class="n">TargetEncoderArtifact</span><span class="p">,</span>
@@ -3459,7 +3465,8 @@ continue to work unchanged.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>skyulf-core/skyulf/preprocessing/encoding/woe.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">308</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">307</span>
+<span class="normal">308</span>
 <span class="normal">309</span>
 <span class="normal">310</span>
 <span class="normal">311</span>
@@ -3503,12 +3510,7 @@ continue to work unchanged.</p>
 <span class="normal">349</span>
 <span class="normal">350</span>
 <span class="normal">351</span>
-<span class="normal">352</span>
-<span class="normal">353</span>
-<span class="normal">354</span>
-<span class="normal">355</span>
-<span class="normal">356</span>
-<span class="normal">357</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">"WOEEncoder"</span><span class="p">,</span> <span class="n">WOEEncoderApplier</span><span class="p">)</span>
+<span class="normal">352</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">"WOEEncoder"</span><span class="p">,</span> <span class="n">WOEEncoderApplier</span><span class="p">)</span>
 <span class="nd">@node_meta</span><span class="p">(</span>
     <span class="nb">id</span><span class="o">=</span><span class="s2">"WOEEncoder"</span><span class="p">,</span>
     <span class="n">name</span><span class="o">=</span><span class="s2">"WOE / IV Encoder"</span><span class="p">,</span>
@@ -3528,10 +3530,7 @@ continue to work unchanged.</p>
         <span class="k">return</span> <span class="n">cast</span><span class="p">(</span>
             <span class="n">Mapping</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span>
             <span class="n">fit_dual_engine</span><span class="p">(</span>
-                <span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">)</span> <span class="k">if</span> <span class="n">y</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">X</span><span class="p">,</span>
-                <span class="n">config</span><span class="p">,</span>
-                <span class="n">polars_func</span><span class="o">=</span><span class="n">_woe_fit</span><span class="p">,</span>
-                <span class="n">pandas_func</span><span class="o">=</span><span class="n">_woe_fit</span><span class="p">,</span>
+                <span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">)</span> <span class="k">if</span> <span class="n">y</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">X</span><span class="p">,</span> <span class="n">config</span><span class="p">,</span> <span class="p">{</span><span class="s2">"polars"</span><span class="p">:</span> <span class="n">_woe_fit</span><span class="p">,</span> <span class="s2">"pandas"</span><span class="p">:</span> <span class="n">_woe_fit</span><span class="p">}</span>
             <span class="p">),</span>
         <span class="p">)</span>
 
@@ -3545,8 +3544,7 @@ continue to work unchanged.</p>
         <span class="n">artifact</span><span class="p">,</span> <span class="n">transformed</span> <span class="o">=</span> <span class="n">fit_transform_train_dual_engine</span><span class="p">(</span>
             <span class="n">df</span><span class="p">,</span>
             <span class="n">config</span><span class="p">,</span>
-            <span class="n">polars_func</span><span class="o">=</span><span class="n">_woe_fit_transform_train_polars</span><span class="p">,</span>
-            <span class="n">pandas_func</span><span class="o">=</span><span class="n">_woe_fit_transform_train_pandas</span><span class="p">,</span>
+            <span class="p">{</span><span class="s2">"polars"</span><span class="p">:</span> <span class="n">_woe_fit_transform_train_polars</span><span class="p">,</span> <span class="s2">"pandas"</span><span class="p">:</span> <span class="n">_woe_fit_transform_train_pandas</span><span class="p">},</span>
         <span class="p">)</span>
         <span class="k">return</span> <span class="n">artifact</span><span class="p">,</span> <span class="n">transformed</span>
 
@@ -3590,7 +3588,11 @@ continue to work unchanged.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>skyulf-core/skyulf/preprocessing/encoding/woe.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">335</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">331</span>
+<span class="normal">332</span>
+<span class="normal">333</span>
+<span class="normal">334</span>
+<span class="normal">335</span>
 <span class="normal">336</span>
 <span class="normal">337</span>
 <span class="normal">338</span>
@@ -3598,12 +3600,7 @@ continue to work unchanged.</p>
 <span class="normal">340</span>
 <span class="normal">341</span>
 <span class="normal">342</span>
-<span class="normal">343</span>
-<span class="normal">344</span>
-<span class="normal">345</span>
-<span class="normal">346</span>
-<span class="normal">347</span>
-<span class="normal">348</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">fit_transform_train</span><span class="p">(</span>
+<span class="normal">343</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">fit_transform_train</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span> <span class="n">df</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span> <span class="o">|</span> <span class="n">SkyulfDataFrame</span> <span class="o">|</span> <span class="nb">tuple</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Mapping</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span> <span class="n">Any</span><span class="p">]:</span>
 <span class="w">    </span><span class="sd">"""Fit the full-data WOE artifact and cross-fit the training rows."""</span>
@@ -3613,8 +3610,7 @@ continue to work unchanged.</p>
     <span class="n">artifact</span><span class="p">,</span> <span class="n">transformed</span> <span class="o">=</span> <span class="n">fit_transform_train_dual_engine</span><span class="p">(</span>
         <span class="n">df</span><span class="p">,</span>
         <span class="n">config</span><span class="p">,</span>
-        <span class="n">polars_func</span><span class="o">=</span><span class="n">_woe_fit_transform_train_polars</span><span class="p">,</span>
-        <span class="n">pandas_func</span><span class="o">=</span><span class="n">_woe_fit_transform_train_pandas</span><span class="p">,</span>
+        <span class="p">{</span><span class="s2">"polars"</span><span class="p">:</span> <span class="n">_woe_fit_transform_train_polars</span><span class="p">,</span> <span class="s2">"pandas"</span><span class="p">:</span> <span class="n">_woe_fit_transform_train_pandas</span><span class="p">},</span>
     <span class="p">)</span>
     <span class="k">return</span> <span class="n">artifact</span><span class="p">,</span> <span class="n">transformed</span>
 </code></pre></div></td></tr></table></div>

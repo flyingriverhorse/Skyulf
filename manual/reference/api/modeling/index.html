@@ -6460,7 +6460,7 @@ training data) — this is exactly why K-Means is deployable for inference.</p>
         <span class="c1"># If input was Pandas, try to preserve index</span>
         <span class="n">index</span> <span class="o">=</span> <span class="kc">None</span>
         <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="s2">"index"</span><span class="p">):</span>
-            <span class="n">index</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">index</span>
+            <span class="n">index</span> <span class="o">=</span> <span class="n">cast</span><span class="p">(</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">df</span><span class="p">)</span><span class="o">.</span><span class="n">index</span>
         <span class="k">elif</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="s2">"to_pandas"</span><span class="p">):</span>
             <span class="c1"># If it's a wrapper or Polars, we might lose index unless we convert</span>
             <span class="c1"># For now, default index is acceptable for predictions</span>
@@ -6478,7 +6478,7 @@ training data) — this is exactly why K-Means is deployable for inference.</p>
         <span class="c1"># Return as DataFrame</span>
         <span class="n">index</span> <span class="o">=</span> <span class="kc">None</span>
         <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="s2">"index"</span><span class="p">):</span>
-            <span class="n">index</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">index</span>
+            <span class="n">index</span> <span class="o">=</span> <span class="n">cast</span><span class="p">(</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">df</span><span class="p">)</span><span class="o">.</span><span class="n">index</span>
 
         <span class="c1"># Column names usually 0, 1, etc. or classes_. Coerce to native</span>
         <span class="c1"># Python types (str) so downstream JSON serialization of the</span>
@@ -8216,8 +8216,7 @@ training data) — this is exactly why K-Means is deployable for inference.</p>
 
         <span class="c1"># Test Predictions</span>
         <span class="n">test_df</span> <span class="o">=</span> <span class="n">dataset</span><span class="o">.</span><span class="n">test</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">dataset</span><span class="o">.</span><span class="n">test</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">)</span> <span class="k">else</span> <span class="n">dataset</span><span class="o">.</span><span class="n">test</span>
-        <span class="c1"># is_test_empty: pandas uses `.empty`, Polars uses `.is_empty()`</span>
-        <span class="n">is_test_empty</span> <span class="o">=</span> <span class="n">test_df</span><span class="o">.</span><span class="n">empty</span> <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">test_df</span><span class="p">,</span> <span class="s2">"empty"</span><span class="p">)</span> <span class="k">else</span> <span class="n">test_df</span><span class="o">.</span><span class="n">is_empty</span><span class="p">()</span>
+        <span class="n">is_test_empty</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">test_df</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span>
 
         <span class="k">if</span> <span class="ow">not</span> <span class="n">is_test_empty</span><span class="p">:</span>
             <span class="n">X_test</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_extract_split_features</span><span class="p">(</span><span class="n">dataset</span><span class="o">.</span><span class="n">test</span><span class="p">,</span> <span class="n">target_column</span><span class="p">)</span>
@@ -8387,6 +8386,7 @@ training data) — this is exactly why K-Means is deployable for inference.</p>
         <span class="n">y_proba_df</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">applier</span><span class="o">.</span><span class="n">predict_proba</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">y_proba_df</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
             <span class="k">return</span> <span class="kc">None</span>
+        <span class="n">y_proba_df</span> <span class="o">=</span> <span class="n">cast</span><span class="p">(</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">y_proba_df</span><span class="p">)</span>
         <span class="k">return</span> <span class="p">{</span>
             <span class="s2">"classes"</span><span class="p">:</span> <span class="n">y_proba_df</span><span class="o">.</span><span class="n">columns</span><span class="o">.</span><span class="n">tolist</span><span class="p">(),</span>
             <span class="s2">"values"</span><span class="p">:</span> <span class="n">y_proba_df</span><span class="o">.</span><span class="n">to_numpy</span><span class="p">()</span><span class="o">.</span><span class="n">tolist</span><span class="p">(),</span>
@@ -8551,7 +8551,8 @@ used here purely to build a post-hoc cluster/label breakdown.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>skyulf-core/skyulf/modeling/base.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">424</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">423</span>
+<span class="normal">424</span>
 <span class="normal">425</span>
 <span class="normal">426</span>
 <span class="normal">427</span>
@@ -8611,8 +8612,7 @@ used here purely to build a post-hoc cluster/label breakdown.</p>
 <span class="normal">481</span>
 <span class="normal">482</span>
 <span class="normal">483</span>
-<span class="normal">484</span>
-<span class="normal">485</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">evaluate</span><span class="p">(</span>
+<span class="normal">484</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">evaluate</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">dataset</span><span class="p">:</span> <span class="n">SplitDataset</span><span class="p">,</span>
     <span class="n">target_column</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
@@ -8795,8 +8795,7 @@ against it directly.</p>
 <span class="normal">418</span>
 <span class="normal">419</span>
 <span class="normal">420</span>
-<span class="normal">421</span>
-<span class="normal">422</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">fit_predict</span><span class="p">(</span>
+<span class="normal">421</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">fit_predict</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">dataset</span><span class="p">:</span> <span class="n">SplitDataset</span>
     <span class="o">|</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span>
@@ -8875,8 +8874,7 @@ against it directly.</p>
 
     <span class="c1"># Test Predictions</span>
     <span class="n">test_df</span> <span class="o">=</span> <span class="n">dataset</span><span class="o">.</span><span class="n">test</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">dataset</span><span class="o">.</span><span class="n">test</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">)</span> <span class="k">else</span> <span class="n">dataset</span><span class="o">.</span><span class="n">test</span>
-    <span class="c1"># is_test_empty: pandas uses `.empty`, Polars uses `.is_empty()`</span>
-    <span class="n">is_test_empty</span> <span class="o">=</span> <span class="n">test_df</span><span class="o">.</span><span class="n">empty</span> <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">test_df</span><span class="p">,</span> <span class="s2">"empty"</span><span class="p">)</span> <span class="k">else</span> <span class="n">test_df</span><span class="o">.</span><span class="n">is_empty</span><span class="p">()</span>
+    <span class="n">is_test_empty</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">test_df</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span>
 
     <span class="k">if</span> <span class="ow">not</span> <span class="n">is_test_empty</span><span class="p">:</span>
         <span class="n">X_test</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_extract_split_features</span><span class="p">(</span><span class="n">dataset</span><span class="o">.</span><span class="n">test</span><span class="p">,</span> <span class="n">target_column</span><span class="p">)</span>

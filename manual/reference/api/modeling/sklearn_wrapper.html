@@ -3254,7 +3254,7 @@
         <span class="c1"># If input was Pandas, try to preserve index</span>
         <span class="n">index</span> <span class="o">=</span> <span class="kc">None</span>
         <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="s2">"index"</span><span class="p">):</span>
-            <span class="n">index</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">index</span>
+            <span class="n">index</span> <span class="o">=</span> <span class="n">cast</span><span class="p">(</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">df</span><span class="p">)</span><span class="o">.</span><span class="n">index</span>
         <span class="k">elif</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="s2">"to_pandas"</span><span class="p">):</span>
             <span class="c1"># If it's a wrapper or Polars, we might lose index unless we convert</span>
             <span class="c1"># For now, default index is acceptable for predictions</span>
@@ -3272,7 +3272,7 @@
         <span class="c1"># Return as DataFrame</span>
         <span class="n">index</span> <span class="o">=</span> <span class="kc">None</span>
         <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="s2">"index"</span><span class="p">):</span>
-            <span class="n">index</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">index</span>
+            <span class="n">index</span> <span class="o">=</span> <span class="n">cast</span><span class="p">(</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">df</span><span class="p">)</span><span class="o">.</span><span class="n">index</span>
 
         <span class="c1"># Column names usually 0, 1, etc. or classes_. Coerce to native</span>
         <span class="c1"># Python types (str) so downstream JSON serialization of the</span>

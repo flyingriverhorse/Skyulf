@@ -3949,9 +3949,7 @@ callers should fall back to runtime introspection.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>skyulf-core/skyulf/preprocessing/bucketing.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">477</span>
-<span class="normal">478</span>
-<span class="normal">479</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">479</span>
 <span class="normal">480</span>
 <span class="normal">481</span>
 <span class="normal">482</span>
@@ -3981,7 +3979,9 @@ callers should fall back to runtime introspection.</p>
 <span class="normal">506</span>
 <span class="normal">507</span>
 <span class="normal">508</span>
-<span class="normal">509</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">"CustomBinning"</span><span class="p">,</span> <span class="n">CustomBinningApplier</span><span class="p">)</span>
+<span class="normal">509</span>
+<span class="normal">510</span>
+<span class="normal">511</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">"CustomBinning"</span><span class="p">,</span> <span class="n">CustomBinningApplier</span><span class="p">)</span>
 <span class="nd">@node_meta</span><span class="p">(</span>
     <span class="nb">id</span><span class="o">=</span><span class="s2">"CustomBinning"</span><span class="p">,</span>
     <span class="n">name</span><span class="o">=</span><span class="s2">"Custom Binning"</span><span class="p">,</span>
@@ -5843,9 +5843,7 @@ payload the same way they do downstream of a real splitter.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>skyulf-core/skyulf/preprocessing/bucketing.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">431</span>
-<span class="normal">432</span>
-<span class="normal">433</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">433</span>
 <span class="normal">434</span>
 <span class="normal">435</span>
 <span class="normal">436</span>
@@ -5882,7 +5880,9 @@ payload the same way they do downstream of a real splitter.</p>
 <span class="normal">467</span>
 <span class="normal">468</span>
 <span class="normal">469</span>
-<span class="normal">470</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">"GeneralBinning"</span><span class="p">,</span> <span class="n">GeneralBinningApplier</span><span class="p">)</span>
+<span class="normal">470</span>
+<span class="normal">471</span>
+<span class="normal">472</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">"GeneralBinning"</span><span class="p">,</span> <span class="n">GeneralBinningApplier</span><span class="p">)</span>
 <span class="nd">@node_meta</span><span class="p">(</span>
     <span class="nb">id</span><span class="o">=</span><span class="s2">"GeneralBinning"</span><span class="p">,</span>
     <span class="n">name</span><span class="o">=</span><span class="s2">"General Binning"</span><span class="p">,</span>
@@ -5974,9 +5974,7 @@ payload the same way they do downstream of a real splitter.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>skyulf-core/skyulf/preprocessing/bucketing.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">516</span>
-<span class="normal">517</span>
-<span class="normal">518</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">518</span>
 <span class="normal">519</span>
 <span class="normal">520</span>
 <span class="normal">521</span>
@@ -5997,7 +5995,9 @@ payload the same way they do downstream of a real splitter.</p>
 <span class="normal">536</span>
 <span class="normal">537</span>
 <span class="normal">538</span>
-<span class="normal">539</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">"KBinsDiscretizer"</span><span class="p">,</span> <span class="n">KBinsDiscretizerApplier</span><span class="p">)</span>
+<span class="normal">539</span>
+<span class="normal">540</span>
+<span class="normal">541</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">"KBinsDiscretizer"</span><span class="p">,</span> <span class="n">KBinsDiscretizerApplier</span><span class="p">)</span>
 <span class="nd">@node_meta</span><span class="p">(</span>
     <span class="nb">id</span><span class="o">=</span><span class="s2">"KBinsDiscretizer"</span><span class="p">,</span>
     <span class="n">name</span><span class="o">=</span><span class="s2">"K-Bins Discretizer"</span><span class="p">,</span>
@@ -6648,7 +6648,9 @@ Missing columns seen during fitting are restored with their stored value.</p>
 <span class="normal">83</span>
 <span class="normal">84</span>
 <span class="normal">85</span>
-<span class="normal">86</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">SimpleImputerApplier</span><span class="p">(</span><span class="n">BaseApplier</span><span class="p">):</span>
+<span class="normal">86</span>
+<span class="normal">87</span>
+<span class="normal">88</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">SimpleImputerApplier</span><span class="p">(</span><span class="n">BaseApplier</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""Apply fitted Simple Imputer fill values to missing values in selected columns.</span>
 
 <span class="sd">    The calculator artifact records per-column values for ``mean``, ``median``,</span>
@@ -6658,7 +6660,9 @@ Missing columns seen during fitting are restored with their stored value.</p>
 
     <span class="nd">@apply_method</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">apply</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">_y</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">params</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>  <span class="c1"># pylint: disable=arguments-differ</span>
-        <span class="k">return</span> <span class="n">apply_dual_engine</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">params</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_apply_polars</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_apply_pandas</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">apply_dual_engine</span><span class="p">(</span>
+            <span class="n">X</span><span class="p">,</span> <span class="n">params</span><span class="p">,</span> <span class="p">{</span><span class="s2">"polars"</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_apply_polars</span><span class="p">,</span> <span class="s2">"pandas"</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_apply_pandas</span><span class="p">}</span>
+        <span class="p">)</span>
 
     <span class="nd">@staticmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">_apply_polars</span><span class="p">(</span><span class="n">X</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">_y</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">params</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
@@ -6769,9 +6773,7 @@ operate on all selected columns.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>skyulf-core/skyulf/preprocessing/imputation/simple.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 89</span>
-<span class="normal"> 90</span>
-<span class="normal"> 91</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 91</span>
 <span class="normal"> 92</span>
 <span class="normal"> 93</span>
 <span class="normal"> 94</span>
@@ -6865,7 +6867,9 @@ operate on all selected columns.</p>
 <span class="normal">182</span>
 <span class="normal">183</span>
 <span class="normal">184</span>
-<span class="normal">185</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">"SimpleImputer"</span><span class="p">,</span> <span class="n">SimpleImputerApplier</span><span class="p">)</span>
+<span class="normal">185</span>
+<span class="normal">186</span>
+<span class="normal">187</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">"SimpleImputer"</span><span class="p">,</span> <span class="n">SimpleImputerApplier</span><span class="p">)</span>
 <span class="nd">@node_meta</span><span class="p">(</span>
     <span class="nb">id</span><span class="o">=</span><span class="s2">"SimpleImputer"</span><span class="p">,</span>
     <span class="n">name</span><span class="o">=</span><span class="s2">"Simple Imputer"</span><span class="p">,</span>
@@ -6912,7 +6916,7 @@ operate on all selected columns.</p>
 
         <span class="k">return</span> <span class="n">cast</span><span class="p">(</span>
             <span class="n">SimpleImputerArtifact</span><span class="p">,</span>
-            <span class="n">fit_dual_engine</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">merged</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_fit_polars</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_fit_pandas</span><span class="p">),</span>
+            <span class="n">fit_dual_engine</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">merged</span><span class="p">,</span> <span class="p">{</span><span class="s2">"polars"</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_fit_polars</span><span class="p">,</span> <span class="s2">"pandas"</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_fit_pandas</span><span class="p">}),</span>
         <span class="p">)</span>
 
     <span class="nd">@staticmethod</span>
@@ -7959,7 +7963,8 @@ exposing matching <code>fit</code>/<code>apply</code> methods, works without sub
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>skyulf-core/skyulf/preprocessing/encoding/target.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">298</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">297</span>
+<span class="normal">298</span>
 <span class="normal">299</span>
 <span class="normal">300</span>
 <span class="normal">301</span>
@@ -8040,8 +8045,7 @@ exposing matching <code>fit</code>/<code>apply</code> methods, works without sub
             <span class="n">fit_dual_engine</span><span class="p">(</span>
                 <span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">)</span> <span class="k">if</span> <span class="n">y</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">X</span><span class="p">,</span>
                 <span class="n">config</span><span class="p">,</span>
-                <span class="n">polars_func</span><span class="o">=</span><span class="n">_target_fit_polars</span><span class="p">,</span>
-                <span class="n">pandas_func</span><span class="o">=</span><span class="n">_target_fit_pandas</span><span class="p">,</span>
+                <span class="p">{</span><span class="s2">"polars"</span><span class="p">:</span> <span class="n">_target_fit_polars</span><span class="p">,</span> <span class="s2">"pandas"</span><span class="p">:</span> <span class="n">_target_fit_pandas</span><span class="p">},</span>
             <span class="p">),</span>
         <span class="p">)</span>
 
@@ -8055,8 +8059,10 @@ exposing matching <code>fit</code>/<code>apply</code> methods, works without sub
         <span class="n">artifact</span><span class="p">,</span> <span class="n">transformed</span> <span class="o">=</span> <span class="n">fit_transform_train_dual_engine</span><span class="p">(</span>
             <span class="n">df</span><span class="p">,</span>
             <span class="n">config</span><span class="p">,</span>
-            <span class="n">polars_func</span><span class="o">=</span><span class="n">_target_fit_transform_train_polars</span><span class="p">,</span>
-            <span class="n">pandas_func</span><span class="o">=</span><span class="n">_target_fit_transform_train_pandas</span><span class="p">,</span>
+            <span class="p">{</span>
+                <span class="s2">"polars"</span><span class="p">:</span> <span class="n">_target_fit_transform_train_polars</span><span class="p">,</span>
+                <span class="s2">"pandas"</span><span class="p">:</span> <span class="n">_target_fit_transform_train_pandas</span><span class="p">,</span>
+            <span class="p">},</span>
         <span class="p">)</span>
         <span class="k">return</span> <span class="n">cast</span><span class="p">(</span>
             <span class="n">TargetEncoderArtifact</span><span class="p">,</span>
@@ -8116,7 +8122,9 @@ exposing matching <code>fit</code>/<code>apply</code> methods, works without sub
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>skyulf-core/skyulf/preprocessing/encoding/target.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">322</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">320</span>
+<span class="normal">321</span>
+<span class="normal">322</span>
 <span class="normal">323</span>
 <span class="normal">324</span>
 <span class="normal">325</span>
@@ -8142,8 +8150,10 @@ exposing matching <code>fit</code>/<code>apply</code> methods, works without sub
     <span class="n">artifact</span><span class="p">,</span> <span class="n">transformed</span> <span class="o">=</span> <span class="n">fit_transform_train_dual_engine</span><span class="p">(</span>
         <span class="n">df</span><span class="p">,</span>
         <span class="n">config</span><span class="p">,</span>
-        <span class="n">polars_func</span><span class="o">=</span><span class="n">_target_fit_transform_train_polars</span><span class="p">,</span>
-        <span class="n">pandas_func</span><span class="o">=</span><span class="n">_target_fit_transform_train_pandas</span><span class="p">,</span>
+        <span class="p">{</span>
+            <span class="s2">"polars"</span><span class="p">:</span> <span class="n">_target_fit_transform_train_polars</span><span class="p">,</span>
+            <span class="s2">"pandas"</span><span class="p">:</span> <span class="n">_target_fit_transform_train_pandas</span><span class="p">,</span>
+        <span class="p">},</span>
     <span class="p">)</span>
     <span class="k">return</span> <span class="n">cast</span><span class="p">(</span>
         <span class="n">TargetEncoderArtifact</span><span class="p">,</span>
