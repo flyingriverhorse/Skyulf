@@ -3,7 +3,7 @@
 import inspect
 import logging
 import warnings
-from typing import Any
+from typing import Any, cast
 
 import pandas as pd
 from sklearn.base import BaseEstimator
@@ -247,7 +247,7 @@ class SklearnApplier(BaseModelApplier):
         # If input was Pandas, try to preserve index
         index = None
         if hasattr(df, "index"):
-            index = df.index
+            index = cast(pd.DataFrame, df).index
         elif hasattr(df, "to_pandas"):
             # If it's a wrapper or Polars, we might lose index unless we convert
             # For now, default index is acceptable for predictions
@@ -265,7 +265,7 @@ class SklearnApplier(BaseModelApplier):
         # Return as DataFrame
         index = None
         if hasattr(df, "index"):
-            index = df.index
+            index = cast(pd.DataFrame, df).index
 
         # Column names usually 0, 1, etc. or classes_. Coerce to native
         # Python types (str) so downstream JSON serialization of the

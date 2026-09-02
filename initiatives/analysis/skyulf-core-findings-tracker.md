@@ -58,7 +58,7 @@ Easy items batched; hard items one at a time.
 | F-15 | 🟡 | Pickle-based reproducibility digest | ~1 day | ✅ |
 | F-07 | 🟠 | `._df` unwrapping → public `to_native()` | ~1 day | ✅ |
 | F-09 | 🟠 | Dual-engine dispatch mapping (Spark prereq) | ~2 days | ✅ 2026-08-30 — dispatchers take an engine-keyed mapping, unmapped engines raise `NotImplementedError` before any `to_pandas()`; 63 call sites migrated; vacuous guard test fixed |
-| F-08 | 🟠 | Split the `SkyulfDataFrame` protocol | ~3 days | ⬜ |
+| F-08 | 🟠 | Split the `SkyulfDataFrame` protocol | ~3 days | ✅ 2026-08-30 — strict base protocol (no `__getattr__`) + `PandasBackedFrame`/`PolarsBackedFrame` sub-protocols; ~41 engine-specific sites now type-checked via casts; zero runtime change (3584 tests pass) |
 | F-11 | 🟠 | Break import cycles (196 deferred imports) | ~2 days | ✅ 2026-08-30 — 173 PLC0415 sites: 144 hoisted, 29 waived (optional extras), 1 cycle broken; PLC0415 now enforced |
 | F-18 | 🟡 | Split `_tuning/engine.py` (1,572 lines) | ~2 days | ✅ |
 | F-19 | 🟡 | Split `pipeline.py` responsibilities | ~1 day | ✅ |

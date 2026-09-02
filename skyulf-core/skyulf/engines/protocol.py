@@ -18,6 +18,11 @@ class SkyulfDataFrame(Protocol):
         ...
 
     @property
+    def dtypes(self) -> Any:
+        """Column dtypes (pandas `Series` or polars `list` depending on engine)."""
+        ...
+
+    @property
     def shape(self) -> tuple[int, int]:
         """Return the shape of the dataframe (rows, cols)."""
         ...
@@ -35,16 +40,18 @@ class SkyulfDataFrame(Protocol):
         """Return the number of rows."""
         ...
 
-    def __getattr__(self, name: str) -> Any:
-        """
-        Allow engine-specific attribute access (e.g. pandas `.loc`, `.iloc`,
-        `.select_dtypes`, polars `.with_columns`, `.is_empty`). Concrete
-        engine adapters expose these natively; the Protocol stays minimal
-        but transparent to the type checker.
-        """
+    # Engine-agnostic column ops (implemented by every engine adapter).
+    def select(self, columns: list[str]) -> "SkyulfDataFrame":
+        """Return a new frame with only the given columns."""
         ...
 
-    # Engine-specific ops (select/drop/with_column) reached via `__getattr__`.
+    def drop(self, columns: list[str]) -> "SkyulfDataFrame":
+        """Return a new frame without the given columns."""
+        ...
+
+    def with_column(self, name: str, values: Any) -> "SkyulfDataFrame":
+        """Return a new frame with a column added or replaced."""
+        ...
 
     # Bridges
     def to_native(self) -> Any:
@@ -74,4 +81,56 @@ class SkyulfDataFrame(Protocol):
 
     def copy(self) -> "SkyulfDataFrame":
         """Return a copy of the dataframe."""
+        ...
+
+
+@runtime_checkable
+class PandasBackedFrame(SkyulfDataFrame, Protocol):
+    """
+    A :class:`SkyulfDataFrame` backed by pandas, exposing pandas-only
+    attributes (``.loc``, ``.iloc``, ``.select_dtypes``) that are not part of
+    the engine-agnostic base protocol.
+
+    Use this in signatures when a function genuinely needs pandas semantics;
+    the type checker then verifies the attribute exists instead of silently
+    accepting ``Any``.
+    """
+
+    @property
+    def loc(self) -> Any:
+        """Label-based indexer (pandas ``.loc``)."""
+        ...
+
+    @property
+    def iloc(self) -> Any:
+        """Positional indexer (pandas ``.iloc``)."""
+        ...
+
+    def select_dtypes(self, include: Any, exclude: Any = None) -> "PandasBackedFrame":
+        """Filter columns by dtype (pandas ``.select_dtypes``)."""
+        ...
+
+
+@runtime_checkable
+class PolarsBackedFrame(SkyulfDataFrame, Protocol):
+    """
+    A :class:`SkyulfDataFrame` backed by polars, exposing polars-only
+    attributes (``.with_columns``, ``.filter``, ``.to_polars``) that are not
+    part of the engine-agnostic base protocol.
+
+    Use this in signatures when a function genuinely needs polars semantics;
+    the type checker then verifies the attribute exists instead of silently
+    accepting ``Any``.
+    """
+
+    def with_columns(self, *expressions: Any) -> "PolarsBackedFrame":
+        """Add/replace columns with expressions (polars ``.with_columns``)."""
+        ...
+
+    def filter(self, predicate: Any) -> "PolarsBackedFrame":
+        """Filter rows by predicate (polars ``.filter``)."""
+        ...
+
+    def to_polars(self) -> Any:
+        """Return the underlying ``polars.DataFrame``."""
         ...

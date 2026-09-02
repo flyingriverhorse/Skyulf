@@ -15,13 +15,20 @@ Boundary with ``dispatcher.py``:
 """
 
 from collections.abc import Callable, Iterable
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 import pandas as pd
 import polars as pl
 
-from ..engines import POLARS_NUMERIC_DTYPES, EngineName, SkyulfDataFrame, get_engine
+from ..engines import (
+    POLARS_NUMERIC_DTYPES,
+    EngineName,
+    PandasBackedFrame,
+    PolarsBackedFrame,
+    SkyulfDataFrame,
+    get_engine,
+)
 from ..utils import resolve_columns
 
 
@@ -162,29 +169,40 @@ def auto_detect_text_columns(df: pd.DataFrame | SkyulfDataFrame) -> list[str]:
     """Return string-like columns from either a Pandas or Polars frame."""
     engine = get_engine(df)
     if engine.name == EngineName.POLARS:
+        polars_df = cast(PolarsBackedFrame, df)
         return [
             c
-            for c, t in zip(df.columns, df.dtypes, strict=True)
+            for c, t in zip(polars_df.columns, polars_df.dtypes, strict=True)
             if t in [pl.Utf8, pl.Categorical, pl.Object]
         ]
-    return list(df.select_dtypes(include=["object", "string", "category"]).columns)
+    return list(
+        cast(PandasBackedFrame, df).select_dtypes(include=["object", "string", "category"]).columns
+    )
 
 
 def auto_detect_numeric_columns(df: pd.DataFrame | SkyulfDataFrame) -> list[str]:
     """Return numeric columns from either a Pandas or Polars frame."""
     engine = get_engine(df)
     if engine.name == EngineName.POLARS:
-        return [c for c, t in zip(df.columns, df.dtypes, strict=True) if t in POLARS_NUMERIC_DTYPES]
-    return list(df.select_dtypes(include=["number"]).columns)
+        polars_df = cast(PolarsBackedFrame, df)
+        return [
+            c
+            for c, t in zip(polars_df.columns, polars_df.dtypes, strict=True)
+            if t in POLARS_NUMERIC_DTYPES
+        ]
+    return list(cast(PandasBackedFrame, df).select_dtypes(include=["number"]).columns)
 
 
 def auto_detect_datetime_columns(df: pd.DataFrame | SkyulfDataFrame) -> list[str]:
     """Return datetime/date columns from either a Pandas or Polars frame."""
     engine = get_engine(df)
     if engine.name == EngineName.POLARS:
+        polars_df = cast(PolarsBackedFrame, df)
         return [
             c
-            for c, t in zip(df.columns, df.dtypes, strict=True)
+            for c, t in zip(polars_df.columns, polars_df.dtypes, strict=True)
             if t in [pl.Date, pl.Datetime] or isinstance(t, pl.Datetime)
         ]
-    return list(df.select_dtypes(include=["datetime", "datetimetz"]).columns)
+    return list(
+        cast(PandasBackedFrame, df).select_dtypes(include=["datetime", "datetimetz"]).columns
+    )

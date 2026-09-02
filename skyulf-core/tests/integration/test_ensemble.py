@@ -205,6 +205,7 @@ class TestStackingClassifier:
         proba = estimator.applier.predict_proba(test_features, estimator.model)
 
         assert proba is not None
+        proba = cast(pd.DataFrame, proba)
         assert np.allclose(proba.sum(axis=1).to_numpy(), 1.0, atol=1e-6)
         assert (proba.to_numpy() >= 0).all()
 
