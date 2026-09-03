@@ -2,6 +2,7 @@
 
 from typing import Any
 
+import numpy as np
 import polars as pl
 
 from ...core.meta.decorators import node_meta
@@ -10,7 +11,11 @@ from .._artifacts import DropMissingRowsArtifact
 from .._schema import SkyulfSchema
 from ..base import BaseApplier, BaseCalculator, apply_method
 from ..dispatcher import apply_dual_engine
-from ._common import _normalize_subset, _polars_filter_y_by_kept_indices
+from ._common import (
+    _normalize_subset,
+    _pandas_filter_y_by_kept_positions,
+    _polars_filter_y_by_kept_indices,
+)
 
 
 def _polars_missing_expr(X: Any, col: str) -> Any:
@@ -56,15 +61,23 @@ def _drop_missing_rows_apply_pandas(X: Any, y: Any, params: dict[str, Any]) -> t
     how = params.get("how", "any")
     threshold = params.get("threshold")
 
-    # Pandas dropna forbids both 'how' and 'thresh'; thresh takes precedence.
+    # Compute the keep mask positionally (same semantics as dropna) so y can be
+    # aligned by position; label-based .loc would return every row matching a
+    # duplicated index label, desynchronizing y from X_clean.
+    cols = subset if subset is not None else list(X.columns)
+    non_na = X[cols].notna()
     if threshold is not None:
-        X_clean = X.dropna(axis=0, thresh=threshold, subset=subset)
+        keep_mask = non_na.sum(axis=1) >= threshold
+    elif how == "any":
+        keep_mask = non_na.all(axis=1)
     else:
-        X_clean = X.dropna(axis=0, how=how, subset=subset)
+        keep_mask = non_na.any(axis=1)
+    kept_positions = np.flatnonzero(keep_mask.to_numpy())
+    X_clean = X.iloc[kept_positions]
 
     if y is None:
         return X_clean, None
-    return X_clean, y.loc[X_clean.index]
+    return X_clean, _pandas_filter_y_by_kept_positions(y, kept_positions)
 
 
 class DropMissingRowsApplier(BaseApplier):

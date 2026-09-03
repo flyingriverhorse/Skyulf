@@ -56,6 +56,14 @@ def _feed_canonical(h: Any, obj: Any) -> None:
         return
     if isinstance(obj, np.ndarray):
         arr = np.ascontiguousarray(obj)
+        if arr.dtype == object:
+            # tobytes() on object arrays serialises raw PyObject* pointers,
+            # which are allocator/ASLR dependent and differ across processes.
+            # Digest the elements instead so the digest reflects values.
+            h.update(f"ndarray-object:{arr.shape}|".encode())
+            for x in arr.flat:
+                _feed_canonical(h, x)
+            return
         h.update(f"ndarray:{arr.dtype}|{arr.shape}|".encode())
         h.update(arr.tobytes())
         return

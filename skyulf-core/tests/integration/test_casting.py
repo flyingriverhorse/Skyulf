@@ -637,6 +637,51 @@ if _POLARS_AVAILABLE:
         pl_values = pl_result["flag"].to_list()
         assert pd_values == pl_values == [True, False, True, False, None]
 
+    def test_casting_apply_polars_numeric_bool_cast_nonzero_becomes_null() -> None:
+        """Regression test (OC-58): numeric->bool on Polars must mirror pandas'
+        ``astype("boolean")`` semantics, not C-style truthiness.
+
+        Polars' default numeric->Boolean cast treats any nonzero value as True
+        and never raises, so ``2.0`` would silently become ``True`` while pandas
+        produces ``<NA>``. Only exact 0/1 values are valid booleans; anything
+        else (including non-integer floats like 0.5) must become null under
+        coerce_on_error=True.
+        """
+        df_pl = pl.DataFrame({"flag": [0.0, 1.0, 2.0, 0.5, None]})
+        params: dict[str, Any] = {"type_map": {"flag": "bool"}, "coerce_on_error": True}
+        result = CastingApplier().apply(df_pl, params)
+        assert result["flag"].dtype == pl.Boolean
+        assert result["flag"].to_list() == [False, True, None, None, None]
+
+    def test_casting_apply_polars_numeric_bool_cast_raises_without_coerce() -> None:
+        """Regression test (OC-58): a non-0/1 numeric value must raise ValueError
+        when coerce_on_error=False, mirroring pandas' strict-mode TypeError."""
+        df_pl = pl.DataFrame({"flag": [0, 1, 2]})
+        params: dict[str, Any] = {"type_map": {"flag": "bool"}, "coerce_on_error": False}
+        with pytest.raises(ValueError, match="not recognized as true/false"):
+            CastingApplier().apply(df_pl, params)
+
+    def test_casting_apply_polars_numeric_bool_cast_pure_zero_one() -> None:
+        """A pure 0/1 numeric column must cast cleanly on both engines."""
+        df_pl = pl.DataFrame({"flag": [0.0, 1.0]})
+        params: dict[str, Any] = {"type_map": {"flag": "bool"}, "coerce_on_error": True}
+        result = CastingApplier().apply(df_pl, params)
+        assert result["flag"].to_list() == [False, True]
+
+    def test_casting_apply_bool_cast_numeric_engine_parity() -> None:
+        """pandas and Polars must produce identical boolean values for the same
+        numeric column containing non-0/1 values (OC-58)."""
+        df_pd = pd.DataFrame({"flag": [0, 1, 2, 0.5, None]})
+        df_pl = pl.from_pandas(df_pd)
+        params: dict[str, Any] = {"type_map": {"flag": "bool"}, "coerce_on_error": True}
+
+        pd_result = CastingApplier().apply(df_pd, params)
+        pl_result = CastingApplier().apply(df_pl, params)
+
+        pd_values = [None if pd.isna(v) else bool(v) for v in pd_result["flag"]]
+        pl_values = pl_result["flag"].to_list()
+        assert pd_values == pl_values == [False, True, None, None, None]
+
     # -----------------------------------------------------------------------
     # _resolve_polars_dtype (datetime-prefix branch + unsupported-dtype None)
     # -----------------------------------------------------------------------

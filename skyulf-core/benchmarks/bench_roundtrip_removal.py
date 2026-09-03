@@ -125,7 +125,11 @@ def main() -> None:
         ("EllipticEnvelope", bench_elliptic),
         ("CountVectorizer", bench_count_vectorizer),
     ):
-        old, new = bench()
+        try:
+            old, new = bench()
+        except Exception as e:  # noqa: BLE001 - keep the table alive if one node can't run
+            print(f"{name:<20} SKIP ({type(e).__name__}: {e})")
+            continue
         print(f"{name:<20} {old:>16.3f}s {new:>12.3f}s {old / new:>8.2f}x")
 
 

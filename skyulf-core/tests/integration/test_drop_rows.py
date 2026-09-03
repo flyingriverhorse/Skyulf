@@ -186,6 +186,21 @@ def test_apply_polars_threshold_keeps_rows_with_enough_non_null() -> None:
     assert result["a"].tolist() == [1.0, 3.0]
 
 
+def test_apply_pandas_tuple_xy_syncs_y_with_duplicate_index_labels() -> None:
+    """OC-12: duplicate index labels must not desync y from X (positional .iloc)."""
+    X = pd.DataFrame(
+        {"a": [1.0, None, 3.0, 4.0], "b": [1.0, 2.0, None, 4.0]},
+        index=pd.Index([0, 0, 1, 2]),
+    )
+    y = pd.Series([10, 20, 30, 40], index=pd.Index([0, 0, 1, 2]))
+    params: dict[str, Any] = {"subset": None, "how": "any", "threshold": None}
+    X_out, y_out = DropMissingRowsApplier().apply((X, y), params)
+    assert len(y_out) == len(X_out) == 2
+    # Rows 0 and 3 have no NaNs; rows 1 and 2 dropped.
+    assert list(y_out) == [10, 40]
+    assert list(X_out["a"]) == [1.0, 4.0]
+
+
 def test_apply_polars_tuple_xy_syncs_y_after_drop() -> None:
     """Polars path: dropping rows from X must drop matching rows from a polars y series."""
     X = pl.DataFrame({"a": [1.0, None, 3.0]})

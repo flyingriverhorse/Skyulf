@@ -28,6 +28,18 @@ def _polars_filter_y_by_kept_indices(y: Any, kept_indices: Any) -> Any:
     )
 
 
+def _pandas_filter_y_by_kept_positions(y: Any, kept_positions: Any) -> Any:
+    """Select rows of ``y`` (pandas Series / DataFrame) by positional index.
+
+    Positional (``.iloc``) selection is required because label-based ``.loc``
+    selection returns every row matching a duplicated index label, which
+    desynchronizes ``y`` from the cleaned ``X``.
+    """
+    if y is None:
+        return None
+    return y.iloc[kept_positions]
+
+
 def _normalize_subset(subset: Any, existing_cols: list) -> list | None:
     """Filter ``subset`` to columns that actually exist; return ``None`` if empty."""
     if not subset:

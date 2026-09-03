@@ -115,6 +115,26 @@ def _bool_expr_from_string_col_polars(col: str) -> Any:
     )
 
 
+def _bool_expr_from_numeric_col_polars(col: str) -> Any:
+    """Build a Polars expression casting a numeric column to Boolean.
+
+    Polars' default numeric->Boolean cast is C-style truthiness (``x != 0``)
+    and never raises, so ``2.0`` would silently become ``True``. The pandas
+    reference (``astype("boolean")``) only accepts exact 0/1 values and raises
+    for anything else, so we mirror that: 0 -> False, 1 -> True, everything
+    else (including non-integer floats like 0.5) -> null. The caller decides
+    whether to raise on those nulls, mirroring ``coerce_on_error``.
+    """
+    return (
+        pl.when(pl.col(col) == 0)
+        .then(False)
+        .when(pl.col(col) == 1)
+        .then(True)
+        .otherwise(None)
+        .alias(col)
+    )
+
+
 def _build_polars_cast_exprs(
     X: Any, type_map: dict[str, Any], coerce_on_error: bool
 ) -> tuple[list[Any], list[str]]:
@@ -142,6 +162,15 @@ def _build_polars_cast_exprs(
             continue
         if pl_dtype == pl.Boolean and X.schema[col] in (pl.String, pl.Utf8, pl.Categorical):
             exprs.append(_bool_expr_from_string_col_polars(col))
+            string_bool_cols.append(col)
+            continue
+        if pl_dtype == pl.Boolean and X.schema[col].is_numeric():
+            # Polars' default numeric->Boolean cast is C-style truthiness
+            # (x != 0) and never raises, so 2.0 would silently become True.
+            # Mirror the pandas reference (astype("boolean")) which only
+            # accepts exact 0/1 values; anything else becomes null and is
+            # validated below in strict mode.
+            exprs.append(_bool_expr_from_numeric_col_polars(col))
             string_bool_cols.append(col)
             continue
         pl_int_dtypes = (
@@ -180,9 +209,9 @@ def _build_polars_cast_exprs(
     return exprs, string_bool_cols
 
 
-def _validate_polars_string_bool_casts(result: Any, X: Any, string_bool_cols: list[str]) -> None:
-    """Raise ``ValueError`` if a strict string->bool cast produced unexpected nulls."""
-    for col in string_bool_cols:
+def _validate_polars_bool_casts(result: Any, X: Any, bool_cols: list[str]) -> None:
+    """Raise ``ValueError`` if a strict string/numeric->bool cast produced nulls."""
+    for col in bool_cols:
         newly_null = result[col].is_null() & X[col].is_not_null()
         if newly_null.any():
             raise ValueError(
@@ -205,7 +234,7 @@ def _casting_apply_polars(X: Any, y: Any, params: dict[str, Any]) -> Any:
     result = X.with_columns(exprs)
 
     if not coerce_on_error and string_bool_cols:
-        _validate_polars_string_bool_casts(result, X, string_bool_cols)
+        _validate_polars_bool_casts(result, X, string_bool_cols)
 
     return result, y
 
