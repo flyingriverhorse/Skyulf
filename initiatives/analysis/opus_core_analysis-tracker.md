@@ -42,7 +42,7 @@ follow, grouped by domain.
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
 | OC-75 | 🔴 | Dev polars 1.40.1 below declared floor ≥1.43.2 — 10 tests, every notebook, a benchmark broken; prerequisite for trusting any polars result | 1 line | ✅ done |
-| OC-12 | 🔴 | Row-dropping desyncs `X` and `y` on non-unique pandas indexes (`drop_rows.py:60-67`, `deduplicate.py:44-47`); polars path already correct | small | ⬜ open |
+| OC-12 | 🔴 | Row-dropping desyncs `X` and `y` on non-unique pandas indexes (`drop_rows.py:60-67`, `deduplicate.py:44-47`); polars path already correct | small | ✅ fixed 2026-09-03 |
 | OC-58 | 🔴 | Numeric→boolean cast on polars treats any nonzero as `True` (`casting.py:143-178`) | small | ⬜ open |
 | OC-62 | 🔴 | `fingerprint()` not reproducible for any artifact holding an object-dtype array (`pipeline/seal.py:57-59`) | small | ⬜ open |
 
@@ -260,6 +260,9 @@ key — also the fastest way to find drift the audit missed).
 ---
 
 ## Log
+
+### 2026-09-03 — OC-12 fixed: positional keep-mask for pandas X/y desync
+OC-12 closed. Root cause: the pandas paths of `DropMissingRows` and `Deduplicate` selected `y` by label (`y.loc[X_clean.index]`); with duplicate index labels `.loc` returns *all* matching rows, so `y` came back longer than `X` with wrong labels — silent X/y desync. Fix mirrors the already-correct polars paths: compute a positional keep mask (`notna` threshold / `duplicated`), take `kept_positions = np.flatnonzero(mask)`, select `X.iloc[kept_positions]`, and filter `y` positionally via the new `_pandas_filter_y_by_kept_positions` helper in `_common.py` (`.iloc`, `None` passthrough). Note: `X.index.get_indexer(X_clean.index)` was rejected as a recovery path — it returns the *first* occurrence for duplicate labels. Added two duplicate-index regression tests (`test_drop_rows.py`, `test_drop_and_missing_gaps.py`). Verified: 62/62 targeted tests pass, `ruff check`/`ruff format`/`ty check` clean.
 
 ### 2026-09-02 — OC-75 fixed: stale nested `uv.lock` removed, benchmark guarded
 OC-75 closed. Root cause of the stale lockfile: the repo is a **uv workspace** (root `pyproject.toml` declares `[tool.uv.workspace] members = ["skyulf-core"]`), so the **root `uv.lock` is the single source of truth** (already pins polars 1.44.1) and `skyulf-core/uv.lock` was a redundant pre-workspace leftover — `uv lock` from inside `skyulf-core/` rewrites the *root* lockfile, never the nested one, so the audit's "regenerate `skyulf-core/uv.lock`" instruction is not a normal uv operation in a workspace. Fix: `git rm skyulf-core/uv.lock` (CI never uses it — all workflows install via `uv pip install -r requirements-ci.txt`; only dependency-review/labeler reference `**/uv.lock`). Also applied the audit's secondary fix: `benchmarks/bench_roundtrip_removal.py`'s per-bench loop now uses the same try/except-and-skip pattern as `bench_engine_comparison.py` (a failing node prints `SKIP (Type: msg)` instead of crashing the table). Verified: `uv lock --check` exit 0, 47/47 `test_split.py` pass, benchmark runs clean (3 nodes, no crash), ruff clean.

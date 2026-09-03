@@ -225,6 +225,21 @@ def test_deduplicate_subset_filters_to_existing_columns() -> None:
     assert len(out) == 1
 
 
+def test_deduplicate_with_y_tuple_syncs_rows_pandas_duplicate_index() -> None:
+    """OC-12: duplicate index labels must not desync y from X (positional .iloc)."""
+    X = pd.DataFrame(
+        {"a": [1.0, 1.0, 2.0, 3.0], "b": [1.0, 1.0, 2.0, 3.0]},
+        index=pd.Index([0, 0, 1, 2]),
+    )
+    y = pd.Series([10, 20, 30, 40], index=pd.Index([0, 0, 1, 2]))
+    art = DeduplicateCalculator().fit(X, {"keep": "first"})
+    X_out, y_out = DeduplicateApplier().apply((X, y), art)
+    assert len(y_out) == len(X_out) == 3
+    # First occurrence of the duplicated (1,1) row is kept (positional row 0).
+    assert list(y_out) == [10, 30, 40]
+    assert list(X_out["a"]) == [1.0, 2.0, 3.0]
+
+
 def test_deduplicate_infer_output_schema_preserves_columns() -> None:
     """Deduplication only removes rows, so the schema is unchanged."""
     schema = SkyulfSchema.from_columns(["a", "b"], {"a": "int64", "b": "int64"})

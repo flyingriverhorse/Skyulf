@@ -2,13 +2,19 @@
 
 from typing import Any
 
+import numpy as np
+
 from ...core.meta.decorators import node_meta
 from ...registry import NodeRegistry
 from .._artifacts import DeduplicateArtifact
 from .._schema import SkyulfSchema
 from ..base import BaseApplier, BaseCalculator, apply_method
 from ..dispatcher import apply_dual_engine
-from ._common import _normalize_subset, _polars_filter_y_by_kept_indices
+from ._common import (
+    _normalize_subset,
+    _pandas_filter_y_by_kept_positions,
+    _polars_filter_y_by_kept_indices,
+)
 
 
 def _normalize_keep(keep: Any) -> Any:
@@ -40,11 +46,19 @@ def _dedup_apply_polars(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, An
 def _dedup_apply_pandas(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
     keep = _normalize_keep(params.get("keep", "first"))
     subset = _normalize_subset(params.get("subset"), list(X.columns))
+    # Positional keep mask mirroring drop_duplicates semantics so y can be
+    # aligned by position; label-based .loc would return every row matching a
+    # duplicated index label, desynchronizing y from X_dedup.
+    if keep is False:
+        keep_mask = ~X.duplicated(subset=subset, keep=False)
+    else:
+        keep_mask = ~X.duplicated(subset=subset, keep=keep)
+    kept_positions = np.flatnonzero(keep_mask.to_numpy())
+    X_dedup = X.iloc[kept_positions]
 
-    X_dedup = X.drop_duplicates(subset=subset, keep=keep)
     if y is None:
         return X_dedup, None
-    return X_dedup, y.loc[X_dedup.index]
+    return X_dedup, _pandas_filter_y_by_kept_positions(y, kept_positions)
 
 
 class DeduplicateApplier(BaseApplier):
