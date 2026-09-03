@@ -45,6 +45,31 @@ def test_artifact_digest_is_deterministic_for_same_estimator() -> None:
     assert artifact_digest(est) == artifact_digest(est)
 
 
+def test_artifact_digest_object_array_depends_on_values_not_pointers() -> None:
+    """OC-62: object-dtype arrays must digest by element value, not by the
+    raw PyObject* pointers ``tobytes()`` would serialise (allocator/ASLR
+    dependent, different on every process run)."""
+    a = np.array(["red", "green", "blue"], dtype=object)
+    b = np.array(["red", "green", "blue"], dtype=object)
+    assert artifact_digest(a) == artifact_digest(b)
+
+    # Non-interned strings force fresh allocations per array.
+    c = np.array([str(i) for i in range(5)], dtype=object)
+    d = np.array([str(i) for i in range(5)], dtype=object)
+    assert artifact_digest(c) == artifact_digest(d)
+
+    # Value changes must still be detected.
+    b[0] = "RED"
+    assert artifact_digest(a) != artifact_digest(b)
+
+
+def test_artifact_digest_object_array_includes_shape() -> None:
+    """Same values in different shapes must digest differently."""
+    flat = np.array(["red", "green", "blue"], dtype=object)
+    col = flat.reshape(3, 1)
+    assert artifact_digest(flat) != artifact_digest(col)
+
+
 def test_artifact_digest_detects_different_weights_same_hyperparams() -> None:
     """Identical hyperparameters but different fitted weights must digest
     differently — this is the collision the old ``repr`` fallback caused."""

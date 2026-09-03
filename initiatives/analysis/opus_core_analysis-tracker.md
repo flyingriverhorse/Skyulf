@@ -44,7 +44,7 @@ follow, grouped by domain.
 | OC-75 | 🔴 | Dev polars 1.40.1 below declared floor ≥1.43.2 — 10 tests, every notebook, a benchmark broken; prerequisite for trusting any polars result | 1 line | ✅ done |
 | OC-12 | 🔴 | Row-dropping desyncs `X` and `y` on non-unique pandas indexes (`drop_rows.py:60-67`, `deduplicate.py:44-47`); polars path already correct | small | ✅ fixed 2026-09-03 |
 | OC-58 | 🔴 | Numeric→boolean cast on polars treats any nonzero as `True` (`casting.py:143-178`) | small | ✅ fixed 2026-09-03 |
-| OC-62 | 🔴 | `fingerprint()` not reproducible for any artifact holding an object-dtype array (`pipeline/seal.py:57-59`) | small | ⬜ open |
+| OC-62 | 🔴 | `fingerprint()` not reproducible for any artifact holding an object-dtype array (`pipeline/seal.py:57-59`) | small | ✅ fixed 2026-09-03 |
 
 ### Next — wrong results in realistic configs
 
@@ -260,6 +260,9 @@ key — also the fastest way to find drift the audit missed).
 ---
 
 ## Log
+
+### 2026-09-03 — OC-62 fixed: object-dtype arrays digested by value, not by pointer
+OC-62 closed. Root cause: `_feed_canonical` in `pipeline/seal.py` digested `np.ndarray` via `arr.tobytes()`; for `dtype=object` arrays that serialises raw `PyObject*` pointers, which are allocator/ASLR dependent — so `fingerprint()` of any artifact holding an object-dtype array (OneHotEncoder/LabelEncoder/Ordinal/TargetEncoder `categories_`) was noise that changed across processes. Fix: the ndarray branch now detects `arr.dtype == object` and digests the shape plus each element recursively via `_feed_canonical`, so the digest reflects values. Added three regression tests in `tests/unit/test_pipeline_coverage.py` (value-vs-pointer stability incl. non-interned strings, shape sensitivity); verified the new tests FAIL on the pre-fix code (`b'\xca' != b'\xf5'`) and pass with the fix. Verified: 30/30 `test_pipeline_coverage.py` pass, `ruff check`/`ruff format`/`ty check` clean.
 
 ### 2026-09-03 — OC-58 fixed: polars numeric→bool cast mirrors pandas 0/1 semantics
 OC-58 closed. Root cause: `_build_polars_cast_exprs` only special-cased string/categorical→bool; numeric→bool fell through to the generic `pl.col(col).cast(pl.Boolean, strict=...)`, which is C-style truthiness (`x != 0`) and never raises — so `2.0` silently became `True` on polars while pandas `astype("boolean")` produced `<NA>` (and raised `TypeError` in strict mode). Fix in `skyulf-core/skyulf/preprocessing/casting.py`: new `_bool_expr_from_numeric_col_polars` helper builds `pl.when(col == 0).then(False).when(col == 1).then(True).otherwise(None)`, so only exact 0/1 values map to booleans and everything else (including non-integer floats) becomes null; the column is tracked in the bool-cast list and validated in strict mode by the renamed `_validate_polars_bool_casts` (raises `ValueError` on newly-null values, matching the existing string→bool strict behavior). Added four regression tests in `tests/integration/test_casting.py` (coerce nulls, strict raise, pure 0/1, engine parity). Verified: 85/85 `test_casting.py` pass, `ruff check`/`ruff format`/`ty check` clean.
