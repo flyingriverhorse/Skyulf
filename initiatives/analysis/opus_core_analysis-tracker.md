@@ -43,7 +43,7 @@ follow, grouped by domain.
 |---|---|---|---|---|
 | OC-75 | 🔴 | Dev polars 1.40.1 below declared floor ≥1.43.2 — 10 tests, every notebook, a benchmark broken; prerequisite for trusting any polars result | 1 line | ✅ done |
 | OC-12 | 🔴 | Row-dropping desyncs `X` and `y` on non-unique pandas indexes (`drop_rows.py:60-67`, `deduplicate.py:44-47`); polars path already correct | small | ✅ fixed 2026-09-03 |
-| OC-58 | 🔴 | Numeric→boolean cast on polars treats any nonzero as `True` (`casting.py:143-178`) | small | ⬜ open |
+| OC-58 | 🔴 | Numeric→boolean cast on polars treats any nonzero as `True` (`casting.py:143-178`) | small | ✅ fixed 2026-09-03 |
 | OC-62 | 🔴 | `fingerprint()` not reproducible for any artifact holding an object-dtype array (`pipeline/seal.py:57-59`) | small | ⬜ open |
 
 ### Next — wrong results in realistic configs
@@ -260,6 +260,9 @@ key — also the fastest way to find drift the audit missed).
 ---
 
 ## Log
+
+### 2026-09-03 — OC-58 fixed: polars numeric→bool cast mirrors pandas 0/1 semantics
+OC-58 closed. Root cause: `_build_polars_cast_exprs` only special-cased string/categorical→bool; numeric→bool fell through to the generic `pl.col(col).cast(pl.Boolean, strict=...)`, which is C-style truthiness (`x != 0`) and never raises — so `2.0` silently became `True` on polars while pandas `astype("boolean")` produced `<NA>` (and raised `TypeError` in strict mode). Fix in `skyulf-core/skyulf/preprocessing/casting.py`: new `_bool_expr_from_numeric_col_polars` helper builds `pl.when(col == 0).then(False).when(col == 1).then(True).otherwise(None)`, so only exact 0/1 values map to booleans and everything else (including non-integer floats) becomes null; the column is tracked in the bool-cast list and validated in strict mode by the renamed `_validate_polars_bool_casts` (raises `ValueError` on newly-null values, matching the existing string→bool strict behavior). Added four regression tests in `tests/integration/test_casting.py` (coerce nulls, strict raise, pure 0/1, engine parity). Verified: 85/85 `test_casting.py` pass, `ruff check`/`ruff format`/`ty check` clean.
 
 ### 2026-09-03 — OC-12 fixed: positional keep-mask for pandas X/y desync
 OC-12 closed. Root cause: the pandas paths of `DropMissingRows` and `Deduplicate` selected `y` by label (`y.loc[X_clean.index]`); with duplicate index labels `.loc` returns *all* matching rows, so `y` came back longer than `X` with wrong labels — silent X/y desync. Fix mirrors the already-correct polars paths: compute a positional keep mask (`notna` threshold / `duplicated`), take `kept_positions = np.flatnonzero(mask)`, select `X.iloc[kept_positions]`, and filter `y` positionally via the new `_pandas_filter_y_by_kept_positions` helper in `_common.py` (`.iloc`, `None` passthrough). Note: `X.index.get_indexer(X_clean.index)` was rejected as a recovery path — it returns the *first* occurrence for duplicate labels. Added two duplicate-index regression tests (`test_drop_rows.py`, `test_drop_and_missing_gaps.py`). Verified: 62/62 targeted tests pass, `ruff check`/`ruff format`/`ty check` clean.
