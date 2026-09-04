@@ -386,6 +386,27 @@ def _kahn_topological_order(
     return result
 
 
+def topological_order(nodes: list[NodeConfig]) -> list[NodeConfig]:
+    """Return ``nodes`` re-ordered so every node's inputs precede it.
+
+    The frontend can emit an acyclic-but-misordered ``nodes`` list (its BFS
+    enqueues a merge node when *any* parent is dequeued, not all), which
+    makes list-order consumers — schema prediction and the execution loop —
+    see a node before one of its parents. Kahn's algorithm over the
+    ``inputs`` edges produces a valid topological order; among simultaneously
+    ready nodes the order is not guaranteed to match the input list.
+
+    Cycles are not handled here: callers run :func:`validate_no_cycles`
+    first, and if a cycle slips through the result is simply shorter than
+    the input (Kahn's emits only the acyclic prefix).
+    """
+    node_map = {node.node_id: node for node in nodes}
+    discovered = set(node_map)
+    in_degree, children = _build_in_degree_and_children(discovered, node_map)
+    ordered_ids = _kahn_topological_order(discovered, in_degree, children)
+    return [node_map[nid] for nid in ordered_ids]
+
+
 def _collect_ancestors(node_id: str, node_map: dict[str, NodeConfig]) -> list[str]:
     """Collect a node and all its ancestors in true topological order.
 

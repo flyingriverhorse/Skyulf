@@ -22,6 +22,7 @@ from typing import Any
 from skyulf.preprocessing import SkyulfSchema
 from skyulf.registry import NodeRegistry
 
+from .graph_utils import topological_order
 from .schemas import NodeConfig, PipelineConfig
 
 logger = logging.getLogger(__name__)
@@ -114,8 +115,7 @@ def predict_schemas(
     """Walk the topology and return a per-node predicted schema map.
 
     Args:
-        config: Pipeline configuration. Nodes are assumed topologically
-            ordered (the canvas converter and partitioner both guarantee this).
+        config: Pipeline configuration.
         initial_schemas: Optional seed map (typically one entry per data
             loader, populated from the dataset catalog).
 
@@ -125,7 +125,9 @@ def predict_schemas(
     seeds = dict(initial_schemas or {})
     predicted: dict[str, SkyulfSchema | None] = {}
 
-    for node in config.nodes:
+    # The canvas converter can emit acyclic-but-misordered node lists, so
+    # re-sort here instead of trusting list order.
+    for node in topological_order(config.nodes):
         if node.node_id in seeds:
             predicted[node.node_id] = seeds[node.node_id]
             continue
