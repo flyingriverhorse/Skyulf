@@ -352,7 +352,8 @@ export const convertGraphToPipelineConfig = (nodes: Node[], edges: Edge[]): Pipe
               output_suffix: node.data.output_suffix,
               drop_original: node.data.drop_original,
               custom_bins: node.data.custom_bins, // For custom strategy
-              custom_labels: node.data.custom_labels // For custom strategy
+              custom_labels: node.data.custom_labels, // For custom strategy
+              precision: node.data.precision
           };
       } else if (node.data.definitionType === 'ResamplingNode') {
           const type = node.data.type || 'oversampling';

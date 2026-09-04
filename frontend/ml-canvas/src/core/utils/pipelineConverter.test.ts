@@ -869,3 +869,50 @@ describe('feature_selection max_features forwarding (OC-53)', () => {
     expect(fs?.params.max_features).toBeUndefined();
   });
 });
+
+describe('BinningNode precision forwarding (OC-61)', () => {
+  it('forwards precision into GeneralBinning params', () => {
+    const nodes = [
+      node('ds', 'dataset_node', { datasetId: 'd1' }),
+      node('bin', 'BinningNode', {
+        columns: ['price'],
+        strategy: 'quantile',
+        n_bins: 5,
+        label_format: 'bracket',
+        output_suffix: '_bin',
+        drop_original: false,
+        precision: 5,
+      }),
+    ];
+    const edges = [edge('ds', 'bin')];
+
+    const cfg = convertGraphToPipelineConfig(nodes, edges);
+    const bin = cfg.nodes.find((n) => n.node_id === 'bin');
+    expect(bin?.step_type).toBe('GeneralBinning');
+    expect(bin?.params).toMatchObject({
+      columns: ['price'],
+      strategy: 'quantile',
+      n_bins: 5,
+      precision: 5,
+    });
+  });
+
+  it('omits precision when the user leaves it unset', () => {
+    const nodes = [
+      node('ds', 'dataset_node', { datasetId: 'd1' }),
+      node('bin', 'BinningNode', {
+        columns: ['price'],
+        strategy: 'quantile',
+        n_bins: 5,
+        label_format: 'bracket',
+        output_suffix: '_bin',
+        drop_original: false,
+      }),
+    ];
+    const edges = [edge('ds', 'bin')];
+
+    const cfg = convertGraphToPipelineConfig(nodes, edges);
+    const bin = cfg.nodes.find((n) => n.node_id === 'bin');
+    expect(bin?.params.precision).toBeUndefined();
+  });
+});

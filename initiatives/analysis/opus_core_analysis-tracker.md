@@ -56,7 +56,7 @@ follow, grouped by domain.
 | OC-19 | 🟡 | Alias Replacement exposes `punctuation` mode that does nothing (`cleaning/alias.py:45-52`) | small | ✅ fixed 2026-09-04 |
 | OC-20 | 🟡 | Value Replacement's "empty columns = all columns" UI promise is false (`cleaning/value_replacement.py:163-180`) | small | ✅ fixed 2026-09-04 |
 | OC-53 | 🟡 | `select_from_model`'s `max_features` is Python-only, UI-unreachable | small | ✅ fixed 2026-09-04 |
-| OC-61 | ⚪ | `BinningNode`'s "Precision (Decimals)" UI field never sent to backend (`BinningNode.tsx`) | small | ⬜ open — R1 candidate |
+| OC-61 | ⚪ | `BinningNode`'s "Precision (Decimals)" UI field never sent to backend (`BinningNode.tsx`) | small | ✅ fixed 2026-09-04 |
 | OC-66 | 🟠 | `CalibratedClassifierCV`'s user-selected base estimator silently discarded during tuning (`classification.py:206-282` vs `_tuning/engine.py:495-499`) | small | ⬜ open — R1 candidate |
 | OC-16 | 🟠 | KNN/Iterative imputers crash on all-missing fitted columns (`imputation/knn.py:64-76`, `iterative.py:68-84`) | small | ⬜ open |
 | OC-17 | 🟠 | SimpleImputer polars mean/median crashes on all-null columns (engine divergence, `imputation/_common.py:32-37`) | small | ⬜ open |
@@ -260,6 +260,9 @@ key — also the fastest way to find drift the audit missed).
 ---
 
 ## Log
+
+### 2026-09-04 — OC-61 fixed: `BinningNode`'s "Precision (Decimals)" now reaches the backend
+OC-61 closed. Root cause: the backend (`bucketing.py`) reads `config.get("precision", 3)` and the canvas `BinningNode` rendered a "Precision (Decimals)" input, but `pipelineConverter.ts`'s `BinningNode` branch listed its params explicitly and omitted `precision`, so the value was silently dropped before reaching the backend. Fix (frontend-only): added `precision: node.data.precision` to the `GeneralBinning` params object. Added 2 vitest cases to `pipelineConverter.test.ts` (precision forwarded; omitted when unset). Verified: 42/42 `pipelineConverter.test.ts` pass, `npm run lint` clean, `npm run build` clean.
 
 ### 2026-09-04 — OC-53 fixed: `select_from_model`'s `max_features` now reachable from the canvas
 OC-53 closed. Root cause: the backend (`feature_selection/_common.py` `_build_model_selector`) reads `config.get("max_features")` and passes it to sklearn's `SelectFromModel`, and `@node_meta` declares it — but the UI's `select_from_model` branch (`FeatureSelectionNode.tsx`) rendered only a `threshold` field, so the cap was Python-only and unreachable from the canvas. Fix (frontend-only): added `max_features?: number` to the `FeatureSelectionConfig` interface and an optional "Max Features" numeric input in the `select_from_model` branch (mirroring the `k` field pattern; empty = no cap, matching the backend's `None` default). No converter change: the `feature_selection` branch already passes `node.data` through unchanged, so the field flows to the backend automatically. Added 2 vitest cases to `pipelineConverter.test.ts` (cap forwarded; omitted when unset). Verified: 40/40 `pipelineConverter.test.ts` pass, `npm run lint` clean, `npm run build` clean.
