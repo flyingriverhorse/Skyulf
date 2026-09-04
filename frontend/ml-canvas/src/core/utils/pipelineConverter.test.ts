@@ -828,3 +828,44 @@ describe('scale_numeric_features range mapping (OC-15)', () => {
     expect(cfg.nodes.find((n) => n.node_id === 'maxabs')?.params.quantile_range).toBeUndefined();
   });
 });
+
+describe('feature_selection max_features forwarding (OC-53)', () => {
+  it('forwards max_features from the select_from_model config to the backend params', () => {
+    const nodes = [
+      node('ds', 'dataset_node', { datasetId: 'd1' }),
+      node('fs', 'feature_selection', {
+        method: 'select_from_model',
+        estimator: 'RandomForest',
+        threshold: 'mean',
+        max_features: 5,
+      }),
+    ];
+    const edges = [edge('ds', 'fs')];
+
+    const cfg = convertGraphToPipelineConfig(nodes, edges);
+    const fs = cfg.nodes.find((n) => n.node_id === 'fs');
+    expect(fs?.step_type).toBe('feature_selection');
+    expect(fs?.params).toMatchObject({
+      method: 'select_from_model',
+      estimator: 'RandomForest',
+      threshold: 'mean',
+      max_features: 5,
+    });
+  });
+
+  it('omits max_features when the user leaves the cap unset', () => {
+    const nodes = [
+      node('ds', 'dataset_node', { datasetId: 'd1' }),
+      node('fs', 'feature_selection', {
+        method: 'select_from_model',
+        estimator: 'RandomForest',
+        threshold: 'mean',
+      }),
+    ];
+    const edges = [edge('ds', 'fs')];
+
+    const cfg = convertGraphToPipelineConfig(nodes, edges);
+    const fs = cfg.nodes.find((n) => n.node_id === 'fs');
+    expect(fs?.params.max_features).toBeUndefined();
+  });
+});
