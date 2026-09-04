@@ -44,9 +44,17 @@ class SimpleImputerApplier(BaseApplier):
         exprs: list[Any] = []
         for col in X.columns:
             if col in cols and col in fill_values:
-                expr = pl.col(col).fill_null(fill_values[col])
+                val = fill_values[col]
+                # An all-null fitted column has no computable mean/median, so
+                # its stored fill value is None. Skip it (leave the column
+                # untouched) to mirror the pandas branch's `if val is None`
+                # guard; fill_null(None) would raise.
+                if val is None:
+                    exprs.append(pl.col(col))
+                    continue
+                expr = pl.col(col).fill_null(val)
                 if X.schema[col].is_float():
-                    expr = expr.fill_nan(fill_values[col])
+                    expr = expr.fill_nan(val)
                 exprs.append(expr.alias(col))
             else:
                 exprs.append(pl.col(col))

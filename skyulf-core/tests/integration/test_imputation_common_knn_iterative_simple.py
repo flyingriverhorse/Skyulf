@@ -638,6 +638,58 @@ def test_compute_polars_fill_values_all_null_column_mean_is_null() -> None:
     assert result["a"] is None
 
 
+def test_simple_imputer_polars_apply_all_null_column_mean_no_crash() -> None:
+    """Polars apply leaves an all-null fitted column untouched instead of crashing.
+
+    An all-null column has no mean, so its stored fill value is None. The
+    polars branch must skip it (parity with pandas) rather than call
+    ``fill_null(None)`` which raises ``ValueError``.
+    """
+    df = pl.DataFrame(
+        {"a": [1.0, None, 3.0], "b": [None, None, None]},
+        schema={"a": pl.Float64, "b": pl.Float64},
+    )
+    params = SimpleImputerCalculator().fit(df, {"columns": ["a", "b"], "strategy": "mean"})
+    assert params["fill_values"]["b"] is None
+
+    out = SimpleImputerApplier().apply(df, params)
+    assert out["a"].to_list() == [1.0, pytest.approx(2.0), 3.0]
+    assert out["b"].null_count() == len(out)  # all-null column stays all-null
+
+
+def test_simple_imputer_polars_apply_all_null_column_median_no_crash() -> None:
+    """Median strategy on an all-null column is also skipped, not a crash."""
+    df = pl.DataFrame(
+        {"a": [1.0, None, 3.0], "b": [None, None, None]},
+        schema={"a": pl.Float64, "b": pl.Float64},
+    )
+    params = SimpleImputerCalculator().fit(df, {"columns": ["a", "b"], "strategy": "median"})
+    assert params["fill_values"]["b"] is None
+
+    out = SimpleImputerApplier().apply(df, params)
+    assert out["a"].to_list() == [1.0, pytest.approx(2.0), 3.0]
+    assert out["b"].null_count() == len(out)
+
+
+def test_simple_imputer_all_null_column_engine_parity() -> None:
+    """Pandas and Polars agree on an all-null column: it stays all-null, no crash."""
+    pdf = pd.DataFrame({"a": [1.0, None, 3.0], "b": [None, None, None]})
+    # pl.from_pandas infers the all-null object column as String; a genuinely
+    # numeric all-null column is Float64, which is the realistic imputation case.
+    pl_df = pl.DataFrame(
+        {"a": [1.0, None, 3.0], "b": pl.Series([None, None, None], dtype=pl.Float64)}
+    )
+
+    for frame in (pdf, pl_df):
+        params = SimpleImputerCalculator().fit(frame, {"columns": ["a", "b"], "strategy": "mean"})
+        out = SimpleImputerApplier().apply(frame, params)
+        assert out["a"].to_list() == [1.0, pytest.approx(2.0), 3.0]
+        if isinstance(out, pl.DataFrame):
+            assert out["b"].null_count() == len(out)
+        else:
+            assert out["b"].isna().sum() == len(out)
+
+
 def test_simple_imputer_single_row_no_missing_values(sample_regression_data: pd.DataFrame) -> None:
     """A single-row frame with no missing values fits/applies without error."""
     df = sample_regression_data[["feature1", "feature2"]].iloc[[10]].copy()
