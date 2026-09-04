@@ -12,7 +12,7 @@ from .._helpers import resolve_columns_then_to_numpy, resolve_valid_columns
 from .._schema import SkyulfSchema
 from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
 from ..dispatcher import apply_dual_engine
-from ._common import _sklearn_transform_subset
+from ._common import _sklearn_transform_subset, drop_all_missing_columns
 
 
 class KNNImputerApplier(BaseApplier):
@@ -66,6 +66,12 @@ class KNNImputerCalculator(BaseCalculator):
         # KNN/Iterative imputers always fit through numpy — engine choice
         # doesn't affect the fit math, so we skip the Pandas hop entirely.
         X_np, cols = resolve_columns_then_to_numpy(X, config, detect_numeric_columns)
+        if not cols:
+            return {}
+
+        # sklearn silently drops all-missing columns from transform() output,
+        # which desyncs the artifact's column list from the imputer's width.
+        X_np, cols = drop_all_missing_columns(X_np, cols, "KNNImputerCalculator")
         if not cols:
             return {}
 

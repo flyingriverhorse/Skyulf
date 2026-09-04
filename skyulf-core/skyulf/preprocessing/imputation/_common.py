@@ -4,6 +4,7 @@ import logging
 import re
 from typing import Any
 
+import numpy as np
 import pandas as pd
 import polars as pl
 from sklearn.ensemble import ExtraTreesRegressor
@@ -99,6 +100,43 @@ def _sklearn_transform_subset(X: Any, cols: list[str], imputer: Any, is_polars: 
     X_transformed = imputer.transform(X_input)
     X_out[cols] = X_transformed
     return X_out
+
+
+def drop_all_missing_columns(
+    X_np: np.ndarray,
+    cols: list[str],
+    node_name: str,
+) -> tuple[np.ndarray, list[str]]:
+    """Drop columns that are entirely missing from the fit matrix.
+
+    sklearn's KNN/Iterative imputers cannot impute a feature with no observed
+    values and silently drop it during ``transform()``. That desyncs the
+    transformed width from ``cols`` and crashes the index-based write-back in
+    :func:`_sklearn_transform_subset`. Dropping such columns up front at fit
+    time keeps the artifact's ``columns`` in lockstep with what the imputer
+    actually returns, and surfaces the situation to the user via a warning.
+
+    Args:
+        X_np: Numeric fit matrix (2-D float array).
+        cols: Column names aligned to ``X_np``'s columns.
+        node_name: Calculator class name, used only in the warning message.
+
+    Returns:
+        ``(X_np, cols)`` with all-missing columns removed from both. The inputs
+        are returned unchanged when there is nothing to drop.
+    """
+    if X_np.shape[0] == 0 or X_np.shape[1] == 0:
+        return X_np, cols
+    missing_mask = np.isnan(X_np).all(axis=0)
+    if not missing_mask.any():
+        return X_np, cols
+    keep = ~missing_mask
+    dropped = [c for c, k in zip(cols, keep, strict=True) if not k]
+    logger.warning(
+        f"{node_name}: dropping all-missing columns from imputation "
+        f"(no observed values to impute from): {dropped}"
+    )
+    return X_np[:, keep], [c for c, k in zip(cols, keep, strict=True) if k]
 
 
 def _build_iterative_estimator(name: str) -> Any:

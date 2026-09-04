@@ -6,6 +6,7 @@ strategies (``most_frequent`` / ``constant``), and shared edge cases
 (empty frame, all-NaN column, single row, no missing values).
 """
 
+import logging
 from typing import Any
 
 import numpy as np
@@ -24,6 +25,7 @@ from skyulf.preprocessing.imputation._common import (
     _polars_stat_for_strategy,
     _resolve_simple_columns,
     _sklearn_transform_subset,
+    drop_all_missing_columns,
 )
 from skyulf.preprocessing.imputation.iterative import (
     IterativeImputerApplier,
@@ -820,3 +822,76 @@ def test_pandas_nullable_int64_survives_all_three_imputers() -> None:
                 f"{type(calc).__name__}: {col} still has missing values"
             )
             np.testing.assert_allclose(pd_vals, pl_vals, err_msg=f"{type(calc).__name__} col {col}")
+
+
+# ---------------------------------------------------------------------------
+# OC-16: all-missing columns at fit time
+# ---------------------------------------------------------------------------
+
+_KNN_ITERATIVE_CASES = [
+    (KNNImputerCalculator(), KNNImputerApplier(), {"n_neighbors": 2}),
+    (IterativeImputerCalculator(), IterativeImputerApplier(), {}),
+]
+
+
+@pytest.mark.parametrize("calc,applier,extra", _KNN_ITERATIVE_CASES, ids=lambda c: type(c).__name__)
+def test_knn_iterative_fit_drops_all_missing_column(
+    calc, applier, extra, caplog: pytest.LogCaptureFixture
+) -> None:
+    """OC-16: a column that is entirely missing at fit time is dropped from
+    the artifact (sklearn silently drops it from transform() output, which
+    desynced the artifact's column list from the imputer's width)."""
+    config = {"columns": ["a", "b"]} | extra
+    pdf = pd.DataFrame({"a": [1.0, 2.0, 3.0, 4.0], "b": [np.nan, np.nan, np.nan, np.nan]})
+    ldf = pl.DataFrame({"a": [1.0, 2.0, 3.0, 4.0], "b": [None, None, None, None]})
+
+    with caplog.at_level(logging.WARNING):
+        art_pd = calc.fit(pdf, config)
+        art_pl = calc.fit(ldf, config)
+
+    assert "dropping all-missing columns" in caplog.text
+    for art in (art_pd, art_pl):
+        assert art["columns"] == ["a"]
+        assert art["imputer_object"].n_features_in_ == 1
+
+    out_pd = _frame_of(applier.apply(pdf, art_pd))
+    out_pl = _frame_of(applier.apply(ldf, art_pl))
+    assert np.asarray(out_pd["a"], dtype="float64").min() > 0
+    assert out_pd["b"].isna().all()
+    assert out_pl["b"].null_count() == 4
+
+
+@pytest.mark.parametrize("calc,applier,extra", _KNN_ITERATIVE_CASES, ids=lambda c: type(c).__name__)
+def test_knn_iterative_fit_all_columns_all_missing_returns_empty(calc, applier, extra) -> None:
+    """OC-16 edge: when every configured column is all-missing, fit returns
+    an empty artifact and apply is a no-op passthrough."""
+    config = {"columns": ["a", "b"]} | extra
+    pdf = pd.DataFrame({"a": [np.nan, np.nan], "b": [np.nan, np.nan]})
+    ldf = pl.DataFrame({"a": [None, None], "b": [None, None]})
+
+    assert calc.fit(pdf, config) == {}
+    assert calc.fit(ldf, config) == {}
+
+    out_pd = _frame_of(applier.apply(pdf, {}))
+    out_pl = _frame_of(applier.apply(ldf, {}))
+    assert out_pd["a"].isna().all() and out_pd["b"].isna().all()
+    assert out_pl["a"].null_count() == 2 and out_pl["b"].null_count() == 2
+
+
+def test_drop_all_missing_columns_helper() -> None:
+    """OC-16: the helper is a no-op without all-missing columns and drops
+    exactly the all-missing ones otherwise."""
+    X = np.array([[1.0, np.nan], [2.0, np.nan], [3.0, np.nan]])
+    X_out, cols_out = drop_all_missing_columns(X, ["a", "b"], "TestNode")
+    assert cols_out == ["a"]
+    assert X_out.shape == (3, 1)
+
+    X_full = np.array([[1.0, 2.0], [3.0, 4.0]])
+    X_same, cols_same = drop_all_missing_columns(X_full, ["a", "b"], "TestNode")
+    assert X_same is X_full
+    assert cols_same == ["a", "b"]
+
+    X_empty_in = np.empty((0, 2))
+    X_empty, cols_empty = drop_all_missing_columns(X_empty_in, ["a", "b"], "TestNode")
+    assert X_empty is X_empty_in
+    assert cols_empty == ["a", "b"]
