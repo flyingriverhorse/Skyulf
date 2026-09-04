@@ -72,10 +72,19 @@ class AliasReplacementApplier(BaseApplier):
         if not valid:
             return X, _y
 
-        mapping = _resolve_alias_mapping(
-            params.get("alias_type", "boolean"), params.get("custom_map", {})
-        )
+        alias_type = params.get("alias_type", "boolean")
         escaped_punct = re.escape(string.punctuation)
+
+        if alias_type == "punctuation":
+            # Punctuation mode strips punctuation only — case and spaces are
+            # preserved, unlike the alias-mapping modes which normalise fully.
+            exprs = [
+                pl.col(col).cast(pl.String).str.replace_all(f"[{escaped_punct}]", "").alias(col)
+                for col in valid
+            ]
+            return X.with_columns(exprs), _y
+
+        mapping = _resolve_alias_mapping(alias_type, params.get("custom_map", {}))
 
         exprs = []
         for col in valid:
@@ -99,9 +108,18 @@ class AliasReplacementApplier(BaseApplier):
         if not valid:
             return X, _y
 
-        mapping = _resolve_alias_mapping(
-            params.get("alias_type", "boolean"), params.get("custom_map", {})
-        )
+        alias_type = params.get("alias_type", "boolean")
+
+        if alias_type == "punctuation":
+            df_out = X.copy()
+            for col in valid:
+                series = df_out[col]
+                stripped = series.astype(str).str.translate(ALIAS_PUNCTUATION_TABLE)
+                # astype(str) turns NaN into "nan"; restore the original NaN.
+                df_out[col] = stripped.where(series.notna(), series)
+            return df_out, _y
+
+        mapping = _resolve_alias_mapping(alias_type, params.get("custom_map", {}))
 
         df_out = X.copy()
         for col in valid:

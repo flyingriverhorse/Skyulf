@@ -53,7 +53,7 @@ follow, grouped by domain.
 | OC-13 | 🟠 | Drop-Rows UI settings ignored; every canvas run becomes "drop any missing" (`pipelineConverter.ts:249-253`) | small | ✅ fixed 2026-09-03 |
 | OC-14 | 🟠 | Iterative Imputer UI estimator choices silently fall back to BayesianRidge (`imputation/_common.py:103-111`) | small | ✅ fixed 2026-09-03 |
 | OC-15 | 🟠 | MinMax/Robust scaler range controls in UI ignored (`scaling/minmax.py:96-100`, `robust.py:116-123`) | small | ✅ fixed 2026-09-03 |
-| OC-19 | 🟡 | Alias Replacement exposes `punctuation` mode that does nothing (`cleaning/alias.py:45-52`) | small | ⬜ open — R1 candidate |
+| OC-19 | 🟡 | Alias Replacement exposes `punctuation` mode that does nothing (`cleaning/alias.py:45-52`) | small | ✅ fixed 2026-09-04 |
 | OC-20 | 🟡 | Value Replacement's "empty columns = all columns" UI promise is false (`cleaning/value_replacement.py:163-180`) | small | ⬜ open — R1 candidate |
 | OC-53 | 🟡 | `select_from_model`'s `max_features` is Python-only, UI-unreachable | small | ⬜ open — R1 candidate |
 | OC-61 | ⚪ | `BinningNode`'s "Precision (Decimals)" UI field never sent to backend (`BinningNode.tsx`) | small | ⬜ open — R1 candidate |
@@ -260,6 +260,9 @@ key — also the fastest way to find drift the audit missed).
 ---
 
 ## Log
+
+### 2026-09-04 — OC-19 fixed: Alias Replacement `punctuation` mode now strips punctuation
+OC-19 closed. Root cause: the UI (`AliasReplacementNode.tsx`) offers a `punctuation` mode ("Removes common punctuation characters from text"), but the backend's `_apply_polars`/`_apply_pandas` in `cleaning/alias.py` only had branches for the alias-mapping modes — `punctuation` fell through to the mapping path, whose resolved mapping is `{}` for this mode, so the applier was a silent no-op. Fix (backend, both engine paths): a dedicated `punctuation` branch that strips `string.punctuation` only — case and spaces are preserved, matching the UI wording (unlike the mapping modes, which fully normalise). Polars: `str.replace_all` with the escaped punctuation class (nulls pass through unchanged). Pandas: `str.translate(ALIAS_PUNCTUATION_TABLE)` with the original NaN restored after `astype(str)`. No converter/UI change: `mode`/`alias_type` already flow through verbatim. Added 3 JSON cases (`type_resolution` pass-through, `resolve_mapping` empty, `applier_value_lists` strip case) + a direct pandas/polars NaN-passthrough parity test. Verified: 45/45 `test_cleaning_alias.py` pass, `ruff check`/`ruff format`/`ty check` clean.
 
 ### 2026-09-03 — OC-15 fixed: MinMax/Robust scaler range controls honored on canvas
 OC-15 closed. Root cause: the UI (`ScalingNode.tsx`) stores scaler ranges as scalar fields (`feature_range_min`/`feature_range_max` for minmax, `quantile_range_min`/`quantile_range_max` for robust), but the converter's `scale_numeric_features` branch did `params = config` — forwarding the scalars verbatim while the backend reads tuple keys (`feature_range` in `scaling/minmax.py`, `quantile_range` in `scaling/robust.py`) — so every canvas run silently used the defaults (0/1 and 25/75). Fix (converter-only, `pipelineConverter.ts`): the branch now assembles `feature_range` (minmax, defaults 0/1) and `quantile_range` (robust, defaults 25/75) from the scalar fields; scalar keys are left in the payload (harmless — the backend ignores unknown keys). No backend change: the contract was already correct and covered by `test_scaling.py`. No doc change: `docs/reference/preprocessing_nodes.md` already documents the tuple keys. Added 4 vitest cases to `pipelineConverter.test.ts` (minmax custom range, robust custom range, defaults when absent, absent for standard/maxabs). Verified: 865/865 vitest pass, `npm run lint` clean, `npm run build` clean.
