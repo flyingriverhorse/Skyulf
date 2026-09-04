@@ -3261,7 +3261,15 @@ Missing columns seen during fitting are restored with their stored value.</p>
 <span class="normal">85</span>
 <span class="normal">86</span>
 <span class="normal">87</span>
-<span class="normal">88</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">SimpleImputerApplier</span><span class="p">(</span><span class="n">BaseApplier</span><span class="p">):</span>
+<span class="normal">88</span>
+<span class="normal">89</span>
+<span class="normal">90</span>
+<span class="normal">91</span>
+<span class="normal">92</span>
+<span class="normal">93</span>
+<span class="normal">94</span>
+<span class="normal">95</span>
+<span class="normal">96</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">SimpleImputerApplier</span><span class="p">(</span><span class="n">BaseApplier</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""Apply fitted Simple Imputer fill values to missing values in selected columns.</span>
 
 <span class="sd">    The calculator artifact records per-column values for ``mean``, ``median``,</span>
@@ -3285,9 +3293,17 @@ Missing columns seen during fitting are restored with their stored value.</p>
         <span class="n">exprs</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
         <span class="k">for</span> <span class="n">col</span> <span class="ow">in</span> <span class="n">X</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
             <span class="k">if</span> <span class="n">col</span> <span class="ow">in</span> <span class="n">cols</span> <span class="ow">and</span> <span class="n">col</span> <span class="ow">in</span> <span class="n">fill_values</span><span class="p">:</span>
-                <span class="n">expr</span> <span class="o">=</span> <span class="n">pl</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="n">col</span><span class="p">)</span><span class="o">.</span><span class="n">fill_null</span><span class="p">(</span><span class="n">fill_values</span><span class="p">[</span><span class="n">col</span><span class="p">])</span>
+                <span class="n">val</span> <span class="o">=</span> <span class="n">fill_values</span><span class="p">[</span><span class="n">col</span><span class="p">]</span>
+                <span class="c1"># An all-null fitted column has no computable mean/median, so</span>
+                <span class="c1"># its stored fill value is None. Skip it (leave the column</span>
+                <span class="c1"># untouched) to mirror the pandas branch's `if val is None`</span>
+                <span class="c1"># guard; fill_null(None) would raise.</span>
+                <span class="k">if</span> <span class="n">val</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                    <span class="n">exprs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">pl</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="n">col</span><span class="p">))</span>
+                    <span class="k">continue</span>
+                <span class="n">expr</span> <span class="o">=</span> <span class="n">pl</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="n">col</span><span class="p">)</span><span class="o">.</span><span class="n">fill_null</span><span class="p">(</span><span class="n">val</span><span class="p">)</span>
                 <span class="k">if</span> <span class="n">X</span><span class="o">.</span><span class="n">schema</span><span class="p">[</span><span class="n">col</span><span class="p">]</span><span class="o">.</span><span class="n">is_float</span><span class="p">():</span>
-                    <span class="n">expr</span> <span class="o">=</span> <span class="n">expr</span><span class="o">.</span><span class="n">fill_nan</span><span class="p">(</span><span class="n">fill_values</span><span class="p">[</span><span class="n">col</span><span class="p">])</span>
+                    <span class="n">expr</span> <span class="o">=</span> <span class="n">expr</span><span class="o">.</span><span class="n">fill_nan</span><span class="p">(</span><span class="n">val</span><span class="p">)</span>
                 <span class="n">exprs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">expr</span><span class="o">.</span><span class="n">alias</span><span class="p">(</span><span class="n">col</span><span class="p">))</span>
             <span class="k">else</span><span class="p">:</span>
                 <span class="n">exprs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">pl</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="n">col</span><span class="p">))</span>
@@ -3384,15 +3400,7 @@ operate on all selected columns.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>skyulf-core/skyulf/preprocessing/imputation/simple.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 91</span>
-<span class="normal"> 92</span>
-<span class="normal"> 93</span>
-<span class="normal"> 94</span>
-<span class="normal"> 95</span>
-<span class="normal"> 96</span>
-<span class="normal"> 97</span>
-<span class="normal"> 98</span>
-<span class="normal"> 99</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 99</span>
 <span class="normal">100</span>
 <span class="normal">101</span>
 <span class="normal">102</span>
@@ -3480,7 +3488,15 @@ operate on all selected columns.</p>
 <span class="normal">184</span>
 <span class="normal">185</span>
 <span class="normal">186</span>
-<span class="normal">187</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">"SimpleImputer"</span><span class="p">,</span> <span class="n">SimpleImputerApplier</span><span class="p">)</span>
+<span class="normal">187</span>
+<span class="normal">188</span>
+<span class="normal">189</span>
+<span class="normal">190</span>
+<span class="normal">191</span>
+<span class="normal">192</span>
+<span class="normal">193</span>
+<span class="normal">194</span>
+<span class="normal">195</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">"SimpleImputer"</span><span class="p">,</span> <span class="n">SimpleImputerApplier</span><span class="p">)</span>
 <span class="nd">@node_meta</span><span class="p">(</span>
     <span class="nb">id</span><span class="o">=</span><span class="s2">"SimpleImputer"</span><span class="p">,</span>
     <span class="n">name</span><span class="o">=</span><span class="s2">"Simple Imputer"</span><span class="p">,</span>
