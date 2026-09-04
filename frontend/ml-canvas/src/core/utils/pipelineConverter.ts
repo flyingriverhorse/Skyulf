@@ -282,7 +282,13 @@ export const convertGraphToPipelineConfig = (nodes: Node[], edges: Edge[]): Pipe
           else if (method === 'maxabs') stepType = 'MaxAbsScaler';
           else if (method === 'robust') stepType = 'RobustScaler';
           else stepType = 'StandardScaler';
-          params = config;
+          params = { ...config };
+          // The canvas stores ranges as scalar fields; the backend expects tuple keys.
+          if (method === 'minmax') {
+            params.feature_range = [config.feature_range_min ?? 0, config.feature_range_max ?? 1];
+          } else if (method === 'robust') {
+            params.quantile_range = [config.quantile_range_min ?? 25, config.quantile_range_max ?? 75];
+          }
       } else if (node.data.definitionType === 'encoding') {
           const method = node.data.method;
           if (method === 'onehot') stepType = 'OneHotEncoder';

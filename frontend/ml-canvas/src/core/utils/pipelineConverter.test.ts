@@ -762,3 +762,69 @@ describe('convertGraphToPipelineConfig — SegmentationNode', () => {
     expect(seg?.params.run_mode).toBe('fixed');
   });
 });
+
+describe('scale_numeric_features range mapping (OC-15)', () => {
+  it('maps minmax scalar range fields to the feature_range tuple key', () => {
+    const nodes = [
+      node('ds', 'dataset_node', { datasetId: 'd1' }),
+      node('scale', 'scale_numeric_features', {
+        method: 'minmax',
+        columns: ['x'],
+        feature_range_min: -1,
+        feature_range_max: 2,
+      }),
+    ];
+    const edges = [edge('ds', 'scale')];
+
+    const cfg = convertGraphToPipelineConfig(nodes, edges);
+    const scale = cfg.nodes.find((n) => n.node_id === 'scale');
+    expect(scale?.step_type).toBe('MinMaxScaler');
+    expect(scale?.params.feature_range).toEqual([-1, 2]);
+  });
+
+  it('maps robust scalar range fields to the quantile_range tuple key', () => {
+    const nodes = [
+      node('ds', 'dataset_node', { datasetId: 'd1' }),
+      node('scale', 'scale_numeric_features', {
+        method: 'robust',
+        columns: ['x'],
+        quantile_range_min: 10,
+        quantile_range_max: 90,
+      }),
+    ];
+    const edges = [edge('ds', 'scale')];
+
+    const cfg = convertGraphToPipelineConfig(nodes, edges);
+    const scale = cfg.nodes.find((n) => n.node_id === 'scale');
+    expect(scale?.step_type).toBe('RobustScaler');
+    expect(scale?.params.quantile_range).toEqual([10, 90]);
+  });
+
+  it('emits default ranges when the scalar fields are absent', () => {
+    const nodes = [
+      node('ds', 'dataset_node', { datasetId: 'd1' }),
+      node('mm', 'scale_numeric_features', { method: 'minmax', columns: ['x'] }),
+      node('rb', 'scale_numeric_features', { method: 'robust', columns: ['x'] }),
+    ];
+    const edges = [edge('ds', 'mm'), edge('ds', 'rb')];
+
+    const cfg = convertGraphToPipelineConfig(nodes, edges);
+    expect(cfg.nodes.find((n) => n.node_id === 'mm')?.params.feature_range).toEqual([0, 1]);
+    expect(cfg.nodes.find((n) => n.node_id === 'rb')?.params.quantile_range).toEqual([25, 75]);
+  });
+
+  it('does not emit range keys for standard and maxabs methods', () => {
+    const nodes = [
+      node('ds', 'dataset_node', { datasetId: 'd1' }),
+      node('std', 'scale_numeric_features', { method: 'standard', columns: ['x'] }),
+      node('maxabs', 'scale_numeric_features', { method: 'maxabs', columns: ['x'] }),
+    ];
+    const edges = [edge('ds', 'std'), edge('ds', 'maxabs')];
+
+    const cfg = convertGraphToPipelineConfig(nodes, edges);
+    expect(cfg.nodes.find((n) => n.node_id === 'std')?.params.feature_range).toBeUndefined();
+    expect(cfg.nodes.find((n) => n.node_id === 'std')?.params.quantile_range).toBeUndefined();
+    expect(cfg.nodes.find((n) => n.node_id === 'maxabs')?.params.feature_range).toBeUndefined();
+    expect(cfg.nodes.find((n) => n.node_id === 'maxabs')?.params.quantile_range).toBeUndefined();
+  });
+});
