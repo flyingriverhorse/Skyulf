@@ -196,6 +196,7 @@ class DropMissingRowsArtifact(TypedDict, total=False):
     subset: list[str] | None
     how: str
     threshold: int | None
+    missing_threshold: float | None
 
 
 class MissingIndicatorArtifact(TypedDict, total=False):

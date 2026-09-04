@@ -1,8 +1,10 @@
 """Shared helpers for imputation nodes."""
 
 import logging
+import re
 from typing import Any
 
+import numpy as np
 import pandas as pd
 import polars as pl
 from sklearn.ensemble import ExtraTreesRegressor
@@ -100,12 +102,57 @@ def _sklearn_transform_subset(X: Any, cols: list[str], imputer: Any, is_polars: 
     return X_out
 
 
+def drop_all_missing_columns(
+    X_np: np.ndarray,
+    cols: list[str],
+    node_name: str,
+) -> tuple[np.ndarray, list[str]]:
+    """Drop columns that are entirely missing from the fit matrix.
+
+    sklearn's KNN/Iterative imputers cannot impute a feature with no observed
+    values and silently drop it during ``transform()``. That desyncs the
+    transformed width from ``cols`` and crashes the index-based write-back in
+    :func:`_sklearn_transform_subset`. Dropping such columns up front at fit
+    time keeps the artifact's ``columns`` in lockstep with what the imputer
+    actually returns, and surfaces the situation to the user via a warning.
+
+    Args:
+        X_np: Numeric fit matrix (2-D float array).
+        cols: Column names aligned to ``X_np``'s columns.
+        node_name: Calculator class name, used only in the warning message.
+
+    Returns:
+        ``(X_np, cols)`` with all-missing columns removed from both. The inputs
+        are returned unchanged when there is nothing to drop.
+    """
+    if X_np.shape[0] == 0 or X_np.shape[1] == 0:
+        return X_np, cols
+    missing_mask = np.isnan(X_np).all(axis=0)
+    if not missing_mask.any():
+        return X_np, cols
+    keep = ~missing_mask
+    dropped = [c for c, k in zip(cols, keep, strict=True) if not k]
+    logger.warning(
+        f"{node_name}: dropping all-missing columns from imputation "
+        f"(no observed values to impute from): {dropped}"
+    )
+    return X_np[:, keep], [c for c, k in zip(cols, keep, strict=True) if k]
+
+
 def _build_iterative_estimator(name: str) -> Any:
-    """Map the public estimator alias to a concrete sklearn regressor."""
-    if name == "DecisionTree":
+    """Map the public estimator alias to a concrete sklearn regressor.
+
+    The alias is matched case-insensitively and tolerant of ``_``/``-``/spaces
+    so the canvas UI values (``decision_tree``, ``extra_trees``, ``knn``) and
+    the documented aliases (``DecisionTree``, ``ExtraTrees``, ``KNeighbors``)
+    both resolve to the same regressor. Unknown names fall back to
+    ``BayesianRidge``.
+    """
+    key = re.sub(r"[^a-z0-9]", "", name.lower())
+    if key == "decisiontree":
         return DecisionTreeRegressor(max_features="sqrt", random_state=0)
-    if name == "ExtraTrees":
+    if key == "extratrees":
         return ExtraTreesRegressor(n_estimators=10, random_state=0)
-    if name == "KNeighbors":
+    if key in {"kneighbors", "knn"}:
         return KNeighborsRegressor(n_neighbors=5)
     return BayesianRidge()

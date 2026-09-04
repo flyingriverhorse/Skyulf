@@ -178,7 +178,7 @@ export const ValueReplacementSettings: React.FC<{ config: ValueReplacementConfig
           onChange={(cols) => onChange({ ...config, columns: cols })}
         />
         <p className="text-[10px] text-gray-500">
-          Select columns to apply replacements to. If empty, applies to all compatible columns.
+          Select columns to apply replacements to. If no columns are selected, this node does nothing.
         </p>
       </div>
 

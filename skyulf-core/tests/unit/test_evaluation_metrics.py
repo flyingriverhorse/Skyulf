@@ -141,6 +141,67 @@ def test_classification_metrics_multiclass_survives_fold_missing_a_trained_class
     assert "pr_auc_weighted" in metrics
 
 
+def test_classification_metrics_multiclass_split_missing_class_keeps_multiclass_only(
+    multiclass_data,
+):
+    """Regression test (OC-35): a 3-class model evaluated on a split that
+    contains only two classes must NOT be treated as binary. Previously the
+    binary gate looked at the unique labels in y_true, so such a split gained
+    unweighted precision/recall/f1 keys that don't belong to a multiclass model."""
+    model, X, y = multiclass_data
+    mask = y != 2
+    X_subset, y_subset = X[mask], y[mask]
+
+    metrics = calculate_classification_metrics(model, X_subset, y_subset)
+    assert "precision" not in metrics
+    assert "recall" not in metrics
+    assert "f1" not in metrics
+    # The multiclass metrics that were always computable must still be present.
+    assert "precision_weighted" in metrics
+    assert "f1_weighted" in metrics
+
+
+def test_classification_metrics_multiclass_split_missing_class_computes_log_loss(multiclass_data):
+    """Regression test (OC-35): log_loss must be computed for a multiclass model
+    on a split missing a class, using the full trained label set. Previously
+    log_loss raised "2 vs 3. Please provide labels" and the metric was dropped."""
+    from sklearn.metrics import log_loss
+
+    model, X, y = multiclass_data
+    mask = y != 2
+    X_subset, y_subset = X[mask], y[mask]
+
+    metrics = calculate_classification_metrics(model, X_subset, y_subset)
+    assert "log_loss" in metrics
+    expected = log_loss(y_subset, model.predict_proba(X_subset), labels=[0, 1, 2])
+    assert metrics["log_loss"] == pytest.approx(expected)
+
+
+def test_evaluate_classification_model_split_missing_class_emits_no_null_curve_points(
+    multiclass_data,
+):
+    """Regression test (OC-35): per-class ROC/PR curves for a class absent from
+    the evaluated split must be skipped, not emitted with NaN (null) points."""
+    import math
+
+    from skyulf.modeling._evaluation.classification import evaluate_classification_model
+
+    model, X, y = multiclass_data
+    mask = y != 2
+    X_subset, y_subset = X[mask], y[mask]
+
+    report = evaluate_classification_model(model, X_subset, y_subset)
+    assert report.classification is not None
+    for curve in [*report.classification.roc_curves, *report.classification.pr_curves]:
+        assert curve.points, f"curve {curve.name} has no points"
+        for point in curve.points:
+            assert math.isfinite(point.x), f"curve {curve.name} has non-finite x"
+            assert math.isfinite(point.y), f"curve {curve.name} has non-finite y"
+    # The absent class (2) must not produce a curve at all.
+    curve_names = [c.name for c in report.classification.roc_curves]
+    assert "ROC (Class 2)" not in curve_names
+
+
 def test_classification_metrics_multiclass_pr_auc_weighted_present(multiclass_data):
     """Multiclass predictions should include a weighted PR-AUC computed via label_binarize."""
     model, X, y = multiclass_data

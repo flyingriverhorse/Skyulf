@@ -248,10 +248,15 @@ export const convertGraphToPipelineConfig = (nodes: Node[], edges: Edge[]): Pipe
           };
       } else if (node.data.definitionType === 'drop_missing_rows' || node.data.definitionType === 'DropMissingRows') {
           stepType = 'DropMissingRows';
-          params = {
-            missing_threshold: node.data.missing_threshold,
-            drop_if_any_missing: node.data.drop_if_any_missing
-          };
+          // UI semantics: "drop rows missing MORE than X%". A 0% threshold
+          // (or the checkbox) means "any missing" -> how="any".
+          const dropRowsData = node.data as { drop_if_any_missing?: boolean; missing_threshold?: number };
+          const dropAny = dropRowsData.drop_if_any_missing === true
+              || dropRowsData.missing_threshold == null
+              || dropRowsData.missing_threshold <= 0;
+          params = dropAny
+              ? { how: 'any' }
+              : { missing_threshold: dropRowsData.missing_threshold };
       } else if (node.data.definitionType === 'deduplicate' || node.data.definitionType === 'Deduplicate') {
           stepType = 'Deduplicate';
           params = {
@@ -277,7 +282,13 @@ export const convertGraphToPipelineConfig = (nodes: Node[], edges: Edge[]): Pipe
           else if (method === 'maxabs') stepType = 'MaxAbsScaler';
           else if (method === 'robust') stepType = 'RobustScaler';
           else stepType = 'StandardScaler';
-          params = config;
+          params = { ...config };
+          // The canvas stores ranges as scalar fields; the backend expects tuple keys.
+          if (method === 'minmax') {
+            params.feature_range = [config.feature_range_min ?? 0, config.feature_range_max ?? 1];
+          } else if (method === 'robust') {
+            params.quantile_range = [config.quantile_range_min ?? 25, config.quantile_range_max ?? 75];
+          }
       } else if (node.data.definitionType === 'encoding') {
           const method = node.data.method;
           if (method === 'onehot') stepType = 'OneHotEncoder';
@@ -341,7 +352,8 @@ export const convertGraphToPipelineConfig = (nodes: Node[], edges: Edge[]): Pipe
               output_suffix: node.data.output_suffix,
               drop_original: node.data.drop_original,
               custom_bins: node.data.custom_bins, // For custom strategy
-              custom_labels: node.data.custom_labels // For custom strategy
+              custom_labels: node.data.custom_labels, // For custom strategy
+              precision: node.data.precision
           };
       } else if (node.data.definitionType === 'ResamplingNode') {
           const type = node.data.type || 'oversampling';

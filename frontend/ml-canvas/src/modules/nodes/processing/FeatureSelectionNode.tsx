@@ -38,6 +38,7 @@ interface FeatureSelectionConfig {
   mode?: 'k_best' | 'percentile' | 'fpr' | 'fdr' | 'fwe' | undefined; // Generic
   param?: number | undefined; // Generic
   estimator?: 'RandomForest' | 'LogisticRegression' | 'LinearRegression' | 'auto' | undefined; // Model based
+  max_features?: number | undefined; // SelectFromModel
   step?: number | undefined; // RFE
   drop_columns?: boolean | undefined;
 }
@@ -501,6 +502,15 @@ const FeatureSelectionSettings: React.FC<{ config: FeatureSelectionConfig; onCha
                 onChange={(e) => onChange({ ...config, threshold: e.target.value })}
               />
               <p className="text-xs text-muted-foreground">String (e.g. &quot;median&quot;) or float.</p>
+                <span className="text-sm font-medium">Max Features</span>
+                <input
+                  type="number"
+                  className="w-full p-2 border rounded bg-background text-sm"
+                  placeholder="Optional"
+                  value={config.max_features ?? ''}
+                  onChange={(e) => onChange({ ...config, max_features: parseIntSafe(e.target.value, config.max_features) })}
+                />
+                <p className="text-xs text-muted-foreground">Optional cap on the number of features to select. Leave empty for no cap.</p>
             </div>
           )}
 

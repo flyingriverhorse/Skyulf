@@ -125,6 +125,19 @@ def test_apply_pandas_empty_dataframe() -> None:
     assert result.shape == (0, 1)
 
 
+@pytest.mark.parametrize("engine", ["pandas", "polars"])
+def test_apply_empty_columns_is_noop(engine: str) -> None:
+    """Empty `columns` must leave the data unchanged (the UI's documented contract)."""
+    data = {"a": [-999, 1], "b": [-999, 2]}
+    df = pd.DataFrame(data) if engine == "pandas" else pl.DataFrame(data)
+    params: dict[str, Any] = {"columns": [], "mapping": {-999: 0}}
+    result = ValueReplacementApplier().apply(df, params)
+    if hasattr(result, "to_pandas"):
+        result = result.to_pandas()
+    assert result["a"].tolist() == [-999, 1]
+    assert result["b"].tolist() == [-999, 2]
+
+
 # ---------------------------------------------------------------------------
 # fit -> apply round trip
 # ---------------------------------------------------------------------------

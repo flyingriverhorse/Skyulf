@@ -52,6 +52,7 @@ from ...constants import StepType
 from .._cycle_validation import validate_no_cycles
 from .._leakage_validation import validate_no_preprocessing_before_split
 from .._schema_graph import predict_schemas, schemas_to_dict
+from ..graph_utils import topological_order
 from ..schemas import (
     NodeConfig,
     NodeExecutionResult,
@@ -142,7 +143,10 @@ class PipelineEngine(ArtifactsMixin, MergeMixin, FeatureEngMixin, NodeRunnersMix
         """
         warn_handler = WarningCaptureHandler().attach()
         try:
-            for node in config.nodes:
+            # Re-sort: the canvas converter can emit acyclic-but-misordered
+            # node lists, and executing out of order fails with "Artifact
+            # not found" for upstream nodes that haven't run yet.
+            for node in topological_order(config.nodes):
                 warn_handler.set_current_node(node.node_id, node.step_type)
                 try:
                     node_result = self._execute_node(node, job_id=job_id)

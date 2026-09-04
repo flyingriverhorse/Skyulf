@@ -225,6 +225,8 @@ class CalibratedClassifierCalculator(SklearnCalculator):
         "svc": lambda: SVC(probability=True, random_state=DEFAULT_RANDOM_STATE),
     }
 
+    STRUCTURAL_TUNING_KEYS: tuple[str, ...] = ("base_estimator",)
+
     def __init__(self):
         super().__init__(
             model_class=CalibratedClassifierCV,
@@ -235,6 +237,27 @@ class CalibratedClassifierCalculator(SklearnCalculator):
             },
             problem_type="classification",
         )
+        self._tuning_base_config: dict[str, Any] = {}
+
+    @property
+    def default_params(self) -> dict[str, Any]:
+        params = dict(self._default_params)
+        if self._tuning_base_config:
+            key = self._tuning_base_config.get("base_estimator")
+            if isinstance(key, str):
+                factory = self.BASE_ESTIMATORS.get(key)
+                if factory is None:
+                    logger.warning(
+                        "Unknown base_estimator '%s'; falling back to logistic_regression.", key
+                    )
+                    factory = self.BASE_ESTIMATORS["logistic_regression"]
+                params["estimator"] = factory()
+        return params
+
+    def prepare_tuning_params(self, config: dict[str, Any]) -> None:
+        src = config.get("params") if isinstance(config.get("params"), dict) else config
+        src = src or {}
+        self._tuning_base_config = {k: src[k] for k in self.STRUCTURAL_TUNING_KEYS if k in src}
 
     def fit(
         self,

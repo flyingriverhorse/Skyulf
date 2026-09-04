@@ -762,3 +762,157 @@ describe('convertGraphToPipelineConfig — SegmentationNode', () => {
     expect(seg?.params.run_mode).toBe('fixed');
   });
 });
+
+describe('scale_numeric_features range mapping (OC-15)', () => {
+  it('maps minmax scalar range fields to the feature_range tuple key', () => {
+    const nodes = [
+      node('ds', 'dataset_node', { datasetId: 'd1' }),
+      node('scale', 'scale_numeric_features', {
+        method: 'minmax',
+        columns: ['x'],
+        feature_range_min: -1,
+        feature_range_max: 2,
+      }),
+    ];
+    const edges = [edge('ds', 'scale')];
+
+    const cfg = convertGraphToPipelineConfig(nodes, edges);
+    const scale = cfg.nodes.find((n) => n.node_id === 'scale');
+    expect(scale?.step_type).toBe('MinMaxScaler');
+    expect(scale?.params.feature_range).toEqual([-1, 2]);
+  });
+
+  it('maps robust scalar range fields to the quantile_range tuple key', () => {
+    const nodes = [
+      node('ds', 'dataset_node', { datasetId: 'd1' }),
+      node('scale', 'scale_numeric_features', {
+        method: 'robust',
+        columns: ['x'],
+        quantile_range_min: 10,
+        quantile_range_max: 90,
+      }),
+    ];
+    const edges = [edge('ds', 'scale')];
+
+    const cfg = convertGraphToPipelineConfig(nodes, edges);
+    const scale = cfg.nodes.find((n) => n.node_id === 'scale');
+    expect(scale?.step_type).toBe('RobustScaler');
+    expect(scale?.params.quantile_range).toEqual([10, 90]);
+  });
+
+  it('emits default ranges when the scalar fields are absent', () => {
+    const nodes = [
+      node('ds', 'dataset_node', { datasetId: 'd1' }),
+      node('mm', 'scale_numeric_features', { method: 'minmax', columns: ['x'] }),
+      node('rb', 'scale_numeric_features', { method: 'robust', columns: ['x'] }),
+    ];
+    const edges = [edge('ds', 'mm'), edge('ds', 'rb')];
+
+    const cfg = convertGraphToPipelineConfig(nodes, edges);
+    expect(cfg.nodes.find((n) => n.node_id === 'mm')?.params.feature_range).toEqual([0, 1]);
+    expect(cfg.nodes.find((n) => n.node_id === 'rb')?.params.quantile_range).toEqual([25, 75]);
+  });
+
+  it('does not emit range keys for standard and maxabs methods', () => {
+    const nodes = [
+      node('ds', 'dataset_node', { datasetId: 'd1' }),
+      node('std', 'scale_numeric_features', { method: 'standard', columns: ['x'] }),
+      node('maxabs', 'scale_numeric_features', { method: 'maxabs', columns: ['x'] }),
+    ];
+    const edges = [edge('ds', 'std'), edge('ds', 'maxabs')];
+
+    const cfg = convertGraphToPipelineConfig(nodes, edges);
+    expect(cfg.nodes.find((n) => n.node_id === 'std')?.params.feature_range).toBeUndefined();
+    expect(cfg.nodes.find((n) => n.node_id === 'std')?.params.quantile_range).toBeUndefined();
+    expect(cfg.nodes.find((n) => n.node_id === 'maxabs')?.params.feature_range).toBeUndefined();
+    expect(cfg.nodes.find((n) => n.node_id === 'maxabs')?.params.quantile_range).toBeUndefined();
+  });
+});
+
+describe('feature_selection max_features forwarding (OC-53)', () => {
+  it('forwards max_features from the select_from_model config to the backend params', () => {
+    const nodes = [
+      node('ds', 'dataset_node', { datasetId: 'd1' }),
+      node('fs', 'feature_selection', {
+        method: 'select_from_model',
+        estimator: 'RandomForest',
+        threshold: 'mean',
+        max_features: 5,
+      }),
+    ];
+    const edges = [edge('ds', 'fs')];
+
+    const cfg = convertGraphToPipelineConfig(nodes, edges);
+    const fs = cfg.nodes.find((n) => n.node_id === 'fs');
+    expect(fs?.step_type).toBe('feature_selection');
+    expect(fs?.params).toMatchObject({
+      method: 'select_from_model',
+      estimator: 'RandomForest',
+      threshold: 'mean',
+      max_features: 5,
+    });
+  });
+
+  it('omits max_features when the user leaves the cap unset', () => {
+    const nodes = [
+      node('ds', 'dataset_node', { datasetId: 'd1' }),
+      node('fs', 'feature_selection', {
+        method: 'select_from_model',
+        estimator: 'RandomForest',
+        threshold: 'mean',
+      }),
+    ];
+    const edges = [edge('ds', 'fs')];
+
+    const cfg = convertGraphToPipelineConfig(nodes, edges);
+    const fs = cfg.nodes.find((n) => n.node_id === 'fs');
+    expect(fs?.params.max_features).toBeUndefined();
+  });
+});
+
+describe('BinningNode precision forwarding (OC-61)', () => {
+  it('forwards precision into GeneralBinning params', () => {
+    const nodes = [
+      node('ds', 'dataset_node', { datasetId: 'd1' }),
+      node('bin', 'BinningNode', {
+        columns: ['price'],
+        strategy: 'quantile',
+        n_bins: 5,
+        label_format: 'bracket',
+        output_suffix: '_bin',
+        drop_original: false,
+        precision: 5,
+      }),
+    ];
+    const edges = [edge('ds', 'bin')];
+
+    const cfg = convertGraphToPipelineConfig(nodes, edges);
+    const bin = cfg.nodes.find((n) => n.node_id === 'bin');
+    expect(bin?.step_type).toBe('GeneralBinning');
+    expect(bin?.params).toMatchObject({
+      columns: ['price'],
+      strategy: 'quantile',
+      n_bins: 5,
+      precision: 5,
+    });
+  });
+
+  it('omits precision when the user leaves it unset', () => {
+    const nodes = [
+      node('ds', 'dataset_node', { datasetId: 'd1' }),
+      node('bin', 'BinningNode', {
+        columns: ['price'],
+        strategy: 'quantile',
+        n_bins: 5,
+        label_format: 'bracket',
+        output_suffix: '_bin',
+        drop_original: false,
+      }),
+    ];
+    const edges = [edge('ds', 'bin')];
+
+    const cfg = convertGraphToPipelineConfig(nodes, edges);
+    const bin = cfg.nodes.find((n) => n.node_id === 'bin');
+    expect(bin?.params.precision).toBeUndefined();
+  });
+});

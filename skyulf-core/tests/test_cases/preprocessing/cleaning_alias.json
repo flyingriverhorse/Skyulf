@@ -6,6 +6,7 @@
         "boolean_passes_through": {"config": {"alias_type": "boolean"}, "expected": "boolean"},
         "country_passes_through": {"config": {"alias_type": "country"}, "expected": "country"},
         "custom_passes_through": {"config": {"alias_type": "custom"}, "expected": "custom"},
+        "punctuation_passes_through": {"config": {"alias_type": "punctuation"}, "expected": "punctuation"},
         "normalize_boolean_remaps_to_boolean": {
           "config": {"alias_type": "normalize_boolean"},
           "expected": "boolean"
@@ -59,6 +60,11 @@
         },
         "unknown_returns_empty": {
           "alias_type": "does_not_exist",
+          "custom_map": {},
+          "expected_kind": "empty"
+        },
+        "punctuation_returns_empty": {
+          "alias_type": "punctuation",
           "custom_map": {},
           "expected_kind": "empty"
         }
@@ -123,6 +129,12 @@
           "alias_type": "boolean",
           "custom_map": {},
           "expected": ["Yes", "No", "Yes"]
+        },
+        "punctuation_strips_chars_preserves_case_and_spaces": {
+          "values": ["Hello, World!", "Yes...No", "a-b_c", "plain"],
+          "alias_type": "punctuation",
+          "custom_map": {},
+          "expected": ["Hello World", "YesNo", "abc", "plain"]
         }
       }
     }

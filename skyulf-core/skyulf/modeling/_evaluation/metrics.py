@@ -230,10 +230,19 @@ def _add_binary_unweighted_metrics(
     except (ValueError, TypeError) as exc:
         logger.warning("Binary precision/recall/f1 omitted: could not resolve labels: %s", exc)
         return
-    if len(unique_classes) != 2:
-        return
     classes_ = getattr(model, "classes_", None)
-    pos_label = classes_[1] if classes_ is not None and len(classes_) == 2 else unique_classes[1]
+    # Binary-ness is decided from the model's training label set, not from the
+    # unique labels present in y_true — a multiclass model evaluated on a split
+    # that happens to contain only two classes must not gain binary-only metrics.
+    # Fall back to the unique label count when the model exposes no classes_.
+    if classes_ is not None:
+        if len(classes_) != 2:
+            return
+        pos_label = classes_[1]
+    else:
+        if len(unique_classes) != 2:
+            return
+        pos_label = unique_classes[1]
     for key, scorer in (
         ("precision", precision_score),
         ("recall", recall_score),
@@ -359,7 +368,13 @@ def _add_probability_based_metrics(
     if proba is None or getattr(proba, "ndim", None) != 2 or proba.shape[1] < 2:
         return
     class_count = proba.shape[1]
-    _try_add_metric(metrics, "log_loss", log_loss, y_arr, proba)
+    # Pass the full trained label set so a split missing a class doesn't make
+    # log_loss raise "Number of classes in y_true not equal to columns in
+    # y_score" and drop the metric.
+    classes = getattr(model, "classes_", None)
+    if classes is None or len(classes) != class_count:
+        classes = np.arange(class_count)
+    _try_add_metric(metrics, "log_loss", log_loss, y_arr, proba, labels=classes)
     _add_roc_pr_auc_metrics(metrics, model, y_arr, proba, class_count)
 
 

@@ -209,6 +209,33 @@ def test_applier_value_lists(
     assert list(result["flag"]) == expected
 
 
+def test_applier_punctuation_nan_passthrough() -> None:
+    """Punctuation mode must strip punctuation while preserving NaN, case, and spaces."""
+    values = ["Hello, World!", None, "Yes...No", "plain"]
+    params: dict[str, Any] = {
+        "columns": ["flag"],
+        "alias_type": "punctuation",
+        "custom_map": {},
+    }
+    applier = AliasReplacementApplier()
+
+    df_pandas = pd.DataFrame({"flag": values})
+    out_pandas = applier.apply(df_pandas, params)
+    assert out_pandas["flag"].iloc[0] == "Hello World"
+    assert pd.isna(out_pandas["flag"].iloc[1])
+    assert out_pandas["flag"].iloc[2] == "YesNo"
+    assert out_pandas["flag"].iloc[3] == "plain"
+
+    df_polars = pl.DataFrame({"flag": values})
+    out_polars = applier.apply(df_polars, params)
+    if hasattr(out_polars, "to_pandas"):
+        out_polars = out_polars.to_pandas()
+    assert out_polars["flag"].iloc[0] == "Hello World"
+    assert pd.isna(out_polars["flag"].iloc[1])
+    assert out_polars["flag"].iloc[2] == "YesNo"
+    assert out_polars["flag"].iloc[3] == "plain"
+
+
 def test_applier_empty_dataframe() -> None:
     """Applying to an empty DataFrame must return an empty DataFrame."""
     df = pd.DataFrame({"flag": pd.Series([], dtype=str)})

@@ -357,9 +357,14 @@ def _discover_ancestors_bfs(node_id: str, node_map: dict[str, NodeConfig]) -> se
 
 
 def _build_in_degree_and_children(
-    discovered: set[str], node_map: dict[str, NodeConfig]
+    discovered: list[str], node_map: dict[str, NodeConfig]
 ) -> tuple[dict[str, int], dict[str, list[str]]]:
-    """Build the in-degree map and children adjacency for Kahn's algorithm over ``discovered``."""
+    """Build the in-degree map and children adjacency for Kahn's algorithm over ``discovered``.
+
+    ``discovered`` must be in a deterministic order (e.g. input-list order)
+    so that the resulting ``in_degree`` dict — and therefore the initial
+    ready queue in Kahn's algorithm — is deterministic.
+    """
     in_degree: dict[str, int] = dict.fromkeys(discovered, 0)
     children: dict[str, list[str]] = {nid: [] for nid in discovered}
     for nid in discovered:
@@ -371,9 +376,13 @@ def _build_in_degree_and_children(
 
 
 def _kahn_topological_order(
-    discovered: set[str], in_degree: dict[str, int], children: dict[str, list[str]]
+    discovered: list[str], in_degree: dict[str, int], children: dict[str, list[str]]
 ) -> list[str]:
-    """Repeatedly emit zero-in-degree nodes (Kahn's algorithm) to produce a topological order."""
+    """Repeatedly emit zero-in-degree nodes (Kahn's algorithm) to produce a topological order.
+
+    The initial ready queue is seeded from ``in_degree`` insertion order, so
+    passing a deterministic ``discovered`` list yields a deterministic result.
+    """
     result: list[str] = []
     ready = [nid for nid, deg in in_degree.items() if deg == 0]
     while ready:
@@ -384,6 +393,28 @@ def _kahn_topological_order(
             if in_degree[child] == 0:
                 ready.append(child)
     return result
+
+
+def topological_order(nodes: list[NodeConfig]) -> list[NodeConfig]:
+    """Return ``nodes`` re-ordered so every node's inputs precede it.
+
+    The frontend can emit an acyclic-but-misordered ``nodes`` list (its BFS
+    enqueues a merge node when *any* parent is dequeued, not all), which
+    makes list-order consumers — schema prediction and the execution loop —
+    see a node before one of its parents. Kahn's algorithm over the
+    ``inputs`` edges produces a valid topological order; among simultaneously
+    ready nodes the input-list order is preserved, so the result is
+    deterministic and idempotent (sorting an already-sorted list is a no-op).
+
+    Cycles are not handled here: callers run :func:`validate_no_cycles`
+    first, and if a cycle slips through the result is simply shorter than
+    the input (Kahn's emits only the acyclic prefix).
+    """
+    node_map = {node.node_id: node for node in nodes}
+    discovered = list(dict.fromkeys(node.node_id for node in nodes))
+    in_degree, children = _build_in_degree_and_children(discovered, node_map)
+    ordered_ids = _kahn_topological_order(discovered, in_degree, children)
+    return [node_map[nid] for nid in ordered_ids]
 
 
 def _collect_ancestors(node_id: str, node_map: dict[str, NodeConfig]) -> list[str]:
@@ -418,7 +449,7 @@ def _collect_ancestors(node_id: str, node_map: dict[str, NodeConfig]) -> list[st
     if node_id not in node_map:
         return []
 
-    discovered = _discover_ancestors_bfs(node_id, node_map)
+    discovered = sorted(_discover_ancestors_bfs(node_id, node_map))
     in_degree, children = _build_in_degree_and_children(discovered, node_map)
     result = _kahn_topological_order(discovered, in_degree, children)
 

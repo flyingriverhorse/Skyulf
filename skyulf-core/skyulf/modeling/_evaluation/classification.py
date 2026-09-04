@@ -109,6 +109,16 @@ def evaluate_classification_model(
             y_test_bin = label_binarize(y_test_np, classes=classes)
 
             for i, class_name in enumerate(class_names):
+                # A class absent from this split has an all-zero one-vs-rest
+                # target; roc_curve/precision_recall_curve return NaN points
+                # for it, which would serialize as null curve coordinates.
+                if len(np.unique(y_test_bin[:, i])) < 2:
+                    logger.debug(
+                        "Skipping per-class curves for class %s: absent from evaluation split",
+                        class_name,
+                    )
+                    continue
+
                 # ROC
                 fpr, tpr, _ = roc_curve(y_test_bin[:, i], y_prob[:, i])
                 roc_curves.append(
