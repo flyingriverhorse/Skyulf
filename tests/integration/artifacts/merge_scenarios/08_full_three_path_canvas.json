@@ -197,6 +197,30 @@
         "summary"
       ]
     },
+    "drop_b": {
+      "status": "success",
+      "error": null,
+      "metrics_keys": [
+        "fit_time",
+        "peak_memory_bytes",
+        "rows_in",
+        "rows_out",
+        "steps",
+        "summary"
+      ]
+    },
+    "drop_c": {
+      "status": "success",
+      "error": null,
+      "metrics_keys": [
+        "fit_time",
+        "peak_memory_bytes",
+        "rows_in",
+        "rows_out",
+        "steps",
+        "summary"
+      ]
+    },
     "fts_a": {
       "status": "success",
       "error": null,
@@ -209,7 +233,55 @@
         "summary"
       ]
     },
+    "fts_b": {
+      "status": "success",
+      "error": null,
+      "metrics_keys": [
+        "fit_time",
+        "peak_memory_bytes",
+        "rows_in",
+        "rows_out",
+        "steps",
+        "summary"
+      ]
+    },
+    "fts_c": {
+      "status": "success",
+      "error": null,
+      "metrics_keys": [
+        "fit_time",
+        "peak_memory_bytes",
+        "rows_in",
+        "rows_out",
+        "steps",
+        "summary"
+      ]
+    },
     "split_a": {
+      "status": "success",
+      "error": null,
+      "metrics_keys": [
+        "fit_time",
+        "peak_memory_bytes",
+        "rows_in",
+        "rows_out",
+        "steps",
+        "summary"
+      ]
+    },
+    "split_b": {
+      "status": "success",
+      "error": null,
+      "metrics_keys": [
+        "fit_time",
+        "peak_memory_bytes",
+        "rows_in",
+        "rows_out",
+        "steps",
+        "summary"
+      ]
+    },
+    "split_c": {
       "status": "success",
       "error": null,
       "metrics_keys": [
@@ -263,42 +335,6 @@
         "trials"
       ]
     },
-    "drop_b": {
-      "status": "success",
-      "error": null,
-      "metrics_keys": [
-        "fit_time",
-        "peak_memory_bytes",
-        "rows_in",
-        "rows_out",
-        "steps",
-        "summary"
-      ]
-    },
-    "fts_b": {
-      "status": "success",
-      "error": null,
-      "metrics_keys": [
-        "fit_time",
-        "peak_memory_bytes",
-        "rows_in",
-        "rows_out",
-        "steps",
-        "summary"
-      ]
-    },
-    "split_b": {
-      "status": "success",
-      "error": null,
-      "metrics_keys": [
-        "fit_time",
-        "peak_memory_bytes",
-        "rows_in",
-        "rows_out",
-        "steps",
-        "summary"
-      ]
-    },
     "train_b": {
       "status": "success",
       "error": null,
@@ -339,42 +375,6 @@
         "train_roc_auc_ovr_weighted",
         "train_roc_auc_weighted",
         "trials"
-      ]
-    },
-    "drop_c": {
-      "status": "success",
-      "error": null,
-      "metrics_keys": [
-        "fit_time",
-        "peak_memory_bytes",
-        "rows_in",
-        "rows_out",
-        "steps",
-        "summary"
-      ]
-    },
-    "fts_c": {
-      "status": "success",
-      "error": null,
-      "metrics_keys": [
-        "fit_time",
-        "peak_memory_bytes",
-        "rows_in",
-        "rows_out",
-        "steps",
-        "summary"
-      ]
-    },
-    "split_c": {
-      "status": "success",
-      "error": null,
-      "metrics_keys": [
-        "fit_time",
-        "peak_memory_bytes",
-        "rows_in",
-        "rows_out",
-        "steps",
-        "summary"
       ]
     },
     "train_c": {
