@@ -29,12 +29,28 @@ def _polars_missing_expr(X: Any, col: str) -> Any:
     return expr
 
 
-def _polars_dropna_filter(X: Any, check_cols: list, how: str, threshold: int | None) -> Any:
+def _min_non_na_for_percentage(missing_threshold: float, n_cols: int) -> float:
+    """Minimum non-missing count that keeps a row under a percentage threshold.
+
+    A row is dropped when its missing share exceeds ``missing_threshold``
+    percent, so it is kept when ``non_na_count >= (1 - pct/100) * n_cols``.
+    """
+    return (1.0 - missing_threshold / 100.0) * n_cols
+
+
+def _polars_dropna_filter(
+    X: Any, check_cols: list, how: str, threshold: int | None, missing_threshold: float | None
+) -> Any:
     """Build the polars filter for dropna with optional threshold/how."""
     missing = [_polars_missing_expr(X, c) for c in check_cols]
     not_missing = [~m for m in missing]
     if threshold is not None:
         return X.filter(pl.sum_horizontal(not_missing) >= threshold)
+    if missing_threshold is not None:
+        return X.filter(
+            pl.sum_horizontal(not_missing)
+            >= _min_non_na_for_percentage(missing_threshold, len(check_cols))
+        )
     if how == "all":
         return X.filter(~pl.all_horizontal(missing))
     return X.filter(~pl.any_horizontal(missing))
@@ -44,10 +60,11 @@ def _drop_missing_rows_apply_polars(X: Any, y: Any, params: dict[str, Any]) -> t
     subset = _normalize_subset(params.get("subset"), list(X.columns))
     how = params.get("how", "any")
     threshold = params.get("threshold")
+    missing_threshold = params.get("missing_threshold")
 
     X_with_idx = X.with_row_index("__idx__")
     check_cols = subset if subset else [c for c in X.columns if c != "__idx__"]
-    X_clean = _polars_dropna_filter(X_with_idx, check_cols, how, threshold)
+    X_clean = _polars_dropna_filter(X_with_idx, check_cols, how, threshold, missing_threshold)
     kept = X_clean["__idx__"]
     X_out = X_clean.drop("__idx__")
 
@@ -60,6 +77,7 @@ def _drop_missing_rows_apply_pandas(X: Any, y: Any, params: dict[str, Any]) -> t
     subset = _normalize_subset(params.get("subset"), list(X.columns))
     how = params.get("how", "any")
     threshold = params.get("threshold")
+    missing_threshold = params.get("missing_threshold")
 
     # Compute the keep mask positionally (same semantics as dropna) so y can be
     # aligned by position; label-based .loc would return every row matching a
@@ -68,6 +86,8 @@ def _drop_missing_rows_apply_pandas(X: Any, y: Any, params: dict[str, Any]) -> t
     non_na = X[cols].notna()
     if threshold is not None:
         keep_mask = non_na.sum(axis=1) >= threshold
+    elif missing_threshold is not None:
+        keep_mask = non_na.sum(axis=1) >= _min_non_na_for_percentage(missing_threshold, len(cols))
     elif how == "any":
         keep_mask = non_na.all(axis=1)
     else:
@@ -96,7 +116,7 @@ class DropMissingRowsApplier(BaseApplier):
     name="Drop Missing Rows",
     category="Cleaning",
     description="Drop rows containing missing values in specified columns.",
-    params={"subset": [], "how": "any"},
+    params={"subset": [], "how": "any", "missing_threshold": None},
     learns_from_data=False,
 )
 class DropMissingRowsCalculator(BaseCalculator):
@@ -112,4 +132,5 @@ class DropMissingRowsCalculator(BaseCalculator):
             "subset": config.get("subset"),
             "how": config.get("how", "any"),
             "threshold": config.get("threshold"),
+            "missing_threshold": config.get("missing_threshold"),
         }

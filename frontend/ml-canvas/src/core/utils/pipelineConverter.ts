@@ -248,10 +248,15 @@ export const convertGraphToPipelineConfig = (nodes: Node[], edges: Edge[]): Pipe
           };
       } else if (node.data.definitionType === 'drop_missing_rows' || node.data.definitionType === 'DropMissingRows') {
           stepType = 'DropMissingRows';
-          params = {
-            missing_threshold: node.data.missing_threshold,
-            drop_if_any_missing: node.data.drop_if_any_missing
-          };
+          // UI semantics: "drop rows missing MORE than X%". A 0% threshold
+          // (or the checkbox) means "any missing" -> how="any".
+          const dropRowsData = node.data as { drop_if_any_missing?: boolean; missing_threshold?: number };
+          const dropAny = dropRowsData.drop_if_any_missing === true
+              || dropRowsData.missing_threshold == null
+              || dropRowsData.missing_threshold <= 0;
+          params = dropAny
+              ? { how: 'any' }
+              : { missing_threshold: dropRowsData.missing_threshold };
       } else if (node.data.definitionType === 'deduplicate' || node.data.definitionType === 'Deduplicate') {
           stepType = 'Deduplicate';
           params = {

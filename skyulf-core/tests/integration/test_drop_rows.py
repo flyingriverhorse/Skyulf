@@ -43,6 +43,20 @@ def test_fit_preserves_subset_and_threshold() -> None:
     assert params["threshold"] == 1
 
 
+def test_fit_preserves_missing_threshold() -> None:
+    """fit must pass through the configured percentage threshold."""
+    df = pd.DataFrame({"a": [1]})
+    params = DropMissingRowsCalculator().fit(df, {"missing_threshold": 50})
+    assert params["missing_threshold"] == 50
+
+
+def test_fit_missing_threshold_defaults_to_none() -> None:
+    """fit must default missing_threshold to None when not configured."""
+    df = pd.DataFrame({"a": [1]})
+    params = DropMissingRowsCalculator().fit(df, {})
+    assert params["missing_threshold"] is None
+
+
 def test_fit_infer_output_schema_passes_through() -> None:
     """infer_output_schema must return the input schema (row-only drop)."""
     from skyulf.core.schema import SkyulfSchema
@@ -103,6 +117,70 @@ def test_apply_pandas_threshold_keeps_rows_with_enough_non_na() -> None:
     assert result["a"].tolist() == [1.0, 3.0]
 
 
+def test_apply_pandas_missing_threshold_drops_rows_over_percentage() -> None:
+    """missing_threshold=50 on 3 cols must drop rows with more than 50% missing."""
+    df = pd.DataFrame(
+        {
+            "a": [1.0, np.nan, np.nan, np.nan],
+            "b": [1.0, 2.0, np.nan, np.nan],
+            "c": [1.0, 3.0, np.nan, np.nan],
+        }
+    )
+    params: dict[str, Any] = {
+        "subset": None,
+        "how": "any",
+        "threshold": None,
+        "missing_threshold": 50,
+    }
+    result = DropMissingRowsApplier().apply(df, params)
+    # Row 0: 0% missing (kept). Row 1: 33% missing (kept). Rows 2 and 3: 100%
+    # missing (dropped).
+    assert result.shape[0] == 2
+    assert result["a"].iloc[0] == 1.0
+    assert np.isnan(result["a"].iloc[1])
+
+
+def test_apply_pandas_missing_threshold_boundary_keeps_exact_share() -> None:
+    """A row missing exactly X% of columns must be KEPT ('more than' is strict)."""
+    df = pd.DataFrame(
+        {
+            "a": [1.0, np.nan],
+            "b": [1.0, np.nan],
+            "c": [1.0, 1.0],
+            "d": [1.0, 1.0],
+        }
+    )
+    params: dict[str, Any] = {
+        "subset": None,
+        "how": "any",
+        "threshold": None,
+        "missing_threshold": 50,
+    }
+    result = DropMissingRowsApplier().apply(df, params)
+    # Row 1 is missing exactly 50% (2 of 4 cols) — not more than 50%, so kept.
+    assert result.shape[0] == 2
+
+
+def test_apply_pandas_missing_threshold_respects_subset() -> None:
+    """Percentage must be computed over subset columns only."""
+    df = pd.DataFrame(
+        {
+            "a": [1.0, np.nan],
+            "b": [1.0, np.nan],
+            "c": [np.nan, np.nan],
+        }
+    )
+    params: dict[str, Any] = {
+        "subset": ["a", "b"],
+        "how": "any",
+        "threshold": None,
+        "missing_threshold": 50,
+    }
+    result = DropMissingRowsApplier().apply(df, params)
+    # Row 1 is missing 100% of the subset (a, b) — dropped; c is ignored.
+    assert result["a"].tolist() == [1.0]
+
+
 def test_apply_pandas_no_missing_values_keeps_all_rows() -> None:
     """A DataFrame with no missing values must have all rows retained."""
     df = pd.DataFrame({"a": [1.0, 2.0, 3.0]})
@@ -133,6 +211,30 @@ def test_apply_pandas_tuple_xy_syncs_y_after_drop() -> None:
     X_out, y_out = DropMissingRowsApplier().apply((X, y), params)
     assert X_out["a"].tolist() == [1.0, 3.0]
     assert y_out.tolist() == [10, 30]
+
+
+def test_apply_pandas_tuple_xy_syncs_y_with_missing_threshold() -> None:
+    """Percentage-mode drops must desync y identically to X."""
+    X = pd.DataFrame(
+        {
+            "a": [1.0, np.nan, np.nan],
+            "b": [1.0, 2.0, np.nan],
+            "c": [1.0, 3.0, np.nan],
+        }
+    )
+    y = pd.Series([10, 20, 30])
+    params: dict[str, Any] = {
+        "subset": None,
+        "how": "any",
+        "threshold": None,
+        "missing_threshold": 50,
+    }
+    X_out, y_out = DropMissingRowsApplier().apply((X, y), params)
+    # Row 0 (0% missing) and row 1 (33% missing) kept; row 2 (100%) dropped.
+    assert X_out.shape[0] == 2
+    assert X_out["a"].iloc[0] == 1.0
+    assert np.isnan(X_out["a"].iloc[1])
+    assert y_out.tolist() == [10, 20]
 
 
 # ---------------------------------------------------------------------------
@@ -184,6 +286,30 @@ def test_apply_polars_threshold_keeps_rows_with_enough_non_null() -> None:
     if hasattr(result, "to_pandas"):
         result = result.to_pandas()
     assert result["a"].tolist() == [1.0, 3.0]
+
+
+def test_apply_polars_missing_threshold_drops_rows_over_percentage() -> None:
+    """Polars path: missing_threshold must drop rows with more than X% missing."""
+    df = pl.DataFrame(
+        {
+            "a": [1.0, None, None, None],
+            "b": [1.0, 2.0, None, None],
+            "c": [1.0, 3.0, None, None],
+        }
+    )
+    params: dict[str, Any] = {
+        "subset": None,
+        "how": "any",
+        "threshold": None,
+        "missing_threshold": 50,
+    }
+    result = DropMissingRowsApplier().apply(df, params)
+    if hasattr(result, "to_pandas"):
+        result = result.to_pandas()
+    # Row 0 (0% missing) and row 1 (33% missing) kept; rows 2 and 3 (100%) dropped.
+    assert result.shape[0] == 2
+    assert result["a"].iloc[0] == 1.0
+    assert np.isnan(result["a"].iloc[1])
 
 
 def test_apply_pandas_tuple_xy_syncs_y_with_duplicate_index_labels() -> None:

@@ -50,7 +50,7 @@ follow, grouped by domain.
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
-| OC-13 | 🟠 | Drop-Rows UI settings ignored; every canvas run becomes "drop any missing" (`pipelineConverter.ts:249-253`) | small | ⬜ open — R1 candidate |
+| OC-13 | 🟠 | Drop-Rows UI settings ignored; every canvas run becomes "drop any missing" (`pipelineConverter.ts:249-253`) | small | ✅ fixed 2026-09-03 |
 | OC-14 | 🟠 | Iterative Imputer UI estimator choices silently fall back to BayesianRidge (`imputation/_common.py:103-111`) | small | ⬜ open — R1 candidate |
 | OC-15 | 🟠 | MinMax/Robust scaler range controls in UI ignored (`scaling/minmax.py:96-100`, `robust.py:116-123`) | small | ⬜ open — R1 candidate |
 | OC-19 | 🟡 | Alias Replacement exposes `punctuation` mode that does nothing (`cleaning/alias.py:45-52`) | small | ⬜ open — R1 candidate |
@@ -260,6 +260,9 @@ key — also the fastest way to find drift the audit missed).
 ---
 
 ## Log
+
+### 2026-09-03 — OC-13 fixed: Drop-Rows percentage threshold now reaches the backend
+OC-13 closed. Root cause: the UI (`DropRowsNode.tsx`) stores `{drop_if_any_missing, missing_threshold}` (a 0–100 **percentage** slider, default 50), but the converter sent those keys verbatim while the backend node only reads `subset`/`how`/`threshold` (absolute non-missing count) — so every canvas run silently ran as `how="any"` (drop any missing). A frontend-only fix is impossible: percentage→absolute conversion needs the column count, unknown at conversion time. Fix (backend percentage mode, mirroring `DropMissingColumns`): `drop_rows.py` gains a `missing_threshold` param — new `_min_non_na_for_percentage` helper, percentage branch in both `_polars_dropna_filter` and `_drop_missing_rows_apply_pandas` (keep rows with `non_na >= (1 - X/100) * n_cols`, i.e. drop rows missing **more than** X% — exactly the UI wording; a row at exactly X% is kept), exposed in `@node_meta` params and `fit()`; `DropMissingRowsArtifact` gains `missing_threshold: float | None`; converter now maps checkbox/null/≤0 → `{how: "any"}`, else `{missing_threshold: X}`. No leakage change needed: the node is `learns_from_data=False` and the threshold is a fixed user setting, not learned data. Added 7 tests (fit preservation/default, pandas percentage drop, boundary keep-at-exact-share, subset respect, tuple X/y sync, polars parity) + a `percentage_threshold` round-trip case in `drop_rows.json`. Verified: 29/29 `test_drop_rows.py` pass, `ruff check`/`ruff format`/`ty check` clean, frontend `npm run build`/`lint`/861 vitest pass.
 
 ### 2026-09-03 — OC-62 fixed: object-dtype arrays digested by value, not by pointer
 OC-62 closed. Root cause: `_feed_canonical` in `pipeline/seal.py` digested `np.ndarray` via `arr.tobytes()`; for `dtype=object` arrays that serialises raw `PyObject*` pointers, which are allocator/ASLR dependent — so `fingerprint()` of any artifact holding an object-dtype array (OneHotEncoder/LabelEncoder/Ordinal/TargetEncoder `categories_`) was noise that changed across processes. Fix: the ndarray branch now detects `arr.dtype == object` and digests the shape plus each element recursively via `_feed_canonical`, so the digest reflects values. Added three regression tests in `tests/unit/test_pipeline_coverage.py` (value-vs-pointer stability incl. non-interned strings, shape sensitivity); verified the new tests FAIL on the pre-fix code (`b'\xca' != b'\xf5'`) and pass with the fix. Verified: 30/30 `test_pipeline_coverage.py` pass, `ruff check`/`ruff format`/`ty check` clean.

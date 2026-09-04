@@ -27,6 +27,11 @@
           "df_data": {"a": [1.0, null], "b": [1.0, 2.0]},
           "config": {},
           "expected_a": [1.0]
+        },
+        "percentage_threshold": {
+          "df_data": {"a": [1.0, 2.0, 3.0], "b": [1.0, null, null], "c": [1.0, 2.0, null]},
+          "config": {"missing_threshold": 50},
+          "expected_a": [1.0, 2.0]
         }
       }
     }
