@@ -57,7 +57,7 @@ follow, grouped by domain.
 | OC-20 | 🟡 | Value Replacement's "empty columns = all columns" UI promise is false (`cleaning/value_replacement.py:163-180`) | small | ✅ fixed 2026-09-04 |
 | OC-53 | 🟡 | `select_from_model`'s `max_features` is Python-only, UI-unreachable | small | ✅ fixed 2026-09-04 |
 | OC-61 | ⚪ | `BinningNode`'s "Precision (Decimals)" UI field never sent to backend (`BinningNode.tsx`) | small | ✅ fixed 2026-09-04 |
-| OC-66 | 🟠 | `CalibratedClassifierCV`'s user-selected base estimator silently discarded during tuning (`classification.py:206-282` vs `_tuning/engine.py:495-499`) | small | ⬜ open — R1 candidate |
+| OC-66 | 🟠 | `CalibratedClassifierCV`'s user-selected base estimator silently discarded during tuning (`classification.py:206-282` vs `_tuning/engine.py:495-499`) | small | ✅ fixed 2026-09-04 |
 | OC-16 | 🟠 | KNN/Iterative imputers crash on all-missing fitted columns (`imputation/knn.py:64-76`, `iterative.py:68-84`) | small | ⬜ open |
 | OC-17 | 🟠 | SimpleImputer polars mean/median crashes on all-null columns (engine divergence, `imputation/_common.py:32-37`) | small | ⬜ open |
 | OC-69 | 🟠 | Engine trusts `config.nodes` list order, never verifies topological sort (`_schema_graph.py:49-70`); `_kahn_topological_order` already exists — wiring fix | small | ⬜ open |
@@ -260,6 +260,9 @@ key — also the fastest way to find drift the audit missed).
 ---
 
 ## Log
+
+### 2026-09-04 — OC-66 fixed: `CalibratedClassifierCV`'s base estimator now survives tuning
+OC-66 closed. Root cause: the tuning engine builds the meta-estimator from `model_calculator.default_params` (`_tuning/engine.py:496`, `refit.py:44`, `grid_random.py:139`), and `CalibratedClassifierCalculator.default_params` hardcoded `estimator=LogisticRegression` — so the user's `base_estimator` selection (read only by `fit` via `_resolve_base_estimator`) was silently discarded whenever the node was tuned. Fix (core-only): routed the selection through the established structural-tuning hook (the same mechanism `_BaseEnsembleCalculator` uses) — `CalibratedClassifierCalculator` now declares `STRUCTURAL_TUNING_KEYS = ("base_estimator",)`, captures the selection in `prepare_tuning_params` (flat or nested `params` config shape), and its `default_params` override resolves it via the `BASE_ESTIMATORS` factory into `estimator` (unknown keys warn + fall back to `logistic_regression`). No backend change: both the fixed-run and tuned paths in `_node_runners.py` already call `prepare_tuning_params` and exclude `STRUCTURAL_TUNING_KEYS` from the search space. Added unit tests in `test_modeling_classification_gaps.py` (flat/nested capture, non-structural key exclusion, `default_params` resolution, unknown-key fallback, no-prepare default) plus an integration test in `test_tuning.py` asserting the tuned pipeline's fitted model is a `RandomForestClassifier` inside `CalibratedClassifierCV`. Verified: `ruff check`/`ty check` clean, OC-66 suites 20 passed, broader classification+tuning suites (6 files) 173 passed.
 
 ### 2026-09-04 — OC-61 fixed: `BinningNode`'s "Precision (Decimals)" now reaches the backend
 OC-61 closed. Root cause: the backend (`bucketing.py`) reads `config.get("precision", 3)` and the canvas `BinningNode` rendered a "Precision (Decimals)" input, but `pipelineConverter.ts`'s `BinningNode` branch listed its params explicitly and omitted `precision`, so the value was silently dropped before reaching the backend. Fix (frontend-only): added `precision: node.data.precision` to the `GeneralBinning` params object. Added 2 vitest cases to `pipelineConverter.test.ts` (precision forwarded; omitted when unset). Verified: 42/42 `pipelineConverter.test.ts` pass, `npm run lint` clean, `npm run build` clean.

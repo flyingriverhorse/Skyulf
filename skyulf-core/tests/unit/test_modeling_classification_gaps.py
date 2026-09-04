@@ -68,6 +68,64 @@ def test_calibrated_classifier_fit_predict_round_trip(clf_data):
     assert set(preds.unique()).issubset({0, 1})
 
 
+def test_prepare_tuning_params_captures_base_estimator_from_flat_config():
+    """prepare_tuning_params must absorb the base_estimator key from a flat config."""
+    calc = CalibratedClassifierCalculator()
+    calc.prepare_tuning_params({"base_estimator": "random_forest", "method": "sigmoid"})
+    assert calc._tuning_base_config == {"base_estimator": "random_forest"}
+
+
+def test_prepare_tuning_params_captures_base_estimator_from_nested_config():
+    """prepare_tuning_params must absorb the base_estimator key from a nested params config."""
+    calc = CalibratedClassifierCalculator()
+    calc.prepare_tuning_params({"params": {"base_estimator": "gradient_boosting"}})
+    assert calc._tuning_base_config == {"base_estimator": "gradient_boosting"}
+
+
+def test_prepare_tuning_params_ignores_non_structural_keys():
+    """prepare_tuning_params must only capture STRUCTURAL_TUNING_KEYS, not other config keys."""
+    calc = CalibratedClassifierCalculator()
+    calc.prepare_tuning_params({"method": "isotonic", "cv": 5})
+    assert calc._tuning_base_config == {}
+
+
+def test_default_params_resolves_base_estimator_to_instance():
+    """After prepare_tuning_params, default_params must expose the resolved estimator instance."""
+    from sklearn.ensemble import RandomForestClassifier
+
+    calc = CalibratedClassifierCalculator()
+    calc.prepare_tuning_params({"base_estimator": "random_forest"})
+    params = calc.default_params
+    assert isinstance(params["estimator"], RandomForestClassifier)
+
+
+def test_default_params_falls_back_to_logistic_regression_for_unknown_key():
+    """An unknown base_estimator key must fall back to LogisticRegression in default_params."""
+    from sklearn.linear_model import LogisticRegression
+
+    calc = CalibratedClassifierCalculator()
+    calc.prepare_tuning_params({"base_estimator": "not_a_real_estimator"})
+    params = calc.default_params
+    assert isinstance(params["estimator"], LogisticRegression)
+
+
+def test_default_params_returns_default_when_no_tuning_base_config():
+    """Without prepare_tuning_params, default_params must return the default LogisticRegression."""
+    from sklearn.linear_model import LogisticRegression
+
+    calc = CalibratedClassifierCalculator()
+    params = calc.default_params
+    assert isinstance(params["estimator"], LogisticRegression)
+
+
+def test_default_params_does_not_mutate_internal_state():
+    """default_params must return a copy; mutating it must not corrupt the calculator's state."""
+    calc = CalibratedClassifierCalculator()
+    params = calc.default_params
+    params["estimator"] = "corrupted"
+    assert calc.default_params["estimator"].__class__.__name__ == "LogisticRegression"
+
+
 def test_silent_lgbm_logger_info_and_warning_are_no_ops():
     """_SilentLgbmLogger.info/.warning must be callable no-ops (silences native lgbm logs)."""
     from skyulf.modeling.classification import _SilentLgbmLogger

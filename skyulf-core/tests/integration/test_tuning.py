@@ -2,11 +2,15 @@
 
 from typing import Any, cast
 
+from sklearn.ensemble import RandomForestClassifier
 from tests.utils.dataset_loader import load_sample_dataset
 
 from skyulf.modeling._tuning.engine import TuningCalculator
 from skyulf.modeling._tuning.schemas import TuningConfig
-from skyulf.modeling.classification import LogisticRegressionCalculator
+from skyulf.modeling.classification import (
+    CalibratedClassifierCalculator,
+    LogisticRegressionCalculator,
+)
 
 
 def test_tuner_grid_search(sample_classification_data):
@@ -129,3 +133,31 @@ class TestRealShapedDataset:
         preds = TuningApplier(LogisticRegressionApplier()).predict(X_val, (model, result))
         assert len(preds) == len(X_val)
         assert set(preds.unique()).issubset(set(model.classes_))
+
+
+def test_tuner_resolves_base_estimator_for_calibrated_classifier(sample_classification_data):
+    """OC-66: the user-selected ``base_estimator`` must survive tuning.
+
+    Before the fix, ``CalibratedClassifierCV``'s ``base_estimator`` string was
+    dropped by ``filter_params_to_signature`` (it is not a constructor param),
+    so every tuned model silently fell back to the default LogisticRegression.
+    """
+    data = sample_classification_data.fillna(0).drop(columns=["category"])
+    X = data.drop(columns=["target"])
+    y = data["target"]
+
+    base_calc = CalibratedClassifierCalculator()
+    base_calc.prepare_tuning_params({"base_estimator": "random_forest"})
+    tuner = TuningCalculator(base_calc)
+
+    config = TuningConfig(
+        strategy="grid",
+        metric="accuracy",
+        search_space={"method": ["sigmoid", "isotonic"]},
+        cv_folds=3,
+    )
+    model, result = tuner.fit(X, y, config=config.__dict__)
+
+    assert result.best_score > 0
+    # The tuned model's base estimator must be the user's choice, not the default.
+    assert isinstance(model.estimator, RandomForestClassifier)
