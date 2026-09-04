@@ -223,7 +223,7 @@ Config:
 
 - `columns`: list[str] (numeric)
 - `max_iter`: int (default 10)
-- `estimator`: `BayesianRidge` | `DecisionTree` | `ExtraTrees` | `KNeighbors`
+- `estimator`: `BayesianRidge` | `DecisionTree` | `ExtraTrees` | `KNeighbors` (matched case-insensitively; the canvas aliases `bayesian_ridge`, `decision_tree`, `extra_trees`, `knn` are accepted too)
 
 Learned params:
 

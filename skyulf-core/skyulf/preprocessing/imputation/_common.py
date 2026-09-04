@@ -1,6 +1,7 @@
 """Shared helpers for imputation nodes."""
 
 import logging
+import re
 from typing import Any
 
 import pandas as pd
@@ -101,11 +102,19 @@ def _sklearn_transform_subset(X: Any, cols: list[str], imputer: Any, is_polars: 
 
 
 def _build_iterative_estimator(name: str) -> Any:
-    """Map the public estimator alias to a concrete sklearn regressor."""
-    if name == "DecisionTree":
+    """Map the public estimator alias to a concrete sklearn regressor.
+
+    The alias is matched case-insensitively and tolerant of ``_``/``-``/spaces
+    so the canvas UI values (``decision_tree``, ``extra_trees``, ``knn``) and
+    the documented aliases (``DecisionTree``, ``ExtraTrees``, ``KNeighbors``)
+    both resolve to the same regressor. Unknown names fall back to
+    ``BayesianRidge``.
+    """
+    key = re.sub(r"[^a-z0-9]", "", name.lower())
+    if key == "decisiontree":
         return DecisionTreeRegressor(max_features="sqrt", random_state=0)
-    if name == "ExtraTrees":
+    if key == "extratrees":
         return ExtraTreesRegressor(n_estimators=10, random_state=0)
-    if name == "KNeighbors":
+    if key in {"kneighbors", "knn"}:
         return KNeighborsRegressor(n_neighbors=5)
     return BayesianRidge()

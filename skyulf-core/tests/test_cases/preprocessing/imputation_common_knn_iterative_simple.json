@@ -40,6 +40,10 @@
         "decision_tree": {"alias": "DecisionTree", "module": "sklearn.tree", "class_name": "DecisionTreeRegressor"},
         "extra_trees": {"alias": "ExtraTrees", "module": "sklearn.ensemble", "class_name": "ExtraTreesRegressor"},
         "kneighbors": {"alias": "KNeighbors", "module": "sklearn.neighbors", "class_name": "KNeighborsRegressor"},
+        "ui_decision_tree": {"alias": "decision_tree", "module": "sklearn.tree", "class_name": "DecisionTreeRegressor"},
+        "ui_extra_trees": {"alias": "extra_trees", "module": "sklearn.ensemble", "class_name": "ExtraTreesRegressor"},
+        "ui_knn": {"alias": "knn", "module": "sklearn.neighbors", "class_name": "KNeighborsRegressor"},
+        "ui_bayesian_ridge": {"alias": "bayesian_ridge", "module": "sklearn.linear_model", "class_name": "BayesianRidge"},
         "default_bayesian_ridge": {"alias": "something_else", "module": "sklearn.linear_model", "class_name": "BayesianRidge"}
       }
     },

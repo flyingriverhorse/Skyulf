@@ -51,7 +51,7 @@ follow, grouped by domain.
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
 | OC-13 | 🟠 | Drop-Rows UI settings ignored; every canvas run becomes "drop any missing" (`pipelineConverter.ts:249-253`) | small | ✅ fixed 2026-09-03 |
-| OC-14 | 🟠 | Iterative Imputer UI estimator choices silently fall back to BayesianRidge (`imputation/_common.py:103-111`) | small | ⬜ open — R1 candidate |
+| OC-14 | 🟠 | Iterative Imputer UI estimator choices silently fall back to BayesianRidge (`imputation/_common.py:103-111`) | small | ✅ fixed 2026-09-03 |
 | OC-15 | 🟠 | MinMax/Robust scaler range controls in UI ignored (`scaling/minmax.py:96-100`, `robust.py:116-123`) | small | ⬜ open — R1 candidate |
 | OC-19 | 🟡 | Alias Replacement exposes `punctuation` mode that does nothing (`cleaning/alias.py:45-52`) | small | ⬜ open — R1 candidate |
 | OC-20 | 🟡 | Value Replacement's "empty columns = all columns" UI promise is false (`cleaning/value_replacement.py:163-180`) | small | ⬜ open — R1 candidate |
@@ -260,6 +260,9 @@ key — also the fastest way to find drift the audit missed).
 ---
 
 ## Log
+
+### 2026-09-03 — OC-14 fixed: Iterative Imputer canvas estimator choices honored
+OC-14 closed. Root cause: the UI (`ImputationNode.tsx`) emits lowercase aliases (`bayesian_ridge`, `decision_tree`, `extra_trees`, `knn`) and the converter forwards `estimator` verbatim, but `_build_iterative_estimator` in `imputation/_common.py` matched only the exact documented strings (`DecisionTree`, `ExtraTrees`, `KNeighbors`) — so every canvas run silently fell back to `BayesianRidge` regardless of the user's choice. Fix (backend normalization, single owner of the mapping): the alias is now lowercased and stripped of non-alphanumerics before dispatch, so both the UI values and the documented aliases resolve to the same regressor; unknown names still fall back to `BayesianRidge`. No frontend or converter change needed. Added 4 JSON-driven cases to `iterative_estimator_aliases` (`ui_decision_tree`, `ui_extra_trees`, `ui_knn`, `ui_bayesian_ridge`). Verified: 74/74 `test_imputation_common_knn_iterative_simple.py` pass, `ruff check`/`ruff format`/`ty check` clean.
 
 ### 2026-09-03 — OC-13 fixed: Drop-Rows percentage threshold now reaches the backend
 OC-13 closed. Root cause: the UI (`DropRowsNode.tsx`) stores `{drop_if_any_missing, missing_threshold}` (a 0–100 **percentage** slider, default 50), but the converter sent those keys verbatim while the backend node only reads `subset`/`how`/`threshold` (absolute non-missing count) — so every canvas run silently ran as `how="any"` (drop any missing). A frontend-only fix is impossible: percentage→absolute conversion needs the column count, unknown at conversion time. Fix (backend percentage mode, mirroring `DropMissingColumns`): `drop_rows.py` gains a `missing_threshold` param — new `_min_non_na_for_percentage` helper, percentage branch in both `_polars_dropna_filter` and `_drop_missing_rows_apply_pandas` (keep rows with `non_na >= (1 - X/100) * n_cols`, i.e. drop rows missing **more than** X% — exactly the UI wording; a row at exactly X% is kept), exposed in `@node_meta` params and `fit()`; `DropMissingRowsArtifact` gains `missing_threshold: float | None`; converter now maps checkbox/null/≤0 → `{how: "any"}`, else `{missing_threshold: X}`. No leakage change needed: the node is `learns_from_data=False` and the threshold is a fixed user setting, not learned data. Added 7 tests (fit preservation/default, pandas percentage drop, boundary keep-at-exact-share, subset respect, tuple X/y sync, polars parity) + a `percentage_threshold` round-trip case in `drop_rows.json`. Verified: 29/29 `test_drop_rows.py` pass, `ruff check`/`ruff format`/`ty check` clean, frontend `npm run build`/`lint`/861 vitest pass.
