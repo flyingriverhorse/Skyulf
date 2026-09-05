@@ -10,7 +10,11 @@ import pandas as pd
 import polars as pl
 import pytest
 
-from backend.data_ingestion.serialization import AsyncJSONSafeSerializer, DataTypeConverter
+from backend.data_ingestion.serialization import (
+    AsyncJSONSafeSerializer,
+    DataTypeConverter,
+    JSONSafeSerializer,
+)
 
 
 class TestHandlePolarsDataFrame:
@@ -221,3 +225,32 @@ class TestConvertColumn:
         series = pd.Series([1, 2, 3])
         converted = DataTypeConverter._convert_column(series, "unknown_type")
         assert converted is series
+
+
+class TestHandleFloatEdgeCases:
+    """Tests for ``JSONSafeSerializer._handle_float_edge_cases``.
+
+    These call the handler directly instead of going through
+    ``clean_for_json``. ``_handle_special_string_values`` sits earlier in the
+    handler chain and already returns ``None`` for a NaN float, because
+    ``str(float("nan"))`` is the sentinel string ``"nan"`` — so the
+    ``math.isnan`` branch here is unreachable from the public entry point and
+    can only be exercised by calling the handler itself.
+    """
+
+    def test_nan_becomes_none(self):
+        assert JSONSafeSerializer._handle_float_edge_cases(float("nan")) is None
+
+    def test_infinities_become_none(self):
+        assert JSONSafeSerializer._handle_float_edge_cases(float("inf")) is None
+        assert JSONSafeSerializer._handle_float_edge_cases(float("-inf")) is None
+
+    def test_finite_floats_pass_through_unchanged(self):
+        assert JSONSafeSerializer._handle_float_edge_cases(1.5) == 1.5
+        assert JSONSafeSerializer._handle_float_edge_cases(0.0) == 0.0
+        assert JSONSafeSerializer._handle_float_edge_cases(-2.5) == -2.5
+
+    def test_non_float_is_not_handled(self):
+        # The NaN *string* belongs to _handle_special_string_values, not here.
+        assert JSONSafeSerializer._handle_float_edge_cases("nan") is JSONSafeSerializer._NOT_HANDLED
+        assert JSONSafeSerializer._handle_float_edge_cases(3) is JSONSafeSerializer._NOT_HANDLED

@@ -52,13 +52,29 @@ ANONYMOUS_ACTOR = "__anonymous__"
 def _pipeline_json_path(storage_dir: str | Path, dataset_id: str) -> Path:
     """Return the on-disk JSON path for `dataset_id`, or raise ValueError.
 
-    `dataset_id` must match `_SAFE_DATASET_ID_RE`; anything else (path
-    separators, "..", absolute-path overrides, etc.) is rejected before any
-    `Path` is built from it.
+    Two independent layers, because the first is invisible to static analysis:
+
+    1. `dataset_id` must match `_SAFE_DATASET_ID_RE`; anything else (path
+       separators, "..", absolute-path overrides, null bytes) is rejected
+       before any `Path` is built from it.
+    2. The joined path is resolved and checked for containment in the resolved
+       storage root.
+
+    Layer 1 alone is already sufficient -- the charset excludes "." and every
+    separator, so the join appends exactly one segment. But CodeQL's
+    `py/path-injection` does not model a character allowlist as a sanitizer and
+    keeps flagging the `aiofiles.open` sinks, and layer 1 is only as durable as
+    the charset it happens to declare. Layer 2 makes containment explicit,
+    matching `LocalFileConnector.resolve_safe_path` and
+    `LocalArtifactStore._get_path`.
     """
     if not _SAFE_DATASET_ID_RE.fullmatch(dataset_id):
         raise ValueError(f"Invalid dataset_id: {dataset_id!r}")
-    return Path(storage_dir) / f"{dataset_id}.json"
+    root = Path(storage_dir).resolve()
+    candidate = (root / f"{dataset_id}.json").resolve()
+    if not candidate.is_relative_to(root):
+        raise ValueError(f"Invalid dataset_id: {dataset_id!r}")
+    return candidate
 
 
 @router.post("/save/{dataset_id}")

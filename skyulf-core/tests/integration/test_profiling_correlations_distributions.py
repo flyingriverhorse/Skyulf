@@ -8,7 +8,11 @@ import polars as pl
 import pytest
 from tests.utils.dataset_loader import load_sample_dataset
 
-from skyulf.profiling.correlations import calculate_correlations
+from skyulf.profiling.correlations import (
+    _clean_cell,
+    _pairwise_correlation_matrix,
+    calculate_correlations,
+)
 from skyulf.profiling.distributions import calculate_histogram
 
 
@@ -259,3 +263,54 @@ class TestRealShapedDataset:
         # every bin's count.
         non_null_income = df_eager["income"].drop_nulls().len()
         assert sum(b.count for b in hist) == non_null_income
+
+
+class TestPairwiseDeletionEdgeCases:
+    """Branches pairwise deletion opens up that the happy path never reaches."""
+
+    def test_pair_with_no_variance_in_its_overlap_is_reported_as_zero(self) -> None:
+        """``b`` varies overall, so it survives the constant-column filter, but
+        it is constant across the four rows where *both* columns are observed.
+        ``pl.corr`` then divides by a zero standard deviation and yields NaN
+        rather than a coefficient, and ``CorrelationMatrix`` has no "unknown"
+        cell — so the pair must land on 0.0 instead of leaking a NaN into the
+        matrix."""
+        df = pl.DataFrame({"a": [1.0, 2.0, 3.0, 4.0, None], "b": [5.0, 5.0, 5.0, 5.0, 99.0]}).lazy()
+
+        matrix = calculate_correlations(df, ["a", "b"])
+
+        assert matrix is not None
+        assert matrix.columns == ["a", "b"]
+        assert matrix.values == [[1.0, 0.0], [0.0, 1.0]]
+
+    def test_clean_cell_coerces_missing_and_non_finite_to_zero(self) -> None:
+        """Direct call on purpose for the ``None`` case. ``calculate_correlations``
+        cannot produce one: a pair sharing fewer than ``MIN_PAIRWISE_OVERLAP``
+        observations is replaced by a literal ``0.0`` before ``_clean_cell`` runs,
+        and every other pair gets a float back from polars (NaN when the overlap
+        has no variance, as the test above pins). ``None`` is defended against
+        because ``_clean_cell`` is typed ``object`` and polars' null-vs-NaN choice
+        for a degenerate coefficient is not something to bet the matrix on."""
+        assert _clean_cell(None) == 0.0
+        assert _clean_cell(float("nan")) == 0.0
+        assert _clean_cell(float("inf")) == 0.0
+        assert _clean_cell(-0.87) == -0.87
+
+    def test_frame_with_fewer_than_two_rows_yields_none(self) -> None:
+        """One row (or none) cannot produce a coefficient, however many usable
+        numeric columns are declared."""
+        single = pl.DataFrame({"a": [1.0], "b": [2.0]}).lazy()
+        assert calculate_correlations(single, ["a", "b"]) is None
+
+        empty = pl.DataFrame({"a": [], "b": []}, schema={"a": pl.Float64, "b": pl.Float64}).lazy()
+        assert calculate_correlations(empty, ["a", "b"]) is None
+
+    def test_matrix_is_the_identity_when_there_are_no_pairs(self) -> None:
+        """Direct call on purpose: ``calculate_correlations`` returns None
+        whenever fewer than two columns survive filtering, so the no-pairs
+        early exit is only reachable by a caller handing the helper a 0- or
+        1-column list."""
+        df = pl.DataFrame({"a": [1.0, 2.0, 3.0]})
+
+        assert _pairwise_correlation_matrix(df, ["a"]) == [[1.0]]
+        assert _pairwise_correlation_matrix(df, []) == []
