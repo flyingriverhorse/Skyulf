@@ -7,7 +7,7 @@ Re-exports the public API so existing imports continue to work:
     from backend.config import Settings, get_settings
 """
 
-from backend.config.base import Settings  # noqa: F401
+from backend.config.base import KNOWN_ENVIRONMENTS, Settings, resolve_environment  # noqa: F401
 from backend.config.environments import (  # noqa: F401
     DevelopmentSettings,
     ProductionSettings,
@@ -20,6 +20,8 @@ __all__ = [
     "DevelopmentSettings",
     "ProductionSettings",
     "TestingSettings",
+    "KNOWN_ENVIRONMENTS",
+    "resolve_environment",
     "get_settings",
     "get_app_settings",
 ]

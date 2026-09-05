@@ -115,41 +115,6 @@ class AsyncSQLiteConnectionManager:
                     with suppress(Exception):
                         await conn.close()
 
-    async def execute_query(
-        self,
-        query: str,
-        params: tuple[Any, ...] | None = None,
-    ) -> list[dict[str, Any]]:
-        """Execute a SELECT query and return results as list of dicts"""
-        async with self.get_connection() as conn:
-            if params:
-                cursor = await conn.execute(query, params)
-            else:
-                cursor = await conn.execute(query)
-
-            columns = [desc[0] for desc in cursor.description] if cursor.description else []
-            rows = await cursor.fetchall()
-            await cursor.close()
-
-            return [dict(zip(columns, row, strict=True)) for row in rows]
-
-    async def execute_update(
-        self,
-        query: str,
-        params: tuple[Any, ...] | None = None,
-    ) -> int:
-        """Execute an INSERT/UPDATE/DELETE query and return affected rows"""
-        async with self.get_connection() as conn:
-            if params:
-                cursor = await conn.execute(query, params)
-            else:
-                cursor = await conn.execute(query)
-
-            await conn.commit()
-            rowcount = cursor.rowcount
-            await cursor.close()
-            return cast(int, rowcount)
-
     def _sync_close_all(self):
         """Synchronous atexit handler.
 
@@ -239,33 +204,6 @@ class AsyncPostgreSQLConnectionManager:
             except Exception:
                 await session.rollback()
                 raise
-
-    async def execute_query(
-        self,
-        query: str,
-        params: dict[str, Any] | None = None,
-    ) -> list[dict[str, Any]]:
-        """Execute a SELECT query and return results as list of dicts"""
-        async with self.get_connection() as conn:
-            from sqlalchemy import text
-
-            result = await conn.execute(text(query), params or {})
-            columns = result.keys()
-            rows = result.fetchall()
-            return [dict(zip(columns, row, strict=True)) for row in rows]
-
-    async def execute_update(
-        self,
-        query: str,
-        params: dict[str, Any] | None = None,
-    ) -> int:
-        """Execute an INSERT/UPDATE/DELETE query and return affected rows"""
-        async with self.get_connection() as conn:
-            from sqlalchemy import text
-
-            result = await conn.execute(text(query), params or {})
-            # engine.begin() commits automatically on clean exit — no explicit commit needed.
-            return cast(int, result.rowcount)
 
     async def close(self):
         """Close the async engine and all connections"""

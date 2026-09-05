@@ -9,7 +9,6 @@ Each mixin lives in ``backend/config/mixins/`` and owns one domain's fields.
 
 import json
 import logging
-import os
 import urllib.parse
 from pathlib import Path
 from typing import Any, cast
@@ -27,6 +26,55 @@ from backend.config.mixins.llm import LLMMixin
 from backend.config.mixins.logging import LoggingMixin
 from backend.config.mixins.security import SecurityMixin
 from backend.config.mixins.snowflake import SnowflakeMixin
+
+# Single source of truth for the dotenv location, shared by ``Settings`` and the
+# ``FASTAPI_ENV`` probe below so the two cannot drift apart.
+_ENV_FILE = ".env"
+
+#: The only accepted ``FASTAPI_ENV`` values.
+KNOWN_ENVIRONMENTS = ("development", "production", "testing")
+
+
+class _EnvironmentSelector(BaseSettings):
+    """Resolve ``FASTAPI_ENV`` through the same channels as :class:`Settings`.
+
+    ``FASTAPI_ENV`` is not a ``Settings`` field, so reading it with a bare
+    ``os.getenv`` ignored a value set in ``.env`` — the documented configuration
+    file — because pydantic-settings loads the dotenv into the model and never
+    exports it into ``os.environ``.
+    """
+
+    model_config = SettingsConfigDict(
+        env_file=_ENV_FILE,
+        env_file_encoding="utf-8",
+        case_sensitive=True,
+        extra="ignore",
+    )
+
+    FASTAPI_ENV: str = "development"
+
+
+def resolve_environment() -> str:
+    """Return the normalized deployment environment, rejecting unknown values.
+
+    Fails closed. An unrecognized ``FASTAPI_ENV`` raises instead of falling back
+    to the most permissive profile: a silent fallback meant ``FASTAPI_ENV=prod``
+    — or a trailing space picked up from a YAML/CI variable — booted the full
+    development posture, i.e. wildcard CORS combined with credentials,
+    ``DEBUG=True``, no ``SECRET_KEY`` check and no security headers.
+
+    Returns:
+        One of :data:`KNOWN_ENVIRONMENTS`.
+
+    Raises:
+        ValueError: If ``FASTAPI_ENV`` is set to anything else, including empty.
+    """
+    env = _EnvironmentSelector().FASTAPI_ENV.strip().lower()
+    if env not in KNOWN_ENVIRONMENTS:
+        raise ValueError(
+            f"Unknown FASTAPI_ENV={env!r}; expected one of {', '.join(KNOWN_ENVIRONMENTS)}"
+        )
+    return env
 
 
 class Settings(
@@ -49,7 +97,7 @@ class Settings(
     """
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=_ENV_FILE,
         env_file_encoding="utf-8",
         case_sensitive=True,
         extra="ignore",
@@ -185,7 +233,7 @@ class Settings(
         and per restart — which breaks JWT validation across workers and makes
         all existing tokens invalid after a restart.
         """
-        env = os.getenv("FASTAPI_ENV", "development").lower()
+        env = resolve_environment()
         if env == "production" and not self.is_field_set("SECRET_KEY"):
             raise ValueError(
                 "SECRET_KEY must be explicitly set in production environments. "

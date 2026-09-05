@@ -6,15 +6,23 @@ Settings Factory
 Creates the correct Settings subclass based on the FASTAPI_ENV environment variable.
 """
 
-import os
 from functools import lru_cache
 
-from backend.config.base import Settings
+from backend.config.base import KNOWN_ENVIRONMENTS, Settings, resolve_environment
 from backend.config.environments import (
     DevelopmentSettings,
     ProductionSettings,
     TestingSettings,
 )
+
+# Must cover exactly ``KNOWN_ENVIRONMENTS``; ``resolve_environment()`` guarantees
+# the lookup key is one of them, so a gap here fails loudly rather than silently
+# selecting the most permissive profile.
+_ENV_SETTINGS_MAP: dict[str, type[Settings]] = {
+    "development": DevelopmentSettings,
+    "production": ProductionSettings,
+    "testing": TestingSettings,
+}
 
 
 @lru_cache
@@ -23,14 +31,12 @@ def get_settings() -> Settings:
     Get application settings based on ``FASTAPI_ENV``.
 
     Returns a cached singleton so the config is built once per process.
-    """
-    env = os.getenv("FASTAPI_ENV", "development").lower()
 
-    env_map = {
-        "production": ProductionSettings,
-        "testing": TestingSettings,
-    }
-    settings: Settings = env_map.get(env, DevelopmentSettings)()
+    Raises:
+        ValueError: If ``FASTAPI_ENV`` is set to an unknown value. Selection
+            fails closed rather than defaulting to the most permissive profile.
+    """
+    settings: Settings = _ENV_SETTINGS_MAP[resolve_environment()]()
     settings.create_directories()
     return settings
 

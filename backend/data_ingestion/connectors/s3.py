@@ -7,6 +7,7 @@ import polars as pl
 from backend.config import get_settings
 from backend.data_ingestion.connectors.base import BaseConnector
 from backend.exceptions.core import ForbiddenException, ResourceNotFoundException
+from backend.utils.logging_utils import redact_credentials
 
 logger = logging.getLogger(__name__)
 
@@ -22,19 +23,12 @@ class S3Connector(BaseConnector):
     def __init__(self, path: str, storage_options: dict | None = None):
         self.path = path
         self.storage_options = storage_options or {}
+        # path is caller-supplied and may itself be a presigned URL, i.e. a bearer credential.
         logger.info(
             "Initialized S3Connector for %s with option keys: %s",
-            path,
+            redact_credentials(path),
             list(self.storage_options.keys()),
         )
-
-    @staticmethod
-    def _sanitize_error(error: Exception) -> str:
-        message = str(error)
-        for secret in ("aws_secret_access_key", "aws_access_key_id", "secret=", "key="):
-            if secret in message:
-                return "redacted sensitive S3 error"
-        return message
 
     @staticmethod
     def _map_storage_option_keys(options: dict) -> dict:
@@ -89,7 +83,9 @@ class S3Connector(BaseConnector):
             raise
         except Exception as e:
             logger.error(
-                "S3 connection check failed for %s: %s", self.path, self._sanitize_error(e)
+                "S3 connection check failed for %s: %s",
+                redact_credentials(self.path),
+                redact_credentials(e),
             )
             raise ConnectionError(f"Failed to connect to S3 path {self.path}") from e
 
@@ -175,7 +171,11 @@ class S3Connector(BaseConnector):
 
             return cast(pl.DataFrame, lf.collect())
         except Exception as e:
-            logger.error("Failed to fetch data from %s: %s", self.path, self._sanitize_error(e))
+            logger.error(
+                "Failed to fetch data from %s: %s",
+                redact_credentials(self.path),
+                redact_credentials(e),
+            )
             raise RuntimeError(f"Failed to fetch data from S3 path {self.path}") from e
 
     async def validate(self) -> bool:
