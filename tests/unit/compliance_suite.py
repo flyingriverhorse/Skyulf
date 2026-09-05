@@ -664,12 +664,7 @@ def test_casting_parity():
     # CastingApplier apply
     # Let's test specific casting
     # a -> float, b -> string, c -> category
-    params = {
-        "columns": ["a", "b", "c"],
-        "target_type": "float",
-    }
-
-    # Let's construct params manually for Applier to test multiple types
+    # Construct params manually for the Applier to test multiple types
     params_mixed = {"type_map": {"a": "float", "b": "string", "c": "category"}}
 
     applier = CastingApplier()

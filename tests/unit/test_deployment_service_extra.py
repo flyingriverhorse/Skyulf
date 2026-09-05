@@ -562,8 +562,13 @@ def test_extract_features_from_engineer_direct_attr():
 
 
 def test_extract_features_from_engineer_from_first_step():
+    """Falls back to the first pipeline step's transformer when the engineer
+    itself carries no ``feature_names_in_``."""
     transformer = SimpleNamespace(feature_names_in_=np.array(["x", "y"]))
     fe = SimpleNamespace(steps=[("step1", transformer)])
+
+    result = DeploymentService._extract_features_from_engineer(fe)
+    assert list(result) == ["x", "y"]
 
 
 # ---------------------------------------------------------------------------
@@ -695,7 +700,6 @@ def test_predict_with_bundled_artifact_validates_pre_transform_columns():
 
 def test_predict_with_bundled_artifact_missing_all_input_columns():
     """F-03 regression: Should fail when all INPUT columns are missing."""
-    transformer = _ColumnAddingTransformer()
 
     class _TestEngineer:
         def __init__(self):

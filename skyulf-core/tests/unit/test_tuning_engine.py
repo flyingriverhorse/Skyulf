@@ -134,7 +134,6 @@ def test_instantiate_model_basic():
     """_instantiate_model should create a model with the supplied params."""
     from sklearn.linear_model import LogisticRegression
 
-    tuner = _tuner_clf()
     model = TuningCalculator._instantiate_model(LogisticRegression, {"C": 5.0})
     assert hasattr(model, "fit")
     assert model.C == 5.0
@@ -144,7 +143,6 @@ def test_instantiate_model_filters_invalid_params():
     """_instantiate_model should silently ignore params not in the constructor."""
     from sklearn.linear_model import LogisticRegression
 
-    tuner = _tuner_clf()
     # 'nonexistent_param' is not a LogisticRegression constructor arg
     model = TuningCalculator._instantiate_model(
         LogisticRegression, {"C": 2.0, "nonexistent_param": 99}
@@ -899,7 +897,7 @@ def test_optuna_failed_trials_surface_error_in_log_and_message():
     the frontend job detail shows the real cause instead of a generic message.
     """
     pytest.importorskip("optuna")
-    xgb = pytest.importorskip("xgboost")
+    pytest.importorskip("xgboost")
     from skyulf.modeling.classification import XGBClassifierCalculator
 
     X, y_int = _clf_xy(n=40)
@@ -1357,7 +1355,6 @@ def test_fit_optuna_cmaes_with_integer_search_space():
     pytest.importorskip("optuna")
     pytest.importorskip("cmaes")
     X, y = _clf_xy(n=150)
-    tuner = TuningCalculator(RandomForestRegressorCalculator())
     tuner_clf = _tuner_clf()
     cfg = TuningConfig(
         strategy="optuna",

@@ -253,9 +253,6 @@ def test_seed_explicit_none_is_respected(clf_data):
 def test_seed_not_injected_for_estimators_without_random_state():
     """Estimators whose constructor has no random_state (and no **kwargs) must
     not receive one — otherwise they'd trigger a dropped-param warning."""
-    rng = np.random.RandomState(3)
-    X = pd.DataFrame({"f1": rng.normal(0, 1, 20)})
-    y = pd.Series(X["f1"] + rng.normal(0, 0.1, 20))
     calc = SklearnCalculator(
         model_class=LinearRegression, default_params={}, problem_type="regression"
     )

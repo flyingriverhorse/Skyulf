@@ -176,30 +176,6 @@ def test_optimize_thresholds_nan_scores_fall_back_to_default():
     assert thresholds[1] == pytest.approx(0.5)
 
 
-def test_optimize_thresholds_multiclass_nelder_mead_improves_on_argmax():
-    """Nelder-Mead-tuned multiclass thresholds must not do worse than plain argmax
-    on balanced accuracy for an imbalanced synthetic dataset."""
-    rng = np.random.default_rng(1)
-    classes = np.array(["a", "b", "c"])
-    n_per_class = [300, 50, 50]
-    y_true_parts = []
-    proba_parts = []
-    for i, n in enumerate(n_per_class):
-        y_true_parts.append(np.full(n, classes[i]))
-        base = rng.dirichlet(alpha=[1, 1, 1], size=n)
-        # Bias each row's own-class column upward so there's real signal.
-        base[:, i] += 1.5
-        base = base / base.sum(axis=1, keepdims=True)
-        proba_parts.append(base)
-    y_true = np.concatenate(y_true_parts)
-    y_proba = np.concatenate(proba_parts)
-
-    def balanced_acc(y_t, y_p):
-        from sklearn.metrics import balanced_accuracy_score
-
-        return balanced_accuracy_score(y_t, y_p)
-
-
 def test_optimize_thresholds_multiclass_nelder_mead_actually_escapes_argmax_start():
     """Regression test for a real bug: scipy's default Nelder-Mead initial
     simplex for a zero-valued starting point (log(1.0) == 0, i.e. plain

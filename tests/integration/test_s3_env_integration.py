@@ -72,7 +72,7 @@ def test_s3_catalog_init_with_env_vars():
         patch.dict("sys.modules", {"s3fs": mock_s3fs}),
     ):
         # Init with empty options
-        catalog = S3Catalog(bucket_name="test-bucket", storage_options={})
+        S3Catalog(bucket_name="test-bucket", storage_options={})
 
         # Verify s3fs.S3FileSystem was called
         # It should be called with empty kwargs if we rely on env vars,
@@ -102,7 +102,7 @@ def test_s3_catalog_explicit_creds_mapping():
     }
 
     with patch.dict("sys.modules", {"s3fs": mock_s3fs}):
-        catalog = S3Catalog(bucket_name="test-bucket", storage_options=options)
+        S3Catalog(bucket_name="test-bucket", storage_options=options)
 
         mock_s3fs.S3FileSystem.assert_called()
         call_kwargs = mock_s3fs.S3FileSystem.call_args[1]
@@ -120,7 +120,7 @@ def test_s3_catalog_region_arg_priority():
 
     with patch.dict("sys.modules", {"s3fs": mock_s3fs}):
         # Pass region_name explicitly
-        catalog = S3Catalog(bucket_name="test-bucket", region_name="eu-central-1")
+        S3Catalog(bucket_name="test-bucket", region_name="eu-central-1")
 
         mock_s3fs.S3FileSystem.assert_called()
         call_kwargs = mock_s3fs.S3FileSystem.call_args[1]

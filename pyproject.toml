@@ -167,12 +167,28 @@ extend-exclude = [
 # dead and auto-fixed; the rest are availability/side-effect probes carrying a
 # per-site `# noqa: F401 - <reason>` waiver, as with BLE001 above. Pre-commit
 # runs ruff with `--fix`, so orphans are now stripped automatically.
+# F841 (unused-variable) added in the same pass. All 19 sites were in tests and
+# none were merely untidy: **three were tests whose bodies ended before any
+# assertion**, so they had always passed trivially — one completed, two deleted
+# (one redundant with 22 existing tests elsewhere, one provably unsatisfiable
+# because plain argmax already scored 1.0 on its fixture). The rest: one test
+# renamed because its name claimed a FAILED status its code path cannot reach,
+# one missing parallel assertion added, one weak `!=` strengthened to an exact
+# mapping check, and the remainder were plain dead bindings. **An unused local
+# in a test is a missing-assertion signal first and a lint problem second —
+# check the test body, don't just strip the binding.** Two traps: (1) scanning
+# for `assert` statements over-reports, since mock `assert_called()` /
+# `assert_awaited_once()` and `pytest.raises` blocks are real assertions that
+# such a scan cannot see — 3 of the 6 it flagged were fine; (2) no `--fix` was
+# used, because every F841 fix is marked unsafe: only a human can tell a dead
+# assignment from an accidentally deleted use.
 select = [
     "E9",
     "F63",
     "F7",
     "F82",
     "F401",
+    "F841",
     "I",
     "UP",
     "B",
