@@ -14,6 +14,7 @@ from backend.ml_pipeline._services.job_service import JobService
 from backend.ml_pipeline._services.prediction_utils import extract_target_label_encoder
 from backend.ml_pipeline.artifacts.local import LocalArtifactStore
 from backend.ml_pipeline.artifacts.s3 import S3ArtifactStore
+from backend.utils import sanitize_for_log
 
 logger = logging.getLogger(__name__)
 
@@ -114,8 +115,11 @@ class DeploymentService:
         if not artifact_uri:
             # Fallback: use node_id if artifact_uri is missing (legacy jobs)
             artifact_uri = str(db_job.node_id)
+            # node_id reaches the DB from the client-submitted graph via the
+            # unvalidated NodeConfig dataclass, so it is tainted like job_id.
             logger.warning(
-                f"No artifact URI found for job {job_id}, falling back to node_id: {artifact_uri}"
+                f"No artifact URI found for job {sanitize_for_log(job_id)}, "
+                f"falling back to node_id: {sanitize_for_log(artifact_uri)}"
             )
 
         # 3. Record the currently active deployment (if any) as the one this

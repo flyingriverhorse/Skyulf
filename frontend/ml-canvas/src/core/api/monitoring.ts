@@ -2,9 +2,22 @@ import { apiClient } from './client';
 
 export interface DriftMetric {
     metric: string;
+    /**
+     * On the same scale as `threshold`, so `value > threshold` reproduces
+     * `has_drift` — except for the diagnostics-only `ks_test_p_value`, which
+     * never decides drift and carries the KS statistic's threshold.
+     */
     value: number;
     has_drift: boolean;
     threshold: number;
+    /**
+     * The untransformed quantity, when `value` is a transform of one. Only the
+     * Wasserstein distance sets it: `value` is normalized by the reference std
+     * (the scale `threshold` applies to) while this is the raw earth-mover
+     * distance in the column's own units. Display only — never compare it
+     * against `threshold`.
+     */
+    raw_value?: number | null;
 }
 
 export interface DriftBin {

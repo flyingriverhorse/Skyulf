@@ -109,7 +109,7 @@ export const PolynomialFeaturesNode: NodeDefinition = {
                     max={5}
                     className="w-full px-2 py-1.5 text-xs border rounded bg-background"
                     value={config.degree || 2}
-                    onChange={(e) => updateConfig({ degree: parseInt(e.target.value) || 2 })}
+                    onChange={(e) => updateConfig({ degree: Number.parseInt(e.target.value) || 2 })}
                   />
                 </div>
 

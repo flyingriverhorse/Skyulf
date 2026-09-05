@@ -137,7 +137,7 @@ def test_csv_nan_token_and_empty_field_parity(tmp_path, polars_engine):
     assert isinstance(pol, pl.DataFrame)
 
     # The F-13 trigger: polars keeps the NaN token as float NaN, not null.
-    assert pol["c"][0] != pol["c"][0]  # NaN != NaN
+    assert pd.isna(pol["c"][0])
 
     # Missingness masks must agree across engines on every column.
     for col in ("a", "b", "c"):

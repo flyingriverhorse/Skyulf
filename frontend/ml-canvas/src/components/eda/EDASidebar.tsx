@@ -118,7 +118,7 @@ export const EDASidebar: React.FC<EDASidebarProps> = ({
 
         onAddFilter(
             newFilterCol,
-            isComparisonOperator ? Number(newFilterVal) : isNaN(Number(newFilterVal)) ? newFilterVal : Number(newFilterVal),
+            isComparisonOperator ? Number(newFilterVal) : Number.isNaN(Number(newFilterVal)) ? newFilterVal : Number(newFilterVal),
             newFilterOp
         );
         setIsAddingFilter(false);

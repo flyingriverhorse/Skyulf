@@ -50,8 +50,9 @@ const sortRows = (
     fi: Record<string, number> | undefined,
 ): ColumnDrift[] => {
     const getMetric = (col: ColumnDrift, metric: string) =>
-        col.metrics.find(m => m.metric === metric || (metric === 'psi' && m.metric === 'psi_categorical'))
-            ?.value ?? 0;
+        col.metrics.find(
+            m => m.metric === metric || (metric === 'psi' && m.metric === 'psi_categorical'),
+        )?.value ?? 0;
     return [...rows].sort((a, b) => {
         let cmp = 0;
         switch (sortConfig.key) {
@@ -205,6 +206,11 @@ export const DriftTable: React.FC<DriftTableProps> = ({
 
     const colSpan = (fi ? 8 : 7) + (hasSparklines ? 1 : 0);
 
+    // Schema drift never appears in `column_drifts` — there are no shared rows
+    // to score — so without this the table looks empty while the report is
+    // actually counting these columns as drifted (OC-45).
+    const hasSchemaDrift = report.missing_columns.length > 0 || report.new_columns.length > 0;
+
     const sortHeader = (key: string, label: React.ReactNode) => (
         <th
             className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer select-none hover:text-gray-700 dark:hover:text-slate-300"
@@ -228,7 +234,7 @@ export const DriftTable: React.FC<DriftTableProps> = ({
                             'wasserstein',
                             <MetricTooltip
                                 label="Wasserstein"
-                                tooltip="Measures distance between distributions. Lower is better. < 0.1 usually means stable."
+                                tooltip="Measures distance between distributions, normalized by the reference column's standard deviation so the threshold is scale-free. Lower is better. < 0.1 usually means stable."
                                 icon={<Info className="w-3 h-3 text-slate-400" />}
                             />,
                         )}
@@ -285,7 +291,9 @@ export const DriftTable: React.FC<DriftTableProps> = ({
                                 className="px-6 py-8 text-center text-gray-500 dark:text-slate-400 text-sm"
                             >
                                 <CheckCircle size={20} className="inline mr-2 text-green-500" />
-                                No drifted columns found — all features are stable.
+                                {hasSchemaDrift
+                                    ? 'No distribution drift among shared columns — see the schema drift above.'
+                                    : 'No drifted columns found — all features are stable.'}
                             </td>
                         </tr>
                     ) : (
@@ -324,6 +332,11 @@ export const DriftTable: React.FC<DriftTableProps> = ({
                                             className={`px-6 py-4 whitespace-nowrap tabular-nums ${
                                                 wasserstein?.has_drift ? 'text-red-600 dark:text-red-400 font-bold' : ''
                                             }`}
+                                            title={
+                                                wasserstein?.raw_value != null
+                                                    ? `Raw earth-mover distance: ${wasserstein.raw_value.toFixed(4)} in column units`
+                                                    : undefined
+                                            }
                                         >
                                             {wasserstein?.value?.toFixed(4) ?? '—'}
                                         </td>

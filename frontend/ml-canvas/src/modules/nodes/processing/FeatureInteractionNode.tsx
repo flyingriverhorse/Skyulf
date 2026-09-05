@@ -103,7 +103,7 @@ export const FeatureInteractionNode: NodeDefinition = {
                     className="w-full px-2 py-1.5 text-xs border rounded bg-background"
                     value={config.degree || 2}
                     onChange={(e) => {
-                      const parsed = parseInt(e.target.value);
+                      const parsed = Number.parseInt(e.target.value);
                       const degree: 2 | 3 | 4 = parsed === 4 ? 4 : parsed === 3 ? 3 : 2;
                       updateConfig({ degree });
                     }}

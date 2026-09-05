@@ -10,6 +10,7 @@ no-baseline/evaluation-failed persistence paths.
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock
 
+import polars as pl
 import pytest
 from fastapi import HTTPException
 
@@ -23,6 +24,7 @@ from backend.monitoring.router import (
     get_drift_history,
     update_drift_alert_disposition,
 )
+from skyulf.profiling.drift import DriftCalculator
 
 
 def _make_report(
@@ -129,6 +131,26 @@ class TestClassifyDriftSeverity:
 
     def test_new_columns_is_always_critical(self) -> None:
         report = _make_report(drifted_columns_count=0, total_columns=4, new_columns=["new_col"])
+        assert _classify_drift_severity(report) == "critical"
+
+    def test_schema_drift_count_and_severity_agree(self) -> None:
+        """OC-45: a real schema-drift report cannot say critical and zero drift at once.
+
+        The two tests above pin the classifier's early return with a mock whose
+        count is 0 — a shape the calculator no longer produces, so neither can
+        catch the contradiction. This one uses the real calculator: a dropped
+        column has to land in `drifted_columns_count`, because the drift-status
+        dashboard counts drifted jobs by that field and used to report no drift
+        for a job this same report classified as critical.
+        """
+        shared = [1.0, 2.0, 3.0, 4.0, 5.0]
+        report = DriftCalculator(
+            pl.DataFrame({"stable": shared, "dropped": shared}),
+            pl.DataFrame({"stable": shared}),
+        ).calculate_drift()
+
+        assert report.column_drifts["stable"].drift_detected is False
+        assert report.drifted_columns_count == 1
         assert _classify_drift_severity(report) == "critical"
 
 

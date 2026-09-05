@@ -32,7 +32,7 @@ export const ThresholdsPanel: React.FC<ThresholdsPanelProps> = ({ thresholds, on
                     type="number"
                     value={thresholds[key] ?? ''}
                     onChange={e =>
-                        onChange({ ...thresholds, [key]: parseFloat(e.target.value) || undefined })
+                        onChange({ ...thresholds, [key]: Number.parseFloat(e.target.value) || undefined })
                     }
                     step={step}
                     min={min}

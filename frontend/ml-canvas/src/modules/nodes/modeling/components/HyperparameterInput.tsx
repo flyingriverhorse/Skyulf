@@ -34,7 +34,7 @@ export const HyperparameterInput: React.FC<HyperparameterInputProps> = ({
         if (type === 'number') {
             if (trimmed === '') return;
             const num = Number(trimmed);
-            if (!isNaN(num)) {
+            if (!Number.isNaN(num)) {
                 onChange(num);
             } else {
                 // Revert if invalid

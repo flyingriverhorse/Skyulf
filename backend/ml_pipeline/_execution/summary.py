@@ -18,6 +18,7 @@ Design constraints
 """
 
 import logging
+import math
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 from typing import Any
@@ -423,7 +424,7 @@ def _first_finite(metrics: Mapping[str, Any], candidates: Iterable[str]) -> floa
                 f = float(v)
             except (TypeError, ValueError):
                 continue
-            if f == f:  # filter NaN
+            if math.isfinite(f):
                 return f
     return None
 
@@ -452,7 +453,7 @@ def _train_only(metrics: Mapping[str, Any], candidates: Iterable[str]) -> float 
         if isinstance(v, (int, float)) and not isinstance(v, bool):
             try:
                 f = float(v)
-                if f == f:
+                if math.isfinite(f):
                     return f
             except (TypeError, ValueError):
                 continue

@@ -98,6 +98,31 @@ def test_calculate_target_interactions_numeric_target() -> None:
     assert interactions[0].p_value is not None
 
 
+def test_boxplot_stats_quartiles_match_numeric_stats_interpolation() -> None:
+    """OC-41: box-plot hinges must use the same linear interpolation as q25/q75.
+
+    ``_compute_boxplot_stats`` is the second ``quantile()`` call site and feeds
+    the drawn box, so polars' default nearest-rank interpolation made the
+    picture disagree with both pandas and the quartiles the same profile
+    reports in ``NumericStats``: [1, 2, 3, 10] drew a box of 2.0-3.0 instead of
+    1.75-4.75.
+    """
+    cat = ["A"] * 4 + ["B"] * 4
+    target = [1.0, 2.0, 3.0, 10.0, 1.0, 2.0, 3.0, 4.0]
+    analyzer = EDAAnalyzer(pl.DataFrame({"cat": cat, "target": target}))
+
+    interactions = analyzer._calculate_target_interactions(
+        "target", ["cat"], is_target_numeric=True
+    )
+
+    assert len(interactions) == 1
+    group_a = next(plot for plot in interactions[0].data if plot.name == "A")
+    assert group_a.stats.q1 == 1.75
+    assert group_a.stats.q3 == 4.75
+    # The median is unaffected by interpolation, and must stay the hinge centre.
+    assert group_a.stats.median == 2.5
+
+
 def test_calculate_target_interactions_skips_high_cardinality_group() -> None:
     """A grouping column with >20 unique values should be skipped (line 104)."""
     rng = np.random.default_rng(34)

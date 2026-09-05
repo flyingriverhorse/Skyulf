@@ -7,7 +7,10 @@ empty data) since ``analyze()`` fans out into nearly every ``_analyzer``
 mixin in one pass.
 """
 
+import json
+
 import numpy as np
+import pandas as pd
 import polars as pl
 import pytest
 from tests.utils.dataset_loader import load_sample_dataset
@@ -637,3 +640,126 @@ class TestRealShapedDataset:
         assert profile.geospatial.lat_col == "lat"
         assert profile.geospatial.lon_col == "lon"
         assert profile.geospatial.min_lat <= profile.geospatial.max_lat
+
+
+class TestNumericStatParityWithPandas:
+    """polars and pandas disagree on missing floats and on estimator defaults.
+
+    polars keeps NaN distinct from null and *propagates* it through
+    aggregations, defaults ``quantile()`` to nearest-rank, and reports the
+    biased skew/kurtosis estimators. pandas treats NaN as missing, interpolates
+    linearly, and bias-corrects. The profiler promises pandas numbers, so each
+    of these is pinned explicitly rather than left to polars' defaults.
+    """
+
+    def test_nan_float_column_matches_pandas_stats(self) -> None:
+        """OC-39: a single NaN must not poison mean/std/var/median/skewness.
+
+        Before the boundary NaN->null normalization every one of these came
+        back NaN, and the median was not even NaN but silently *wrong* (3.0
+        instead of 2.0) because the NaN sorted into the middle of the sample.
+        """
+        values = [1.0, 2.0, float("nan"), 4.0]
+        profile = EDAAnalyzer(pl.DataFrame({"x": values})).analyze()
+        stats = profile.columns["x"].numeric_stats
+        expected = pd.Series([1.0, 2.0, np.nan, 4.0])
+
+        assert stats is not None
+        assert stats.mean == pytest.approx(expected.mean())
+        assert stats.std == pytest.approx(expected.std())
+        assert stats.variance == pytest.approx(expected.var())
+        assert stats.median == pytest.approx(expected.median())
+        assert stats.skewness == pytest.approx(expected.skew())
+        assert stats.min == pytest.approx(1.0)
+        assert stats.max == pytest.approx(4.0)
+        # NaN still counts as missing (F-20 parity), now via null_count().
+        assert profile.columns["x"].missing_count == 1
+
+    def test_quartiles_use_linear_interpolation(self) -> None:
+        """OC-41: quartiles must interpolate, not snap to observed values.
+
+        polars' default ``interpolation="nearest"`` reported q25/q75 as 2.0/3.0
+        for [1, 2, 3, 10]; pandas (and every box plot the user compares
+        against) says 1.75/4.75.
+        """
+        values = [1.0, 2.0, 3.0, 10.0]
+        stats = EDAAnalyzer(pl.DataFrame({"x": values})).analyze().columns["x"].numeric_stats
+        expected = pd.Series(values)
+
+        assert stats is not None
+        assert stats.q25 == pytest.approx(expected.quantile(0.25))
+        assert stats.q75 == pytest.approx(expected.quantile(0.75))
+        assert stats.q25 == pytest.approx(1.75)
+        assert stats.q75 == pytest.approx(4.75)
+
+    def test_skewness_and_kurtosis_are_bias_corrected(self) -> None:
+        """OC-42: skew/kurtosis must match pandas' bias-corrected estimators.
+
+        polars' biased defaults reported 1.0182/-0.7696 for [1, 2, 3, 10]
+        where pandas says 1.7636/3.2280.
+        """
+        values = [1.0, 2.0, 3.0, 10.0]
+        stats = EDAAnalyzer(pl.DataFrame({"x": values})).analyze().columns["x"].numeric_stats
+        expected = pd.Series(values)
+
+        assert stats is not None
+        assert stats.skewness == pytest.approx(expected.skew())
+        assert stats.kurtosis == pytest.approx(expected.kurt())
+
+    def test_skewness_recommendation_fires_on_a_skewed_column(self) -> None:
+        """OC-42's user-visible half: the 1.5 transform threshold must fire.
+
+        ``recommendations.SKEWNESS_TRANSFORM_THRESHOLD`` is calibrated on the
+        bias-corrected skewness. For [1, 2, 3, 4, 10] the biased estimator
+        gives 1.1384 (below 1.5, so no advice) while the correct value is
+        1.6971 (above it), so the skewed column silently got no Transform
+        recommendation at all.
+        """
+        profile = EDAAnalyzer(pl.DataFrame({"x": [1.0, 2.0, 3.0, 4.0, 10.0]})).analyze()
+        stats = profile.columns["x"].numeric_stats
+
+        assert stats is not None
+        assert stats.skewness is not None
+        assert stats.skewness == pytest.approx(pd.Series([1.0, 2.0, 3.0, 4.0, 10.0]).skew())
+        assert abs(stats.skewness) > 1.5
+        transforms = [
+            r for r in profile.recommendations if r.column == "x" and r.action == "Transform"
+        ]
+        assert transforms, f"expected a Transform recommendation, got {profile.recommendations}"
+
+    def test_all_nan_column_yields_null_stats_without_crashing(self) -> None:
+        """OC-39: an all-NaN float column must degrade to nulls, not raise.
+
+        ``calculate_histogram`` used to hit ``ComputeError: breaks cannot be
+        NaN`` here, because its ``min_val == max_val`` guard is False for NaN
+        (NaN != NaN) so ``np.linspace(nan, nan)`` produced NaN bin edges. The
+        error was caught but logged as a traceback and the histogram was lost.
+        """
+        profile = EDAAnalyzer(pl.DataFrame({"x": [float("nan")] * 4})).analyze()
+        stats = profile.columns["x"].numeric_stats
+
+        assert stats is not None
+        assert stats.mean is None and stats.std is None and stats.median is None
+        assert profile.columns["x"].histogram is None
+        assert profile.columns["x"].missing_count == 4
+        assert any(a.type == "High Null" for a in profile.alerts)
+
+    def test_profile_serializes_without_non_finite_floats(self) -> None:
+        """OC-46: the profile must survive ``json.dumps(allow_nan=False)``.
+
+        ``model_dump(mode="json")`` keeps Python ``nan``, and the stdlib-JSON
+        persistence path (``backend/eda/tasks.py`` writes it into the report's
+        JSON column) then emits a bare ``NaN`` token — invalid JSON that the
+        browser's ``JSON.parse`` rejects. Only the orjson-based EDA route
+        happened to coerce it. A NaN-bearing column must not be able to produce
+        a profile that cannot be stored or read back.
+        """
+        profile = EDAAnalyzer(pl.DataFrame({"x": [1.0, 2.0, float("nan"), 4.0]})).analyze()
+
+        payload = json.dumps(profile.model_dump(mode="json"), allow_nan=False)
+
+        assert "NaN" not in payload
+        assert "Infinity" not in payload
+        assert json.loads(payload)["columns"]["x"]["numeric_stats"]["mean"] == pytest.approx(
+            7.0 / 3.0
+        )

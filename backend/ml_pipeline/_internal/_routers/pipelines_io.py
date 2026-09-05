@@ -13,6 +13,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, cast
 
+import aiofiles
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -51,13 +52,29 @@ ANONYMOUS_ACTOR = "__anonymous__"
 def _pipeline_json_path(storage_dir: str | Path, dataset_id: str) -> Path:
     """Return the on-disk JSON path for `dataset_id`, or raise ValueError.
 
-    `dataset_id` must match `_SAFE_DATASET_ID_RE`; anything else (path
-    separators, "..", absolute-path overrides, etc.) is rejected before any
-    `Path` is built from it.
+    Two independent layers, because the first is invisible to static analysis:
+
+    1. `dataset_id` must match `_SAFE_DATASET_ID_RE`; anything else (path
+       separators, "..", absolute-path overrides, null bytes) is rejected
+       before any `Path` is built from it.
+    2. The joined path is resolved and checked for containment in the resolved
+       storage root.
+
+    Layer 1 alone is already sufficient -- the charset excludes "." and every
+    separator, so the join appends exactly one segment. But CodeQL's
+    `py/path-injection` does not model a character allowlist as a sanitizer and
+    keeps flagging the `aiofiles.open` sinks, and layer 1 is only as durable as
+    the charset it happens to declare. Layer 2 makes containment explicit,
+    matching `LocalFileConnector.resolve_safe_path` and
+    `LocalArtifactStore._get_path`.
     """
     if not _SAFE_DATASET_ID_RE.fullmatch(dataset_id):
         raise ValueError(f"Invalid dataset_id: {dataset_id!r}")
-    return Path(storage_dir) / f"{dataset_id}.json"
+    root = Path(storage_dir).resolve()
+    candidate = (root / f"{dataset_id}.json").resolve()
+    if not candidate.is_relative_to(root):
+        raise ValueError(f"Invalid dataset_id: {dataset_id!r}")
+    return candidate
 
 
 @router.post("/save/{dataset_id}")
@@ -77,8 +94,8 @@ async def save_pipeline(
         except ValueError as e:
             raise HTTPException(status_code=400, detail="Invalid dataset_id") from e
         try:
-            with file_path.open("w") as f:
-                json.dump(payload.model_dump(), f, indent=2)
+            async with aiofiles.open(file_path, "w") as f:
+                await f.write(json.dumps(payload.model_dump(), indent=2))
             return {"status": "success", "id": dataset_id, "storage": "json"}
         except Exception as e:
             raise SkyulfException(message=f"Failed to save pipeline to JSON: {str(e)}") from e
@@ -151,8 +168,8 @@ async def load_pipeline(
         if not file_path.exists():
             return None
         try:
-            with file_path.open() as f:
-                return json.load(f)
+            async with aiofiles.open(file_path) as f:
+                return json.loads(await f.read())
         except Exception as e:
             raise SkyulfException(message=f"Failed to load pipeline from JSON: {str(e)}") from e
 

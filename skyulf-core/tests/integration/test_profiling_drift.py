@@ -88,6 +88,142 @@ def test_calculate_drift_reports_missing_and_new_columns() -> None:
     assert "b" not in report.column_drifts
 
 
+def test_wasserstein_value_is_reported_on_the_threshold_scale() -> None:
+    """OC-44: the number the threshold is applied to is the number reported.
+
+    The earth-mover distance here is ~50 column units, which is only ~0.017
+    reference standard deviations. The verdict has always been made on the
+    normalized distance, but `value` carried the raw one — so the report read
+    `wasserstein_distance=50.0, threshold=0.1, has_drift=False` and every
+    consumer that re-derives the verdict from `value` (the UI threshold
+    sliders, the CSV export, the persisted alert summary) contradicted it.
+    """
+    rng = np.random.default_rng(0)
+    ref_values = rng.normal(0.0, 3000.0, 2000)
+    reference = pl.DataFrame({"feature": ref_values})
+    current = pl.DataFrame({"feature": ref_values + 50.0})
+
+    report = DriftCalculator(reference, current).calculate_drift()
+    wd = next(
+        m for m in report.column_drifts["feature"].metrics if m.metric == "wasserstein_distance"
+    )
+
+    assert wd.raw_value is not None
+    assert wd.raw_value == pytest.approx(50.0, abs=1.0)
+    assert wd.value == pytest.approx(wd.raw_value / float(np.std(ref_values)), rel=1e-9)
+    assert wd.value < wd.threshold
+    assert wd.has_drift is False
+
+
+def test_value_over_threshold_reproduces_the_verdict_for_every_deciding_metric() -> None:
+    """The UI re-derives `has_drift` from its sliders by comparing value to threshold.
+
+    `large_scale` is what makes this bite: its raw earth-mover distance (50
+    column units) sits above the 0.1 threshold while the normalized distance
+    the verdict was made on (0.017 stds) sits below it, so reporting the raw
+    one breaks the invariant. Unit-scale columns cannot catch that, because
+    there raw and normalized coincide.
+
+    `ks_test_p_value` is skipped: it is diagnostics only, never decides drift,
+    and borrows the KS statistic's threshold.
+    """
+    rng = np.random.default_rng(1)
+    categories = np.array(["a", "b", "c"])
+    large_scale = rng.normal(0.0, 3000.0, 400)
+    reference = pl.DataFrame(
+        {
+            "num": rng.normal(0.0, 1.0, 400),
+            "cat": rng.choice(categories, 400),
+            "large_scale": large_scale,
+        }
+    )
+    current = pl.DataFrame(
+        {
+            "num": rng.normal(3.0, 1.0, 400),
+            "cat": rng.choice(categories, 400, p=[0.7, 0.2, 0.1]),
+            "large_scale": large_scale + 50.0,
+        }
+    )
+
+    report = DriftCalculator(reference, current).calculate_drift()
+
+    checked = 0
+    for col in report.column_drifts.values():
+        for metric in col.metrics:
+            if metric.metric == "ks_test_p_value":
+                continue
+            assert (metric.value > metric.threshold) is metric.has_drift, (
+                f"{col.column}/{metric.metric}: value={metric.value} "
+                f"threshold={metric.threshold} has_drift={metric.has_drift}"
+            )
+            checked += 1
+    # Four deciding metrics per numeric column (the KS p-value is excluded)
+    # times two numeric columns, plus categorical PSI. Exact so the sweep
+    # cannot silently degrade to checking nothing.
+    assert checked == 9
+
+
+def test_wasserstein_stays_finite_for_a_constant_reference() -> None:
+    """A zero reference std leaves nothing to normalize by — fall back, never emit inf."""
+    reference = pl.DataFrame({"feature": [5.0] * 100})
+    current = pl.DataFrame({"feature": [7.0] * 100})
+
+    report = DriftCalculator(reference, current).calculate_drift()
+    wd = next(
+        m for m in report.column_drifts["feature"].metrics if m.metric == "wasserstein_distance"
+    )
+
+    assert np.isfinite(wd.value)
+    assert wd.value == pytest.approx(2.0)
+    assert wd.raw_value is not None
+    assert wd.raw_value == pytest.approx(wd.value)
+
+
+def test_drifted_columns_count_includes_schema_drift() -> None:
+    """OC-45: a column that vanished or appeared is drift, even with no distribution shift.
+
+    The count used to be rebuilt from the per-column metric flags alone, so a
+    dropped feature left it at 0 while the backend classified that same
+    structural change as critical.
+    """
+    shared = [1.0, 2.0, 3.0, 4.0, 5.0]
+    reference = pl.DataFrame({"stable": shared, "dropped": shared})
+    current = pl.DataFrame({"stable": shared, "added": shared})
+
+    report = DriftCalculator(reference, current).calculate_drift()
+
+    assert report.column_drifts["stable"].drift_detected is False
+    assert report.missing_columns == ["dropped"]
+    assert report.new_columns == ["added"]
+    assert report.drifted_columns_count == 2
+
+
+def test_drifted_columns_count_sums_distribution_and_schema_drift() -> None:
+    """Both kinds of drift are counted, without double-counting the shared columns."""
+    rng = np.random.default_rng(2)
+    stable_values = rng.normal(0.0, 1.0, 500)
+    reference = pl.DataFrame(
+        {
+            "shifted": rng.normal(0.0, 1.0, 500),
+            "stable": stable_values,
+            "dropped": rng.normal(0.0, 1.0, 500),
+        }
+    )
+    current = pl.DataFrame(
+        {
+            "shifted": rng.normal(9.0, 1.0, 500),
+            "stable": stable_values,
+            "added": rng.normal(0.0, 1.0, 500),
+        }
+    )
+
+    report = DriftCalculator(reference, current).calculate_drift()
+
+    assert report.column_drifts["shifted"].drift_detected is True
+    assert report.column_drifts["stable"].drift_detected is False
+    assert report.drifted_columns_count == 3
+
+
 def test_calculate_drift_computes_categorical_psi_for_low_cardinality_string_column() -> None:
     """A low-cardinality string column should now get PSI-based categorical
     drift detection instead of being skipped entirely."""

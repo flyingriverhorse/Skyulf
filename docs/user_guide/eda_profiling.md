@@ -305,8 +305,8 @@ Data Drift occurs when the statistical properties of the input data (production)
 ### Metrics
 Skyulf calculates drift using four key statistical metrics for every numerical column:
 
-1.  **Wasserstein Distance (Earth Mover's Distance):** Measures the "work" needed to transform one distribution into the other. Good for detecting shifts in shape and location.
-2.  **KS Test (Kolmogorov-Smirnov):** A non-parametric test that compares cumulative distribution functions. The p-value indicates the probability that the two samples come from the same distribution.
+1.  **Wasserstein Distance (Earth Mover's Distance):** Measures the "work" needed to transform one distribution into the other. Good for detecting shifts in shape and location. The reported value is the distance divided by the reference column's standard deviation, so one threshold means the same thing whatever unit the column is in; the untransformed distance is kept in `raw_value`.
+2.  **KS Test (Kolmogorov-Smirnov):** A non-parametric test that compares cumulative distribution functions. The drift decision is made on the **statistic** (the maximum distance between the two CDFs, 0–1); the p-value is reported alongside it as `ks_test_p_value` for diagnostics but never decides drift, because it shrinks with sample size.
 3.  **PSI (Population Stability Index):** A widely used industry standard for measuring population shifts.
     *   `PSI < 0.1`: No significant drift.
     *   `0.1 <= PSI < 0.25`: Moderate drift.
@@ -317,6 +317,11 @@ Skyulf calculates drift using four key statistical metrics for every numerical c
 The system also monitors for structural changes:
 *   **Missing Columns:** Critical alerts for features present in training but missing in production.
 *   **New Columns:** Alerts for unexpected features appearing in production data.
+
+Both count toward `report.drifted_columns_count`, so that figure covers
+distribution drift *and* schema drift. A missing column has no values left to
+compare and therefore never appears in `column_drifts` — the count is the only
+place it is reported.
 
 ### Using the Data Drift UI
 1.  Navigate to the **Data Drift** page in the ML Canvas.

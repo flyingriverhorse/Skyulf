@@ -187,7 +187,7 @@ export function isExplicitColumnDrop(stepType: string, params: Record<string, un
   if (stepType !== 'DropMissingColumns') return false;
   const raw = params.missing_threshold;
   const threshold =
-    typeof raw === 'number' ? raw : typeof raw === 'string' && raw !== '' ? Number(raw) : NaN;
+    typeof raw === 'number' ? raw : typeof raw === 'string' && raw !== '' ? Number(raw) : Number.NaN;
   return !(threshold > 0);
 }
 

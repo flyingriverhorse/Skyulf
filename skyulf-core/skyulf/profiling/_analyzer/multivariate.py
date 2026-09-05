@@ -49,8 +49,19 @@ class MultivariateMixin(_AnalyzerState):
 
     @staticmethod
     def _impute_matrix(X_df: pl.DataFrame) -> np.ndarray:
-        """Mean-impute (Polars fast path, sklearn fallback) and return a finite numpy matrix."""
+        """Mean-impute (Polars fast path, sklearn fallback) and return a finite numpy matrix.
+
+        Unlike :meth:`_impute_matrix_drop_empty`, all-null columns are kept and
+        zero-filled so PCA/clustering see a stable column count.
+        """
         try:
+            # NaN is not null in polars, so `fill_null` alone no-ops on it and the
+            # value falls through to the nan_to_num(0.0) guard — PCA/clustering then
+            # see 0.0 where SimpleImputer would have put the column mean. Normalize
+            # first, as _impute_matrix_drop_empty already does.
+            X_df = X_df.with_columns(
+                [pl.col(c).cast(pl.Float64).fill_nan(None) for c in X_df.columns]
+            )
             # Polars fill_null is faster than sklearn's imputer; fall back if it errors.
             # Trailing fill_null(0) covers all-null columns where mean is also null.
             X_df = X_df.fill_null(strategy="mean").fill_null(0)
@@ -372,7 +383,7 @@ class MultivariateMixin(_AnalyzerState):
             preds = clf.predict(X)
             scores = clf.decision_function(X)  # lower = more anomalous
 
-            outlier_indices = np.where(preds == -1)[0]
+            outlier_indices = np.nonzero(preds == -1)[0]
             total_outliers = len(outlier_indices)
             if total_outliers == 0:
                 return None

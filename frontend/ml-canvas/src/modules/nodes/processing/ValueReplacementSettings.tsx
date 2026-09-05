@@ -40,7 +40,7 @@ const TypedInput: React.FC<{
 
   const handleValueChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     let val: unknown = e.target.value;
-    if (type === 'number') val = parseFloat(val as string);
+    if (type === 'number') val = Number.parseFloat(val as string);
     onChange(val, type);
   };
 

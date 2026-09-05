@@ -92,7 +92,7 @@ const TrainTestSplitSettings: React.FC<{ config: TrainTestSplitConfig; onChange:
               max="0.95"
               className="w-full p-2 border rounded bg-background text-sm"
               value={config.test_size}
-              onChange={(e) => onChange({ ...config, test_size: parseFloat(e.target.value) })}
+              onChange={(e) => onChange({ ...config, test_size: Number.parseFloat(e.target.value) })}
             />
           </div>
 
@@ -105,7 +105,7 @@ const TrainTestSplitSettings: React.FC<{ config: TrainTestSplitConfig; onChange:
               max="0.95"
               className="w-full p-2 border rounded bg-background text-sm"
               value={valSize}
-              onChange={(e) => onChange({ ...config, validation_size: parseFloat(e.target.value) })}
+              onChange={(e) => onChange({ ...config, validation_size: Number.parseFloat(e.target.value) })}
             />
             <p className="text-xs text-muted-foreground">
               {Math.round(trainSize * 100)}% Training, {Math.round(valSize * 100)}% Validation, {Math.round(config.test_size * 100)}% Testing

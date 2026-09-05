@@ -210,6 +210,72 @@ def test_classification_metrics_multiclass_pr_auc_weighted_present(multiclass_da
     assert 0.0 <= metrics["pr_auc_weighted"] <= 1.0
 
 
+# ---------------------------------------------------------------------------
+# OC-146: binary pr_auc must score the class the model actually treats as
+# positive, not sklearn's pos_label=1 default.
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def strong_signal_binary():
+    """Binary data with a learnable signal, so pr_auc is high (~0.97) and an
+    inverted computation (~0.32) is unmistakably distinguishable from it."""
+    rng = np.random.RandomState(7)
+    X = pd.DataFrame({"f1": rng.normal(0, 1, 400), "f2": rng.normal(0, 1, 400)})
+    y = (X["f1"] - X["f2"] + rng.normal(0, 0.3, 400) > 0).astype(int).to_numpy()
+    return X, y
+
+
+@pytest.mark.parametrize(
+    ("encoding", "relabel"),
+    [
+        ("{0,1}", lambda y: y),
+        ("{1,2}", lambda y: y + 1),
+        ("{1,5}", lambda y: np.where(y == 1, 5, 1)),
+        ("{-1,1}", lambda y: np.where(y == 1, 1, -1)),
+        ("{'no','yes'}", lambda y: np.where(y == 1, "yes", "no")),
+    ],
+)
+def test_classification_metrics_pr_auc_invariant_under_label_reencoding(
+    strong_signal_binary, encoding, relabel
+):
+    """Regression test (OC-146/OC-37): the same data under any binary label
+    encoding must report the same pr_auc.
+
+    ``average_precision_score`` defaults to ``pos_label=1`` — unlike
+    ``roc_auc_score``, which infers the positive class from the sorted uniques.
+    On ``{1,2}``/``{1,5}`` the literal ``1`` is the *negative* class, so PR-AUC
+    was computed for the inverted problem (0.32 reported for a 0.97 model) with
+    no warning; on string and other arbitrary labels it raised and the metric
+    vanished from the report entirely.
+    """
+    from sklearn.metrics import average_precision_score
+
+    X, y_raw = strong_signal_binary
+    y = pd.Series(relabel(y_raw), name="target")
+    model = LogisticRegression(max_iter=1000).fit(X, y)
+
+    metrics = calculate_classification_metrics(model, X, y)
+
+    assert "pr_auc" in metrics, f"pr_auc missing for {encoding} labels"
+    expected = average_precision_score(y, model.predict_proba(X)[:, 1], pos_label=model.classes_[1])
+    assert metrics["pr_auc"] == pytest.approx(expected), encoding
+
+
+def test_classification_metrics_pr_auc_agrees_across_encodings(strong_signal_binary):
+    """The {1,2} encoding must report the same pr_auc as the {0,1} control —
+    the two disagreed by 3x (0.32 vs 0.97) before the pos_label fix."""
+    X, y_raw = strong_signal_binary
+    reported = {}
+    for encoding, y in (("{0,1}", y_raw), ("{1,2}", y_raw + 1)):
+        y_ser = pd.Series(y, name="target")
+        model = LogisticRegression(max_iter=1000).fit(X, y_ser)
+        reported[encoding] = calculate_classification_metrics(model, X, y_ser)["pr_auc"]
+
+    assert reported["{1,2}"] == pytest.approx(reported["{0,1}"])
+    assert reported["{1,2}"] > 0.9  # a strong model, not the inverted ~0.32
+
+
 def test_classification_metrics_matthews_corrcoef_bounded(binary_data):
     """matthews_corrcoef should be within its valid [-1, 1] range."""
     model, X, y = binary_data

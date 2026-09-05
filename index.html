@@ -294,6 +294,7 @@
                 <a href="#how" class="text-soft hover:text-gold transition-colors">How it works</a>
                 <a href="#why" class="text-soft hover:text-gold transition-colors">Why Skyulf</a>
                 <a href="#features" class="text-soft hover:text-gold transition-colors">Features</a>
+                <a href="#updates" class="text-soft hover:text-gold transition-colors">Updates</a>
                 <a href="#faq" class="text-soft hover:text-gold transition-colors">FAQ</a>
             </div>
             <div class="flex items-center gap-3">
@@ -316,6 +317,7 @@
             <a href="#how" class="text-soft hover:text-gold transition-colors px-3 py-2.5 rounded-lg">How it works</a>
             <a href="#why" class="text-soft hover:text-gold transition-colors px-3 py-2.5 rounded-lg">Why Skyulf</a>
             <a href="#features" class="text-soft hover:text-gold transition-colors px-3 py-2.5 rounded-lg">Features</a>
+            <a href="#updates" class="text-soft hover:text-gold transition-colors px-3 py-2.5 rounded-lg">Updates</a>
             <a href="#faq" class="text-soft hover:text-gold transition-colors px-3 py-2.5 rounded-lg">FAQ</a>
             <a href="./manual/index.html" class="text-soft hover:text-gold transition-colors px-3 py-2.5 rounded-lg">Docs</a>
         </nav>
@@ -331,7 +333,7 @@
         <div class="relative z-10 w-full max-w-6xl mx-auto px-5 sm:px-8 text-center">
             <a id="version-badge" href="https://github.com/flyingriverhorse/Skyulf/releases" target="_blank" rel="noopener" class="rv in inline-flex items-center gap-2.5 rounded-full border px-4 py-1.5 mb-8 font-mono text-[11px] font-semibold tracking-[0.14em] uppercase transition-colors hover:border-[rgba(255,218,217,.8)]" style="border-color: rgba(255,218,217,.4); color: var(--ink); background: var(--panel-60); backdrop-filter: blur(12px);">
                 <span class="relative w-2 h-2 rounded-full bg-[#f2c025] dot-ping"></span>
-                <span data-version-label>v0.8.5 — live now</span>
+                <span data-version-label>v0.8.11 — live now</span>
             </a>
 
             <h1 class="text-ink font-extrabold tracking-tight leading-[1.04] text-4xl sm:text-6xl lg:text-7xl mb-6 drop-shadow-xl">
@@ -726,6 +728,26 @@ pipeline.save(<span class="text-gold">"tumour.pkl"</span>)  <span class="text-fa
         </div>
     </section>
 
+    <!-- ============ UPDATES ============ -->
+    <section id="updates" class="py-24 relative overflow-hidden">
+        <div class="max-w-6xl mx-auto px-5 sm:px-8">
+            <div class="text-center mb-14">
+                <h2 class="rv text-3xl sm:text-5xl font-extrabold text-ink tracking-tight mb-4">Always <span class="text-gold">shipping</span></h2>
+                <p class="rv text-soft max-w-2xl mx-auto">Live from the GitHub releases feed, every version, newest first.</p>
+            </div>
+            <div id="updates-list" class="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div class="rv glass-panel rounded-2xl p-6 hover-lift">
+                    <div class="flex items-center justify-between mb-3">
+                        <span class="font-mono text-sm font-bold text-gold">v0.8.11</span>
+                        <span class="text-faint text-xs">Sep 2026</span>
+                    </div>
+                    <p class="text-soft text-sm leading-relaxed">Latest release — see the full notes on GitHub.</p>
+                    <a href="https://github.com/flyingriverhorse/skyulf/releases" target="_blank" rel="noopener" class="inline-flex items-center gap-1 text-sm font-semibold text-gold hover:underline mt-3">All releases <span class="msi text-[16px]">open_in_new</span></a>
+                </div>
+            </div>
+        </div>
+    </section>
+
     <!-- ============ EVIDENCE ============ -->
     <section id="evidence" class="py-24 relative overflow-hidden">
         <div class="max-w-6xl mx-auto px-5 sm:px-8">
@@ -881,7 +903,6 @@ pipeline.save(<span class="text-gold">"tumour.pkl"</span>)  <span class="text-fa
                 <div>
                     <h3 class="font-mono text-[11px] tracking-[0.16em] uppercase text-faint mb-4">Project</h3>
                     <ul class="space-y-2 text-sm text-soft">
-                        <li><a href="https://github.com/flyingriverhorse/skyulf/blob/master/ROADMAP.md" target="_blank" rel="noopener" class="hover:text-gold transition-colors">Roadmap</a></li>
                         <li><a href="https://github.com/flyingriverhorse/skyulf/blob/master/CONTRIBUTING.md" target="_blank" rel="noopener" class="hover:text-gold transition-colors">Contributing</a></li>
                         <li><a href="https://github.com/flyingriverhorse/skyulf/blob/master/SECURITY.md" target="_blank" rel="noopener" class="hover:text-gold transition-colors">Security</a></li>
                         <li><a href="https://github.com/flyingriverhorse/skyulf/blob/master/LICENSE" target="_blank" rel="noopener" class="hover:text-gold transition-colors">License</a></li>
@@ -1028,6 +1049,60 @@ pipeline.save(<span class="text-gold">"tumour.pkl"</span>)  <span class="text-fa
                         if (value && value.trim()) totalLabel.textContent = value.trim();
                     })
                     .catch(function () { /* offline or blocked: static fallback stays */ });
+            }
+
+            // --- Updates: render recent GitHub releases, keep static fallback on failure ---
+            var updatesList = document.getElementById('updates-list');
+            if (updatesList && window.fetch) {
+                fetch('https://api.github.com/repos/flyingriverhorse/skyulf/releases?per_page=6')
+                    .then(function (res) { return res.ok ? res.json() : null; })
+                    .then(function (releases) {
+                        if (!Array.isArray(releases) || !releases.length) return;
+                        var monthFmt = new Intl.DateTimeFormat('en', { month: 'short', year: 'numeric' });
+                        updatesList.innerHTML = '';
+                        releases.forEach(function (rel) {
+                            var card = document.createElement('div');
+                            card.className = 'rv in glass-panel rounded-2xl p-6 hover-lift';
+                            var head = document.createElement('div');
+                            head.className = 'flex items-center justify-between mb-3';
+                            var tag = document.createElement('span');
+                            tag.className = 'font-mono text-sm font-bold text-gold';
+                            tag.textContent = rel.tag_name || rel.name || 'release';
+                            var date = document.createElement('span');
+                            date.className = 'text-faint text-xs';
+                            try { date.textContent = monthFmt.format(new Date(rel.published_at)); } catch (e) { date.textContent = ''; }
+                            head.appendChild(tag);
+                            head.appendChild(date);
+                            var body = document.createElement('p');
+                            body.className = 'text-soft text-sm leading-relaxed';
+                            body.textContent = summarizeRelease(rel.body);
+                            var link = document.createElement('a');
+                            link.href = rel.html_url;
+                            link.target = '_blank';
+                            link.rel = 'noopener';
+                            link.className = 'inline-flex items-center gap-1 text-sm font-semibold text-gold hover:underline mt-3';
+                            link.innerHTML = 'Full notes <span class="msi text-[16px]">open_in_new</span>';
+                            card.appendChild(head);
+                            card.appendChild(body);
+                            card.appendChild(link);
+                            updatesList.appendChild(card);
+                        });
+                    })
+                    .catch(function () { /* offline or blocked: static fallback stays */ });
+            }
+            function summarizeRelease(body) {
+                if (!body) return 'See the full notes on GitHub.';
+                // strip markdown, keep the first meaningful line, truncate
+                var line = String(body)
+                    .replace(/```[\s\S]*?```/g, ' ')
+                    .replace(/`([^`]*)`/g, '$1')
+                    .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
+                    .replace(/[*_#>|]/g, ' ')
+                    .split('\n')
+                    .map(function (l) { return l.replace(/^[-\d.\s]+/, '').trim(); })
+                    .filter(function (l) { return l.length > 15; })[0];
+                if (!line) return 'See the full notes on GitHub.';
+                return line.length > 140 ? line.slice(0, 137).trimEnd() + '…' : line;
             }
 
             // --- Constellation canvas over the hero ---

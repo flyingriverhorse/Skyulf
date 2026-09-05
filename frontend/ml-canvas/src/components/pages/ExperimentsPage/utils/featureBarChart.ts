@@ -44,7 +44,7 @@ export const reportedFlagKey = (barKey: string): string => `${barKey}__reported`
  */
 function normalizePerJob(raw: Record<string, number>): Record<string, number> {
   const max = Math.max(...Object.values(raw).map((v) => Math.abs(v)));
-  if (!isFinite(max) || max === 0) return raw;
+  if (!Number.isFinite(max) || max === 0) return raw;
   const out: Record<string, number> = {};
   for (const [k, v] of Object.entries(raw)) {
     out[k] = v / max;

@@ -356,7 +356,13 @@ def _add_middleware(app: FastAPI, settings) -> None:
     if settings.ALLOWED_HOSTS:
         app.add_middleware(TrustedHostMiddleware, allowed_hosts=settings.ALLOWED_HOSTS)
 
-    # CORS middleware
+    # Custom middleware
+    app.add_middleware(LoggingMiddleware)
+    app.add_middleware(ErrorHandlerMiddleware)
+
+    # add_middleware wraps, so the last one added is the outermost: CORS must
+    # come last or error responses built by ErrorHandlerMiddleware reach the
+    # browser without Access-Control-Allow-Origin and get blocked there.
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.CORS_ORIGINS,
@@ -364,10 +370,6 @@ def _add_middleware(app: FastAPI, settings) -> None:
         allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
         allow_headers=["*"],
     )
-
-    # Custom middleware
-    app.add_middleware(LoggingMiddleware)
-    app.add_middleware(ErrorHandlerMiddleware)
 
 
 def _include_routers(app: FastAPI) -> None:

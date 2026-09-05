@@ -408,7 +408,7 @@ export const EvaluationView: React.FC<Props> = ({
                     <input
                       type="range" min={0.01} max={0.99} step={0.01}
                       value={threshold}
-                      onChange={(e) => { setThreshold(parseFloat(e.target.value)); }}
+                      onChange={(e) => { setThreshold(Number.parseFloat(e.target.value)); }}
                       className="w-28 accent-blue-500"
                     />
                     <span className="text-sm font-mono font-semibold text-blue-600 dark:text-blue-400 w-9">{threshold.toFixed(2)}</span>

@@ -209,6 +209,60 @@ def test_training_summary_falls_back_to_accuracy_only() -> None:
     assert out == "acc 0.90"
 
 
+def test_infinite_metric_falls_through_to_next_finite_candidate() -> None:
+    """An infinite metric is skipped, not rendered.
+
+    ``_first_finite`` used to filter with ``if f == f``, which rejects NaN but
+    accepts ``±inf`` — so ``test_accuracy=inf`` (a divide-by-zero in a ratio
+    metric) won the candidate scan and the node summary read ``acc inf``.
+    """
+    out = build_summary(
+        step_type="training",
+        output=None,
+        metrics={"test_accuracy": float("inf"), "accuracy": 0.87},
+    )
+    assert out == "acc 0.87"
+
+
+def test_all_infinite_metrics_yield_no_summary() -> None:
+    """With every candidate infinite there is no headline at all.
+
+    Pre-fix this rendered ``acc inf · f1 -inf`` on the canvas node card and in
+    the pipeline diagram detail line.
+    """
+    out = build_summary(
+        step_type="training",
+        output=None,
+        metrics={"metrics": {"accuracy": float("inf"), "f1": float("-inf")}},
+    )
+    assert out is None
+
+
+def test_infinite_train_metric_produces_no_overfit_gap_badge() -> None:
+    """``_train_only`` shared the same ``f == f`` idiom.
+
+    Pre-fix an infinite ``train_accuracy`` gave ``diff = inf - 0.80 = inf``,
+    which fails the ``diff < 0.05`` guard and rendered ``acc 0.80 · ▲inf``.
+    """
+    out = build_summary(
+        step_type="training",
+        output=None,
+        metrics={"test_accuracy": 0.80, "train_accuracy": float("inf")},
+    )
+    assert out == "acc 0.80"
+
+
+def test_nan_metric_is_still_skipped() -> None:
+    """Pin: NaN rejection already worked under ``f == f`` and must survive
+    the move to ``math.isfinite``, which is a strictly wider filter."""
+    out = build_summary(
+        step_type="training",
+        output=None,
+        metrics={"test_accuracy": float("nan"), "accuracy": 0.91},
+    )
+    assert out == "acc 0.91"
+
+
 def test_training_summary_regression_path() -> None:
     out = build_summary(
         step_type="training",

@@ -944,3 +944,68 @@ def test_calculate_drift_end_to_end(tmp_path):
     body = response.json()
     assert body["reference_rows"] == 25
     assert "a" in body["column_drifts"]
+
+
+def test_calculate_drift_records_a_failed_alert_when_the_calculator_raises():
+    """A calculator blow-up must be *recorded*, not just surfaced.
+
+    The alert history is what lets the UI distinguish "checked and failed"
+    from "never checked", so the except branch has to write a row with
+    ``evaluation_status='failed'`` and the underlying message before
+    re-raising as a SkyulfException.
+    """
+    import polars as pl
+    from fastapi.testclient import TestClient
+
+    from backend.dependencies import get_db
+    from backend.main import app
+
+    ref_df = pl.DataFrame({"a": [1, 2, 3, 4, 5] * 5})
+
+    artifact_store = MagicMock()
+    artifact_store.exists.return_value = True
+    artifact_store.load.return_value = ref_df
+
+    discovery = MagicMock()
+    discovery.get_store_for_job.return_value = artifact_store
+
+    db = AsyncMock()
+    db.add = MagicMock()
+    db.execute.return_value = _make_db_execute_result_scalar_one(None)
+
+    async def _override_get_db():
+        yield db
+
+    app.dependency_overrides[get_db] = _override_get_db
+    try:
+        with (
+            patch("backend.monitoring.router.ArtifactFactory") as mock_factory,
+            patch("backend.monitoring.router.DriftCalculator") as mock_calculator,
+            patch(
+                "backend.monitoring.router._save_drift_alert", new=AsyncMock()
+            ) as mock_save_alert,
+            TestClient(app, base_url="http://localhost") as client,
+        ):
+            mock_factory.get_discovery.return_value = discovery
+            mock_calculator.return_value.calculate_drift.side_effect = RuntimeError(
+                "KS statistic exploded"
+            )
+            csv_bytes = b"a\n" + b"\n".join(str(v).encode() for v in [1, 2, 3, 4, 5] * 5)
+            response = client.post(
+                "/api/monitoring/drift/calculate",
+                data={"job_id": "job-1", "dataset_name": "ds"},
+                files={"file": ("current.csv", csv_bytes, "text/csv")},
+            )
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+
+    assert response.status_code >= 400, response.text
+
+    calls = mock_save_alert.await_args_list
+    failed = [c for c in calls if c.kwargs.get("evaluation_status") == "failed"]
+    assert len(failed) == 1, [c.kwargs.get("evaluation_status") for c in calls]
+    assert failed[0].kwargs["job_id"] == "job-1"
+    assert failed[0].kwargs["dataset_name"] == "ds"
+    assert failed[0].kwargs["error_message"] == "KS statistic exploded"
+    # Nothing was recorded as a successful check.
+    assert not [c for c in calls if c.kwargs.get("evaluation_status") == "completed"]

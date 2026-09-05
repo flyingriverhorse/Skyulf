@@ -50,7 +50,7 @@ uniform record lists.
 ## Repo conventions (short form)
 
 - Python deps: `uv pip` only, never plain pip; keep `requirements-*.txt` in sync with `pyproject.toml`.
-- Commits need DCO sign-off; pre-commit hooks run ruff/ty/eslint.
+- Commits need pre-commit hooks run ruff/ty/eslint.
 - Full-stack features usually touch skyulf-core + backend + frontend — check all three layers.
 - After working with the frontend always rebuild it (`npm run build` in `frontend/ml-canvas/`).
 - Docs: docstrings are the source of truth for `docs/reference/`; run `mkdocs build --strict` after doc changes.

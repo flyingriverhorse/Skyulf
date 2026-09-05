@@ -390,6 +390,43 @@ def test_impute_matrix_drop_empty_drops_all_null_columns() -> None:
     np.testing.assert_allclose(result[:, 0], [1.0, 2.0, 3.0])
 
 
+def test_impute_matrix_mean_imputes_nan_instead_of_zero_filling() -> None:
+    """OC-40: `_impute_matrix` must mean-impute NaN, matching SimpleImputer.
+
+    polars NaN is not null, so ``fill_null(strategy="mean")`` was a no-op on it
+    and the value fell through to the ``nan_to_num(0.0)`` guard — PCA and
+    clustering then saw a fabricated 0.0 in a column whose observations are
+    10-20, dragging loadings and cluster centres toward a value that never
+    occurred.
+    """
+    from sklearn.impute import SimpleImputer
+
+    from skyulf.profiling._analyzer.multivariate import MultivariateMixin
+
+    df = pl.DataFrame({"a": [10.0, 20.0, float("nan")], "b": [1.0, 2.0, 3.0]})
+
+    result = MultivariateMixin._impute_matrix(df)
+    expected = SimpleImputer(strategy="mean").fit_transform(df.to_pandas().values)
+
+    np.testing.assert_allclose(result, expected)
+    assert result[2, 0] == 15.0
+
+
+def test_impute_matrix_keeps_all_missing_column_zero_filled() -> None:
+    """Unlike `_impute_matrix_drop_empty`, a column with nothing observed is kept
+    and zero-filled, so PCA/clustering see a stable column count.
+    """
+    from skyulf.profiling._analyzer.multivariate import MultivariateMixin
+
+    df = pl.DataFrame({"x": [1.0, 2.0, 3.0], "empty": [float("nan"), float("nan"), float("nan")]})
+
+    result = MultivariateMixin._impute_matrix(df)
+
+    assert result.shape == (3, 2)
+    np.testing.assert_allclose(result[:, 0], [1.0, 2.0, 3.0])
+    np.testing.assert_allclose(result[:, 1], [0.0, 0.0, 0.0])
+
+
 def test_detect_outliers_infinite_value_returns_none() -> None:
     """Infinite values are not finite-safe under either the fast or fallback path,
     so `_detect_outliers` must catch the error and return `None` rather than crash.

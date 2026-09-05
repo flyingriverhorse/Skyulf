@@ -328,7 +328,7 @@ const OutlierSettings: React.FC<{ config: OutlierConfig; onChange: (c: OutlierCo
                 step="0.1"
                 className="w-full p-2 border rounded bg-background text-sm"
                 value={config.multiplier ?? 1.5}
-                onChange={(e) => onChange({ ...config, multiplier: parseFloat(e.target.value) })}
+                onChange={(e) => onChange({ ...config, multiplier: Number.parseFloat(e.target.value) })}
               />
               <p className="text-xs text-muted-foreground">Usually 1.5 for outliers, 3.0 for extreme outliers.</p>
             </div>
@@ -343,7 +343,7 @@ const OutlierSettings: React.FC<{ config: OutlierConfig; onChange: (c: OutlierCo
                 step="0.1"
                 className="w-full p-2 border rounded bg-background text-sm"
                 value={config.threshold ?? 3.0}
-                onChange={(e) => onChange({ ...config, threshold: parseFloat(e.target.value) })}
+                onChange={(e) => onChange({ ...config, threshold: Number.parseFloat(e.target.value) })}
               />
               <p className="text-xs text-muted-foreground">Number of standard deviations to tolerate.</p>
             </div>
@@ -360,7 +360,7 @@ const OutlierSettings: React.FC<{ config: OutlierConfig; onChange: (c: OutlierCo
                     type="number"
                     className="w-full p-2 border rounded bg-background text-sm"
                     value={config.lower_percentile ?? 5.0}
-                    onChange={(e) => onChange({ ...config, lower_percentile: parseFloat(e.target.value) })}
+                    onChange={(e) => onChange({ ...config, lower_percentile: Number.parseFloat(e.target.value) })}
                   />
                 </div>
                 <div className="flex-1">
@@ -369,7 +369,7 @@ const OutlierSettings: React.FC<{ config: OutlierConfig; onChange: (c: OutlierCo
                     type="number"
                     className="w-full p-2 border rounded bg-background text-sm"
                     value={config.upper_percentile ?? 95.0}
-                    onChange={(e) => onChange({ ...config, upper_percentile: parseFloat(e.target.value) })}
+                    onChange={(e) => onChange({ ...config, upper_percentile: Number.parseFloat(e.target.value) })}
                   />
                 </div>
               </div>
@@ -387,7 +387,7 @@ const OutlierSettings: React.FC<{ config: OutlierConfig; onChange: (c: OutlierCo
                 max="0.5"
                 className="w-full p-2 border rounded bg-background text-sm"
                 value={config.contamination ?? 0.01}
-                onChange={(e) => onChange({ ...config, contamination: parseFloat(e.target.value) })}
+                onChange={(e) => onChange({ ...config, contamination: Number.parseFloat(e.target.value) })}
               />
               <p className="text-xs text-muted-foreground">Expected proportion of outliers in the dataset.</p>
             </div>

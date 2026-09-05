@@ -18,6 +18,7 @@ from sklearn.preprocessing import KBinsDiscretizer
 from ..core.meta.decorators import node_meta
 from ..engines import SkyulfDataFrame
 from ..registry import NodeRegistry
+from ..types import DEFAULT_RANDOM_STATE
 from ..utils import (
     detect_numeric_columns,
     user_picked_no_columns,
@@ -306,7 +307,12 @@ def _fit_equal_frequency(series: pd.Series, n_bins: int, duplicates: str) -> np.
 
 
 def _fit_kmeans(series: pd.Series, n_bins: int) -> np.ndarray:
-    est = KBinsDiscretizer(n_bins=n_bins, strategy="kmeans", encode="ordinal")
+    est = KBinsDiscretizer(
+        n_bins=n_bins,
+        strategy="kmeans",
+        encode="ordinal",
+        random_state=DEFAULT_RANDOM_STATE,
+    )
     est.fit(np.asarray(series.values).reshape(-1, 1))
     return est.bin_edges_[0]
 
@@ -326,6 +332,7 @@ def _fit_kbins(series: pd.Series, n_bins: int, k_strategy: str) -> np.ndarray:
         "n_bins": n_bins,
         "strategy": sklearn_strategy,
         "encode": "ordinal",
+        "random_state": DEFAULT_RANDOM_STATE,
     }
     if sklearn_strategy == "quantile":
         kwargs["quantile_method"] = "averaged_inverted_cdf"

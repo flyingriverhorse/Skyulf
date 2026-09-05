@@ -151,9 +151,15 @@ class TargetMixin(_AnalyzerState):
             self.lazy_df.group_by(group_col).agg(  # type: ignore[attr-defined]
                 [
                     pl.col(value_col).cast(pl.Float64, strict=False).min().alias("min"),
-                    pl.col(value_col).cast(pl.Float64, strict=False).quantile(0.25).alias("q1"),
+                    pl.col(value_col)
+                    .cast(pl.Float64, strict=False)
+                    .quantile(0.25, interpolation="linear")
+                    .alias("q1"),
                     pl.col(value_col).cast(pl.Float64, strict=False).median().alias("median"),
-                    pl.col(value_col).cast(pl.Float64, strict=False).quantile(0.75).alias("q3"),
+                    pl.col(value_col)
+                    .cast(pl.Float64, strict=False)
+                    .quantile(0.75, interpolation="linear")
+                    .alias("q3"),
                     pl.col(value_col).cast(pl.Float64, strict=False).max().alias("max"),
                 ]
             )

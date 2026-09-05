@@ -9,10 +9,11 @@ from .file_utils import (
     extract_file_path_from_source,
     safe_delete_path,
 )
-from .logging_utils import log_data_action
+from .logging_utils import log_data_action, sanitize_for_log
 
 __all__ = [
     "log_data_action",
+    "sanitize_for_log",
     "safe_delete_path",
     "extract_file_path_from_source",
     "cleanup_empty_directories",

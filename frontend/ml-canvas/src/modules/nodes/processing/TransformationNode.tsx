@@ -210,7 +210,7 @@ const TransformationSettings: React.FC<{ config: TransformationConfig; onChange:
                            type="number"
                            className="w-full p-1 border rounded text-xs"
                            value={rule.params?.clip_threshold || 700}
-                           onChange={(e) => { updateRule(idx, { params: { ...rule.params, clip_threshold: parseFloat(e.target.value) } }); }}
+                           onChange={(e) => { updateRule(idx, { params: { ...rule.params, clip_threshold: Number.parseFloat(e.target.value) } }); }}
                          />
                        </div>
                     )}

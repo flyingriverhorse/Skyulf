@@ -36,7 +36,7 @@ export const SearchSpaceInput: React.FC<SearchSpaceInputProps> = ({ def, value, 
 
             if (def.type === 'number') {
                 const num = Number(part);
-                if (isNaN(num)) {
+                if (Number.isNaN(num)) {
                     throw new Error(`"${part}" is not a valid number`);
                 }
                 parsed.push(num);

@@ -28,6 +28,36 @@ def test_apply_thresholds_binary_dict_form():
     np.testing.assert_array_equal(preds, [0, 1])
 
 
+def test_apply_thresholds_binary_full_dict_breaks_ties_toward_positive_class():
+    """Regression test (OC-147): the full-coverage two-entry dict that
+    `optimize_thresholds` returns must follow the documented binary rule.
+
+    It used to fall through to the multiclass scaled argmax, where `np.argmax`
+    breaks exact ties toward the first column — turning `p1 >= threshold` into
+    a strict `>`. The search scores candidates with `>=`, so at a tie the tuned
+    score it reported was not the score apply-time produced.
+    """
+    y_proba = np.array([[0.5, 0.5], [0.2, 0.8], [0.8, 0.2]])
+
+    from_dict = apply_thresholds(y_proba, thresholds={0: 0.5, 1: 0.5}, classes=[0, 1])
+    from_float = apply_thresholds(y_proba, thresholds=0.5, classes=[0, 1])
+
+    np.testing.assert_array_equal(from_dict, [1, 1, 0])  # the tie predicts positive
+    np.testing.assert_array_equal(from_dict, from_float)
+
+
+def test_apply_thresholds_binary_full_dict_still_honors_both_entries():
+    """The tie-break must not degrade into ignoring `thresholds[classes[0]]`:
+    a non-complementary pair (e.g. user-saved thresholds) is still compared in
+    scaled space using both entries."""
+    y_proba = np.array([[0.14, 0.86]])
+
+    # 0.86 / 0.1 = 8.6 beats 0.14 / 1.0 = 0.14
+    assert apply_thresholds(y_proba, thresholds={0: 1.0, 1: 0.1}, classes=[0, 1]).tolist() == [1]
+    # 0.14 / 0.1 = 1.4 beats 0.86 / 0.9 = 0.956 — the class-0 entry decides it
+    assert apply_thresholds(y_proba, thresholds={0: 0.1, 1: 0.9}, classes=[0, 1]).tolist() == [0]
+
+
 def test_apply_thresholds_multiclass_equal_thresholds_matches_argmax():
     """Equal thresholds across all classes must reduce to plain argmax."""
     y_proba = np.array(
@@ -91,6 +121,59 @@ def test_optimize_thresholds_defaults_to_grid_for_binary():
     y_proba = np.array([[0.8, 0.2], [0.6, 0.4], [0.4, 0.6], [0.2, 0.8]])
     thresholds = optimize_thresholds(y_true, y_proba, metric=f1_score, classes=[0, 1])
     assert set(thresholds.keys()) == {0, 1}
+
+
+def test_optimize_thresholds_single_class_validation_keeps_default(caplog):
+    """Regression test (OC-36): a validation split holding one class gives every
+    candidate the same score, so the strict `>` tie-break used to keep the first
+    grid point — a near-zero threshold that classified almost everything
+    positive (measured: `{0: 0.990, 1: 0.0099}`, 49/50 positive at f1=0.0) with
+    no diagnostic. It must warn and keep the default rule instead.
+    """
+    import logging
+
+    rng = np.random.default_rng(0)
+    y_proba = rng.random((50, 2))
+    y_proba /= y_proba.sum(axis=1, keepdims=True)
+    y_true = np.zeros(50, dtype=int)  # no positives in the split at all
+
+    with caplog.at_level(logging.WARNING):
+        thresholds = optimize_thresholds(y_true, y_proba, metric=f1_score, classes=[0, 1])
+
+    assert thresholds == {0: 0.5, 1: 0.5}
+    assert any("degenerate" in message for message in caplog.messages)
+    np.testing.assert_array_equal(
+        apply_thresholds(y_proba, thresholds, classes=[0, 1]),
+        apply_thresholds(y_proba, thresholds=0.5, classes=[0, 1]),
+    )
+
+
+def test_optimize_thresholds_ties_break_toward_the_default_cut():
+    """Regression test (OC-36): F1 and friends are piecewise constant in the
+    threshold, so exactly-tied plateaus are the common case. The tie must break
+    toward the default 0.5 cut, not toward whichever plateau edge the scan
+    reaches first (previously the smallest candidate, ~0.0098)."""
+    y_true = np.array([0, 1, 0, 1])
+    y_proba = np.array([[0.6, 0.4], [0.3, 0.7], [0.9, 0.1], [0.2, 0.8]])
+
+    thresholds = optimize_thresholds(
+        y_true, y_proba, metric=lambda *_: 1.0, classes=[0, 1], grid_points=101
+    )
+
+    assert thresholds == {0: 0.5, 1: 0.5}
+
+
+def test_optimize_thresholds_nan_scores_fall_back_to_default():
+    """A caller-supplied metric returning NaN must not poison the search: every
+    candidate is skipped and the default 0.5 threshold stands."""
+    y_true = np.array([0, 1, 0, 1])
+    y_proba = np.array([[0.6, 0.4], [0.3, 0.7], [0.9, 0.1], [0.2, 0.8]])
+
+    thresholds = optimize_thresholds(
+        y_true, y_proba, metric=lambda *_: float("nan"), classes=[0, 1], grid_points=101
+    )
+
+    assert thresholds[1] == pytest.approx(0.5)
 
 
 def test_optimize_thresholds_multiclass_nelder_mead_improves_on_argmax():

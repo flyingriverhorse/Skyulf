@@ -133,18 +133,15 @@ async def test_all_transformers(sample_data, tmp_path):
 
         try:
             result = engine.run(config, job_id="test_job")
-            assert result.status == "success"
-            # Check if node output exists in artifacts
-            # The engine doesn't return the data directly, it saves it.
-            # But for this test, we might need to inspect the artifact store or the result object
-            # The result object contains node_results which has output_artifacts
-
-            node_res = result.node_results.get("test_node")
-            assert node_res is not None
-            assert node_res.status == "success"
-
         except Exception as e:  # noqa: BLE001 - convert failure into pytest.fail message
             pytest.fail(f"Node {node_id} failed: {str(e)}")
+
+        assert result.status == "success"
+        # The engine saves node data to the artifact store rather than returning
+        # it; result.node_results carries the per-node status.
+        node_res = result.node_results.get("test_node")
+        assert node_res is not None
+        assert node_res.status == "success"
 
 
 @pytest.mark.asyncio
@@ -207,12 +204,13 @@ async def test_models(sample_data, tmp_path):
 
         try:
             result = engine.run(config, job_id="test_job")
-            assert result.status == "success"
-            node_res = result.node_results.get("model")
-            assert node_res is not None
-            assert node_res.status == "success"
         except Exception as e:  # noqa: BLE001 - convert failure into pytest.fail message
             pytest.fail(f"Model {node_id} failed: {str(e)}")
+
+        assert result.status == "success"
+        node_res = result.node_results.get("model")
+        assert node_res is not None
+        assert node_res.status == "success"
 
 
 @pytest.mark.asyncio
@@ -258,9 +256,10 @@ async def test_splitters(sample_data, tmp_path):
 
         try:
             result = engine.run(config, job_id="test_job")
-            assert result.status == "success"
-            node_res = result.node_results.get("t_splitter")
-            assert node_res is not None
-            assert node_res.status == "success"
         except Exception as e:  # noqa: BLE001 - convert failure into pytest.fail message
             pytest.fail(f"Splitter {node_id} failed: {str(e)}")
+
+        assert result.status == "success"
+        node_res = result.node_results.get("t_splitter")
+        assert node_res is not None
+        assert node_res.status == "success"

@@ -33,6 +33,7 @@ from backend.ml_pipeline._execution.graph_utils import (
 )
 from backend.ml_pipeline._execution.utils import parse_branch_info, resolve_dataset_name
 from backend.ml_pipeline.constants import StepType
+from backend.utils import sanitize_for_log
 from skyulf.profiling.drift import DriftCalculator
 from skyulf.registry import NodeRegistry as SkyulfRegistry
 
@@ -532,7 +533,7 @@ async def calculate_drift(
         calculator = DriftCalculator(ref_df, curr_df)
         report = calculator.calculate_drift(thresholds=custom_thresholds or None)
     except Exception as exc:
-        logger.exception("Drift calculation failed for job %s", job_id)
+        logger.exception("Drift calculation failed for job %s", sanitize_for_log(job_id))
         await _save_drift_alert(
             db,
             job_id=job_id,

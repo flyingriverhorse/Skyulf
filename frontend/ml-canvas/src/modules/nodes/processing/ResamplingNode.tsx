@@ -333,7 +333,7 @@ const ResamplingSettings: React.FC<{ config: ResamplingConfig; onChange: (c: Res
                                 step="0.1"
                                 className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 p-2 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                                 value={config.out_step ?? 0.5}
-                                onChange={(e) => { handleChange('out_step', parseFloat(e.target.value)); }}
+                                onChange={(e) => { handleChange('out_step', Number.parseFloat(e.target.value)); }}
                             />
                         </div>
                     )}
@@ -347,7 +347,7 @@ const ResamplingSettings: React.FC<{ config: ResamplingConfig; onChange: (c: Res
                                     step="0.1"
                                     className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 p-2 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                                     value={config.cluster_balance_threshold ?? 0.1}
-                                    onChange={(e) => { handleChange('cluster_balance_threshold', parseFloat(e.target.value)); }}
+                                    onChange={(e) => { handleChange('cluster_balance_threshold', Number.parseFloat(e.target.value)); }}
                                 />
                             </div>
                             <div className="space-y-2">

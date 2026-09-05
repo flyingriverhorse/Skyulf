@@ -382,7 +382,7 @@ export const ExperimentsPage: React.FC = () => {
       const m = (job.metrics || job.result?.metrics || {}) as Record<string, unknown>;
       return Object.keys(m).filter(k => {
         const val = m[k];
-        return typeof val === 'number' && !isNaN(val);
+        return typeof val === 'number' && !Number.isNaN(val);
       });
     })
   )), [selectedJobs]);
@@ -399,7 +399,7 @@ export const ExperimentsPage: React.FC = () => {
         const m = (job.metrics || job.result?.metrics || {}) as Record<string, unknown>;
         return Object.keys(m).filter(k => {
           const val = m[k];
-          return typeof val === 'number' && !isNaN(val);
+          return typeof val === 'number' && !Number.isNaN(val);
         });
       })
     )),

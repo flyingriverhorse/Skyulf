@@ -58,9 +58,9 @@ function computeFitTransform(
   const ct = vpEl.style.transform;
   const tMatch = ct.match(/translate\(([^,]+)px,\s*([^)]+)px\)/);
   const sMatch = ct.match(/scale\(([^)]+)\)/);
-  const vpX = tMatch ? parseFloat(tMatch[1] ?? '0') : 0;
-  const vpY = tMatch ? parseFloat(tMatch[2] ?? '0') : 0;
-  const vpZoom = sMatch ? parseFloat(sMatch[1] ?? '1') : 1;
+  const vpX = tMatch ? Number.parseFloat(tMatch[1] ?? '0') : 0;
+  const vpY = tMatch ? Number.parseFloat(tMatch[2] ?? '0') : 0;
+  const vpZoom = sMatch ? Number.parseFloat(sMatch[1] ?? '1') : 1;
 
   const canvasRect = canvas.getBoundingClientRect();
 
@@ -83,7 +83,7 @@ function computeFitTransform(
     maxY = Math.max(maxY, fy + fh);
   }
 
-  if (!isFinite(minX)) return null;
+  if (!Number.isFinite(minX)) return null;
 
   const cW = canvas.offsetWidth;
   const cH = canvas.offsetHeight;
