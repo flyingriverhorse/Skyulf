@@ -19,9 +19,10 @@ from ._common import (
 
 
 def _polars_missing_expr(X: Any, col: str) -> Any:
-    """Return an expression that is True when ``col`` is null or (for float
-    dtypes) NaN, so missing-row detection matches pandas' ``isna()``, which
-    treats float NaN as missing too.
+    """Return an expression that is True when ``col`` is null or (for float dtypes) NaN.
+
+    Missing-row detection then matches pandas' ``isna()``, which treats float
+    NaN as missing too.
     """
     expr = pl.col(col).is_null()
     if X.schema[col].is_float():
@@ -101,8 +102,20 @@ def _drop_missing_rows_apply_pandas(X: Any, y: Any, params: dict[str, Any]) -> t
 
 
 class DropMissingRowsApplier(BaseApplier):
+    """Drop rows exceeding the configured missingness policy, keeping ``y`` in sync.
+
+    This node changes the row count, so the pandas and polars paths must drop
+    the same rows *and* filter ``y`` by the identical kept positions. The
+    pandas path therefore computes its keep mask positionally: label-based
+    ``.loc`` returns every row matching a duplicated index label, which
+    desynchronises ``y`` from the cleaned ``X``. A ``subset`` that is empty or
+    names only nonexistent columns collapses to ``None``, which both engines
+    read as "check every column" rather than as a no-op.
+    """
+
     @apply_method
     def apply(self, X: Any, y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
+        """Dispatch to the engine-specific dropna, forwarding ``(X, y)`` only when ``y`` exists."""
         return apply_dual_engine(
             (X, y) if y is not None else X,
             params,
@@ -120,13 +133,23 @@ class DropMissingRowsApplier(BaseApplier):
     learns_from_data=False,
 )
 class DropMissingRowsCalculator(BaseCalculator):
+    """Resolve drop-missing-rows config into an artifact; nothing is learned from data."""
+
     def infer_output_schema(
         self, input_schema: SkyulfSchema, config: dict[str, Any]
     ) -> SkyulfSchema:
+        """Pass the input schema through: rows are dropped, columns are preserved."""
         # Drops rows; column set is preserved.
         return input_schema
 
     def fit(self, df: Any, config: dict[str, Any]) -> DropMissingRowsArtifact:
+        """Carry the dropna policy into the artifact.
+
+        Reads only ``config``, so it takes ``df`` directly and needs no
+        ``@fit_method`` unpacking of ``(X, y)``. Both engines apply the policy
+        in the same precedence: an absolute ``threshold`` outranks the
+        percentage ``missing_threshold``, which outranks ``how``.
+        """
         return {
             "type": "drop_missing_rows",
             "subset": config.get("subset"),

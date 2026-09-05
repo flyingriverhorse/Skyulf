@@ -151,8 +151,9 @@ def _compute_reference_crosstab_polars(
 def _compute_centroids(
     X: pd.DataFrame, labels: np.ndarray, X_numeric: pd.DataFrame
 ) -> list[ClusterCentroid]:
-    """Compute per-cluster size/percentage/mean-feature-value ("centroid") stats,
-    plus an auto-generated characteristic-profile label for each cluster.
+    """Compute per-cluster size/percentage/mean-feature-value ("centroid") stats.
+
+    Also auto-generates a characteristic-profile label for each cluster.
     """
     total = len(labels)
     overall_mean = {str(k): float(v) for k, v in X_numeric.mean(numeric_only=True).items()}

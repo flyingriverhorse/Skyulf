@@ -85,8 +85,21 @@ def _hash_apply_pandas(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, Any
 
 
 class HashEncoderApplier(BaseApplier):
+    """Replace each categorical column's values in place with a bucket index.
+
+    Buckets run over ``[0, n_features)``. No vocabulary is learned, so the same
+    artifact handles values never seen at fit time — at the cost of collisions,
+    which the hashing trick accepts by design. Both engines must agree on the
+    bucket, which is why they share ``_stable_hash`` (blake2b) instead of using
+    polars' native ``hash()``: deployment always crosses engines, so a
+    divergence would corrupt every production encoding. Nulls are filled with
+    the literal ``"nan"`` on polars to mirror pandas' ``astype(str)``, keeping
+    them in the same bucket on both sides.
+    """
+
     @apply_method
     def apply(self, X: Any, y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
+        """Dispatch to the engine-specific hashing, forwarding ``(X, y)`` only when ``y`` exists."""
         return apply_dual_engine(
             (X, y) if y is not None else X,
             params,
@@ -104,8 +117,18 @@ class HashEncoderApplier(BaseApplier):
     learns_from_data=True,
 )
 class HashEncoderCalculator(BaseCalculator):
+    """Resolve which columns to hash and how many buckets to use.
+
+    No vocabulary is learned — hashing is stateless, so the artifact is just
+    the column set plus ``n_features``. The target column is excluded because
+    hash encoding overwrites the column it encodes. An explicit
+    ``columns: []``, or auto-detection finding nothing, yields an empty
+    artifact so the applier no-ops.
+    """
+
     @fit_method
     def fit(self, X: Any, y: Any, config: dict[str, Any]) -> HashEncoderArtifact:  # pylint: disable=arguments-differ
+        """Build the artifact, auto-detecting categorical columns when none are named."""
         if user_picked_no_columns(config):
             return {}
 
@@ -125,6 +148,7 @@ class HashEncoderCalculator(BaseCalculator):
         input_schema: SkyulfSchema,
         config: dict[str, Any],
     ) -> SkyulfSchema | None:
+        """Pass the input schema through: bucket indices replace values in place."""
         # Hash encoder replaces values in source columns in place
         # (`pl.col(col)...alias(col)`). Schema is unchanged.
         return input_schema

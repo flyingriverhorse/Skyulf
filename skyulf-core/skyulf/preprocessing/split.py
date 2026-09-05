@@ -119,11 +119,19 @@ def _build_splitter(params: dict[str, Any]) -> "DataSplitter":
 
 
 class SplitApplier(BaseApplier):
+    """Route the input to the right :class:`DataSplitter` entry point."""
+
     def apply(
         self,
         df: pd.DataFrame | SkyulfDataFrame | tuple[Any, ...] | Any,
         params: dict[str, Any],
     ) -> SplitDataset:
+        """Split ``df`` into train/test and optional validation.
+
+        Routes three ways: an ``(X, y)`` tuple is split as a pair; a plain frame
+        carrying a configured ``target_column`` has that column lifted into ``y``
+        first; anything else is split row-wise with the target left in place.
+        """
         target_col = params.get("target_column")
         splitter = _build_splitter(params)
 
@@ -164,9 +172,12 @@ class SplitApplier(BaseApplier):
     is_splitter=True,
 )
 class SplitCalculator(BaseCalculator):
+    """Carry the split configuration into the artifact; splitting happens at apply time."""
+
     def fit(
         self, df: pd.DataFrame | SkyulfDataFrame | tuple[Any, ...] | Any, config: dict[str, Any]
     ) -> SplitArtifact:
+        """Return a typed ``SplitArtifact`` holding the recognized split settings."""
         # No learning from data; pass through known split params from config.
         # Constructed explicitly so the artifact shape matches SplitArtifact
         # rather than echoing arbitrary user keys back into the params dict.
@@ -188,6 +199,7 @@ class SplitCalculator(BaseCalculator):
         input_schema: SkyulfSchema,
         config: dict[str, Any],
     ) -> SkyulfSchema | None:
+        """Return ``input_schema``: every split frame keeps the full column set."""
         # Split produces a SplitDataset whose train/test/val frames carry
         # the full input schema. Downstream consumers see the same columns.
         return input_schema
@@ -209,6 +221,18 @@ class DataSplitter:
         shuffle: bool = True,
         stratify_col: str | None = None,
     ):
+        """Validate and store the split proportions and stratification column.
+
+        ``stratify_col`` names the column to balance class proportions on;
+        ``None`` disables stratification. ``random_state`` and ``shuffle`` are
+        reused for both the test carve and the validation carve, so the
+        partitioning is reproducible as a whole.
+
+        Raises:
+            ValueError: If ``test_size`` is not strictly between 0 and 1, if
+                ``validation_size`` is outside ``[0, 1)``, or if the two
+                together reach 1 and leave no rows for training.
+        """
         if not 0 < test_size < 1:
             raise ValueError(f"test_size must be between 0 and 1 (exclusive), got {test_size!r}.")
         if not 0 <= validation_size < 1:
@@ -230,6 +254,14 @@ class DataSplitter:
     # ---- public API ---------------------------------------------------------
 
     def split_xy(self, X: pd.DataFrame | SkyulfDataFrame, y: pd.Series | Any) -> SplitDataset:
+        """Split an ``(X, y)`` pair into train/test and optional validation.
+
+        Polars input is partitioned by index gather and never converted; other
+        engines round-trip through pandas and are converted back, so the result
+        stays on the input engine. Requested stratification is downgraded to an
+        unstratified split, with a warning, when the rarest class has fewer than
+        two members.
+        """
         if is_polars(X):
             return self._split_xy_polars(cast(Any, X), y)
 
@@ -259,6 +291,13 @@ class DataSplitter:
         return SplitDataset(train=train, test=test, validation=validation)
 
     def split(self, df: pd.DataFrame | SkyulfDataFrame) -> SplitDataset:
+        """Split a whole frame row-wise, leaving any target column in place.
+
+        Shares :meth:`split_xy`'s engine handling. Stratification here reads
+        ``stratify_col`` out of the frame itself, so a configured column that is
+        absent from ``df`` disables stratification with a warning instead of
+        raising.
+        """
         if is_polars(df):
             return self._split_polars(cast(Any, df))
 
@@ -457,11 +496,22 @@ def _maybe_split_xy_member(data: Any, target_col: str) -> tuple[Any, Any]:
 
 
 class FeatureTargetSplitApplier(BaseApplier):
+    """Separate the target column from the features without moving any rows."""
+
     def apply(
         self,
         df: pd.DataFrame | SkyulfDataFrame | SplitDataset | tuple[Any, ...],
         params: dict[str, Any],
     ) -> tuple[pd.DataFrame, pd.Series] | SplitDataset:
+        """Return ``(X, y)`` with ``target_column`` lifted out of the features.
+
+        A ``SplitDataset`` has each train/test/validation member split on its
+        own, and members that already are ``(X, y)`` pairs pass through
+        untouched; a bare tuple is returned as-is.
+
+        Raises:
+            ValueError: If no ``target_column`` is configured.
+        """
         target_col = params.get("target_column")
         if not target_col:
             raise ValueError("Target column must be specified for FeatureTargetSplitter")
@@ -492,11 +542,18 @@ class FeatureTargetSplitApplier(BaseApplier):
     learns_from_data=False,
 )
 class FeatureTargetSplitCalculator(BaseCalculator):
+    """Carry the configured target column into the artifact."""
+
     def fit(
         self,
         df: pd.DataFrame | SkyulfDataFrame | SplitDataset | tuple[Any, ...] | Any,
         config: dict[str, Any],
     ) -> FeatureTargetSplitArtifact:
+        """Return a typed artifact holding ``target_column`` as a string.
+
+        The key is omitted entirely when unconfigured or ``None``, which is what
+        makes the applier raise rather than split on an empty name.
+        """
         # Only ``target_column`` is consumed downstream by the Applier.
         # Build a typed artifact rather than echoing the raw config dict.
         artifact: FeatureTargetSplitArtifact = {"type": "feature_target_split"}
@@ -509,6 +566,7 @@ class FeatureTargetSplitCalculator(BaseCalculator):
         input_schema: SkyulfSchema,
         config: dict[str, Any],
     ) -> SkyulfSchema | None:
+        """Return ``input_schema``, target column included, so pickers can still select it."""
         # Output is (X, y). The target column lives in the y slot but is still
         # part of the dataset, so we keep it in the downstream schema. This
         # lets downstream column pickers (Encoder, Scaler, etc.) see and select

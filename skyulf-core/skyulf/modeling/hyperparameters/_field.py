@@ -38,6 +38,12 @@ class HyperparameterField:
     )
 
     def to_dict(self) -> dict[str, Any]:
+        """Plain-dict view of the field for JSON consumers (backend API, frontend).
+
+        ``dataclasses.asdict`` recurses, so nested ``options``/``depends_on``
+        structures arrive as plain data too — the registry serves these dicts
+        onward and clients never touch the dataclass itself.
+        """
         return asdict(self)
 
 

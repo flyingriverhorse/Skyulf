@@ -39,7 +39,9 @@ class CalculatorProtocol(Protocol):
         self,
         df: pd.DataFrame | SkyulfDataFrame | tuple,
         config: dict[str, Any],
-    ) -> Mapping[str, Any]: ...
+    ) -> Mapping[str, Any]:
+        """Fit on ``df`` using ``config`` and return the fitted parameters as a ``Mapping``."""
+        ...
 
 
 @runtime_checkable
@@ -56,7 +58,9 @@ class ApplierProtocol(Protocol):
         self,
         df: pd.DataFrame | SkyulfDataFrame | tuple,
         params: dict[str, Any],
-    ) -> Any: ...
+    ) -> Any:
+        """Transform ``df`` using the fitted ``params`` and return the result."""
+        ...
 
 
 @runtime_checkable

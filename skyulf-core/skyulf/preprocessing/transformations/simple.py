@@ -15,8 +15,11 @@ from ._ops import _PANDAS_OPS, _POLARS_OPS
 
 
 class SimpleTransformationApplier(BaseApplier):
+    """Apply the configured per-column math transformations (log, sqrt, ...)."""
+
     @apply_method
     def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
+        """Run each configured transformation on the active engine; ``y`` passes through."""
         return apply_dual_engine(
             X, params, {"polars": self._apply_polars, "pandas": self._apply_pandas}
         )
@@ -68,9 +71,12 @@ class SimpleTransformationApplier(BaseApplier):
     learns_from_data=False,
 )
 class SimpleTransformationCalculator(BaseCalculator):
+    """Package the configured transformations into an artifact without reading the data."""
+
     def infer_output_schema(
         self, input_schema: SkyulfSchema, config: dict[str, Any]
     ) -> SkyulfSchema:
+        """Return the input schema unchanged: transformations replace values in place."""
         # Simple transformations replace values in place; column set is preserved.
         return input_schema
 
@@ -79,6 +85,7 @@ class SimpleTransformationCalculator(BaseCalculator):
         df: pd.DataFrame | SkyulfDataFrame | tuple[Any, ...] | Any,
         config: dict[str, Any],
     ) -> SimpleTransformationArtifact:
+        """Return the ``transformations`` config as-is; nothing is fitted."""
         # Config: {'transformations': [{'column': 'col1', 'method': 'log'}, ...]}
         return {
             "type": "simple_transformation",

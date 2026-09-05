@@ -46,6 +46,7 @@ class SchemaMismatchError(ValueError):
         dtype_mismatches: dict[str, tuple[str, str]] | None = None,
         order_mismatch: bool = False,
     ) -> None:
+        """Set the ``ValueError`` message and capture the structured diff fields as attributes."""
         super().__init__(message)
         self.missing = missing or []
         self.unexpected = unexpected or []
@@ -75,6 +76,7 @@ class SkyulfSchema:
     def from_columns(
         cls, columns: Iterable[str], dtypes: dict[str, str] | None = None
     ) -> "SkyulfSchema":
+        """Build a schema from an iterable of ``columns`` and an optional ``dtypes`` mapping."""
         cols = tuple(columns)
         return cls(columns=cols, dtypes=dict(dtypes or {}))
 
@@ -91,12 +93,14 @@ class SkyulfSchema:
     # ---- Mutations (return new instances) ---------------------------------
 
     def drop(self, names: Iterable[str]) -> "SkyulfSchema":
+        """Return a new schema with the ``names`` columns (and their dtypes) removed."""
         drop_set = set(names)
         new_cols = tuple(c for c in self.columns if c not in drop_set)
         new_dtypes = {k: v for k, v in self.dtypes.items() if k not in drop_set}
         return replace(self, columns=new_cols, dtypes=new_dtypes)
 
     def add(self, name: str, dtype: str = "unknown") -> "SkyulfSchema":
+        """Return a new schema with ``name`` added under ``dtype``; unchanged if already present."""
         if name in self.columns:
             return self
         new_dtypes = dict(self.dtypes)
@@ -104,6 +108,11 @@ class SkyulfSchema:
         return replace(self, columns=self.columns + (name,), dtypes=new_dtypes)
 
     def rename(self, mapping: dict[str, str]) -> "SkyulfSchema":
+        """Return a new schema with columns renamed according to ``mapping``.
+
+        Raises:
+            ValueError: If the rename would produce duplicate column names.
+        """
         new_cols = tuple(mapping.get(c, c) for c in self.columns)
         if len(set(new_cols)) != len(new_cols):
             seen: set[str] = set()
@@ -122,6 +131,7 @@ class SkyulfSchema:
         return replace(self, columns=new_cols, dtypes=new_dtypes)
 
     def with_dtype(self, name: str, dtype: str) -> "SkyulfSchema":
+        """Return a new schema with ``name``'s dtype set to ``dtype``; unchanged if absent."""
         if name not in self.columns:
             return self
         new_dtypes = dict(self.dtypes)
@@ -131,15 +141,19 @@ class SkyulfSchema:
     # ---- Queries ----------------------------------------------------------
 
     def has(self, name: str) -> bool:
+        """Return ``True`` if ``name`` is a column in this schema."""
         return name in self.columns
 
     def column_list(self) -> list[str]:
+        """Return the column names as a plain ``list``."""
         return list(self.columns)
 
     def __contains__(self, item: object) -> bool:
+        """Support ``in``: return ``True`` if ``item`` is a column name in this schema."""
         return item in self.columns
 
     def __len__(self) -> int:
+        """Return the number of columns in this schema."""
         return len(self.columns)
 
     # ---- Contract validation ---------------------------------------------

@@ -84,6 +84,19 @@ class MergedBranchFoldAdapter:
         target_column: str,
         drop_columns: list[str] | tuple[str, ...] = (),
     ):
+        """Validate every branch up front so a fold can never fail mid-run.
+
+        Each step list is trial-built as a :class:`FeatureEngineer`, screened
+        against :data:`UNSAFE_BRANCH_STEP_TYPES`, and resolved through the node
+        registry. The lists are then copied — shallowly, so the step dicts stay
+        shared — meaning a caller appending to its own list afterwards cannot
+        reach a constructed adapter.
+
+        Raises:
+            ValueError: If the merge strategy is unrecognized, if there is no
+                branch step list or one is empty, or if a branch step splits the
+                data or changes row counts.
+        """
         if merge_strategy not in ("last_wins", "first_wins"):
             raise ValueError(f"unknown merge strategy '{merge_strategy}'")
         if not branch_step_lists:
@@ -110,6 +123,15 @@ class MergedBranchFoldAdapter:
         self.changes_row_count = False
 
     def fit_transform(self, X: Any, y: Any) -> tuple[Any, Any]:
+        """Fit fresh branch engineers on this fold's payload and merge the results.
+
+        Every branch engineer is rebuilt from the stored step lists on each call
+        rather than reused, so a statistic fitted on one fold cannot reach the
+        next.
+
+        Raises:
+            ValueError: If ``X`` still embeds the configured target column.
+        """
         self._validate_payload(X)
         engineers = [FeatureEngineer(list(steps)) for steps in self._branch_step_lists]
         frames, ys = self._run_branches(engineers, (X, y), fit=True)
@@ -117,6 +139,12 @@ class MergedBranchFoldAdapter:
         return self._finalize(frames, ys)
 
     def transform(self, X: Any, y: Any) -> tuple[Any, Any]:
+        """Re-apply the branch engineers fitted by the last :meth:`fit_transform`.
+
+        Raises:
+            RuntimeError: If called before :meth:`fit_transform`.
+            ValueError: If ``X`` still embeds the configured target column.
+        """
         if self._engineers is None:
             raise RuntimeError("transform() called before fit_transform()")
         self._validate_payload(X)
@@ -171,6 +199,18 @@ class FeatureEngineerFoldAdapter:
     """
 
     def __init__(self, steps_config: list[dict[str, Any]], target_column: str):
+        """Store the chain minus any splitter steps and validate it eagerly.
+
+        Splitter steps are filtered out because they already ran upstream of the
+        fold boundary. Unlike :class:`MergedBranchFoldAdapter`, row-changing
+        steps are accepted here and ``changes_row_count`` merely reports the
+        chain's nature: a single branch has no column-wise merge to
+        desynchronise.
+
+        Raises:
+            ValueError: If a step names a transformer absent from the registry,
+                or if the trial :class:`FeatureEngineer` rejects the chain.
+        """
         self._steps_config = [
             step for step in steps_config if step.get("transformer") not in SPLITTER_STEP_TYPES
         ]
@@ -190,6 +230,14 @@ class FeatureEngineerFoldAdapter:
         self._engineer: FeatureEngineer | None = None
 
     def fit_transform(self, X: Any, y: Any) -> tuple[Any, Any]:
+        """Fit a fresh engineer on this fold's ``(X, y)`` payload and return it.
+
+        A new :class:`FeatureEngineer` is built on every call, so nothing fitted
+        on one fold survives into the next.
+
+        Raises:
+            ValueError: If ``X`` still embeds the configured target column.
+        """
         self._validate_payload(X)
         engineer = FeatureEngineer(self._steps_config)
         transformed, _metrics = engineer.fit_transform((X, y))
@@ -197,6 +245,16 @@ class FeatureEngineerFoldAdapter:
         return transformed
 
     def transform(self, X: Any, y: Any) -> tuple[Any, Any]:
+        """Apply the engineer fitted by the last :meth:`fit_transform`.
+
+        Always returns an ``(X, y)`` pair, re-pairing when an applier handed
+        back a bare frame, so callers can rely on the ``FoldPreprocessor``
+        protocol shape.
+
+        Raises:
+            RuntimeError: If called before :meth:`fit_transform`.
+            ValueError: If ``X`` still embeds the configured target column.
+        """
         if self._engineer is None:
             raise RuntimeError("transform() called before fit_transform()")
         self._validate_payload(X)
@@ -239,6 +297,12 @@ class AuditedFoldPreprocessor:
     """
 
     def __init__(self, inner: Any):
+        """Wrap ``inner`` and start both row-count logs empty.
+
+        ``changes_row_count`` is mirrored from ``inner`` when it declares one
+        and defaults to ``False``, keeping the decorator transparent to callers
+        that inspect the flag.
+        """
         self._inner = inner
         self.fit_rows: list[int] = []
         self.transform_rows: list[int] = []
@@ -246,17 +310,25 @@ class AuditedFoldPreprocessor:
 
     @property
     def inner(self) -> Any:
+        """Return the wrapped preprocessor."""
         return self._inner
 
     def fit_transform(self, X: Any, y: Any) -> tuple[Any, Any]:
+        """Log the fit-time input row count, then delegate to ``inner``."""
         self.fit_rows.append(frame_rows(X))
         return self._inner.fit_transform(X, y)
 
     def transform(self, X: Any, y: Any) -> tuple[Any, Any]:
+        """Log the transform-time input row count, then delegate to ``inner``."""
         self.transform_rows.append(frame_rows(X))
         return self._inner.transform(X, y)
 
     def summary(self, train_rows: int | None = None) -> dict[str, Any]:
+        """Return per-fold call counts and the largest fit payload seen.
+
+        ``isolation_ok`` appears only when ``train_rows`` is supplied; omitting
+        it leaves the invariant unevaluated rather than assumed satisfied.
+        """
         result: dict[str, Any] = {
             "fit_calls": len(self.fit_rows),
             "max_fit_rows": max(self.fit_rows, default=0),

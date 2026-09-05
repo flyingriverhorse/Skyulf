@@ -98,8 +98,18 @@ def _target_apply_pandas(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, A
 
 
 class TargetEncoderApplier(BaseApplier):
+    """Replace categorical columns with the target statistics the fitted encoder learned.
+
+    Both engines transform through the same sklearn ``TargetEncoder`` carried in
+    the artifact, so parity comes from sharing it. The output shape follows the
+    target type: binary and regression targets are encoded in place, while a
+    multiclass target drops the originals and emits one ``{col}_cls{i}`` column
+    per class.
+    """
+
     @apply_method
     def apply(self, X: Any, y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
+        """Dispatch to the engine-specific transform, forwarding ``(X, y)`` only when present."""
         return apply_dual_engine(
             (X, y) if y is not None else X,
             params,
@@ -304,8 +314,20 @@ def _target_fit_transform_train_pandas(
     learns_from_data=True,
 )
 class TargetEncoderCalculator(BaseCalculator):
+    """Fit a sklearn ``TargetEncoder`` against ``y``, cross-fitting the training rows.
+
+    A target is mandatory: with no ``y`` the node logs a warning and returns an
+    empty artifact rather than failing. The target column is excluded from the
+    encoded set, since encoding it against itself is degenerate. This calculator
+    also satisfies ``TrainTransformCalculatorProtocol``, so the training split
+    receives out-of-fold encodings — a row's own target never leaks into its
+    feature — with the fold count capped by the smallest class count, while
+    held-out splits go through the plain applier.
+    """
+
     @fit_method
     def fit(self, X: Any, y: Any, config: dict[str, Any]) -> TargetEncoderArtifact:  # pylint: disable=arguments-differ
+        """Short-circuit an explicit empty column selection, else fit on the frame's own engine."""
         if user_picked_no_columns(config):
             return {}
         return cast(
@@ -342,6 +364,12 @@ class TargetEncoderCalculator(BaseCalculator):
         input_schema: SkyulfSchema,
         config: dict[str, Any],
     ) -> SkyulfSchema | None:
+        """Predict the schema only when ``target_type`` is explicitly binary or regression.
+
+        Anything else — ``"auto"`` included — can resolve to multiclass at fit
+        time, which changes the column set in a data-dependent way, so ``None``
+        is returned and callers fall back to runtime introspection.
+        """
         # For binary/regression targets, the encoder replaces values in
         # source columns in place — same column names, dtype becomes float
         # (per-column dtype is best-effort so we don't bother rewriting it).

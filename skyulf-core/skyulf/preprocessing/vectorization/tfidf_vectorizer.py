@@ -38,8 +38,19 @@ def _tfidf_apply_pandas(
 
 
 class TfidfVectorizerApplier(BaseApplier):
+    """Attach one TF-IDF-weighted column per vocabulary term to the frame.
+
+    The configured text columns are joined into a single corpus string before
+    transforming, the dense result is concatenated on, and the source columns
+    survive unless ``drop_original`` is set. This node uses the text-specific
+    dispatcher: the polars path runs natively, so only the text payload crosses
+    into sklearn, and it falls back to a full pandas round-trip when a text
+    column is not String dtype.
+    """
+
     @apply_method
     def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
+        """Dispatch through the text-specific dual-engine path; ``y`` passes through."""
         return apply_text_dual_engine(
             X, params, _tfidf_apply_pandas, _sklearn_vectorizer_apply_polars
         )
@@ -119,11 +130,25 @@ def _build_tfidf_artifact(
     learns_from_data=True,
 )
 class TfidfVectorizerCalculator(BaseCalculator):
+    """Fit a ``TfidfVectorizer`` vocabulary and IDF weights on the joined text.
+
+    Both the vocabulary and the per-term IDF weights are learned from the
+    training corpus and carried in the artifact, so the weights stay inspectable
+    and serialisable. A very wide output is warned about rather than raising,
+    since it is a memory problem, not an error.
+    """
+
     def infer_output_schema(self, input_schema: Any, config: dict[str, Any]) -> None:
+        """Return ``None``: how many columns appear depends on the learned vocabulary."""
         return None
 
     @fit_method
     def fit(self, X: Any, _y: Any, config: dict[str, Any]) -> TfidfVectorizerArtifact:  # pylint: disable=arguments-differ
+        """Narrow to the configured text columns and fit the vocabulary on their joined text.
+
+        An empty or wholly-absent column selection yields an empty artifact so
+        the applier no-ops.
+        """
         resolved = resolve_fit_text_columns(X, config)
         if resolved is None:
             return {}

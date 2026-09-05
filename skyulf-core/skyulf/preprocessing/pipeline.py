@@ -49,6 +49,15 @@ class FeatureEngineer:
         *,
         _validated: bool = False,
     ):
+        """Store the ordered step configuration, validating it unless the caller already did.
+
+        Args:
+            steps_config: Pipeline steps in execution order, as dicts or
+                ``PreprocessingStepConfig`` objects.
+            _validated: Skip ``validate_preprocessing_steps`` when ``True``; set by
+                callers such as ``SkyulfPipeline`` that already validated the same
+                structural rules via ``validate_pipeline_config``.
+        """
         # `Sequence` (covariant) accepts list[dict] or list[PreprocessingStepConfig].
         if not _validated:
             validate_preprocessing_steps(steps_config)

@@ -134,8 +134,20 @@ def _ordinal_apply_pandas(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, 
 
 
 class OrdinalEncoderApplier(BaseApplier):
+    """Replace categorical values in place with fitted ordinal indices, target included.
+
+    Features go through the artifact's shared ``encoder_object`` and ``y``
+    through a separate ``__target__`` encoder. Parity rests on both engines
+    transforming through the same sklearn objects *and* stringifying values
+    identically: polars fills nulls with ``"nan"``, pandas collapses
+    ``astype(str)``'s ``"None"`` onto that same token (F-07). A value unseen at
+    fit time becomes ``unknown_value`` unless ``handle_unknown`` is ``"error"``.
+    Encoded output is ``float32``, not integer.
+    """
+
     @apply_method
     def apply(self, X: Any, y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
+        """Dispatch to the engine-specific encode, forwarding ``(X, y)`` only when ``y`` exists."""
         return apply_dual_engine(
             (X, y) if y is not None else X,
             params,
@@ -315,15 +327,27 @@ def _ordinal_fit_pandas(X: Any, y: Any, config: dict[str, Any]) -> Mapping[str, 
     learns_from_data=True,
 )
 class OrdinalEncoderCalculator(BaseCalculator):
+    """Fit an ordinal encoder for the features and, when split out, for the target.
+
+    Picking no feature columns is *not* a no-op here — unlike its sibling
+    encoders, this node still fits a target encoder when ``y`` is available.
+    The target is encoded only when ``y`` exists and the configured target name
+    is listed in ``columns`` but absent from ``X``, i.e. it has already been
+    split away. ``categories_order`` supplies an explicit ordering, and the
+    target reads the last row of an ``n_features + 1`` row table.
+    """
+
     def infer_output_schema(
         self, input_schema: SkyulfSchema, config: dict[str, Any]
     ) -> SkyulfSchema:
+        """Pass the input schema through: encoded columns keep their name and position."""
         # Ordinal encoding replaces categorical values with ints in place;
         # column set is preserved.
         return input_schema
 
     @fit_method
     def fit(self, X: Any, y: Any, config: dict[str, Any]) -> OrdinalArtifact:  # pylint: disable=arguments-differ
+        """Fit the encoders on the frame's own engine, forwarding ``y`` when present."""
         return cast(
             OrdinalArtifact,
             fit_dual_engine(

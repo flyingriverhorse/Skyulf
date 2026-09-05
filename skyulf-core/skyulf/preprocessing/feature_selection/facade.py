@@ -16,11 +16,19 @@ logger = logging.getLogger(__name__)
 
 
 class FeatureSelectionApplier(BaseApplier):
+    """Route a fitted selection artifact to the applier that produced it."""
+
     def apply(
         self,
         df: Any,
         params: dict[str, Any],
     ) -> Any:
+        """Apply whichever concrete selection applier the artifact's ``type`` names.
+
+        An unrecognized ``type`` — including the empty artifact an unknown method
+        produces at fit time — is an identity passthrough, so this facade can
+        never drop data on its own.
+        """
         # The params returned by the specific calculator carry a "type" tag
         # that selects the right concrete applier.
         type_name = params.get("type")
@@ -66,11 +74,21 @@ _FS_CALCULATORS: dict[str, Callable[[], BaseCalculator]] = {
     learns_from_data=True,
 )
 class FeatureSelectionCalculator(BaseCalculator):
+    """Resolve ``config["method"]`` to one of the four concrete selection nodes."""
+
     def fit(
         self,
         df: Any,
         config: dict[str, Any],
     ) -> Mapping[str, Any]:
+        """Fit the concrete calculator the method alias maps to and return its artifact.
+
+        ``_FS_CALCULATORS`` collapses eleven aliases — node ids such as
+        ``variance`` alongside sklearn-style names such as ``select_k_best`` and
+        ``rfe`` — onto four calculators, so several spellings reach the same fit.
+        An unknown method logs a warning and returns an empty artifact rather
+        than raising, which degrades the node to a passthrough.
+        """
         method = config.get("method", "select_k_best")
         ctor = _FS_CALCULATORS.get(method)
         if ctor is None:

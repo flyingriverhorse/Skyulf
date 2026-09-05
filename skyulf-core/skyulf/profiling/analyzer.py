@@ -68,6 +68,12 @@ class EDAAnalyzer(
     """
 
     def __init__(self, df: pl.DataFrame):
+        """Store the frame and cache the lazy view, row count and column list.
+
+        The derived views are what every mixin reads. NaN is normalized to
+        null on the way in; see :meth:`_nan_to_null` for why that has to
+        happen before any aggregation runs.
+        """
         self.df = self._nan_to_null(df)
         # Detect date-like string columns up front so downstream type checks see Date/Datetime.
         self._cast_date_columns()

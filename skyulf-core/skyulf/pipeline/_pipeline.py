@@ -28,8 +28,10 @@ logger = logging.getLogger(__name__)
 
 
 def _to_pandas(obj: Any) -> Any:
-    """Convert a Polars DataFrame/Series (or any object exposing ``to_pandas()``)
-    to its pandas equivalent; pass pandas objects (or ``None``) through unchanged.
+    """Convert a Polars DataFrame/Series to its pandas equivalent.
+
+    Also converts any object exposing ``to_pandas()``; pandas objects (or
+    ``None``) pass through unchanged.
     """
     if obj is None:
         return None
@@ -206,10 +208,10 @@ class SkyulfPipeline:
         data: pd.DataFrame | pl.DataFrame | SkyulfDataFrame | SplitDataset,
         target_column: str,
     ) -> tuple[pd.DataFrame, pd.Series, pd.DataFrame, pd.Series]:
-        """Run this pipeline's configured preprocessing chain and return the
-        resulting train/test split as plain pandas objects.
+        """Run this pipeline's configured preprocessing chain and return the split.
 
-        Runs ``self.feature_engineer.fit_transform(data)`` — the same
+        The result is the train/test split as plain pandas objects. Runs
+        ``self.feature_engineer.fit_transform(data)`` — the same
         preprocessing ``fit()`` uses internally — and extracts
         ``(X_train, y_train, X_test, y_test)`` from the resulting split using
         ``target_column``, converting any Polars/SkyulfDataFrame frames to
@@ -269,15 +271,14 @@ class SkyulfPipeline:
         strategy: str | None = None,
         grid_points: int = 101,
     ) -> dict[Any, float]:
-        """Search for per-class decision thresholds that maximize ``metric`` on
-        caller-supplied validation data, and store the result for later use
-        by ``predict(use_tuned_thresholds=True)``.
+        """Search for per-class decision thresholds that maximize ``metric``.
 
-        Always uses the *explicit* ``(X_val, y_val)`` the caller passes in —
-        never the pipeline's internal train/test split. Get a clean,
-        independent holdout via ``get_fitted_split()`` (or your own split)
-        before calling this, the same way you would for any other
-        out-of-sample evaluation.
+        Runs on caller-supplied validation data and stores the result for later
+        use by ``predict(use_tuned_thresholds=True)``. Always uses the
+        *explicit* ``(X_val, y_val)`` the caller passes in — never the
+        pipeline's internal train/test split. Get a clean, independent holdout
+        via ``get_fitted_split()`` (or your own split) before calling this, the
+        same way you would for any other out-of-sample evaluation.
 
         Args:
             X_val: Validation features, *not* yet transformed (this method

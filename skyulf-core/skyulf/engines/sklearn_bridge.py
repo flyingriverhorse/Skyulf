@@ -1,3 +1,5 @@
+"""Convert Skyulf engine-agnostic frames into NumPy arrays for scikit-learn."""
+
 from typing import Any
 
 import numpy as np

@@ -26,6 +26,13 @@ class ConsoleTrialReporter:
     """``progress_callback``-shaped reporter; call ``finish`` after the run."""
 
     def __init__(self, stream: TextIO | None = None, force_live: bool | None = None) -> None:
+        """Bind the output stream and pick live vs piped reporting mode.
+
+        The self-updating single line is only safe on a TTY, so live mode
+        defaults to ``stream.isatty()``; ``force_live`` overrides that for
+        tests and callers that know the stream's capabilities. Both modes
+        track the best score so ``finish`` can summarize the run.
+        """
         self._stream = stream if stream is not None else sys.stdout
         self._live = force_live if force_live is not None else self._stream.isatty()
         self._best: float | None = None
@@ -40,6 +47,15 @@ class ConsoleTrialReporter:
         score: float | None,
         params: dict[str, Any] | None = None,
     ) -> None:
+        """Report one finished trial; shaped like the engine's ``progress_callback``.
+
+        Tracks the running best score (higher is better). On a TTY, rewrites
+        a single status line with a carriage return, padded to erase any
+        leftovers from a longer previous line, and closes it on the final
+        trial; failed or pruned trials (``score is None``) get a status too.
+        On piped streams nothing is written per trial — only ``finish``
+        prints.
+        """
         if score is not None and (self._best is None or score > self._best):
             self._best = float(score)
             self._best_trial = current

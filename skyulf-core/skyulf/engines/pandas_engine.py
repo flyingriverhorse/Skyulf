@@ -1,3 +1,5 @@
+"""Pandas implementation of the ``SkyulfDataFrame`` protocol and its ``PandasEngine`` adapter."""
+
 from collections.abc import Sequence
 from typing import Any
 
@@ -10,9 +12,10 @@ from .registry import BaseEngine, EngineName, EngineRegistry
 
 
 def _to_positional_values(values: Any, target_index: pd.Index) -> Any:
-    """Strip index alignment from Series-like values so assignment behaves
-    positionally, matching Polars semantics instead of pandas' index-based
-    alignment (which silently produces NaNs on mismatched indices).
+    """Strip index alignment from Series-like values so assignment behaves positionally.
+
+    This matches Polars semantics instead of pandas' index-based alignment, which
+    silently produces NaNs on mismatched indices.
     """
     if isinstance(values, pd.Series) and not values.index.equals(target_index):
         if len(values) != len(target_index):
@@ -28,17 +31,21 @@ class SkyulfPandasWrapper:
     """Wrapper for Pandas DataFrame to implement SkyulfDataFrame protocol."""
 
     def __init__(self, df: pd.DataFrame):
+        """Store ``df``, the ``pandas.DataFrame`` this wrapper adapts."""
         self._df = df
 
     @property
     def columns(self) -> Sequence[str]:
+        """Column names as a plain ``list[str]``."""
         return self._df.columns.tolist()
 
     @property
     def shape(self) -> tuple[int, int]:
+        """Row and column counts as a ``(rows, cols)`` tuple."""
         return self._df.shape
 
     def select(self, columns: list[str] | str) -> "SkyulfDataFrame":
+        """Return a new wrapper with only the selected column(s); a bare string selects one."""
         # Normalize a bare string to a single-element list so pandas returns
         # a DataFrame (matching Polars' select(), which always returns a
         # DataFrame) instead of a bare Series.
@@ -47,9 +54,11 @@ class SkyulfPandasWrapper:
         return SkyulfPandasWrapper(self._df[columns])
 
     def drop(self, columns: list[str]) -> "SkyulfDataFrame":
+        """Return a new wrapper without the given columns."""
         return SkyulfPandasWrapper(self._df.drop(columns=columns))
 
     def with_column(self, name: str, values: Any) -> "SkyulfDataFrame":
+        """Return a new wrapper with ``name`` set to ``values``, positionally like Polars."""
         # Pandas aligns Series/DataFrame-like values by index, while Polars
         # always assigns positionally. If `values` carries its own index that
         # doesn't match self._df's, a naive assign() would silently produce
@@ -58,46 +67,59 @@ class SkyulfPandasWrapper:
         return SkyulfPandasWrapper(self._df.assign(**{name: values}))
 
     def to_native(self) -> pd.DataFrame:
+        """Return the underlying ``pandas.DataFrame`` without conversion."""
         return self._df
 
     def to_pandas(self) -> pd.DataFrame:
+        """Return the frame as a ``pandas.DataFrame`` (a no-op for this pandas-backed wrapper)."""
         return self._df
 
     def to_arrow(self) -> Any:
+        """Convert the frame to a ``pyarrow.Table``."""
         return pa.Table.from_pandas(self._df)
 
     def copy(self) -> "SkyulfDataFrame":
+        """Return a new wrapper around a copy of the underlying frame."""
         return SkyulfPandasWrapper(self._df.copy())
 
     def __getitem__(self, key):
+        """Delegate column/row selection to the underlying ``pandas.DataFrame``."""
         return self._df[key]
 
     def __setitem__(self, key, value):
+        """Assign into the underlying frame positionally, ignoring index alignment."""
         value = _to_positional_values(value, self._df.index)
         self._df[key] = value
 
     def __len__(self) -> int:
+        """Return the row count of the underlying frame."""
         return len(self._df)
 
     # Allow access to underlying dataframe methods for flexibility,
     # but this breaks the protocol abstraction if used.
     def __getattr__(self, name):
+        """Delegate unknown attribute access to the underlying ``pandas.DataFrame``."""
         return getattr(self._df, name)
 
 
 class PandasEngine(BaseEngine):
+    """Engine adapter that keeps data in pandas; registered under ``"pandas"``."""
+
     name = EngineName.PANDAS
 
     @classmethod
     def is_compatible(cls, data: Any) -> bool:
+        """Return ``True`` if ``data`` is a ``pandas.DataFrame``."""
         return isinstance(data, pd.DataFrame)
 
     @classmethod
     def from_pandas(cls, df: Any) -> Any:
+        """Return ``df`` unchanged (already a pandas frame)."""
         return df
 
     @classmethod
     def to_numpy(cls, df: Any) -> Any:
+        """Convert ``df`` to a NumPy array (via its ``to_numpy()`` when available)."""
         # `SkyulfPandasWrapper` delegates unknown attributes to its wrapped
         # `pd.DataFrame` via `__getattr__`, so `hasattr(df, "to_numpy")` is
         # already `True` for it (and for any pandas/Polars object, both of
@@ -109,12 +131,14 @@ class PandasEngine(BaseEngine):
 
     @classmethod
     def wrap(cls, data: Any) -> "SkyulfDataFrame":
+        """Wrap ``data`` in a ``SkyulfPandasWrapper`` (idempotent for wrappers)."""
         if isinstance(data, SkyulfPandasWrapper):
             return data
         return SkyulfPandasWrapper(data)
 
     @classmethod
     def create_dataframe(cls, data: Any) -> Any:
+        """Build a ``pandas.DataFrame`` from ``data`` (dict, list, etc.)."""
         return pd.DataFrame(data)
 
 

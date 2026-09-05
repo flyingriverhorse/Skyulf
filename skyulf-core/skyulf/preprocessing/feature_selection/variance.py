@@ -15,8 +15,15 @@ from ._common import _drop_selected_pandas, _drop_selected_polars
 
 
 class VarianceThresholdApplier(BaseApplier):
+    """Remove the columns a fitted variance threshold rejected."""
+
     @apply_method
     def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
+        """Drop ``candidate_columns - selected_columns`` from ``X``.
+
+        Honours the artifact's ``drop_columns`` flag; when it is false the frame
+        passes through untouched.
+        """
         return apply_dual_engine(
             X, params, {"polars": _drop_selected_polars, "pandas": _drop_selected_pandas}
         )
@@ -32,8 +39,16 @@ class VarianceThresholdApplier(BaseApplier):
     learns_from_data=True,
 )
 class VarianceThresholdCalculator(BaseCalculator):
+    """Fit ``sklearn.feature_selection.VarianceThreshold`` on numeric columns."""
+
     @fit_method
     def fit(self, X: Any, _y: Any, config: dict[str, Any]) -> VarianceThresholdArtifact:  # pylint: disable=arguments-differ
+        """Record which numeric columns clear ``config["threshold"]`` variance.
+
+        Binary and constant columns are kept as candidates rather than excluded
+        up front, so the threshold itself decides their fate. Returns an empty
+        artifact — a no-op passthrough — when no numeric column is resolved.
+        """
         threshold = config.get("threshold", 0.0)
         drop_columns = config.get("drop_columns", True)
 

@@ -54,9 +54,11 @@ class JoblibModelSerializer(ModelSerializer):
     format = "joblib"
 
     def dump(self, model: Any, path: PathLike) -> None:
+        """Persist ``model`` to ``path`` with ``joblib.dump``."""
         joblib.dump(model, path)
 
     def load(self, path: PathLike) -> Any:
+        """Load and return the model written to ``path`` via ``joblib.load``."""
         return joblib.load(path)
 
 

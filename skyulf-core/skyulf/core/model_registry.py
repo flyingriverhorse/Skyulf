@@ -53,6 +53,7 @@ class InMemoryModelRegistry(ModelRegistry):
     """Default in-process registry. Versions auto-increment from 1."""
 
     def __init__(self) -> None:
+        """Create an empty registry plus the lock that serialises concurrent version assignment."""
         self._store: dict[str, list[ModelVersion]] = {}
         # Guards read-modify-write of `_store[name]` so concurrent `register()`
         # calls for the same model name can't both read the same
@@ -62,6 +63,7 @@ class InMemoryModelRegistry(ModelRegistry):
     def register(
         self, name: str, model: Any, metadata: dict[str, Any] | None = None
     ) -> ModelVersion:
+        """Register ``model`` under ``name``, assigning the next auto-incremented version."""
         with self._lock:
             versions = self._store.setdefault(name, [])
             entry = ModelVersion(name, len(versions) + 1, model, dict(metadata or {}))
@@ -69,6 +71,7 @@ class InMemoryModelRegistry(ModelRegistry):
         return entry
 
     def get(self, name: str, version: int | None = None) -> ModelVersion:
+        """Return the requested version of ``name`` (latest when ``version`` is ``None``)."""
         versions = self._store.get(name)
         if not versions:
             raise KeyError(f"No model registered under '{name}'.")
@@ -80,4 +83,5 @@ class InMemoryModelRegistry(ModelRegistry):
         raise KeyError(f"Version {version} not found for model '{name}'.")
 
     def versions(self, name: str) -> list[ModelVersion]:
+        """Return a copy of all versions under ``name`` (oldest first); empty if unregistered."""
         return list(self._store.get(name, []))

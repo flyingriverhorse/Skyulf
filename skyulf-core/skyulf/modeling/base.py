@@ -1,3 +1,13 @@
+"""Contracts shared by every modeling node.
+
+Defines :class:`BaseModelCalculator` and :class:`BaseModelApplier`, the
+fit/predict halves each model node implements; :func:`extract_xy` and its
+engine-specific helpers, the pandas/Polars/tuple ``(X, y)`` extraction every
+model node shares; and :class:`StatefulEstimator`, which binds a
+calculator/applier pair and owns the in-memory fitted model across fit,
+predict, cross-validation and evaluation.
+"""
+
 import logging
 from abc import ABC, abstractmethod
 from collections.abc import Callable
@@ -20,8 +30,10 @@ logger = logging.getLogger(__name__)
 
 
 def extract_xy(data: Any, target_column: str) -> tuple[Any, Any]:
-    """Extract ``(X, y)`` from a DataFrame (pandas or Polars) or an ``(X, y)``
-    tuple, given the target column name.
+    """Extract ``(X, y)`` from a DataFrame or an ``(X, y)`` tuple.
+
+    The frame may be pandas or Polars, and ``target_column`` names the column to
+    lift into ``y``.
 
     An empty/falsy ``target_column`` is the established "no target" sentinel
     (see ``_node_runners.py``'s ``target_col=""`` for data-preview-only
@@ -80,6 +92,13 @@ def _extract_xy_pandas_like(data: Any, target_column: str) -> tuple[Any, Any]:
 
 
 class BaseModelCalculator(ABC):
+    """Fitting half of a model node: declares the problem type and trains the estimator.
+
+    Subclasses must supply :attr:`problem_type` and :meth:`fit`. The
+    :attr:`default_params` and tuning hooks carry plain-model defaults that
+    structural models such as ensembles override.
+    """
+
     @property
     @abstractmethod
     def problem_type(self) -> str:
@@ -98,10 +117,10 @@ class BaseModelCalculator(ABC):
         return {}
 
     def prepare_tuning_params(self, config: dict[str, Any]) -> None:
-        """Hook for structural models (e.g. ensembles) to absorb their
-        sub-estimator selection before the tuner builds the base model.
+        """Hook for structural models (e.g. ensembles) to absorb their sub-estimator selection.
 
-        No-op for plain models. Ensembles override this to inject the resolved
+        Runs before the tuner builds the base model. No-op for plain models.
+        Ensembles override this to inject the resolved
         ``estimators`` (and ``final_estimator``) into :attr:`default_params` so
         the tuner can construct a valid meta-estimator.
         """
@@ -162,6 +181,13 @@ class BaseModelCalculator(ABC):
 
 
 class BaseModelApplier(ABC):
+    """Predicting half of a model node: turns a fitted artifact into predictions.
+
+    :meth:`predict_proba` is optional. The base implementation returns ``None``,
+    which is how callers detect an estimator that cannot produce class
+    probabilities.
+    """
+
     @abstractmethod
     def predict(self, df: pd.DataFrame | SkyulfDataFrame, model_artifact: Any) -> pd.Series | Any:
         """Generates predictions."""
@@ -177,7 +203,19 @@ class BaseModelApplier(ABC):
 
 
 class StatefulEstimator:
+    """Drive a model node end to end, holding the fitted model between calls.
+
+    Wraps a calculator/applier pair and owns the in-memory ``model`` artifact,
+    so fitting, cross-validation, prediction and evaluation all share one
+    fitted state instead of retraining.
+    """
+
     def __init__(self, calculator: BaseModelCalculator, applier: BaseModelApplier, node_id: str):
+        """Store the node pair and start with no fitted model.
+
+        ``node_id`` is recorded into the evaluation payload alongside
+        ``job_id``; ``model`` stays ``None`` until the first fit.
+        """
         self.calculator = calculator
         self.applier = applier
         self.node_id = node_id
@@ -206,8 +244,9 @@ class StatefulEstimator:
             return False
 
     def _extract_xy(self, data: Any, target_column: str) -> tuple[Any, Any]:
-        """Instance-method wrapper around the module-level ``extract_xy()``,
-        kept for backward compatibility with existing call sites/tests.
+        """Instance-method wrapper around the module-level ``extract_xy()``.
+
+        Kept for backward compatibility with existing call sites/tests.
         """
         return extract_xy(data, target_column)
 
@@ -487,8 +526,10 @@ class StatefulEstimator:
         evaluation_data: dict[str, Any],
         reference_column: str = "",
     ) -> Any:
-        """Evaluates a single dataset split, recording raw predictions into ``evaluation_data``
-        and returning the split's evaluation report (or ``None`` if it can't be evaluated).
+        """Evaluates a single dataset split, recording raw predictions into ``evaluation_data``.
+
+        Returns the split's evaluation report, or ``None`` if it can't be
+        evaluated.
         """
         # Delegate to the same engine-agnostic (pandas/polars/tuple) X/y
         # extraction used by fit_predict, instead of duplicating

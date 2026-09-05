@@ -110,8 +110,11 @@ def _validate_h3_resolution(resolution: Any) -> None:
 
 
 class H3IndexApplier(BaseApplier):
+    """Append each row's H3 hexagonal cell index as a new string column."""
+
     @apply_method
     def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
+        """Compute the per-row cell indices on the active engine; ``y`` passes through."""
         return apply_dual_engine(
             X, params, {"polars": _h3_index_apply_polars, "pandas": _h3_index_apply_pandas}
         )
@@ -131,8 +134,11 @@ class H3IndexApplier(BaseApplier):
     learns_from_data=False,
 )
 class H3IndexCalculator(BaseCalculator):
+    """Validate the lat/lon columns and resolution for H3 cell indexing."""
+
     @fit_method
     def fit(self, X: Any, _y: Any, config: dict[str, Any]) -> H3IndexArtifact:  # pylint: disable=arguments-differ
+        """Import ``h3`` eagerly to fail fast, then validate the columns and resolution."""
         # Fail fast with a clear message if the optional dependency is missing,
         # rather than only failing later inside Applier.apply().
         _import_h3()

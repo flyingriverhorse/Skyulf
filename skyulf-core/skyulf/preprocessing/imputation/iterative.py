@@ -19,8 +19,11 @@ from ._common import _build_iterative_estimator, _sklearn_transform_subset, drop
 
 
 class IterativeImputerApplier(BaseApplier):
+    """Fill missing values from the fitted MICE (chained-equations) imputer."""
+
     @apply_method
     def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
+        """Impute ``X`` with the stored sklearn imputer; ``y`` passes through."""
         return apply_dual_engine(
             X, params, {"polars": self._apply_polars, "pandas": self._apply_pandas}
         )
@@ -52,14 +55,18 @@ class IterativeImputerApplier(BaseApplier):
     learns_from_data=True,
 )
 class IterativeImputerCalculator(BaseCalculator):
+    """Fit a sklearn ``IterativeImputer`` with the configured estimator."""
+
     def infer_output_schema(
         self, input_schema: SkyulfSchema, config: dict[str, Any]
     ) -> SkyulfSchema:
+        """Return the input schema unchanged: imputation fills cells, not columns."""
         # MICE imputation fills NaNs in place; column set is preserved.
         return input_schema
 
     @fit_method
     def fit(self, X: Any, _y: Any, config: dict[str, Any]) -> IterativeImputerArtifact:  # pylint: disable=arguments-differ
+        """Fit chained-equations imputation, dropping all-missing columns sklearn cannot impute."""
         if user_picked_no_columns(config):
             return {}
 

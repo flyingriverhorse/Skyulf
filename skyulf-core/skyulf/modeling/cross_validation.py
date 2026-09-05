@@ -571,8 +571,9 @@ def _perform_nested_cv(
     log_callback: Callable[[str], None] | None = None,
     preprocessing: "FoldPreprocessor | None" = None,
 ) -> dict[str, Any]:
-    """Performs nested cross-validation with an outer loop for generalization
-    evaluation and an inner loop that produces a diagnostic stability signal.
+    """Performs nested cross-validation with an outer loop for generalization.
+
+    The inner loop produces a diagnostic stability signal.
 
     Outer loop: evaluates generalization (same as standard CV).
     Inner loop: fits the *same* config across inner folds within each outer

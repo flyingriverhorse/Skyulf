@@ -25,7 +25,9 @@ _MAXIMIZE_METRICS = frozenset({"auc", "aucpr", "map", "ndcg", "precession", "pre
 
 
 def direction_for_xgb_metric(metric: str) -> str:
-    """XGBoost's callback env doesn't say which way is better; losses and
+    """Return ``"maximize"`` or ``"minimize"`` for an XGBoost metric name.
+
+    XGBoost's callback env doesn't say which way is better; losses and
     error rates dominate its metric names, so default to minimize and
     whitelist the ranking metrics.
     """
@@ -74,9 +76,23 @@ class LightGBMIterationAdapter:
     """LightGBM callbacks are plain callables receiving the booster env."""
 
     def __init__(self, callback: IterationCallback) -> None:
+        """Store the callback fired after every boosting round.
+
+        No total needs capturing up front, unlike the XGBoost adapter:
+        LightGBM's callback env carries both ``iteration`` and
+        ``end_iteration`` on every round.
+        """
         self._callback = callback
 
     def __call__(self, env: Any) -> None:
+        """Forward one finished boosting round's score to the callback.
+
+        LightGBM invokes this per round with the booster env; the first
+        evaluation result carries the metric, value, and LightGBM's own
+        ``is_higher_better`` flag, so no metric-name whitelist is needed.
+        Rounds without results are skipped, and callback errors are
+        suppressed — telemetry must never break training.
+        """
         results = getattr(env, "evaluation_result_list", None) or []
         if not results:
             return

@@ -91,10 +91,21 @@ class TuningCalculator(BaseModelCalculator):
     """
 
     def __init__(self, model_calculator: BaseModelCalculator):
+        """Store the base calculator whose estimator will be tuned.
+
+        Everything the search needs — model class, default parameters,
+        problem type — is read off the wrapped calculator, so one tuner
+        serves every sklearn-backed model node without per-model code.
+        """
         self.model_calculator = model_calculator
 
     @property
     def problem_type(self) -> str:
+        """The wrapped calculator's problem type (classification/regression/clustering).
+
+        Delegated so splitter construction and metric/scorer resolution see
+        the tuner as the base model — tuning must honor the same contract.
+        """
         return self.model_calculator.problem_type
 
     # ------------------------------------------------------------------
@@ -675,6 +686,12 @@ class TuningApplier(BaseModelApplier):
     """
 
     def __init__(self, base_applier: BaseModelApplier):
+        """Store the base applier that performs the actual predictions.
+
+        The tuning artifact is a ``(model, tuning_result)`` tuple; unless
+        tuned decision thresholds apply, predictions unwrap the model and
+        delegate, keeping the tuner transparent at serving time.
+        """
         self.base_applier = base_applier
 
     def predict(
@@ -682,6 +699,16 @@ class TuningApplier(BaseModelApplier):
         df: pd.DataFrame | SkyulfDataFrame,
         model_artifact: Any,
     ) -> pd.Series | Any:
+        """Predict with the refit best model, honoring tuned decision thresholds.
+
+        Unwraps the ``(model, tuning_result)`` artifact; when threshold
+        tuning (F-13) stored decision thresholds and the model exposes
+        probabilities, those replace the model's default decision rule.
+        Otherwise prediction delegates to the base applier. An artifact
+        that isn't the expected tuple (e.g. a plain fitted model) yields an
+        engine-aware all-null placeholder instead of raising, so downstream
+        nodes still receive correctly shaped output.
+        """
         # model_artifact is (fitted_model, tuning_result)
         if isinstance(model_artifact, tuple) and len(model_artifact) == 2:
             model, tuning_result = model_artifact
@@ -713,6 +740,13 @@ class TuningApplier(BaseModelApplier):
         df: pd.DataFrame | SkyulfDataFrame,
         model_artifact: Any,
     ) -> pd.DataFrame | SkyulfDataFrame | None:
+        """Class probabilities from the tuned model, via the base applier.
+
+        Decision thresholds are deliberately not applied — probabilities
+        are the pre-decision payload consumers (and threshold tuning
+        itself) need untouched. Returns ``None`` when the artifact isn't
+        the ``(model, tuning_result)`` tuple the tuner produces.
+        """
         if isinstance(model_artifact, tuple) and len(model_artifact) == 2:
             model, _ = model_artifact
             return self.base_applier.predict_proba(df, model)

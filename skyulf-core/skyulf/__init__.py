@@ -1,4 +1,11 @@
-"""Skyulf Core SDK"""
+"""Skyulf Core SDK.
+
+Importing this package pulls in the pipeline, preprocessing and profiling
+entry points, which in turn import the node modules — and those register
+their Calculator/Applier pairs with :class:`~skyulf.registry.NodeRegistry` as
+an import side effect. ``__version__`` is read back from the installed
+package's metadata rather than hardcoded, so it cannot drift from ``setup.py``.
+"""
 
 from importlib.metadata import PackageNotFoundError, version
 

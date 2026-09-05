@@ -80,8 +80,18 @@ def _polynomial_apply_pandas(X: Any, _y: Any, params: dict[str, Any]) -> tuple[A
 
 
 class PolynomialFeaturesApplier(BaseApplier):
+    """Append the polynomial expansion described by the artifact."""
+
     @apply_method
     def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
+        """Recompute the expansion from ``X`` and append it as new columns.
+
+        ``PolynomialFeatures`` is refit here rather than persisted, so the
+        artifact only carries configuration. Artifact columns absent from ``X``
+        are filtered out first, and the default ``include_input_features=False``
+        drops the degree-1 terms so the originals are not duplicated. ``X`` is
+        returned unchanged when nothing survives.
+        """
         return apply_dual_engine(
             X, params, {"polars": _polynomial_apply_polars, "pandas": _polynomial_apply_pandas}
         )
@@ -98,8 +108,18 @@ class PolynomialFeaturesApplier(BaseApplier):
     learns_from_data=False,
 )
 class PolynomialFeaturesCalculator(BaseCalculator):
+    """Resolve the polynomial configuration and the names it will emit."""
+
     @fit_method
     def fit(self, X: Any, _y: Any, config: dict[str, Any]) -> PolynomialFeaturesArtifact:  # pylint: disable=arguments-differ
+        """Record the expansion settings and the feature names they produce.
+
+        ``columns`` falls back to auto-detected numeric columns when
+        ``auto_detect`` is set. ``PolynomialFeatures`` is fitted here purely to
+        derive ``feature_names`` — the expansion itself is recomputed at apply
+        time. Returns an empty artifact, a no-op passthrough, when no column
+        resolves.
+        """
         cols = list(config.get("columns", []))
         if not cols and config.get("auto_detect", False):
             # detect_numeric_columns dispatches natively on Polars frames too,

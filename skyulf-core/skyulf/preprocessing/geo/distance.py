@@ -1,9 +1,9 @@
-"""GeoDistance node — great-circle (haversine) or flat-plane distance between
-two lat/lon coordinate pairs.
+"""GeoDistance node — great-circle (haversine) or flat-plane distance.
 
-Pure math (no optional geospatial dependency): both the pandas and polars
-engines compute the distance directly with trigonometric expressions, so this
-node works without ``geopandas``/``shapely``/``h3`` installed.
+Computed between two lat/lon coordinate pairs. Pure math (no optional
+geospatial dependency): both the pandas and polars engines compute the
+distance directly with trigonometric expressions, so this node works without
+``geopandas``/``shapely``/``h3`` installed.
 """
 
 from typing import Any, cast
@@ -134,8 +134,11 @@ def _validate_geo_distance_method_unit(method: str, unit: str) -> None:
 
 
 class GeoDistanceApplier(BaseApplier):
+    """Append the configured pairwise distance as a new numeric column."""
+
     @apply_method
     def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
+        """Compute the distance column on the active engine; ``y`` passes through."""
         return apply_dual_engine(
             X, params, {"polars": _geo_distance_apply_polars, "pandas": _geo_distance_apply_pandas}
         )
@@ -162,8 +165,11 @@ class GeoDistanceApplier(BaseApplier):
     learns_from_data=False,
 )
 class GeoDistanceCalculator(BaseCalculator):
+    """Validate the coordinate columns, method, and unit for the distance computation."""
+
     @fit_method
     def fit(self, X: Any, _y: Any, config: dict[str, Any]) -> GeoDistanceArtifact:  # pylint: disable=arguments-differ
+        """Check the columns, method, and unit against the data, then record the config."""
         lat1_col = config.get("lat1_col", "")
         lon1_col = config.get("lon1_col", "")
         lat2_col = config.get("lat2_col", "")

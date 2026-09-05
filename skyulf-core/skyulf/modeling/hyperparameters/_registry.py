@@ -85,6 +85,13 @@ MODEL_HYPERPARAMETERS = {
 
 
 def get_hyperparameters(model_key: str) -> list[dict[str, Any]]:
+    """Return one model's hyperparameter fields in dict form.
+
+    The lookup the backend's meta router uses to render a model node's
+    parameter controls and tuning search space. Unregistered keys yield an
+    empty list rather than raising, so an unknown model simply shows no
+    tunable parameters.
+    """
     params = MODEL_HYPERPARAMETERS.get(model_key, [])
     return [p.to_dict() for p in params]
 

@@ -19,8 +19,14 @@ from ._common import _select_subset_pandas, _select_subset_polars
 
 
 class RobustScalerApplier(BaseApplier):
+    """Center on the fitted median and scale by the fitted quantile spread.
+
+    Honors ``with_centering``/``with_scaling``; ``y`` is never modified.
+    """
+
     @apply_method
     def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
+        """Apply the fitted robust center/scale to ``X`` on the active engine."""
         return apply_dual_engine(
             X, params, {"polars": self._apply_polars, "pandas": self._apply_pandas}
         )
@@ -86,13 +92,17 @@ class RobustScalerApplier(BaseApplier):
     learns_from_data=True,
 )
 class RobustScalerCalculator(BaseCalculator):
+    """Fit outlier-robust median/quantile-range statistics via sklearn's ``RobustScaler``."""
+
     def infer_output_schema(
         self, input_schema: SkyulfSchema, config: dict[str, Any]
     ) -> SkyulfSchema:
+        """Return the input schema unchanged: scaling rewrites values, not columns."""
         return input_schema
 
     @fit_method
     def fit(self, X: Any, _y: Any, config: dict[str, Any]) -> RobustScalerArtifact:  # pylint: disable=arguments-differ
+        """Dispatch the fit to the active engine and return the robust-statistics artifact."""
         if user_picked_no_columns(config):
             return cast(RobustScalerArtifact, {})
         return cast(

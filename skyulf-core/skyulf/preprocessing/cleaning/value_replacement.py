@@ -36,10 +36,11 @@ def _coerce_key(key: Any, dtype_kind: str) -> Any:
 
 
 def _coerce_mapping_keys(mapping: dict[str, Any], dtype_kind: str) -> dict[Any, Any]:
-    """Coerce string-typed mapping keys (as produced by JSON configs) to a
-    column's numeric/boolean dtype so lookups actually match values instead
-    of silently no-op'ing (pandas) or stringifying the whole column
-    (polars ``replace_strict``).
+    """Coerce string-typed mapping keys (as produced by JSON configs) to a column's dtype.
+
+    Applies to numeric/boolean columns so lookups actually match values instead
+    of silently no-op'ing (pandas) or stringifying the whole column (polars
+    ``replace_strict``).
     """
     if dtype_kind not in ("i", "u", "f", "b"):
         return mapping
@@ -98,9 +99,10 @@ def _value_replacement_exprs_polars(
 
 
 def _pandas_dtype_kind(dtype: Any) -> str:
-    """Map a pandas/numpy dtype to a dtype-kind character, treating pandas
-    nullable extension dtypes (``Int64``, ``Float64``, ``boolean``) the same
-    as their numpy equivalents.
+    """Map a pandas/numpy dtype to a dtype-kind character.
+
+    Treats pandas nullable extension dtypes (``Int64``, ``Float64``,
+    ``boolean``) the same as their numpy equivalents.
     """
     kind = getattr(dtype, "kind", "")
     return kind if kind in ("i", "u", "f", "b") else ""
@@ -155,8 +157,18 @@ def _apply_value_replacement_pandas(
 
 
 class ValueReplacementApplier(BaseApplier):
+    """Replace configured values in the resolved columns, leaving other cells alone.
+
+    The pandas and polars paths must agree value-for-value. A ``mapping`` wins
+    over ``to_replace``/``value`` when both are configured, and may be flat
+    (one map applied to every column) or nested (``{column: {old: new}}``).
+    Mapping keys are coerced to the column's dtype before lookup, and a column
+    selection that resolves to nothing makes the node a no-op.
+    """
+
     @apply_method
     def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
+        """Dispatch the replacement to the pandas or polars path; ``y`` passes through."""
         return apply_dual_engine(
             X, params, {"polars": self._apply_polars, "pandas": self._apply_pandas}
         )
@@ -201,14 +213,23 @@ class ValueReplacementApplier(BaseApplier):
     learns_from_data=False,
 )
 class ValueReplacementCalculator(BaseCalculator):
+    """Resolve value-replacement config into an artifact; nothing is learned from data."""
+
     def infer_output_schema(
         self, input_schema: SkyulfSchema, config: dict[str, Any]
     ) -> SkyulfSchema:
+        """Pass the input schema through, since only cell values are rewritten."""
         # Value mapping replaces values in place; column set is preserved.
         return input_schema
 
     @fit_method
     def fit(self, X: Any, _y: Any, config: dict[str, Any]) -> ValueReplacementArtifact:  # pylint: disable=arguments-differ
+        """Build the artifact, folding the UI's ``replacements`` pairs into a flat mapping.
+
+        A non-empty ``replacements`` list overrides any configured ``mapping``.
+        ``to_replace``/``value`` are carried through untouched for the applier
+        to fall back on when no mapping survived.
+        """
         cols = resolve_columns(X, config)
         mapping = config.get("mapping")
         replacements = config.get("replacements")

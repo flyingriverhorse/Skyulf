@@ -27,8 +27,16 @@ logger = logging.getLogger(__name__)
 
 
 class ModelBasedSelectionApplier(BaseApplier):
+    """Remove the columns an estimator's importances rejected."""
+
     @apply_method
     def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
+        """Drop ``candidate_columns - selected_columns`` from ``X``.
+
+        Honours the artifact's ``drop_columns`` flag; the recorded
+        ``feature_importances`` are reporting metadata and take no part in the
+        transform.
+        """
         return apply_dual_engine(
             X, params, {"polars": _drop_selected_polars, "pandas": _drop_selected_pandas}
         )
@@ -44,8 +52,18 @@ class ModelBasedSelectionApplier(BaseApplier):
     learns_from_data=True,
 )
 class ModelBasedSelectionCalculator(BaseCalculator):
+    """Fit a ``SelectFromModel`` or ``RFE`` selector around a resolved estimator."""
+
     @fit_method
     def fit(self, X: Any, y: Any, config: dict[str, Any]) -> ModelBasedSelectionArtifact:  # pylint: disable=arguments-differ
+        """Return the features the fitted estimator's support keeps.
+
+        This selector is supervised: with no target there is nothing to score
+        against, so a missing target is treated as an error. Every failure mode
+        returns an empty artifact instead of raising, which degrades the node to
+        a passthrough — though an unsupported ``method`` does so silently,
+        without the log line the other branches emit.
+        """
         target_col = config.get("target_column")
         # Resolve candidate columns natively on the raw frame first (works on
         # Polars without conversion), then convert only the columns actually

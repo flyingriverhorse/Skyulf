@@ -94,8 +94,18 @@ def _woe_apply_pandas(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, Any]
 
 
 class WOEEncoderApplier(BaseApplier):
+    """Replace each category with the Weight-of-Evidence value learned for it.
+
+    Both engines look the category up in the same fitted mapping, keyed by the
+    *string* form of the value, and fall back to ``default`` for categories
+    never seen at fit time. Nulls are keyed as the literal ``"nan"`` on both
+    sides, so a missing category gets its own learned WOE instead of always
+    taking the default (F-28). Encoded columns become float.
+    """
+
     @apply_method
     def apply(self, X: Any, y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
+        """Dispatch to the engine-specific WOE lookup, forwarding ``(X, y)`` only when present."""
         return apply_dual_engine(
             (X, y) if y is not None else X,
             params,
@@ -317,8 +327,24 @@ def _woe_fit_transform_train_polars(
     learns_from_data=True,
 )
 class WOEEncoderCalculator(BaseCalculator):
+    """Fit the WOE mapping and per-column Information Value from a binary target.
+
+    Supervised and binary-only: a target without exactly two classes logs a
+    warning and yields an empty artifact rather than failing. The target column
+    is excluded from the encoded set, since WOE computed against itself is
+    near-perfect separation. The math is engine-agnostic, so fit funnels both
+    engines through one narrow pandas boundary while ``apply`` stays in the
+    caller's engine. ``fit_transform_train`` cross-fits the training rows so a
+    row's own target never leaks into its encoding.
+    """
+
     @fit_method
     def fit(self, X: Any, y: Any, config: dict[str, Any]) -> Mapping[str, Any]:  # pylint: disable=arguments-differ
+        """Short-circuit an explicit empty column selection, else fit via the shared boundary.
+
+        Both engine keys dispatch to the same ``_woe_fit``: it converts to
+        pandas internally, so there is no engine-specific fit to choose between.
+        """
         if user_picked_no_columns(config):
             return {}
         return cast(
@@ -347,6 +373,7 @@ class WOEEncoderCalculator(BaseCalculator):
         input_schema: SkyulfSchema,
         config: dict[str, Any],
     ) -> SkyulfSchema | None:
+        """Pass the input schema through: WOE values replace the source columns in place."""
         # WOE replaces values in source columns in place (now float-valued);
         # column names are unchanged.
         return input_schema

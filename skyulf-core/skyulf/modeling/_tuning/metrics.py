@@ -96,8 +96,10 @@ def weight_metric_for_multiclass(metric: str, original_metric: str) -> str:
 
 
 def resolve_metric(config: TuningConfig, y: Any, problem_type: str) -> str:
-    """Validates the metric against the problem type, maps friendly aliases to sklearn
-    scoring strings, and switches binary-default metrics to weighted for multiclass targets.
+    """Validates the metric against the problem type and maps it to a scorer.
+
+    Friendly aliases become sklearn scoring strings, and binary-default
+    metrics switch to weighted for multiclass targets.
     """
     metric = config.metric
 

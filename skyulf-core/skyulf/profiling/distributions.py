@@ -1,3 +1,10 @@
+"""Histogram binning for the profiler, computed inside polars.
+
+Bin edges come from ``numpy.linspace`` over the column's true min/max, which
+costs one collect pass; the counts are then aggregated with polars
+``cut``/``group_by``, so the raw values never leave the frame.
+"""
+
 import logging
 from typing import cast
 

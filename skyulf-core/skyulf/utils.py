@@ -1,3 +1,11 @@
+"""Engine-neutral helpers shared by node calculators and the pipeline.
+
+Covers the frame / ``(X, y)`` tuple / ``SplitDataset`` input shapes that nodes
+pack and unpack, numeric-column detection, and the explicit-vs-auto column
+resolution rules. Each dispatches on the runtime engine, so a node never has
+to branch on pandas vs polars itself.
+"""
+
 import contextlib
 import logging
 from collections.abc import Callable

@@ -238,8 +238,10 @@ def run_grid_or_random_search(
     *,
     model_calculator: BaseModelCalculator,
 ) -> TuningResult:
-    """Runs a custom grid/random search loop (instead of sklearn's searchers) so
-    per-candidate and per-fold progress/log callbacks can be emitted during tuning.
+    """Runs a custom grid/random search loop instead of sklearn's searchers.
+
+    The custom loop exists so per-candidate and per-fold progress/log
+    callbacks can be emitted during tuning.
     """
     if log_callback:
         log_callback(f"Starting {config.strategy} search with custom loop for detailed logging...")

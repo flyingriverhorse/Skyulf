@@ -40,8 +40,15 @@ def _needs_fitted_artifact(
 
 
 class StandardScalerApplier(BaseApplier):
+    """Standardize the selected columns using the fitted mean and scale.
+
+    Honors ``with_mean``/``with_std``; ``X`` passes through unchanged when the
+    enabled flags have no fitted statistics, and ``y`` is never modified.
+    """
+
     @apply_method
     def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
+        """Center and scale ``X`` with the fitted statistics on the active engine."""
         return apply_dual_engine(
             X, params, {"polars": self._apply_polars, "pandas": self._apply_pandas}
         )
@@ -106,14 +113,18 @@ class StandardScalerApplier(BaseApplier):
     learns_from_data=True,
 )
 class StandardScalerCalculator(BaseCalculator):
+    """Fit per-column mean/scale statistics with sklearn's ``StandardScaler``."""
+
     def infer_output_schema(
         self, input_schema: SkyulfSchema, config: dict[str, Any]
     ) -> SkyulfSchema:
+        """Return the input schema unchanged: scaling rewrites values, not columns."""
         # Scalers preserve column set; values change but names/order do not.
         return input_schema
 
     @fit_method
     def fit(self, X: Any, _y: Any, config: dict[str, Any]) -> StandardScalerArtifact:  # pylint: disable=arguments-differ
+        """Dispatch the fit to the active engine and return the scaler-statistics artifact."""
         if user_picked_no_columns(config):
             return cast(StandardScalerArtifact, {})
         return cast(

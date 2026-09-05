@@ -1,3 +1,12 @@
+"""Pairwise-deletion Pearson correlation matrices for the profiler.
+
+polars' ``DataFrame.corr()`` is listwise: it returns NaN for *every* cell when
+any column holds a null. This module instead scores each coefficient over just
+the rows where that pair is observed — pandas ``.corr()`` semantics — and caps
+the matrix at the first 20 numeric columns, a hard limit introduced after
+larger matrices crashed both the backend and the frontend.
+"""
+
 import logging
 from typing import cast
 
