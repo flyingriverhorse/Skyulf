@@ -295,9 +295,7 @@ def test_applier_pandas_noop(
 
 @pytest.mark.parametrize(*_applier_polars_noop_cases)
 def test_applier_polars_noop(applier: str, df_data: dict, config: dict, imputer_kind: str) -> None:
-    """Applier must return X unchanged (Polars) when fitted columns are missing
-    from X.
-    """
+    """Applier must return X unchanged (Polars) when fitted columns are missing from X."""
     df = pl.DataFrame(df_data)
     full_config = dict(config)
     full_config["imputer_object"] = _IMPUTER_KIND[imputer_kind]()

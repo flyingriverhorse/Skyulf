@@ -70,6 +70,7 @@ class DriftReport(BaseModel):
 
 class DriftCalculator:
     """Calculates data drift between a reference dataset (training) and current dataset (production).
+
     Uses Polars for efficient data processing.
     """
 

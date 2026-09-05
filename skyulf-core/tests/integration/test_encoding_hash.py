@@ -31,6 +31,7 @@ def _fit_apply(df: pd.DataFrame, config: dict[str, Any]) -> tuple[dict[str, Any]
 
 class TestFitRecordsColumnsAndNFeatures:
     """fit() stores the resolved columns and configured (or default) n_features.
+
     Scenarios loaded from
     ``tests/test_cases/preprocessing/encoding_hash.json``.
     """

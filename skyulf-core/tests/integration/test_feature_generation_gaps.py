@@ -554,6 +554,7 @@ def test_safe_divide_never_raises_or_produces_inf(a: list, b: list) -> None:
 
 class TestRealShapedDataset:
     """Integration-style check against the checked-in ``customers.csv`` sample.
+
     ``income`` has missing values — exercises group_agg NaN handling on
     production-like data: rows with missing income must receive the group mean,
     not NaN, because pandas ``groupby.transform("mean")`` excludes NaN from the

@@ -180,10 +180,7 @@ class TestPreviewMerge:
     """
 
     def test_preview_merges_two_branches_from_dataset(self, numeric_csv, artifact_store, catalog):
-        """Dataset → StandardScaler(f1)
-        ↘ MinMaxScaler(f2)
-                ↘ Preview (must merge both)
-        """
+        """Dataset → StandardScaler(f1) ↘ MinMaxScaler(f2) ↘ Preview (must merge both)"""
         config = PipelineConfig(
             pipeline_id="preview_dataset_merge",
             nodes=[
@@ -229,10 +226,7 @@ class TestPreviewMerge:
         assert full["shape"][0] == 30
 
     def test_preview_merges_two_branches_from_split(self, numeric_csv, artifact_store, catalog):
-        """Dataset → Splitter → StandardScaler
-        ↘ MinMaxScaler
-                  ↘ Preview
-        """
+        """Dataset → Splitter → StandardScaler ↘ MinMaxScaler ↘ Preview"""
         config = PipelineConfig(
             pipeline_id="preview_split_merge",
             nodes=[
@@ -352,9 +346,7 @@ class TestTrainingMerge:
     def test_training_after_split_merge_keeps_test_metrics(
         self, numeric_csv, artifact_store, catalog
     ):
-        """Dataset → Splitter → StandardScaler
-                                  ↘ MinMaxScaler
-                                            ↘ Training (merge SplitDatasets)
+        """Dataset → Splitter → StandardScaler ↘ MinMaxScaler ↘ Training (merge SplitDatasets)
 
         Before the fix the test halves were dropped at merge time, so
         ``test_*`` metrics never appeared in the result. This is the

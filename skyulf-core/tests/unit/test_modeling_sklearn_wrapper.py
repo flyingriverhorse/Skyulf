@@ -68,6 +68,7 @@ def test_fit_merges_nested_params_dict(clf_data):
 
 def test_fit_native_class_weight_passed_through_unchanged(clf_data):
     """A model whose constructor declares `class_weight` natively (e.g.
+
     LogisticRegression) should receive it directly at construction time —
     no sample_weight translation should occur.
     """

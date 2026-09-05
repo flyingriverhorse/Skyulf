@@ -226,6 +226,7 @@ def _reset_stale_jobs() -> None:
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Lifespan context manager for FastAPI application.
+
     Handles startup and shutdown events.
     """
     # Startup

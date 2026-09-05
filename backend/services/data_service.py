@@ -17,6 +17,7 @@ def _collect(lf: "pl.LazyFrame") -> "pl.DataFrame":
 
 class DataService:
     """Unified entry point for data I/O.
+
     Favors Polars for speed but falls back to Pandas if necessary.
     """
 
@@ -100,6 +101,7 @@ class DataService:
 
     async def get_sample(self, path: str | Path, limit: int = 5) -> Any:
         """Get a sample of the data as a list of dictionaries.
+
         Efficiently reads only the first N rows.
         """
         path_str = str(path)

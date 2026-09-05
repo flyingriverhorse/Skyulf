@@ -38,6 +38,7 @@ if isinstance(allowed, list) and "testserver" not in allowed:
 @pytest.fixture(scope="session", autouse=True)
 def cleanup_resources():
     """Explicitly close connections (Celery, DB) at the end of the test session.
+
     This prevents hanging threads from keeping the process alive.
     """
     yield

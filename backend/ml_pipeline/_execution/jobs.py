@@ -1,4 +1,5 @@
 """Job Management for V2 Pipeline.
+
 Handles persistence of Training and Tuning jobs to the database.
 """
 
@@ -21,6 +22,7 @@ logger = logging.getLogger(__name__)
 
 class JobManager:
     """Facade for managing training and tuning jobs.
+
     Delegates to BasicTrainingManager and AdvancedTuningManager.
     """
 

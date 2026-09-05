@@ -304,6 +304,7 @@ def test_zero_category_column_logs_warning(caplog: pytest.LogCaptureFixture) -> 
 
 class TestFitNoResolvableColumnsReturnsEmpty:
     """A purely-numeric frame yields no encodable columns, so fit() returns {}.
+
     Scenarios (pandas/polars) loaded from
     ``tests/test_cases/preprocessing/encoding_one_hot.json`` (group ``no_resolvable_columns``).
     """

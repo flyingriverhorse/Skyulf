@@ -159,9 +159,7 @@ def test_calibrated_classifier_registered_and_predicts():
 
 
 class TestCalibratedClassifierBaseEstimator:
-    """Scenarios loaded from
-    ``tests/test_cases/preprocessing/woe_and_calibration.json``.
-    """
+    """Scenarios loaded from ``tests/test_cases/preprocessing/woe_and_calibration.json``."""
 
     @pytest.mark.parametrize(*_base_estimator_cases)
     def test_base_estimator_resolution(

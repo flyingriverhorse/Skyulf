@@ -30,6 +30,7 @@ def test_calculate_drift_detects_shifted_distribution() -> None:
 
 def test_calculate_drift_still_flags_shift_when_data_contains_nan() -> None:
     """F-13: `pl.read_csv` turns literal 'NaN' tokens into float NaN, not null.
+
     `drop_nulls()` keeps NaN, so the metrics used to go NaN and every
     comparison silently voted "no drift". NaN rows must be dropped alongside
     nulls so a real shift is still detected.

@@ -67,6 +67,7 @@ def get_data_stats(
     data: pd.DataFrame | pl.DataFrame | SkyulfDataFrame | tuple[Any, Any] | SplitDataset,
 ) -> tuple[int, set[str]]:
     """Calculates row count and column set for various data structures.
+
     Supports DataFrame, (X, y) tuple, and SplitDataset.
     """
     # Check for DataFrame-like object (Pandas, Polars, Wrapper)
@@ -85,6 +86,7 @@ def unpack_pipeline_input(
     data: pd.DataFrame | SkyulfDataFrame | tuple[Any, Any],
 ) -> tuple[Any, Any | None, bool]:
     """Unpacks input which might be a DataFrame or a (X, y) tuple.
+
     Returns: (X, y, is_tuple)
 
     `X` is typed `Any` (instead of `pd.DataFrame | SkyulfDataFrame`) because
@@ -165,6 +167,7 @@ def pack_pipeline_output(
     X: Any, y: Any | None, was_tuple: bool
 ) -> pd.DataFrame | SkyulfDataFrame | tuple[Any, Any]:
     """Packs output back into a tuple if the input was a tuple and y is present.
+
     Otherwise, if y is present, concatenates it back to X.
 
     `X` is typed `Any` because callers pass pandas / polars / wrapper /

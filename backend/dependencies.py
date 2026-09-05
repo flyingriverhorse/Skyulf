@@ -16,6 +16,7 @@ from backend.database.engine import get_async_session
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
     """Database dependency that provides an async database session.
+
     Automatically handles session lifecycle.
     """
     async for session in get_async_session():

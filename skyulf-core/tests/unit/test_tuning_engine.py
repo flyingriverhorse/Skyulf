@@ -252,9 +252,7 @@ def test_fit_raises_on_nan_target_even_for_missing_native_models():
 
 
 def test_fit_raises_on_inf_features_even_for_missing_native_models():
-    """Inf is not supported even by missing-native models and must keep
-    raising.
-    """
+    """Inf is not supported even by missing-native models and must keep raising."""
     from skyulf.modeling.classification import HistGradientBoostingClassifierCalculator
 
     X, y = _clf_xy()
@@ -2161,9 +2159,7 @@ def test_config_random_state_reaches_refit_model():
 
 
 def test_search_space_seed_beats_config_seed():
-    """A seed the search itself selects must still take precedence over the
-    caller's config seed.
-    """
+    """A seed the search itself selects must still take precedence over the caller's config seed."""
     X, y = _clf_xy()
     cfg = TuningConfig(
         strategy="grid",

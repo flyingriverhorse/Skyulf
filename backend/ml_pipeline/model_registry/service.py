@@ -279,6 +279,7 @@ class ModelRegistryService:
         session: AsyncSession, skip: int = 0, limit: int | None = None
     ) -> list[ModelRegistryEntry]:
         """Lists all model types and their versions.
+
         Aggregates TrainingJob by (model_type, dataset_source_id), scoped by run_mode.
         """
         deployed_job_ids = await ModelRegistryService._get_deployed_job_ids(session)

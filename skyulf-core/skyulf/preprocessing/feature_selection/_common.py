@@ -110,7 +110,7 @@ def _resolve_drop_list(params: dict[str, Any], existing_cols: list[str]) -> list
 
 
 def _drop_selected_polars(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
-    """Polars apply path for selectors that drop ``candidate \\ selected`` columns."""
+    r"""Polars apply path for selectors that drop ``candidate \ selected`` columns."""
     if not params.get("drop_columns", True):
         return X, y
     to_drop = _resolve_drop_list(params, list(X.columns))
@@ -120,7 +120,7 @@ def _drop_selected_polars(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, 
 
 
 def _drop_selected_pandas(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
-    """Pandas apply path for selectors that drop ``candidate \\ selected`` columns."""
+    r"""Pandas apply path for selectors that drop ``candidate \ selected`` columns."""
     if not params.get("drop_columns", True):
         return X, y
     to_drop = _resolve_drop_list(params, list(X.columns))

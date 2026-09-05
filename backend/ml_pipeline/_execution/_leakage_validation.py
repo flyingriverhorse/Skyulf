@@ -70,6 +70,7 @@ def data_dependent_step_types() -> frozenset[str]:
 
 def train_test_split_step_types() -> frozenset[str]:
     """Step types that partition rows into train/test (the leakage boundary).
+
     ``feature_target_split`` is deliberately not one — it only separates
     features (X) from the target (y) and creates no train/test boundary, so
     preprocessing before it is not a leakage concern.

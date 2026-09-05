@@ -97,9 +97,7 @@ def test_artifact_digest_raises_on_undigestible_object() -> None:
 
 
 def test_artifact_digest_is_key_order_insensitive_for_dicts() -> None:
-    """Preprocessing artifacts are config dicts; insertion order must not
-    matter for the seal.
-    """
+    """Preprocessing artifacts are config dicts; insertion order must not matter for the seal."""
     assert artifact_digest({"a": 1, "b": 2.0, "c": [1, 2]}) == artifact_digest(
         {"c": [1, 2], "b": 2.0, "a": 1}
     )
@@ -275,9 +273,7 @@ def test_init_model_estimator_resolves_known_types_from_registry(model_type: str
 def test_init_model_estimator_hyperparameter_tuner_wraps_registry_base_model(
     base_model_type: str,
 ) -> None:
-    """hyperparameter_tuner must wrap the registry-resolved base model for
-    every known base type.
-    """
+    """hyperparameter_tuner must wrap the registry-resolved base model for every known base type."""
     expected_calc_cls = NodeRegistry.get_calculator(base_model_type)
     expected_applier_cls = NodeRegistry.get_applier(base_model_type)
 

@@ -331,6 +331,7 @@ def test_maybe_fit_target_skips_when_y_name_not_in_columns() -> None:
 
 class TestRealShapedDataset:
     """Integration-style check against the checked-in ``customers.csv`` sample.
+
     ``city`` has one missing value (NaN) — verifies that the LabelEncoder
     stringifies NaN to a "nan" class rather than propagating it as missing.
     """

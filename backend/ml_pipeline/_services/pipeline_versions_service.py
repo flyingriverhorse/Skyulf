@@ -1,5 +1,4 @@
-"""Pipeline Versions Service (L7)
-------------------------------
+"""Pipeline Versions Service (L7) ------------------------------
 
 CRUD over `PipelineVersion` rows. Replaces the per-browser localStorage
 "Recent" ring buffer with a durable, server-side history.

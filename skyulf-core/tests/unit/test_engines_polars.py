@@ -85,6 +85,7 @@ def test_wrapper_to_native_returns_native_polars_frame(pl_df):
 
 def test_wrapper_to_native_differs_from_to_pandas(pl_df):
     """to_native() hands back the polars frame; to_pandas() converts to pandas.
+
     For a polars-backed wrapper they must yield different types.
     """
     import pandas as pd

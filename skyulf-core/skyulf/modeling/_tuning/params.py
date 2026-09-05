@@ -16,6 +16,7 @@ from .schemas import TuningConfig
 
 def clean_search_space(search_space: dict[str, Any]) -> dict[str, Any]:
     """Recursively cleans the search space.
+
     - Converts "none" string to None.
     """
     cleaned: dict[str, Any] = {}

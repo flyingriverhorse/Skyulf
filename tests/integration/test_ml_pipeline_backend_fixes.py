@@ -144,6 +144,7 @@ async def test_get_job_evaluation_succeeds_when_job_id_matches():
 
 async def test_get_job_evaluation_decodes_reference_crosstab_labels():
     """A clustering reference column that was label-encoded upstream (e.g.
+
     species name -> 0/1/2) should have its crosstab keys decoded back to the
     original text, not left as numeric-looking strings, when a matching
     LabelEncoder is present in the bundled feature engineer.

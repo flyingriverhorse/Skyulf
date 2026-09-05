@@ -1,5 +1,4 @@
-"""Focused unit tests for
-``backend.ml_pipeline._execution._leakage_validation``.
+"""Focused unit tests for ``backend.ml_pipeline._execution._leakage_validation``.
 
 These build small, synthetic ``NodeConfig`` graphs directly (no dataset,
 no execution) to exercise the pre-execution leakage guard in isolation —

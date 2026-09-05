@@ -229,6 +229,7 @@ async def run_eda_analysis(report_id: int, session: AsyncSession):
 
 async def run_eda_background(report_id: int):
     """Entry point for FastAPI BackgroundTasks.
+
     Creates its own session.
     """
     async with get_database_session() as session:

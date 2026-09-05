@@ -16,12 +16,14 @@ logger = logging.getLogger(__name__)
 
 class ArtifactFactory:
     """Factory for creating ArtifactStore instances based on configuration and context.
+
     Centralizes logic for S3 vs Local storage, credential injection, and routing rules.
     """
 
     @staticmethod
     def get_artifact_store(artifact_uri: str) -> ArtifactStore:
         """Creates an ArtifactStore for an existing artifact URI.
+
         Handles both 's3://' URIs and local paths.
         """
         if not artifact_uri:

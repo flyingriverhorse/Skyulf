@@ -257,6 +257,7 @@ async def async_session_or_connection(settings: Settings, config: dict[str, Any]
 
 class AsyncSnowflakeConnection:
     """Async wrapper for Snowflake connection.
+
     Since Snowflake doesn't support native async, we wrap it with ThreadPoolExecutor.
     """
 

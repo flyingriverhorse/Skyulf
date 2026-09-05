@@ -44,6 +44,7 @@ class DetailedHealthResponse(HealthResponse):
 @router.get("/health", response_model=HealthResponse)
 async def health_check(settings: Settings = Depends(get_config)):
     """Basic health check endpoint.
+
     Returns simple status information for load balancers.
     """
     return HealthResponse(

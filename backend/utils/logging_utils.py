@@ -1,6 +1,4 @@
-"""Simple logging utility for data actions
-Replaces the Flask log_data_action function
-"""
+"""Simple logging utility for data actions Replaces the Flask log_data_action function"""
 
 import logging
 import os
@@ -228,6 +226,7 @@ def setup_universal_logging(
     console_log_level: str = "WARNING",
 ) -> None:
     """Universal logging setup for FastAPI applications.
+
     Enhanced for async applications and modern Python practices.
 
     Args:

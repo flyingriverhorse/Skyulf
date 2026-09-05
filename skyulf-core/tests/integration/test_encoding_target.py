@@ -364,6 +364,7 @@ def test_resolve_target_encoder_training_cv_rejects_singleton_class() -> None:
 
 class TestNoTargetReturnsEmptyAndWarns:
     """Fitting without a resolvable target logs a warning and returns {}.
+
     Scenarios (pandas/polars) loaded from
     ``tests/test_cases/preprocessing/encoding_target.json`` (group ``no_target_returns_empty``).
     """
@@ -637,6 +638,7 @@ def test_polars_fit_extracts_y_from_target_column() -> None:
 
 class TestFitNoResolvableColumnsReturnsEmpty:
     """A purely-numeric frame yields no encodable columns, so fit() returns {}.
+
     Scenarios (pandas/polars) loaded from
     ``tests/test_cases/preprocessing/encoding_target.json`` (group ``no_resolvable_columns``).
     """
@@ -746,6 +748,7 @@ def test_infer_output_schema_returns_none_for_default_auto_target_type() -> None
 
 class TestRealShapedDataset:
     """Integration-style check against the checked-in ``customers.csv`` sample.
+
     ``plan_type`` (no NaN, 3 categories) + binary ``churned`` target exercises the
     TargetEncoder on production-like data: each plan group gets its own smoothed
     target statistic, and the result is a numeric column of the same length.

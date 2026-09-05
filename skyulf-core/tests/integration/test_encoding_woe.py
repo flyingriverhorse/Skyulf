@@ -272,6 +272,7 @@ def test_woe_fit_polars_no_target_returns_empty_and_warns(
 
 class TestFitNoResolvableColumnsReturnsEmpty:
     """A purely-numeric frame yields no encodable columns, so fit() returns {}.
+
     Scenarios (pandas/polars) loaded from
     ``tests/test_cases/preprocessing/encoding_woe.json`` (group ``no_resolvable_columns``).
     """
@@ -294,6 +295,7 @@ class TestFitNoResolvableColumnsReturnsEmpty:
 
 class TestRealShapedDataset:
     """Integration-style check against the checked-in ``customers.csv`` sample.
+
     ``plan_type`` (no NaN, 3 categories) + binary ``churned`` target — exercises
     multi-category WOE computation on production-like data, including a category
     with zero positive-class observations (enterprise: all churned=0).

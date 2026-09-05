@@ -229,6 +229,7 @@ class EvaluationService:
     @staticmethod
     async def get_job_evaluation(session: AsyncSession, job_id: str) -> dict[str, Any]:
         """Retrieves the raw evaluation data (y_true, y_pred) for a job.
+
         Decodes target labels if a LabelEncoder was used.
         """
         evaluation_data, artifact_store = await EvaluationService._load_raw_evaluation_data(

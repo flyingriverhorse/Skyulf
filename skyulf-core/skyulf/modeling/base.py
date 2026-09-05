@@ -170,6 +170,7 @@ class BaseModelApplier(ABC):
         self, df: pd.DataFrame | SkyulfDataFrame, model_artifact: Any
     ) -> pd.DataFrame | SkyulfDataFrame | None:
         """Generates prediction probabilities if supported.
+
         Returns DataFrame where columns are classes.
         """
         return None

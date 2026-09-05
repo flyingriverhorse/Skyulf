@@ -118,6 +118,7 @@ def _enrich_drift_job(job: DriftJobOption, db_row: TrainingJob) -> None:
 @router.get("/jobs", response_model=list[DriftJobOption])
 async def list_drift_jobs(db: AsyncSession = Depends(get_db)):
     """List all jobs that have reference data available for drift calculation.
+
     Scans subdirectories in the artifact folder, enriched with DB metadata.
     """
     jobs: list[DriftJobOption] = []

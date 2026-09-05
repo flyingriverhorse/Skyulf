@@ -269,6 +269,7 @@ def test_regression_nested_cv_uses_k_fold(
     regression_dataset: SplitDataset,
 ) -> None:
     """For regression, nested_cv downgrade should use k_fold (not stratified).
+
     Simulates engine.py logic: problem_type != classification -> k_fold.
     """
     calc = RidgeRegressionCalculator()
@@ -322,6 +323,7 @@ def test_classification_nested_cv_uses_stratified(
     classification_dataset: SplitDataset,
 ) -> None:
     """For classification, nested_cv downgrade should use stratified_k_fold.
+
     Simulates engine.py logic: problem_type == classification -> stratified_k_fold.
     """
     calc = LogisticRegressionCalculator()

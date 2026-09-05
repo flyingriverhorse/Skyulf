@@ -7,6 +7,7 @@ from ..engines import SkyulfDataFrame
 
 class DataCatalog(ABC):
     """Abstract interface for data access.
+
     Decouples the pipeline from the storage mechanism.
     """
 

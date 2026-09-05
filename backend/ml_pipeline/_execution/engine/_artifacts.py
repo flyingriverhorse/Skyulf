@@ -212,6 +212,7 @@ class ArtifactsMixin:
 
     def _save_reference_data(self, data: Any, job_id: str, target_col: str):
         """Saves the training data as a reference dataset for future drift detection.
+
         Handles SplitDataset (extracts train) and DataFrame/Tuple formats.
         """
         if not job_id or job_id == "unknown":

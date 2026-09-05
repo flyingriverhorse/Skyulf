@@ -1,4 +1,4 @@
-"""Generate ``tests/data/pipeline_dataset.csv`` — a larger synthetic sample
+r"""Generate ``tests/data/pipeline_dataset.csv`` — a larger synthetic sample
 dataset for pipeline/modeling integration tests.
 
 Unlike ``customers.csv`` (15 rows, used for per-node unit tests), this dataset
@@ -7,7 +7,7 @@ generated once with a fixed seed and the output is checked into git — this
 script is kept for reproducibility/documentation, but is NOT run as part of
 the test suite itself (the CSV is the source of truth, not this script).
 
-Run manually to regenerate: `.\\.venv\\Scripts\\python.exe tests/data/generate_pipeline_dataset.py`
+Run manually to regenerate: `.\.venv\Scripts\python.exe tests/data/generate_pipeline_dataset.py`
 """
 
 from pathlib import Path

@@ -81,6 +81,7 @@ class FeatureEngineer:
 
     def fit_transform(self, data: pd.DataFrame | SkyulfDataFrame | Any, node_id_prefix="") -> Any:
         """Runs the pipeline on data.
+
         Returns: (transformed_data, metrics_dict)
         """
         self.fitted_steps = []  # Reset fitted steps

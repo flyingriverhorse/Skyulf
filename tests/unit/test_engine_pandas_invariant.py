@@ -75,9 +75,7 @@ def test_data_loader_accepts_polars_when_engine_polars(monkeypatch) -> None:
 
 
 def test_data_loader_rejects_polars_frame_when_engine_pandas(monkeypatch) -> None:
-    """An engine mismatch must fail loudly rather than silently degrading
-    SHAP/drift downstream.
-    """
+    """An engine mismatch must fail loudly rather than silently degrading SHAP/drift downstream."""
     pl = pytest.importorskip("polars")
     settings = get_settings()
     monkeypatch.setattr(settings, "SKYULF_ENGINE", "pandas", raising=False)

@@ -391,6 +391,7 @@ class TestConnectedComponents:
 
     def test_mixed_connected_and_disconnected(self):
         """Three terminals: two share a dataset, one is isolated.
+
         Should produce 2 components.
         """
         nodes = [

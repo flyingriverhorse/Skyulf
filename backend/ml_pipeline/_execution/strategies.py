@@ -11,6 +11,7 @@ from backend.ml_pipeline._execution.summary import build_summary
 
 class JobStrategy(ABC):
     """Abstract base class for job execution strategies.
+
     Encapsulates logic specific to different job types (Training, Tuning, etc.).
     """
 
@@ -107,6 +108,7 @@ class JobStrategy(ABC):
 
     def handle_success(self, job: MLJob, result: PipelineExecutionResult) -> None:
         """Updates the job with results from a successful pipeline execution.
+
         Base implementation handles common metrics.
         """
         # Extract metrics from the last node if available

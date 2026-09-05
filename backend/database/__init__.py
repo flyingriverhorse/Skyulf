@@ -1,4 +1,5 @@
 """Async database module for FastAPI application.
+
 This provides all the async database functionality migrated from Flask.
 """
 

@@ -1,11 +1,11 @@
-"""Tidy console progress for core-only tuning runs.
+r"""Tidy console progress for core-only tuning runs.
 
 Backend/UI users watch trials on the live chart; someone running
 skyulf-core from a terminal used to get silence (or had to hand-write a
 ``progress_callback``). With ``progress=True`` in the tuning config, the
 engine attaches :class:`ConsoleTrialReporter`:
 
-- on a TTY, one self-updating line (``\\r``) — ``Tuning trial 12/60 |
+- on a TTY, one self-updating line (``\r``) — ``Tuning trial 12/60 |
   score 0.8530 | best 0.8710 (#8)`` — never a 200-line flood;
 - on completion, a compact summary (best score + params, top trials);
 - when stdout is piped (CI, logs), per-trial lines are skipped and only

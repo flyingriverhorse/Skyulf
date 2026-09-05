@@ -43,6 +43,7 @@ Base = declarative_base()
 
 async def init_db() -> None:
     """Initialize async database connections.
+
     Sets up the global engine and session factory.
     """
     global async_engine, async_session_factory, sync_engine, sync_session_factory
@@ -137,6 +138,7 @@ async def get_async_session() -> AsyncGenerator[AsyncSession, None]:
 
 def get_db():
     """Get sync database session for dependency injection.
+
     Compatible with non-async operations.
 
     Yields:

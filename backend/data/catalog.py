@@ -17,6 +17,7 @@ logger = logging.getLogger(__name__)
 
 class FileSystemCatalog(DataCatalog):
     """Concrete implementation that reads/writes files from the local filesystem.
+
     Replaces the old 'DataLoader'.
     """
 
@@ -174,6 +175,7 @@ class FileSystemCatalog(DataCatalog):
 
 class S3Catalog(DataCatalog):
     """Implementation that reads/writes files from AWS S3.
+
     Requires 's3fs' and 'boto3' to be installed.
     Supports local caching to reduce S3 calls.
     """
@@ -210,6 +212,7 @@ class S3Catalog(DataCatalog):
 
     def _prepare_s3fs_options(self, options: dict) -> dict:
         """Prepare storage options for s3fs/pandas.
+
         - Maps aws_access_key_id -> key
         - Maps aws_secret_access_key -> secret
         - Moves region/aws_region -> client_kwargs['region_name']

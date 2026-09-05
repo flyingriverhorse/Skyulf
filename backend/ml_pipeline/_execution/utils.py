@@ -23,6 +23,7 @@ def parse_branch_info(pipeline_id: str) -> tuple[str | None, int | None]:
 
 async def resolve_dataset_name(session: AsyncSession, dataset_source_id: str | None) -> str | None:
     """Resolves the dataset name from a dataset_source_id.
+
     Handles both integer IDs (as strings) and UUIDs.
     """
     if not dataset_source_id:
@@ -46,6 +47,7 @@ async def resolve_dataset_name(session: AsyncSession, dataset_source_id: str | N
 
 async def get_dataset_map(session: AsyncSession) -> dict[str, str]:
     """Returns a map of dataset IDs (and UUIDs) to dataset names.
+
     Useful for bulk resolution.
     """
     ds_result = await session.execute(select(DataSource.id, DataSource.source_id, DataSource.name))

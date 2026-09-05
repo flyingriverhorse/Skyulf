@@ -302,6 +302,7 @@ class TuningCalculator(BaseModelCalculator):
         validation_frames: tuple[Any, Any] | None = None,
     ) -> Any:
         """Fits the tuner (runs tuning).
+
         Adapts the generic fit interface to the specific tune method.
 
         ``preprocessing`` (F-15): re-fits the given preprocessor on
@@ -669,6 +670,7 @@ class TuningCalculator(BaseModelCalculator):
 
 class TuningApplier(BaseModelApplier):
     """Applier for TuningCalculator.
+
     Wraps the base model applier to provide predictions using the refitted best model.
     """
 

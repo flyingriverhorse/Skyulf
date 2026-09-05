@@ -311,9 +311,7 @@ class TestS3CatalogPolarsPaths:
 
     @patch("pandas.read_json")
     def test_read_from_source_dispatches_json(self, mock_read_json):
-        """`.json` paths route to the JSON reader — the else sides of the
-        csv/parquet checks.
-        """
+        """`.json` paths route to the JSON reader — the else sides of the csv/parquet checks."""
         with patch("backend.data.catalog.get_settings") as mock_settings:
             mock_settings.return_value = MagicMock(SKYULF_ENGINE="pandas")
             mock_read_json.return_value = pd.DataFrame({"a": [1]})

@@ -1,4 +1,5 @@
 """Async PostgreSQL connection module for FastAPI.
+
 This is the async equivalent of the Flask db/connections/postgres_db_connection/connection.py
 """
 

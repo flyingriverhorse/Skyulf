@@ -37,6 +37,7 @@ class TimestampMixin:
 
 class User(Base, TimestampMixin):
     """User model - mirrors the Flask user table structure.
+
     Compatible with existing Flask-Login users.
     """
 
@@ -84,6 +85,7 @@ class User(Base, TimestampMixin):
 
 class DataSource(Base, TimestampMixin):
     """Data Source model for data ingestion connections.
+
     Compatible with existing data_sources table.
     """
 

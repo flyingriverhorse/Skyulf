@@ -23,6 +23,7 @@ logger = logging.getLogger(__name__)
 
 class BaseRepository[ModelType: Base]:
     """Generic repository class for common database operations.
+
     Provides async equivalents of Flask CRUD operations.
     """
 

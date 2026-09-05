@@ -140,6 +140,7 @@ def _to_int_like_array(arr: Any) -> Any | None:
 
 def decode_int_like(values: list[Any], label_encoder: Any) -> list[Any]:
     """Best-effort decode for lists of encoded class indices.
+
     If values are not int-like (or decoding fails), returns the original list.
     """
     try:

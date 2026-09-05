@@ -1057,9 +1057,7 @@ def _noise_csv_with_nan(tmp_path) -> str:
 
 
 def _signal_csv(tmp_path, n: int = 400) -> str:
-    """Informative numerics (f2 carries NaNs) + informative categorical +
-    mild label noise.
-    """
+    """Informative numerics (f2 carries NaNs) + informative categorical + mild label noise."""
     rng = np.random.default_rng(5)
     y = rng.integers(0, 2, size=n)
     flip = rng.random(n) < 0.05

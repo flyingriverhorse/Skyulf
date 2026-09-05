@@ -104,9 +104,7 @@ class TestBasicTrainingStrategy(unittest.TestCase):
         self.assertNotIn("leakage_gate", self.job.metrics)
 
     def test_handle_success_persists_pipeline_diagram(self):
-        """The mermaid topology diagram rides on job.metrics for the
-        Experiments diagram tab.
-        """
+        """The mermaid topology diagram rides on job.metrics for the Experiments diagram tab."""
         node_res = NodeExecutionResult(
             node_id="node_1", status="success", metrics={"accuracy": 0.9}
         )

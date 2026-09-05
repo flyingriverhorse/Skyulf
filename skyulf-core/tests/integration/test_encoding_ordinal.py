@@ -431,6 +431,7 @@ def test_no_feature_columns_but_target_encoding_fits_target_only() -> None:
 
 class TestRealShapedDataset:
     """Integration-style check against the checked-in ``customers.csv`` sample.
+
     ``plan_type`` (no NaN, 3 categories: basic/enterprise/premium) exercises the
     full fit→apply round-trip on production-like data with a multi-class column.
     """

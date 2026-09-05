@@ -72,6 +72,7 @@ class SkyulfDataFrame(Protocol):
 
     def to_arrow(self) -> Any:
         """Convert to an Arrow Table/RecordBatch.
+
         Critical for zero-copy data transfer between engines.
         """
         ...

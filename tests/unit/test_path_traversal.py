@@ -12,9 +12,9 @@ from backend.ml_pipeline.artifacts.local import LocalArtifactStore
 
 
 class TestLocalArtifactStoreTraversal:
-    """Verify _get_path neutralises directory escape attempts.
+    r"""Verify _get_path neutralises directory escape attempts.
 
-    LocalArtifactStore replaces ``/`` and ``\\`` in the key with ``_``
+    LocalArtifactStore replaces ``/`` and ``\`` in the key with ``_``
     before joining, so traversal characters become part of a flat filename.
     The PermissionError check is defence-in-depth if sanitisation ever fails.
     """
