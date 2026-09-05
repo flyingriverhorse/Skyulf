@@ -1,5 +1,4 @@
-"""
-Async Database Adapter for FastAPI
+"""Async Database Adapter for FastAPI
 
 Provides unified access to different database backends with async support.
 This is the async equivalent of the Flask db/adapter.py module.
@@ -53,8 +52,7 @@ _URL_PREFIX_TYPES: tuple[tuple[str, tuple[str, ...]], ...] = (
 
 
 def get_db_type_from_url(database_url: str) -> str:
-    """
-    Extract database type from connection URL.
+    """Extract database type from connection URL.
 
     Args:
         database_url: Database connection URL
@@ -74,8 +72,7 @@ def get_db_type_from_url(database_url: str) -> str:
 
 
 def get_db_type(settings: Settings) -> str:
-    """
-    Get database type from settings.
+    """Get database type from settings.
 
     Args:
         settings: Application settings
@@ -87,8 +84,7 @@ def get_db_type(settings: Settings) -> str:
 
 
 def build_connection_config(settings: Settings) -> dict[str, Any]:
-    """
-    Build connection configuration from settings.
+    """Build connection configuration from settings.
 
     Args:
         settings: Application settings
@@ -233,8 +229,7 @@ _CONNECTION_FACTORIES = {
 
 @asynccontextmanager
 async def async_session_or_connection(settings: Settings, config: dict[str, Any] | None = None):
-    """
-    Async context manager that yields appropriate database connection/session.
+    """Async context manager that yields appropriate database connection/session.
 
     Args:
         settings: Application settings
@@ -261,8 +256,7 @@ async def async_session_or_connection(settings: Settings, config: dict[str, Any]
 
 
 class AsyncSnowflakeConnection:
-    """
-    Async wrapper for Snowflake connection.
+    """Async wrapper for Snowflake connection.
     Since Snowflake doesn't support native async, we wrap it with ThreadPoolExecutor.
     """
 

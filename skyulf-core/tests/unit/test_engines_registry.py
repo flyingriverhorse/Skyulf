@@ -20,7 +20,8 @@ def test_engine_name_enum_values():
 
 def test_engine_name_str_returns_value():
     """EngineName is a StrEnum: str()/f-string must yield the bare value,
-    not `ClassName.MEMBER` (regression guard against reverting to `(str, Enum)`)."""
+    not `ClassName.MEMBER` (regression guard against reverting to `(str, Enum)`).
+    """
     assert str(EngineName.PANDAS) == "pandas"
     assert f"{EngineName.POLARS}" == "polars"
 
@@ -79,7 +80,8 @@ def test_resolve_with_none_returns_active_default_engine():
 
 def test_set_active_engine_changes_default(monkeypatch):
     """set_active_engine() should change which engine resolve(None) returns
-    (regression guard for r5 EngineRegistry missing setter finding)."""
+    (regression guard for r5 EngineRegistry missing setter finding).
+    """
     original = EngineRegistry._active_engine
     try:
         EngineRegistry.set_active_engine("polars")
@@ -123,7 +125,8 @@ def test_resolve_plain_list_falls_back_without_warning(caplog):
     """Regression test: a plain Python list (e.g. a raw y target) is a common,
     expected input shape, not a genuinely unknown type - resolve() must fall
     back to the default engine silently, without emitting the 'Unknown data
-    type' warning."""
+    type' warning.
+    """
     with caplog.at_level(logging.WARNING, logger="skyulf.engines.registry"):
         resolved = EngineRegistry.resolve([1, 2, 3])
     assert resolved is EngineRegistry.get(EngineRegistry._active_engine)
@@ -142,7 +145,8 @@ def test_resolve_uses_top_level_package_not_substring_match():
     """A module whose name merely *contains* 'pandas'/'polars' as a substring
     (e.g. a third-party 'fake_polars_stub' or 'my_pandas_wrapper' module) must
     NOT be misdetected as the real pandas/polars engine — regression guard
-    against the old `"pandas" in module` substring check."""
+    against the old `"pandas" in module` substring check.
+    """
 
     class _FakePolarsLookalike:
         pass
@@ -161,7 +165,8 @@ def test_resolve_uses_top_level_package_not_substring_match():
 
 def test_resolve_matches_submodules_of_real_pandas_polars():
     """A dotted submodule of the real library (e.g. `pandas.core.frame`) must
-    still match via the top-level package check."""
+    still match via the top-level package check.
+    """
 
     class _RealPandasSubmoduleType:
         pass

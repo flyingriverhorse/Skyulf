@@ -83,7 +83,7 @@ def df_polars(df_pandas: pd.DataFrame) -> pl.DataFrame:
 
 class TestManualBoundsCalculator:
     def test_fit_stores_bounds(self) -> None:
-        """fit must echo the bounds config into the artifact."""
+        """Fit must echo the bounds config into the artifact."""
         config = {"bounds": {"val": {"lower": 0.0, "upper": 50.0}}}
         params = ManualBoundsCalculator().fit(pd.DataFrame({"val": [1, 2, 3]}), config)
         assert params["type"] == "manual_bounds"
@@ -96,7 +96,7 @@ class TestManualBoundsCalculator:
         assert params["bounds"] == {}
 
     def test_fit_ignores_data_values(self) -> None:
-        """fit only passes bounds through; it never inspects the data."""
+        """Fit only passes bounds through; it never inspects the data."""
         df = pd.DataFrame({"x": [1, 2, 3]})
         config = {"bounds": {"x": {"lower": -999.0}}}
         params = ManualBoundsCalculator().fit(df, config)
@@ -176,7 +176,7 @@ class TestManualBoundsApplierPandas:
         assert pd.isna(out["val"].iloc[0])
 
     def test_tuple_xy_apply_returns_tuple(self) -> None:
-        """apply on a (X, y) tuple input must return a (X_out, y_out) tuple."""
+        """Apply on a (X, y) tuple input must return a (X_out, y_out) tuple."""
         X = pd.DataFrame({"val": [1.0, 50.0, 200.0]})
         y = pd.Series([0, 1, 2])
         config = {"bounds": {"val": {"upper": 100.0}}}
@@ -286,7 +286,8 @@ class TestManualBoundsApplierPolars:
 
     def test_polars_tuple_xy_with_non_polars_y_passthrough(self, df_polars: pl.DataFrame) -> None:
         """A non-Polars, non-None ``y`` alongside a Polars X must be returned
-        unchanged (the ``_filter_y_polars`` fallback branch)."""
+        unchanged (the ``_filter_y_polars`` fallback branch).
+        """
         y = [0, 1, 2, 3, 4, 5]
         config = {"bounds": {"val": {"lower": 0.0, "upper": 50.0}}}
         params = ManualBoundsCalculator().fit(df_polars.to_pandas(), config)
@@ -307,7 +308,8 @@ class TestRealShapedDataset:
 
     def test_nan_age_rows_preserved_by_bounds_filter(self) -> None:
         """Rows where age is NaN in customers.csv must survive a strict age
-        range filter — NaN is always an inlier by definition."""
+        range filter — NaN is always an inlier by definition.
+        """
         df = load_sample_dataset("customers")
         nan_age_count = int(df["age"].isna().sum())
         config = {"bounds": {"age": {"lower": 20.0, "upper": 60.0}}}

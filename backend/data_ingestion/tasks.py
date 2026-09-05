@@ -144,9 +144,7 @@ def _handle_ingestion_failure(session, source_id: int, error: Exception) -> None
 
 @shared_task(name="core.data_ingestion.tasks.ingest_data_task")
 def ingest_data_task(source_id: int):
-    """
-    Background task to ingest data from any source (File, SQL, etc.).
-    """
+    """Background task to ingest data from any source (File, SQL, etc.)."""
     logger.info(f"Starting ingestion for source {source_id}")
     session = get_db_session()
 

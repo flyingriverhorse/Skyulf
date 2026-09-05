@@ -654,7 +654,8 @@ class TestRealShapedDataset:
 
     def test_correlation_threshold_on_customers_numeric_does_not_raise(self) -> None:
         """CorrelationThresholdCalculator.fit on NaN-containing numeric columns
-        must return a valid artifact with a columns_to_drop list."""
+        must return a valid artifact with a columns_to_drop list.
+        """
         df = load_sample_dataset("customers")
         art = CorrelationThresholdCalculator().fit(
             df[["age", "income", "lat", "lon"]], {"threshold": 0.9}
@@ -665,7 +666,8 @@ class TestRealShapedDataset:
     def test_lat_lon_highly_correlated_in_customers(self) -> None:
         """CorrelationThresholdCalculator on the clean lat/lon subset of customers.csv
         must return a valid artifact — confirming it handles a two-column frame
-        without raising and produces the expected artifact keys."""
+        without raising and produces the expected artifact keys.
+        """
         df = load_sample_dataset("customers")
         # Drop rows where lat or lon is NaN for a clean correlation computation.
         clean = df[["lat", "lon"]].dropna()

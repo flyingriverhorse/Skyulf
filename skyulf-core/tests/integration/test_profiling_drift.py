@@ -32,7 +32,8 @@ def test_calculate_drift_still_flags_shift_when_data_contains_nan() -> None:
     """F-13: `pl.read_csv` turns literal 'NaN' tokens into float NaN, not null.
     `drop_nulls()` keeps NaN, so the metrics used to go NaN and every
     comparison silently voted "no drift". NaN rows must be dropped alongside
-    nulls so a real shift is still detected."""
+    nulls so a real shift is still detected.
+    """
     rng = np.random.default_rng(0)
     reference = pl.DataFrame({"feature": rng.normal(0, 1, 500)})
     shifted = rng.normal(5, 1, 500)
@@ -226,7 +227,8 @@ def test_drifted_columns_count_sums_distribution_and_schema_drift() -> None:
 
 def test_calculate_drift_computes_categorical_psi_for_low_cardinality_string_column() -> None:
     """A low-cardinality string column should now get PSI-based categorical
-    drift detection instead of being skipped entirely."""
+    drift detection instead of being skipped entirely.
+    """
     reference = pl.DataFrame({"cat": ["a", "b", "c"]})
     current = pl.DataFrame({"cat": ["a", "b", "c"]})
 
@@ -241,7 +243,8 @@ def test_calculate_drift_computes_categorical_psi_for_low_cardinality_string_col
 
 def test_calculate_drift_detects_categorical_distribution_shift() -> None:
     """A current dataset whose category proportions have shifted heavily
-    away from the reference should be flagged as drifted."""
+    away from the reference should be flagged as drifted.
+    """
     rng = np.random.default_rng(3)
     reference = pl.DataFrame({"cat": rng.choice(["a", "b", "c"], size=500, p=[0.8, 0.1, 0.1])})
     current = pl.DataFrame({"cat": rng.choice(["a", "b", "c"], size=500, p=[0.1, 0.1, 0.8])})
@@ -255,7 +258,8 @@ def test_calculate_drift_detects_categorical_distribution_shift() -> None:
 
 def test_calculate_drift_skips_high_cardinality_categorical_column() -> None:
     """A near-unique-per-row string column (free text / IDs) must be skipped
-    rather than blowing up the PSI computation on effectively-unique values."""
+    rather than blowing up the PSI computation on effectively-unique values.
+    """
     n = 200
     reference = pl.DataFrame({"cat": [f"id_{i}" for i in range(n)]})
     current = pl.DataFrame({"cat": [f"id_{i}" for i in range(n)]})
@@ -310,7 +314,8 @@ def test_calculate_psi_detects_drift_when_actual_fully_outside_reference_range()
 def test_calculate_kl_detects_drift_when_current_fully_outside_reference_range() -> None:
     """Regression test: KL divergence must not silently report ~0 when
     `current` has shifted entirely outside `reference`'s range (same
-    out-of-range-clipping bug as PSI above)."""
+    out-of-range-clipping bug as PSI above).
+    """
     calc = DriftCalculator(pl.DataFrame({"a": [1.0]}), pl.DataFrame({"a": [1.0]}))
     reference = np.random.RandomState(0).normal(loc=0, scale=1, size=500)
     current = np.random.RandomState(1).normal(loc=100, scale=1, size=500)  # fully out of range
@@ -414,7 +419,8 @@ def test_calculate_drift_ks_drift_without_psi_drift_suggestion() -> None:
 
 def test_calculate_drift_ignores_significant_p_value_when_statistic_is_small() -> None:
     """F-12: a negligible shift on a large window produces p < 0.05 but a small KS
-    statistic; the decision is on the statistic, so no drift must be flagged."""
+    statistic; the decision is on the statistic, so no drift must be flagged.
+    """
     rng = np.random.default_rng(11)
     reference = pl.DataFrame({"feature": rng.normal(0, 1, 50_000)})
     current = pl.DataFrame({"feature": rng.normal(0.03, 1, 50_000)})

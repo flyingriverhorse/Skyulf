@@ -1,5 +1,4 @@
-"""
-Logging Middleware
+"""Logging Middleware
 
 Provides request/response logging for monitoring and debugging.
 """
@@ -17,16 +16,13 @@ logger = logging.getLogger(__name__)
 
 
 class LoggingMiddleware(BaseHTTPMiddleware):
-    """
-    Middleware to log HTTP requests and responses.
-    """
+    """Middleware to log HTTP requests and responses."""
 
     def __init__(self, app: ASGIApp):
         super().__init__(app)
 
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
-        """
-        Log request details and response metrics.
+        """Log request details and response metrics.
 
         Args:
             request: The HTTP request

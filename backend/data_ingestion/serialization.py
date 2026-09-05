@@ -1,5 +1,4 @@
-"""
-FastAPI-compatible serialization utilities.
+"""FastAPI-compatible serialization utilities.
 
 JSON-safe data conversion utilities with enhanced async support.
 Migrated from Flask sync version with improved type handling.
@@ -47,8 +46,7 @@ class AsyncJSONSafeSerializer:
 
     @classmethod
     async def clean_for_json(cls, obj: Any) -> Any:
-        """
-        Convert data structures to JSON-safe format asynchronously.
+        """Convert data structures to JSON-safe format asynchronously.
 
         Args:
             obj: Object to make JSON-safe
@@ -236,8 +234,7 @@ class AsyncJSONSafeSerializer:
     async def safe_dict_from_dataframe(
         df: pd.DataFrame | Any, records_format: bool = True, max_rows: int | None = None
     ) -> list[dict] | dict:
-        """
-        Convert DataFrame (Pandas or Polars) to JSON-safe dictionary format.
+        """Convert DataFrame (Pandas or Polars) to JSON-safe dictionary format.
 
         Args:
             df: DataFrame to convert
@@ -266,8 +263,7 @@ class AsyncJSONSafeSerializer:
 
     @staticmethod
     async def serialize_dataframe_metadata(df: pd.DataFrame) -> dict[str, Any]:
-        """
-        Extract and serialize DataFrame metadata.
+        """Extract and serialize DataFrame metadata.
 
         Args:
             df: DataFrame to analyze
@@ -321,8 +317,7 @@ class AsyncJSONSafeSerializer:
     async def serialize_query_result(
         df: pd.DataFrame, include_metadata: bool = True, max_rows: int | None = None
     ) -> dict[str, Any]:
-        """
-        Serialize a query result DataFrame with optional metadata.
+        """Serialize a query result DataFrame with optional metadata.
 
         Args:
             df: Query result DataFrame
@@ -575,8 +570,7 @@ class DataTypeConverter:
 
     @staticmethod
     def infer_column_types(df: pd.DataFrame) -> dict[str, str]:
-        """
-        Infer semantic data types for DataFrame columns.
+        """Infer semantic data types for DataFrame columns.
 
         Args:
             df: DataFrame to analyze
@@ -616,8 +610,7 @@ class DataTypeConverter:
     async def convert_dataframe_types(
         df: pd.DataFrame, type_mapping: dict[str, str]
     ) -> pd.DataFrame:
-        """
-        Convert DataFrame columns to specified types.
+        """Convert DataFrame columns to specified types.
 
         Args:
             df: DataFrame to convert
@@ -641,8 +634,7 @@ class DataTypeConverter:
 
     @staticmethod
     def get_data_quality_report(df: pd.DataFrame) -> dict[str, Any]:
-        """
-        Generate a data quality report for a DataFrame.
+        """Generate a data quality report for a DataFrame.
 
         Args:
             df: DataFrame to analyze
@@ -705,8 +697,7 @@ async def serialize_api_response(
     message: str | None = None,
     metadata: dict | None = None,
 ) -> dict[str, Any]:
-    """
-    Serialize data into a standard API response format.
+    """Serialize data into a standard API response format.
 
     Args:
         data: Data to serialize

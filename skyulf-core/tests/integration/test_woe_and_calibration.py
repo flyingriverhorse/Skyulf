@@ -90,7 +90,8 @@ def test_woe_null_category_key_matches_across_engines():
 
 def test_woe_null_row_hits_learned_mapping_cross_engine():
     """Serving always builds a pandas frame, so a polars-fitted artifact must
-    map pandas null rows to the learned null WOE, not fall back to default."""
+    map pandas null rows to the learned null WOE, not fall back to default.
+    """
     df = _woe_frame_with_nulls()
     pl_X = pl.from_pandas(df[["city"]])
     pl_y = pl.from_pandas(df[["target"]])["target"]

@@ -254,7 +254,8 @@ def test_infinite_train_metric_produces_no_overfit_gap_badge() -> None:
 
 def test_nan_metric_is_still_skipped() -> None:
     """Pin: NaN rejection already worked under ``f == f`` and must survive
-    the move to ``math.isfinite``, which is a strictly wider filter."""
+    the move to ``math.isfinite``, which is a strictly wider filter.
+    """
     out = build_summary(
         step_type="training",
         output=None,
@@ -450,8 +451,9 @@ def test_advanced_tuning_int_trials_is_accepted() -> None:
 
 
 def test_advanced_tuning_neg_loss_is_sign_flipped() -> None:
-    """sklearn losses come in as ``neg_*`` (higher-is-better). Show the
-    natural magnitude on the card so the user can reason about it."""
+    """Sklearn losses come in as ``neg_*`` (higher-is-better). Show the
+    natural magnitude on the card so the user can reason about it.
+    """
     out = build_summary(
         step_type="training",
         output=None,
@@ -467,7 +469,8 @@ def test_advanced_tuning_neg_loss_is_sign_flipped() -> None:
 
 def test_advanced_tuning_legacy_eval_only_falls_back_to_test_metrics() -> None:
     """`training` node with `run_mode=tuned` and no ``best_score`` falls back
-    to the eval headline (mirrors legacy job rows pre-tuning-summary refactor)."""
+    to the eval headline (mirrors legacy job rows pre-tuning-summary refactor).
+    """
     out = build_summary(
         step_type="training",
         output=None,

@@ -1,5 +1,4 @@
-"""
-Settings Factory
+"""Settings Factory
 
 © 2025 Murat Unsal — Skyulf Project
 
@@ -27,8 +26,7 @@ _ENV_SETTINGS_MAP: dict[str, type[Settings]] = {
 
 @lru_cache
 def get_settings() -> Settings:
-    """
-    Get application settings based on ``FASTAPI_ENV``.
+    """Get application settings based on ``FASTAPI_ENV``.
 
     Returns a cached singleton so the config is built once per process.
 

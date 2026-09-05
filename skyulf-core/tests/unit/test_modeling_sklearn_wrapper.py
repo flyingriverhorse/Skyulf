@@ -69,7 +69,8 @@ def test_fit_merges_nested_params_dict(clf_data):
 def test_fit_native_class_weight_passed_through_unchanged(clf_data):
     """A model whose constructor declares `class_weight` natively (e.g.
     LogisticRegression) should receive it directly at construction time —
-    no sample_weight translation should occur."""
+    no sample_weight translation should occur.
+    """
     X, y = clf_data
     calc = SklearnCalculator(LogisticRegression, {}, "classification")
     model = calc.fit(X, y, {"class_weight": "balanced"})
@@ -78,7 +79,8 @@ def test_fit_native_class_weight_passed_through_unchanged(clf_data):
 
 def test_fit_class_weight_none_string_normalized_to_none(clf_data):
     """A stringified 'None' (as a native <select> element would submit for a
-    null-valued option) should be treated the same as Python None."""
+    null-valued option) should be treated the same as Python None.
+    """
     X, y = clf_data
     calc = SklearnCalculator(LogisticRegression, {}, "classification")
     model = calc.fit(X, y, {"class_weight": "None"})
@@ -89,7 +91,8 @@ def test_fit_kwargs_constructor_class_weight_translated_to_sample_weight():
     """A model whose constructor accepts **kwargs but has no real
     'class_weight' parameter (mirrors XGBoost's sklearn wrapper) should have
     class_weight popped before construction and converted into a
-    sample_weight array passed to fit(), rather than silently no-op'ing."""
+    sample_weight array passed to fit(), rather than silently no-op'ing.
+    """
     captured = {}
 
     class _NoNativeClassWeightModel:
@@ -125,7 +128,8 @@ def test_fit_kwargs_constructor_class_weight_translated_to_sample_weight():
 
 def test_fit_kwargs_constructor_class_weight_none_is_noop():
     """class_weight=None for a non-natively-supporting model should not
-    compute or pass any sample_weight at all."""
+    compute or pass any sample_weight at all.
+    """
     captured = {}
 
     class _NoNativeClassWeightModel:
@@ -151,7 +155,8 @@ def test_fit_kwargs_constructor_class_weight_none_is_noop():
 def test_fit_kwargs_constructor_class_weight_without_sample_weight_support_raises():
     """If the model has no native class_weight support AND its fit() doesn't
     accept sample_weight either, raise a clear ValueError instead of
-    silently dropping the requested class weighting."""
+    silently dropping the requested class weighting.
+    """
 
     class _NoWeightingSupportAtAllModel:
         def __init__(self, **kwargs):
@@ -205,7 +210,8 @@ def test_predict_proba_returns_none_when_unsupported():
 def test_predict_proba_returns_dataframe_with_classes_as_columns(clf_data):
     """predict_proba should return a DataFrame whose columns are the model's
     classes_, coerced to native str so downstream JSON serialization never
-    chokes on numpy scalar types."""
+    chokes on numpy scalar types.
+    """
     X, y = clf_data
     model = SVC(probability=True).fit(X, y)
     result = SklearnApplier().predict_proba(X, model)
@@ -229,7 +235,8 @@ def _seed_calculator(model_class, **extra_defaults):
 
 def test_seed_injected_when_not_configured(clf_data):
     """A model whose defaults carry no random_state must still be seeded with
-    the single shared fallback (F-21: seeding has one owner)."""
+    the single shared fallback (F-21: seeding has one owner).
+    """
     from skyulf.types import DEFAULT_RANDOM_STATE
 
     X, y = clf_data
@@ -252,7 +259,8 @@ def test_seed_explicit_none_is_respected(clf_data):
 
 def test_seed_not_injected_for_estimators_without_random_state():
     """Estimators whose constructor has no random_state (and no **kwargs) must
-    not receive one — otherwise they'd trigger a dropped-param warning."""
+    not receive one — otherwise they'd trigger a dropped-param warning.
+    """
     calc = SklearnCalculator(
         model_class=LinearRegression, default_params={}, problem_type="regression"
     )

@@ -1,5 +1,4 @@
-"""
-Skyulf EDA Example: Automated Analysis (The Easy Way)
+"""Skyulf EDA Example: Automated Analysis (The Easy Way)
 ===================================================
 
 This script demonstrates the simplified EDA workflow using the new `EDAVisualizer`.

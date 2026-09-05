@@ -101,7 +101,8 @@ class TestRealShapedDataset:
 
     def test_tune_threshold_on_customers_data(self) -> None:
         """F-13 end-to-end: validation split → threshold selected on it →
-        applier predictions honour the cutoff."""
+        applier predictions honour the cutoff.
+        """
         from skyulf.modeling._tuning.engine import TuningApplier
         from skyulf.modeling.classification import LogisticRegressionApplier
 

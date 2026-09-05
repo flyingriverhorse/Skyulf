@@ -1,5 +1,4 @@
-"""
- 2025 Murat Unsal  Skyulf Project
+"""2025 Murat Unsal  Skyulf Project
 
 Configuration endpoints.
 

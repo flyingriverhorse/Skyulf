@@ -1,5 +1,4 @@
-"""
-Async registry DB helpers: centralized DDL for the `data_sources` registry.
+"""Async registry DB helpers: centralized DDL for the `data_sources` registry.
 
 Provides `ensure_registry_tables(settings)` which ensures the `data_sources` table
 exists in the configured registry backend (async SQLAlchemy engine or local sqlite).

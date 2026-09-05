@@ -1,5 +1,4 @@
-"""
-Skyulf EDA Example: Geospatial Analysis
+"""Skyulf EDA Example: Geospatial Analysis
 =======================================
 
 This script demonstrates how Skyulf automatically detects latitude/longitude columns

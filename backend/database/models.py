@@ -1,5 +1,4 @@
-"""
-Database Models for FastAPI
+"""Database Models for FastAPI
 
 SQLAlchemy models that mirror the existing Flask database structure.
 These models are compatible with the existing database schema.
@@ -37,8 +36,7 @@ class TimestampMixin:
 
 
 class User(Base, TimestampMixin):
-    """
-    User model - mirrors the Flask user table structure.
+    """User model - mirrors the Flask user table structure.
     Compatible with existing Flask-Login users.
     """
 
@@ -85,8 +83,7 @@ class User(Base, TimestampMixin):
 
 
 class DataSource(Base, TimestampMixin):
-    """
-    Data Source model for data ingestion connections.
+    """Data Source model for data ingestion connections.
     Compatible with existing data_sources table.
     """
 
@@ -369,9 +366,7 @@ class ModelVersionCounter(Base):
 
 
 class Deployment(Base, TimestampMixin):
-    """
-    Tracks deployed models.
-    """
+    """Tracks deployed models."""
 
     __tablename__ = "deployments"
 
@@ -407,9 +402,7 @@ class Deployment(Base, TimestampMixin):
 
 
 class EDAReport(Base, TimestampMixin):
-    """
-    Stores the results of EDA analysis for a dataset.
-    """
+    """Stores the results of EDA analysis for a dataset."""
 
     __tablename__ = "eda_reports"
 
@@ -633,7 +626,6 @@ async def get_database_session(
     Yields:
         AsyncSession: A managed session with automatic commit/rollback semantics.
     """
-
     from .engine import get_engine  # Local import to avoid circular dependency
 
     resolved_engine = engine or get_engine()

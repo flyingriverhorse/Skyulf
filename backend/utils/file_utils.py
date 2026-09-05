@@ -1,5 +1,4 @@
-"""
-File System Utilities for Data Source Management
+"""File System Utilities for Data Source Management
 
 Provides safe file and folder deletion functionality with backup options,
 plus file cleanup and maintenance utilities.
@@ -28,8 +27,7 @@ def safe_delete_path(
     files_only: bool = True,
     allowed_base: str | Path | None = None,
 ) -> bool:
-    """
-    Safely delete a file or directory.
+    """Safely delete a file or directory.
 
     Args:
         path: Path to the file or directory to delete
@@ -101,8 +99,7 @@ def _delete_immediately(path: Path, files_only: bool = True) -> bool:
 
 
 def cleanup_empty_directories(base_path: str | Path) -> int:
-    """
-    Remove empty directories recursively from base_path.
+    """Remove empty directories recursively from base_path.
 
     Args:
         base_path: Base directory to start cleanup from
@@ -193,8 +190,7 @@ def _first_valid_path_candidate(path_candidates: list) -> str | Path | None:
 
 
 def extract_file_path_from_source(source_data: dict) -> Path | str | None:
-    """
-    Extract the file path from a data source record.
+    """Extract the file path from a data source record.
 
     Args:
         source_data: Data source dictionary from database
@@ -221,8 +217,7 @@ def cleanup_old_files(
     max_age_days: int = 7,
     file_pattern: str = "*",
 ) -> dict:
-    """
-    Clean up old files in a directory based on count and age limits.
+    """Clean up old files in a directory based on count and age limits.
 
     Args:
         directory: Directory to clean up
@@ -329,8 +324,7 @@ def cleanup_uploads_directory(
     max_age_days: int = 7,
     file_extensions: list[str] | None = None,
 ) -> dict:
-    """
-    Clean up uploaded files based on settings.
+    """Clean up uploaded files based on settings.
 
     Args:
         uploads_dir: Uploads directory path

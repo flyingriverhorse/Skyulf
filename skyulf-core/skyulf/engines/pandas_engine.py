@@ -12,7 +12,8 @@ from .registry import BaseEngine, EngineName, EngineRegistry
 def _to_positional_values(values: Any, target_index: pd.Index) -> Any:
     """Strip index alignment from Series-like values so assignment behaves
     positionally, matching Polars semantics instead of pandas' index-based
-    alignment (which silently produces NaNs on mismatched indices)."""
+    alignment (which silently produces NaNs on mismatched indices).
+    """
     if isinstance(values, pd.Series) and not values.index.equals(target_index):
         if len(values) != len(target_index):
             raise ValueError(

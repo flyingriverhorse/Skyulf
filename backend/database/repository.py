@@ -1,5 +1,4 @@
-"""
-Repository Pattern for Database Operations
+"""Repository Pattern for Database Operations
 
 Provides async CRUD operations that mirror the existing Flask db/crud.py functionality.
 Uses the repository pattern to separate database operations from business logic.
@@ -23,8 +22,7 @@ logger = logging.getLogger(__name__)
 
 
 class BaseRepository[ModelType: Base]:
-    """
-    Generic repository class for common database operations.
+    """Generic repository class for common database operations.
     Provides async equivalents of Flask CRUD operations.
     """
 
@@ -33,8 +31,7 @@ class BaseRepository[ModelType: Base]:
         self.model = model
 
     async def create(self, obj_in: dict[str, Any]) -> ModelType:
-        """
-        Create a new record.
+        """Create a new record.
 
         Args:
             obj_in: Dictionary of field values
@@ -51,8 +48,7 @@ class BaseRepository[ModelType: Base]:
         return db_obj
 
     async def get(self, record_id: int) -> ModelType | None:
-        """
-        Get a record by ID.
+        """Get a record by ID.
 
         Args:
             record_id: Record ID
@@ -71,8 +67,7 @@ class BaseRepository[ModelType: Base]:
         filters: dict[str, Any] | None = None,
         order_by: str | None = None,
     ) -> list[ModelType]:
-        """
-        Get multiple records with pagination and filtering.
+        """Get multiple records with pagination and filtering.
 
         Args:
             skip: Number of records to skip
@@ -104,8 +99,7 @@ class BaseRepository[ModelType: Base]:
         return list(records)
 
     async def update(self, record_id: int, obj_in: dict[str, Any]) -> ModelType | None:
-        """
-        Update a record by ID.
+        """Update a record by ID.
 
         Args:
             record_id: Record ID
@@ -131,8 +125,7 @@ class BaseRepository[ModelType: Base]:
         return db_obj
 
     async def delete(self, record_id: int) -> bool:
-        """
-        Delete a record by ID.
+        """Delete a record by ID.
 
         Args:
             record_id: Record ID
@@ -152,8 +145,7 @@ class BaseRepository[ModelType: Base]:
         return False
 
     async def count(self, filters: dict[str, Any] | None = None) -> int:
-        """
-        Count records with optional filtering.
+        """Count records with optional filtering.
 
         Args:
             filters: Dictionary of field filters
@@ -173,8 +165,7 @@ class BaseRepository[ModelType: Base]:
         return int(count_value)
 
     async def exists(self, record_id: int) -> bool:
-        """
-        Check if a record exists.
+        """Check if a record exists.
 
         Args:
             record_id: Record ID

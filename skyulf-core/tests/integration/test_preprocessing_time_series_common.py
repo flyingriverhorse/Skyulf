@@ -78,7 +78,8 @@ class TestRealShapedDataset:
 
     def test_sort_pandas_by_signup_date_produces_ascending_order(self) -> None:
         """sort_pandas on signup_date must return all rows in ISO-date ascending
-        order without dropping any rows or raising."""
+        order without dropping any rows or raising.
+        """
         df = load_sample_dataset("customers")
         sorted_df = sort_pandas(df, "signup_date")
         assert len(sorted_df) == len(df)

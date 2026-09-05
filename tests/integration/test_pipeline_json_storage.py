@@ -78,7 +78,8 @@ def test_load_unknown_dataset_returns_null(client: TestClient) -> None:
 
 def test_save_rejects_a_dataset_id_outside_the_allowlist(client: TestClient, tmp_path) -> None:
     """Routed through HTTP, not just the helper: an id with a space fails
-    `_SAFE_DATASET_ID_RE` and must 400 without touching the filesystem."""
+    `_SAFE_DATASET_ID_RE` and must 400 without touching the filesystem.
+    """
     response = client.post("/api/pipeline/save/bad%20id", json=PAYLOAD)
 
     assert response.status_code == 400, response.text

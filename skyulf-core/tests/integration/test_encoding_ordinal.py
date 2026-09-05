@@ -91,7 +91,7 @@ def test_invalid_handle_unknown_falls_back_to_use_encoded_value() -> None:
 
 
 def test_empty_dataframe_raises_on_fit() -> None:
-    """sklearn's OrdinalEncoder requires >=1 sample; an empty frame surfaces that error."""
+    """Sklearn's OrdinalEncoder requires >=1 sample; an empty frame surfaces that error."""
     df = pd.DataFrame({"category": pd.Series([], dtype=object)})
     calc = OrdinalEncoderCalculator()
 
@@ -297,7 +297,8 @@ def test_target_to_str_array_polars_series_fills_nulls_with_nan_string() -> None
 
 def test_target_to_str_array_polars_series_without_nulls_matches_apply_representation() -> None:
     """A null-free Polars target still goes through the Utf8 cast path, so fit and
-    apply agree even when null presence differs between batches."""
+    apply agree even when null presence differs between batches.
+    """
     from skyulf.preprocessing.encoding.ordinal import _target_to_str_array
 
     result = _target_to_str_array(pl.Series("target", [1, 2, 1]))
@@ -455,7 +456,8 @@ def test_ordinal_missing_values_encode_identically_across_engines_and_dtypes() -
     polars null, and a *wrapped* polars frame must all fit the same categories
     and produce identical codes. Before the fix, polars null skipped the
     ``fill_null("nan")`` normalisation label.py applies, so the three
-    representations disagreed."""
+    representations disagreed.
+    """
     calc = OrdinalEncoderCalculator()
     applier = OrdinalEncoderApplier()
     config = {"columns": ["category"]}

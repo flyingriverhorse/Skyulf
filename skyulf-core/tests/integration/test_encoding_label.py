@@ -216,7 +216,8 @@ def test_label_apply_engine_parity_on_unseen_category() -> None:
 
 def test_polars_col_to_str_array_fills_nulls_with_nan_string() -> None:
     """_polars_col_to_str_array casts to Utf8 and fills nulls as "nan" natively,
-    matching the apply-time representation in `_build_polars_feature_exprs`."""
+    matching the apply-time representation in `_build_polars_feature_exprs`.
+    """
     from skyulf.preprocessing.encoding.label import _polars_col_to_str_array
 
     X = pl.DataFrame({"cat": [1, 2, None]})
@@ -262,7 +263,8 @@ def test_y_to_str_array_without_to_numpy_uses_np_array_fallback() -> None:
 
 def test_y_to_str_array_polars_series_fills_nulls_with_nan_string() -> None:
     """_y_to_str_array casts a Polars Series to Utf8 and fills nulls as "nan" natively,
-    instead of relying on `.to_numpy()`'s int->float->"1.0" null-driven cast."""
+    instead of relying on `.to_numpy()`'s int->float->"1.0" null-driven cast.
+    """
     from skyulf.preprocessing.encoding.label import _y_to_str_array
 
     result = _y_to_str_array(pl.Series("target", [1, 2, None]))
@@ -271,7 +273,8 @@ def test_y_to_str_array_polars_series_fills_nulls_with_nan_string() -> None:
 
 def test_y_to_str_array_polars_series_without_nulls_matches_apply_representation() -> None:
     """A null-free Polars Series still goes through the Utf8 cast path (not `.to_numpy().astype(str)`),
-    so fit and apply agree even when null presence differs between batches."""
+    so fit and apply agree even when null presence differs between batches.
+    """
     from skyulf.preprocessing.encoding.label import _y_to_str_array
 
     result = _y_to_str_array(pl.Series("target", [1, 2, 1]))
@@ -358,7 +361,8 @@ def test_label_encoder_pandas_dtype_stays_int64_with_unseen_category() -> None:
     explicit `.cast(pl.Int64)`) even when the applied data contains a
     category unseen during fit - previously `.map().fillna(missing_code)`
     silently upcast the whole column to float64 the moment any value
-    mapped to NaN, even though `fillna` filled it with an int missing_code."""
+    mapped to NaN, even though `fillna` filled it with an int missing_code.
+    """
     X_fit = pd.DataFrame({"category": ["a", "b"]})
     params = LabelEncoderCalculator().fit(X_fit, {"columns": ["category"]})
 
@@ -385,7 +389,8 @@ def test_label_encoder_pandas_target_dtype_stays_int64_with_unseen_category() ->
 
 def test_label_encoder_polars_pandas_dtype_parity_with_unseen_category() -> None:
     """Cross-engine parity: pandas and Polars must agree on both the dtype
-    "kind" (integer) and the encoded values for an unseen category."""
+    "kind" (integer) and the encoded values for an unseen category.
+    """
     X_fit_pd = pd.DataFrame({"category": ["a", "b"]})
     X_fit_pl = pl.DataFrame({"category": ["a", "b"]})
     params_pd = LabelEncoderCalculator().fit(X_fit_pd, {"columns": ["category"]})

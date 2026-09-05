@@ -1,5 +1,4 @@
-"""
-Base Settings Model
+"""Base Settings Model
 
 © 2025 Murat Unsal — Skyulf Project
 
@@ -90,8 +89,7 @@ class Settings(
     LLMMixin,
     BaseSettings,
 ):
-    """
-    Application settings assembled from domain mixins.
+    """Application settings assembled from domain mixins.
 
     All fields stay flat — use ``settings.FIELD_NAME`` directly.
     """

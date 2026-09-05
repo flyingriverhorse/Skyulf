@@ -34,7 +34,6 @@ def _maybe_decode_predictions(
     under encoders[target_column] (for pipelines where encoding happened before
     the Feature/Target Split).
     """
-
     target_encoder = extract_target_label_encoder(feature_engineer, target_column=target_column)
     if target_encoder is None:
         return predictions
@@ -750,7 +749,8 @@ class DeploymentService:
     @staticmethod
     def _lineage_fields_from_job(job: TrainingJob | None) -> dict[str, Any]:
         """Builds the cheap dataset/version/target-column lineage fields from an
-        already-fetched TrainingJob, without touching the deployed artifact."""
+        already-fetched TrainingJob, without touching the deployed artifact.
+        """
         if job is None:
             return {"dataset_id": None, "version": None, "target_column": None}
         target_column = (
@@ -766,9 +766,7 @@ class DeploymentService:
     async def get_deployment_details(
         session: AsyncSession, deployment: Deployment
     ) -> dict[str, Any]:
-        """
-        Returns deployment info enriched with input/output schema from the artifact.
-        """
+        """Returns deployment info enriched with input/output schema from the artifact."""
         info = deployment.to_dict()
         info["input_schema"] = None
         info["output_schema"] = None

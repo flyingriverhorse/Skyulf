@@ -45,14 +45,16 @@ def test_valid_dataset_id_resolves_inside_storage_dir(tmp_path) -> None:
 )
 def test_malicious_or_malformed_dataset_id_rejected(tmp_path, dataset_id: str) -> None:
     """Anything containing a path separator, '..', or non-allowlisted
-    character must raise ValueError before a Path is ever constructed."""
+    character must raise ValueError before a Path is ever constructed.
+    """
     with pytest.raises(ValueError):
         _pipeline_json_path(tmp_path, dataset_id)
 
 
 def test_containment_check_rejects_escape_if_allowlist_is_loosened(tmp_path, monkeypatch) -> None:
     """Layer 2 stands alone: if `_SAFE_DATASET_ID_RE` were ever widened, the
-    resolve+contain check must still refuse a path that escapes storage_dir."""
+    resolve+contain check must still refuse a path that escapes storage_dir.
+    """
     monkeypatch.setattr(pipelines_io, "_SAFE_DATASET_ID_RE", re.compile(r".*", re.DOTALL))
     # Positive control — a contained id still resolves, so the rejection below
     # comes from the containment check and not from the helper raising always.

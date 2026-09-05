@@ -88,7 +88,8 @@ def test_process_env_wins_over_dotenv(monkeypatch, tmp_path):
 
 def test_settings_map_covers_every_known_environment():
     """A key added to ``KNOWN_ENVIRONMENTS`` but missing from the map must not
-    silently select a fallback profile."""
+    silently select a fallback profile.
+    """
     assert set(_ENV_SETTINGS_MAP) == set(KNOWN_ENVIRONMENTS)
     assert _ENV_SETTINGS_MAP["development"] is env_profiles.DevelopmentSettings
     assert _ENV_SETTINGS_MAP["production"] is env_profiles.ProductionSettings

@@ -1,5 +1,4 @@
-"""
-Health Check Endpoints
+"""Health Check Endpoints
 
 Basic health and status endpoints for monitoring and load balancer checks.
 """
@@ -44,8 +43,7 @@ class DetailedHealthResponse(HealthResponse):
 
 @router.get("/health", response_model=HealthResponse)
 async def health_check(settings: Settings = Depends(get_config)):
-    """
-    Basic health check endpoint.
+    """Basic health check endpoint.
     Returns simple status information for load balancers.
     """
     return HealthResponse(
@@ -59,8 +57,7 @@ async def health_check(settings: Settings = Depends(get_config)):
 
 @router.get("/health/detailed", response_model=DetailedHealthResponse)
 async def detailed_health_check(settings: Settings = Depends(get_config)):
-    """
-    Detailed health check endpoint.
+    """Detailed health check endpoint.
 
     Reports a single aggregate `dependencies_healthy` boolean rather than
     naming individual backends/integrations, since this endpoint has no
@@ -104,8 +101,7 @@ async def detailed_health_check(settings: Settings = Depends(get_config)):
 
 @router.get("/health/ready")
 async def readiness_check():
-    """
-    Readiness probe: fits a tiny sklearn pipeline end-to-end.
+    """Readiness probe: fits a tiny sklearn pipeline end-to-end.
 
     Catches dependency breakage (sklearn/polars upgrade, broken install)
     that the basic /health check misses. Returns 503 if the fit fails so

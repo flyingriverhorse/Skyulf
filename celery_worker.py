@@ -1,5 +1,4 @@
-"""
-Celery worker bootstrap.
+"""Celery worker bootstrap.
 
 © 2025 Murat Unsal — Skyulf Project
 """

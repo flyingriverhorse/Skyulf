@@ -5,8 +5,7 @@ from skyulf import DriftCalculator
 
 
 def generate_synthetic_data():
-    """
-    Generates two datasets:
+    """Generates two datasets:
     1. Reference: Normal distribution
     2. Current: Shifted distribution (Drifted)
     """

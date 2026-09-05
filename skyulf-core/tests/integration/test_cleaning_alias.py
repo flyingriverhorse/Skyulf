@@ -112,7 +112,7 @@ def test_normalize_alias_pandas(value: Any, expected: Any) -> None:
 
 
 def test_calculator_fit_boolean_type() -> None:
-    """fit must store alias_type='boolean' and columns in the artifact."""
+    """Fit must store alias_type='boolean' and columns in the artifact."""
     df = pd.DataFrame({"flag": ["yes", "no", "true"]})
     params = AliasReplacementCalculator().fit(df, {"columns": ["flag"], "alias_type": "boolean"})
     assert params["alias_type"] == "boolean"
@@ -120,14 +120,14 @@ def test_calculator_fit_boolean_type() -> None:
 
 
 def test_calculator_fit_country_type() -> None:
-    """fit must resolve and store alias_type='country'."""
+    """Fit must resolve and store alias_type='country'."""
     df = pd.DataFrame({"country": ["uk", "usa"]})
     params = AliasReplacementCalculator().fit(df, {"columns": ["country"], "alias_type": "country"})
     assert params["alias_type"] == "country"
 
 
 def test_calculator_fit_custom_type_normalises_map() -> None:
-    """fit must normalise custom_map keys (lowercase, no punctuation)."""
+    """Fit must normalise custom_map keys (lowercase, no punctuation)."""
     df = pd.DataFrame({"label": ["Active", "Inactive"]})
     params = AliasReplacementCalculator().fit(
         df,

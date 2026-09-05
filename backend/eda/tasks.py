@@ -178,9 +178,7 @@ async def _run_analysis_or_fail(session: AsyncSession, report: EDAReport, df: An
 
 
 async def run_eda_analysis(report_id: int, session: AsyncSession):
-    """
-    Core logic to run EDA analysis.
-    """
+    """Core logic to run EDA analysis."""
     report = None
     try:
         logger.info(f"Starting EDA analysis for report {report_id}")
@@ -230,8 +228,7 @@ async def run_eda_analysis(report_id: int, session: AsyncSession):
 
 
 async def run_eda_background(report_id: int):
-    """
-    Entry point for FastAPI BackgroundTasks.
+    """Entry point for FastAPI BackgroundTasks.
     Creates its own session.
     """
     async with get_database_session() as session:
@@ -245,9 +242,7 @@ try:
 
     @celery_app.task(name="eda.generate_profile")
     def generate_profile_celery(report_id: int):
-        """
-        Entry point for Celery.
-        """
+        """Entry point for Celery."""
         loop = asyncio.new_event_loop()
         try:
             asyncio.set_event_loop(loop)

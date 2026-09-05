@@ -92,7 +92,8 @@ class TestLogisticRegression:
     ) -> None:
         """solver='lbfgs' + penalty='l1' is invalid in sklearn; the calculator
         must fail fast with an actionable message rather than surfacing
-        sklearn's own deep ValueError from inside LogisticRegression.fit."""
+        sklearn's own deep ValueError from inside LogisticRegression.fit.
+        """
         from skyulf.modeling.classification import (
             LogisticRegressionApplier,
             LogisticRegressionCalculator,
@@ -113,7 +114,7 @@ class TestLogisticRegression:
     def test_fit_allows_compatible_solver_penalty(
         self, classification_dataset: SplitDataset
     ) -> None:
-        """saga supports l1/l2/elasticnet/None -- must not raise."""
+        """Saga supports l1/l2/elasticnet/None -- must not raise."""
         from skyulf.modeling.classification import (
             LogisticRegressionApplier,
             LogisticRegressionCalculator,
@@ -136,7 +137,8 @@ class TestLogisticRegression:
     ) -> None:
         """Overriding only `solver` (no explicit `penalty` key) must not raise
         -- validation only runs when both keys are present in the same
-        config so we don't reject a partial config the model defaults fill in."""
+        config so we don't reject a partial config the model defaults fill in.
+        """
         from skyulf.modeling.classification import (
             LogisticRegressionApplier,
             LogisticRegressionCalculator,
@@ -285,7 +287,8 @@ class TestXGBClassifier:
     def test_class_weight_balanced_improves_minority_recall(self) -> None:
         """XGBoost has no native class_weight support; this proves the
         SklearnCalculator shim actually changes fitted behavior end-to-end,
-        not just that it avoids raising."""
+        not just that it avoids raising.
+        """
         pytest.importorskip("xgboost")
         import numpy as np
         from sklearn.metrics import recall_score
@@ -763,7 +766,8 @@ class TestHyperparameterRegistry:
         'newton-cholesky' solver (`_SOLVER_PENALTIES`), but the hyperparameter
         UI options list didn't include it, so users had no way to select it
         from the frontend dropdown (which is generated from this registry
-        via the backend's hyperparameters API)."""
+        via the backend's hyperparameters API).
+        """
         from skyulf.modeling.hyperparameters import get_hyperparameters
 
         params = get_hyperparameters("logistic_regression")

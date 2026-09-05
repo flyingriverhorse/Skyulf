@@ -228,7 +228,8 @@ def _ordinal_fit_no_columns(y: Any, config: dict[str, Any]) -> Mapping[str, Any]
 
 def _should_encode_target(X: Any, y: Any, config: dict[str, Any]) -> bool:
     """True iff ``y`` exists and the configured target name is in `columns`
-    but not in ``X``."""
+    but not in ``X``.
+    """
     if y is None:
         return False
     target_col = config.get("target_column") or getattr(y, "name", None)

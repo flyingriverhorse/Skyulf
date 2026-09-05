@@ -259,7 +259,8 @@ def _fillna_zero_with_warning(X_pd: pd.DataFrame, cols: list[str]) -> pd.DataFra
     changes data (unlike ``_maybe_chi2_rescale``'s already-existing warning
     pattern, a silent ``fillna(0)`` can bias univariate/model-based feature
     scores whenever 0 is itself a meaningful value, or missingness is
-    correlated with the target)."""
+    correlated with the target).
+    """
     subset = X_pd[cols]
     if subset.isna().any().any():
         logger.warning(

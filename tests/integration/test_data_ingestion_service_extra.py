@@ -90,7 +90,8 @@ async def test_fetch_s3_sample_happy_path_returns_dicts():
 @pytest.mark.asyncio
 async def test_fetch_s3_sample_generic_exception_maps_to_skyulf_exception():
     """A non-typed exception from the connector maps to a generic SkyulfException,
-    not a raw/unclassified error."""
+    not a raw/unclassified error.
+    """
     with (
         patch("backend.data_ingestion.connectors.s3.S3Connector.connect", new=AsyncMock()),
         patch(
@@ -336,7 +337,8 @@ async def test_create_file_source_and_ingest_happy_path(db_session, tmp_path):
 @pytest.mark.asyncio
 async def test_create_file_source_and_ingest_db_failure_cleans_up_file(tmp_path):
     """A DB failure during row creation must delete the just-saved file and
-    surface a SkyulfException instead of leaving an orphaned upload."""
+    surface a SkyulfException instead of leaving an orphaned upload.
+    """
     file_path = tmp_path / "uploaded.csv"
     file_path.write_text("a,b\n1,2\n")
 
@@ -359,7 +361,8 @@ async def test_create_file_source_and_ingest_db_failure_cleans_up_file(tmp_path)
 @pytest.mark.asyncio
 async def test_handle_file_upload_end_to_end(db_session, tmp_path):
     """Full orchestration: declared-size check, filename validation, streamed
-    save, DataSource creation, and ingestion trigger all succeed together."""
+    save, DataSource creation, and ingestion trigger all succeed together.
+    """
     service = DataIngestionService(session=db_session, upload_dir=str(tmp_path / "uploads"))
     file = _FakeUploadFile("dataset.csv", b"a,b\n1,2\n3,4\n")
 

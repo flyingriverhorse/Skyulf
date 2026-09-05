@@ -244,7 +244,7 @@ def test_analyze_timeseries_acf_fills_nan_values() -> None:
 
 
 def test_analyze_timeseries_adfuller_exception_is_caught(monkeypatch) -> None:
-    """adfuller raising should be caught, leaving stationarity_test as None (lines 183-184)."""
+    """Adfuller raising should be caught, leaving stationarity_test as None (lines 183-184)."""
     import statsmodels.tsa.stattools as stattools
 
     def _boom(*args, **kwargs):

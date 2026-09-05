@@ -1,3 +1,1 @@
-"""
-Core Health Module
-"""
+"""Core Health Module"""

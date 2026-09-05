@@ -173,7 +173,6 @@ def calculate_classification_metrics(
     avoiding a redundant conversion/inference pass on the same data. When
     omitted, each is (re)computed here exactly as before.
     """
-
     # Convert to Numpy for compatibility (skip if the caller already has it)
     if X_np is None or y_np is None:
         X_np, y_np = SklearnBridge.to_sklearn((X, y))
@@ -411,7 +410,6 @@ def calculate_regression_metrics(
     ``evaluate_regression_model``) pass those results straight through,
     avoiding a redundant conversion/inference pass on the same data.
     """
-
     # Convert to Numpy for compatibility (skip if the caller already has it)
     if X_np is None or y_np is None:
         X_np, y_np = SklearnBridge.to_sklearn((X, y))

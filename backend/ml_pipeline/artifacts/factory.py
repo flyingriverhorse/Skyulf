@@ -15,15 +15,13 @@ logger = logging.getLogger(__name__)
 
 
 class ArtifactFactory:
-    """
-    Factory for creating ArtifactStore instances based on configuration and context.
+    """Factory for creating ArtifactStore instances based on configuration and context.
     Centralizes logic for S3 vs Local storage, credential injection, and routing rules.
     """
 
     @staticmethod
     def get_artifact_store(artifact_uri: str) -> ArtifactStore:
-        """
-        Creates an ArtifactStore for an existing artifact URI.
+        """Creates an ArtifactStore for an existing artifact URI.
         Handles both 's3://' URIs and local paths.
         """
         if not artifact_uri:
@@ -40,8 +38,7 @@ class ArtifactFactory:
 
     @staticmethod
     def get_discovery() -> "ArtifactDiscovery":
-        """
-        Returns the discovery backend used to enumerate job folders and their
+        """Returns the discovery backend used to enumerate job folders and their
         reference artifacts at the artifact root.
 
         Currently local-only; a UC/S3 implementation slots in here for Databricks
@@ -62,8 +59,7 @@ class ArtifactFactory:
     def create_store_for_job(
         job_id: str, is_s3_source: bool = False, artifact_path_name: str | None = None
     ) -> tuple[ArtifactStore, str]:
-        """
-        Determines the correct storage location for a new job based on:
+        """Determines the correct storage location for a new job based on:
         1. The data source type (S3 vs Local)
         2. Configuration settings (UPLOAD_TO_S3_FOR_LOCAL_FILES, SAVE_S3_ARTIFACTS_LOCALLY)
 

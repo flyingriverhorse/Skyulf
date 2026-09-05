@@ -96,6 +96,7 @@ def test_skyulf_warning_default_context_is_isolated():
 
 def test_warning_category_str_returns_value():
     """WarningCategory is a StrEnum: str()/f-string must yield the bare value,
-    not `ClassName.MEMBER` (regression guard against reverting to `(str, Enum)`)."""
+    not `ClassName.MEMBER` (regression guard against reverting to `(str, Enum)`).
+    """
     assert str(WarningCategory.DEGENERATE) == "degenerate"
     assert f"{WarningCategory.CONFIG}" == "config"

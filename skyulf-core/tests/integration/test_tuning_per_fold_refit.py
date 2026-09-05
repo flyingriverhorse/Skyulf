@@ -90,7 +90,8 @@ def test_tuning_grid_refits_preprocessing_per_candidate_fold() -> None:
 
 def test_tuning_woe_noise_target_stays_near_chance() -> None:
     """Leakage proof for tuning scores: refitting WOE per fold kills the
-    noise-target memorization that inflates the leaky best_score."""
+    noise-target memorization that inflates the leaky best_score.
+    """
     rng = np.random.default_rng(42)
     n, n_categories = 400, 200
     X = pd.DataFrame({"city": [f"c{v}" for v in rng.integers(0, n_categories, size=n)]})
@@ -158,7 +159,8 @@ def _disc(auc: float) -> float:
 
 def test_tuning_halving_grid_refits_woe_noise_near_chance() -> None:
     """halving_grid runs its CV inside the sklearn searcher; the fold-aware
-    estimator must refit WOE per fold there too, killing the noise-target leak."""
+    estimator must refit WOE per fold there too, killing the noise-target leak.
+    """
     from skyulf.preprocessing.encoding import WOEEncoderApplier, WOEEncoderCalculator
 
     X, y, steps = _noise_woe_setup()
@@ -246,7 +248,8 @@ def test_tuning_halving_random_refits_woe_noise_near_chance() -> None:
 
 def test_halving_multi_candidate_results_carry_unprefixed_params() -> None:
     """Several candidates exercise successive-halving iterations; extracted
-    best_params and per-trial params must keep the caller's original keys."""
+    best_params and per-trial params must keep the caller's original keys.
+    """
     X, y = _make_classification_xy()
     config = TuningConfig(
         strategy="halving_grid",
@@ -267,7 +270,8 @@ def test_halving_multi_candidate_results_carry_unprefixed_params() -> None:
 
 def test_halving_grid_refits_on_fold_train_rows_only() -> None:
     """Fold isolation inside the halving searcher: every refit sees only its
-    fold's training rows, never the rows it is scored against."""
+    fold's training rows, never the rows it is scored against.
+    """
     X, y = _make_classification_xy()
     recorder = RecordingPreprocessor()
 
@@ -292,7 +296,8 @@ def test_halving_grid_refits_on_fold_train_rows_only() -> None:
 def test_holdout_grid_refits_preprocessing_on_train_rows_only() -> None:
     """Holdout tuning applies the per-fold discipline to the single
     PredefinedSplit fold: refit on train rows only, score the untouched
-    validation split, final refit on train rows only."""
+    validation split, final refit on train rows only.
+    """
     X, y = _make_classification_xy()
     X_train, y_train = X.iloc[:100], y.iloc[:100]
     X_val, y_val = X.iloc[100:], y.iloc[100:]
@@ -323,7 +328,8 @@ def test_holdout_grid_refits_preprocessing_on_train_rows_only() -> None:
 
 def test_holdout_halving_grid_refits_on_train_rows_only() -> None:
     """Holdout under the halving searcher: the fold-aware estimator receives
-    only train rows in fit and scores the untouched validation split."""
+    only train rows in fit and scores the untouched validation split.
+    """
     X, y = _make_classification_xy()
     X_train, y_train = X.iloc[:100], y.iloc[:100]
     X_val, y_val = X.iloc[100:], y.iloc[100:]
@@ -357,7 +363,8 @@ def test_holdout_halving_grid_refits_on_train_rows_only() -> None:
 def test_holdout_tuning_woe_noise_near_chance() -> None:
     """Flagship honesty proof for holdout tuning: with a memorising WOE step
     and a noise target, the leaky full-fit control scores far above chance on
-    the validation split, while the train-only refit stays near it."""
+    the validation split, while the train-only refit stays near it.
+    """
     from skyulf.preprocessing.encoding import WOEEncoderApplier, WOEEncoderCalculator
 
     X, y, steps = _noise_woe_setup()
@@ -437,7 +444,8 @@ def test_merged_branch_adapter_refits_woe_noise_near_chance(
     """Fork-join merge honesty: the adapter re-runs + re-merges both branches
     inside every candidate fold and CV stays near chance on a noise target.
     (The leaky contrast lives in the end-to-end backend suite, where the
-    engine's one-shot fit_transform path feeds the merged training input.)"""
+    engine's one-shot fit_transform path feeds the merged training input.)
+    """
     from skyulf.preprocessing.fold_adapter import MergedBranchFoldAdapter
 
     X, y, woe_branch, scaler_branch = _merged_branch_setup()
@@ -462,7 +470,8 @@ def test_merged_branch_adapter_refits_woe_noise_near_chance(
 def test_merged_branch_adapter_survives_the_halving_wrap() -> None:
     """The fold-aware estimator wraps the merged adapter unconditionally, and
     the searcher-internal CV refits both branches per fold — noise-target
-    tuning stays near chance."""
+    tuning stays near chance.
+    """
     from skyulf.preprocessing.fold_adapter import MergedBranchFoldAdapter
 
     X, y, woe_branch, scaler_branch = _merged_branch_setup()

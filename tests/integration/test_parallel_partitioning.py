@@ -155,7 +155,8 @@ class TestMultipleTerminals:
     def test_shared_prefix_included_in_both_unified_training(self):
         """Same as test_shared_prefix_included_in_both but using the unified
         `training` step_type with differing run_mode values — partitioning
-        must still recognize each as its own terminal."""
+        must still recognize each as its own terminal.
+        """
         nodes = [
             _make_node("ds", "data_loader"),
             _make_node("clean", inputs=["ds"]),
@@ -285,7 +286,8 @@ class TestParallelMode:
     def test_multi_terminal_with_parallel_mode_hybrid(self):
         """Two training nodes. One is normal (1 input), the other has
         execution_mode=parallel with 2 inputs.  Should produce 3 sub-pipelines:
-        1 for the normal terminal + 2 for the parallel terminal's inputs."""
+        1 for the normal terminal + 2 for the parallel terminal's inputs.
+        """
         nodes = [
             _make_node("ds", "data_loader"),
             _make_node("scaler", inputs=["ds"]),
@@ -329,7 +331,8 @@ class TestParallelMode:
 
     def test_multi_terminal_no_parallel_stays_flat(self):
         """Two training nodes, neither has parallel mode. Multi-input terminal
-        stays as one branch (merge mode). Should produce exactly 2 sub-pipelines."""
+        stays as one branch (merge mode). Should produce exactly 2 sub-pipelines.
+        """
         nodes = [
             _make_node("ds", "data_loader"),
             _make_node("a", inputs=["ds"]),
@@ -388,7 +391,8 @@ class TestConnectedComponents:
 
     def test_mixed_connected_and_disconnected(self):
         """Three terminals: two share a dataset, one is isolated.
-        Should produce 2 components."""
+        Should produce 2 components.
+        """
         nodes = [
             # Connected subgraph: Dataset A → two training nodes
             _make_node("dsA", "data_loader"),

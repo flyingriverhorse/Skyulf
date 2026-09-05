@@ -28,7 +28,7 @@ _round_trip_cases = TestCaseLoader("preprocessing/drop_rows", group="round_trip"
 
 
 def test_fit_default_how_is_any() -> None:
-    """fit must default `how` to 'any' when not specified."""
+    """Fit must default `how` to 'any' when not specified."""
     df = pd.DataFrame({"a": [1, np.nan]})
     params = DropMissingRowsCalculator().fit(df, {})
     assert params["how"] == "any"
@@ -36,7 +36,7 @@ def test_fit_default_how_is_any() -> None:
 
 
 def test_fit_preserves_subset_and_threshold() -> None:
-    """fit must pass through the configured subset and threshold values."""
+    """Fit must pass through the configured subset and threshold values."""
     df = pd.DataFrame({"a": [1], "b": [2]})
     params = DropMissingRowsCalculator().fit(df, {"subset": ["a"], "threshold": 1})
     assert params["subset"] == ["a"]
@@ -44,14 +44,14 @@ def test_fit_preserves_subset_and_threshold() -> None:
 
 
 def test_fit_preserves_missing_threshold() -> None:
-    """fit must pass through the configured percentage threshold."""
+    """Fit must pass through the configured percentage threshold."""
     df = pd.DataFrame({"a": [1]})
     params = DropMissingRowsCalculator().fit(df, {"missing_threshold": 50})
     assert params["missing_threshold"] == 50
 
 
 def test_fit_missing_threshold_defaults_to_none() -> None:
-    """fit must default missing_threshold to None when not configured."""
+    """Fit must default missing_threshold to None when not configured."""
     df = pd.DataFrame({"a": [1]})
     params = DropMissingRowsCalculator().fit(df, {})
     assert params["missing_threshold"] is None

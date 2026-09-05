@@ -80,7 +80,8 @@ def test_longer_loop_raises_and_names_every_loop_node():
 
 def test_downstream_innocents_are_not_named():
     """Nodes fed by the cycle cannot run either, but they are not part of
-    the loop — the message must point only at the loop itself."""
+    the loop — the message must point only at the loop itself.
+    """
     nodes = [
         _node("a", ["b"]),
         _node("b", ["a"]),

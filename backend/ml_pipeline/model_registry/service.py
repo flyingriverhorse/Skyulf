@@ -278,8 +278,7 @@ class ModelRegistryService:
     async def list_models(
         session: AsyncSession, skip: int = 0, limit: int | None = None
     ) -> list[ModelRegistryEntry]:
-        """
-        Lists all model types and their versions.
+        """Lists all model types and their versions.
         Aggregates TrainingJob by (model_type, dataset_source_id), scoped by run_mode.
         """
         deployed_job_ids = await ModelRegistryService._get_deployed_job_ids(session)
@@ -386,10 +385,7 @@ class ModelRegistryService:
 
     @staticmethod
     async def get_job_artifacts(session: AsyncSession, job_id: str) -> ArtifactListResponse:
-        """
-        List artifacts for a specific job (Training or Tuning).
-        """
-
+        """List artifacts for a specific job (Training or Tuning)."""
         from backend.ml_pipeline.artifacts.local import LocalArtifactStore
         from backend.ml_pipeline.artifacts.s3 import S3ArtifactStore
 

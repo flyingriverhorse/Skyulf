@@ -301,8 +301,7 @@ class TuningCalculator(BaseModelCalculator):
         preprocessing: "FoldPreprocessor | None" = None,
         validation_frames: tuple[Any, Any] | None = None,
     ) -> Any:
-        """
-        Fits the tuner (runs tuning).
+        """Fits the tuner (runs tuning).
         Adapts the generic fit interface to the specific tune method.
 
         ``preprocessing`` (F-15): re-fits the given preprocessor on
@@ -467,9 +466,7 @@ class TuningCalculator(BaseModelCalculator):
         preprocessing_frames: tuple[Any, Any] | None = None,
         validation_frames: tuple[Any, Any] | None = None,
     ) -> TuningResult:
-        """
-        Runs hyperparameter tuning.
-        """
+        """Runs hyperparameter tuning."""
         # Holdout tuning with per-fold preprocessing refit: the train and
         # validation frames are concatenated (train rows masked -1 in a
         # PredefinedSplit) so every strategy refits the chain on train rows
@@ -671,8 +668,7 @@ class TuningCalculator(BaseModelCalculator):
 
 
 class TuningApplier(BaseModelApplier):
-    """
-    Applier for TuningCalculator.
+    """Applier for TuningCalculator.
     Wraps the base model applier to provide predictions using the refitted best model.
     """
 

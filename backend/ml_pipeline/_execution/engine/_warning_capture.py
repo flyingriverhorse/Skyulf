@@ -45,7 +45,8 @@ class WarningCaptureHandler(logging.Handler):
 
     def set_current_node(self, node_id: str | None, node_type: str | None) -> None:
         """Tag subsequent warnings with this node id (called by the engine
-        before each ``_execute_node``). Pass ``None`` to clear."""
+        before each ``_execute_node``). Pass ``None`` to clear.
+        """
         self._current_node_id = node_id
         self._current_node_type = node_type
 
@@ -81,7 +82,8 @@ class WarningCaptureHandler(logging.Handler):
 
     def attach(self) -> "WarningCaptureHandler":
         """Attach this handler to the captured logger trees and return self
-        so callers can use it as a context manager."""
+        so callers can use it as a context manager.
+        """
         for name in _CAPTURED_LOGGERS:
             lg = logging.getLogger(name)
             lg.addHandler(self)

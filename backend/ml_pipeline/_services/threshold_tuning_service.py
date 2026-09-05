@@ -1,5 +1,4 @@
-"""
-Threshold Tuning Service
+"""Threshold Tuning Service
 ------------------------
 Service for previewing, saving, toggling, and clearing per-job tuned
 decision thresholds. Tuning always operates on raw/undecoded target labels

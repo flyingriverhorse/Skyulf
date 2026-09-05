@@ -179,7 +179,8 @@ def test_fit_raises_on_nan_in_object_dtype_features():
     from SklearnBridge), not only pure numeric-dtype arrays. Previously this
     guard was skipped entirely via `np.issubdtype(dtype, np.number)`, so a
     NaN buried in an object array silently reached the model and produced an
-    opaque downstream sklearn error instead of the clear upfront message."""
+    opaque downstream sklearn error instead of the clear upfront message.
+    """
     X = pd.DataFrame(
         {
             "num": [1.0, 2.0, float("nan"), 4.0] * 30,
@@ -211,7 +212,8 @@ def test_fit_raises_on_nan_target():
 def test_fit_allows_nan_features_for_missing_native_models():
     """Models that handle missing values natively (XGBoost, LightGBM,
     HistGradientBoosting) must not be rejected by the NaN pre-flight check —
-    forcing an Imputer on them would block a legitimate configuration."""
+    forcing an Imputer on them would block a legitimate configuration.
+    """
     from skyulf.modeling.classification import HistGradientBoostingClassifierCalculator
 
     X, y = _clf_xy()
@@ -231,7 +233,8 @@ def test_fit_allows_nan_features_for_missing_native_models():
 
 def test_fit_raises_on_nan_target_even_for_missing_native_models():
     """No estimator accepts missing targets: the y NaN check must stay in
-    force even for models with native missing-value support in X."""
+    force even for models with native missing-value support in X.
+    """
     from skyulf.modeling.classification import HistGradientBoostingClassifierCalculator
 
     X, y = _clf_xy()
@@ -250,7 +253,8 @@ def test_fit_raises_on_nan_target_even_for_missing_native_models():
 
 def test_fit_raises_on_inf_features_even_for_missing_native_models():
     """Inf is not supported even by missing-native models and must keep
-    raising."""
+    raising.
+    """
     from skyulf.modeling.classification import HistGradientBoostingClassifierCalculator
 
     X, y = _clf_xy()
@@ -374,7 +378,8 @@ def test_fit_time_series_split_sorts_and_drops_time_column_prevents_leakage():
     straight to numpy (discarding column names) without ever calling the
     shared _sort_by_time() helper used by perform_cross_validation(), so an
     out-of-order time column perfectly correlated with y leaked directly
-    into training and folds were built on unsorted row order."""
+    into training and folds were built on unsorted row order.
+    """
     import numpy as np
 
     from skyulf.modeling.regression import LinearRegressionCalculator
@@ -645,7 +650,8 @@ def test_halving_wrap_accepts_row_shaping_preprocessing(monkeypatch):
 
 def test_halving_wrap_accepts_target_mutating_preprocessing(monkeypatch):
     """A target-only re-encoding (the XGBoost string-target crash case) is
-    wrapped too — predictions are mapped back to the original label space."""
+    wrapped too — predictions are mapped back to the original label space.
+    """
     from skyulf.modeling._tuning.fold_pipeline import FoldAwareModelStep
 
     built, logs, _result = _tune_with_spied_halving_build(
@@ -660,7 +666,8 @@ def test_halving_wrap_accepts_target_mutating_preprocessing(monkeypatch):
 
 def test_halving_wrap_strips_model_estimator_prefix(monkeypatch):
     """best_params and per-trial params keep the caller's original keys after
-    routing the search space through ``model__estimator__``."""
+    routing the search space through ``model__estimator__``.
+    """
     _built, _logs, result = _tune_with_spied_halving_build(
         monkeypatch,
         _StubPreprocessor(),
@@ -671,7 +678,8 @@ def test_halving_wrap_strips_model_estimator_prefix(monkeypatch):
 
 def test_halving_frameless_sdk_call_falls_back_with_log(monkeypatch):
     """Without named frames (numpy-only library call) the chain cannot run
-    inside the searcher's folds; keep scoring the raw payload with a log."""
+    inside the searcher's folds; keep scoring the raw payload with a log.
+    """
     built, logs, result = _tune_with_spied_halving_build(
         monkeypatch,
         _StubPreprocessor(),
@@ -686,7 +694,8 @@ def test_halving_frameless_sdk_call_falls_back_with_log(monkeypatch):
 def test_halving_wrap_with_validation_builds_predefined_split_on_concat_frames(monkeypatch):
     """Holdout + named frames: the searcher receives a PredefinedSplit over
     the concatenated train+val frames (train marked -1, validation 0) and the
-    fold-aware wrap stays active."""
+    fold-aware wrap stays active.
+    """
     from sklearn.model_selection import PredefinedSplit
 
     from skyulf.modeling._tuning.fold_pipeline import FoldAwareModelStep
@@ -724,7 +733,8 @@ def test_halving_wrap_with_validation_builds_predefined_split_on_concat_frames(m
 
 def test_halving_validation_without_validation_frames_falls_back_with_log(monkeypatch):
     """Holdout tuning without named validation frames cannot score the
-    untouched validation split through the chain: drop the wrap and say so."""
+    untouched validation split through the chain: drop the wrap and say so.
+    """
     from sklearn.model_selection import PredefinedSplit
 
     X_np, y_np = _clf_xy(n=60)
@@ -775,7 +785,8 @@ def _expected_kfold_partitions(n: int, cv_folds: int = 3) -> list[tuple[frozense
 
 def _assert_fold_discipline(n: int, cv_folds: int = 3) -> None:
     """The headline leakage assertions: fits stay inside their fold's training
-    rows, validations get the complementary rows."""
+    rows, validations get the complementary rows.
+    """
     folds = _expected_kfold_partitions(n, cv_folds)
     fit_calls = _IndexSpyAdapter.fit_calls
     transform_calls = _IndexSpyAdapter.transform_calls
@@ -792,7 +803,8 @@ def _assert_fold_discipline(n: int, cv_folds: int = 3) -> None:
 
 def test_optuna_refits_every_fold_without_leakage():
     """Leakage proof (optuna): every fit_transform sees exactly one fold's
-    training rows, and each validation fold is transformed for scoring."""
+    training rows, and each validation fold is transformed for scoring.
+    """
     pytest.importorskip("optuna")
     _IndexSpyAdapter.fit_calls.clear()
     _IndexSpyAdapter.transform_calls.clear()
@@ -821,7 +833,8 @@ def test_optuna_refits_every_fold_without_leakage():
 
 def test_halving_random_refits_folds_without_leakage():
     """Leakage proof (halving_random): even with rung subsampling, no fit ever
-    sees a row from the fold it is scored against."""
+    sees a row from the fold it is scored against.
+    """
     _IndexSpyAdapter.fit_calls.clear()
     _IndexSpyAdapter.transform_calls.clear()
 
@@ -845,7 +858,8 @@ def test_halving_random_refits_folds_without_leakage():
 def test_optuna_target_mutating_chain_matches_grid_scores():
     """End-to-end on today's crash case: a target-mutating chain (string
     labels) + XGBoost under optuna now runs per-fold instead of failing or
-    falling back — and scores the same as the grid path on the same folds."""
+    falling back — and scores the same as the grid path on the same folds.
+    """
     pytest.importorskip("optuna")
     pytest.importorskip("xgboost")
     from skyulf.modeling.classification import XGBClassifierCalculator
@@ -974,7 +988,8 @@ def test_optuna_import_failure_disables_optuna():
 
 def test_optuna_integration_import_all_fallbacks_fail():
     """If optuna is present but none of the integration import paths work,
-    HAS_OPTUNA should be reset to False and a warning logged."""
+    HAS_OPTUNA should be reset to False and a warning logged.
+    """
     variant = _load_optuna_variant(
         {
             "optuna.integration": None,
@@ -988,7 +1003,8 @@ def test_optuna_integration_import_all_fallbacks_fail():
 
 def test_optuna_integration_second_fallback_path_succeeds():
     """If `optuna.integration` fails but `optuna.integration.sklearn` succeeds,
-    OptunaSearchCV should be sourced from the second fallback path."""
+    OptunaSearchCV should be sourced from the second fallback path.
+    """
     pytest.importorskip("optuna")
     import types
 
@@ -1005,7 +1021,8 @@ def test_optuna_integration_second_fallback_path_succeeds():
 def test_optuna_integration_third_fallback_path_succeeds():
     """If both `optuna.integration` and `optuna.integration.sklearn` fail but
     `optuna_integration.sklearn` succeeds, OptunaSearchCV should come from the
-    third fallback path."""
+    third fallback path.
+    """
     pytest.importorskip("optuna")
     import types
 
@@ -1028,7 +1045,8 @@ def test_importing_engine_does_not_eagerly_resolve_optuna():
     transitively does) must not attempt to import optuna or log its
     "OptunaSearchCV not found" warning — only calling `_ensure_optuna_loaded()`
     (from `_build_optuna_searcher`, i.e. only when strategy='optuna' is
-    actually requested) should trigger resolution."""
+    actually requested) should trigger resolution.
+    """
     variant = _load_optuna_variant({"optuna": None}, resolve_optuna=False)
     assert variant.HAS_OPTUNA is False
     assert variant.OptunaSearchCV is None
@@ -1064,7 +1082,8 @@ def test_fit_raises_on_inf_target():
 class _FlipModelClassCalculator(BaseModelCalculator):
     """Calculator whose `model_class` property returns a real class the first
     time it is accessed (so tune() succeeds) and None afterwards (so the
-    post-tune check in fit() raises)."""
+    post-tune check in fit() raises).
+    """
 
     def __init__(self):
         self._access_count = 0
@@ -1212,7 +1231,8 @@ def test_fit_multiclass_roc_auc_promotes_to_ovr_weighted():
 
 def test_fit_grid_search_handles_failing_candidate():
     """A candidate whose params make the model.fit() raise on every fold
-    should be penalized with -inf mean score, not crash the whole tuning."""
+    should be penalized with -inf mean score, not crash the whole tuning.
+    """
     X, y = _clf_xy()
     tuner = _tuner_clf()
     # C=-5 is invalid for LogisticRegression and will raise on every fold.
@@ -1234,7 +1254,8 @@ def test_fit_grid_search_raises_when_all_candidates_fail():
     the halving/optuna strategies' behavior for "no trials completed").
     The error must also carry the first fold's original exception so the
     failure is actionable (mirrors the optuna/halving "First trial error:"
-    detail)."""
+    detail).
+    """
     X, y = _clf_xy()
     tuner = _tuner_clf()
     # Both C values are invalid for LogisticRegression -> every candidate fails.
@@ -1269,7 +1290,8 @@ def test_fit_halving_grid_with_log_callback():
 
 def test_fit_halving_random_with_log_callback_and_string_min_resources():
     """halving_random should emit its own start log and accept a numeric
-    string for min_resources (converted to int)."""
+    string for min_resources (converted to int).
+    """
     X, y = _clf_xy(n=200)
     tuner = _tuner_clf()
     cfg = TuningConfig(
@@ -1330,7 +1352,7 @@ def test_fit_optuna_strategy_basic():
 
 @pytest.mark.parametrize("sampler_name", ["tpe", "random", "cmaes"])
 def test_fit_optuna_strategy_samplers(sampler_name):
-    """optuna strategy should support tpe/random/cmaes samplers."""
+    """Optuna strategy should support tpe/random/cmaes samplers."""
     pytest.importorskip("optuna")
     if sampler_name == "cmaes":
         pytest.importorskip("cmaes")
@@ -1351,7 +1373,7 @@ def test_fit_optuna_strategy_samplers(sampler_name):
 
 
 def test_fit_optuna_cmaes_with_integer_search_space():
-    """cmaes sampler with an all-integer numeric list should use IntDistribution."""
+    """Cmaes sampler with an all-integer numeric list should use IntDistribution."""
     pytest.importorskip("optuna")
     pytest.importorskip("cmaes")
     X, y = _clf_xy(n=150)
@@ -1372,7 +1394,8 @@ def test_fit_optuna_cmaes_with_integer_search_space():
 
 def test_fit_optuna_with_non_list_search_space_value():
     """A non-list search_space value (a pre-built Optuna distribution) should
-    be passed through to Optuna unchanged rather than converted."""
+    be passed through to Optuna unchanged rather than converted.
+    """
     optuna = pytest.importorskip("optuna")
 
     X, y = _clf_xy(n=150)
@@ -1402,7 +1425,7 @@ def test_fit_optuna_with_non_list_search_space_value():
 
 @pytest.mark.parametrize("pruner_name", ["median", "hyperband", "none"])
 def test_fit_optuna_strategy_pruners(pruner_name):
-    """optuna strategy should support median/hyperband/none pruners."""
+    """Optuna strategy should support median/hyperband/none pruners."""
     pytest.importorskip("optuna")
     X, y = _clf_xy(n=150)
     tuner = _tuner_clf()
@@ -1462,7 +1485,8 @@ def test_tune_unknown_strategy_raises():
 
 def test_fit_halving_grid_with_parallel_backend():
     """When config.parallel_backend is set, the search should run inside a
-    joblib parallel_backend context manager."""
+    joblib parallel_backend context manager.
+    """
     X, y = _clf_xy(n=200)
     tuner = _tuner_clf()
     cfg = TuningConfig(
@@ -1594,7 +1618,8 @@ def test_tuning_applier_predict_without_tuple_artifact_handles_polars_input():
     """Regression test: the NaN-fallback previously always did
     `pd.Series(np.nan, index=df.index)`, which raises AttributeError for a
     Polars DataFrame (no `.index` attribute). Must return an all-null
-    placeholder of the correct length instead of crashing."""
+    placeholder of the correct length instead of crashing.
+    """
     applier = TuningApplier(LogisticRegressionApplier())
     X_pl = pl.DataFrame({"a": [1, 2, 3]})
     preds = applier.predict(X_pl, "not-a-tuple-artifact")  # ty: ignore[invalid-argument-type]
@@ -1646,7 +1671,8 @@ def test_tune_threshold_default_off():
 
 def test_tune_threshold_binary_selects_and_applies():
     """tune_threshold=True on a binary classifier: a threshold is selected,
-    stored on the result, and applied by the applier's predict()."""
+    stored on the result, and applied by the applier's predict().
+    """
     X_train, y_train, X_val, y_val = _clf_xy_split()
     model, result = _tuner_clf().fit(
         X_train,
@@ -1671,7 +1697,8 @@ def test_tune_threshold_binary_selects_and_applies():
 
 def test_tune_threshold_probability_metric_falls_back_to_balanced_accuracy():
     """roc_auc needs probabilities, so the threshold search falls back to
-    balanced_accuracy and records that in decision_threshold_metric."""
+    balanced_accuracy and records that in decision_threshold_metric.
+    """
     X_train, y_train, X_val, y_val = _clf_xy_split()
     model, result = _tuner_clf().fit(
         X_train,
@@ -1714,7 +1741,8 @@ def test_tune_threshold_single_class_validation_skips():
     """Regression test (OC-36): a validation split holding only one class gives
     every candidate threshold the same score, so nothing is tunable. Skip and
     leave the default decision rule rather than persisting a threshold that the
-    UI would report as tuned."""
+    UI would report as tuned.
+    """
     X_train, y_train, X_val, y_val = _clf_xy_split()
     single_class = y_val == y_val[0]
     X_val, y_val = X_val[single_class], y_val[single_class]
@@ -1779,7 +1807,8 @@ def _clf_xy_str_split(n: int = 200, seed: int = 42):
 
 def test_resolve_scorer_pins_pos_label_for_string_binary_target():
     """f1/precision/recall scorers default to pos_label=1, which raises for
-    string labels; _resolve_scorer must pin pos_label to the positive class."""
+    string labels; _resolve_scorer must pin pos_label to the positive class.
+    """
     tuner = _tuner_clf()
     y_str = pd.Series(["no"] * 20 + ["yes"] * 20)
     for metric in ("f1", "precision", "recall"):
@@ -1803,7 +1832,8 @@ def test_resolve_scorer_keeps_stock_scorer_for_numeric_binary_target():
 def test_optuna_tuning_completes_on_string_binary_target_with_f1():
     """Regression: optuna tuning of a string-label binary target with the
     binary-default 'f1' metric used to fail every trial with
-    'pos_label=1 is not a valid label' and surface as all-NaN trials."""
+    'pos_label=1 is not a valid label' and surface as all-NaN trials.
+    """
     X_train, y_train, X_val, y_val = _clf_xy_str_split()
     cfg = TuningConfig(
         strategy="optuna",
@@ -1827,7 +1857,8 @@ def test_optuna_tuning_completes_on_string_binary_target_with_f1():
 
 def test_grid_tuning_completes_on_string_binary_target_with_f1():
     """The custom grid/random loop scores folds the same way and must also
-    survive string-label binary targets with binary-default metrics."""
+    survive string-label binary targets with binary-default metrics.
+    """
     X_train, y_train, X_val, y_val = _clf_xy_str_split()
     model, result = _tuner_clf().fit(
         pd.DataFrame(X_train),
@@ -1841,7 +1872,8 @@ def test_grid_tuning_completes_on_string_binary_target_with_f1():
 
 def test_tune_threshold_seeds_on_string_binary_target():
     """F-13 threshold seeding with string labels: the f1 hard-label callable
-    must get the model's positive class instead of the pos_label=1 default."""
+    must get the model's positive class instead of the pos_label=1 default.
+    """
     X_train, y_train, X_val, y_val = _clf_xy_str_split()
     model, result = _tuner_clf().fit(
         pd.DataFrame(X_train),
@@ -1884,7 +1916,8 @@ def test_tune_search_phase_honors_cv_random_state(monkeypatch):
 
 def test_tune_search_phase_honors_cv_shuffle_false(monkeypatch):
     """cv_shuffle=False must produce shuffle=False and random_state=None (sklearn
-    raises ValueError if random_state is set while shuffle=False)."""
+    raises ValueError if random_state is set while shuffle=False).
+    """
     X, y = _clf_xy()
     tuner = _tuner_clf()
     cfg = _clf_config(cv_shuffle=False, cv_random_state=123)  # default cv_type="k_fold"
@@ -2110,7 +2143,8 @@ def test_no_progress_flag_stays_silent(capsys):
 
 def test_config_random_state_reaches_refit_model():
     """F-02: the caller's seed must win over the calculator's baked-in default
-    at refit time, instead of being silently discarded."""
+    at refit time, instead of being silently discarded.
+    """
     X, y = _clf_xy()
     for seed in (1, 999):
         cfg = TuningConfig(
@@ -2128,7 +2162,8 @@ def test_config_random_state_reaches_refit_model():
 
 def test_search_space_seed_beats_config_seed():
     """A seed the search itself selects must still take precedence over the
-    caller's config seed."""
+    caller's config seed.
+    """
     X, y = _clf_xy()
     cfg = TuningConfig(
         strategy="grid",
@@ -2143,7 +2178,8 @@ def test_search_space_seed_beats_config_seed():
 
 def test_all_trials_failed_reports_suppressed_fold_errors():
     """F-24: every fold failure is collected, so the all-trials-failed error
-    reports the first error plus how many more were suppressed."""
+    reports the first error plus how many more were suppressed.
+    """
     X, y = _clf_xy()
     # lbfgs (the default solver) rejects the l1 penalty at fit time, so every
     # fold of every candidate fails.

@@ -29,8 +29,7 @@ def sample_data(tmp_path):
 
 @pytest.mark.asyncio
 async def test_all_transformers(sample_data, tmp_path):
-    """
-    Test that all transformer nodes can be initialized and run.
+    """Test that all transformer nodes can be initialized and run.
     We skip models and splitters here.
     """
     # List of nodes that are transformers (take df, return df)

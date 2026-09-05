@@ -1,5 +1,4 @@
-"""
-Configuration Package
+"""Configuration Package
 
 © 2025 Murat Unsal — Skyulf Project
 

@@ -123,7 +123,8 @@ def test_plot_runs_all_sections_with_agg_backend(rich_profile: DatasetProfile) -
 
 def test_plot_closes_figures_it_creates(rich_profile: DatasetProfile) -> None:
     """plot() must not leak matplotlib figures: every figure it creates should
-    be closed by the time it returns, regardless of any pre-existing figures."""
+    be closed by the time it returns, regardless of any pre-existing figures.
+    """
     import matplotlib.pyplot as plt
 
     plt.close("all")

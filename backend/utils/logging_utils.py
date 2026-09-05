@@ -1,5 +1,4 @@
-"""
-Simple logging utility for data actions
+"""Simple logging utility for data actions
 Replaces the Flask log_data_action function
 """
 
@@ -15,8 +14,7 @@ data_logger = logging.getLogger("data_actions")
 
 
 def log_data_action(action: str, success: bool = True, details: str | None = None):
-    """
-    Log data-related actions for monitoring and debugging
+    """Log data-related actions for monitoring and debugging
 
     Args:
         action: The action being performed
@@ -229,8 +227,7 @@ def setup_universal_logging(
     backup_count: int = 10,
     console_log_level: str = "WARNING",
 ) -> None:
-    """
-    Universal logging setup for FastAPI applications.
+    """Universal logging setup for FastAPI applications.
     Enhanced for async applications and modern Python practices.
 
     Args:

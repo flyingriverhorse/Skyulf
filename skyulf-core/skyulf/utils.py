@@ -66,8 +66,7 @@ def _data_stats_from_split_dataset(data: SplitDataset) -> tuple[int, set[str]]:
 def get_data_stats(
     data: pd.DataFrame | pl.DataFrame | SkyulfDataFrame | tuple[Any, Any] | SplitDataset,
 ) -> tuple[int, set[str]]:
-    """
-    Calculates row count and column set for various data structures.
+    """Calculates row count and column set for various data structures.
     Supports DataFrame, (X, y) tuple, and SplitDataset.
     """
     # Check for DataFrame-like object (Pandas, Polars, Wrapper)
@@ -85,8 +84,7 @@ def get_data_stats(
 def unpack_pipeline_input(
     data: pd.DataFrame | SkyulfDataFrame | tuple[Any, Any],
 ) -> tuple[Any, Any | None, bool]:
-    """
-    Unpacks input which might be a DataFrame or a (X, y) tuple.
+    """Unpacks input which might be a DataFrame or a (X, y) tuple.
     Returns: (X, y, is_tuple)
 
     `X` is typed `Any` (instead of `pd.DataFrame | SkyulfDataFrame`) because
@@ -166,8 +164,7 @@ def _pack_pandas_output(X: Any, y: Any) -> pd.DataFrame:
 def pack_pipeline_output(
     X: Any, y: Any | None, was_tuple: bool
 ) -> pd.DataFrame | SkyulfDataFrame | tuple[Any, Any]:
-    """
-    Packs output back into a tuple if the input was a tuple and y is present.
+    """Packs output back into a tuple if the input was a tuple and y is present.
     Otherwise, if y is present, concatenates it back to X.
 
     `X` is typed `Any` because callers pass pandas / polars / wrapper /
@@ -296,8 +293,7 @@ def detect_numeric_columns(
     exclude_binary: bool = True,
     exclude_constant: bool = True,
 ) -> list[str]:
-    """
-    Find numeric-like columns.
+    """Find numeric-like columns.
 
     Args:
         frame: DataFrame to analyze
@@ -355,8 +351,7 @@ def resolve_columns(
     default_selection_func: Callable[[pd.DataFrame | SkyulfDataFrame], list[str]] | None = None,
     target_column_key: str = "target_column",
 ) -> list[str]:
-    """
-    Resolves the list of columns to process based on configuration and auto-detection.
+    """Resolves the list of columns to process based on configuration and auto-detection.
 
     Logic:
     1. If 'columns' is explicitly provided in config, use it (filtering for existence in df).

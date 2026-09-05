@@ -129,8 +129,7 @@ def apply_dual_engine(
     params: dict[str, Any],
     implementations: Mapping[str, ApplyFunction],
 ) -> Any:
-    """
-    Dispatcher to handle boilerplate for dual-engine Appliers.
+    """Dispatcher to handle boilerplate for dual-engine Appliers.
 
     Args:
         df: Input data (DataFrame or Tuple).
@@ -187,8 +186,7 @@ def fit_dual_engine(
     params: dict[str, Any],
     implementations: Mapping[str, FitFunction],
 ) -> dict[str, Any]:
-    """
-    Dispatcher to handle boilerplate for dual-engine Calculators.
+    """Dispatcher to handle boilerplate for dual-engine Calculators.
 
     Args:
         df: Inputs.

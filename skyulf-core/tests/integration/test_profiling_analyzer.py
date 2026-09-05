@@ -136,7 +136,8 @@ def test_analyze_boolean_target_gets_correlations_and_interactions() -> None:
     e.g. `churned`/`is_fraud`) previously fell through both the Numeric and
     Categorical target_semantic_type branches and got no target_correlations
     or leakage-alert analysis at all. It must now be treated the same as a
-    Categorical target."""
+    Categorical target.
+    """
     df = pl.DataFrame(
         {
             "is_churned": [True, False, True, False, True, False, True, False, True, False] * 3,
@@ -324,7 +325,8 @@ def test_analyze_handles_all_null_column() -> None:
 def test_analyze_counts_nan_as_missing() -> None:
     """F-20: Polars NaNs must count as missing — a profile reporting
     ``missing=0`` while ``mean=NaN`` is self-contradictory. Pandas'
-    ``isna()`` counts NaN as missing, so the Polars profiler must too."""
+    ``isna()`` counts NaN as missing, so the Polars profiler must too.
+    """
     df = pl.DataFrame(
         {
             "a": [1.0, float("nan"), 3.0, 4.0],

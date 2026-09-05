@@ -1,5 +1,4 @@
-"""
-Async Database Connection Manager
+"""Async Database Connection Manager
 Handles async connection pooling and concurrent access optimization for SQLite and PostgreSQL
 """
 
@@ -25,9 +24,7 @@ logger = logging.getLogger(__name__)
 
 
 class AsyncSQLiteConnectionManager:
-    """
-    Async SQLite connection manager with optimized settings
-    """
+    """Async SQLite connection manager with optimized settings"""
 
     def __init__(self, database_path: str, pool_size: int = 10, timeout: int = 30):
         self.database_path = database_path
@@ -126,9 +123,7 @@ class AsyncSQLiteConnectionManager:
 
 
 class AsyncPostgreSQLConnectionManager:
-    """
-    Async PostgreSQL connection manager with SQLAlchemy async pooling
-    """
+    """Async PostgreSQL connection manager with SQLAlchemy async pooling"""
 
     def __init__(self, connection_string: str, pool_size: int = 10):
         self.connection_string = connection_string
@@ -213,9 +208,7 @@ class AsyncPostgreSQLConnectionManager:
 
 
 class AsyncDatabaseManager:
-    """
-    Unified async database manager that handles both SQLite and PostgreSQL
-    """
+    """Unified async database manager that handles both SQLite and PostgreSQL"""
 
     def __init__(self, settings: Settings):
         self.settings = settings

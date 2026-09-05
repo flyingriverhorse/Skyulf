@@ -509,7 +509,7 @@ def _categorical_binary_frame(
 
 @given(df=_categorical_binary_frame())
 def test_target_encoder_fit_engine_parity(df: pd.DataFrame) -> None:
-    """pandas and polars fits must produce numerically identical encodings."""
+    """Pandas and polars fits must produce numerically identical encodings."""
     config: dict[str, Any] = {"columns": ["city"], "target_type": "binary"}
 
     pd_params = dict(TargetEncoderCalculator().fit((df[["city"]], df["target"]), dict(config)))
@@ -658,7 +658,7 @@ class TestFitNoResolvableColumnsReturnsEmpty:
 
 
 def test_unknown_label_type_error_is_translated_to_actionable_message() -> None:
-    """sklearn's 'unknown label type' ValueError is translated into an actionable message.
+    """Sklearn's 'unknown label type' ValueError is translated into an actionable message.
 
     A multi-output (2-D) target forces sklearn's `type_of_target` to infer
     'multiclass-multioutput', which is unsupported and raises the exact

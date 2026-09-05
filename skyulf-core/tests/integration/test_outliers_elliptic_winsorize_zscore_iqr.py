@@ -181,7 +181,7 @@ class TestIQRApplier:
         assert sorted(pd_out["val"].tolist()) == sorted(pl_out["val"].to_list())
 
     def test_tuple_xy_input_filters_y_in_sync(self) -> None:
-        """apply on an (X, y) tuple must filter y rows to match the surviving X rows."""
+        """Apply on an (X, y) tuple must filter y rows to match the surviving X rows."""
         X = pd.DataFrame({"val": [1.0, 2.0, 3.0, 1000.0]})
         y = pd.Series([10, 20, 30, 40])
         params = IQRCalculator().fit(X, {"columns": ["val"]})
@@ -204,7 +204,7 @@ class TestIQRApplier:
 
 class TestZScoreCalculator:
     def test_stats_match_mean_and_population_std(self) -> None:
-        """fit must store the population mean/std (ddof=0) used for z computation."""
+        """Fit must store the population mean/std (ddof=0) used for z computation."""
         values = [1.0, 2.0, 3.0, 4.0, 5.0]
         df = pd.DataFrame({"val": values})
         params = ZScoreCalculator().fit(df, {"columns": ["val"], "threshold": 3.0})
@@ -332,7 +332,8 @@ class TestWinsorizeApplier:
     def test_non_numeric_column_untouched_polars(self) -> None:
         """Polars path must mirror pandas: a non-numeric column referenced in bounds
         is skipped (not cast/clipped), while a numeric column with bounds is still
-        winsorized correctly."""
+        winsorized correctly.
+        """
         df = pl.DataFrame({"val": [1.0, 1000.0], "label": ["a", "b"]})
         params = {
             "bounds": {
@@ -385,7 +386,7 @@ class TestWinsorizeApplier:
 
 class TestEllipticEnvelopeCalculator:
     def test_fit_produces_model_per_column(self) -> None:
-        """fit must produce a fitted EllipticEnvelope model per requested column."""
+        """Fit must produce a fitted EllipticEnvelope model per requested column."""
         rng = np.random.RandomState(0)
         values = rng.normal(0, 1, 50).tolist()
         df = pd.DataFrame({"val": values})
@@ -421,7 +422,8 @@ class TestEllipticEnvelopeCalculator:
         """Regression test: EllipticEnvelope must set random_state so repeated
         fits on identical data produce identical inlier/outlier decisions.
         Previously no random_state was passed (unlike every other stochastic
-        estimator in this codebase), making results non-reproducible."""
+        estimator in this codebase), making results non-reproducible.
+        """
         rng = np.random.RandomState(0)
         values = rng.normal(0, 1, 200).tolist()
         df = pd.DataFrame({"val": values})
@@ -529,7 +531,8 @@ class TestEllipticEnvelopeApplier:
 
     def test_polars_filter_preserves_unrelated_column_dtypes(self) -> None:
         """No whole-frame round-trip: a nullable Int64 column not involved in
-        filtering must keep its dtype (pandas round-trip upcasts to Float64)."""
+        filtering must keep its dtype (pandas round-trip upcasts to Float64).
+        """
         rng = np.random.RandomState(4)
         values = rng.normal(0, 1, 60).tolist()
         values.append(500.0)
@@ -555,7 +558,7 @@ class TestEllipticEnvelopeApplier:
         assert (len(values) - 1) not in y_out.to_list()
 
     def test_tuple_xy_input_filters_y_in_sync(self) -> None:
-        """apply on an (X, y) tuple must filter y rows to match the surviving X rows."""
+        """Apply on an (X, y) tuple must filter y rows to match the surviving X rows."""
         rng = np.random.RandomState(5)
         values = rng.normal(0, 1, 60).tolist()
         values.append(500.0)
@@ -589,7 +592,8 @@ class TestRealShapedDataset:
 def test_winsorize_clips_nullable_int64_column_like_polars() -> None:
     """F-10: clipping a nullable ``Int64`` column with float bounds raised
     ``TypeError: Invalid value for dtype 'Int64'`` on the pandas path while
-    Polars (which casts to Float64 first) worked. Pandas must match."""
+    Polars (which casts to Float64 first) worked. Pandas must match.
+    """
     df_pd = pd.DataFrame({"a": pd.array([1, 2, 3, 4, 5, 100], dtype="Int64")})
     df_pl = pl.DataFrame({"a": [1, 2, 3, 4, 5, 100]})
     config = {"columns": ["a"], "lower_percentile": 5.0, "upper_percentile": 95.0}

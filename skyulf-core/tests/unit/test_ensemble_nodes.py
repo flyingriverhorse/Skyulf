@@ -264,7 +264,8 @@ def test_voting_regressor_ignores_calibration():
 def test_maybe_calibrate_warns_and_coerces_invalid_cv(caplog):
     """Regression test: an invalid calibration cv (< 2, e.g. 0 or 1) is
     silently coerced to 2 rather than raised - this must at least log a
-    warning so the coercion is visible in diagnostics."""
+    warning so the coercion is visible in diagnostics.
+    """
     import logging
 
     from sklearn.linear_model import LogisticRegression

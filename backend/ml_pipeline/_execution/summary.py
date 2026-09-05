@@ -197,7 +197,8 @@ def _polars_dtype_counts(df: pl.DataFrame) -> tuple[int, int, int, int]:
 def _dtype_breakdown(df: pd.DataFrame | pl.DataFrame) -> str | None:
     """Return ``"10 num · 2 cat"`` style breakdown when a DataFrame has a
     meaningful mix of dtypes. ``None`` when it's all one kind (avoids
-    redundant noise)."""
+    redundant noise).
+    """
     try:
         if isinstance(df, pl.DataFrame):
             num, cat, dt, bo = _polars_dtype_counts(df)

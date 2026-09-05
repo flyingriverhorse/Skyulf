@@ -1,5 +1,4 @@
-"""
-Error Handling Middleware
+"""Error Handling Middleware
 
 Centralizes error handling and logging for the FastAPI application.
 """
@@ -19,16 +18,13 @@ logger = logging.getLogger(__name__)
 
 
 class ErrorHandlerMiddleware(BaseHTTPMiddleware):
-    """
-    Middleware to handle uncaught exceptions and standardize error responses.
-    """
+    """Middleware to handle uncaught exceptions and standardize error responses."""
 
     def __init__(self, app: ASGIApp):
         super().__init__(app)
 
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
-        """
-        Process request and handle any uncaught exceptions.
+        """Process request and handle any uncaught exceptions.
 
         Args:
             request: The HTTP request

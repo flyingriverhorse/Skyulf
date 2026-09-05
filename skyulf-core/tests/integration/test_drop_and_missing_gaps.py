@@ -125,7 +125,8 @@ def test_missing_indicator_custom_flag_suffix_pandas() -> None:
     silently ignored in favor of a hardcoded "_missing" - previously
     node_meta declared unused "features"/"sparse" params while the
     frontend's flag_suffix field (forwarded via pipelineConverter.ts) was
-    accepted into params but never read by the apply functions."""
+    accepted into params but never read by the apply functions.
+    """
     df = _missing_df()
     art = MissingIndicatorCalculator().fit(df, {"columns": ["a"], "flag_suffix": "_was_missing"})
     assert art["flag_suffix"] == "_was_missing"
@@ -156,7 +157,8 @@ def test_missing_indicator_default_flag_suffix_when_not_configured() -> None:
 
 def test_missing_indicator_infer_output_schema_honors_custom_flag_suffix() -> None:
     """infer_output_schema must predict the correctly-suffixed column name
-    when a custom flag_suffix is configured."""
+    when a custom flag_suffix is configured.
+    """
     schema = SkyulfSchema.from_columns(["a", "b"], {"a": "float64", "b": "float64"})
     out = MissingIndicatorCalculator().infer_output_schema(
         schema, {"columns": ["a"], "flag_suffix": "_was_missing"}
@@ -284,7 +286,8 @@ def test_drop_missing_columns_by_threshold_polars() -> None:
 def test_drop_missing_columns_counts_nan_as_missing_parity() -> None:
     """F-19: pandas' ``isna()`` counts NaN as missing; polars ``null_count()``
     does not — so a float column holding NaNs must still be dropped by the
-    Polars fit path, matching the pandas verdict."""
+    Polars fit path, matching the pandas verdict.
+    """
     pdf = pd.DataFrame({"a": [float("nan"), float("nan"), 1.0, 2.0], "b": [1.0] * 4})
     plf = pl.DataFrame({"a": [float("nan"), float("nan"), 1.0, 2.0], "b": [1.0] * 4})
     art_pd = DropMissingColumnsCalculator().fit(pdf, {"missing_threshold": 50})
@@ -298,7 +301,8 @@ def test_drop_missing_columns_declared_default_params_honor_threshold() -> None:
     ``fit`` actually reads. The declaration used to say ``threshold`` while
     fit read ``missing_threshold``, so fitting with the node's own declared
     defaults silently skipped the threshold path (the registry contract and
-    smoke suites both fit with these defaults)."""
+    smoke suites both fit with these defaults).
+    """
     # Read the declared params through the registry — the same source the
     # registry contract and smoke suites consume (`__node_meta__` feeds it).
     declared = NodeRegistry.get_all_metadata()["DropMissingColumns"]["params"]

@@ -253,7 +253,8 @@ def test_apply_buckets_identical_across_engines() -> None:
     path used blake2b, so the same category landed in different buckets per
     engine — and deployment guarantees an engine crossing (Polars-trained
     pipelines always serve a pandas frame), making every production encoding
-    diverge silently. Both engines must now produce identical buckets."""
+    diverge silently. Both engines must now produce identical buckets.
+    """
     values = ["alpha", "beta", "gamma", "alpha", "delta", "beta"]
     df_pd = pd.DataFrame({"category": values})
     df_pl = pl.DataFrame({"category": values})
@@ -271,7 +272,8 @@ def test_apply_buckets_identical_across_engines() -> None:
 
 def test_apply_buckets_identical_across_engines_with_missing() -> None:
     """F-11 follow-up: missing values must hash to the same bucket on both
-    engines too (both normalise missing to the literal "nan" string)."""
+    engines too (both normalise missing to the literal "nan" string).
+    """
     df_pd = pd.DataFrame({"category": ["a", None, "b", None]})
     df_pl = pl.DataFrame({"category": ["a", None, "b", None]})
     applier = HashEncoderApplier()

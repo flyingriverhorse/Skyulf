@@ -9,8 +9,7 @@ from .base import BaseConnector
 
 
 class LocalFileConnector(BaseConnector):
-    """
-    Connector for local files (CSV, Excel, Parquet, JSON).
+    """Connector for local files (CSV, Excel, Parquet, JSON).
 
     Schema and small samples are resolved lazily via `polars.scan_*`
     when the format supports it (CSV, Parquet) so that previewing a

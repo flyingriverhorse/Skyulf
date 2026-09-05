@@ -62,9 +62,7 @@ class S3Connector(BaseConnector):
         return options
 
     def _get_storage_options(self) -> dict[str, str]:
-        """
-        Ensure all storage options are strings for Polars and map common keys.
-        """
+        """Ensure all storage options are strings for Polars and map common keys."""
         options = self.storage_options.copy() if self.storage_options else {}
         options = self._map_storage_option_keys(options)
         options = self._apply_trusted_endpoint(options)

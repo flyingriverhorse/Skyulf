@@ -161,7 +161,8 @@ def _maybe_call_apply(
 )
 def test_node_smoke(node_id: str) -> None:
     """Smoke test: every Preprocessing/Cleaning node fits + applies on a
-    realistic synthetic dataset without raising."""
+    realistic synthetic dataset without raising.
+    """
     meta = NodeRegistry.get_all_metadata()[node_id]
     calculator = NodeRegistry.get_calculator(node_id)()
     applier = NodeRegistry.get_applier(node_id)()
@@ -190,7 +191,8 @@ def test_node_smoke(node_id: str) -> None:
 def test_registry_minimum_population() -> None:
     """Guard rail: if someone accidentally breaks the auto-import sweep in
     `skyulf.preprocessing.__init__`, the registry shrinks silently. Pin a
-    minimum size so CI catches it."""
+    minimum size so CI catches it.
+    """
     meta = NodeRegistry.get_all_metadata()
     preprocessing = [k for k, m in meta.items() if m.get("category") == "Preprocessing"]
     assert len(preprocessing) >= 25, (

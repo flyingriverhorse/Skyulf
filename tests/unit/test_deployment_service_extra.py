@@ -262,7 +262,8 @@ def test_resolve_predict_store_and_key_local_existing_relative_path(tmp_path, mo
 
 def test_resolve_predict_store_and_key_local_nonexistent_three_parts(tmp_path, monkeypatch):
     """A separator-containing URI that doesn't exist and splits into != 2 parts falls
-    back to (parent, name) instead of the pipeline_id/node_id shortcut."""
+    back to (parent, name) instead of the pipeline_id/node_id shortcut.
+    """
     monkeypatch.chdir(tmp_path)
     store_uri, key = DeploymentService._resolve_predict_store_and_key_local(
         "pipeA/subdir/nodeB.joblib"
@@ -563,7 +564,8 @@ def test_extract_features_from_engineer_direct_attr():
 
 def test_extract_features_from_engineer_from_first_step():
     """Falls back to the first pipeline step's transformer when the engineer
-    itself carries no ``feature_names_in_``."""
+    itself carries no ``feature_names_in_``.
+    """
     transformer = SimpleNamespace(feature_names_in_=np.array(["x", "y"]))
     fe = SimpleNamespace(steps=[("step1", transformer)])
 
@@ -613,7 +615,6 @@ def test_predict_with_bundled_artifact_reorders_columns_to_match_training():
     the predict path must reindex to the recorded training feature order
     before passing to sklearn (which uses positional numpy arrays).
     """
-
     # Create a transformer that adds column 'c'
     transformer = _ColumnAddingTransformer()
     model = _NoFeatureNamesModel(expected_order=["a", "b", "c"])
@@ -1004,7 +1005,8 @@ async def test_get_deployment_details_handles_exception(async_session):
 def test_warn_on_engine_mismatch_flags_polars_trained_bundle(caplog):
     """A bundle trained on Polars but served on pandas must log a warning —
     the recorded ``engine`` key exists precisely so serving can surface this
-    instead of silently assuming pandas."""
+    instead of silently assuming pandas.
+    """
     import logging
 
     with caplog.at_level(logging.WARNING, logger="backend.ml_pipeline.deployment.service"):

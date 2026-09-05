@@ -29,7 +29,6 @@ def evaluate_regression_model(
     produce the same sampled points instead of a different random subset
     each time.
     """
-
     # Convert to Numpy for compatibility
     X_test_np, y_test_np = SklearnBridge.to_sklearn((X_test, y_test))
 

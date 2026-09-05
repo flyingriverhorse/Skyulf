@@ -70,9 +70,7 @@ logger = logging.getLogger(__name__)
 
 
 class PipelineEngine(ArtifactsMixin, MergeMixin, FeatureEngMixin, NodeRunnersMixin):
-    """
-    Orchestrates the execution of ML pipelines.
-    """
+    """Orchestrates the execution of ML pipelines."""
 
     def __init__(
         self,
@@ -204,9 +202,7 @@ class PipelineEngine(ArtifactsMixin, MergeMixin, FeatureEngMixin, NodeRunnersMix
     def run(
         self, config: PipelineConfig, job_id: str = "unknown", dataset_name: str = "dataset"
     ) -> PipelineExecutionResult:
-        """
-        Executes the pipeline defined by the configuration.
-        """
+        """Executes the pipeline defined by the configuration."""
         self.log(f"Starting pipeline execution: {config.pipeline_id} (Job: {job_id})")
 
         # Fail fast on cyclic graphs before anything runs: nodes in a loop

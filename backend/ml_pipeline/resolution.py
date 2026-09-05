@@ -61,8 +61,7 @@ async def _resolve_and_apply_dataset_path(
 async def resolve_pipeline_nodes(
     nodes: list[Any], ingestion_service: DataIngestionService
 ) -> dict[str, Any]:
-    """
-    Resolves dataset IDs to paths in the nodes and returns any S3 storage options found.
+    """Resolves dataset IDs to paths in the nodes and returns any S3 storage options found.
     Modifies the nodes in-place.
     """
     resolved_s3_options: dict[str, Any] = {}

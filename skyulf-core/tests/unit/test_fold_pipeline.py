@@ -1,6 +1,7 @@
 """Unit tests for ``FoldAwareModelStep`` — the fit-time meta-estimator that
 gives ``halving_*``/``optuna`` tuning leakage-free per-fold refits, including
-chains that change the row count or the target (F-15 follow-up)."""
+chains that change the row count or the target (F-15 follow-up).
+"""
 
 from typing import Any
 
@@ -17,7 +18,8 @@ from skyulf.modeling._tuning.fold_pipeline import FoldAwareModelStep
 
 class LabelEncodingAdapter:
     """Encodes a string target to ints (sorted-class order, like the real
-    LabelEncoder node); ``transform`` encodes held-out rows the same way."""
+    LabelEncoder node); ``transform`` encodes held-out rows the same way.
+    """
 
     def fit_transform(self, X: Any, y: Any) -> tuple[Any, Any]:
         classes = np.unique(np.asarray(y))
@@ -102,7 +104,8 @@ def _xy_int(n: int = 30) -> tuple[pd.DataFrame, pd.Series]:
 
 def test_predict_returns_original_space_labels() -> None:
     """A target-encoding chain must not leak encoded labels into predictions:
-    predict maps back to the original space scorers compare against."""
+    predict maps back to the original space scorers compare against.
+    """
     X, y = _xy_str()
     step = FoldAwareModelStep(estimator=LogisticRegression(), preprocessor=LabelEncodingAdapter())
 
@@ -115,7 +118,8 @@ def test_predict_returns_original_space_labels() -> None:
 
 def test_classes_and_proba_align_with_original_space() -> None:
     """``classes_`` lives in the original label space and ``predict_proba``
-    columns align with it — what roc_auc-style scorers depend on."""
+    columns align with it — what roc_auc-style scorers depend on.
+    """
     X, y = _xy_str()
     step = FoldAwareModelStep(estimator=LogisticRegression(), preprocessor=LabelEncodingAdapter())
     step.fit(X, y)
@@ -143,7 +147,8 @@ def test_untouched_target_builds_no_label_map() -> None:
 
 def test_row_changing_chain_trains_on_more_rows_and_predicts_all() -> None:
     """SMOTE-style chains shape the training rows only: fit sees more rows
-    than the input fold, predict keeps every held-out row."""
+    than the input fold, predict keeps every held-out row.
+    """
     X, y = _xy_int()
     adapter = RowDoublingAdapter()
     step = FoldAwareModelStep(estimator=LogisticRegression(), preprocessor=adapter)
@@ -172,7 +177,8 @@ def test_step_is_sklearn_cloneable() -> None:
 
 def test_two_clones_never_share_fitted_state() -> None:
     """Searcher clones share one constructor preprocessor/estimator; each fit
-    must work on its own deep copies so ``n_jobs > 1`` candidates are safe."""
+    must work on its own deep copies so ``n_jobs > 1`` candidates are safe.
+    """
     X, y = _xy_int()
     original_adapter = CountingAdapter()
     original_estimator = LogisticRegression()
@@ -205,7 +211,8 @@ class ColumnSpyAdapter:
 def test_array_input_rebuilds_frames_from_column_contract() -> None:
     """If searcher slicing ever strips the frames, the step rebuilds named
     frames from the constructor's column contract — the preprocessor still
-    sees real column names."""
+    sees real column names.
+    """
     X, y = _xy_int()
     spy = ColumnSpyAdapter()
     step = FoldAwareModelStep(
@@ -235,9 +242,10 @@ class DtypeSpyAdapter:
 
 
 def test_polars_input_converts_with_dtypes_intact() -> None:
-    """polars payloads must reach the chain as typed pandas frames — the
+    """Polars payloads must reach the chain as typed pandas frames — the
     ``np.asarray`` fallback collapses mixed-type frames to object dtype and
-    silently disables numeric steps like SimpleImputer."""
+    silently disables numeric steps like SimpleImputer.
+    """
     import polars as pl
 
     X_pl = pl.DataFrame({"a": [1.0, 2.0, 3.0, 4.0], "b": [1.5, 2.5, 3.5, 4.5]})
@@ -285,7 +293,8 @@ def test_regressor_has_no_label_map_or_classes() -> None:
 )
 def test_searcher_scorers_align_with_original_label_space(scoring: str, adapter_cls) -> None:
     """Through a real searcher's CV loop: predictions, ``classes_`` and proba
-    columns stay aligned with the original labels the scorer sees."""
+    columns stay aligned with the original labels the scorer sees.
+    """
     X, y = _xy_str(n=60)
     if adapter_cls is SwapEncodingAdapter:
         y = y.map({"neg": 0, "pos": 1})

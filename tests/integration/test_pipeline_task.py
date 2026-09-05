@@ -140,8 +140,7 @@ def test_run_pipeline_task_failure(mock_get_db_session, mock_engine_class):
 
 
 def test_run_pipeline_task_resolves_dataset_id(mock_get_db_session, mock_engine_class):
-    """
-    Test that run_pipeline_task correctly resolves a numeric dataset_id (28)
+    """Test that run_pipeline_task correctly resolves a numeric dataset_id (28)
     to a file path using the DataSource table.
     """
     # Setup Mock Session

@@ -40,7 +40,6 @@ def test_predict_rejects_input_containing_fitted_target_column(data_factory):
 
 def test_end_to_end_pipeline(sample_classification_data):
     """Test full pipeline execution, saving, and loading."""
-
     # Define Pipeline Config
     pipeline_config = {
         "preprocessing": [

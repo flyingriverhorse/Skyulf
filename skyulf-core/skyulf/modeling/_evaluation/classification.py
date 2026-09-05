@@ -32,7 +32,6 @@ def evaluate_classification_model(
     dataset_name: str = "test",
 ) -> ModelEvaluationReport:
     """Evaluate a classification model and return a structured report."""
-
     # Convert to Numpy for compatibility
     X_test_np, y_test_np = SklearnBridge.to_sklearn((X_test, y_test))
 

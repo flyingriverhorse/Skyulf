@@ -102,7 +102,8 @@ def signal_reg_csv(tmp_path):
 @pytest.fixture
 def noise_reg_csv(tmp_path):
     """Same features, pure-noise continuous target: TargetEncoder can only
-    'predict' it by leaking validation rows into its per-category means."""
+    'predict' it by leaking validation rows into its per-category means.
+    """
     rng = np.random.default_rng(13)
     n = 400
     num1 = rng.normal(0, 1, n)
@@ -222,7 +223,8 @@ def test_regression_chain_refit_scores_real_signal(
 
 def test_regression_noise_target_stays_near_zero(noise_reg_csv, tmp_path):
     """Honesty probe for the regression path: leaky TargetEncoder memorises
-    per-category noise means and inflates R^2; per-fold refit keeps it ~0."""
+    per-category noise means and inflates R^2; per-fold refit keeps it ~0.
+    """
     training = _training(["node_features"], "ridge_regression", {}, "r2")
     result, logs = _run(tmp_path, noise_reg_csv, REG_STEPS, training, "f15-stress-noise-reg")
 
@@ -234,7 +236,8 @@ def test_regression_noise_target_stays_near_zero(noise_reg_csv, tmp_path):
 
 def test_random_forest_noise_target_stays_near_chance(noise_reg_csv, tmp_path):
     """Honesty probe through a tree ensemble on the classification noise trick:
-    a memorising WOE step + forest on noise must stay near chance."""
+    a memorising WOE step + forest on noise must stay near chance.
+    """
     rng = np.random.default_rng(17)
     df = pd.read_csv(noise_reg_csv)
     df["target"] = rng.integers(0, 2, size=len(df))

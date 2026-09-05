@@ -129,8 +129,7 @@ def _pairwise_correlation_matrix(subset: pl.DataFrame, cols: list[str]) -> list[
 
 
 def calculate_correlations(df: pl.LazyFrame, numeric_cols: list[str]) -> CorrelationMatrix | None:
-    """
-    Calculates Pearson correlation matrix for numeric columns.
+    """Calculates Pearson correlation matrix for numeric columns.
 
     Missing values use **pairwise deletion** (pandas ``.corr()`` semantics):
     each coefficient is computed over the rows where *that pair* is observed,

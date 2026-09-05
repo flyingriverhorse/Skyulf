@@ -234,7 +234,8 @@ def _fork_join_nodes(csv: str, training_params: dict | None = None) -> list[Node
 
 def test_fork_join_merged_branches_refit_per_fold(noise_target_csv, tmp_path):
     """Fork-join merge (last_wins): both WOE branches re-fit inside every fold,
-    so the noise-target CV stays near chance instead of memorising."""
+    so the noise-target CV stays near chance instead of memorising.
+    """
     result, logs = _run(tmp_path, _fork_join_nodes(noise_target_csv), job_id="f15-fork-join")
 
     assert result.status == "success"
@@ -290,7 +291,8 @@ def test_nested_merge_falls_back_with_warning(noise_target_csv, tmp_path):
 
 def test_row_count_changing_branch_falls_back_with_warning(noise_target_csv, tmp_path):
     """A branch containing a row-count-changing step cannot run fold-wise:
-    warn + skip (the branch itself keeps working in the full run)."""
+    warn + skip (the branch itself keeps working in the full run).
+    """
     result, logs = _run(
         tmp_path,
         [
@@ -331,7 +333,8 @@ def test_row_count_changing_branch_falls_back_with_warning(noise_target_csv, tmp
 
 def test_learning_step_after_splitter_falls_back_with_warning(noise_target_csv, tmp_path):
     """A trunk node whose last step is not a splitter (splitter mid-chain) is
-    outside fork-join scope: warn + skip."""
+    outside fork-join scope: warn + skip.
+    """
     result, logs = _run(
         tmp_path,
         [
@@ -385,7 +388,8 @@ def _scaler_node(node_id: str, inputs: list[str], columns: list[str]) -> NodeCon
 def test_learning_trunk_step_before_fork_splitter_falls_back(tmp_path):
     """A data-dependent trunk step before the fork splitter learned from the
     full trunk frame (held-out rows included) — fork-join falls back with a
-    warning, exactly like the linear path does."""
+    warning, exactly like the linear path does.
+    """
     csv = _numeric_csv(tmp_path)
     result, logs = _run(
         tmp_path,
@@ -429,7 +433,8 @@ def test_learning_trunk_step_before_fork_splitter_falls_back(tmp_path):
 
 def test_stateless_trunk_step_before_fork_splitter_keeps_refit(tmp_path):
     """A stateless trunk step (explicit column drop) before the fork splitter
-    is already applied by the fork artifact once — fork-join stays enabled."""
+    is already applied by the fork artifact once — fork-join stays enabled.
+    """
     csv = _numeric_csv(tmp_path)
     result, logs = _run(
         tmp_path,
@@ -531,7 +536,8 @@ def test_leakage_dominated_contrast_end_to_end(noise_target_csv, tmp_path):
 
 def test_halving_strategy_refits_per_fold(noise_target_csv, tmp_path):
     """halving_grid runs CV inside the sklearn searcher; the Pipeline wrapper
-    must refit WOE per fold there too, so the noise-target score stays honest."""
+    must refit WOE per fold there too, so the noise-target score stays honest.
+    """
     result, logs = _run(
         tmp_path,
         [
@@ -571,7 +577,8 @@ def test_halving_strategy_refits_per_fold(noise_target_csv, tmp_path):
 def test_halving_with_nan_and_imputer_runs_refit(tmp_path):
     """NaN-bearing features + imputer step through the halving Pipeline wrapper:
     the NaN gate must let the pre-transform payload through and the run must
-    complete with refit enabled."""
+    complete with refit enabled.
+    """
     rng = np.random.default_rng(3)
     n = 300
     num1 = rng.normal(0, 1, n)
@@ -631,7 +638,8 @@ def test_halving_with_nan_and_imputer_runs_refit(tmp_path):
 
 def test_two_independent_pipelines_both_refit(noise_target_csv, tmp_path):
     """One job, two disjoint loader→FE→training pipelines: each training node
-    resolves its own chain and stays honest independently."""
+    resolves its own chain and stays honest independently.
+    """
     result, logs = _run(
         tmp_path,
         [
@@ -726,7 +734,8 @@ def test_learning_step_before_splitter_falls_back_with_warning(tmp_path):
     """A data-dependent step configured BEFORE the splitter cannot be re-fit
     per fold: payload reconstruction would fit it on the full frame (leaking
     held-out rows) and the per-fold adapter would apply it twice. The resolver
-    must fall back to pre-transformed scoring with an explicit warning."""
+    must fall back to pre-transformed scoring with an explicit warning.
+    """
     rng = np.random.default_rng(11)
     n = 240
     df = pd.DataFrame(
@@ -771,7 +780,8 @@ def test_learning_step_before_splitter_falls_back_with_warning(tmp_path):
 
 def test_stateless_step_before_splitter_keeps_refit_enabled(tmp_path):
     """Param-aware exemption: an explicit-column DropMissingColumns before the
-    splitter learns nothing from the rows, so per-fold refit stays enabled."""
+    splitter learns nothing from the rows, so per-fold refit stays enabled.
+    """
     rng = np.random.default_rng(7)
     n, n_categories = 400, 200
     df = pd.DataFrame(
@@ -860,7 +870,8 @@ def test_step_learns_from_data_mirrors_the_leakage_gate():
 
 def test_no_split_chain_refits_from_the_raw_loader_frame(tmp_path):
     """No splitter upstream: the raw loader frame is the pre-transform payload
-    and the learning step refits per fold."""
+    and the learning step refits per fold.
+    """
     rng = np.random.default_rng(13)
     n = 240
     df = pd.DataFrame(
@@ -898,7 +909,8 @@ def test_payload_reconstruction_failure_never_fails_the_run(
     noise_target_csv, tmp_path, monkeypatch
 ):
     """If payload reconstruction raises, the resolver must swallow the error,
-    warn explicitly, and let the job finish on pre-transformed scoring."""
+    warn explicitly, and let the job finish on pre-transformed scoring.
+    """
     from backend.ml_pipeline._execution.engine._feature_eng import FeatureEngMixin
 
     def boom(self, output, target_col):
@@ -934,7 +946,8 @@ def test_validation_split_tuning_refits_per_fold(noise_target_csv, tmp_path):
     """Holdout tuning with a validation split gets the per-fold discipline:
     WOE refits on the train rows only, candidates score against the untouched
     validation split, and the post-tuning CV refits too — a memorising WOE on
-    a noise target must stay near chance in both scores."""
+    a noise target must stay near chance in both scores.
+    """
     result, logs = _run(
         tmp_path,
         [
@@ -1045,7 +1058,8 @@ def _noise_csv_with_nan(tmp_path) -> str:
 
 def _signal_csv(tmp_path, n: int = 400) -> str:
     """Informative numerics (f2 carries NaNs) + informative categorical +
-    mild label noise."""
+    mild label noise.
+    """
     rng = np.random.default_rng(5)
     y = rng.integers(0, 2, size=n)
     flip = rng.random(n) < 0.05
@@ -1088,7 +1102,8 @@ def _holdout_tuning(**extra) -> dict:
 def test_validation_split_multi_step_chain_refits_honest(tmp_path):
     """Imputer + memorising WOE + scaler + 3-way split, tuned holdout: the
     NaN gate passes the pre-transform payload, the chain refits on train rows
-    only, and both scores stay near chance on the noise target."""
+    only, and both scores stay near chance on the noise target.
+    """
     csv = _noise_csv_with_nan(tmp_path)
     result, logs = _run(
         tmp_path,
@@ -1139,7 +1154,8 @@ def _splitter_with_validation_params() -> dict:
 def test_validation_split_signal_run_keeps_honest_scores(tmp_path):
     """Optuna (wrapped path) + imputer/WOE/scaler chain + validation split on
     real signal: honest scores stay well above chance and the untouched
-    validation split is evaluated alongside the test split."""
+    validation split is evaluated alongside the test split.
+    """
     csv = _signal_csv(tmp_path)
     result, logs = _run(
         tmp_path,
@@ -1236,7 +1252,8 @@ def test_validation_split_fork_join_refits_honest(tmp_path):
 
 def test_validation_split_fork_join_signal_keeps_scores(tmp_path):
     """Fork-join on signal data with a validation split: the merged-branch
-    refit keeps every score meaningful (no silent degradation)."""
+    refit keeps every score meaningful (no silent degradation).
+    """
     csv = _signal_csv(tmp_path)
     result, logs = _run(
         tmp_path,
@@ -1278,7 +1295,8 @@ def test_validation_split_fork_join_signal_keeps_scores(tmp_path):
 def test_validation_split_refit_never_fits_on_validation_rows(tmp_path, monkeypatch):
     """Row-isolation proof through the real resolver: with a validation
     split, the chain fits only on train rows across holdout tuning and the
-    post-tuning CV — a validation row never enters a fit."""
+    post-tuning CV — a validation row never enters a fit.
+    """
     from skyulf.preprocessing.fold_adapter import FeatureEngineerFoldAdapter
 
     rng = np.random.default_rng(17)
@@ -1546,7 +1564,8 @@ def test_fork_join_unencoded_last_branch_fails_fast(tmp_path):
     """Basic training (fixed mode) must fail fast when the last branch of a
     fork-join leaves a string column unencoded: post-split merges resolve by
     pure merge order, so the winning branch's raw column reaches the model.
-    The error names the column instead of surfacing "All trials failed"."""
+    The error names the column instead of surfacing "All trials failed".
+    """
     csv = _two_string_csv(tmp_path)
     nodes = [
         _loader("node_data", csv),
@@ -1566,7 +1585,8 @@ def test_fork_join_unencoded_last_branch_fails_fast(tmp_path):
 
 def test_fork_join_unencoded_last_branch_fails_fast_in_tuned_mode(tmp_path):
     """Same fork-join shape under run_mode='tuned': the guard fires before any
-    search strategy starts, so no fold loop can swallow the failure."""
+    search strategy starts, so no fold loop can swallow the failure.
+    """
     csv = _two_string_csv(tmp_path)
     nodes = [
         _loader("node_data", csv),
@@ -1601,7 +1621,8 @@ def test_fork_join_unencoded_last_branch_fails_fast_in_tuned_mode(tmp_path):
 
 def test_refit_audit_telemetry_records_fold_isolation(noise_target_csv, tmp_path):
     """Linear FE-node path: the audit wrapper records every per-fold call and
-    the isolation invariant (largest fit <= train-split rows) holds."""
+    the isolation invariant (largest fit <= train-split rows) holds.
+    """
     result, logs = _run(
         tmp_path,
         [

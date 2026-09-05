@@ -94,7 +94,8 @@ def test_get_data_stats_split_dataset_warns_on_test_column_mismatch(
 ) -> None:
     """Regression test: get_data_stats() for a SplitDataset only ever reflected
     train's column set, silently assuming test/validation match. Must now warn
-    when test's columns actually diverge from train's."""
+    when test's columns actually diverge from train's.
+    """
     import logging
 
     train = pd.DataFrame({"a": [1, 2], "b": [3, 4]})
@@ -202,7 +203,8 @@ def test_pack_not_tuple_with_y_concatenates(capsys: pytest.CaptureFixture) -> No
 
 def test_pack_raises_on_row_count_mismatch() -> None:
     """Regression test: X and y with different row counts must raise instead
-    of silently NaN-padding/duplicating rows via a naive axis=1 concat."""
+    of silently NaN-padding/duplicating rows via a naive axis=1 concat.
+    """
     X = pd.DataFrame({"x": [1, 2, 3]})
     y = pd.Series([10, 20], name="target")
     with pytest.raises(ValueError, match="different row counts"):
@@ -212,7 +214,8 @@ def test_pack_raises_on_row_count_mismatch() -> None:
 def test_pack_realigns_mismatched_but_same_length_indices() -> None:
     """Regression test: same row count but non-matching pandas indices (e.g. a
     row-dropping step that reset X's index without resetting y's) must still
-    concatenate positionally rather than NaN-padding via index-based concat."""
+    concatenate positionally rather than NaN-padding via index-based concat.
+    """
     X = pd.DataFrame({"x": [1, 2, 3]}, index=[10, 11, 12])  # ty: ignore[invalid-argument-type]
     y = pd.Series([100, 200, 300], name="target", index=[0, 1, 2])
     result = pack_pipeline_output(X, y, False)
@@ -263,7 +266,7 @@ def test_is_binary_numeric_single_value_zero() -> None:
 
 
 def test_is_binary_numeric_ignores_nan() -> None:
-    """dropna happens before the check, so NaN must not break detection."""
+    """Dropna happens before the check, so NaN must not break detection."""
     s = pd.Series([0.0, 1.0, np.nan])
     # Caller is expected to dropna first (as in detect_numeric_columns).
     s_clean = s.dropna()
@@ -376,7 +379,8 @@ def test_resolve_columns_dedupes_explicit_duplicates_preserving_order() -> None:
     """Regression test: duplicate column names in an explicit `columns` list
     must be deduplicated (preserving first-occurrence order), otherwise
     stateful calculators (encoders/scalers) would process the same column
-    twice, potentially corrupting fitted artifacts."""
+    twice, potentially corrupting fitted artifacts.
+    """
     df = pd.DataFrame({"a": [1], "b": [2], "c": [3]})
     result = resolve_columns(df, {"columns": ["b", "a", "b", "c", "a"]})
     assert result == ["b", "a", "c"]

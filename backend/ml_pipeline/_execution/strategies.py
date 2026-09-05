@@ -10,8 +10,7 @@ from backend.ml_pipeline._execution.summary import build_summary
 
 
 class JobStrategy(ABC):
-    """
-    Abstract base class for job execution strategies.
+    """Abstract base class for job execution strategies.
     Encapsulates logic specific to different job types (Training, Tuning, etc.).
     """
 
@@ -107,8 +106,7 @@ class JobStrategy(ABC):
         return summary
 
     def handle_success(self, job: MLJob, result: PipelineExecutionResult) -> None:
-        """
-        Updates the job with results from a successful pipeline execution.
+        """Updates the job with results from a successful pipeline execution.
         Base implementation handles common metrics.
         """
         # Extract metrics from the last node if available
@@ -244,8 +242,7 @@ class JobStrategyFactory:
 
     @classmethod
     def find_job(cls, session: Session, job_id: str) -> tuple[MLJob | None, JobStrategy | None]:
-        """
-        Looks up the job by id (single shared table) and resolves its strategy
+        """Looks up the job by id (single shared table) and resolves its strategy
         from `run_mode`. Returns (job, strategy) or (None, None).
         """
         job = session.query(TrainingJob).filter(TrainingJob.id == job_id).first()

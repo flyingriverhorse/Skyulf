@@ -1,5 +1,4 @@
-"""
-Async Database Engine for FastAPI
+"""Async Database Engine for FastAPI
 
 This module provides async database connectivity using SQLAlchemy 2.0+
 with support for the same databases as the Flask version (SQLite, PostgreSQL).
@@ -43,8 +42,7 @@ Base = declarative_base()
 
 
 async def init_db() -> None:
-    """
-    Initialize async database connections.
+    """Initialize async database connections.
     Sets up the global engine and session factory.
     """
     global async_engine, async_session_factory, sync_engine, sync_session_factory
@@ -119,8 +117,7 @@ async def close_db() -> None:
 
 
 async def get_async_session() -> AsyncGenerator[AsyncSession, None]:
-    """
-    Get async database session for dependency injection.
+    """Get async database session for dependency injection.
 
     Yields:
         AsyncSession: Database session for async operations
@@ -139,8 +136,7 @@ async def get_async_session() -> AsyncGenerator[AsyncSession, None]:
 
 
 def get_db():
-    """
-    Get sync database session for dependency injection.
+    """Get sync database session for dependency injection.
     Compatible with non-async operations.
 
     Yields:
@@ -261,8 +257,7 @@ async def _run_migrations() -> None:
 
 
 async def health_check() -> bool:
-    """
-    Check database connectivity for health checks.
+    """Check database connectivity for health checks.
 
     Returns:
         bool: True if database is accessible, False otherwise

@@ -128,7 +128,7 @@ def test_polars_rule(
 
 
 def test_calculator_fit_negative_rule() -> None:
-    """fit stores the rule and column list correctly for negative replacement."""
+    """Fit stores the rule and column list correctly for negative replacement."""
     df = _basic_df()
     params = InvalidValueReplacementCalculator().fit(df, {"columns": ["x"], "rule": "negative"})
     assert params["rule"] == "negative"
@@ -136,14 +136,14 @@ def test_calculator_fit_negative_rule() -> None:
 
 
 def test_calculator_fit_zero_rule() -> None:
-    """fit stores zero rule correctly."""
+    """Fit stores zero rule correctly."""
     df = _basic_df()
     params = InvalidValueReplacementCalculator().fit(df, {"columns": ["x"], "rule": "zero"})
     assert params["rule"] == "zero"
 
 
 def test_calculator_fit_custom_range() -> None:
-    """fit passes min_value and max_value through to the artifact."""
+    """Fit passes min_value and max_value through to the artifact."""
     df = _basic_df()
     params = InvalidValueReplacementCalculator().fit(
         df, {"columns": ["x"], "rule": "custom_range", "min_value": 0, "max_value": 9}
@@ -153,7 +153,7 @@ def test_calculator_fit_custom_range() -> None:
 
 
 def test_calculator_fit_replace_inf_flags() -> None:
-    """fit preserves the replace_inf / replace_neg_inf flags."""
+    """Fit preserves the replace_inf / replace_neg_inf flags."""
     df = _basic_df()
     params = InvalidValueReplacementCalculator().fit(
         df, {"columns": ["x"], "replace_inf": True, "replace_neg_inf": True}
@@ -188,7 +188,8 @@ def test_calculator_fit_value_key_stored() -> None:
 def test_calculator_fit_zero_to_nan_alias_normalizes_to_zero_rule() -> None:
     """The frontend's 'zero_to_nan' UI mode must normalize to the canonical
     'zero' rule -- previously it fell through as an unrecognized rule string
-    and silently no-op'd on both engines."""
+    and silently no-op'd on both engines.
+    """
     df = _basic_df()
     params = InvalidValueReplacementCalculator().fit(df, {"columns": ["x"], "mode": "zero_to_nan"})
     assert params["rule"] == "zero"
@@ -196,7 +197,8 @@ def test_calculator_fit_zero_to_nan_alias_normalizes_to_zero_rule() -> None:
 
 def test_calculator_fit_percentage_bounds_normalizes_with_defaults() -> None:
     """The frontend's 'percentage_bounds' UI mode must normalize to
-    'custom_range' with a 0-100 default when the user hasn't overridden it."""
+    'custom_range' with a 0-100 default when the user hasn't overridden it.
+    """
     df = _basic_df()
     params = InvalidValueReplacementCalculator().fit(
         df, {"columns": ["x"], "mode": "percentage_bounds"}
@@ -208,7 +210,8 @@ def test_calculator_fit_percentage_bounds_normalizes_with_defaults() -> None:
 
 def test_calculator_fit_age_bounds_normalizes_with_defaults() -> None:
     """The frontend's 'age_bounds' UI mode must normalize to 'custom_range'
-    with a 0-120 default when the user hasn't overridden it."""
+    with a 0-120 default when the user hasn't overridden it.
+    """
     df = _basic_df()
     params = InvalidValueReplacementCalculator().fit(df, {"columns": ["x"], "mode": "age_bounds"})
     assert params["rule"] == "custom_range"
@@ -282,7 +285,8 @@ def test_applier_all_nan_column() -> None:
 def test_applier_pandas_no_op_config_preserves_non_numeric_column() -> None:
     """When no rule/inf-replacement is configured, a non-numeric column must be
     left completely untouched (not silently NaN'd by an unconditional
-    pd.to_numeric coercion)."""
+    pd.to_numeric coercion).
+    """
     df = pd.DataFrame({"v": ["a", "b", "c"]})
     params: dict[str, Any] = {
         "columns": ["v"],
@@ -296,7 +300,8 @@ def test_applier_pandas_no_op_config_preserves_non_numeric_column() -> None:
 
 def test_applier_polars_negative_to_nan_alias_replaces_negatives() -> None:
     """The `negative_to_nan` rule alias must behave identically on the polars
-    engine to the pandas engine (both replace negative values)."""
+    engine to the pandas engine (both replace negative values).
+    """
     df = pl.DataFrame({"v": [-2.0, 0.0, 3.0]})
     params: dict[str, Any] = {
         "columns": ["v"],
@@ -399,7 +404,7 @@ def _numeric_frame_for_iv(draw: st.DrawFn, min_rows: int = 5, max_rows: int = 30
 @settings(max_examples=25, deadline=None)
 @given(df=_numeric_frame_for_iv())
 def test_invalid_value_apply_engine_parity_negative(df: pd.DataFrame) -> None:
-    """pandas and polars paths must produce identical results for the negative rule."""
+    """Pandas and polars paths must produce identical results for the negative rule."""
     params: dict[str, Any] = {
         "columns": ["a", "b"],
         "rule": "negative",

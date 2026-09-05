@@ -806,7 +806,8 @@ def test_data_preview_with_split_dataset(pipeline_data_csv, tmp_path):
 
 def test_basic_training_kmeans_without_target_column_succeeds(pipeline_data_csv, tmp_path):
     """A KMeans basic-training node with no target_column should train, predict,
-    and evaluate with clustering metrics — not crash on the missing target."""
+    and evaluate with clustering metrics — not crash on the missing target.
+    """
     engine = _make_engine(tmp_path, "artifacts_kmeans")
     config = PipelineConfig(
         pipeline_id="p_kmeans",
@@ -846,7 +847,8 @@ def test_advanced_tuning_clustering_algorithm_silently_runs_fixed_mode(pipeline_
     run_mode='tuned') now silently forces the plain direct-fit path instead of
     raising — clustering has no reachable "toggle mismatch" scenario via the
     UI (its model dropdown never offers a tuning mode), so this is a
-    defensive-path behavior change, not a user-facing regression."""
+    defensive-path behavior change, not a user-facing regression.
+    """
     engine = _make_engine(tmp_path, "artifacts_kmeans_tuning_reject")
     config = PipelineConfig(
         pipeline_id="p_kmeans_tuning_reject",
@@ -1006,7 +1008,8 @@ def test_kmeans_reference_column_excluded_and_crosstab_bundled(tmp_path):
 def test_additional_clustering_algorithms_train_and_bundle(tmp_path, algorithm):
     """Mini-Batch K-Means, Gaussian Mixture, and Birch must all be trainable
     through the same Basic Training pipeline as K-Means, and produce a
-    bundled artifact with the expected feature_columns."""
+    bundled artifact with the expected feature_columns.
+    """
     df = pd.DataFrame(
         {
             "a": [1.0, 2.0, 3.0, 4.0, 10.0, 11.0, 12.0, 13.0] * 3,
@@ -1055,7 +1058,8 @@ def test_additional_clustering_algorithms_train_and_bundle(tmp_path, algorithm):
 def test_resolve_train_feature_columns_polars_numeric_only_matches_clustering_fit():
     """A Polars training frame must get the same numeric filter the clustering
     fit applies, so the persisted feature_columns never advertise columns the
-    model was never fit on."""
+    model was never fit on.
+    """
     import polars as pl
 
     harness = _Harness()
@@ -1106,7 +1110,8 @@ def test_resolve_train_feature_columns_pandas_numeric_only_unchanged():
 
 def test_xgboost_tuned_job_persists_iteration_history(pipeline_data_csv, tmp_path):
     """A boosting tuned job records per-round iteration history on its metrics
-    (the completed-job chart redraw source) with metric + direction metadata."""
+    (the completed-job chart redraw source) with metric + direction metadata.
+    """
     pytest.importorskip("xgboost")
     engine = _make_engine(tmp_path, "artifacts_xgb_iterations")
     config = PipelineConfig(

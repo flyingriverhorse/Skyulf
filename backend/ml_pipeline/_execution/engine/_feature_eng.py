@@ -136,7 +136,6 @@ class FeatureEngMixin:
         For inference and label decoding we need a single FeatureEngineer that contains the
         full chain in the correct order.
         """
-
         if not node.inputs:
             return None
 

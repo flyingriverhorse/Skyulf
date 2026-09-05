@@ -117,7 +117,7 @@ class TestPolarsArithOps:
         assert vals == expected
 
     def test_divide_two_columns(self) -> None:
-        """a / b element-wise (no zero denominators here)."""
+        """A / b element-wise (no zero denominators here)."""
         vals = self._eval({"method": "divide", "input_columns": ["a", "b"]})
         expected = [1 / 10, 2 / 20, 3 / 30, 4 / 40]
         np.testing.assert_allclose(vals, expected, rtol=1e-9)
@@ -153,7 +153,7 @@ class TestPolarsDivide:
     _EPS = 1e-9
 
     def test_constants_only(self) -> None:
-        """divide with constants only (no column exprs) should work."""
+        """Divide with constants only (no column exprs) should work."""
         result = _polars_divide([], [10.0, 2.0], self._EPS)
         assert result is not None
         val = pl.DataFrame({"dummy": [1]}).select(result.alias("r"))["r"][0]
@@ -351,7 +351,8 @@ class TestPolarsDatetimeApply:
     def test_bad_column_does_not_drop_good_column_features(self) -> None:
         """A column that fails datetime extraction must not prevent other
         columns in the same op from producing their features (per-column
-        isolation, matching the pandas engine's behaviour)."""
+        isolation, matching the pandas engine's behaviour).
+        """
         df = pl.DataFrame(
             {
                 "good": pl.Series(["2024-01-15", "2024-07-04"]).str.to_datetime(),
@@ -440,7 +441,7 @@ class TestFeatgenApplyPolars:
         assert out["out"].to_list() == [-9.0, -18.0, -27.0, -36.0]
 
     def test_y_passed_through_unchanged(self) -> None:
-        """y is never modified by _featgen_apply_polars."""
+        """Y is never modified by _featgen_apply_polars."""
         df = _make_pl()
         y = pl.Series("target", [0, 1, 0, 1])
         params = {
@@ -547,7 +548,8 @@ class TestRealShapedDataset:
 
     def test_add_op_on_null_containing_columns_preserves_all_rows(self) -> None:
         """An arithmetic add on age+income must not drop rows that have nulls —
-        row count must be identical to the input even when null-filling is applied."""
+        row count must be identical to the input even when null-filling is applied.
+        """
         df = load_sample_dataset("customers", engine="polars")
         params = {
             "operations": [

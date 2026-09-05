@@ -1,5 +1,4 @@
-"""
-Environment-Specific Settings
+"""Environment-Specific Settings
 
 © 2025 Murat Unsal — Skyulf Project
 

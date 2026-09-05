@@ -59,7 +59,8 @@ def numeric_csv(tmp_path):
 
 class TestSplitDatasetMerge:
     """`_merge_inputs` must keep test/validation portions when all inputs are
-    SplitDatasets — previously they were silently flattened into train-only."""
+    SplitDatasets — previously they were silently flattened into train-only.
+    """
 
     def _make_node(self, engine, store, inputs):
         for nid, art in inputs:
@@ -137,7 +138,8 @@ class TestSplitDatasetMerge:
         """``TrainTestSplitter`` outputs ``(X, y)`` tuples. Merging two
         SplitDatasets that both wrap tuples must return a SplitDataset whose
         train/test are still tuples — otherwise the frontend collapses
-        ``train_X``/``train_y`` into a single ``train`` tab."""
+        ``train_X``/``train_y`` into a single ``train`` tab.
+        """
         y_train = pd.Series([0, 1, 0], name="target")
         y_test = pd.Series([1, 0], name="target")
 
@@ -174,12 +176,14 @@ class TestSplitDatasetMerge:
 
 class TestPreviewMerge:
     """Run Preview must merge multi-input nodes. Before the fix, a preview
-    node with two parents silently kept only the first edge."""
+    node with two parents silently kept only the first edge.
+    """
 
     def test_preview_merges_two_branches_from_dataset(self, numeric_csv, artifact_store, catalog):
         """Dataset → StandardScaler(f1)
         ↘ MinMaxScaler(f2)
-                ↘ Preview (must merge both)"""
+                ↘ Preview (must merge both)
+        """
         config = PipelineConfig(
             pipeline_id="preview_dataset_merge",
             nodes=[
@@ -227,7 +231,8 @@ class TestPreviewMerge:
     def test_preview_merges_two_branches_from_split(self, numeric_csv, artifact_store, catalog):
         """Dataset → Splitter → StandardScaler
         ↘ MinMaxScaler
-                  ↘ Preview"""
+                  ↘ Preview
+        """
         config = PipelineConfig(
             pipeline_id="preview_split_merge",
             nodes=[
@@ -292,12 +297,14 @@ class TestPreviewMerge:
 
 class TestPreprocessingMerge:
     """A preprocessing transformer (not a model) with two parents must merge
-    rather than silently keep the first input."""
+    rather than silently keep the first input.
+    """
 
     def test_transformer_merges_two_parents(self, numeric_csv, artifact_store, catalog):
         """Dataset → StandardScaler(f1)
         ↘ MinMaxScaler(f2)
-                ↘ Deduplicate (multi-input transformer)"""
+                ↘ Deduplicate (multi-input transformer)
+        """
         config = PipelineConfig(
             pipeline_id="transformer_merge",
             nodes=[
@@ -413,7 +420,8 @@ class TestTrainingMerge:
 
     def test_training_merges_two_dataset_branches(self, numeric_csv, artifact_store, catalog):
         """Sanity check: two parallel preprocessing chains from raw dataset
-        still feed into a training node (existing behaviour, not regressed)."""
+        still feed into a training node (existing behaviour, not regressed).
+        """
         config = PipelineConfig(
             pipeline_id="training_dataset_merge",
             nodes=[

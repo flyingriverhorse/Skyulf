@@ -314,8 +314,7 @@ class TestMergeInputs:
 
 class TestMultiPathPipeline:
     def test_forked_pipeline_basic_training(self, sample_csv, tmp_path):
-        """
-        Dataset → [Scaler branch (f1,f2), Encoder branch (cat)] → Training
+        """Dataset → [Scaler branch (f1,f2), Encoder branch (cat)] → Training
         Both branches feed into the same training node.
         The scaler outputs all columns (scaled f1 & f2 + cat + target).
         The encoder outputs all columns (encoded cat + f1 + f2 + target).

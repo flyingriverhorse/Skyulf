@@ -146,7 +146,8 @@ def collect_trials(searcher: Any, config: TuningConfig) -> list[dict[str, Any]]:
 def strip_model_prefix(params: Any) -> Any:
     """Removes the internal ``model__estimator__`` pipeline prefix from
     extracted params (see ``tune``'s wrapped Pipeline path) so callers see
-    the original search-space keys."""
+    the original search-space keys.
+    """
     if not isinstance(params, dict):
         return params
     return {

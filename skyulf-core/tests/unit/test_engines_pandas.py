@@ -20,14 +20,14 @@ def df():
 
 
 def test_wrapper_columns_returns_list(df):
-    """columns property should return a plain list, not a pandas Index."""
+    """Columns property should return a plain list, not a pandas Index."""
     wrapper = SkyulfPandasWrapper(df)
     assert wrapper.columns == ["a", "b"]
     assert isinstance(wrapper.columns, list)
 
 
 def test_wrapper_shape_matches_dataframe(df):
-    """shape property should mirror the underlying DataFrame's shape."""
+    """Shape property should mirror the underlying DataFrame's shape."""
     wrapper = SkyulfPandasWrapper(df)
     assert wrapper.shape == (3, 2)
 
@@ -50,7 +50,8 @@ def test_wrapper_drop_removes_column(df):
 def test_wrapper_select_with_bare_string_returns_dataframe_not_series(df):
     """select() with a plain string column name must return a wrapper around a
     DataFrame (matching Polars' select() semantics), not a bare Series
-    (regression guard for r5 select() str-vs-list engine parity bug)."""
+    (regression guard for r5 select() str-vs-list engine parity bug).
+    """
     wrapper = SkyulfPandasWrapper(df)
     selected = wrapper.select("a")
     assert isinstance(selected, SkyulfPandasWrapper)
@@ -70,7 +71,8 @@ def test_wrapper_with_column_ignores_mismatched_series_index(df):
     """with_column() must assign Series values positionally, matching Polars,
     instead of pandas' default index-alignment which would silently produce
     NaNs for a Series whose index doesn't match the target frame's
-    (regression guard for r5 pandas with_column index-misalignment bug)."""
+    (regression guard for r5 pandas with_column index-misalignment bug).
+    """
     wrapper = SkyulfPandasWrapper(df)
     mismatched = pd.Series([7, 8, 9], index=[100, 101, 102])
     result = wrapper.with_column("c", mismatched)
@@ -80,7 +82,8 @@ def test_wrapper_with_column_ignores_mismatched_series_index(df):
 
 def test_wrapper_with_column_raises_on_length_mismatch(df):
     """with_column() should raise a clear error rather than silently
-    NaN-filling when a mismatched-index Series has the wrong length."""
+    NaN-filling when a mismatched-index Series has the wrong length.
+    """
     wrapper = SkyulfPandasWrapper(df)
     too_short = pd.Series([7, 8], index=[100, 101])
     with pytest.raises(ValueError, match="Length mismatch"):
@@ -96,7 +99,8 @@ def test_wrapper_to_pandas_returns_same_object(df):
 def test_wrapper_to_native_returns_same_object(df):
     """to_native() must return the underlying pandas frame unchanged — the
     documented replacement for the private ``._df``. For the pandas wrapper it
-    coincides with to_pandas(), giving one engine-agnostic unwrap seam."""
+    coincides with to_pandas(), giving one engine-agnostic unwrap seam.
+    """
     wrapper = SkyulfPandasWrapper(df)
     native = wrapper.to_native()
     assert isinstance(native, pd.DataFrame)
@@ -134,7 +138,8 @@ def test_wrapper_setitem_mutates_underlying_frame(df):
 
 def test_wrapper_setitem_ignores_mismatched_series_index(df):
     """__setitem__ must also assign positionally for a mismatched-index
-    Series, mirroring with_column()'s fix (regression guard for r5)."""
+    Series, mirroring with_column()'s fix (regression guard for r5).
+    """
     wrapper = SkyulfPandasWrapper(df)
     mismatched = pd.Series([10, 11, 12], index=[7, 8, 9])
     wrapper["c"] = mismatched

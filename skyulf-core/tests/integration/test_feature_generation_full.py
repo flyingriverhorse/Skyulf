@@ -1,5 +1,4 @@
-"""
-Comprehensive tests for FeatureGenerationApplier — covers all operation types
+"""Comprehensive tests for FeatureGenerationApplier — covers all operation types
 on both the pandas and polars engine paths.
 
 Run with:

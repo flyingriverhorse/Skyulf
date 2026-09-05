@@ -69,8 +69,7 @@ class DriftReport(BaseModel):
 
 
 class DriftCalculator:
-    """
-    Calculates data drift between a reference dataset (training) and current dataset (production).
+    """Calculates data drift between a reference dataset (training) and current dataset (production).
     Uses Polars for efficient data processing.
     """
 
@@ -85,8 +84,7 @@ class DriftCalculator:
         self.common_columns = [col for col in reference_df.columns if col in current_df.columns]
 
     def calculate_drift(self, thresholds: dict[str, float] | None = None) -> DriftReport:
-        """
-        Calculates drift for all common columns.
+        """Calculates drift for all common columns.
 
         ``drifted_columns_count`` covers both kinds of drift: columns whose
         value distribution moved past a threshold, and columns that appeared or
@@ -325,9 +323,7 @@ class DriftCalculator:
     def _calculate_distribution(
         self, ref_data: np.ndarray, curr_data: np.ndarray, bins: int = 20
     ) -> DriftDistribution:
-        """
-        Calculates histogram bins for reference and current data using the same range.
-        """
+        """Calculates histogram bins for reference and current data using the same range."""
         try:
             # Determine global min/max
             min_val = min(np.min(ref_data), np.min(curr_data))
@@ -408,8 +404,7 @@ class DriftCalculator:
     def _calculate_categorical_drift(
         self, col: str, thresholds: dict[str, float]
     ) -> "ColumnDrift | None":
-        """
-        Calculates PSI-based drift for a categorical/text/boolean column using
+        """Calculates PSI-based drift for a categorical/text/boolean column using
         the category frequency distribution (union of categories seen in
         either dataset). Returns ``None`` if the column looks like free-text
         or a high-cardinality identifier (not a meaningful categorical
@@ -457,10 +452,7 @@ class DriftCalculator:
         )
 
     def _calculate_psi(self, expected: np.ndarray, actual: np.ndarray, buckets: int = 10) -> float:
-        """
-        Calculate Population Stability Index (PSI).
-        """
-
+        """Calculate Population Stability Index (PSI)."""
         breakpoints = np.arange(0, buckets + 1) / (buckets) * 100
 
         if len(expected) == 0 or len(actual) == 0:
@@ -505,9 +497,7 @@ class DriftCalculator:
             return 0.0
 
     def _calculate_kl(self, reference: np.ndarray, current: np.ndarray, buckets: int = 10) -> float:
-        """
-        Calculates KL Divergence (Current || Reference).
-        """
+        """Calculates KL Divergence (Current || Reference)."""
         try:
             if len(reference) == 0 or len(current) == 0:
                 return 0.0

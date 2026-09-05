@@ -15,9 +15,7 @@ def create_sample_data():
 
 
 def test_scenario_1_xy_then_split_then_encode():
-    """
-    Scenario 1: Feature-Target Split -> Train-Test Split -> Encoding
-    """
+    """Scenario 1: Feature-Target Split -> Train-Test Split -> Encoding"""
     print("\n--- Scenario 1: Feature-Target Split -> Train-Test Split -> Encoding ---")
     df = create_sample_data()
 
@@ -65,9 +63,7 @@ def test_scenario_1_xy_then_split_then_encode():
 
 
 def test_scenario_2_split_then_xy_then_encode():
-    """
-    Scenario 2: Train-Test Split -> Feature-Target Split -> Encoding
-    """
+    """Scenario 2: Train-Test Split -> Feature-Target Split -> Encoding"""
     print("\n--- Scenario 2: Train-Test Split -> Feature-Target Split -> Encoding ---")
     df = create_sample_data()
 
@@ -115,9 +111,7 @@ def test_scenario_2_split_then_xy_then_encode():
 
 
 def test_feature_encoding():
-    """
-    Scenario 3: Encoding a feature column (e.g. Label Encoding 'feature1' if it were categorical)
-    """
+    """Scenario 3: Encoding a feature column (e.g. Label Encoding 'feature1' if it were categorical)"""
     print("\n--- Scenario 3: Feature Encoding ---")
     df = pd.DataFrame(
         {"cat_feature": ["low", "high", "medium", "low", "high"], "target": [0, 1, 0, 0, 1]}
@@ -144,9 +138,7 @@ def test_feature_encoding():
 
 
 def test_serialization():
-    """
-    Scenario 4: Serialization (Pickling fitted params and reloading)
-    """
+    """Scenario 4: Serialization (Pickling fitted params and reloading)"""
     import pickle
 
     print("\n--- Scenario 4: Serialization ---")

@@ -185,7 +185,7 @@ class TestApplySimpleOpsPandas:
         )
 
     def test_exp_clips_large_values(self, calc: Any, appl: Any) -> None:
-        """exp clips input at 700 (by default) to avoid overflow."""
+        """Exp clips input at 700 (by default) to avoid overflow."""
         df = pd.DataFrame({"x": [1.0, 10.0, 800.0]})
         art = calc.fit(df, {"transformations": [{"column": "x", "method": "exp"}]})
         result = appl.apply(df, art)

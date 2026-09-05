@@ -100,7 +100,7 @@ def test_regex_pandas(
 
 
 def test_calculator_fit_returns_correct_artifact() -> None:
-    """fit must return an artifact with type, columns, and operations."""
+    """Fit must return an artifact with type, columns, and operations."""
     df = pd.DataFrame({"text": ["Hello", "World"]})
     params = TextCleaningCalculator().fit(
         df,

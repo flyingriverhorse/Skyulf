@@ -329,7 +329,7 @@ def test_fit_dual_engine_accepts_same_function_for_both_engines():
 
 
 def test_apply_dual_engine_rejects_mixed_engine_tuple():
-    """pandas X with a polars y must raise TypeError, not a downstream AttributeError."""
+    """Pandas X with a polars y must raise TypeError, not a downstream AttributeError."""
     X = pd.DataFrame({"a": [1, 2]})
     y = pl.Series("t", [0, 1])
     with pytest.raises(TypeError, match="[Mm]ixed engines"):
@@ -337,7 +337,7 @@ def test_apply_dual_engine_rejects_mixed_engine_tuple():
 
 
 def test_apply_dual_engine_rejects_polars_x_with_pandas_y():
-    """polars X with a pandas y must raise TypeError too."""
+    """Polars X with a pandas y must raise TypeError too."""
     X = pl.DataFrame({"a": [1, 2]})
     y = pd.Series([0, 1])
     with pytest.raises(TypeError, match="[Mm]ixed engines"):
