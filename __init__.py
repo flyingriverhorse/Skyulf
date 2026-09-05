@@ -1,6 +1,6 @@
-"""© 2025 Murat Unsal — Skyulf Project
+"""FastAPI MLops Application Package.
 
-FastAPI MLops Application Package
+© 2025 Murat Unsal — Skyulf Project
 
 This package contains the FastAPI implementation of the MLops platform,
 designed to replace the Flask application with better concurrency support.
