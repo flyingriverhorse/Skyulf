@@ -3308,7 +3308,9 @@ default decision rule when any of these don't hold:</p>
 <li>the model is a <strong>classifier</strong> exposing <code>predict_proba</code>;</li>
 <li>the target is <strong>binary</strong> (for multiclass, use the pipeline- or array-level
   APIs above);</li>
-<li>a <strong>validation split</strong> exists (configure a train/validation split upstream).</li>
+<li>a <strong>validation split</strong> exists (configure a train/validation split upstream);</li>
+<li>the validation split contains <strong>both classes</strong> — with one class present every
+  candidate cutoff scores identically, so there is nothing to tune against.</li>
 </ul>
 <p>Probability-only metrics (<code>roc_auc</code>, <code>log_loss</code>, <code>pr_auc</code>, …) cannot be
 computed from hard labels, so the cutoff sweep maximises <code>balanced_accuracy</code>
@@ -3339,7 +3341,10 @@ tuning run.</p>
 </table>
 <ul>
 <li><strong>Binary</strong> uses a grid search over <code>(0, 1)</code> (<code>grid_points</code> candidates,
-  exclusive of the endpoints).</li>
+  exclusive of the endpoints). Metrics like F1 are piecewise constant in the
+  cutoff, so exactly-tied plateaus are common; ties break toward the default
+  <code>0.5</code> cut. Applying the returned per-class thresholds reproduces the same
+  <code>&gt;=</code> rule the search scored with, an exact tie included.</li>
 <li><strong>Multiclass</strong> uses Nelder–Mead optimization over a scaled-argmax rule.
   Equal thresholds across all classes reduce to plain <code>argmax</code>, so the tuned
   result can only match or beat the default rule on the tuning metric.</li>

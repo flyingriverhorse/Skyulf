@@ -3949,14 +3949,7 @@ callers should fall back to runtime introspection.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>skyulf-core/skyulf/preprocessing/bucketing.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">479</span>
-<span class="normal">480</span>
-<span class="normal">481</span>
-<span class="normal">482</span>
-<span class="normal">483</span>
-<span class="normal">484</span>
-<span class="normal">485</span>
-<span class="normal">486</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">486</span>
 <span class="normal">487</span>
 <span class="normal">488</span>
 <span class="normal">489</span>
@@ -3981,7 +3974,14 @@ callers should fall back to runtime introspection.</p>
 <span class="normal">508</span>
 <span class="normal">509</span>
 <span class="normal">510</span>
-<span class="normal">511</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">"CustomBinning"</span><span class="p">,</span> <span class="n">CustomBinningApplier</span><span class="p">)</span>
+<span class="normal">511</span>
+<span class="normal">512</span>
+<span class="normal">513</span>
+<span class="normal">514</span>
+<span class="normal">515</span>
+<span class="normal">516</span>
+<span class="normal">517</span>
+<span class="normal">518</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">"CustomBinning"</span><span class="p">,</span> <span class="n">CustomBinningApplier</span><span class="p">)</span>
 <span class="nd">@node_meta</span><span class="p">(</span>
     <span class="nb">id</span><span class="o">=</span><span class="s2">"CustomBinning"</span><span class="p">,</span>
     <span class="n">name</span><span class="o">=</span><span class="s2">"Custom Binning"</span><span class="p">,</span>
@@ -5843,14 +5843,7 @@ payload the same way they do downstream of a real splitter.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>skyulf-core/skyulf/preprocessing/bucketing.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">433</span>
-<span class="normal">434</span>
-<span class="normal">435</span>
-<span class="normal">436</span>
-<span class="normal">437</span>
-<span class="normal">438</span>
-<span class="normal">439</span>
-<span class="normal">440</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">440</span>
 <span class="normal">441</span>
 <span class="normal">442</span>
 <span class="normal">443</span>
@@ -5882,7 +5875,14 @@ payload the same way they do downstream of a real splitter.</p>
 <span class="normal">469</span>
 <span class="normal">470</span>
 <span class="normal">471</span>
-<span class="normal">472</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">"GeneralBinning"</span><span class="p">,</span> <span class="n">GeneralBinningApplier</span><span class="p">)</span>
+<span class="normal">472</span>
+<span class="normal">473</span>
+<span class="normal">474</span>
+<span class="normal">475</span>
+<span class="normal">476</span>
+<span class="normal">477</span>
+<span class="normal">478</span>
+<span class="normal">479</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">"GeneralBinning"</span><span class="p">,</span> <span class="n">GeneralBinningApplier</span><span class="p">)</span>
 <span class="nd">@node_meta</span><span class="p">(</span>
     <span class="nb">id</span><span class="o">=</span><span class="s2">"GeneralBinning"</span><span class="p">,</span>
     <span class="n">name</span><span class="o">=</span><span class="s2">"General Binning"</span><span class="p">,</span>
@@ -5974,14 +5974,7 @@ payload the same way they do downstream of a real splitter.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>skyulf-core/skyulf/preprocessing/bucketing.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">518</span>
-<span class="normal">519</span>
-<span class="normal">520</span>
-<span class="normal">521</span>
-<span class="normal">522</span>
-<span class="normal">523</span>
-<span class="normal">524</span>
-<span class="normal">525</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">525</span>
 <span class="normal">526</span>
 <span class="normal">527</span>
 <span class="normal">528</span>
@@ -5997,7 +5990,14 @@ payload the same way they do downstream of a real splitter.</p>
 <span class="normal">538</span>
 <span class="normal">539</span>
 <span class="normal">540</span>
-<span class="normal">541</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">"KBinsDiscretizer"</span><span class="p">,</span> <span class="n">KBinsDiscretizerApplier</span><span class="p">)</span>
+<span class="normal">541</span>
+<span class="normal">542</span>
+<span class="normal">543</span>
+<span class="normal">544</span>
+<span class="normal">545</span>
+<span class="normal">546</span>
+<span class="normal">547</span>
+<span class="normal">548</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">"KBinsDiscretizer"</span><span class="p">,</span> <span class="n">KBinsDiscretizerApplier</span><span class="p">)</span>
 <span class="nd">@node_meta</span><span class="p">(</span>
     <span class="nb">id</span><span class="o">=</span><span class="s2">"KBinsDiscretizer"</span><span class="p">,</span>
     <span class="n">name</span><span class="o">=</span><span class="s2">"K-Bins Discretizer"</span><span class="p">,</span>

@@ -3691,8 +3691,8 @@ profile = analyzer.analyze(
 <h3 id="metrics">Metrics</h3>
 <p>Skyulf calculates drift using four key statistical metrics for every numerical column:</p>
 <ol>
-<li><strong>Wasserstein Distance (Earth Mover's Distance):</strong> Measures the "work" needed to transform one distribution into the other. Good for detecting shifts in shape and location.</li>
-<li><strong>KS Test (Kolmogorov-Smirnov):</strong> A non-parametric test that compares cumulative distribution functions. The p-value indicates the probability that the two samples come from the same distribution.</li>
+<li><strong>Wasserstein Distance (Earth Mover's Distance):</strong> Measures the "work" needed to transform one distribution into the other. Good for detecting shifts in shape and location. The reported value is the distance divided by the reference column's standard deviation, so one threshold means the same thing whatever unit the column is in; the untransformed distance is kept in <code>raw_value</code>.</li>
+<li><strong>KS Test (Kolmogorov-Smirnov):</strong> A non-parametric test that compares cumulative distribution functions. The drift decision is made on the <strong>statistic</strong> (the maximum distance between the two CDFs, 0–1); the p-value is reported alongside it as <code>ks_test_p_value</code> for diagnostics but never decides drift, because it shrinks with sample size.</li>
 <li><strong>PSI (Population Stability Index):</strong> A widely used industry standard for measuring population shifts.<ul>
 <li><code>PSI &lt; 0.1</code>: No significant drift.</li>
 <li><code>0.1 &lt;= PSI &lt; 0.25</code>: Moderate drift.</li>
@@ -3705,6 +3705,10 @@ profile = analyzer.analyze(
 <p>The system also monitors for structural changes:
 *   <strong>Missing Columns:</strong> Critical alerts for features present in training but missing in production.
 *   <strong>New Columns:</strong> Alerts for unexpected features appearing in production data.</p>
+<p>Both count toward <code>report.drifted_columns_count</code>, so that figure covers
+distribution drift <em>and</em> schema drift. A missing column has no values left to
+compare and therefore never appears in <code>column_drifts</code> — the count is the only
+place it is reported.</p>
 <h3 id="using-the-data-drift-ui">Using the Data Drift UI</h3>
 <ol>
 <li>Navigate to the <strong>Data Drift</strong> page in the ML Canvas.</li>

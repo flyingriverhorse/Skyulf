@@ -3221,13 +3221,13 @@ for col, drift in report.column_drifts.items():
 <tbody>
 <tr>
 <td><strong>Wasserstein distance</strong></td>
-<td>How much "work" to transform one distribution into the other</td>
-<td>0.1 (normalized)</td>
+<td>How much "work" to transform one distribution into the other, divided by the reference column's standard deviation</td>
+<td>0.1</td>
 </tr>
 <tr>
-<td><strong>KS test</strong> (Kolmogorov-Smirnov)</td>
-<td>Maximum distance between CDFs; returns a p-value</td>
-<td>p &lt; 0.05</td>
+<td><strong>KS statistic</strong> (Kolmogorov-Smirnov)</td>
+<td>Maximum distance between the two CDFs (0–1)</td>
+<td>0.1</td>
 </tr>
 <tr>
 <td><strong>PSI</strong> (Population Stability Index)</td>
@@ -3242,20 +3242,40 @@ for col, drift in report.column_drifts.items():
 </tbody>
 </table>
 <p>A column is flagged as "drifted" if <strong>any</strong> metric exceeds its threshold.</p>
+<p>Each metric's <code>value</code> is reported on the same scale as its <code>threshold</code>, so
+<code>value &gt; threshold</code> reproduces <code>has_drift</code>. Two caveats:</p>
+<ul>
+<li>The Wasserstein <code>value</code> is the <strong>normalized</strong> distance — the raw distance is
+  in the column's own units, so a single threshold could not mean the same
+  thing for a column measured in cents and one measured in kilometres. The
+  untransformed distance is kept in <code>raw_value</code> for display.</li>
+<li>The KS <strong>p-value</strong> is reported alongside the statistic as <code>ks_test_p_value</code>
+  but never decides drift: it shrinks with sample size, so an identical tiny
+  shift looks significant at n=100k and not at n=100. It carries the KS
+  statistic's threshold rather than one of its own.</li>
+</ul>
 <h2 id="custom-thresholds">Custom thresholds</h2>
 <pre><code class="language-python">report = calc.calculate_drift(thresholds={
     &quot;psi&quot;: 0.15,
-    &quot;ks&quot;: 0.01,
+    &quot;ks_statistic&quot;: 0.01,
     &quot;wasserstein&quot;: 0.05,
     &quot;kl_divergence&quot;: 0.2,
 })
 </code></pre>
+<p>The keys are <code>psi</code>, <code>ks_statistic</code>, <code>wasserstein</code> and <code>kl_divergence</code>. Anything
+else is merged into the dict but never read, so a misspelled key silently leaves
+that threshold at its default.</p>
 <h2 id="schema-drift">Schema drift</h2>
 <p>The report also detects structural changes:</p>
 <ul>
 <li><code>report.missing_columns</code> — columns present in reference but absent in current data.</li>
 <li><code>report.new_columns</code> — columns in current data that were not in the reference.</li>
 </ul>
+<p>Both count toward <code>report.drifted_columns_count</code>, which therefore covers
+distribution drift <em>and</em> schema drift. A vanished feature has no values left to
+compare, so it never appears in <code>column_drifts</code> — the count is the only place it
+shows up, and it used to be omitted entirely, leaving a report that claimed zero
+drift while the structural change was classified as critical.</p>
 <h2 id="report-structure">Report structure</h2>
 <pre><code class="language-python">DriftReport(
     reference_rows=1000,
