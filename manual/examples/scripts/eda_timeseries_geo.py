@@ -1,5 +1,4 @@
-"""
-Skyulf EDA Example: Time Series & Geospatial Analysis
+"""Skyulf EDA Example: Time Series & Geospatial Analysis
 ===================================================
 
 This script demonstrates how to use Skyulf's EDA module for:

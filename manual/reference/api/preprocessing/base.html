@@ -3277,12 +3277,10 @@
 <span class="normal">123</span>
 <span class="normal">124</span>
 <span class="normal">125</span>
-<span class="normal">126</span>
-<span class="normal">127</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">BaseApplier</span><span class="p">(</span><span class="n">ABC</span><span class="p">):</span>
+<span class="normal">126</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">BaseApplier</span><span class="p">(</span><span class="n">ABC</span><span class="p">):</span>
     <span class="nd">@abstractmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">apply</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">df</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span> <span class="o">|</span> <span class="n">SkyulfDataFrame</span> <span class="o">|</span> <span class="nb">tuple</span><span class="p">,</span> <span class="n">params</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">"""</span>
-<span class="sd">        Applies the transformation using fitted parameters.</span>
+<span class="w">        </span><span class="sd">"""Applies the transformation using fitted parameters.</span>
 
 <span class="sd">        The return type is intentionally `Any` because the concrete shape</span>
 <span class="sd">        depends on the input: passing a `DataFrame` returns a `DataFrame`;</span>
@@ -3340,11 +3338,9 @@ defensively narrow on every use, which is worse than <code>Any</code> here.</p>
 <span class="normal">123</span>
 <span class="normal">124</span>
 <span class="normal">125</span>
-<span class="normal">126</span>
-<span class="normal">127</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@abstractmethod</span>
+<span class="normal">126</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@abstractmethod</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">apply</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">df</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span> <span class="o">|</span> <span class="n">SkyulfDataFrame</span> <span class="o">|</span> <span class="nb">tuple</span><span class="p">,</span> <span class="n">params</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">"""</span>
-<span class="sd">    Applies the transformation using fitted parameters.</span>
+<span class="w">    </span><span class="sd">"""Applies the transformation using fitted parameters.</span>
 
 <span class="sd">    The return type is intentionally `Any` because the concrete shape</span>
 <span class="sd">    depends on the input: passing a `DataFrame` returns a `DataFrame`;</span>
@@ -3427,8 +3423,8 @@ defensively narrow on every use, which is worse than <code>Any</code> here.</p>
     <span class="k">def</span><span class="w"> </span><span class="nf">fit</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span> <span class="n">df</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span> <span class="o">|</span> <span class="n">SkyulfDataFrame</span> <span class="o">|</span> <span class="nb">tuple</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Mapping</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
-<span class="w">        </span><span class="sd">"""</span>
-<span class="sd">        Calculates parameters from the training data.</span>
+<span class="w">        </span><span class="sd">"""Calculates parameters from the training data.</span>
+
 <span class="sd">        Returns a Mapping of fitted parameters (typically a TypedDict</span>
 <span class="sd">        ``*Artifact`` declared in ``preprocessing._artifacts``). The return</span>
 <span class="sd">        type is ``Mapping`` rather than ``Dict`` so concrete TypedDict</span>
@@ -3484,8 +3480,8 @@ defensively narrow on every use, which is worse than <code>Any</code> here.</p>
 
     <div class="doc doc-contents ">
 
-        <p>Calculates parameters from the training data.
-Returns a Mapping of fitted parameters (typically a TypedDict
+        <p>Calculates parameters from the training data.</p>
+<p>Returns a Mapping of fitted parameters (typically a TypedDict
 <code>*Artifact</code> declared in <code>preprocessing._artifacts</code>). The return
 type is <code>Mapping</code> rather than <code>Dict</code> so concrete TypedDict
 subclasses are valid LSP-substitutable returns.</p>
@@ -3507,8 +3503,8 @@ subclasses are valid LSP-substitutable returns.</p>
 <span class="k">def</span><span class="w"> </span><span class="nf">fit</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span> <span class="n">df</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span> <span class="o">|</span> <span class="n">SkyulfDataFrame</span> <span class="o">|</span> <span class="nb">tuple</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Mapping</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
-<span class="w">    </span><span class="sd">"""</span>
-<span class="sd">    Calculates parameters from the training data.</span>
+<span class="w">    </span><span class="sd">"""Calculates parameters from the training data.</span>
+
 <span class="sd">    Returns a Mapping of fitted parameters (typically a TypedDict</span>
 <span class="sd">    ``*Artifact`` declared in ``preprocessing._artifacts``). The return</span>
 <span class="sd">    type is ``Mapping`` rather than ``Dict`` so concrete TypedDict</span>
@@ -3626,7 +3622,8 @@ exposing matching <code>fit</code>/<code>apply</code> methods, works without sub
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>skyulf-core/skyulf/preprocessing/base.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">130</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">129</span>
+<span class="normal">130</span>
 <span class="normal">131</span>
 <span class="normal">132</span>
 <span class="normal">133</span>
@@ -3789,8 +3786,7 @@ exposing matching <code>fit</code>/<code>apply</code> methods, works without sub
 <span class="normal">290</span>
 <span class="normal">291</span>
 <span class="normal">292</span>
-<span class="normal">293</span>
-<span class="normal">294</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">StatefulTransformer</span><span class="p">:</span>
+<span class="normal">293</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">StatefulTransformer</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""Fits + applies one pipeline step.</span>
 
 <span class="sd">    Accepts anything satisfying :class:`~skyulf.core.protocols.CalculatorProtocol` /</span>

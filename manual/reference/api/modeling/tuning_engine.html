@@ -3217,8 +3217,8 @@ existing test surface.</p>
 
 
 
-        <p>Applier for TuningCalculator.
-Wraps the base model applier to provide predictions using the refitted best model.</p>
+        <p>Applier for TuningCalculator.</p>
+<p>Wraps the base model applier to provide predictions using the refitted best model.</p>
 
 
 
@@ -3229,7 +3229,9 @@ Wraps the base model applier to provide predictions using the refitted best mode
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>skyulf-core/skyulf/modeling/_tuning/engine.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">673</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">671</span>
+<span class="normal">672</span>
+<span class="normal">673</span>
 <span class="normal">674</span>
 <span class="normal">675</span>
 <span class="normal">676</span>
@@ -3275,11 +3277,9 @@ Wraps the base model applier to provide predictions using the refitted best mode
 <span class="normal">716</span>
 <span class="normal">717</span>
 <span class="normal">718</span>
-<span class="normal">719</span>
-<span class="normal">720</span>
-<span class="normal">721</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">TuningApplier</span><span class="p">(</span><span class="n">BaseModelApplier</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">"""</span>
-<span class="sd">    Applier for TuningCalculator.</span>
+<span class="normal">719</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">TuningApplier</span><span class="p">(</span><span class="n">BaseModelApplier</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Applier for TuningCalculator.</span>
+
 <span class="sd">    Wraps the base model applier to provide predictions using the refitted best model.</span>
 <span class="sd">    """</span>
 
@@ -3980,9 +3980,7 @@ and requires the Optuna integration package.</p>
 <span class="normal">665</span>
 <span class="normal">666</span>
 <span class="normal">667</span>
-<span class="normal">668</span>
-<span class="normal">669</span>
-<span class="normal">670</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">TuningCalculator</span><span class="p">(</span><span class="n">BaseModelCalculator</span><span class="p">):</span>
+<span class="normal">668</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">TuningCalculator</span><span class="p">(</span><span class="n">BaseModelCalculator</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""Tune a plain ``BaseModelCalculator`` and refit it with the best parameters.</span>
 
 <span class="sd">    ``fit`` accepts a ``TuningConfig`` or dict with ``strategy``, ``metric``,</span>
@@ -4208,8 +4206,8 @@ and requires the Optuna integration package.</p>
         <span class="n">preprocessing</span><span class="p">:</span> <span class="s2">"FoldPreprocessor | None"</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">validation_frames</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">"""</span>
-<span class="sd">        Fits the tuner (runs tuning).</span>
+<span class="w">        </span><span class="sd">"""Fits the tuner (runs tuning).</span>
+
 <span class="sd">        Adapts the generic fit interface to the specific tune method.</span>
 
 <span class="sd">        ``preprocessing`` (F-15): re-fits the given preprocessor on</span>
@@ -4374,9 +4372,7 @@ and requires the Optuna integration package.</p>
         <span class="n">preprocessing_frames</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">validation_frames</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">TuningResult</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">"""</span>
-<span class="sd">        Runs hyperparameter tuning.</span>
-<span class="sd">        """</span>
+<span class="w">        </span><span class="sd">"""Runs hyperparameter tuning."""</span>
         <span class="c1"># Holdout tuning with per-fold preprocessing refit: the train and</span>
         <span class="c1"># validation frames are concatenated (train rows masked -1 in a</span>
         <span class="c1"># PredefinedSplit) so every strategy refits the chain on train rows</span>
@@ -4602,8 +4598,8 @@ and requires the Optuna integration package.</p>
 
     <div class="doc doc-contents ">
 
-        <p>Fits the tuner (runs tuning).
-Adapts the generic fit interface to the specific tune method.</p>
+        <p>Fits the tuner (runs tuning).</p>
+<p>Adapts the generic fit interface to the specific tune method.</p>
 <p><code>preprocessing</code> (F-15): re-fits the given preprocessor on
 each candidate fold's training rows during search, so tuning scores
 stop leaking held-out rows into preprocessing statistics. The custom
@@ -4795,8 +4791,8 @@ intact.</p>
     <span class="n">preprocessing</span><span class="p">:</span> <span class="s2">"FoldPreprocessor | None"</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">validation_frames</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">"""</span>
-<span class="sd">    Fits the tuner (runs tuning).</span>
+<span class="w">    </span><span class="sd">"""Fits the tuner (runs tuning).</span>
+
 <span class="sd">    Adapts the generic fit interface to the specific tune method.</span>
 
 <span class="sd">    ``preprocessing`` (F-15): re-fits the given preprocessor on</span>
@@ -5175,9 +5171,7 @@ intact.</p>
 <span class="normal">665</span>
 <span class="normal">666</span>
 <span class="normal">667</span>
-<span class="normal">668</span>
-<span class="normal">669</span>
-<span class="normal">670</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">tune</span><span class="p">(</span>
+<span class="normal">668</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">tune</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">X</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
     <span class="n">y</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
@@ -5189,9 +5183,7 @@ intact.</p>
     <span class="n">preprocessing_frames</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">validation_frames</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">TuningResult</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">"""</span>
-<span class="sd">    Runs hyperparameter tuning.</span>
-<span class="sd">    """</span>
+<span class="w">    </span><span class="sd">"""Runs hyperparameter tuning."""</span>
     <span class="c1"># Holdout tuning with per-fold preprocessing refit: the train and</span>
     <span class="c1"># validation frames are concatenated (train rows masked -1 in a</span>
     <span class="c1"># PredefinedSplit) so every strategy refits the chain on train rows</span>

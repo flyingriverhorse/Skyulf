@@ -3227,7 +3227,7 @@ They are case-sensitive. Start by copying the example:</p>
 <tr>
 <td><code>FASTAPI_ENV</code></td>
 <td><code>development</code></td>
-<td>Environment mode: <code>development</code>, <code>production</code>, or <code>testing</code></td>
+<td>Environment mode: <code>development</code>, <code>production</code>, or <code>testing</code>. Any other value — including blank — stops the server at startup</td>
 </tr>
 <tr>
 <td><code>APP_NAME</code></td>
@@ -3267,7 +3267,10 @@ They are case-sensitive. Start by copying the example:</p>
 </tbody>
 </table>
 <blockquote>
-<p><strong>Note:</strong> <code>FASTAPI_ENV=development</code> is the default. Production mode is enabled with <code>FASTAPI_ENV=production</code>.</p>
+<p><strong>Note:</strong> <code>FASTAPI_ENV=development</code> is the default. Production mode is enabled with <code>FASTAPI_ENV=production</code>.
+The value may come from the process environment or from <code>.env</code>, and case and surrounding whitespace are
+normalized (<code>PRODUCTION</code> and <code>"production "</code> both work). Anything else raises at startup rather than
+falling back to development — a typo used to boot the development security posture silently.</p>
 </blockquote>
 <hr />
 <h2 id="security-auth">Security &amp; Auth</h2>
