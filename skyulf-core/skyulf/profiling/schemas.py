@@ -1,20 +1,40 @@
+import math
 from datetime import datetime
-from typing import Any
+from typing import Annotated, Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, BeforeValidator, Field
+
+
+def _non_finite_to_none(value: Any) -> Any:
+    """Map NaN/inf to ``None`` so a profile never serializes a non-finite float.
+
+    ``orjson`` (the EDA route) coerces NaN to ``null`` on its own, but the
+    stdlib-JSON paths do not: ``model_dump(mode="json")`` keeps the Python
+    ``nan``, ``json.dumps`` then emits a bare ``NaN`` token — invalid JSON that
+    the browser's ``JSON.parse`` rejects — and SQLAlchemy writes that straight
+    into the EDA report's JSON column. A non-finite stat means "not
+    computable", which ``None`` already expresses throughout these schemas.
+    """
+    if isinstance(value, float) and not math.isfinite(value):
+        return None
+    return value
+
+
+FiniteFloat = Annotated[float | None, BeforeValidator(_non_finite_to_none)]
+"""A ``float | None`` that rejects NaN/inf by rewriting it to ``None``."""
 
 
 class NumericStats(BaseModel):
-    mean: float | None = None
-    median: float | None = None
-    std: float | None = None
-    variance: float | None = None
-    min: float | None = None
-    max: float | None = None
-    q25: float | None = None
-    q75: float | None = None
-    skewness: float | None = None
-    kurtosis: float | None = None
+    mean: FiniteFloat = None
+    median: FiniteFloat = None
+    std: FiniteFloat = None
+    variance: FiniteFloat = None
+    min: FiniteFloat = None
+    max: FiniteFloat = None
+    q25: FiniteFloat = None
+    q75: FiniteFloat = None
+    skewness: FiniteFloat = None
+    kurtosis: FiniteFloat = None
     zeros_count: int | None = None
     negatives_count: int | None = None
     normality_test: dict[str, Any] | None = None

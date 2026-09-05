@@ -8,11 +8,14 @@ metric the caller actually cares about (F1, MCC, balanced accuracy, a custom
 business metric, ...) on held-out validation data.
 """
 
+import logging
 from collections.abc import Callable
 from typing import Any
 
 import numpy as np
 from scipy.optimize import minimize
+
+logger = logging.getLogger(__name__)
 
 
 def _resolve_classes(y_true: Any, classes: Any) -> np.ndarray:
@@ -29,11 +32,15 @@ def apply_thresholds(
 ) -> np.ndarray:
     """Convert predicted probabilities into class predictions using per-class thresholds.
 
-    Binary (``thresholds`` is a single float, or a one-entry dict): predicts
-    the positive (second) class when ``y_proba[:, 1] >= threshold``, else the
-    first class.
+    Binary (``thresholds`` is a single float, or a dict over the two classes):
+    predicts the positive (second) class when ``y_proba[:, 1] >= threshold``,
+    else the first class. A one-entry dict supplies that threshold directly; a
+    full-coverage pair — the shape ``optimize_thresholds`` returns, where
+    ``t0 == 1 - t1`` — is compared in scaled space (``p1/t1 >= p0/t0``), which
+    reduces to the same rule. Either way an exact tie predicts the positive
+    class, matching ``>=``.
 
-    Multiclass (``thresholds`` is a dict covering every class): scaled
+    Multiclass (3+ classes, ``thresholds`` covering every class): scaled
     argmax — ``classes[argmax(y_proba / thresholds, axis=1)]``. Equal
     thresholds across all classes reduce to plain argmax.
 
@@ -88,6 +95,15 @@ def apply_thresholds(
 
     thresholds_array = np.array([float(thresholds[c]) for c in classes])
     scaled = y_proba / thresholds_array
+    if n_classes == 2:
+        # `np.argmax` breaks exact ties toward the first column, which would
+        # turn the documented binary rule (`>=` predicts the positive class)
+        # into a strict `>` for the full-coverage dict `_grid_search_binary`
+        # returns — so the search would score ties as positive while
+        # apply-time scoring counts them negative. Comparing the scaled scores
+        # directly keeps `>=` authoritative and is identical on every non-tied
+        # row.
+        return np.where(scaled[:, 1] >= scaled[:, 0], classes[1], classes[0])
     return classes[np.argmax(scaled, axis=1)]
 
 
@@ -99,15 +115,33 @@ def _grid_search_binary(
     grid_points: int,
 ) -> dict[Any, float]:
     """Grid search over (0, 1) exclusive for the best binary threshold."""
+    present = np.unique(y_true)
+    if len(present) < 2:
+        # With one class in the validation split every candidate scores
+        # identically, so a strict `>` tie-break would keep the first grid
+        # point — a near-zero threshold that predicts almost everything
+        # positive. There is no signal to tune against; keep the default rule.
+        logger.warning(
+            "Binary threshold tuning is degenerate: validation labels cover only %s. "
+            "Keeping the default 0.5 threshold.",
+            present.tolist(),
+        )
+        return {classes[0]: 0.5, classes[1]: 0.5}
+
     candidates = np.linspace(0.0, 1.0, grid_points + 2)[1:-1]  # exclude 0 and 1
     best_threshold = 0.5
     best_score = -np.inf
     for t in candidates:
         pred = np.where(y_proba[:, 1] >= t, classes[1], classes[0])
         score = metric(y_true, pred)
-        if score > best_score:
+        # Metrics like F1 are piecewise constant in the threshold, so tied
+        # plateaus are the common case, not an edge case; break them toward the
+        # default 0.5 cut rather than toward whichever plateau edge the scan
+        # happens to reach first. A NaN score fails both comparisons and is
+        # skipped, leaving the 0.5 default.
+        if score > best_score or (score == best_score and abs(t - 0.5) < abs(best_threshold - 0.5)):
             best_score = score
-            best_threshold = t
+            best_threshold = float(t)
     return {classes[0]: 1.0 - best_threshold, classes[1]: best_threshold}
 
 

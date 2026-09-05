@@ -185,6 +185,9 @@ def tune_decision_thresholds(
     try:
         X_val, y_val = validation_data
         X_val_np, y_val_np = SklearnBridge.to_sklearn((X_val, y_val))
+        if len(np.unique(y_val_np)) < 2:
+            _skip("the validation split contains only one class, so no threshold can be scored.")
+            return
         y_proba = np.asarray(model.predict_proba(X_val_np))
 
         metric_callable, metric_name = resolve_threshold_metric(

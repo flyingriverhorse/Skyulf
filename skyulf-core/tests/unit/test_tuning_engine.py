@@ -1713,6 +1713,26 @@ def test_tune_threshold_multiclass_skips():
     assert result.decision_thresholds is None
 
 
+def test_tune_threshold_single_class_validation_skips():
+    """Regression test (OC-36): a validation split holding only one class gives
+    every candidate threshold the same score, so nothing is tunable. Skip and
+    leave the default decision rule rather than persisting a threshold that the
+    UI would report as tuned."""
+    X_train, y_train, X_val, y_val = _clf_xy_split()
+    single_class = y_val == y_val[0]
+    X_val, y_val = X_val[single_class], y_val[single_class]
+    assert len(np.unique(y_val)) == 1  # guard: the split really is degenerate
+
+    model, result = _tuner_clf().fit(
+        X_train,
+        y_train,
+        config=_clf_config(tune_threshold=True),
+        validation_data=(X_val, y_val),
+    )
+    assert result.decision_thresholds is None
+    assert result.decision_threshold_metric is None
+
+
 def test_tune_threshold_regression_skips():
     """tune_threshold=True on a regression problem skips."""
     X, y = _reg_xy(n=200)

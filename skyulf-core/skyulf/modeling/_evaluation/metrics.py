@@ -332,7 +332,24 @@ def _add_roc_pr_auc_metrics(
     """
     if class_count == 2:
         _try_add_metric(metrics, "roc_auc", roc_auc_score, y_arr, proba[:, 1])
-        _try_add_metric(metrics, "pr_auc", average_precision_score, y_arr, proba[:, 1])
+        # `average_precision_score` defaults to pos_label=1 — unlike
+        # `roc_auc_score`, which infers the positive class from the sorted
+        # uniques. With labels like {1, 2}, `proba[:, 1]` is P(classes_[1]) but
+        # pos_label=1 names the *negative* class, so PR-AUC is computed for the
+        # inverted problem (0.32 reported for a 0.97 model) with no warning;
+        # with string labels it raises and the metric vanishes. Resolve the
+        # positive class from the model's own class order, as
+        # `_add_binary_unweighted_metrics` and the PR-curve builder do.
+        classes_ = getattr(model, "classes_", None)
+        pos_label = classes_[1] if classes_ is not None and len(classes_) == 2 else 1
+        _try_add_metric(
+            metrics,
+            "pr_auc",
+            average_precision_score,
+            y_arr,
+            proba[:, 1],
+            pos_label=pos_label,
+        )
         return
     # Explicitly pass the full label set the model was trained on
     # (`classes`, resolved below) so a CV fold whose validation

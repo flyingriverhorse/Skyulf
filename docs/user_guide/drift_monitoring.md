@@ -42,23 +42,39 @@ The `DriftCalculator` computes these metrics for each numeric column:
 
 | Metric | What it measures | Default threshold |
 |---|---|---|
-| **Wasserstein distance** | How much "work" to transform one distribution into the other | 0.1 (normalized) |
-| **KS test** (Kolmogorov-Smirnov) | Maximum distance between CDFs; returns a p-value | p < 0.05 |
+| **Wasserstein distance** | How much "work" to transform one distribution into the other, divided by the reference column's standard deviation | 0.1 |
+| **KS statistic** (Kolmogorov-Smirnov) | Maximum distance between the two CDFs (0–1) | 0.1 |
 | **PSI** (Population Stability Index) | Binned distribution shift | 0.2 |
 | **KL divergence** | Information-theoretic divergence | 0.1 |
 
 A column is flagged as "drifted" if **any** metric exceeds its threshold.
+
+Each metric's `value` is reported on the same scale as its `threshold`, so
+`value > threshold` reproduces `has_drift`. Two caveats:
+
+- The Wasserstein `value` is the **normalized** distance — the raw distance is
+  in the column's own units, so a single threshold could not mean the same
+  thing for a column measured in cents and one measured in kilometres. The
+  untransformed distance is kept in `raw_value` for display.
+- The KS **p-value** is reported alongside the statistic as `ks_test_p_value`
+  but never decides drift: it shrinks with sample size, so an identical tiny
+  shift looks significant at n=100k and not at n=100. It carries the KS
+  statistic's threshold rather than one of its own.
 
 ## Custom thresholds
 
 ```python
 report = calc.calculate_drift(thresholds={
     "psi": 0.15,
-    "ks": 0.01,
+    "ks_statistic": 0.01,
     "wasserstein": 0.05,
     "kl_divergence": 0.2,
 })
 ```
+
+The keys are `psi`, `ks_statistic`, `wasserstein` and `kl_divergence`. Anything
+else is merged into the dict but never read, so a misspelled key silently leaves
+that threshold at its default.
 
 ## Schema drift
 
@@ -66,6 +82,12 @@ The report also detects structural changes:
 
 - `report.missing_columns` — columns present in reference but absent in current data.
 - `report.new_columns` — columns in current data that were not in the reference.
+
+Both count toward `report.drifted_columns_count`, which therefore covers
+distribution drift *and* schema drift. A vanished feature has no values left to
+compare, so it never appears in `column_drifts` — the count is the only place it
+shows up, and it used to be omitted entirely, leaving a report that claimed zero
+drift while the structural change was classified as critical.
 
 ## Report structure
 

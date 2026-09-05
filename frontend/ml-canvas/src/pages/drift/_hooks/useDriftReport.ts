@@ -83,7 +83,15 @@ export function useDriftReport(thresholds: DriftThresholds) {
             if (drifted) driftedCount++;
             newDrifts[colName] = { ...col, metrics: newMetrics, drift_detected: drifted };
         }
-        return { ...report, column_drifts: newDrifts, drifted_columns_count: driftedCount };
+        // Schema drift counts too (OC-45): the backend includes missing/new
+        // columns in `drifted_columns_count`, and rebuilding the count from
+        // metric flags alone would silently drop them the moment a slider moved.
+        const schemaDriftCount = report.missing_columns.length + report.new_columns.length;
+        return {
+            ...report,
+            column_drifts: newDrifts,
+            drifted_columns_count: driftedCount + schemaDriftCount,
+        };
     }, [report, thresholds]);
 
     return {

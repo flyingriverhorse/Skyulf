@@ -68,7 +68,7 @@ class EDAAnalyzer(
     """
 
     def __init__(self, df: pl.DataFrame):
-        self.df = df
+        self.df = self._nan_to_null(df)
         # Detect date-like string columns up front so downstream type checks see Date/Datetime.
         self._cast_date_columns()
         self.lazy_df = self.df.lazy()
@@ -76,6 +76,24 @@ class EDAAnalyzer(
         self.columns = self.df.columns
 
     _NUMERIC_DTYPES = POLARS_NUMERIC_DTYPES
+
+    @staticmethod
+    def _nan_to_null(df: pl.DataFrame) -> pl.DataFrame:
+        """Rewrite NaN to null in every float column.
+
+        polars keeps NaN and null distinct and its aggregations *propagate* NaN
+        rather than skipping it, so one NaN in a float column turns
+        mean/std/variance/skewness/kurtosis into NaN and silently corrupts
+        median/quantiles (the NaN sorts into the middle). pandas treats both as
+        missing, so normalizing once at the boundary buys pandas parity for
+        every downstream consumer — aggregations, histogram binning (``cut()``
+        raises ``ComputeError: breaks cannot be NaN`` on an all-NaN column),
+        correlations and mean-imputation — instead of per-call-site patching.
+        """
+        float_cols = [name for name, dtype in df.schema.items() if dtype.is_float()]
+        if not float_cols:
+            return df
+        return df.with_columns([pl.col(c).fill_nan(None) for c in float_cols])
 
     @staticmethod
     def _filter_expr_builders() -> dict[str, Any]:
@@ -210,7 +228,13 @@ class EDAAnalyzer(
         return semantic_types
 
     def _numeric_advanced_aggs(self, col: str) -> list[pl.Expr]:
-        """Advanced aggregation expressions for a Numeric column."""
+        """Advanced aggregation expressions for a Numeric column.
+
+        The explicit ``interpolation``/``bias``/``fisher`` arguments are pandas
+        parity, not decoration — polars defaults to nearest-rank quantiles and
+        biased skew/kurtosis, and ``recommendations.py`` compares skewness
+        against a hardcoded threshold calibrated on the bias-corrected value.
+        """
         return [
             pl.col(col).mean().alias(f"{col}__mean"),
             pl.col(col).median().alias(f"{col}__median"),
@@ -218,10 +242,10 @@ class EDAAnalyzer(
             pl.col(col).var().alias(f"{col}__var"),
             pl.col(col).min().alias(f"{col}__min"),
             pl.col(col).max().alias(f"{col}__max"),
-            pl.col(col).quantile(0.25).alias(f"{col}__q25"),
-            pl.col(col).quantile(0.75).alias(f"{col}__q75"),
-            pl.col(col).skew().alias(f"{col}__skew"),
-            pl.col(col).kurtosis().alias(f"{col}__kurt"),
+            pl.col(col).quantile(0.25, interpolation="linear").alias(f"{col}__q25"),
+            pl.col(col).quantile(0.75, interpolation="linear").alias(f"{col}__q75"),
+            pl.col(col).skew(bias=False).alias(f"{col}__skew"),
+            pl.col(col).kurtosis(fisher=True, bias=False).alias(f"{col}__kurt"),
             (pl.col(col) == 0).sum().alias(f"{col}__zeros"),
             (pl.col(col) < 0).sum().alias(f"{col}__negatives"),
         ]

@@ -16,10 +16,28 @@ PSI_MODERATE = 0.1
 
 
 class DriftMetric(BaseModel):
+    """One drift statistic for one column.
+
+    ``value`` is reported on the same scale as ``threshold`` whenever ``value``
+    is what the verdict was made on, so ``value > threshold`` reproduces
+    ``has_drift`` and consumers that re-derive the verdict (the UI's threshold
+    sliders do) need no metric-specific knowledge. The one exception is
+    ``ks_test_p_value``: it rides along for diagnostics, never decides drift
+    (the p-value shrinks with sample size), and carries the KS statistic's
+    threshold rather than one of its own.
+
+    ``raw_value`` is set only where ``value`` is a transform of a more familiar
+    quantity — the Wasserstein distance is reported normalized by the reference
+    std, because the raw distance is in data units and a fixed threshold cannot
+    mean the same thing across columns. It carries the untransformed number for
+    display and must never be compared against ``threshold``.
+    """
+
     metric: str
     value: float
     has_drift: bool
     threshold: float
+    raw_value: float | None = None
 
 
 class DriftBin(BaseModel):
@@ -69,6 +87,12 @@ class DriftCalculator:
     def calculate_drift(self, thresholds: dict[str, float] | None = None) -> DriftReport:
         """
         Calculates drift for all common columns.
+
+        ``drifted_columns_count`` covers both kinds of drift: columns whose
+        value distribution moved past a threshold, and columns that appeared or
+        disappeared between the two schemas. A vanished column used to leave the
+        count at 0, so the report claimed no drift while the backend classified
+        that same structural change as critical.
         """
         if not SCIPY_AVAILABLE:
             raise ImportError("scipy is required for drift calculation")
@@ -91,7 +115,7 @@ class DriftCalculator:
         return DriftReport(
             reference_rows=len(self.reference_df),
             current_rows=len(self.current_df),
-            drifted_columns_count=drifted_count,
+            drifted_columns_count=drifted_count + len(missing_columns) + len(new_columns),
             column_drifts=column_drifts,
             missing_columns=missing_columns,
             new_columns=new_columns,
@@ -116,7 +140,7 @@ class DriftCalculator:
         default_thresholds = {
             "psi": 0.2,
             "ks_statistic": 0.1,  # max CDF distance, sample-size robust (unlike the p-value)
-            "wasserstein": 0.1,  # Heuristic, depends on scale
+            "wasserstein": 0.1,  # applied to the std-normalized distance, so it is scale-free
             "kl_divergence": 0.1,
         }
         return {**default_thresholds, **(thresholds or {})}
@@ -180,8 +204,11 @@ class DriftCalculator:
 
         # 1. Wasserstein Distance
         wd = wasserstein_distance(ref_data, curr_data)
-        # Normalize WD? It's scale dependent.
-        # Simple normalization: divide by std of reference
+        # WD is in data units, so a fixed threshold cannot mean the same thing
+        # for a column measured in cents and one measured in kilometres. The
+        # reported value is the distance normalized by the reference std, which
+        # is what `threshold` applies to. A constant reference has no scale to
+        # normalize by — fall back to the raw distance rather than emit inf.
         std_ref = np.std(ref_data)
         norm_wd = wd / std_ref if std_ref > 0 else wd
 
@@ -189,9 +216,10 @@ class DriftCalculator:
         metrics.append(
             DriftMetric(
                 metric="wasserstein_distance",
-                value=float(wd),
+                value=float(norm_wd),
                 has_drift=wd_drift,
                 threshold=thresholds["wasserstein"],
+                raw_value=float(wd),
             )
         )
         if wd_drift:
