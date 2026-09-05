@@ -1,4 +1,4 @@
-"""Custom Exception Handlers for API Responses
+"""Custom Exception Handlers for API Responses.
 
 Provides exception handlers that return JSON responses for API errors.
 """

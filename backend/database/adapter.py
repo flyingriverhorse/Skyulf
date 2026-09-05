@@ -1,4 +1,4 @@
-"""Async Database Adapter for FastAPI
+"""Async database adapter for FastAPI.
 
 Provides unified access to different database backends with async support.
 This is the async equivalent of the Flask db/adapter.py module.
@@ -262,6 +262,16 @@ class AsyncSnowflakeConnection:
     """
 
     def __init__(self, connection, executor):
+        """Wrap an already-open blocking Snowflake connection for async use.
+
+        Args:
+            connection: The sync ``snowflake.connector`` connection. Every
+                method here offloads its driver calls to ``executor`` so the
+                event loop is never blocked.
+            executor: ``ThreadPoolExecutor`` supplied by ``_snowflake_connection``,
+                which also owns closing the connection and shutting the pool down
+                on exit. This class never disposes of either.
+        """
         self._connection = connection
         self._executor = executor
 

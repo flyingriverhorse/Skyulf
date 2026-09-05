@@ -57,6 +57,12 @@ class LocalArtifactDiscovery(ArtifactDiscovery):
     """Filesystem implementation rooted at ``TRAINING_ARTIFACT_DIR``."""
 
     def __init__(self, root_path: str):
+        """Record ``root_path`` as the artifact root to scan, expanded and resolved.
+
+        Args:
+            root_path: Directory holding one subfolder per job, normally
+                ``TRAINING_ARTIFACT_DIR``.
+        """
         self.root_path = Path(root_path).expanduser().resolve()
 
     @staticmethod
@@ -73,6 +79,15 @@ class LocalArtifactDiscovery(ArtifactDiscovery):
             return None
 
     def list_reference_artifacts(self) -> list[ReferenceArtifact]:
+        """List every ``reference_data_*`` artifact across all job folders.
+
+        Each folder name is searched for a ``YYYYMMDD_HHMMSS`` timestamp to fill
+        ``created_at``, and each file stem is split on its last underscore into
+        ``<dataset_name>_<job_id>``; stems that don't have that shape are
+        skipped. A missing root yields ``[]``, and an unreadable root or job
+        folder is logged and skipped so one bad directory can't empty the
+        listing.
+        """
         if not self.root_path.exists():
             return []
 
@@ -109,6 +124,13 @@ class LocalArtifactDiscovery(ArtifactDiscovery):
         return artifacts
 
     def get_store_for_job(self, job_id: str) -> ArtifactStore:
+        """Return the artifact store rooted at the folder owning ``job_id``.
+
+        A subfolder matches when its name is exactly ``job_id`` or ends with
+        ``_<job_id>``, covering both bare and timestamped folder names. When the
+        root is missing, unreadable or has no match, the store falls back to the
+        artifact root itself.
+        """
         job_folder = str(self.root_path)
         if self.root_path.exists():
             try:

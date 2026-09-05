@@ -9,6 +9,8 @@ from pydantic import BaseModel
 
 
 class JobStatus(StrEnum):
+    """Lifecycle states a persisted ML job can be in, as served to the frontend."""
+
     QUEUED = "queued"
     RUNNING = "running"
     COMPLETED = "completed"
@@ -18,6 +20,16 @@ class JobStatus(StrEnum):
 
 
 class JobInfo(BaseModel):
+    """API view of one persisted training/tuning job row.
+
+    Beyond the identity, status and timing every job carries, this holds the
+    Experiments-page extras (resolved model type/family, DataFrame engine,
+    hyperparameters, metrics, search strategy, the stored graph and config) and
+    the parallel-branch provenance (``branch_index``, ``parent_pipeline_id``)
+    that lets a branch be grouped under the pipeline it was split from.
+    Optional fields stay ``None`` for legacy rows written before they existed.
+    """
+
     job_id: str
     pipeline_id: str
     node_id: str

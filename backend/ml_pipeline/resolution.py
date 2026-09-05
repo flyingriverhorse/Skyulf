@@ -1,3 +1,10 @@
+"""Resolve loader nodes' ``dataset_id`` params to the file paths the engine reads.
+
+The graph stores dataset ids; execution needs ``params['path']``, so the run and
+preview routers call ``resolve_pipeline_nodes`` first to look every loader node up
+through the ingestion service and collect any S3 storage options on the way.
+"""
+
 from typing import Any, cast
 
 from fastapi import HTTPException

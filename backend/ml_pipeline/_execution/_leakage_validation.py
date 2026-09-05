@@ -57,10 +57,11 @@ NO_SPLIT_DIAGNOSTIC = (
 
 
 def data_dependent_step_types() -> frozenset[str]:
-    """Step types whose ``.fit()`` learns parameters from the data it's given
-    (means/std, learned categories, medians, variance/correlation,
+    """Step types whose ``.fit()`` learns parameters from the data it's given.
+
+    Covers means/std, learned categories, medians, variance/correlation,
     quantile-based thresholds, target statistics, vocabulary/IDF, missingness
-    structure, duplicate sets, etc.). Fitting one of these on data that still
+    structure, duplicate sets, etc. Fitting one of these on data that still
     includes the test/validation portion leaks that portion's information
     into the fitted parameters, even though the transformer is only ever
     *applied* to train afterward. Derived from the skyulf-core registry.
@@ -102,10 +103,10 @@ def _find_target_column(nodes: list[NodeConfig]) -> str | None:
 
 
 def _is_target_only_encoding(step_type: str, params: dict, target_column: str | None) -> bool:
-    """True if a Label/Ordinal encoder node is configured to encode *only* the
-    target column (y), with no feature columns.
+    """True if a Label/Ordinal encoder node is configured to encode *only* the target.
 
-    Per ``skyulf-core``'s ``LabelEncoderCalculator``/``OrdinalEncoderCalculator``
+    Encodes the target column (y), with no feature columns. Per ``skyulf-core``'s
+    ``LabelEncoderCalculator``/``OrdinalEncoderCalculator``
     (see ``_maybe_fit_target``/``_should_encode_target``), the node fits
     *only* on ``y`` — never touching feature columns — when its ``columns``
     param is empty/missing, OR when ``columns`` names exactly the target
@@ -171,8 +172,9 @@ def _build_descendant_map(nodes: list[NodeConfig]) -> dict[str, set[str]]:
 
 
 def _exemption_reason(step_type: str, params: dict, target_column: str | None) -> str | None:
-    """Human-readable reason when a data-dependent node type is exempted by
-    its params (a stateless configuration of a stateful node), else None.
+    """Human-readable reason when a data-dependent node type is exempted, else None.
+
+    Exemption comes from its params: a stateless configuration of a stateful node.
     """
     if _is_target_only_encoding(step_type, params, target_column):
         return (

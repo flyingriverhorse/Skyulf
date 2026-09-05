@@ -1,4 +1,4 @@
-"""Environment-Specific Settings
+"""Environment-specific settings.
 
 © 2025 Murat Unsal — Skyulf Project
 
@@ -62,6 +62,13 @@ class DevelopmentSettings(Settings):
     """Development environment settings."""
 
     def model_post_init(self, __context: Any) -> None:
+        """Apply the development overrides, then configure pandas and logging.
+
+        Only fields the operator left unset are touched (see ``_apply_defaults``).
+        This is the permissive profile — ``DEBUG=True``, ``CORS_ORIGINS=["*"]``
+        and ``HOST`` bound to ``0.0.0.0`` — which is why ``resolve_environment()``
+        fails closed on an unrecognized ``FASTAPI_ENV`` instead of landing here.
+        """
         _apply_defaults(self, _DEV_DEFAULTS)
         super().model_post_init(__context)
         self.configure_pandas()
@@ -79,6 +86,14 @@ class ProductionSettings(Settings):
     DATA_SAMPLE_SIZE: int = 50000
 
     def model_post_init(self, __context: Any) -> None:
+        """Apply the production overrides, then configure pandas and logging.
+
+        ``DEBUG`` defaults to ``False`` and ``CORS_ORIGINS``/``ALLOWED_HOSTS`` to
+        the production hostnames. ``SECURITY_HEADERS`` is declared here and
+        nowhere else, and the two ML sizing fields exist only on this subclass
+        and ``TestingSettings`` — the base ``Settings`` defines none of the three,
+        so they are absent entirely under ``DevelopmentSettings``.
+        """
         _apply_defaults(self, _PROD_DEFAULTS)
         super().model_post_init(__context)
         self.configure_pandas()
@@ -95,6 +110,14 @@ class TestingSettings(Settings):
     ML_MODEL_CACHE_SIZE: int = 10
 
     def model_post_init(self, __context: Any) -> None:
+        """Apply the testing overrides, then configure logging.
+
+        Redirects ``DATABASE_URL`` to a throwaway SQLite file and lengthens
+        ``ACCESS_TOKEN_EXPIRE_MINUTES`` so a long test session does not expire
+        mid-run. Note the asymmetry with the other two profiles: this one never
+        calls ``configure_pandas()``, so pandas copy-on-write is not enabled
+        under ``TestingSettings``.
+        """
         _apply_defaults(self, _TEST_DEFAULTS)
         super().model_post_init(__context)
         self.setup_logging()

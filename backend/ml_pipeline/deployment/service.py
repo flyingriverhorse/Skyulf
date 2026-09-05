@@ -1,3 +1,5 @@
+"""Serving side of a deployment: promote a job, resolve its artifact, score rows."""
+
 import logging
 from collections.abc import Sequence
 from pathlib import Path
@@ -55,6 +57,14 @@ def _maybe_decode_predictions(
 
 
 class DeploymentService:
+    """Deploys a completed job's artifact and serves predictions from it.
+
+    Stateless: every method is a static that takes the async session it needs.
+    Promotion resolves the job's ``artifact_uri`` down to the bundled artifact
+    file and records the deployment it replaced, so serving and history can both
+    follow the chain back to a training run.
+    """
+
     @staticmethod
     def _validate_job_for_deployment(db_job: Any, job_id: str) -> None:
         """Raises ValueError if the job doesn't exist or hasn't completed successfully."""
@@ -100,6 +110,24 @@ class DeploymentService:
     async def deploy_model(
         session: AsyncSession, job_id: str, user_id: int | None = None
     ) -> Deployment:
+        """Promotes a completed job's artifact to the active deployment.
+
+        Resolves ``artifact_uri`` — falling back to ``node_id`` for legacy jobs —
+        down to the specific bundled artifact file, captures the currently active
+        deployment as the one this replaces, deactivates it, then inserts the new
+        row as active and commits.
+
+        Args:
+            session: Async database session.
+            job_id: Job whose artifact is deployed.
+            user_id: Recorded on the row as ``deployed_by``; optional.
+
+        Returns:
+            The committed ``Deployment`` row.
+
+        Raises:
+            ValueError: If the job doesn't exist or hasn't completed successfully.
+        """
         # 1. Get Job Entity
         db_job = await JobService.get_job_by_id(session, job_id)
         DeploymentService._validate_job_for_deployment(db_job, job_id)
@@ -151,6 +179,7 @@ class DeploymentService:
 
     @staticmethod
     async def get_active_deployment(session: AsyncSession) -> Deployment | None:
+        """Returns the most recently created active deployment, or None if there is none."""
         stmt = select(Deployment).where(Deployment.is_active).order_by(Deployment.created_at.desc())
         result = await session.execute(stmt)
         return result.scalars().first()
@@ -487,6 +516,29 @@ class DeploymentService:
         data: list[dict],
         override_thresholds: dict[str, float] | None = None,
     ) -> tuple[list, dict[str, float] | None]:
+        """Scores ``data`` with the active deployment's model.
+
+        A bundled ``{"feature_engineer", "model"}`` artifact is transformed then
+        predicted, with thresholds resolved as explicit override first and the
+        job's saved-and-enabled tuned thresholds second. A legacy artifact that is
+        itself the predictor is used directly and rejects overrides, because it
+        exposes no probabilities to threshold.
+
+        Args:
+            session: Async database session, used to find the deployment and its job.
+            data: Rows to score, one dict per record.
+            override_thresholds: Per-class thresholds for this call only.
+
+        Returns:
+            Tuple of the predictions and the thresholds applied (``None`` when the
+            model's default decision rule was used).
+
+        Raises:
+            ValueError: If nothing is deployed, the artifact fails to load, or it is
+                not a recognizable predictor.
+            OverrideThresholdMismatch: If overrides go to a legacy artifact, or their
+                keys don't match the model's classes.
+        """
         # 1. Get active deployment
         deployment = await DeploymentService.get_active_deployment(session)
         if not deployment:
@@ -748,8 +800,10 @@ class DeploymentService:
 
     @staticmethod
     def _lineage_fields_from_job(job: TrainingJob | None) -> dict[str, Any]:
-        """Builds the cheap dataset/version/target-column lineage fields from an
-        already-fetched TrainingJob, without touching the deployed artifact.
+        """Builds the cheap dataset/version/target-column lineage fields.
+
+        Derived from an already-fetched TrainingJob, without touching the deployed
+        artifact.
         """
         if job is None:
             return {"dataset_id": None, "version": None, "target_column": None}

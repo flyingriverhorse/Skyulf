@@ -1,4 +1,4 @@
-"""Async Database Engine for FastAPI
+"""Async database engine for FastAPI.
 
 This module provides async database connectivity using SQLAlchemy 2.0+
 with support for the same databases as the Flask version (SQLite, PostgreSQL).

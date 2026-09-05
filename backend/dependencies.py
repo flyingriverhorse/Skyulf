@@ -1,6 +1,6 @@
-"""2025 Murat Unsal  Skyulf Project
+"""Dependency Injection for FastAPI.
 
-Dependency Injection for FastAPI
+© 2025 Murat Unsal — Skyulf Project
 
 This module provides common dependencies used across the application,
 including database sessions and configuration.

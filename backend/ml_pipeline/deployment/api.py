@@ -1,3 +1,5 @@
+"""Deployment endpoints: promote a job, inspect the active deployment, score rows."""
+
 import logging
 from collections.abc import AsyncGenerator
 
@@ -19,6 +21,7 @@ router = APIRouter(prefix="/deployment", tags=["Deployment"])
 
 
 async def get_async_session() -> AsyncGenerator[AsyncSession, None]:
+    """Yield one async database session per request, closed when the request ends."""
     async with get_database_session() as session:
         yield session
 
@@ -55,9 +58,11 @@ async def get_active_deployment(session: AsyncSession = Depends(get_async_sessio
 async def list_deployments(
     limit: int | None = None, skip: int = 0, session: AsyncSession = Depends(get_async_session)
 ):
-    """Lists deployment history, enriched with the same model-version lineage
-    (dataset id, version, replacement chain) shown on the active deployment
-    and Registry, so History rows are traceable rather than bare job ids.
+    """Lists deployment history.
+
+    Enriched with the same model-version lineage (dataset id, version,
+    replacement chain) shown on the active deployment and Registry, so History
+    rows are traceable rather than bare job ids.
 
     Unlike the single-deployment and active-deployment endpoints, this never
     loads the deployed artifact — the input/output schema requires per-row

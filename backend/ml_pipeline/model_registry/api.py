@@ -1,3 +1,5 @@
+"""Read-only model-registry endpoints: stats, models, versions and job artifacts."""
+
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Query

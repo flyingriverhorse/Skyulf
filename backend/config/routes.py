@@ -1,6 +1,6 @@
-"""2025 Murat Unsal  Skyulf Project
+"""Configuration endpoints.
 
-Configuration endpoints.
+© 2025 Murat Unsal — Skyulf Project
 
 Exposes non-sensitive runtime settings to the frontend so client-side UI
 can mirror server-side limits (upload size, allowed file types) instead

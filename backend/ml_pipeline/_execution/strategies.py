@@ -1,3 +1,12 @@
+"""Per-job-type execution strategies for Celery pipeline runs.
+
+A submitted canvas run lands on one of two ``run_mode`` values — ``fixed``
+(single-fit training) or ``tuned`` (hyperparameter search). Each strategy
+owns what differs between them: the first log line written before the engine
+starts, and how a finished ``PipelineExecutionResult`` is folded back onto
+the job row. ``JobStrategyFactory`` resolves the right one from the job.
+"""
+
 from abc import ABC, abstractmethod
 from datetime import UTC, datetime
 from typing import Any
@@ -33,8 +42,10 @@ class JobStrategy(ABC):
         """Returns the initial log message for the job."""
 
     def _collect_node_timings(self, result: PipelineExecutionResult) -> list[dict]:
-        """Roll up per-node execution times, surfacing the same slow-step info
-        the engine already collected for the Top-N slowest nodes admin view.
+        """Roll up per-node execution times.
+
+        Surfaces the same slow-step info the engine already collected for the
+        Top-N slowest nodes admin view.
         """
         node_timings = []
         for node_res in result.node_results.values():
@@ -193,23 +204,45 @@ class JobStrategy(ABC):
 
 
 class BasicTrainingStrategy(JobStrategy):
+    """Strategy for fixed-hyperparameter training runs (``run_mode="fixed"``).
+
+    Inherits the shared success/failure handling unchanged — a single fit
+    writes its metrics straight onto ``job.metrics``.
+    """
+
     run_mode = "fixed"
 
     def get_initial_log(self, job: MLJob) -> str:
+        """Return the timestamped first log line naming the training version."""
         timestamp = datetime.now().strftime("%H:%M:%S")
         version = getattr(job, "version", "unknown")
         return f"[{timestamp}] Training Job Version: {version}"
 
 
 class AdvancedTuningStrategy(JobStrategy):
+    """Strategy for hyperparameter-search runs (``run_mode="tuned"``).
+
+    Extends the shared success handling with the tuning-only columns
+    (``best_params``, ``best_score``, ``results``, ``scoring``).
+    """
+
     run_mode = "tuned"
 
     def get_initial_log(self, job: MLJob) -> str:
+        """Return the timestamped first log line naming the tuning run version."""
         timestamp = datetime.now().strftime("%H:%M:%S")
         version = getattr(job, "version", "unknown")
         return f"[{timestamp}] Tuning Job Run: {version}"
 
     def handle_success(self, job: MLJob, result: PipelineExecutionResult) -> None:
+        """Persist the shared metrics, then lift tuning fields onto job columns.
+
+        The base handler leaves everything inside ``job.metrics``; copying
+        ``best_params`` / ``best_score`` / ``trials`` / ``scoring_metric``
+        onto dedicated columns is what lets the Experiments table and the
+        tuning-history endpoints filter and compare runs without JSON
+        queries.
+        """
         # Call base to set standard metrics
         super().handle_success(job, result)
 
@@ -226,6 +259,12 @@ class AdvancedTuningStrategy(JobStrategy):
 
 
 class JobStrategyFactory:
+    """Registry mapping a job's ``run_mode`` onto its execution strategy.
+
+    Strategies are stateless singletons, so one instance per mode is created
+    at import time and reused for every job.
+    """
+
     _strategies: dict[str, JobStrategy] = {
         "training": BasicTrainingStrategy(),
         "tuning": AdvancedTuningStrategy(),
@@ -234,6 +273,11 @@ class JobStrategyFactory:
 
     @classmethod
     def get_strategy_by_job(cls, job: MLJob) -> JobStrategy:
+        """Return the strategy matching *job*'s ``run_mode``.
+
+        Raises:
+            ValueError: If the row carries a missing or unknown ``run_mode``.
+        """
         run_mode = getattr(job, "run_mode", None)
         if run_mode == "fixed":
             return cls._strategies["training"]
@@ -244,8 +288,10 @@ class JobStrategyFactory:
 
     @classmethod
     def find_job(cls, session: Session, job_id: str) -> tuple[MLJob | None, JobStrategy | None]:
-        """Looks up the job by id (single shared table) and resolves its strategy
-        from `run_mode`. Returns (job, strategy) or (None, None).
+        """Looks up the job by id in the single shared table.
+
+        Resolves its strategy from `run_mode`. Returns (job, strategy) or
+        (None, None).
         """
         job = session.query(TrainingJob).filter(TrainingJob.id == job_id).first()
         if job is None:

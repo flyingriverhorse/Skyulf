@@ -1,4 +1,4 @@
-"""Base Settings Model
+"""Base settings model.
 
 © 2025 Murat Unsal — Skyulf Project
 
@@ -106,6 +106,7 @@ class Settings(
     @field_validator("SECRET_KEY")
     @classmethod
     def validate_secret_key(cls, v: str) -> str:
+        """Reject a ``SECRET_KEY`` shorter than 32 characters."""
         if len(v) < 32:
             raise ValueError("SECRET_KEY must be at least 32 characters long")
         return v
@@ -123,6 +124,11 @@ class Settings(
     @field_validator("SKYULF_ENGINE", mode="before")
     @classmethod
     def normalize_skyulf_engine(cls, v: Any) -> Any:
+        """Trim and case-fold ``SKYULF_ENGINE`` so engine names compare case-insensitively.
+
+        Runs ``mode="before"``, so non-string input reaches the field's own
+        type validation untouched.
+        """
         if isinstance(v, str):
             return v.strip().lower()
         return v
@@ -130,6 +136,14 @@ class Settings(
     @field_validator("CORS_ORIGINS", mode="before")
     @classmethod
     def parse_cors_origins(cls, v: Any) -> list[str]:
+        """Accept ``CORS_ORIGINS`` as a JSON array or a comma-separated string.
+
+        A bracketed value is parsed as JSON first, but a malformed one does not
+        raise: the brackets are stripped and it falls through to the comma
+        split. The leniency is worth knowing here because the development
+        profile pairs wildcard CORS with credentials — a typo in this field
+        silently narrows or widens the allow-list instead of failing the boot.
+        """
         if isinstance(v, str):
             v = v.strip()
             if v.startswith("["):
@@ -143,6 +157,10 @@ class Settings(
     @field_validator("ALLOWED_HOSTS", mode="before")
     @classmethod
     def parse_allowed_hosts(cls, v: Any) -> list[str]:
+        """Accept ``ALLOWED_HOSTS`` as a JSON array or a comma-separated string.
+
+        Same lenient bracket-stripping fall-through as :meth:`parse_cors_origins`.
+        """
         if isinstance(v, str):
             v = v.strip()
             if v.startswith("["):
@@ -156,6 +174,10 @@ class Settings(
     @field_validator("ALLOWED_EXTENSIONS", mode="before")
     @classmethod
     def parse_allowed_extensions(cls, v: Any) -> list[str]:
+        """Accept ``ALLOWED_EXTENSIONS`` as a JSON array or a comma-separated string.
+
+        Same lenient bracket-stripping fall-through as :meth:`parse_cors_origins`.
+        """
         if isinstance(v, str):
             v = v.strip()
             if v.startswith("["):
@@ -169,6 +191,11 @@ class Settings(
     @field_validator("API_DOCS_SERVERS", mode="before")
     @classmethod
     def parse_api_docs_servers(cls, v: Any) -> list[str]:
+        """Accept ``API_DOCS_SERVERS`` as a comma-separated string only.
+
+        Unlike the three parsers above this one has no JSON-array branch, so a
+        bracketed value keeps its brackets in the first and last entries.
+        """
         if isinstance(v, str):
             return [item.strip() for item in v.split(",") if item.strip()]
         return cast(list[str], v)

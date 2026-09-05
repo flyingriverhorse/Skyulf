@@ -32,10 +32,12 @@ class _PipelineIn(BaseModel):
 
 
 def md_cell(text: str) -> dict[str, Any]:
+    """Build an nbformat markdown cell dict, storing *text* as a list of source lines."""
     return {"cell_type": "markdown", "metadata": {}, "source": text.splitlines(keepends=True)}
 
 
 def code_cell(text: str) -> dict[str, Any]:
+    """Build an nbformat code cell dict with empty outputs and a null execution count."""
     return {
         "cell_type": "code",
         "metadata": {},
@@ -46,6 +48,7 @@ def code_cell(text: str) -> dict[str, Any]:
 
 
 def wrap_notebook(cells: list[dict[str, Any]]) -> dict[str, Any]:
+    """Wrap *cells* into a complete nbformat 4.5 notebook with a python3 kernelspec."""
     return {
         "nbformat": 4,
         "nbformat_minor": 5,
@@ -80,6 +83,7 @@ _DROP_PARAMS = {
 
 
 def strip_internal_params(params: dict[str, Any]) -> dict[str, Any]:
+    """Drop ``_DROP_PARAMS`` and ``_``-prefixed routing keys, keeping real estimator params."""
     return {k: v for k, v in params.items() if k not in _DROP_PARAMS and not k.startswith("_")}
 
 
@@ -134,6 +138,7 @@ def _to_py_literal(d: Any) -> str:
 
 
 def config_fingerprint(cfg: _PipelineIn) -> str:
+    """Compute the 12-char SHA-256 config fingerprint embedded in the notebook header."""
     payload = json.dumps(
         [{"step": n.step_type, "params": n.params, "inputs": n.inputs} for n in cfg.nodes],
         sort_keys=True,
@@ -233,6 +238,7 @@ def compact_summary_md(
     train_test: _NodeIn | None,
     model: _NodeIn | None,
 ) -> str:
+    """Build the compact notebook's title markdown: fingerprint, handoff intent, graph summary."""
     return (
         f"# Skyulf pipeline — `{dataset_name or dataset_id}` (compact)\n\n"
         f"_Auto-exported from the Skyulf canvas. Config fingerprint: "
@@ -268,6 +274,7 @@ _FASTAPI_SNIPPET_CELL = code_cell(
 def compact_load_cells(
     data_path: str, target_col: str, resolved_from_db: bool = False
 ) -> list[dict[str, Any]]:
+    """Build the compact notebook's opening cells: imports, guided data load, metrics helper."""
     return [
         md_cell("## 1. Imports\n"),
         code_cell(
@@ -290,6 +297,7 @@ def compact_load_cells(
 
 
 def compact_run_cells(config_json: str) -> list[dict[str, Any]]:
+    """Build compact sections 3-5: config dict, fit + evaluate, and the prediction stub."""
     return [
         md_cell(
             "## 3. Pipeline configuration\n\n"
@@ -315,6 +323,7 @@ def compact_run_cells(config_json: str) -> list[dict[str, Any]]:
 
 
 def compact_persist_cells() -> list[dict[str, Any]]:
+    """Build compact sections 6-7: pickle the fitted pipeline, then print a FastAPI snippet."""
     return [
         md_cell(
             "## 6. Persist for production\n\n"
@@ -374,6 +383,7 @@ def _data_path_guidance_md(data_path: str, resolved_from_db: bool) -> str:
 
 
 def node_to_cell(n: _NodeIn, idx: int) -> dict[str, Any]:
+    """Render one preprocessing node as a code cell: fit its calculator, apply it, rebind df."""
     config_json = _to_py_literal(strip_internal_params(n.params))
     var = f"step{idx:02d}"
     return code_cell(
@@ -388,6 +398,7 @@ def node_to_cell(n: _NodeIn, idx: int) -> dict[str, Any]:
 
 
 def topology_summary(nodes: list[_NodeIn]) -> str:
+    """Format a fenced ASCII listing of *nodes* in topological order for the header markdown."""
     lines = ["```", "Topology (topological order):"]
     for i, n in enumerate(nodes, start=1):
         inputs = ", ".join(n.inputs) if n.inputs else "—"
@@ -407,6 +418,7 @@ def full_summary_md(
     train_test: _NodeIn | None,
     model: _NodeIn | None,
 ) -> str:
+    """Build the full notebook's title markdown: fingerprint, per-cell intent, and topology."""
     return (
         f"# Skyulf pipeline — `{dataset_name or dataset_id}` (full)\n\n"
         f"_Auto-exported from the Skyulf canvas. Config fingerprint: "
@@ -525,6 +537,7 @@ def _modeling_cell_tuning(model: _NodeIn, algo: str, config_json: str, metrics_v
 def modeling_cells(
     model: _NodeIn | None, in_branch: bool = False, branch_letter: str | None = None
 ) -> list[dict[str, Any]]:
+    """Build the section 6 modeling cells: tuned or basic training render, or a no-model stub."""
     if model is None:
         return _no_model_cells(in_branch)
     params = strip_internal_params(model.params)
@@ -610,10 +623,12 @@ def split_cells(
     train_test: _NodeIn | None,
     in_branch: bool = False,
 ) -> list[dict[str, Any]]:
+    """Build the split section: feature/target cells followed by train/test cells."""
     return _feat_target_cells(feat_target, in_branch) + _train_test_cells(train_test, in_branch)
 
 
 def persist_cells(preprocess: list[_NodeIn]) -> list[dict[str, Any]]:
+    """Build full-mode sections 7-8: pickle per-step artifacts, then a replay predict loop."""
     artifact_dict = "".join(
         f"    {i:>2}: ({n.step_type!r}, step{i:02d}_artifact),\n"
         for i, n in enumerate(preprocess, start=1)
@@ -650,6 +665,7 @@ def persist_cells(preprocess: list[_NodeIn]) -> list[dict[str, Any]]:
 
 
 def full_intro_cells(data_path: str, resolved_from_db: bool = False) -> list[dict[str, Any]]:
+    """Build full-mode intro cells: imports, data load, metrics helper, section 3 preamble."""
     return [
         md_cell("## 1. Imports\n"),
         code_cell(

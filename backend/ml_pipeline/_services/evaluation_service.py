@@ -1,7 +1,6 @@
-"""Evaluation Service
-------------------
-Service for retrieving and processing evaluation results (y_true, y_pred)
-for training and tuning jobs.
+"""Evaluation service: retrieves and processes evaluation results (y_true, y_pred).
+
+Covers both training and tuning jobs.
 """
 
 import logging

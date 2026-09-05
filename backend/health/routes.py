@@ -1,4 +1,4 @@
-"""Health Check Endpoints
+"""Health Check Endpoints.
 
 Basic health and status endpoints for monitoring and load balancer checks.
 """

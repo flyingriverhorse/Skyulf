@@ -1,4 +1,4 @@
-"""Settings Factory
+"""Settings factory.
 
 © 2025 Murat Unsal — Skyulf Project
 

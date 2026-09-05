@@ -1,4 +1,4 @@
-"""Logging Middleware
+"""Logging Middleware.
 
 Provides request/response logging for monitoring and debugging.
 """
@@ -19,6 +19,14 @@ class LoggingMiddleware(BaseHTTPMiddleware):
     """Middleware to log HTTP requests and responses."""
 
     def __init__(self, app: ASGIApp):
+        """Wrap the downstream ASGI ``app`` so its requests pass through ``dispatch``.
+
+        A pass-through to ``BaseHTTPMiddleware``'s own constructor; the class keeps
+        no state. It mints no request id either — ``dispatch`` reads the one
+        ``ErrorHandlerMiddleware`` stamped onto ``request.state`` and falls back to
+        ``"unknown"``. That ordering holds because the error handler is added after
+        this middleware, so it wraps it and runs first.
+        """
         super().__init__(app)
 
     async def dispatch(self, request: Request, call_next: Callable) -> Response:

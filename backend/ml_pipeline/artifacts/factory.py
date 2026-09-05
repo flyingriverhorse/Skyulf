@@ -1,3 +1,5 @@
+"""Artifact backend selection: the single place that picks S3 vs local storage."""
+
 import logging
 import os
 from pathlib import Path
@@ -40,11 +42,11 @@ class ArtifactFactory:
 
     @staticmethod
     def get_discovery() -> "ArtifactDiscovery":
-        """Returns the discovery backend used to enumerate job folders and their
-        reference artifacts at the artifact root.
+        """Returns the discovery backend for the artifact root.
 
-        Currently local-only; a UC/S3 implementation slots in here for Databricks
-        without touching the routers that consume it.
+        Used to enumerate job folders and their reference artifacts. Currently
+        local-only; a UC/S3 implementation slots in here for Databricks without
+        touching the routers that consume it.
         """
         from backend.ml_pipeline.artifacts.discovery import (
             ArtifactDiscovery,
@@ -61,7 +63,10 @@ class ArtifactFactory:
     def create_store_for_job(
         job_id: str, is_s3_source: bool = False, artifact_path_name: str | None = None
     ) -> tuple[ArtifactStore, str]:
-        """Determines the correct storage location for a new job based on:
+        """Determines the correct storage location for a new job.
+
+        Based on:
+
         1. The data source type (S3 vs Local)
         2. Configuration settings (UPLOAD_TO_S3_FOR_LOCAL_FILES, SAVE_S3_ARTIFACTS_LOCALLY)
 

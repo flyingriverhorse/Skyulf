@@ -1,3 +1,16 @@
+"""Exploratory data analysis endpoints, mounted at ``/api/eda``.
+
+Triggering an analysis inserts an ``EDAReport`` row and returns immediately: the
+profiling work is dispatched off the request path, through Celery when
+``USE_CELERY`` is set and FastAPI ``BackgroundTasks`` otherwise. The remaining
+routes list, cancel and serve those reports, and compute decomposition-tree
+splits on demand for the visualization.
+
+Report payloads are serialized with ``orjson`` into a raw ``Response`` rather
+than returned as dicts, because a profile blob runs to 2-10 MB on wide datasets
+and letting FastAPI re-encode it would buffer the whole thing twice.
+"""
+
 import logging
 from pathlib import Path
 from typing import Any, Literal, cast
@@ -28,6 +41,13 @@ router = APIRouter(prefix="/eda", tags=["EDA"])
 
 
 class FilterRequest(BaseModel):
+    """One row-level filter to apply before profiling or splitting.
+
+    Instances are dumped to plain dicts and handed to ``skyulf``'s ``EDAAnalyzer``
+    as its ``filters`` argument, so the operator vocabulary below is the analyzer's,
+    not this layer's.
+    """
+
     column: str
     operator: str
     value: Any
@@ -35,6 +55,11 @@ class FilterRequest(BaseModel):
     @field_validator("column")
     @classmethod
     def validate_column(cls, v: str) -> str:
+        """Reject a blank column name and one over the configured length cap.
+
+        The cap is the ``MAX_COLUMN_NAME_LENGTH`` setting, so the limit the client
+        is validated against follows the server profile rather than a constant.
+        """
         if not v or not v.strip():
             raise ValueError("column name cannot be empty")
         if len(v) > get_settings().MAX_COLUMN_NAME_LENGTH:
@@ -44,6 +69,11 @@ class FilterRequest(BaseModel):
     @field_validator("operator")
     @classmethod
     def validate_operator(cls, v: str) -> str:
+        """Restrict ``operator`` to the comparisons the analyzer implements.
+
+        Anything outside the set is refused here rather than failing deeper in the
+        analysis job; the rejection message lists the accepted values.
+        """
         allowed = {"==", "!=", ">", ">=", "<", "<=", "in", "not_in", "contains", "not_contains"}
         if v not in allowed:
             raise ValueError(f"operator must be one of {sorted(allowed)}")
@@ -51,6 +81,14 @@ class FilterRequest(BaseModel):
 
 
 class AnalyzeRequest(BaseModel):
+    """Optional body for ``POST /{dataset_id}/analyze``.
+
+    Every field is optional and the whole body may be omitted, which profiles the
+    dataset with no target column and no exclusions. Fields that are unset *or
+    empty* are left out of the stored config entirely rather than persisted as
+    nulls, so ``EDAReport.config`` records only what the caller asked for.
+    """
+
     target_col: str | None = None
     exclude_cols: list[str] | None = None
     filters: list[FilterRequest] | None = None
@@ -242,6 +280,15 @@ async def get_report(report_id: int, session: AsyncSession = Depends(get_db)):
 
 
 class DecompositionRequest(BaseModel):
+    """Body for ``POST /{dataset_id}/decomposition``: one decomposition-tree split.
+
+    ``measure_agg`` says how ``measure_col`` is aggregated within each group and
+    defaults to a plain row ``count``, so a request that names no measure still
+    returns group sizes. An empty-string ``split_col`` — what the frontend sends
+    before a split column is chosen — is normalized to ``None`` on the way to the
+    analyzer instead of being treated as a column name.
+    """
+
     measure_col: str | None = None
     measure_agg: Literal["count", "sum", "mean", "min", "max", "median"] = "count"
     split_col: str | None = None

@@ -1,3 +1,5 @@
+"""Request and response schemas for the deployment and prediction endpoints."""
+
 from datetime import datetime
 from typing import Any
 
@@ -5,10 +7,23 @@ from pydantic import BaseModel
 
 
 class DeploymentCreate(BaseModel):
+    """Job id to deploy, as a request body.
+
+    Currently unused: ``POST /deployment/deploy/{job_id}`` takes the job id as a
+    path parameter instead.
+    """
+
     job_id: str
 
 
 class DeploymentInfo(BaseModel):
+    """One deployment as the API returns it: identity, artifact URI and lineage.
+
+    ``input_schema`` is filled from the deployed artifact by the endpoints that
+    load it and stays null on the history list; ``output_schema`` is never
+    populated by any endpoint today.
+    """
+
     id: int
     job_id: str
     model_type: str
@@ -31,6 +46,8 @@ class DeploymentInfo(BaseModel):
 
 
 class PredictionRequest(BaseModel):
+    """Rows to score with the active deployment, plus optional threshold overrides."""
+
     data: list[dict[str, Any]]  # List of records (rows). Row-count is capped
     # dynamically in the /predict route via Settings.MAX_PREDICT_REQUEST_ROWS.
     # Ad-hoc per-class decision thresholds applied to THIS request only,
@@ -39,6 +56,8 @@ class PredictionRequest(BaseModel):
 
 
 class PredictionResponse(BaseModel):
+    """Scored rows, the deployed job id served as ``model_version``, and the thresholds used."""
+
     predictions: list[Any]
     model_version: str  # job_id
     # The per-class thresholds actually applied (override or saved+enabled),

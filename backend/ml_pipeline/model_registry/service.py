@@ -1,3 +1,5 @@
+"""Registry queries: version allocation, model/version listing, job artifacts."""
+
 from datetime import datetime
 from typing import Any, cast
 
@@ -21,6 +23,15 @@ _MAX_VERSION_ALLOCATION_ATTEMPTS = 5
 
 
 class ModelRegistryService:
+    """Query side of the model registry, assembled from ``TrainingJob`` rows.
+
+    Versions are derived rather than stored: completed fixed-mode (training) and
+    tuned-mode (tuning) jobs are projected into ``ModelVersion`` entries and
+    grouped by model type and dataset. Only the per-(dataset, model_type) version
+    counter is persisted, and it is allocated atomically so two concurrent
+    submissions cannot be handed the same number.
+    """
+
     @staticmethod
     async def _compute_seed_version(session: AsyncSession, dataset_id: str, model_type: str) -> int:
         """Best-effort seed for a brand-new counter row from pre-existing job history.
@@ -97,6 +108,13 @@ class ModelRegistryService:
 
     @staticmethod
     async def get_registry_stats(session: AsyncSession) -> RegistryStats:
+        """Counts completed jobs and active deployments for the registry header.
+
+        ``total_versions`` sums the completed fixed-mode and tuned-mode jobs and
+        ``active_deployments`` counts the ``is_active`` deployments.
+        ``total_models`` is hardcoded to 0: counting distinct model types across
+        both run_modes was never implemented, so it carries no information.
+        """
         # Count unique model types (approximate)
         # This is a bit complex with two tables, so we'll just count total jobs for now
 
@@ -311,6 +329,13 @@ class ModelRegistryService:
 
     @staticmethod
     async def get_model_versions(session: AsyncSession, model_type: str) -> list[ModelVersion]:
+        """Lists every completed job of one ``model_type`` as a registry version.
+
+        Merges fixed-mode (training) and tuned-mode (tuning) jobs across all
+        datasets, newest first, and flags the ones an active deployment points
+        at. Tuned rows fold ``best_score`` into ``metrics`` and report
+        ``best_params`` as their hyperparameters.
+        """
         # Similar to list_models but filtered by model_type
         # ... (implementation reuse or copy)
         # For brevity, just filtered the list_models result for now,

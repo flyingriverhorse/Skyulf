@@ -604,9 +604,11 @@ class NodeRunnersMixin:
         return metrics
 
     def _resolve_run_mode(self, node: NodeConfig) -> str:
-        """Derive ``'fixed'`` (plain, single hyperparameter set) vs ``'tuned'``
-        (hyperparameter search) for this training node, from its
-        ``run_mode`` param.
+        """Derive this training node's run mode from its ``run_mode`` param.
+
+        Either ``'fixed'`` (plain, single hyperparameter set) or ``'tuned'``
+        (hyperparameter search). Defaults to ``'fixed'`` when the param is
+        absent; any other value raises ``ValueError``.
         """
         run_mode = node.params.get("run_mode", "fixed")
         if run_mode not in ("fixed", "tuned"):
@@ -710,8 +712,10 @@ class NodeRunnersMixin:
     def _run_training_direct(
         self, node: NodeConfig, job_id: str, calculator: Any, applier: Any
     ) -> tuple[str, dict[str, Any]]:
-        """Plain direct-fit path — clustering only (Phase 2b keeps this route
-        for clustering since the tuning engine requires a supervised scorer).
+        """Plain direct-fit path — clustering only.
+
+        Phase 2b keeps this route for clustering since the tuning engine
+        requires a supervised scorer.
         """
         # Clustering (segmentation) nodes have no target column to predict —
         # `""` is the established "no target" sentinel `_get_input`/`_extract_xy`

@@ -78,6 +78,7 @@ class PipelineEngine(ArtifactsMixin, MergeMixin, FeatureEngMixin, NodeRunnersMix
         catalog: DataCatalog,
         log_callback=None,
     ):
+        """Bind the artifact store, catalog and log callback, and seed empty per-run state."""
         self.artifact_store = artifact_store
         self.catalog = catalog
         self.log_callback = log_callback
@@ -107,6 +108,12 @@ class PipelineEngine(ArtifactsMixin, MergeMixin, FeatureEngMixin, NodeRunnersMix
             return {}
 
     def log(self, message: str):
+        """Write ``message`` to the server log and forward it to the job's log callback.
+
+        The callback is what streams engine progress into the UI job-log panel;
+        when there is none (tests, direct calls) the message still lands in
+        ``logger``.
+        """
         logger.info(message)
         if self.log_callback:
             self.log_callback(message)

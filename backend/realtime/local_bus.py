@@ -22,6 +22,7 @@ class LocalBus:
     """Single-process bridge from sync publishers to one async listener."""
 
     def __init__(self) -> None:
+        """Create a detached bus: no loop and no queue until ``attach()`` runs."""
         self._loop: asyncio.AbstractEventLoop | None = None
         self._queue: asyncio.Queue[str] | None = None
 
@@ -32,6 +33,7 @@ class LocalBus:
         return self._queue
 
     def detach(self) -> None:
+        """Drop the bound loop and queue, returning ``publish`` to a no-op."""
         self._loop = None
         self._queue = None
 

@@ -32,6 +32,7 @@ class WarningCaptureHandler(logging.Handler):
     """
 
     def __init__(self, level: int = logging.WARNING) -> None:
+        """Create an empty buffer for records at ``level`` and above; not attached yet."""
         super().__init__(level=level)
         self._buffer: list[dict[str, Any]] = []
         self._current_node_id: str | None = None
@@ -44,8 +45,10 @@ class WarningCaptureHandler(logging.Handler):
     # ------------------------------------------------------------------
 
     def set_current_node(self, node_id: str | None, node_type: str | None) -> None:
-        """Tag subsequent warnings with this node id (called by the engine
-        before each ``_execute_node``). Pass ``None`` to clear.
+        """Tag subsequent warnings with this node id.
+
+        Called by the engine before each ``_execute_node``. Pass ``None`` to
+        clear.
         """
         self._current_node_id = node_id
         self._current_node_type = node_type
@@ -61,6 +64,12 @@ class WarningCaptureHandler(logging.Handler):
     # ------------------------------------------------------------------
 
     def emit(self, record: logging.LogRecord) -> None:  # noqa: D401
+        """Append ``record`` to the buffer, tagged with the currently-executing node.
+
+        Never raises: if the record cannot be formatted it goes to
+        ``handleError`` and is dropped, because a logging handler that threw
+        would take the pipeline run down with it.
+        """
         try:
             msg = record.getMessage()
         except Exception:  # noqa: BLE001 - logging handler emit must never raise
@@ -81,8 +90,9 @@ class WarningCaptureHandler(logging.Handler):
     # ------------------------------------------------------------------
 
     def attach(self) -> "WarningCaptureHandler":
-        """Attach this handler to the captured logger trees and return self
-        so callers can use it as a context manager.
+        """Attach this handler to the captured logger trees.
+
+        Returns self so callers can use it as a context manager.
         """
         for name in _CAPTURED_LOGGERS:
             lg = logging.getLogger(name)
@@ -91,6 +101,12 @@ class WarningCaptureHandler(logging.Handler):
         return self
 
     def detach(self) -> None:
+        """Remove this handler from every logger it attached to, then forget them.
+
+        Runs in the engine's ``finally`` block, so a logger that is already gone
+        must not turn run cleanup into an exception — per-logger failures are
+        swallowed at debug level.
+        """
         for lg in self._attached:
             try:
                 lg.removeHandler(self)
@@ -104,9 +120,11 @@ class WarningCaptureHandler(logging.Handler):
 
     # Context-manager sugar so engine code can do ``with handler.attach():``.
     def __enter__(self) -> "WarningCaptureHandler":
+        """Return ``self`` so ``attach()`` can be used directly in a ``with`` block."""
         return self
 
     def __exit__(self, exc_type: Any, exc: Any, tb: Any) -> None:
+        """Detach the handler on block exit, whether the run finished or raised."""
         self.detach()
 
 

@@ -1,8 +1,16 @@
+"""Storage-backend interface for the artifacts produced by one job."""
+
 from abc import ABC, abstractmethod
 from typing import Any
 
 
 class ArtifactStore(ABC):
+    """Key/value persistence seam for the artifacts inside a single job store.
+
+    Rooted at one job folder or S3 prefix; scanning the artifact root for job
+    folders is a separate concern and lives in ``artifacts.discovery``.
+    """
+
     @abstractmethod
     def save(self, key: str, data: Any) -> None:
         """Save data to the store with the given key."""

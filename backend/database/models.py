@@ -1,4 +1,4 @@
-"""Database Models for FastAPI
+"""Database models for FastAPI.
 
 SQLAlchemy models that mirror the existing Flask database structure.
 These models are compatible with the existing database schema.
@@ -64,6 +64,7 @@ class User(Base, TimestampMixin):
     data_sources = relationship("DataSource", back_populates="creator")
 
     def __repr__(self):
+        """Render a log-safe identity: username only, no email or password hash."""
         return f"<User {self.username}>"
 
     def to_dict(self):
@@ -125,6 +126,7 @@ class DataSource(Base, TimestampMixin):
     source_metadata: Mapped[Any | None] = mapped_column(JSON, nullable=True)
 
     def __repr__(self):
+        """Render a log-safe identity: name and type only, no config or credentials."""
         return f"<DataSource {self.name} ({self.type})>"
 
     def to_dict(self):
@@ -179,6 +181,7 @@ class FeatureEngineeringPipeline(Base, TimestampMixin):
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
     def to_dict(self) -> dict:
+        """Convert model to dictionary (``pipeline_metadata`` is emitted as ``metadata``)."""
         return {
             "id": self.id,
             "dataset_source_id": self.dataset_source_id,
@@ -226,6 +229,7 @@ class PipelineVersion(Base):
     )
 
     def to_dict(self) -> dict:
+        """Convert model to dictionary (the full snapshot, graph payload included)."""
         return {
             "id": self.id,
             "dataset_source_id": self.dataset_source_id,
@@ -330,6 +334,12 @@ class TrainingJob(MLJob):
     owner = relationship("User", backref="training_jobs")
 
     def to_dict(self) -> dict:
+        """Convert model to dictionary (``to_dict_base()`` plus the run-mode columns).
+
+        Both mode-specific column groups are emitted unconditionally; the
+        nullable tuning columns stay null on a ``run_mode="fixed"`` row, and
+        ``hyperparameters`` is fixed-mode only.
+        """
         data = self.to_dict_base()
         data.update(
             {
@@ -390,6 +400,7 @@ class Deployment(Base, TimestampMixin):
     )
 
     def to_dict(self):
+        """Convert model to dictionary, including the ``previous_deployment_id`` chain link."""
         return {
             "id": self.id,
             "job_id": self.job_id,
@@ -438,6 +449,7 @@ class EDAReport(Base, TimestampMixin):
     )
 
     def to_dict(self):
+        """Convert model to dictionary (status, config and the ``profile_data`` payload)."""
         return {
             "id": self.id,
             "data_source_id": self.data_source_id,
@@ -473,6 +485,7 @@ class DriftThresholdVersion(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=func.now(), nullable=False)
 
     def to_dict(self) -> dict:
+        """Convert model to dictionary (the four pinned threshold metrics and their version)."""
         return {
             "id": self.id,
             "version": self.version,
@@ -564,6 +577,12 @@ class ErrorEvent(Base):
     resolved_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, index=True)
 
     def to_dict(self):
+        """Convert model to dictionary, full traceback included.
+
+        Unlike ``__repr__`` this is not trimmed for logging: the complete
+        traceback text is emitted, and ``resolved_at`` stays null until an
+        operator triages the event.
+        """
         return {
             "id": self.id,
             "route": self.route,
@@ -595,6 +614,7 @@ class PipelineRunLog(Base):
     )
 
     def to_dict(self) -> dict:
+        """Convert model to dictionary (``pipeline_id``/``node_id`` are null when unattributed)."""
         return {
             "id": self.id,
             "pipeline_id": self.pipeline_id,

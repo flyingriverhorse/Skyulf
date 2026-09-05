@@ -18,6 +18,13 @@ router = APIRouter()
 
 @router.websocket("/ws/jobs")
 async def ws_jobs(ws: WebSocket) -> None:
+    """Serve the ``/ws/jobs`` event feed to one client until it disconnects.
+
+    Push-only: inbound frames are never read for their content, the receive loop
+    exists just so a client close surfaces as ``WebSocketDisconnect``. A socket
+    that fails to be accepted returns before it is ever registered, so it needs no
+    cleanup; every other exit path unregisters it in the ``finally``.
+    """
     try:
         await connection_manager.connect(ws)
     except Exception as exc:  # noqa: BLE001 - failed accept exits handler

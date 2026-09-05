@@ -1,3 +1,14 @@
+"""Tabular data I/O for the backend, and its polars/pandas boundary.
+
+``DataService`` is the single entry point the rest of the backend uses to read,
+sample and write datasets, over local paths and ``s3://`` URIs alike — the latter
+authenticated through ``storage_options`` rather than a separate code path.
+
+Because every frame entering the app arrives through here, this module is where
+the polars/pandas decision gets made; nothing downstream should reach for a
+reader directly, or the engine a ``skyulf`` node receives stops being predictable.
+"""
+
 import logging
 from pathlib import Path
 from typing import Any, cast
@@ -22,6 +33,13 @@ class DataService:
     """
 
     def __init__(self):
+        """Nothing to set up — ``DataService`` carries no state.
+
+        There are no instance attributes, no pooled connection and no cache: every
+        method takes its path, engine preference and credentials per call. Callers
+        therefore construct a fresh instance wherever one is needed rather than
+        sharing a long-lived one.
+        """
         pass
 
     async def load_file(
