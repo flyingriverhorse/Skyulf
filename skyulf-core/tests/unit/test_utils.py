@@ -438,7 +438,7 @@ def test_user_picked_no_columns_none_value() -> None:
 # ---------------------------------------------------------------------------
 
 try:
-    import polars as pl
+    import polars as pl  # noqa: F401 - availability probe; each test rebinds pl locally
 
     _POLARS_AVAILABLE = True
 except ImportError:

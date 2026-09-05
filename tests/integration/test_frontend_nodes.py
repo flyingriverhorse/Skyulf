@@ -54,7 +54,7 @@ async def test_all_transformers(sample_data, tmp_path):
     }
 
     try:
-        import h3
+        import h3  # noqa: F401 - availability probe; only the ImportError outcome is used
 
         has_h3 = True
     except ImportError:

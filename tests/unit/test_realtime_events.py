@@ -10,7 +10,6 @@ unauthenticated broadcast), and numpy scores serialize cleanly.
 import numpy as np
 import orjson
 import pytest
-from pydantic import ValidationError
 
 from backend.realtime.events import JobEvent
 

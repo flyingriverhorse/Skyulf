@@ -253,7 +253,7 @@ class TestS3CatalogPolarsPaths:
         """A fresh local CSV cache is returned as a Polars frame under the
         polars engine, not a pandas frame."""
         pl = pytest.importorskip("polars")
-        from datetime import datetime, timedelta, timezone
+        from datetime import datetime, timedelta
 
         from backend.config import get_settings
 
@@ -274,7 +274,7 @@ class TestS3CatalogPolarsPaths:
     def test_fresh_parquet_cache_is_read_with_polars(self, tmp_path, monkeypatch):
         """Same for parquet caches, with the row limit applied after the read."""
         pl = pytest.importorskip("polars")
-        from datetime import datetime, timedelta, timezone
+        from datetime import datetime, timedelta
 
         from backend.config import get_settings
 
@@ -334,7 +334,7 @@ class TestS3CatalogPolarsPaths:
     def test_fresh_csv_cache_is_read_with_pandas(self, tmp_path, monkeypatch):
         """The else side of the cache engine check: under the pandas engine a
         fresh CSV cache stays a pandas frame."""
-        from datetime import datetime, timedelta, timezone
+        from datetime import datetime, timedelta
 
         from backend.config import get_settings
 
@@ -354,7 +354,7 @@ class TestS3CatalogPolarsPaths:
     @pytest.mark.skipif(not _has_pyarrow(), reason="pyarrow not installed")
     def test_fresh_parquet_cache_is_read_with_pandas(self, tmp_path, monkeypatch):
         """Same else side for parquet caches."""
-        from datetime import datetime, timedelta, timezone
+        from datetime import datetime, timedelta
 
         from backend.config import get_settings
 

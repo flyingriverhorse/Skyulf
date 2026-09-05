@@ -13,7 +13,7 @@ cp .env.example .env
 
 | Variable | Default | Description |
 |---|---|---|
-| `FASTAPI_ENV` | `development` | Environment mode: `development`, `production`, or `testing` |
+| `FASTAPI_ENV` | `development` | Environment mode: `development`, `production`, or `testing`. Any other value — including blank — stops the server at startup |
 | `APP_NAME` | `Skyulf` | Application name shown in API docs |
 | `APP_VERSION` | *(set by code)* | Application version — do not override |
 | `DEBUG` | `false` | Enable debug mode (enables API docs, verbose logging, auto-reload) |
@@ -23,6 +23,9 @@ cp .env.example .env
 | `SENTRY_DSN` | *(unset)* | Sentry error tracking DSN — leave unset to disable |
 
 > **Note:** `FASTAPI_ENV=development` is the default. Production mode is enabled with `FASTAPI_ENV=production`.
+> The value may come from the process environment or from `.env`, and case and surrounding whitespace are
+> normalized (`PRODUCTION` and `"production "` both work). Anything else raises at startup rather than
+> falling back to development — a typo used to boot the development security posture silently.
 
 ---
 

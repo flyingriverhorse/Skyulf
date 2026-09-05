@@ -4,7 +4,6 @@ Tests are deliberately free of any database: all SQLAlchemy objects are
 replaced by lightweight MagicMock / SimpleNamespace instances.
 """
 
-import asyncio
 import unittest
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch

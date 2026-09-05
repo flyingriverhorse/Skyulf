@@ -5,6 +5,8 @@ from typing import Any
 
 import joblib
 
+from backend.utils.logging_utils import redact_credentials
+
 from .store import ArtifactStore
 
 logger = logging.getLogger(__name__)
@@ -61,16 +63,8 @@ class S3ArtifactStore(ArtifactStore):
         except ImportError:
             raise ImportError("s3fs is required for S3ArtifactStore") from None
         except Exception as e:
-            logger.error("Failed to initialize S3 filesystem client: %s", self._sanitize_error(e))
+            logger.error("Failed to initialize S3 filesystem client: %s", redact_credentials(e))
             raise RuntimeError("Failed to initialize S3 artifact storage") from e
-
-    @staticmethod
-    def _sanitize_error(error: Exception) -> str:
-        message = str(error)
-        for secret in ("aws_secret_access_key", "aws_access_key_id", "secret=", "key="):
-            if secret in message:
-                return "redacted sensitive S3 error"
-        return message
 
     @staticmethod
     def _normalize_prefix(prefix: str) -> str:
@@ -124,7 +118,7 @@ class S3ArtifactStore(ArtifactStore):
             with self.fs.open(path, "wb") as f:
                 joblib.dump(data, f)
         except Exception as e:
-            logger.error("Failed to save artifact to S3 %s: %s", path, self._sanitize_error(e))
+            logger.error("Failed to save artifact to S3 %s: %s", path, redact_credentials(e))
             raise RuntimeError(f"Failed to save artifact to S3: {path}") from e
 
     def load(self, key: str) -> Any:
@@ -143,7 +137,7 @@ class S3ArtifactStore(ArtifactStore):
             with self.fs.open(path, "rb") as f:
                 return joblib.load(f)
         except Exception as e:
-            logger.error("Failed to load artifact from S3 %s: %s", path, self._sanitize_error(e))
+            logger.error("Failed to load artifact from S3 %s: %s", path, redact_credentials(e))
             if isinstance(e, FileNotFoundError):
                 raise
             raise RuntimeError(f"Failed to load artifact from S3: {path}") from e
@@ -154,7 +148,7 @@ class S3ArtifactStore(ArtifactStore):
             return bool(self.fs.exists(path))
         except Exception as e:
             logger.error(
-                "Failed to check artifact existence in S3 %s: %s", path, self._sanitize_error(e)
+                "Failed to check artifact existence in S3 %s: %s", path, redact_credentials(e)
             )
             raise RuntimeError(f"Failed to check artifact existence in S3: {path}") from e
 
@@ -190,7 +184,7 @@ class S3ArtifactStore(ArtifactStore):
             keys = [key for f in files if (key := self._key_from_listed_path(f)) is not None]
             return keys
         except Exception as e:  # noqa: BLE001 - any S3 error degrades to empty list
-            logger.error("Failed to list artifacts in %s: %s", base_path, self._sanitize_error(e))
+            logger.error("Failed to list artifacts in %s: %s", base_path, redact_credentials(e))
             return []
 
     def get_artifact_uri(self, key: str) -> str:

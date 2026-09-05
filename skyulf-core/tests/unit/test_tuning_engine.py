@@ -20,7 +20,7 @@ from skyulf.modeling._evaluation.thresholds import apply_thresholds
 from skyulf.modeling._tuning import engine as engine_mod
 from skyulf.modeling._tuning import splitters as splitters_mod
 from skyulf.modeling._tuning.engine import TuningApplier, TuningCalculator
-from skyulf.modeling._tuning.schemas import TuningConfig, TuningResult
+from skyulf.modeling._tuning.schemas import TuningConfig
 from skyulf.modeling._tuning.strategies import halving as halving_mod
 from skyulf.modeling._tuning.strategies import runner as runner_mod
 from skyulf.modeling.base import BaseModelCalculator

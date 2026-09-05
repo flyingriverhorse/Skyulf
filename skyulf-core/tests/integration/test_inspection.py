@@ -15,7 +15,6 @@ import polars as pl
 import pytest
 from tests.utils.test_case_loader import TestCaseLoader
 
-from skyulf.core.artifacts import DatasetProfileArtifact, DataSnapshotArtifact
 from skyulf.preprocessing.inspection import (
     DatasetProfileApplier,
     DatasetProfileCalculator,

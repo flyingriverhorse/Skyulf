@@ -6,8 +6,6 @@ verifies the PRAGMA actually reflects the configured value at both call
 sites (initialization optimizations and per-connection setup).
 """
 
-import asyncio
-
 import pytest
 
 from backend.database.async_connection_manager import AsyncSQLiteConnectionManager

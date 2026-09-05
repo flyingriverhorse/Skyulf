@@ -2,7 +2,7 @@
 
 [project]
 name = "skyulf"
-version = "0.8.12"
+version = "0.8.13"
 description = "MLOps web application for privacy-preserving ML workflows"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -160,7 +160,28 @@ extend-exclude = [
 # skyulf-core/skyulf/ (audit finding F-11): 173 deferred imports hoisted,
 # 29 optional-extra imports waived per-site. Tests, entry points and
 # backend stay exempt via per-file-ignores below.
-select = ["E9", "F63", "F7", "F82", "I", "UP", "B", "C4", "SIM", "PERF", "BLE", "PLC0415"]
+# F401 (unused-import) enabled repo-wide (audit finding OC-09): the flake8-parity
+# set covers *undefined* names only, so orphans went unpoliced — neither `ty` nor
+# the formatter reports them. Two left behind by the OC-130/OC-152 fixes passed
+# every gate and were caught only by an external linter. Of 27 sites, 22 were
+# dead and auto-fixed; the rest are availability/side-effect probes carrying a
+# per-site `# noqa: F401 - <reason>` waiver, as with BLE001 above. Pre-commit
+# runs ruff with `--fix`, so orphans are now stripped automatically.
+select = [
+    "E9",
+    "F63",
+    "F7",
+    "F82",
+    "F401",
+    "I",
+    "UP",
+    "B",
+    "C4",
+    "SIM",
+    "PERF",
+    "BLE",
+    "PLC0415",
+]
 # E203: owned by the formatter. UP042/046/047: StrEnum/PEP 695 need
 # case-by-case review, not blanket enforcement. B008: FastAPI's Depends()
 # default-argument idiom, not a bug.

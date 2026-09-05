@@ -5,7 +5,7 @@ cleanup, exercising branches not covered by the higher-level flow tests in
 test_deployment.py (deploy -> predict happy path).
 """
 
-from datetime import UTC, datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -403,12 +403,12 @@ def test_predict_and_decode_plain_list_without_tolist():
 # ---------------------------------------------------------------------------
 
 
-def test_predict_with_legacy_artifact_fills_missing_columns_and_reorders():
+def test_predict_with_legacy_artifact_reorders_columns_to_match_model():
     class _LegacyModel:
         feature_names_in_ = np.array(["a", "b"])
 
         def predict(self, df):
-            # Ensure columns were reordered/filled as expected before predict is called
+            # Ensure columns were reordered as expected before predict is called
             assert list(df.columns) == ["a", "b"]
             return np.array([df["a"].iloc[0] + df["b"].iloc[0]])
 
@@ -418,18 +418,25 @@ def test_predict_with_legacy_artifact_fills_missing_columns_and_reorders():
     assert result == [8]
 
 
-def test_predict_with_legacy_artifact_fills_zero_for_missing_column():
+def test_predict_with_legacy_artifact_raises_on_missing_column():
+    """OC-155 regression: absent features are rejected, not zero-filled.
+
+    A literal 0 is an extreme out-of-distribution input for any feature whose
+    training distribution is not centred on zero, and the prediction used to
+    reach the API caller as a normal result behind a server-side warning.
+    """
+
     class _LegacyModel:
-        feature_names_in_ = np.array(["a", "b", "c"])
+        feature_names_in_ = np.array(["income", "age", "price"])
 
-        def predict(self, df):
-            assert "c" in df.columns
-            assert (df["c"] == 0).all()
-            return df["a"] + df["b"] + df["c"]
+        def predict(self, df):  # pragma: no cover - must not be reached
+            raise AssertionError("predict() must not run when a feature is missing")
 
-    df = pd.DataFrame({"a": [1], "b": [2]})
-    result = DeploymentService._predict_with_legacy_artifact(_LegacyModel(), df)
-    assert list(result) == [3]
+    df = pd.DataFrame({"income": [50000], "age": [30]})
+    with pytest.raises(ValueError, match="Missing required column.*price"):
+        DeploymentService._predict_with_legacy_artifact(_LegacyModel(), df)
+    # The zero-fill also wrote into the caller's frame; the rejection must not.
+    assert list(df.columns) == ["income", "age"]
 
 
 # ---------------------------------------------------------------------------
@@ -601,7 +608,6 @@ def test_predict_with_bundled_artifact_reorders_columns_to_match_training():
     the predict path must reindex to the recorded training feature order
     before passing to sklearn (which uses positional numpy arrays).
     """
-    from backend.ml_pipeline.artifacts.local import LocalArtifactStore
 
     # Create a transformer that adds column 'c'
     transformer = _ColumnAddingTransformer()
@@ -713,6 +719,51 @@ def test_predict_with_bundled_artifact_missing_all_input_columns():
     df = pd.DataFrame({"x": [1], "y": [2]})
 
     with pytest.raises(ValueError, match="Missing required column.*a.*b"):
+        DeploymentService._predict_with_bundled_artifact(artifact, df)
+
+
+def test_predict_with_bundled_artifact_raises_when_transform_output_misaligns():
+    """OC-154 regression: feature-order alignment must fail closed, not be skipped.
+
+    The F-02 reindex used to guard itself with ``if not missing``, so when the
+    feature engineer's output did not contain every recorded training column the
+    reindex was skipped silently and the frame reached a positional model (no
+    ``feature_names_in_``) in whatever order the transform happened to produce —
+    a wrong prediction with no error and no warning.
+    """
+
+    class _ColumnRenamingTransformer:
+        def transform(self, X):
+            out = X.copy()
+            out["d"] = 99  # 'c' was renamed/lost, so it is absent from the output
+            return out
+
+    transformer = _ColumnRenamingTransformer()
+
+    class _TestEngineer:
+        def __init__(self):
+            self.feature_names_in_ = ["a", "b"]
+
+        def transform(self, df):
+            return transformer.transform(df)
+
+    class _PositionalModel:
+        """No feature_names_in_: consumes columns purely positionally."""
+
+        def predict(self, X):  # pragma: no cover - must not be reached
+            raise AssertionError("predict() must not run on misaligned features")
+
+    artifact = {
+        "feature_engineer": _TestEngineer(),
+        "model": _PositionalModel(),
+        "feature_columns": ["a", "b", "c"],  # Recorded at training time
+        "target_column": None,
+        "dropped_columns": [],
+    }
+
+    df = pd.DataFrame({"a": [1], "b": [2]})
+
+    with pytest.raises(ValueError, match="cannot align to the training feature order"):
         DeploymentService._predict_with_bundled_artifact(artifact, df)
 
 
