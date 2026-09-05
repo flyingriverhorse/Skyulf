@@ -19,6 +19,7 @@ from backend.data_ingestion.tasks import ingest_data_task
 from backend.database.models import DataSource
 from backend.exceptions.core import ForbiddenException, ResourceNotFoundException, SkyulfException
 from backend.services.data_service import DataService
+from backend.utils import sanitize_for_log
 
 logger = logging.getLogger(__name__)
 
@@ -104,14 +105,14 @@ class DataIngestionService:
                     path = Path(file_path)
                     if path.exists():
                         path.unlink()
-                        logger.info(f"Deleted file: {file_path}")
+                        logger.info("Deleted file: %s", sanitize_for_log(file_path))
                 except Exception as e:  # noqa: BLE001 - best-effort file cleanup, logged
                     logger.error(
                         "Orphaned file: failed to delete '%s' while deleting source %s "
                         "(the data source record will still be removed); manual cleanup "
                         "required. Error: %s",
-                        file_path,
-                        source_id,
+                        sanitize_for_log(file_path),
+                        sanitize_for_log(source_id),
                         e,
                     )
 

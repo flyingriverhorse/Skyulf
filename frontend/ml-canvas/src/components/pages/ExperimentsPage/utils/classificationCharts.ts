@@ -429,8 +429,8 @@ export function getCalibrationData(
   }
   return bins
     .map((b, i) => ({
-      midpoint: parseFloat(((i + 0.5) / nBins).toFixed(2)),
-      fracPos: b.count > 0 ? parseFloat((b.pos / b.count).toFixed(4)) : 0,
+      midpoint: Number.parseFloat(((i + 0.5) / nBins).toFixed(2)),
+      fracPos: b.count > 0 ? Number.parseFloat((b.pos / b.count).toFixed(4)) : 0,
       count: b.count,
     }))
     .filter(b => b.count > 0);
@@ -460,9 +460,9 @@ export function getCumulativeGainsData(
     const pct = (i + 1) / n;
     const gain = cumPos / totalPos;
     pts.push({
-      pct: parseFloat(pct.toFixed(3)),
-      gain: parseFloat(gain.toFixed(3)),
-      lift: parseFloat((gain / pct).toFixed(3)),
+      pct: Number.parseFloat(pct.toFixed(3)),
+      gain: Number.parseFloat(gain.toFixed(3)),
+      lift: Number.parseFloat((gain / pct).toFixed(3)),
     });
   }
   // Down-sample to keep the chart responsive on large splits.
@@ -494,8 +494,8 @@ export function getMCCByThreshold(
     }
     const denom = Math.sqrt((tp + fp) * (tp + fn) * (tn + fp) * (tn + fn));
     return {
-      threshold: parseFloat(t.toFixed(2)),
-      mcc: parseFloat((denom > 0 ? (tp * tn - fp * fn) / denom : 0).toFixed(4)),
+      threshold: Number.parseFloat(t.toFixed(2)),
+      mcc: Number.parseFloat((denom > 0 ? (tp * tn - fp * fn) / denom : 0).toFixed(4)),
     };
   });
 }

@@ -383,7 +383,7 @@ class MultivariateMixin(_AnalyzerState):
             preds = clf.predict(X)
             scores = clf.decision_function(X)  # lower = more anomalous
 
-            outlier_indices = np.where(preds == -1)[0]
+            outlier_indices = np.nonzero(preds == -1)[0]
             total_outliers = len(outlier_indices)
             if total_outliers == 0:
                 return None

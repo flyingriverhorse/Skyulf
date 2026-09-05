@@ -49,13 +49,13 @@ class TestPolarsPreprocessingFull(unittest.TestCase):
             params = {"strategy": "quantile", "n_bins": 2, "columns": ["A_num"]}
             fit_res = calc.fit(self.df, params)
             applier.apply(self.df, fit_res)
-
-            # Check for bin_edges instead of bins
-            self.assertIn("bin_edges", fit_res)
-
-            print("  v Quantile extraction passed")
         except Exception as e:  # noqa: BLE001 - convert failure into test failure message
             self.fail(f"Bucketing failed: {e}")
+
+        # Check for bin_edges instead of bins
+        self.assertIn("bin_edges", fit_res)
+
+        print("  v Quantile extraction passed")
 
     # --- 2. Cleaning: Text ---
     def test_text_cleaning_polars(self):

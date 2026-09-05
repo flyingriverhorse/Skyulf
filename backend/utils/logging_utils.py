@@ -36,6 +36,27 @@ def log_data_action(action: str, success: bool = True, details: str | None = Non
     data_logger.log(level, message)
 
 
+# C0 control block (includes CR/LF) plus DEL, mapped to a visible escape.
+_CONTROL_ESCAPES = {**{c: f"\\x{c:02x}" for c in range(0x20)}, 0x7F: "\\x7f"}
+
+
+def sanitize_for_log(value: object) -> str:
+    """Render a possibly user-controlled value so it cannot forge log lines.
+
+    Values reaching the backend from HTTP path parameters or uploaded filenames
+    can carry CR/LF, letting a caller split one log record into several and
+    fabricate entries that never happened (CWE-117). Control characters are
+    escaped rather than deleted so an injection attempt stays visible.
+
+    Args:
+        value: The value to render.
+
+    Returns:
+        A single-line string safe to interpolate into a log record.
+    """
+    return str(value).translate(_CONTROL_ESCAPES)
+
+
 def _build_file_handler(
     log_file: str,
     log_level: str,

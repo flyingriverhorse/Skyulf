@@ -260,7 +260,7 @@ const EncodingSettings: React.FC<{ config: EncodingConfig; onChange: (c: Encodin
                   value={config.smooth ?? 'auto'}
                   onChange={(e) => {
                     const v = e.target.value;
-                    onChange({ ...config, smooth: v === 'auto' ? 'auto' : (isNaN(Number(v)) ? 'auto' : Number(v)) });
+                    onChange({ ...config, smooth: v === 'auto' ? 'auto' : (Number.isNaN(Number(v)) ? 'auto' : Number(v)) });
                   }}
                   placeholder="auto or number"
                   title="Smoothing strength. 'auto' uses sklearn's default."
@@ -308,7 +308,7 @@ const EncodingSettings: React.FC<{ config: EncodingConfig; onChange: (c: Encodin
                   min="0"
                   className="w-full p-2 border rounded"
                   value={config.regularization ?? 0.5}
-                  onChange={(e) => onChange({ ...config, regularization: parseFloat(e.target.value) })}
+                  onChange={(e) => onChange({ ...config, regularization: Number.parseFloat(e.target.value) })}
                   title="Laplace smoothing added to event/non-event counts to avoid division by zero."
                 />
                 <p className="text-[10px] text-muted-foreground">Smoothing for rare categories (default 0.5).</p>

@@ -130,12 +130,12 @@ const LOG_HIGHLIGHT_RULES: HighlightRule[] = [
   },
   // durations with units  e.g.  3.14s  250ms  0.05s
   {
-    re: /-?\d+\.?\d*(?:[eE][+-]?\d+)?\s*(?:ms|s)\b/,
+    re: /-?\d+(?:\.\d*)?(?:[eE][+-]?\d+)?\s*(?:ms|s)\b/,
     seg: m => [{ text: m[0], cls: 'text-teal-400' }],
   },
   // percentages  e.g.  98.5%
   {
-    re: /-?\d+\.?\d*%/,
+    re: /-?\d+(?:\.\d*)?%/,
     seg: m => [{ text: m[0], cls: 'text-emerald-400' }],
   },
   // floats (bare)

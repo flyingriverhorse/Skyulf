@@ -91,7 +91,7 @@ export const StrategySettingsModal: React.FC<StrategySettingsModalProps> = ({
         if (isOptuna && (finalConfig.timeout === '' || finalConfig.timeout === undefined)) {
             delete finalConfig.timeout;
         } else if (isOptuna && typeof finalConfig.timeout === 'string') {
-            finalConfig.timeout = parseInt(finalConfig.timeout, 10);
+            finalConfig.timeout = Number.parseInt(finalConfig.timeout, 10);
         }
 
         onSave(finalConfig);
@@ -151,7 +151,7 @@ export const StrategySettingsModal: React.FC<StrategySettingsModalProps> = ({
                                     type="number"
                                     min="2"
                                     value={config.factor ?? 3}
-                                    onChange={(e) => setConfig({ ...config, factor: parseInt(e.target.value, 10) })}
+                                    onChange={(e) => setConfig({ ...config, factor: Number.parseInt(e.target.value, 10) })}
                                     className="w-full text-sm border-gray-300 dark:border-gray-600 rounded-lg p-2.5 bg-gray-50 dark:bg-gray-900 dark:text-white border focus:ring-2 focus:ring-blue-500"
                                 />
                                 <p className="text-xs text-gray-500 mt-1">Typical values are 2 or 3.</p>
@@ -253,7 +253,7 @@ export const StrategySettingsModal: React.FC<StrategySettingsModalProps> = ({
                                     type="number"
                                     min="1"
                                     value={config.timeout ?? ''}
-                                    onChange={(e) => setConfig({ ...config, timeout: e.target.value ? parseInt(e.target.value, 10) : '' })}
+                                    onChange={(e) => setConfig({ ...config, timeout: e.target.value ? Number.parseInt(e.target.value, 10) : '' })}
                                     className="w-full text-sm border-gray-300 dark:border-gray-600 rounded-lg p-2.5 bg-gray-50 dark:bg-gray-900 dark:text-white border focus:ring-2 focus:ring-blue-500"
                                     placeholder="e.g. 300 (Optional)"
                                 />

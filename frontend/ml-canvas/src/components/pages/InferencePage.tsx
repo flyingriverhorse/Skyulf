@@ -288,7 +288,7 @@ const checkSchema = (raw: string, schema: { name: string; type: string }[]): Sch
  * left them as strings, which then crashed the model with
  * `unsupported operand type(s) for -: 'str' and 'float'`.
  */
-const NUMERIC_RE = /^-?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?$/;
+const NUMERIC_RE = /^-?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$/;
 
 /**
  * Tiny CSV-to-objects parser: comma-separated, first row is headers, no

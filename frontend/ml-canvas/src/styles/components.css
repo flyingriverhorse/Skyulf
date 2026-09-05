@@ -154,12 +154,14 @@ select {
   background-position: right .5rem center;
   background-repeat: no-repeat;
   background-size: 1.5em 1.5em;
-  padding-right: 2.5rem;
   background-color: var(--light-input-bg);
   color: var(--light-text-primary);
   border: 1px solid var(--light-border-strong);
   border-radius: .65rem;
   padding: .55rem .8rem;
+  /* Must follow the shorthand above, which would otherwise reset it: keeps
+     selected text clear of the arrow drawn by background-image. */
+  padding-right: 2.5rem;
   font-size: .95rem;
   transition: border-color .2s ease, box-shadow .2s ease;
 }

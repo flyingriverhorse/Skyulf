@@ -52,7 +52,7 @@ export const RegressionChartsForSplit: React.FC<Props> = ({
   );
   const meanBinLabel = hist
     ? hist.bins.reduce((best, b, i) => (
-        Math.abs(parseFloat(b.label) - hist.mean) < Math.abs(parseFloat(hist.bins[best]!.label) - hist.mean) ? i : best
+        Math.abs(Number.parseFloat(b.label) - hist.mean) < Math.abs(Number.parseFloat(hist.bins[best]!.label) - hist.mean) ? i : best
       ), 0)
     : 0;
   const pct = useMemo(
@@ -220,7 +220,7 @@ export const RegressionChartsForSplit: React.FC<Props> = ({
                   return null;
                 }}
               />
-              <ReferenceLine x={hist.bins.find(b => parseFloat(b.label) >= 0)?.label ?? ''} stroke="#ef4444" strokeDasharray="3 3" strokeWidth={1.5} label={{ value: '0', position: 'top', fontSize: 10, fill: '#ef4444' }} />
+              <ReferenceLine x={hist.bins.find(b => Number.parseFloat(b.label) >= 0)?.label ?? ''} stroke="#ef4444" strokeDasharray="3 3" strokeWidth={1.5} label={{ value: '0', position: 'top', fontSize: 10, fill: '#ef4444' }} />
               <ReferenceLine x={hist.bins[meanBinLabel]?.label ?? ''} stroke="#f59e0b" strokeDasharray="4 2" strokeWidth={1.5} label={{ value: `\u03bc=${hist.mean.toFixed(2)}`, position: 'top', fontSize: 10, fill: '#f59e0b' }} />
               <Bar dataKey="count" fill="#6ee7b7" fillOpacity={0.8} isAnimationActive={false} />
             </BarChart>
@@ -276,7 +276,7 @@ export const RegressionChartsForSplit: React.FC<Props> = ({
                 }
                 return null;
               }} />
-              <ReferenceLine x={relHist.find(b => parseFloat(b.label) >= 0)?.label ?? ''} stroke="#ef4444" strokeDasharray="3 3" strokeWidth={1.5} label={{ value: '0', position: 'top', fontSize: 10, fill: '#ef4444' }} />
+              <ReferenceLine x={relHist.find(b => Number.parseFloat(b.label) >= 0)?.label ?? ''} stroke="#ef4444" strokeDasharray="3 3" strokeWidth={1.5} label={{ value: '0', position: 'top', fontSize: 10, fill: '#ef4444' }} />
               <Bar dataKey="count" fill="#fbbf24" fillOpacity={0.8} isAnimationActive={false} />
             </BarChart>
           </ResponsiveContainer>

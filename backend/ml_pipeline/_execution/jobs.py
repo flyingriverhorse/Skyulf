@@ -247,7 +247,7 @@ class JobManager:
     @staticmethod
     def _job_summary_entry(job: Any) -> dict[str, Any] | None:
         """Build a single node-card summary entry for a completed job, or None if no summary."""
-        summary = (job.metrics or {}).get("summary") if job.metrics else None
+        summary = job.metrics.get("summary") if job.metrics else None
         if not isinstance(summary, str) or not summary.strip():
             return None
         entry: dict[str, Any] = {

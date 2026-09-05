@@ -179,7 +179,7 @@ const ScalingSettings: React.FC<{ config: ScalingConfig; onChange: (c: ScalingCo
                   className="w-full p-2 border rounded bg-background text-sm"
                   placeholder="Min (0)"
                   value={config.feature_range_min ?? 0}
-                  onChange={(e) => onChange({ ...config, feature_range_min: parseFloat(e.target.value) })}
+                  onChange={(e) => onChange({ ...config, feature_range_min: Number.parseFloat(e.target.value) })}
                 />
                 <span className="text-muted-foreground">-</span>
                 <input
@@ -187,7 +187,7 @@ const ScalingSettings: React.FC<{ config: ScalingConfig; onChange: (c: ScalingCo
                   className="w-full p-2 border rounded bg-background text-sm"
                   placeholder="Max (1)"
                   value={config.feature_range_max ?? 1}
-                  onChange={(e) => onChange({ ...config, feature_range_max: parseFloat(e.target.value) })}
+                  onChange={(e) => onChange({ ...config, feature_range_max: Number.parseFloat(e.target.value) })}
                 />
               </div>
             </div>
@@ -203,7 +203,7 @@ const ScalingSettings: React.FC<{ config: ScalingConfig; onChange: (c: ScalingCo
                   className="w-full p-2 border rounded bg-background text-sm"
                   placeholder="Min (25.0)"
                   value={config.quantile_range_min ?? 25.0}
-                  onChange={(e) => onChange({ ...config, quantile_range_min: parseFloat(e.target.value) })}
+                  onChange={(e) => onChange({ ...config, quantile_range_min: Number.parseFloat(e.target.value) })}
                 />
                 <span className="text-muted-foreground">-</span>
                 <input
@@ -211,7 +211,7 @@ const ScalingSettings: React.FC<{ config: ScalingConfig; onChange: (c: ScalingCo
                   className="w-full p-2 border rounded bg-background text-sm"
                   placeholder="Max (75.0)"
                   value={config.quantile_range_max ?? 75.0}
-                  onChange={(e) => onChange({ ...config, quantile_range_max: parseFloat(e.target.value) })}
+                  onChange={(e) => onChange({ ...config, quantile_range_max: Number.parseFloat(e.target.value) })}
                 />
               </div>
               <div className="space-y-2 mt-2">

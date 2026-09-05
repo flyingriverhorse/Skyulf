@@ -13,6 +13,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, cast
 
+import aiofiles
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -77,8 +78,8 @@ async def save_pipeline(
         except ValueError as e:
             raise HTTPException(status_code=400, detail="Invalid dataset_id") from e
         try:
-            with file_path.open("w") as f:
-                json.dump(payload.model_dump(), f, indent=2)
+            async with aiofiles.open(file_path, "w") as f:
+                await f.write(json.dumps(payload.model_dump(), indent=2))
             return {"status": "success", "id": dataset_id, "storage": "json"}
         except Exception as e:
             raise SkyulfException(message=f"Failed to save pipeline to JSON: {str(e)}") from e
@@ -151,8 +152,8 @@ async def load_pipeline(
         if not file_path.exists():
             return None
         try:
-            with file_path.open() as f:
-                return json.load(f)
+            async with aiofiles.open(file_path) as f:
+                return json.loads(await f.read())
         except Exception as e:
             raise SkyulfException(message=f"Failed to load pipeline from JSON: {str(e)}") from e
 

@@ -349,7 +349,7 @@ const FeatureSelectionSettings: React.FC<{ config: FeatureSelectionConfig; onCha
                 step="0.01"
                 className="w-full p-2 border rounded bg-background text-sm"
                 value={config.threshold ?? 0}
-                onChange={(e) => onChange({ ...config, threshold: parseFloat(e.target.value) })}
+                onChange={(e) => onChange({ ...config, threshold: Number.parseFloat(e.target.value) })}
               />
               <p className="text-xs text-muted-foreground">Features with variance lower than this will be removed.</p>
             </div>
@@ -367,7 +367,7 @@ const FeatureSelectionSettings: React.FC<{ config: FeatureSelectionConfig; onCha
                   min="0"
                   className="w-full p-2 border rounded bg-background text-sm"
                   value={config.threshold ?? 0.95}
-                  onChange={(e) => onChange({ ...config, threshold: parseFloat(e.target.value) })}
+                  onChange={(e) => onChange({ ...config, threshold: Number.parseFloat(e.target.value) })}
                 />
               </div>
               <div className="space-y-2">
@@ -437,7 +437,7 @@ const FeatureSelectionSettings: React.FC<{ config: FeatureSelectionConfig; onCha
                 step="0.001"
                 className="w-full p-2 border rounded bg-background text-sm"
                 value={config.alpha ?? 0.05}
-                onChange={(e) => onChange({ ...config, alpha: parseFloat(e.target.value) })}
+                onChange={(e) => onChange({ ...config, alpha: Number.parseFloat(e.target.value) })}
               />
             </div>
           )}
@@ -466,7 +466,7 @@ const FeatureSelectionSettings: React.FC<{ config: FeatureSelectionConfig; onCha
                   step="0.001"
                   className="w-full p-2 border rounded bg-background text-sm"
                   value={config.param ?? 1e-5}
-                  onChange={(e) => onChange({ ...config, param: parseFloat(e.target.value) })}
+                  onChange={(e) => onChange({ ...config, param: Number.parseFloat(e.target.value) })}
                 />
                 <p className="text-xs text-muted-foreground">Value for the selected mode (e.g., k, percentile, or alpha).</p>
               </div>

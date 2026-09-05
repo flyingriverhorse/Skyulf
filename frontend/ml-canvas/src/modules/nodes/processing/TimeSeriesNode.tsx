@@ -113,7 +113,7 @@ function LagSettings({ config, update }: { config: TimeSeriesConfig; update: Upd
         onChange={e => {
           const parsed = e.target.value
             .split(',')
-            .map(s => parseInt(s.trim(), 10))
+            .map(s => Number.parseInt(s.trim(), 10))
             .filter(n => Number.isFinite(n));
           update({ lags: parsed });
         }}
@@ -144,7 +144,7 @@ function RollingSettings({ config, update }: { config: TimeSeriesConfig; update:
           min="1"
           className="w-full p-1.5 border rounded text-sm"
           value={config.window ?? 3}
-          onChange={e => { update({ window: parseInt(e.target.value, 10) }); }}
+          onChange={e => { update({ window: Number.parseInt(e.target.value, 10) }); }}
         />
       </div>
       <div className="space-y-1">
@@ -154,7 +154,7 @@ function RollingSettings({ config, update }: { config: TimeSeriesConfig; update:
           min="1"
           className="w-full p-1.5 border rounded text-sm"
           value={config.min_periods ?? 1}
-          onChange={e => { update({ min_periods: parseInt(e.target.value, 10) }); }}
+          onChange={e => { update({ min_periods: Number.parseInt(e.target.value, 10) }); }}
         />
       </div>
     </div>

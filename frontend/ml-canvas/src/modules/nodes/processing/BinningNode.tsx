@@ -34,7 +34,7 @@ const CustomBinInput: React.FC<{
   }, [value]);
 
   const handleBlur = () => {
-    const edges = text.split(',').map(s => parseFloat(s.trim())).filter(n => !isNaN(n)).sort((a, b) => a - b);
+    const edges = text.split(',').map(s => Number.parseFloat(s.trim())).filter(n => !Number.isNaN(n)).sort((a, b) => a - b);
     onChange(edges);
   };
 
@@ -111,7 +111,7 @@ const BinningSettings: React.FC<{ config: BinningConfig; onChange: (c: BinningCo
                 max={100}
                 className="w-full p-2 border rounded bg-background focus:ring-1 focus:ring-primary outline-none"
                 value={config.n_bins}
-                onChange={(e) => onChange({ ...config, n_bins: parseInt(e.target.value) || 5 })}
+                onChange={(e) => onChange({ ...config, n_bins: Number.parseInt(e.target.value) || 5 })}
               />
             </div>
           )}
@@ -162,7 +162,7 @@ const BinningSettings: React.FC<{ config: BinningConfig; onChange: (c: BinningCo
                 max={10}
                 className="w-full p-2 border rounded bg-background focus:ring-1 focus:ring-primary outline-none"
                 value={config.precision ?? 3}
-                onChange={(e) => onChange({ ...config, precision: parseInt(e.target.value) || 0 })}
+                onChange={(e) => onChange({ ...config, precision: Number.parseInt(e.target.value) || 0 })}
               />
               <p className="text-[10px] text-muted-foreground">
                 Number of decimal places to show in interval labels (e.g. 2 gives [0.00, 10.00]).

@@ -9,6 +9,7 @@ Migrated from Flask sync version with improved type handling.
 
 import asyncio
 import logging
+import math
 from datetime import date, datetime
 from decimal import Decimal
 from typing import Any, cast
@@ -450,7 +451,7 @@ class JSONSafeSerializer:
     def _handle_float_edge_cases(obj: Any) -> Any:
         if not isinstance(obj, float):
             return JSONSafeSerializer._NOT_HANDLED
-        if obj != obj:
+        if math.isnan(obj):
             return None
         if obj in (float("inf"), float("-inf")):
             return None

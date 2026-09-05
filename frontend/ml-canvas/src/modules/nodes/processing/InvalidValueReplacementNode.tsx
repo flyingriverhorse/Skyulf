@@ -116,7 +116,7 @@ const InvalidValueSettings: React.FC<{ config: InvalidValueReplacementConfig; on
                   className="w-full text-xs rounded border border-gray-300 dark:border-gray-600 px-2 py-1.5"
                   placeholder={config.mode === 'percentage_bounds' ? '0' : 'Min'}
                   value={config.min_value ?? ''}
-                  onChange={(e) => onChange({ ...config, min_value: e.target.value ? parseFloat(e.target.value) : undefined })}
+                  onChange={(e) => onChange({ ...config, min_value: e.target.value ? Number.parseFloat(e.target.value) : undefined })}
                 />
               </div>
               <div>
@@ -126,7 +126,7 @@ const InvalidValueSettings: React.FC<{ config: InvalidValueReplacementConfig; on
                   className="w-full text-xs rounded border border-gray-300 dark:border-gray-600 px-2 py-1.5"
                   placeholder={config.mode === 'percentage_bounds' ? '100' : 'Max'}
                   value={config.max_value ?? ''}
-                  onChange={(e) => onChange({ ...config, max_value: e.target.value ? parseFloat(e.target.value) : undefined })}
+                  onChange={(e) => onChange({ ...config, max_value: e.target.value ? Number.parseFloat(e.target.value) : undefined })}
                 />
               </div>
               <p className="col-span-2 text-[10px] text-gray-500">
