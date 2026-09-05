@@ -306,7 +306,7 @@ class TestLocalFileConnectorLazyProbeFailures:
         lf.head.return_value.collect.side_effect = RuntimeError("collect broken")
         monkeypatch.setattr(file_mod.pl, "scan_csv", lambda *a, **k: lf)
         connector = self._connector("any.csv")
-        assert connector._try_lazy_head(query=None, limit=5) is None
+        assert connector._try_lazy_head(limit=5) is None
 
 
 class TestHealthDegradedBranches:

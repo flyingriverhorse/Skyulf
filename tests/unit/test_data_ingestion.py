@@ -3,6 +3,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import polars as pl
 import pytest
 
+from backend.config import get_settings
+from backend.data_ingestion.service import DataIngestionService
 from backend.data_ingestion.tasks import ingest_data_task
 from backend.database.models import DataSource
 
@@ -57,3 +59,31 @@ def test_ingest_file_task(
     assert mock_data_source.source_metadata["row_count"] == 3
     assert mock_data_source.source_metadata["column_count"] == 2
     assert "profile" in mock_data_source.source_metadata
+
+
+def test_upload_dir_defaults_to_settings_upload_dir(monkeypatch, tmp_path):
+    """The service must write uploads where ``LocalFileConnector`` reads them.
+
+    The connector resolves against ``settings.UPLOAD_DIR``; the service used to
+    hardcode the literal ``"uploads/data"``, so configuring ``UPLOAD_DIR`` wrote
+    files to a directory no connector would ever look in.
+    """
+    configured = tmp_path / "configured_uploads"
+    monkeypatch.setattr(get_settings(), "UPLOAD_DIR", str(configured))
+
+    service = DataIngestionService(session=MagicMock())
+
+    assert service.upload_dir == configured
+    assert configured.is_dir(), "the directory must still be created eagerly"
+
+
+def test_upload_dir_explicit_argument_overrides_settings(monkeypatch, tmp_path):
+    """An explicit ``upload_dir`` wins, which is how tests isolate their writes."""
+    from_settings = tmp_path / "from_settings"
+    explicit = tmp_path / "explicit"
+    monkeypatch.setattr(get_settings(), "UPLOAD_DIR", str(from_settings))
+
+    service = DataIngestionService(session=MagicMock(), upload_dir=str(explicit))
+
+    assert service.upload_dir == explicit
+    assert not from_settings.exists(), "settings must not be consulted when overridden"

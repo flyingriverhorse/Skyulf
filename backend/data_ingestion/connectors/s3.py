@@ -1,3 +1,14 @@
+"""S3 / object-store connector for the ingestion pipeline.
+
+Reads Parquet and CSV objects through polars' lazy ``scan_*`` readers. Two
+security constraints shape this module and are enforced below rather than left
+to callers: a request-supplied ``storage_options`` entry may never set the S3
+endpoint — that would let a caller redirect outbound requests to an arbitrary
+host, including cloud metadata services — and the object path may itself be a
+presigned URL, i.e. a bearer credential, so every log line is passed through
+``redact_credentials``.
+"""
+
 import logging
 import re
 from typing import cast
@@ -20,7 +31,25 @@ _HTTP_404_RE = re.compile(r"\b404\b")
 
 
 class S3Connector(BaseConnector):
+    """Connector for S3-compatible object storage, backed by polars lazy scans.
+
+    Only Parquet and CSV are supported. Failures from the underlying object
+    store are classified into :class:`ForbiddenException` and
+    :class:`ResourceNotFoundException` so callers can branch on exception type
+    instead of substring-matching an error message.
+    """
+
     def __init__(self, path: str, storage_options: dict | None = None):
+        """Store the object path and the per-request client options.
+
+        Args:
+            path: ``s3://`` URL of the object, or a presigned HTTPS URL. Either
+                form is a bearer credential, so it is redacted before logging.
+            storage_options: Credentials and client options forwarded to polars,
+                with s3fs/boto3 key spellings mapped to the object_store ones.
+                Any ``endpoint_url`` / ``aws_endpoint_url`` entry is discarded:
+                the endpoint is taken only from server-side ``AWS_ENDPOINT_URL``.
+        """
         self.path = path
         self.storage_options = storage_options or {}
         # path is caller-supplied and may itself be a presigned URL, i.e. a bearer credential.
@@ -71,6 +100,15 @@ class S3Connector(BaseConnector):
         return {k: str(v) for k, v in options.items() if v is not None}
 
     async def connect(self) -> bool:
+        """Probe connectivity by reading the object's schema.
+
+        Raises:
+            ForbiddenException: If the credentials were refused (HTTP 403).
+                Re-raised as-is rather than collapsed, because callers branch
+                on the type.
+            ResourceNotFoundException: If the object does not exist (HTTP 404).
+            ConnectionError: For every other failure, with the cause chained.
+        """
         # Simple check by trying to read schema
         try:
             await self.get_schema()
@@ -122,6 +160,13 @@ class S3Connector(BaseConnector):
         ) from e
 
     async def get_schema(self) -> dict[str, str]:
+        """Infer the object's schema with a lazy scan, Parquet first then CSV.
+
+        A path ending in ``.csv`` is scanned as CSV up front to skip the probe
+        round-trip. When neither format parses, ``_raise_classified_schema_error``
+        converts the failure into a typed exception instead of surfacing the raw
+        object-store message.
+        """
         options = self._get_storage_options()
 
         # Optimization: Check extension first
@@ -142,7 +187,14 @@ class S3Connector(BaseConnector):
                 self._raise_classified_schema_error(e)
                 raise  # pragma: no cover - _raise_classified_schema_error always raises
 
-    async def fetch_data(self, query: str | None = None, limit: int | None = None) -> pl.DataFrame:
+    async def fetch_data(self, limit: int | None = None) -> pl.DataFrame:
+        """Collect up to ``limit`` rows from the object into a polars ``DataFrame``.
+
+        The format comes from the extension to avoid a probe round-trip; an
+        unrecognized extension is scanned as Parquet and falls back to CSV.
+        ``limit`` is pushed into the lazy plan, so only that many rows are
+        transferred rather than the whole object.
+        """
         options = self._get_storage_options()
 
         # Determine format based on extension to avoid lazy evaluation errors
@@ -177,4 +229,5 @@ class S3Connector(BaseConnector):
             raise RuntimeError(f"Failed to fetch data from S3 path {self.path}") from e
 
     async def validate(self) -> bool:
+        """Validate by running :meth:`connect`, so the schema probe is the whole check."""
         return await self.connect()

@@ -1,3 +1,12 @@
+"""Connector contract shared by every data source backend.
+
+Defines :class:`BaseConnector`, the ABC a connector implements so the ingestion
+service can drive any source through one interface: connect, discover the
+schema, fetch rows and validate the configuration. ``fetch_data`` returns a
+polars ``DataFrame`` — connectors hand back polars and leave any pandas
+conversion to their callers, never doing it themselves.
+"""
+
 from abc import ABC, abstractmethod
 
 import polars as pl
@@ -24,11 +33,10 @@ class BaseConnector(ABC):
         """
 
     @abstractmethod
-    async def fetch_data(self, query: str | None = None, limit: int | None = None) -> pl.DataFrame:
+    async def fetch_data(self, limit: int | None = None) -> pl.DataFrame:
         """Fetch data from the source.
 
         Args:
-            query: Optional query string (SQL, filter, etc.)
             limit: Optional limit on number of rows
 
         Returns:
