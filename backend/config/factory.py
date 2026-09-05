@@ -8,7 +8,7 @@ Creates the correct Settings subclass based on the FASTAPI_ENV environment varia
 
 from functools import lru_cache
 
-from backend.config.base import KNOWN_ENVIRONMENTS, Settings, resolve_environment
+from backend.config.base import Settings, resolve_environment
 from backend.config.environments import (
     DevelopmentSettings,
     ProductionSettings,

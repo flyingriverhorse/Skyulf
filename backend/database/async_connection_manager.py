@@ -8,7 +8,7 @@ import atexit
 import logging
 from contextlib import asynccontextmanager, suppress
 from pathlib import Path
-from typing import Any, cast
+from typing import Any
 
 import aiosqlite
 from sqlalchemy import text
