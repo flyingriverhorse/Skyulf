@@ -16,8 +16,8 @@ def _collect(lf: "pl.LazyFrame") -> "pl.DataFrame":
 
 
 class DataService:
-    """
-    Unified entry point for data I/O.
+    """Unified entry point for data I/O.
+
     Favors Polars for speed but falls back to Pandas if necessary.
     """
 
@@ -30,8 +30,7 @@ class DataService:
         force_type: str | None = None,
         storage_options: dict | None = None,
     ) -> Any:
-        """
-        Loads a file into a DataFrame (Polars or Pandas).
+        """Loads a file into a DataFrame (Polars or Pandas).
 
         Args:
             path: Path to the file.
@@ -101,8 +100,8 @@ class DataService:
             raise ValueError(f"Unsupported file format: {path}")
 
     async def get_sample(self, path: str | Path, limit: int = 5) -> Any:
-        """
-        Get a sample of the data as a list of dictionaries.
+        """Get a sample of the data as a list of dictionaries.
+
         Efficiently reads only the first N rows.
         """
         path_str = str(path)
@@ -146,8 +145,7 @@ class DataService:
         return data.head(limit).to_dict(orient="records")
 
     async def save_artifact(self, data: Any, path: str | Path) -> None:
-        """
-        Save a DataFrame to disk (Parquet preferred).
+        """Save a DataFrame to disk (Parquet preferred).
 
         Args:
             data: The DataFrame (Polars, Pandas, or Skyulf wrapper).

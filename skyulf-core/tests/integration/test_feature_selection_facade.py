@@ -207,7 +207,8 @@ class TestRealShapedDataset:
 
     def test_variance_threshold_on_customers_numeric_columns_does_not_raise(self) -> None:
         """Variance threshold fit/apply on NaN-containing numeric columns must not raise
-        and must return a result whose columns are a subset of the input columns."""
+        and must return a result whose columns are a subset of the input columns.
+        """
         df = load_sample_dataset("customers")
         num_df = df[["age", "income", "lat", "lon"]]
         params = _CALC.fit(num_df, {"method": "variance_threshold", "threshold": 0.0})

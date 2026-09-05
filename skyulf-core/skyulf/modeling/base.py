@@ -164,15 +164,13 @@ class BaseModelCalculator(ABC):
 class BaseModelApplier(ABC):
     @abstractmethod
     def predict(self, df: pd.DataFrame | SkyulfDataFrame, model_artifact: Any) -> pd.Series | Any:
-        """
-        Generates predictions.
-        """
+        """Generates predictions."""
 
     def predict_proba(
         self, df: pd.DataFrame | SkyulfDataFrame, model_artifact: Any
     ) -> pd.DataFrame | SkyulfDataFrame | None:
-        """
-        Generates prediction probabilities if supported.
+        """Generates prediction probabilities if supported.
+
         Returns DataFrame where columns are classes.
         """
         return None
@@ -209,7 +207,8 @@ class StatefulEstimator:
 
     def _extract_xy(self, data: Any, target_column: str) -> tuple[Any, Any]:
         """Instance-method wrapper around the module-level ``extract_xy()``,
-        kept for backward compatibility with existing call sites/tests."""
+        kept for backward compatibility with existing call sites/tests.
+        """
         return extract_xy(data, target_column)
 
     def cross_validate(
@@ -226,9 +225,7 @@ class StatefulEstimator:
         log_callback: Callable[[str], None] | None = None,
         preprocessing: FoldPreprocessor | None = None,
     ) -> dict[str, Any]:
-        """
-        Performs cross-validation on the training split.
-        """
+        """Performs cross-validation on the training split."""
         X_train, y_train = self._extract_xy(dataset.train, target_column)
 
         return perform_cross_validation(
@@ -346,8 +343,7 @@ class StatefulEstimator:
         preprocessing_validation: tuple[Any, Any] | None = None,
         iteration_callback: Callable[..., None] | None = None,
     ) -> dict[str, pd.Series]:
-        """
-        Fits the model on training data and returns predictions for all splits.
+        """Fits the model on training data and returns predictions for all splits.
 
         ``preprocessing`` (F-15): forwarded to calculators that
         support per-fold refit (``TuningCalculator``). When set,
@@ -427,8 +423,7 @@ class StatefulEstimator:
         job_id: str = "unknown",
         reference_column: str = "",
     ) -> Any:
-        """
-        Evaluates the model on all splits and returns a detailed report.
+        """Evaluates the model on all splits and returns a detailed report.
 
         ``reference_column`` is clustering-only: an optional column (e.g. a
         known label like species name) excluded from training features but

@@ -20,13 +20,13 @@ def pl_df():
 
 
 def test_wrapper_columns_returns_polars_columns(pl_df):
-    """columns property should mirror the underlying polars DataFrame's columns."""
+    """Columns property should mirror the underlying polars DataFrame's columns."""
     wrapper = SkyulfPolarsWrapper(pl_df)
     assert wrapper.columns == ["a", "b"]
 
 
 def test_wrapper_shape_matches_dataframe(pl_df):
-    """shape property should mirror the underlying DataFrame's shape."""
+    """Shape property should mirror the underlying DataFrame's shape."""
     wrapper = SkyulfPolarsWrapper(pl_df)
     assert wrapper.shape == (3, 2)
 
@@ -58,7 +58,8 @@ def test_wrapper_with_column_broadcasts_scalar(pl_df):
     """with_column() must broadcast a bare scalar across all rows, matching
     pandas' assign() semantics, instead of crashing on a length-1 Series
     that can't broadcast against a taller frame (regression guard for r5
-    polars with_column scalar broadcast crash)."""
+    polars with_column scalar broadcast crash).
+    """
     wrapper = SkyulfPolarsWrapper(pl_df)
     result = wrapper.with_column("c", 42)
     assert result.to_pandas()["c"].tolist() == [42, 42, 42]
@@ -74,7 +75,8 @@ def test_wrapper_to_pandas_converts(pl_df):
 
 def test_wrapper_to_native_returns_native_polars_frame(pl_df):
     """to_native() must return the underlying polars frame as-is (same object,
-    no conversion) — the documented replacement for the private ``._df``."""
+    no conversion) — the documented replacement for the private ``._df``.
+    """
     wrapper = SkyulfPolarsWrapper(pl_df)
     native = wrapper.to_native()
     assert isinstance(native, pl.DataFrame)
@@ -83,7 +85,9 @@ def test_wrapper_to_native_returns_native_polars_frame(pl_df):
 
 def test_wrapper_to_native_differs_from_to_pandas(pl_df):
     """to_native() hands back the polars frame; to_pandas() converts to pandas.
-    For a polars-backed wrapper they must yield different types."""
+
+    For a polars-backed wrapper they must yield different types.
+    """
     import pandas as pd
 
     wrapper = SkyulfPolarsWrapper(pl_df)
@@ -133,7 +137,7 @@ def test_wrapper_setitem_mutates_underlying_frame(pl_df):
 
 
 def test_wrapper_setitem_whole_column_raises_clear_error(pl_df):
-    """polars has no pandas-style whole-column assignment; wrapper should raise
+    """Polars has no pandas-style whole-column assignment; wrapper should raise
     a clear, actionable error instead of a confusing polars-internal TypeError.
     """
     wrapper = SkyulfPolarsWrapper(pl_df)

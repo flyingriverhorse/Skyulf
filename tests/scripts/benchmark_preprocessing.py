@@ -62,8 +62,7 @@ def generate_dataset(n_rows: int = 100_000):
 
 
 def run_pipeline(df, engine_name: str):
-    """
-    Runs a Comprehensive Pipeline:
+    """Runs a Comprehensive Pipeline:
     1. Drop Missing Rows (Threshold)
     2. Imputation (Mean)
     3. Outlier Removal (Z-Score > 3)

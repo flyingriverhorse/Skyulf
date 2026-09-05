@@ -58,7 +58,8 @@ def test_split_test_size_plus_validation_size_at_or_above_1_raises_clear_error()
     """Regression test: previously test_size + validation_size >= 1 fell
     through to sklearn's train_test_split with a cryptic internal error
     (e.g. about a non-positive train size) instead of a clear, actionable
-    message at construction time."""
+    message at construction time.
+    """
     with pytest.raises(ValueError, match="must be less than 1"):
         DataSplitter(test_size=0.7, validation_size=0.3)
     with pytest.raises(ValueError, match="must be less than 1"):
@@ -343,7 +344,8 @@ def test_data_splitter_split_polars_round_trips_back_to_polars() -> None:
 
 def test_data_splitter_polars_split_preserves_dtypes() -> None:
     """No whole-frame round-trip: a nullable Int64 column must keep its dtype
-    through split() (a pandas round-trip upcasts it to Float64)."""
+    through split() (a pandas round-trip upcasts it to Float64).
+    """
     df = pl.DataFrame(
         {
             "feature": [None if i % 7 == 0 else i for i in range(20)],
@@ -417,7 +419,8 @@ def test_data_splitter_split_xy_polars_with_validation_round_trips() -> None:
 
 def test_split_applier_stratify_true_without_target_column_uses_sentinel() -> None:
     """stratify=True with no target_column must fall back to the implicit sentinel
-    and still stratify successfully on a supplied (X, y) tuple."""
+    and still stratify successfully on a supplied (X, y) tuple.
+    """
     X = pd.DataFrame({"feature": range(100)})
     y = pd.Series([i % 2 for i in range(100)])
     params: dict[str, Any] = {"test_size": 0.2, "random_state": 42, "stratify": True}
@@ -432,7 +435,8 @@ def test_split_applier_frame_stratify_without_target_column_warns_and_splits(
 ) -> None:
     """stratify=True with no target_column on a plain-frame input has no column
     to stratify on; this must emit a warning (not fail silently) and still
-    complete as a plain (non-stratified) shuffle split."""
+    complete as a plain (non-stratified) shuffle split.
+    """
     df = pd.DataFrame({"feature": range(100)})
     params: dict[str, Any] = {"test_size": 0.2, "random_state": 42, "stratify": True}
     with caplog.at_level(logging.WARNING):
@@ -486,7 +490,8 @@ def test_feature_target_split_applier_handles_polars_split_dataset_input() -> No
 
 def test_feature_target_split_applier_split_dataset_member_already_split() -> None:
     """A SplitDataset member that is already an (X, y) tuple with non-None y must
-    be returned unchanged instead of being re-split."""
+    be returned unchanged instead of being re-split.
+    """
     X_train = pd.DataFrame({"feature": [1, 2]})
     y_train = pd.Series([0, 1])
     X_test = pd.DataFrame({"feature": [3, 4], "target": [1, 0]})
@@ -504,7 +509,8 @@ def test_feature_target_split_applier_split_dataset_member_already_split() -> No
 
 def test_feature_target_split_applier_split_dataset_member_tuple_without_target_col() -> None:
     """A SplitDataset (X, None) member whose X lacks the target column must pass through
-    unchanged rather than raising."""
+    unchanged rather than raising.
+    """
     X = pd.DataFrame({"feature": [1, 2, 3]})
     split_dataset = SplitDataset(train=(X, None), test=(X.copy(), None))
     result = FeatureTargetSplitApplier().apply(split_dataset, {"target_column": "target"})
@@ -515,7 +521,8 @@ def test_feature_target_split_applier_split_dataset_member_tuple_without_target_
 
 def test_feature_target_split_calculator_infer_output_schema_passes_through() -> None:
     """FeatureTargetSplitCalculator.infer_output_schema must return the input schema
-    unchanged (target column stays visible downstream in the y slot)."""
+    unchanged (target column stays visible downstream in the y slot).
+    """
     from skyulf.core.schema import SkyulfSchema
 
     schema = SkyulfSchema.from_columns(

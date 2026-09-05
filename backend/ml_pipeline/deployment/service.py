@@ -34,7 +34,6 @@ def _maybe_decode_predictions(
     under encoders[target_column] (for pipelines where encoding happened before
     the Feature/Target Split).
     """
-
     target_encoder = extract_target_label_encoder(feature_engineer, target_column=target_column)
     if target_encoder is None:
         return predictions
@@ -439,11 +438,21 @@ class DeploymentService:
         # positional consumers (sklearn on bare numpy, no feature_names_in_)
         # receive columns in the order they were trained on. The legacy path
         # already does this; the bundled path was missing it.
+        # OC-154: alignment is enforced, not best-effort. Skipping the reindex
+        # when it cannot be confirmed is what let a misaligned frame reach a
+        # positional model and return a silently wrong prediction.
         feature_columns = artifact.get("feature_columns")
         if feature_columns and hasattr(X_transformed, "columns"):
             missing = [c for c in feature_columns if c not in X_transformed.columns]
-            if not missing:
-                X_transformed = X_transformed[feature_columns]
+            if missing:
+                raise ValueError(
+                    f"Feature engineering produced columns {list(X_transformed.columns)}, "
+                    f"but the deployed bundle was trained on {list(feature_columns)}; "
+                    f"cannot align to the training feature order "
+                    f"(missing after transform: {missing}). "
+                    "Refusing to predict on misaligned features."
+                )
+            X_transformed = X_transformed[feature_columns]
 
         return DeploymentService._predict_and_decode(
             estimator, X_transformed, feature_engineer, target_col, thresholds=thresholds
@@ -458,11 +467,12 @@ class DeploymentService:
             # Check if model has feature names and if they match
             if hasattr(artifact, "feature_names_in_"):
                 model_cols = artifact.feature_names_in_.tolist()
-                missing_in_df = set(model_cols) - set(df.columns)
-                if missing_in_df:
-                    logger.warning(f"Missing columns in input DataFrame: {missing_in_df}")
-                    for c in missing_in_df:
-                        df[c] = 0
+                # OC-155: absent features are rejected, not zero-filled. A
+                # literal 0 is an extreme out-of-distribution input for any
+                # feature whose training distribution is not centred on zero,
+                # and the resulting prediction reached the caller as a normal
+                # result behind a server-side warning they never saw.
+                DeploymentService._validate_required_columns(df, model_cols)
                 # Reorder columns to match model
                 df = df[model_cols]
 
@@ -739,7 +749,8 @@ class DeploymentService:
     @staticmethod
     def _lineage_fields_from_job(job: TrainingJob | None) -> dict[str, Any]:
         """Builds the cheap dataset/version/target-column lineage fields from an
-        already-fetched TrainingJob, without touching the deployed artifact."""
+        already-fetched TrainingJob, without touching the deployed artifact.
+        """
         if job is None:
             return {"dataset_id": None, "version": None, "target_column": None}
         target_column = (
@@ -755,9 +766,7 @@ class DeploymentService:
     async def get_deployment_details(
         session: AsyncSession, deployment: Deployment
     ) -> dict[str, Any]:
-        """
-        Returns deployment info enriched with input/output schema from the artifact.
-        """
+        """Returns deployment info enriched with input/output schema from the artifact."""
         info = deployment.to_dict()
         info["input_schema"] = None
         info["output_schema"] = None

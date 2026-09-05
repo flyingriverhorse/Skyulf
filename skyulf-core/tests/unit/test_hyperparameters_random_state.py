@@ -83,7 +83,8 @@ def test_unseeded_models_expose_no_seed_field(key: str) -> None:
 @pytest.mark.parametrize("strategy", ["random", "grid", "halving_grid", "optuna"])
 def test_seed_never_lands_in_default_search_spaces(strategy: str) -> None:
     """A seed is never a sensible tuning target — no default search space may
-    propose one, regardless of strategy."""
+    propose one, regardless of strategy.
+    """
     for key in MODEL_HYPERPARAMETERS:
         space = get_default_search_space(key, strategy=strategy)
         assert "random_state" not in space, f"{key} ({strategy}) proposes a seed"

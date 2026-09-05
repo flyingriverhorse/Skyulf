@@ -1,5 +1,4 @@
-"""
-Compare cross-validation metrics between basic training and advanced tuning.
+"""Compare cross-validation metrics between basic training and advanced tuning.
 
 Verifies:
 1. Both paths produce cv_* metrics when cv_enabled=True.
@@ -147,8 +146,7 @@ def test_advanced_tuning_cv_kfold(classification_dataset: SplitDataset) -> None:
 def test_advanced_tuning_nested_cv_uses_standard_fold(
     classification_dataset: SplitDataset,
 ) -> None:
-    """
-    When nested_cv is selected with advanced tuning, the post-tuning CV
+    """When nested_cv is selected with advanced tuning, the post-tuning CV
     should use stratified_k_fold (not nested_cv) because the inner loop
     already ran during the tuning search.
 
@@ -270,8 +268,8 @@ def test_basic_vs_advanced_metric_keys_match(
 def test_regression_nested_cv_uses_k_fold(
     regression_dataset: SplitDataset,
 ) -> None:
-    """
-    For regression, nested_cv downgrade should use k_fold (not stratified).
+    """For regression, nested_cv downgrade should use k_fold (not stratified).
+
     Simulates engine.py logic: problem_type != classification -> k_fold.
     """
     calc = RidgeRegressionCalculator()
@@ -324,8 +322,8 @@ def test_regression_nested_cv_uses_k_fold(
 def test_classification_nested_cv_uses_stratified(
     classification_dataset: SplitDataset,
 ) -> None:
-    """
-    For classification, nested_cv downgrade should use stratified_k_fold.
+    """For classification, nested_cv downgrade should use stratified_k_fold.
+
     Simulates engine.py logic: problem_type == classification -> stratified_k_fold.
     """
     calc = LogisticRegressionCalculator()

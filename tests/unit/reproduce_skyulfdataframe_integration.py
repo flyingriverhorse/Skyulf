@@ -12,8 +12,8 @@ from skyulf.pipeline import SkyulfPipeline
 
 
 def test_skyulfdataframe_integration():
-    """
-    Test that SkyulfPipeline handles SkyulfDataFrame input (via PandasWrapper).
+    """Test that SkyulfPipeline handles SkyulfDataFrame input (via PandasWrapper).
+
     This ensures the pipeline logic respects the protocol and doesn't rely solely on pd.DataFrame.
     """
     print("Setting up data...")

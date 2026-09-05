@@ -6,15 +6,14 @@ from ..engines import SkyulfDataFrame
 
 
 class DataCatalog(ABC):
-    """
-    Abstract interface for data access.
+    """Abstract interface for data access.
+
     Decouples the pipeline from the storage mechanism.
     """
 
     @abstractmethod
     def load(self, dataset_id: str, **kwargs) -> pd.DataFrame | SkyulfDataFrame:
-        """
-        Load a dataset by its identifier.
+        """Load a dataset by its identifier.
 
         Args:
             dataset_id: Unique identifier for the dataset (e.g., filename, table name).
@@ -23,8 +22,7 @@ class DataCatalog(ABC):
 
     @abstractmethod
     def save(self, dataset_id: str, data: pd.DataFrame | SkyulfDataFrame, **kwargs) -> None:
-        """
-        Save a dataset.
+        """Save a dataset.
 
         Args:
             dataset_id: Unique identifier for the destination.

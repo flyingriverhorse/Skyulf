@@ -158,7 +158,8 @@ def test_pipeline_tuning_flow(pipeline_data_csv, tmp_path):
 
 def test_cyclic_graph_fails_fast_before_execution(pipeline_data_csv, tmp_path):
     """A cyclic graph must be rejected up front with a message naming the
-    loop, instead of dying late on a missing artifact mid-run."""
+    loop, instead of dying late on a missing artifact mid-run.
+    """
     artifact_store = LocalArtifactStore(str(tmp_path / "artifacts_cycle"))
     config = PipelineConfig(
         pipeline_id="test_pipeline_cycle",

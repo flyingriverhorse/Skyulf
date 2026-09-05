@@ -37,6 +37,7 @@ def test_skyulf_engine_rejects_unknown_engine(monkeypatch):
 
 def test_skyulf_engine_validator_passes_non_strings_through():
     """Non-string values bypass normalization untouched so pydantic's own
-    default/required handling still applies (e.g. an unset env entry)."""
+    default/required handling still applies (e.g. an unset env entry).
+    """
     assert Settings.normalize_skyulf_engine(None) is None
     assert Settings.normalize_skyulf_engine(42) == 42

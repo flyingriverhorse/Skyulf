@@ -42,7 +42,8 @@ def test_get_registry_has_no_duplicate_ids(client):
 def test_registry_exposes_leakage_gate_flags(client):
     """The frontend canvas leakage check derives its node lists from this
     endpoint (instead of a hand-synced TS copy), so every item must carry
-    both flags."""
+    both flags.
+    """
     response = client.get("/api/pipeline/registry")
     assert response.status_code == 200
     data = response.json()
@@ -354,7 +355,8 @@ def test_run_pipeline_submission(client):
 
 def test_run_pipeline_rejects_empty_nodes(client):
     """An empty node list used to fall through to `all_job_ids[0]` and raise
-    an unhandled IndexError (opaque 500) instead of a proper 400."""
+    an unhandled IndexError (opaque 500) instead of a proper 400.
+    """
     payload = {"pipeline_id": "test_run_empty", "nodes": []}
     response = client.post("/api/pipeline/run", json=payload)
     assert response.status_code == 400

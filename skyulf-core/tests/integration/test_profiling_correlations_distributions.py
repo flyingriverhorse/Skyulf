@@ -76,7 +76,8 @@ def test_calculate_correlations_truncation_logs_warning_with_dropped_columns(
 ) -> None:
     """Regression test: truncating to the first 20 columns (by order, not
     variance/relevance) previously gave the caller/UI no signal that data was
-    dropped. Must now log a warning naming the dropped columns."""
+    dropped. Must now log a warning naming the dropped columns.
+    """
     import logging
 
     data = {f"c{i}": list(np.linspace(0, 1, 10) + i) for i in range(25)}
@@ -274,7 +275,8 @@ class TestPairwiseDeletionEdgeCases:
         ``pl.corr`` then divides by a zero standard deviation and yields NaN
         rather than a coefficient, and ``CorrelationMatrix`` has no "unknown"
         cell — so the pair must land on 0.0 instead of leaking a NaN into the
-        matrix."""
+        matrix.
+        """
         df = pl.DataFrame({"a": [1.0, 2.0, 3.0, 4.0, None], "b": [5.0, 5.0, 5.0, 5.0, 99.0]}).lazy()
 
         matrix = calculate_correlations(df, ["a", "b"])
@@ -290,7 +292,8 @@ class TestPairwiseDeletionEdgeCases:
         and every other pair gets a float back from polars (NaN when the overlap
         has no variance, as the test above pins). ``None`` is defended against
         because ``_clean_cell`` is typed ``object`` and polars' null-vs-NaN choice
-        for a degenerate coefficient is not something to bet the matrix on."""
+        for a degenerate coefficient is not something to bet the matrix on.
+        """
         assert _clean_cell(None) == 0.0
         assert _clean_cell(float("nan")) == 0.0
         assert _clean_cell(float("inf")) == 0.0
@@ -298,7 +301,8 @@ class TestPairwiseDeletionEdgeCases:
 
     def test_frame_with_fewer_than_two_rows_yields_none(self) -> None:
         """One row (or none) cannot produce a coefficient, however many usable
-        numeric columns are declared."""
+        numeric columns are declared.
+        """
         single = pl.DataFrame({"a": [1.0], "b": [2.0]}).lazy()
         assert calculate_correlations(single, ["a", "b"]) is None
 
@@ -309,7 +313,8 @@ class TestPairwiseDeletionEdgeCases:
         """Direct call on purpose: ``calculate_correlations`` returns None
         whenever fewer than two columns survive filtering, so the no-pairs
         early exit is only reachable by a caller handing the helper a 0- or
-        1-column list."""
+        1-column list.
+        """
         df = pl.DataFrame({"a": [1.0, 2.0, 3.0]})
 
         assert _pairwise_correlation_matrix(df, ["a"]) == [[1.0]]

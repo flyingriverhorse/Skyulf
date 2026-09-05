@@ -258,7 +258,8 @@ class TestMainStartupTolerance:
 
         class FlakyStaticFiles:
             """Raises on first mount (covered branch); later mounts succeed so
-            the frontend-assets mount outside the try still works."""
+            the frontend-assets mount outside the try still works.
+            """
 
             def __init__(self, directory=None):
                 call_count["n"] += 1

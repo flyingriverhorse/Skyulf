@@ -117,7 +117,8 @@ class _TracingControlApplier(BaseApplier):
 class _CountingSplitReturningApplier(BaseApplier):
     """Returns the input frame unchanged for the first `trigger_after` calls, then
     illegally returns a SplitDataset — used to selectively trigger the test/validation
-    guard (as opposed to the train guard, which fires on the very first call)."""
+    guard (as opposed to the train guard, which fires on the very first call).
+    """
 
     def __init__(self, trigger_after: int):
         self.calls = 0

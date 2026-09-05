@@ -1,5 +1,5 @@
-"""
-Async PostgreSQL connection module for FastAPI.
+"""Async PostgreSQL connection module for FastAPI.
+
 This is the async equivalent of the Flask db/connections/postgres_db_connection/connection.py
 """
 
@@ -71,8 +71,7 @@ def _build_database_url_from_components(
 
 
 def build_async_database_url_from_env() -> str:
-    """
-    Build an async SQLAlchemy database URL from environment variables.
+    """Build an async SQLAlchemy database URL from environment variables.
 
     Priority:
       1. `DATABASE_URL` (raw full URL, modified for async)
@@ -84,7 +83,6 @@ def build_async_database_url_from_env() -> str:
     Returns a full async SQLAlchemy URL string. If no DB settings are found, falls back to
     an async SQLite file for development: `sqlite+aiosqlite:///mlops_postgres_fallback.db`.
     """
-
     # TODO: Add provider secret loading for AWS/Azure/GCP when needed
 
     raw = os.environ.get("DATABASE_URL")

@@ -10,7 +10,6 @@ unauthenticated broadcast), and numpy scores serialize cleanly.
 import numpy as np
 import orjson
 import pytest
-from pydantic import ValidationError
 
 from backend.realtime.events import JobEvent
 
@@ -47,7 +46,8 @@ def test_legacy_progress_payload_unchanged():
 
 def test_model_has_no_params_field():
     """/ws/jobs broadcasts to every client without auth — hyperparameter
-    payloads must not ride along with trial events."""
+    payloads must not ride along with trial events.
+    """
     assert "params" not in JobEvent.model_fields
 
 

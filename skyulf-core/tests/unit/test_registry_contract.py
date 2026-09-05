@@ -14,7 +14,6 @@ external libraries the generic fixture cannot provide.  Those are covered by
 their own targeted tests.
 """
 
-import logging
 from typing import Any
 
 import numpy as np
@@ -22,7 +21,6 @@ import pandas as pd
 import polars as pl
 import pytest
 
-import skyulf
 from skyulf.engines.polars_engine import SkyulfPolarsWrapper
 from skyulf.registry import NodeRegistry
 
@@ -554,7 +552,8 @@ def test_every_registered_node_resolves_calculator_and_applier() -> None:
     """F-10: `pipeline.py` resolves models exclusively through the registry —
     the hardcoded fallback map is gone, so a partial registration (calculator
     without applier, or vice versa) would surface as a user-facing failure.
-    Walk the whole registry and assert every node has a complete pair."""
+    Walk the whole registry and assert every node has a complete pair.
+    """
     import warnings
 
     with warnings.catch_warnings():

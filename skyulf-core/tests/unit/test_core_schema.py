@@ -69,7 +69,8 @@ def test_rename_updates_columns_and_dtypes():
 
 def test_rename_raises_on_collision_with_existing_column():
     """Renaming a column to a name that already exists elsewhere in the schema
-    must raise instead of silently producing duplicate column names."""
+    must raise instead of silently producing duplicate column names.
+    """
     schema = SkyulfSchema.from_columns(["a", "b"], {"a": "int64", "b": "string"})
     with pytest.raises(ValueError, match="duplicate column"):
         schema.rename({"a": "b"})
@@ -255,7 +256,8 @@ def test_extract_polars_dtypes_direct_call_on_real_polars_frame():
 def test_extract_pandas_dtypes_logs_debug_on_failure(caplog: pytest.LogCaptureFixture):
     """Regression test: a swallowed exception while extracting pandas dtypes
     must still be logged at debug level for diagnosability, not silently
-    dropped."""
+    dropped.
+    """
     import logging
 
     from skyulf.core.schema import _extract_pandas_dtypes
@@ -276,7 +278,8 @@ def test_extract_pandas_dtypes_logs_debug_on_failure(caplog: pytest.LogCaptureFi
 def test_extract_polars_dtypes_logs_debug_on_failure(caplog: pytest.LogCaptureFixture):
     """Regression test: a swallowed exception while extracting polars dtypes
     must still be logged at debug level for diagnosability, not silently
-    dropped."""
+    dropped.
+    """
     import logging
 
     from skyulf.core.schema import _extract_polars_dtypes

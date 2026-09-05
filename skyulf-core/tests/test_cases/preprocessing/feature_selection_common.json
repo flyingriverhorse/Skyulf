@@ -443,6 +443,29 @@
           "attr_name": "n_features_to_select",
           "attr_value": 2
         },
+        "rfe_accepts_ui_k_alias": {
+          "method": "rfe",
+          "estimator_name": "LogisticRegression",
+          "config": {
+            "k": 3,
+            "step": 1
+          },
+          "expected_class_name": "RFE",
+          "attr_name": "n_features_to_select",
+          "attr_value": 3
+        },
+        "rfe_explicit_name_wins_over_k": {
+          "method": "rfe",
+          "estimator_name": "LogisticRegression",
+          "config": {
+            "k": 5,
+            "n_features_to_select": 2,
+            "step": 1
+          },
+          "expected_class_name": "RFE",
+          "attr_name": "n_features_to_select",
+          "attr_value": 2
+        },
         "unknown_method_returns_none": {
           "method": "telepathy",
           "estimator_name": "LinearRegression",

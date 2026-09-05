@@ -46,7 +46,8 @@ def test_none_score_publishes_nothing(captured):
 
 def test_non_finite_score_publishes_nothing(captured):
     """Degenerate trials can report -inf/NaN; the jobs API serializes with
-    allow_nan=False, so these must be dropped, not charted."""
+    allow_nan=False, so these must be dropped, not charted.
+    """
     from backend.realtime import trial_buffer
 
     try:

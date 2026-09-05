@@ -124,7 +124,8 @@ def test_date_features_invalid_date_yields_null_not_nan_or_zero_pandas():
     properties (year/month/dayofweek/...) widened to float64 NaN, and
     boolean-derived features (is_weekend/is_month_start/is_month_end)
     silently defaulted to 0/False instead of propagating a null, diverging
-    from polars' Int32/null semantics for the same input."""
+    from polars' Int32/null semantics for the same input.
+    """
     df = pd.DataFrame({"d": ["2021-06-15", "not-a-date", "2021-12-25"]})
     feats = ["year", "month", "dayofweek", "is_weekend", "is_month_start", "is_month_end"]
     art = DateFeaturesCalculator().fit(df, {"columns": ["d"], "features": feats})
@@ -142,7 +143,8 @@ def test_date_features_invalid_date_yields_null_not_nan_or_zero_pandas():
 
 def test_date_features_invalid_date_null_parity_pandas_polars():
     """Both engines must treat an unparseable date string identically: every
-    calendar feature is null for that row, not just some."""
+    calendar feature is null for that row, not just some.
+    """
     pdf = pd.DataFrame({"d": ["2021-06-15", "garbage", "2021-12-25"]})
     feats = ["year", "month", "is_weekend"]
     art = DateFeaturesCalculator().fit(pdf, {"columns": ["d"], "features": feats})

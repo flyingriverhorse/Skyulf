@@ -1227,9 +1227,7 @@ class NodeRunnersMixin:
         return summary
 
     def _run_data_preview(self, node: NodeConfig) -> tuple[str, dict[str, Any]]:
-        """
-        Generates a detailed preview of the data and pipeline state.
-        """
+        """Generates a detailed preview of the data and pipeline state."""
         # Input: DataFrame or SplitDataset (merged when multiple branches feed in).
         data = self._get_input(node)
 

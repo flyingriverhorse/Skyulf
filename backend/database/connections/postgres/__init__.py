@@ -1,6 +1,4 @@
-"""
-Async PostgreSQL connection package for FastAPI.
-"""
+"""Async PostgreSQL connection package for FastAPI."""
 
 from .async_connection import (
     DATABASE_URL,

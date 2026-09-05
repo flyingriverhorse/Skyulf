@@ -85,7 +85,7 @@ def test_nested_cv_refits_preprocessing_per_inner_and_outer_fold() -> None:
     X, y = _make_classification_xy()
     recorder = RecordingPreprocessor()
 
-    result = perform_cross_validation(
+    perform_cross_validation(
         LogisticRegressionCalculator(),
         LogisticRegressionApplier(),
         X,

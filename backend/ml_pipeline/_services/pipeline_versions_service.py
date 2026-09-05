@@ -1,6 +1,4 @@
-"""
-Pipeline Versions Service (L7)
-------------------------------
+"""Pipeline Versions Service (L7) ------------------------------
 
 CRUD over `PipelineVersion` rows. Replaces the per-browser localStorage
 "Recent" ring buffer with a durable, server-side history.
@@ -23,7 +21,8 @@ logger = logging.getLogger(__name__)
 
 def _count_graph(graph: Any) -> tuple[int, int]:
     """Best-effort node/edge counts. Tolerates either RF snapshot shape
-    ({nodes, edges}) or engine config shape (list of nodes)."""
+    ({nodes, edges}) or engine config shape (list of nodes).
+    """
     if isinstance(graph, dict):
         nodes = graph.get("nodes")
         edges = graph.get("edges")

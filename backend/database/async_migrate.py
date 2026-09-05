@@ -1,5 +1,4 @@
-"""
-Async migration utilities for registry-related data.
+"""Async migration utilities for registry-related data.
 
 This module centralizes migration entrypoints for async FastAPI application.
 """

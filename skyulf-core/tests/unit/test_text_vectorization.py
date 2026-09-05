@@ -98,7 +98,8 @@ def test_apply_polars_roundtrip(
 @pytest.mark.parametrize("node", sorted(_VECTORIZER_NODES))
 def test_polars_apply_preserves_unrelated_column_dtypes(node: str, df_polars: Any) -> None:
     """No whole-frame round-trip: an unrelated nullable Int64 column must keep
-    its dtype through apply (a pandas round-trip upcasts it to Float64)."""
+    its dtype through apply (a pandas round-trip upcasts it to Float64).
+    """
     calculator_cls, applier_cls = _VECTORIZER_NODES[node]
     n = df_polars.height
     ids = [None if i == 1 else i for i in range(n)]

@@ -16,7 +16,8 @@ from backend.services.data_service import DataService
 
 async def test_get_sample_falls_back_to_eager_load(tmp_path, monkeypatch) -> None:
     """When the lazy Polars scan yields nothing, ``get_sample`` must fall back
-    to an eager load and still return the first ``limit`` rows as dicts."""
+    to an eager load and still return the first ``limit`` rows as dicts.
+    """
     path = tmp_path / "data.csv"
     path.write_text("a\n1\n2\n3\n")
     service = DataService()
@@ -29,7 +30,8 @@ async def test_get_sample_falls_back_to_eager_load(tmp_path, monkeypatch) -> Non
 
 async def test_get_sample_eager_fallback_samples_polars_frame(tmp_path) -> None:
     """The eager path's sampler must recognize a Polars frame and use its
-    native ``to_dicts`` instead of the pandas ``to_dict`` protocol."""
+    native ``to_dicts`` instead of the pandas ``to_dict`` protocol.
+    """
     path = tmp_path / "data.parquet"
     pl.DataFrame({"a": [1, 2, 3]}).write_parquet(path)
     service = DataService()
@@ -55,7 +57,8 @@ async def test_save_artifact_converts_pandas_via_polars(tmp_path) -> None:
 
 async def test_save_artifact_writes_wrapped_polars_native(tmp_path) -> None:
     """A SkyulfPolarsWrapper must be written via its native polars frame
-    (unwrap, no pandas round-trip), pinning the wrapper save path."""
+    (unwrap, no pandas round-trip), pinning the wrapper save path.
+    """
     from skyulf.engines.polars_engine import SkyulfPolarsWrapper
 
     path = tmp_path / "out.parquet"
@@ -66,7 +69,8 @@ async def test_save_artifact_writes_wrapped_polars_native(tmp_path) -> None:
 
 def test_save_polars_native_unwraps_via_to_native(tmp_path) -> None:
     """A Polars-routed object without its own ``write_parquet`` must be
-    unwrapped through the public ``to_native()`` accessor."""
+    unwrapped through the public ``to_native()`` accessor.
+    """
 
     class _NoWriteParquet:
         def __init__(self) -> None:
@@ -82,7 +86,8 @@ def test_save_polars_native_unwraps_via_to_native(tmp_path) -> None:
 
 def test_save_polars_native_falls_back_to_pandas_conversion(tmp_path) -> None:
     """When the unwrapped frame lacks ``write_parquet`` (should not happen
-    for PolarsEngine data), the defensive path converts via pandas."""
+    for PolarsEngine data), the defensive path converts via pandas.
+    """
 
     class _OddNative:
         def to_native(self) -> pd.DataFrame:
@@ -102,14 +107,16 @@ def test_should_use_polars_respects_force_type() -> None:
 
 def test_sample_from_loaded_data_pandas_frame() -> None:
     """A pandas frame (no ``to_pandas`` attribute) must be sampled through the
-    pandas ``to_dict`` protocol, not mistaken for Polars."""
+    pandas ``to_dict`` protocol, not mistaken for Polars.
+    """
     rows = DataService()._sample_from_loaded_data(pd.DataFrame({"a": [1, 2]}), 5)
     assert rows == [{"a": 1}, {"a": 2}]
 
 
 def test_sample_from_loaded_data_wrapper_with_to_pandas() -> None:
     """A non-Polars wrapper exposing ``to_pandas`` must be sampled via its
-    pandas conversion, not treated as a Polars frame."""
+    pandas conversion, not treated as a Polars frame.
+    """
 
     class _Wrapper:
         def __init__(self, df: pd.DataFrame) -> None:

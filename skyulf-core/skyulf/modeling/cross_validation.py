@@ -87,8 +87,7 @@ def perform_cross_validation(
     log_callback: Callable[[str], None] | None = None,
     preprocessing: "FoldPreprocessor | None" = None,
 ) -> dict[str, Any]:
-    """
-    Performs K-Fold cross-validation.
+    """Performs K-Fold cross-validation.
 
     Args:
         calculator: The model calculator (fit logic).
@@ -572,8 +571,7 @@ def _perform_nested_cv(
     log_callback: Callable[[str], None] | None = None,
     preprocessing: "FoldPreprocessor | None" = None,
 ) -> dict[str, Any]:
-    """
-    Performs nested cross-validation with an outer loop for generalization
+    """Performs nested cross-validation with an outer loop for generalization
     evaluation and an inner loop that produces a diagnostic stability signal.
 
     Outer loop: evaluates generalization (same as standard CV).

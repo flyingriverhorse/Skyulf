@@ -33,7 +33,8 @@ def test_register_stores_metadata():
 def test_register_is_thread_safe_no_duplicate_or_skipped_versions():
     """Concurrent register() calls for the same name must each get a unique,
     contiguous version number — regression guard against the
-    read-len-then-append race in the old unguarded implementation."""
+    read-len-then-append race in the old unguarded implementation.
+    """
     import threading
 
     registry = InMemoryModelRegistry()

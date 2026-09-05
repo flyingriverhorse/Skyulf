@@ -2,7 +2,7 @@
 
 [project]
 name = "skyulf"
-version = "0.8.12"
+version = "0.8.13"
 description = "MLOps web application for privacy-preserving ML workflows"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -160,11 +160,73 @@ extend-exclude = [
 # skyulf-core/skyulf/ (audit finding F-11): 173 deferred imports hoisted,
 # 29 optional-extra imports waived per-site. Tests, entry points and
 # backend stay exempt via per-file-ignores below.
-select = ["E9", "F63", "F7", "F82", "I", "UP", "B", "C4", "SIM", "PERF", "BLE", "PLC0415"]
+# F401 (unused-import) enabled repo-wide (audit finding OC-09): the flake8-parity
+# set covers *undefined* names only, so orphans went unpoliced — neither `ty` nor
+# the formatter reports them. Two left behind by the OC-130/OC-152 fixes passed
+# every gate and were caught only by an external linter. Of 27 sites, 22 were
+# dead and auto-fixed; the rest are availability/side-effect probes carrying a
+# per-site `# noqa: F401 - <reason>` waiver, as with BLE001 above. Pre-commit
+# runs ruff with `--fix`, so orphans are now stripped automatically.
+# F841 (unused-variable) added in the same pass. All 19 sites were in tests and
+# none were merely untidy: **three were tests whose bodies ended before any
+# assertion**, so they had always passed trivially — one completed, two deleted
+# (one redundant with 22 existing tests elsewhere, one provably unsatisfiable
+# because plain argmax already scored 1.0 on its fixture). The rest: one test
+# renamed because its name claimed a FAILED status its code path cannot reach,
+# one missing parallel assertion added, one weak `!=` strengthened to an exact
+# mapping check, and the remainder were plain dead bindings. **An unused local
+# in a test is a missing-assertion signal first and a lint problem second —
+# check the test body, don't just strip the binding.** Two traps: (1) scanning
+# for `assert` statements over-reports, since mock `assert_called()` /
+# `assert_awaited_once()` and `pytest.raises` blocks are real assertions that
+# such a scan cannot see — 3 of the 6 it flagged were fine; (2) no `--fix` was
+# used, because every F841 fix is marked unsafe: only a human can tell a dead
+# assignment from an accidentally deleted use.
+select = [
+    "E9",
+    "F63",
+    "F7",
+    "F82",
+    "F401",
+    "F841",
+    "I",
+    "UP",
+    "B",
+    "C4",
+    "SIM",
+    "PERF",
+    "BLE",
+    "PLC0415",
+    "D",
+]
 # E203: owned by the formatter. UP042/046/047: StrEnum/PEP 695 need
 # case-by-case review, not blanket enforcement. B008: FastAPI's Depends()
 # default-argument idiom, not a bug.
-ignore = ["E203", "UP042", "UP046", "UP047", "B008"]
+#
+# The D entries are a STAGED TODO, not permanent exemptions: `D` is selected as
+# a family (with convention = "google" below) and these twelve are the ones not
+# yet cleared, with their counts as of 2026-09-05. Remove an entry when its rule
+# reaches zero; the list must end up empty. The four auto-fixable rules (D202,
+# D209, D212, D403 — 772 sites) are already clean and deliberately absent here.
+ignore = [
+    "E203",
+    "UP042",
+    "UP046",
+    "UP047",
+    "B008",
+    "D102",  # 1048 undocumented-public-method
+    "D103",  # 797 undocumented-public-function
+    "D205",  # 769 missing-blank-line-after-summary
+    "D101",  # 511 undocumented-public-class
+    "D100",  # 117 undocumented-public-module
+    "D415",  # 93 missing-terminal-punctuation
+    "D107",  # 83 undocumented-public-init
+    "D200",  # 72 unnecessary-multiline-docstring
+    "D104",  # 13 undocumented-public-package
+    "D105",  # 13 undocumented-magic-method
+    "D301",  # 5 escape-sequence-in-docstring
+    "D417",  # 3 undocumented-param
+]
 
 [tool.ruff.lint.per-file-ignores]
 # E402: these modules append sys.path/set env vars before importing, or wrap
@@ -190,6 +252,15 @@ ignore = ["E203", "UP042", "UP046", "UP047", "B008"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["skyulf", "backend"]
+
+[tool.ruff.lint.pydocstyle]
+# Google-style: the convention the codebase already writes (138 `Args:`/
+# `Returns:`/`Raises:` section markers across skyulf-core and backend vs 1-2
+# NumPy-style). Setting it is also technically required — without a convention
+# ruff enables mutually exclusive pairs (D203/D211, D212/D213) that no
+# docstring can satisfy simultaneously. The convention deactivates the rules
+# that contradict Google style, so they are not enforced here.
+convention = "google"
 
 [tool.ruff.format]
 # Black-compatible defaults; line-length inherited from [tool.ruff].

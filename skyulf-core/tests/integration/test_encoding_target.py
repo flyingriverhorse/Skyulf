@@ -364,6 +364,7 @@ def test_resolve_target_encoder_training_cv_rejects_singleton_class() -> None:
 
 class TestNoTargetReturnsEmptyAndWarns:
     """Fitting without a resolvable target logs a warning and returns {}.
+
     Scenarios (pandas/polars) loaded from
     ``tests/test_cases/preprocessing/encoding_target.json`` (group ``no_target_returns_empty``).
     """
@@ -509,7 +510,7 @@ def _categorical_binary_frame(
 
 @given(df=_categorical_binary_frame())
 def test_target_encoder_fit_engine_parity(df: pd.DataFrame) -> None:
-    """pandas and polars fits must produce numerically identical encodings."""
+    """Pandas and polars fits must produce numerically identical encodings."""
     config: dict[str, Any] = {"columns": ["city"], "target_type": "binary"}
 
     pd_params = dict(TargetEncoderCalculator().fit((df[["city"]], df["target"]), dict(config)))
@@ -637,6 +638,7 @@ def test_polars_fit_extracts_y_from_target_column() -> None:
 
 class TestFitNoResolvableColumnsReturnsEmpty:
     """A purely-numeric frame yields no encodable columns, so fit() returns {}.
+
     Scenarios (pandas/polars) loaded from
     ``tests/test_cases/preprocessing/encoding_target.json`` (group ``no_resolvable_columns``).
     """
@@ -658,7 +660,7 @@ class TestFitNoResolvableColumnsReturnsEmpty:
 
 
 def test_unknown_label_type_error_is_translated_to_actionable_message() -> None:
-    """sklearn's 'unknown label type' ValueError is translated into an actionable message.
+    """Sklearn's 'unknown label type' ValueError is translated into an actionable message.
 
     A multi-output (2-D) target forces sklearn's `type_of_target` to infer
     'multiclass-multioutput', which is unsupported and raises the exact
@@ -746,6 +748,7 @@ def test_infer_output_schema_returns_none_for_default_auto_target_type() -> None
 
 class TestRealShapedDataset:
     """Integration-style check against the checked-in ``customers.csv`` sample.
+
     ``plan_type`` (no NaN, 3 categories) + binary ``churned`` target exercises the
     TargetEncoder on production-like data: each plan group gets its own smoothed
     target statistic, and the result is a numeric column of the same length.

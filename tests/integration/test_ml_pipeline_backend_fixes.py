@@ -30,7 +30,8 @@ from backend.ml_pipeline.tasks import run_pipeline_batch_task, run_pipeline_task
 
 def _make_request() -> Request:
     """Build a minimal real Starlette Request so slowapi's rate limiter decorator
-    (which requires an actual Request instance, not a mock) can inspect it."""
+    (which requires an actual Request instance, not a mock) can inspect it.
+    """
     scope = {
         "type": "http",
         "method": "POST",
@@ -82,7 +83,8 @@ async def test_prediction_request_rejects_oversized_batch():
 
 async def test_get_job_evaluation_raises_on_job_id_mismatch():
     """A stale/foreign job_id embedded in the loaded artifact must not be
-    silently served back to the caller."""
+    silently served back to the caller.
+    """
     from backend.ml_pipeline._services.evaluation_service import EvaluationService
 
     job_id = "job-a"
@@ -142,9 +144,11 @@ async def test_get_job_evaluation_succeeds_when_job_id_matches():
 
 async def test_get_job_evaluation_decodes_reference_crosstab_labels():
     """A clustering reference column that was label-encoded upstream (e.g.
+
     species name -> 0/1/2) should have its crosstab keys decoded back to the
     original text, not left as numeric-looking strings, when a matching
-    LabelEncoder is present in the bundled feature engineer."""
+    LabelEncoder is present in the bundled feature engineer.
+    """
     from sklearn.preprocessing import LabelEncoder
 
     from backend.ml_pipeline._services.evaluation_service import EvaluationService
@@ -224,7 +228,8 @@ async def test_get_job_evaluation_decodes_reference_crosstab_labels():
 
 def test_get_db_session_concurrent_init_creates_single_engine():
     """Simulate many threads racing the lazy-init check; only one engine
-    should ever be created (double-checked locking prevents the leak)."""
+    should ever be created (double-checked locking prevents the leak).
+    """
     import backend.ml_pipeline.tasks as tasks_module
 
     # Reset module globals to force re-initialization.
@@ -281,7 +286,8 @@ def test_get_db_session_concurrent_init_creates_single_engine():
 def test_run_pipeline_task_marks_job_failed_when_execute_pipeline_raises_unexpectedly():
     """If execute_pipeline itself raises (violating its own 'raises nothing'
     contract, e.g. an infra-level bug), the job's status must still end up
-    as 'failed' instead of being stuck at 'running'/'queued'."""
+    as 'failed' instead of being stuck at 'running'/'queued'.
+    """
     job_id = str(uuid.uuid4())
     job = TrainingJob(id=job_id, status="running", run_mode="fixed")
 

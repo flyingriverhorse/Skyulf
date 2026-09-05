@@ -16,8 +16,8 @@ logger = logging.getLogger(__name__)
 
 
 class FileSystemCatalog(DataCatalog):
-    """
-    Concrete implementation that reads/writes files from the local filesystem.
+    """Concrete implementation that reads/writes files from the local filesystem.
+
     Replaces the old 'DataLoader'.
     """
 
@@ -174,8 +174,8 @@ class FileSystemCatalog(DataCatalog):
 
 
 class S3Catalog(DataCatalog):
-    """
-    Implementation that reads/writes files from AWS S3.
+    """Implementation that reads/writes files from AWS S3.
+
     Requires 's3fs' and 'boto3' to be installed.
     Supports local caching to reduce S3 calls.
     """
@@ -211,8 +211,8 @@ class S3Catalog(DataCatalog):
             raise ImportError("s3fs is required for S3Catalog") from None
 
     def _prepare_s3fs_options(self, options: dict) -> dict:
-        """
-        Prepare storage options for s3fs/pandas.
+        """Prepare storage options for s3fs/pandas.
+
         - Maps aws_access_key_id -> key
         - Maps aws_secret_access_key -> secret
         - Moves region/aws_region -> client_kwargs['region_name']
@@ -421,8 +421,7 @@ class S3Catalog(DataCatalog):
 
 
 class SmartCatalog(DataCatalog):
-    """
-    A wrapper catalog that resolves Database IDs to file paths/keys
+    """A wrapper catalog that resolves Database IDs to file paths/keys
     and dispatches to the appropriate underlying catalog (S3 or FileSystem).
     """
 
@@ -445,9 +444,7 @@ class SmartCatalog(DataCatalog):
                     self.s3_catalog = S3Catalog(bucket_name=bucket)
 
     def _resolve_id(self, dataset_id: str) -> tuple[str, dict]:
-        """
-        Resolves a dataset ID to a (path, options) tuple.
-        """
+        """Resolves a dataset ID to a (path, options) tuple."""
         # If it's a numeric ID, try to resolve it via DB
         if str(dataset_id).isdigit():
             try:
@@ -562,9 +559,7 @@ def _find_s3_bucket_in_nodes(nodes: list | None) -> str | None:
 def create_catalog_from_options(
     storage_options: dict | None, nodes: list | None = None, session=None
 ) -> DataCatalog:
-    """
-    Factory to create the appropriate DataCatalog based on storage options and node paths.
-    """
+    """Factory to create the appropriate DataCatalog based on storage options and node paths."""
     bucket = _find_s3_bucket_in_nodes(nodes)
 
     if bucket:

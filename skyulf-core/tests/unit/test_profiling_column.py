@@ -184,7 +184,8 @@ def test_analyze_column_numeric_all_unique_triggers_possible_id() -> None:
     """Regression test: is_unique/'Possible ID' was previously only ever set
     for Categorical columns, so a fully-unique Numeric ID column (e.g. a raw
     integer primary key) never got flagged. Now uses the batched `__unique`
-    aggregate generically."""
+    aggregate generically.
+    """
     n = 60
     df = pl.DataFrame({"id": [float(i) for i in range(n)]})
     analyzer = _basic_analyzer(df)
@@ -216,7 +217,8 @@ def test_analyze_column_numeric_all_unique_triggers_possible_id() -> None:
 
 def test_analyze_column_text_all_unique_triggers_possible_id() -> None:
     """Same regression as above but for a fully-unique Text column (e.g. a
-    UUID-style string ID stored as free text)."""
+    UUID-style string ID stored as free text).
+    """
     n = 60
     df = pl.DataFrame({"uid": [f"uuid-{i}" for i in range(n)]})
     analyzer = _basic_analyzer(df)
@@ -360,7 +362,8 @@ def test_analyze_categorical_robust_to_extra_struct_keys() -> None:
     keys and picked the value key by hard-coded position (keys[0] or
     keys[1]), which would silently misassign the value or raise IndexError
     if the struct ever carried extra keys. Now finds the non-'count' key by
-    name, robust to any number of additional keys."""
+    name, robust to any number of additional keys.
+    """
     df = pl.DataFrame({"cat": ["a", "b"]})
     analyzer = _basic_analyzer(df)
     row = {

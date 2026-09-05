@@ -58,7 +58,7 @@ def _coerce_numeric_keys(mapping: Any) -> Any:
 def test_fit_mapping_scenarios(
     config: dict[str, Any], expected_mapping: dict[str, Any], expected_columns: Any
 ) -> None:
-    """fit must resolve `mapping`/`replacements` config into the artifact's mapping."""
+    """Fit must resolve `mapping`/`replacements` config into the artifact's mapping."""
     df = pd.DataFrame({"a": [1, 2, 3]})
     cfg = dict(config)
     if cfg.get("mapping") is not None:

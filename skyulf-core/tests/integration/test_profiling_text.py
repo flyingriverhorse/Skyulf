@@ -148,7 +148,8 @@ class TestRealShapedDataset:
 
 class TestCheckPii:
     """Regression guard: the "PII (Email/Phone)" alert message claims both
-    email and phone detection, so _check_pii must actually check both."""
+    email and phone detection, so _check_pii must actually check both.
+    """
 
     def test_check_pii_detects_email(self) -> None:
         df = pl.DataFrame(

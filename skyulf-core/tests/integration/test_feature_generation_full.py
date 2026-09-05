@@ -1,5 +1,4 @@
-"""
-Comprehensive tests for FeatureGenerationApplier — covers all operation types
+"""Comprehensive tests for FeatureGenerationApplier — covers all operation types
 on both the pandas and polars engine paths.
 
 Run with:
@@ -285,7 +284,7 @@ class TestDatetimeExtractPolars:
     @pytest.fixture(autouse=True)
     def _result(self) -> None:
         try:
-            import polars as pl
+            import polars  # noqa: F401 - availability probe; only the ImportError outcome is used
         except ImportError:
             pytest.skip("polars not installed")  # ty: ignore[too-many-positional-arguments]
         self.out_pd = _run(

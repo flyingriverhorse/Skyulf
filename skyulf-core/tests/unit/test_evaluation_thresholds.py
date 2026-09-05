@@ -49,7 +49,8 @@ def test_apply_thresholds_binary_full_dict_breaks_ties_toward_positive_class():
 def test_apply_thresholds_binary_full_dict_still_honors_both_entries():
     """The tie-break must not degrade into ignoring `thresholds[classes[0]]`:
     a non-complementary pair (e.g. user-saved thresholds) is still compared in
-    scaled space using both entries."""
+    scaled space using both entries.
+    """
     y_proba = np.array([[0.14, 0.86]])
 
     # 0.86 / 0.1 = 8.6 beats 0.14 / 1.0 = 0.14
@@ -152,7 +153,8 @@ def test_optimize_thresholds_ties_break_toward_the_default_cut():
     """Regression test (OC-36): F1 and friends are piecewise constant in the
     threshold, so exactly-tied plateaus are the common case. The tie must break
     toward the default 0.5 cut, not toward whichever plateau edge the scan
-    reaches first (previously the smallest candidate, ~0.0098)."""
+    reaches first (previously the smallest candidate, ~0.0098).
+    """
     y_true = np.array([0, 1, 0, 1])
     y_proba = np.array([[0.6, 0.4], [0.3, 0.7], [0.9, 0.1], [0.2, 0.8]])
 
@@ -165,7 +167,8 @@ def test_optimize_thresholds_ties_break_toward_the_default_cut():
 
 def test_optimize_thresholds_nan_scores_fall_back_to_default():
     """A caller-supplied metric returning NaN must not poison the search: every
-    candidate is skipped and the default 0.5 threshold stands."""
+    candidate is skipped and the default 0.5 threshold stands.
+    """
     y_true = np.array([0, 1, 0, 1])
     y_proba = np.array([[0.6, 0.4], [0.3, 0.7], [0.9, 0.1], [0.2, 0.8]])
 
@@ -174,30 +177,6 @@ def test_optimize_thresholds_nan_scores_fall_back_to_default():
     )
 
     assert thresholds[1] == pytest.approx(0.5)
-
-
-def test_optimize_thresholds_multiclass_nelder_mead_improves_on_argmax():
-    """Nelder-Mead-tuned multiclass thresholds must not do worse than plain argmax
-    on balanced accuracy for an imbalanced synthetic dataset."""
-    rng = np.random.default_rng(1)
-    classes = np.array(["a", "b", "c"])
-    n_per_class = [300, 50, 50]
-    y_true_parts = []
-    proba_parts = []
-    for i, n in enumerate(n_per_class):
-        y_true_parts.append(np.full(n, classes[i]))
-        base = rng.dirichlet(alpha=[1, 1, 1], size=n)
-        # Bias each row's own-class column upward so there's real signal.
-        base[:, i] += 1.5
-        base = base / base.sum(axis=1, keepdims=True)
-        proba_parts.append(base)
-    y_true = np.concatenate(y_true_parts)
-    y_proba = np.concatenate(proba_parts)
-
-    def balanced_acc(y_t, y_p):
-        from sklearn.metrics import balanced_accuracy_score
-
-        return balanced_accuracy_score(y_t, y_p)
 
 
 def test_optimize_thresholds_multiclass_nelder_mead_actually_escapes_argmax_start():

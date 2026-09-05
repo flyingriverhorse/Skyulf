@@ -6,7 +6,6 @@ from backend.data_ingestion.connectors.s3 import S3Connector
 
 def test_s3_connector_storage_options_conversion():
     """Test that storage_options are correctly converted to strings."""
-
     # Case 1: Mixed types (int, None, str)
     options = {
         "aws_access_key_id": "TEST_KEY",
@@ -70,7 +69,8 @@ def test_s3_connector_strips_caller_supplied_endpoint_url(monkeypatch):
 
 def test_s3_connector_uses_only_server_configured_endpoint_url(monkeypatch):
     """When AWS_ENDPOINT_URL is configured server-side, it is used regardless of
-    what the caller supplied — the caller's value is discarded, not merged."""
+    what the caller supplied — the caller's value is discarded, not merged.
+    """
     monkeypatch.setattr(
         s3_connector_module,
         "get_settings",

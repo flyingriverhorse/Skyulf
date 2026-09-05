@@ -38,7 +38,8 @@ class _Merger(MergeMixin):
 
 def test_coerce_tuple_to_frame_polars_reattaches_target() -> None:
     """A Polars ``(X, y)`` payload must coerce to a frame with the target
-    reattached — returning None here silently drops training data."""
+    reattached — returning None here silently drops training data.
+    """
     X = pl.DataFrame({"f": [1, 2]})
     out = _Merger()._coerce_tuple_to_frame((X, [0, 1]), target_col="target")
     assert isinstance(out, pl.DataFrame)
@@ -48,7 +49,8 @@ def test_coerce_tuple_to_frame_polars_reattaches_target() -> None:
 
 def test_merge_xy_tuples_polars_returns_polars_frame(monkeypatch) -> None:
     """Merging Polars X parts must yield a Polars merged X (engine round-trip),
-    keeping y from the first edge."""
+    keeping y from the first edge.
+    """
     monkeypatch.setattr(get_settings(), "SKYULF_ENGINE", "polars", raising=False)
     y = pl.Series([0, 1])
     artifacts = [
@@ -68,7 +70,8 @@ def test_merge_xy_tuples_polars_returns_polars_frame(monkeypatch) -> None:
 def test_merge_split_datasets_defaults_empty_test_to_polars_frame(monkeypatch) -> None:
     """When every branch's test split is empty, the merged test must default
     to an empty frame of the configured engine — hard-coding pandas here
-    would hand downstream nodes a foreign frame type under SKYULF_ENGINE=polars."""
+    would hand downstream nodes a foreign frame type under SKYULF_ENGINE=polars.
+    """
     monkeypatch.setattr(get_settings(), "SKYULF_ENGINE", "polars", raising=False)
     sd1 = SplitDataset(train=pl.DataFrame({"a": [1, 2]}), test=pl.DataFrame(), validation=None)
     sd2 = SplitDataset(train=pl.DataFrame({"b": [3, 4]}), test=pl.DataFrame(), validation=None)
@@ -97,7 +100,8 @@ def test_merge_split_datasets_defaults_empty_test_to_pandas_frame(monkeypatch) -
 
 def test_strip_columns_polars() -> None:
     """Column stripping must no-op when nothing matches and drop in-place on
-    Polars frames (``df.drop(columns=...)`` is pandas-only API)."""
+    Polars frames (``df.drop(columns=...)`` is pandas-only API).
+    """
     merger = _Merger()
     df = pl.DataFrame({"a": [1], "b": [2]})
 
@@ -123,7 +127,8 @@ def test_strip_columns_tuple_payload(monkeypatch) -> None:
 
 def test_merge_split_dataset_xy_part_pandas_with_empty_branch(monkeypatch) -> None:
     """Pandas ``(X, y)`` parts merge column-wise, and a branch whose X is
-    empty is skipped rather than failing the whole merge."""
+    empty is skipped rather than failing the whole merge.
+    """
     monkeypatch.setattr(get_settings(), "SKYULF_ENGINE", "pandas", raising=False)
     y = pd.Series([0, 1])
     non_empty = [
@@ -142,7 +147,8 @@ def test_merge_split_dataset_xy_part_pandas_with_empty_branch(monkeypatch) -> No
 
 def test_merge_fallback_frames_raises_on_empty_input(monkeypatch) -> None:
     """An empty flattened input must fail loudly with actionable guidance,
-    not merge into a silently degraded frame."""
+    not merge into a silently degraded frame.
+    """
     monkeypatch.setattr(get_settings(), "SKYULF_ENGINE", "polars", raising=False)
     node = SimpleNamespace(node_id="m1")
 

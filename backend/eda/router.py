@@ -63,9 +63,7 @@ async def list_all_jobs(
     skip: int = Query(default=0, ge=0),
     session: AsyncSession = Depends(get_db),
 ):
-    """
-    Returns a list of all EDA jobs across all datasets.
-    """
+    """Returns a list of all EDA jobs across all datasets."""
     query = (
         select(EDAReport, DataSource.name.label("dataset_name"))
         .join(DataSource, EDAReport.data_source_id == DataSource.id)
@@ -139,9 +137,7 @@ async def trigger_analysis(
     body: AnalyzeRequest | None = None,
     session: AsyncSession = Depends(get_db),
 ):
-    """
-    Triggers an EDA analysis job for the given dataset.
-    """
+    """Triggers an EDA analysis job for the given dataset."""
     logger.info("Triggering analysis for dataset %s. Request: %s", dataset_id, body)
 
     # Check if dataset exists
@@ -165,9 +161,7 @@ async def trigger_analysis(
 
 @router.post("/reports/{report_id}/cancel")
 async def cancel_analysis(report_id: int, session: AsyncSession = Depends(get_db)):
-    """
-    Cancels a running analysis job.
-    """
+    """Cancels a running analysis job."""
     report = await session.get(EDAReport, report_id)
     if not report:
         raise HTTPException(status_code=404, detail="Report not found")
@@ -190,9 +184,7 @@ async def cancel_analysis(report_id: int, session: AsyncSession = Depends(get_db
 
 @router.get("/{dataset_id}/history")
 async def get_report_history(dataset_id: int, session: AsyncSession = Depends(get_db)):
-    """
-    Returns a list of past reports for a dataset.
-    """
+    """Returns a list of past reports for a dataset."""
     query = (
         select(EDAReport.id, EDAReport.created_at, EDAReport.status, EDAReport.config)
         .where(EDAReport.data_source_id == dataset_id)
@@ -216,8 +208,7 @@ async def get_report_history(dataset_id: int, session: AsyncSession = Depends(ge
 
 @router.get("/{dataset_id}/latest")
 async def get_latest_report(dataset_id: int, session: AsyncSession = Depends(get_db)):
-    """
-    Returns the most recent report for a dataset, regardless of status.
+    """Returns the most recent report for a dataset, regardless of status.
 
     Uses orjson serialisation + raw Response to avoid double-buffering the
     profile_data blob (can be 2-10 MB for wide datasets).
@@ -239,8 +230,7 @@ async def get_latest_report(dataset_id: int, session: AsyncSession = Depends(get
 
 @router.get("/reports/{report_id}")
 async def get_report(report_id: int, session: AsyncSession = Depends(get_db)):
-    """
-    Get a specific report by ID.
+    """Get a specific report by ID.
 
     Uses orjson serialisation + raw Response to avoid double-buffering the
     profile_data blob (can be 2-10 MB for wide datasets).
@@ -382,9 +372,7 @@ async def get_decomposition(
     body: DecompositionRequest,
     session: AsyncSession = Depends(get_db),
 ):
-    """
-    Calculates the breakdown of a measure by a split column for Decomposition Trees.
-    """
+    """Calculates the breakdown of a measure by a split column for Decomposition Trees."""
     try:
         # 1. Fetch DataSource
         ds = await session.get(DataSource, dataset_id)

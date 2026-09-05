@@ -136,8 +136,7 @@ class ArtifactsMixin:
     def _finalize_training_artifacts(
         self, data: Any, job_id: str, target_col: str, node_id: str, model_artifact: Any
     ):
-        """
-        Finalize training by saving standard artifacts:
+        """Finalize training by saving standard artifacts:
         1. Reference Data for Drift Detection (if not already present).
         2. Model Artifact (node_id and job_id).
         """
@@ -212,8 +211,8 @@ class ArtifactsMixin:
             logger.warning(f"Could not extract reference data for job {job_id} ({reason})")
 
     def _save_reference_data(self, data: Any, job_id: str, target_col: str):
-        """
-        Saves the training data as a reference dataset for future drift detection.
+        """Saves the training data as a reference dataset for future drift detection.
+
         Handles SplitDataset (extracts train) and DataFrame/Tuple formats.
         """
         if not job_id or job_id == "unknown":

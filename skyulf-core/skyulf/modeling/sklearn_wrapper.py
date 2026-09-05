@@ -215,7 +215,8 @@ class SklearnCalculator(BaseModelCalculator):
         """True if the wrapped model's constructor explicitly declares a
         `class_weight` parameter (e.g. RandomForestClassifier, LGBMClassifier,
         LogisticRegression) — as opposed to merely accepting arbitrary
-        **kwargs (e.g. XGBoost's sklearn wrapper) that silently swallow it."""
+        **kwargs (e.g. XGBoost's sklearn wrapper) that silently swallow it.
+        """
         sig = inspect.signature(self.model_class)
         return "class_weight" in sig.parameters
 
@@ -223,7 +224,8 @@ class SklearnCalculator(BaseModelCalculator):
         """Translate a `class_weight` value into a per-sample weight array for
         models with no native `class_weight` support, raising a clear error
         instead of silently no-op'ing if the model's `.fit()` doesn't accept
-        `sample_weight` either."""
+        `sample_weight` either.
+        """
         fit_sig = inspect.signature(model.fit)
         if "sample_weight" not in fit_sig.parameters:
             raise ValueError(

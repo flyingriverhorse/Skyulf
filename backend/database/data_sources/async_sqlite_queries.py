@@ -1,5 +1,5 @@
-"""
-Async SQLite-specific queries for data_sources table.
+"""Async SQLite-specific queries for data_sources table.
+
 This is the async equivalent of the Flask db/data_sources/sqlite_queries.py
 """
 

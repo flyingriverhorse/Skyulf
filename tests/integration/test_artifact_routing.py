@@ -14,9 +14,7 @@ async def test_artifact_routing_logic():
         patch("backend.ml_pipeline.artifacts.factory.get_settings") as mock_get_settings,
         patch("backend.ml_pipeline.artifacts.factory.S3ArtifactStore") as MockS3Store,
         patch("backend.ml_pipeline.artifacts.factory.LocalArtifactStore") as MockLocalStore,
-        patch(
-            "backend.ml_pipeline._services.pipeline_execution_service.PipelineEngine"
-        ) as MockEngine,
+        patch("backend.ml_pipeline._services.pipeline_execution_service.PipelineEngine"),
         patch("os.makedirs"),
     ):
         # Setup Session and Job

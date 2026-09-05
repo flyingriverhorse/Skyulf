@@ -149,7 +149,8 @@ def test_cast_int_narrow_dtype_out_of_range_coerced_not_silently_uncast() -> Non
     through to `numeric.astype("int8")`, which raises on NaN-containing data.
     That raise was silently swallowed by the caller's best-effort except
     block, leaving the ENTIRE column completely uncast (not just the
-    out-of-range value)."""
+    out-of-range value).
+    """
     s = pd.Series([300.0, 100.0])  # 300 is out of int8 range [-128, 127]
     result = _cast_int(s, "col", "int8", coerce_on_error=True)
     assert result.dtype == pd.Int8Dtype()
@@ -169,7 +170,8 @@ def test_cast_int_narrow_uint_dtype_out_of_range_coerced() -> None:
 def test_casting_applier_narrow_int_dtype_out_of_range_not_silently_uncast() -> None:
     """End-to-end regression: CastingApplier.apply() on a DataFrame column
     targeting int8 with an out-of-range value must actually cast (nulling
-    the bad value), not silently leave the whole column untouched."""
+    the bad value), not silently leave the whole column untouched.
+    """
     df = pd.DataFrame({"a": [300, 100]})
     params: dict[str, Any] = {"type_map": {"a": "int8"}, "coerce_on_error": True}
     result = CastingApplier().apply(df, params)
@@ -186,7 +188,8 @@ def test_casting_applier_uint_dtype_out_of_range_masks_not_wraps() -> None:
     `uint*` fell through to a bare `series.astype("uint8")`, which
     silently WRAPS (300 -> 44 via mod 256) instead of erroring or nulling,
     a data-corruption bug distinct from (and worse than) the narrow-int
-    silent-no-op bug."""
+    silent-no-op bug.
+    """
     df = pd.DataFrame({"a": [300, 100]})
 
     # Coerce mode: out-of-range value must become null, not wrap to 44.
@@ -609,7 +612,8 @@ if _POLARS_AVAILABLE:
 
     def test_casting_apply_polars_bool_cast_unrecognized_string_becomes_null() -> None:
         """An unrecognized string value must become null under coerce_on_error=True,
-        matching pandas' `_coerce_boolean_value` fallback-to-None behavior."""
+        matching pandas' `_coerce_boolean_value` fallback-to-None behavior.
+        """
         df_pl = pl.DataFrame({"flag": ["yes", "maybe"]})
         params: dict[str, Any] = {"type_map": {"flag": "bool"}, "coerce_on_error": True}
         result = CastingApplier().apply(df_pl, params)
@@ -617,15 +621,17 @@ if _POLARS_AVAILABLE:
 
     def test_casting_apply_polars_bool_cast_raises_without_coerce() -> None:
         """An unrecognized string value must raise ValueError when
-        coerce_on_error=False, mirroring pandas' `_cast_bool` strict-mode re-raise."""
+        coerce_on_error=False, mirroring pandas' `_cast_bool` strict-mode re-raise.
+        """
         df_pl = pl.DataFrame({"flag": ["yes", "maybe"]})
         params: dict[str, Any] = {"type_map": {"flag": "bool"}, "coerce_on_error": False}
         with pytest.raises(ValueError, match="not recognized as true/false"):
             CastingApplier().apply(df_pl, params)
 
     def test_casting_apply_bool_cast_string_engine_parity() -> None:
-        """pandas and Polars must produce identical boolean values for the
-        same "yes"/"no"-style string column."""
+        """Pandas and Polars must produce identical boolean values for the
+        same "yes"/"no"-style string column.
+        """
         df_pd = pd.DataFrame({"flag": ["Yes", "no", "1", "0", "maybe"]})
         df_pl = pl.from_pandas(df_pd)
         params: dict[str, Any] = {"type_map": {"flag": "bool"}, "coerce_on_error": True}
@@ -655,7 +661,8 @@ if _POLARS_AVAILABLE:
 
     def test_casting_apply_polars_numeric_bool_cast_raises_without_coerce() -> None:
         """Regression test (OC-58): a non-0/1 numeric value must raise ValueError
-        when coerce_on_error=False, mirroring pandas' strict-mode TypeError."""
+        when coerce_on_error=False, mirroring pandas' strict-mode TypeError.
+        """
         df_pl = pl.DataFrame({"flag": [0, 1, 2]})
         params: dict[str, Any] = {"type_map": {"flag": "bool"}, "coerce_on_error": False}
         with pytest.raises(ValueError, match="not recognized as true/false"):
@@ -669,8 +676,9 @@ if _POLARS_AVAILABLE:
         assert result["flag"].to_list() == [False, True]
 
     def test_casting_apply_bool_cast_numeric_engine_parity() -> None:
-        """pandas and Polars must produce identical boolean values for the same
-        numeric column containing non-0/1 values (OC-58)."""
+        """Pandas and Polars must produce identical boolean values for the same
+        numeric column containing non-0/1 values (OC-58).
+        """
         df_pd = pd.DataFrame({"flag": [0, 1, 2, 0.5, None]})
         df_pl = pl.from_pandas(df_pd)
         params: dict[str, Any] = {"type_map": {"flag": "bool"}, "coerce_on_error": True}
@@ -690,7 +698,8 @@ if _POLARS_AVAILABLE:
 
     def test_resolve_polars_dtype_datetime_prefix_variant() -> None:
         """A 'datetime...' string not in the alias table must map via the
-        startswith('datetime') fallback to pl.Datetime."""
+        startswith('datetime') fallback to pl.Datetime.
+        """
         assert _resolve_polars_dtype("datetime64[ns]") is pl.Datetime
 
     def test_resolve_polars_dtype_unsupported_returns_none() -> None:
@@ -699,7 +708,8 @@ if _POLARS_AVAILABLE:
 
     def test_casting_apply_polars_skips_unsupported_dtype_column() -> None:
         """Polars apply must silently skip a column whose target dtype is
-        unsupported (_resolve_polars_dtype returns None), leaving it untouched."""
+        unsupported (_resolve_polars_dtype returns None), leaving it untouched.
+        """
         df_pl = pl.DataFrame({"a": [1, 2], "b": ["x", "y"]})
         params: dict[str, Any] = {
             "type_map": {"a": "totally_unsupported_dtype", "b": "string"},
@@ -715,7 +725,8 @@ if _POLARS_AVAILABLE:
         clear error under coerce_on_error=False (strict mode), instead of
         silently skipping the column with zero error - previously this
         silently no-op'd even in strict mode, diverging from the pandas
-        path (which raises on an unrecognized dtype string via astype())."""
+        path (which raises on an unrecognized dtype string via astype()).
+        """
         df_pl = pl.DataFrame({"a": [1, 2]})
         params: dict[str, Any] = {
             "type_map": {"a": "totally_unsupported_dtype"},
@@ -728,7 +739,8 @@ if _POLARS_AVAILABLE:
         """Regression test: narrow int dtype strings (int8/int16/uint8/etc.)
         must resolve to a concrete Polars dtype - previously only int32/
         int64/int were mapped, so requesting e.g. "int16" on the Polars
-        engine silently no-op'd (parity gap vs. pandas, which supports it)."""
+        engine silently no-op'd (parity gap vs. pandas, which supports it).
+        """
         assert _resolve_polars_dtype("int8") is pl.Int8
         assert _resolve_polars_dtype("int16") is pl.Int16
         assert _resolve_polars_dtype("uint8") is pl.UInt8

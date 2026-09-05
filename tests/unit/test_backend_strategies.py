@@ -17,7 +17,8 @@ from backend.ml_pipeline.constants import StepType
 class TestEnumStrSemantics(unittest.TestCase):
     """StepType/JobStatus are StrEnum: str()/f-string must yield the bare
     value, not `ClassName.MEMBER` (regression guard against reverting to
-    `(str, Enum)`)."""
+    `(str, Enum)`).
+    """
 
     def test_step_type_str_returns_value(self):
         self.assertEqual(str(StepType.TRAINING), "training")
@@ -66,7 +67,8 @@ class TestBasicTrainingStrategy(unittest.TestCase):
 
     def test_handle_success_stamps_leakage_gate_verdict(self):
         """The pre-execution leakage verdict is persisted on the job so the
-        Job Details UI can show it as factual per-job information."""
+        Job Details UI can show it as factual per-job information.
+        """
         node_res = NodeExecutionResult(
             node_id="node_1",
             status="success",
@@ -102,8 +104,7 @@ class TestBasicTrainingStrategy(unittest.TestCase):
         self.assertNotIn("leakage_gate", self.job.metrics)
 
     def test_handle_success_persists_pipeline_diagram(self):
-        """The mermaid topology diagram rides on job.metrics for the
-        Experiments diagram tab."""
+        """The mermaid topology diagram rides on job.metrics for the Experiments diagram tab."""
         node_res = NodeExecutionResult(
             node_id="node_1", status="success", metrics={"accuracy": 0.9}
         )
@@ -160,7 +161,8 @@ class TestBasicTrainingStrategy(unittest.TestCase):
     def test_handle_success_seeds_tuned_thresholds_from_training_time_tuning(self):
         """F-13 bridge: thresholds selected during training are copied into
         the per-job tuned-thresholds store (enabled), so Experiments and
-        deployment reuse the existing save/toggle lifecycle."""
+        deployment reuse the existing save/toggle lifecycle.
+        """
         node_res = NodeExecutionResult(
             node_id="node_1",
             status="success",
@@ -249,7 +251,8 @@ class TestAdvancedTuningStrategy(unittest.TestCase):
 
     def test_handle_success_seeds_tuned_thresholds(self):
         """The seeding bridge lives on the base strategy and must fire for
-        tuning jobs too (their handle_success delegates to super first)."""
+        tuning jobs too (their handle_success delegates to super first).
+        """
         metrics = {
             "best_params": {"max_depth": 5},
             "best_score": 0.88,

@@ -142,7 +142,8 @@ class TestCoordinateRangeValidation:
 
     def test_analyze_geospatial_rejects_out_of_range_latitude(self) -> None:
         """A column named 'lat' holding values outside [-90, 90] (e.g. an ID
-        or percentage column) must not be reported as valid geospatial data."""
+        or percentage column) must not be reported as valid geospatial data.
+        """
         df = pl.DataFrame(
             {
                 "lat": [100.0, 200.0, 300.0, 400.0],
@@ -157,7 +158,8 @@ class TestCoordinateRangeValidation:
 
     def test_analyze_geospatial_rejects_out_of_range_longitude(self) -> None:
         """A column named 'lon' holding values outside [-180, 180] must not be
-        reported as valid geospatial data."""
+        reported as valid geospatial data.
+        """
         df = pl.DataFrame(
             {
                 "lat": [10.0, 20.0, 30.0, 40.0],

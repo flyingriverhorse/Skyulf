@@ -21,8 +21,7 @@ logger = logging.getLogger(__name__)
 
 
 class FeatureEngineer:
-    """
-    Orchestrates a sequence of feature engineering steps.
+    """Orchestrates a sequence of feature engineering steps.
 
     Examples:
         >>> engineer = FeatureEngineer([])
@@ -57,9 +56,7 @@ class FeatureEngineer:
         self.fitted_steps: list[dict[str, Any]] = []
 
     def transform(self, data: pd.DataFrame | SkyulfDataFrame | Any) -> Any:
-        """
-        Apply fitted transformations to new data.
-        """
+        """Apply fitted transformations to new data."""
         current_data = data
 
         for step in self.fitted_steps:
@@ -83,8 +80,8 @@ class FeatureEngineer:
         return current_data
 
     def fit_transform(self, data: pd.DataFrame | SkyulfDataFrame | Any, node_id_prefix="") -> Any:
-        """
-        Runs the pipeline on data.
+        """Runs the pipeline on data.
+
         Returns: (transformed_data, metrics_dict)
         """
         self.fitted_steps = []  # Reset fitted steps

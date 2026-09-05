@@ -1,5 +1,4 @@
-"""
-FastAPI MLops Application Entry Point
+"""FastAPI MLops Application Entry Point
 
 © 2025 Murat Unsal — Skyulf Project
 
@@ -226,8 +225,8 @@ def _reset_stale_jobs() -> None:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
-    """
-    Lifespan context manager for FastAPI application.
+    """Lifespan context manager for FastAPI application.
+
     Handles startup and shutdown events.
     """
     # Startup
@@ -270,8 +269,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
 
 def create_app() -> FastAPI:
-    """
-    FastAPI application factory.
+    """FastAPI application factory.
 
     Returns:
         FastAPI: Configured FastAPI application instance
@@ -318,7 +316,6 @@ def create_app() -> FastAPI:
 
 def _setup_templates_and_static(app: FastAPI) -> None:
     """Setup templates and static files for the FastAPI application."""
-
     # Define paths
     base_dir = Path(__file__).parent
     project_root = base_dir.parent
@@ -351,7 +348,6 @@ def _setup_templates_and_static(app: FastAPI) -> None:
 
 def _add_middleware(app: FastAPI, settings) -> None:
     """Add middleware to the FastAPI application."""
-
     # Security middleware
     if settings.ALLOWED_HOSTS:
         app.add_middleware(TrustedHostMiddleware, allowed_hosts=settings.ALLOWED_HOSTS)

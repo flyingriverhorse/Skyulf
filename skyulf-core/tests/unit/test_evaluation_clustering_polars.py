@@ -131,7 +131,8 @@ def test_evaluate_clustering_model_nan_labels_raise_value_error(engine: str) -> 
 @pytest.mark.parametrize("engine", ["pandas", "raw_polars"])
 def test_evaluate_clustering_model_no_numeric_columns_raises_like_sklearn(engine: str) -> None:
     """Non-numeric-only frames (after excluding the reference column) must fail
-    identically on both engines, not with a Polars-specific row-count error."""
+    identically on both engines, not with a Polars-specific row-count error.
+    """
     fixture = {"id": ["a", "b", "c"], "note": ["x", "y", "z"], "ref": ["p", "q", "r"]}
     df = pd.DataFrame(fixture) if engine == "pandas" else pl.DataFrame(fixture)
     with pytest.raises(ValueError, match="0 feature"):

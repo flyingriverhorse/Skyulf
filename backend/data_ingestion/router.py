@@ -35,9 +35,7 @@ async def list_sources(
     skip: int = 0,
     service: DataIngestionService = Depends(get_data_service),
 ):
-    """
-    List all available data sources.
-    """
+    """List all available data sources."""
     # KNOWN-GAP: Auth not implemented yet — all sources are visible.
     # TODO(auth): Replace None with real user ID from auth dependency.
     effective_limit = limit if limit is not None else get_settings().DEFAULT_PAGE_SIZE
@@ -49,18 +47,14 @@ async def list_sources(
 async def list_usable_sources(
     service: DataIngestionService = Depends(get_data_service),
 ):
-    """
-    List only successfully ingested data sources.
-    """
+    """List only successfully ingested data sources."""
     sources = await service.list_usable_sources(user_id=None)
     return DataSourceListResponse(sources=[DataSourceRead.model_validate(s) for s in sources])
 
 
 @sources_router.get("/sources/{source_id}", response_model=DataSourceResponse)
 async def get_source(source_id: str, service: DataIngestionService = Depends(get_data_service)):
-    """
-    Get a specific data source.
-    """
+    """Get a specific data source."""
     source = await service.get_source(source_id)
     if not source:
         raise HTTPException(status_code=404, detail="Source not found")
@@ -73,9 +67,7 @@ async def get_source_sample(
     limit: int | None = None,
     service: DataIngestionService = Depends(get_data_service),
 ):
-    """
-    Get a sample of data from the source.
-    """
+    """Get a sample of data from the source."""
     effective_limit = limit if limit is not None else get_settings().DEFAULT_SAMPLE_ROWS
     data = await service.get_sample(source_id, effective_limit)
     return DataSourceSampleResponse(data=data)
@@ -83,9 +75,7 @@ async def get_source_sample(
 
 @sources_router.delete("/sources/{source_id}")
 async def delete_source(source_id: str, service: DataIngestionService = Depends(get_data_service)):
-    """
-    Delete a data source.
-    """
+    """Delete a data source."""
     success = await service.delete_source(source_id)
     if not success:
         raise HTTPException(status_code=404, detail="Source not found")
@@ -99,9 +89,7 @@ async def export_source_data(
     limit: int = Query(1000, ge=1, le=50_000),
     service: DataIngestionService = Depends(get_data_service),
 ) -> Response:
-    """
-    Export data from a source as CSV or Parquet.
-    """
+    """Export data from a source as CSV or Parquet."""
     data = await service.get_sample(source_id, limit=limit)
     if not data:
         raise HTTPException(status_code=404, detail="No data found for this source")
@@ -142,9 +130,7 @@ async def upload_file(
     file: UploadFile = File(...),
     service: DataIngestionService = Depends(get_data_service),
 ):
-    """
-    Upload a file and start ingestion process.
-    """
+    """Upload a file and start ingestion process."""
     # KNOWN-GAP: Auth not implemented yet — hardcoded user_id=1.
     # TODO(auth): Replace with real user ID from auth dependency.
     user_id = 1
@@ -159,8 +145,7 @@ async def create_source(
     background_tasks: BackgroundTasks,
     service: DataIngestionService = Depends(get_data_service),
 ):
-    """
-    Create a data source from an inline config (e.g. S3) and start ingestion.
+    """Create a data source from an inline config (e.g. S3) and start ingestion.
 
     Named "/database" for historical/frontend-compatibility reasons; despite
     the name it currently only supports the "s3" source type (see
@@ -175,9 +160,7 @@ async def create_source(
 
 @router.get("/{source_id}/status", response_model=IngestionStatus)
 async def get_status(source_id: int, service: DataIngestionService = Depends(get_data_service)):
-    """
-    Get the status of an ingestion job.
-    """
+    """Get the status of an ingestion job."""
     status_data = await service.get_ingestion_status(source_id)
     return IngestionStatus(**status_data)
 
@@ -186,9 +169,7 @@ async def get_status(source_id: int, service: DataIngestionService = Depends(get
 async def cancel_ingestion(
     source_id: str, service: DataIngestionService = Depends(get_data_service)
 ):
-    """
-    Cancel an ingestion job.
-    """
+    """Cancel an ingestion job."""
     success = await service.cancel_ingestion(source_id)
     if not success:
         # `cancel_ingestion` is idempotent for finished jobs, so the only

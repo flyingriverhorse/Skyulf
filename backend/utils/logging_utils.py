@@ -1,10 +1,8 @@
-"""
-Simple logging utility for data actions
-Replaces the Flask log_data_action function
-"""
+"""Simple logging utility for data actions Replaces the Flask log_data_action function"""
 
 import logging
 import os
+import re
 from logging import Handler
 from logging.handlers import RotatingFileHandler, TimedRotatingFileHandler
 from pathlib import Path
@@ -14,8 +12,7 @@ data_logger = logging.getLogger("data_actions")
 
 
 def log_data_action(action: str, success: bool = True, details: str | None = None):
-    """
-    Log data-related actions for monitoring and debugging
+    """Log data-related actions for monitoring and debugging
 
     Args:
         action: The action being performed
@@ -55,6 +52,84 @@ def sanitize_for_log(value: object) -> str:
         A single-line string safe to interpolate into a log record.
     """
     return str(value).translate(_CONTROL_ESCAPES)
+
+
+# AWS access key IDs are 20 characters: a 4-character prefix naming the
+# credential type, then 16 uppercase alphanumerics.
+_AWS_KEY_ID_RE = re.compile(
+    r"\b(?:A3T[A-Z0-9]|AKIA|ASIA|ABIA|ACCA|AIDA|AROA|AIPA|ANPA|ANVA)[0-9A-Z]{16}\b"
+)
+
+# Option names whose *value* is a credential. `key` is included because both S3
+# modules use it as the access-key-id option name (`key` <-> `aws_access_key_id`).
+_SECRET_NAMES = (
+    "x-amz-credential",
+    "x-amz-security-token",
+    "x-amz-signature",
+    "aws_secret_access_key",
+    "aws_access_key_id",
+    "awsaccesskeyid",
+    "secret_access_key",
+    "session_token",
+    "security_token",
+    "signature",
+    "secret",
+    "password",
+    "key",
+)
+
+# `name=value`, `name: value` and the quoted/dict-repr forms of both. The value
+# charset stops at quotes, separators and brackets so a value already replaced
+# by an earlier pass is not matched again, and so the scrub cannot run past the
+# credential into the surrounding prose.
+_SECRET_ASSIGNMENT_RE = re.compile(
+    r"\b(?P<name>" + "|".join(_SECRET_NAMES) + r")\b"
+    r"(?P<sep>['\"]?\s*[:=]\s*['\"]?)"
+    r"(?P<value>[^\s,&'\"<>{}\[\]()]+)",
+    re.IGNORECASE,
+)
+
+# S3's own 403 body reports the signature and string-to-sign as XML elements,
+# where the separator is `>` rather than `=` or `:`.
+_SECRET_XML_RE = re.compile(
+    r"<(?P<tag>SignatureProvided|StringToSign|StringToSignBytes"
+    r"|AWSSecretAccessKey|SecretAccessKey|SessionToken)>"
+    r"(?P<value>[^<]*)</(?P=tag)>",
+    re.IGNORECASE,
+)
+
+
+def redact_credentials(value: object) -> str:
+    """Scrub AWS credentials and signatures out of text destined for a log.
+
+    Redaction keys off the *shape of a credential*, not the name of a setting:
+    S3 surfaces secrets in forms containing no option name at all — its own 403
+    XML body, and any presigned URL. A presigned URL is a bearer credential, so
+    whoever can read the log can replay it against the object until it expires
+    with no AWS account required.
+
+    Each secret is replaced in place rather than discarding the whole message,
+    so the surrounding diagnostic survives. Matching on key names instead
+    produced both failure modes at once: real credentials passed through
+    unredacted, while a benign object-key message (`key=reports/q3.csv`) lost
+    its entire text.
+
+    Args:
+        value: The value to render.
+
+    Returns:
+        The string form of ``value`` with credentials replaced by ``[REDACTED]``.
+    """
+    text = str(value)
+    text = _AWS_KEY_ID_RE.sub("[REDACTED]", text)
+    text = _SECRET_ASSIGNMENT_RE.sub(
+        lambda m: f"{m.group('name')}{m.group('sep')}[REDACTED]",
+        text,
+    )
+    return _SECRET_XML_RE.sub(
+        lambda m: f"<{m.group('tag')}>[REDACTED]</{m.group('tag')}>",
+        text,
+    )
 
 
 def _build_file_handler(
@@ -150,8 +225,8 @@ def setup_universal_logging(
     backup_count: int = 10,
     console_log_level: str = "WARNING",
 ) -> None:
-    """
-    Universal logging setup for FastAPI applications.
+    """Universal logging setup for FastAPI applications.
+
     Enhanced for async applications and modern Python practices.
 
     Args:

@@ -29,7 +29,8 @@ logger = logging.getLogger(__name__)
 
 def _to_pandas(obj: Any) -> Any:
     """Convert a Polars DataFrame/Series (or any object exposing ``to_pandas()``)
-    to its pandas equivalent; pass pandas objects (or ``None``) through unchanged."""
+    to its pandas equivalent; pass pandas objects (or ``None``) through unchanged.
+    """
     if obj is None:
         return None
     if hasattr(obj, "to_pandas"):
@@ -38,8 +39,7 @@ def _to_pandas(obj: Any) -> Any:
 
 
 class SkyulfPipeline:
-    """
-    End-to-end ML Pipeline.
+    """End-to-end ML Pipeline.
 
     Encapsulates:
     1. Feature Engineering (Preprocessing)
@@ -51,8 +51,7 @@ class SkyulfPipeline:
     """
 
     def __init__(self, config: PipelineConfig | dict[str, Any]):
-        """
-        Initialize the pipeline.
+        """Initialize the pipeline.
 
         Args:
             config: Pipeline configuration dictionary.
@@ -137,8 +136,7 @@ class SkyulfPipeline:
         data: pd.DataFrame | pl.DataFrame | SkyulfDataFrame | SplitDataset,
         target_column: str,
     ) -> dict[str, Any]:
-        """
-        Fit the pipeline.
+        """Fit the pipeline.
 
         Args:
             data: Input data (DataFrame or SplitDataset).
@@ -208,8 +206,7 @@ class SkyulfPipeline:
         data: pd.DataFrame | pl.DataFrame | SkyulfDataFrame | SplitDataset,
         target_column: str,
     ) -> tuple[pd.DataFrame, pd.Series, pd.DataFrame, pd.Series]:
-        """
-        Run this pipeline's configured preprocessing chain and return the
+        """Run this pipeline's configured preprocessing chain and return the
         resulting train/test split as plain pandas objects.
 
         Runs ``self.feature_engineer.fit_transform(data)`` — the same
@@ -272,8 +269,7 @@ class SkyulfPipeline:
         strategy: str | None = None,
         grid_points: int = 101,
     ) -> dict[Any, float]:
-        """
-        Search for per-class decision thresholds that maximize ``metric`` on
+        """Search for per-class decision thresholds that maximize ``metric`` on
         caller-supplied validation data, and store the result for later use
         by ``predict(use_tuned_thresholds=True)``.
 
@@ -338,8 +334,7 @@ class SkyulfPipeline:
         data: pd.DataFrame | SkyulfDataFrame,
         use_tuned_thresholds: bool = False,
     ) -> Any:
-        """
-        Generate predictions.
+        """Generate predictions.
 
         Args:
             data: Input DataFrame.

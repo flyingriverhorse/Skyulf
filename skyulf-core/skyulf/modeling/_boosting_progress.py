@@ -27,7 +27,8 @@ _MAXIMIZE_METRICS = frozenset({"auc", "aucpr", "map", "ndcg", "precession", "pre
 def direction_for_xgb_metric(metric: str) -> str:
     """XGBoost's callback env doesn't say which way is better; losses and
     error rates dominate its metric names, so default to minimize and
-    whitelist the ranking metrics."""
+    whitelist the ranking metrics.
+    """
     return "maximize" if metric.lower() in _MAXIMIZE_METRICS else "minimize"
 
 

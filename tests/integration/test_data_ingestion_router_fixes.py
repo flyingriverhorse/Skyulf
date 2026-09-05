@@ -84,7 +84,8 @@ def test_create_s3_source_rejects_local_path(client):
     """A type="s3" source whose path isn't an s3:// URI would otherwise be
     treated as an arbitrary local filesystem path downstream (see
     `get_source_sample`), with no traversal/extension checks — reject it here
-    instead of letting it slip through as a path-traversal-style read."""
+    instead of letting it slip through as a path-traversal-style read.
+    """
     response = client.post(
         "/api/ingestion/database",
         json={"name": "Sneaky Local Path", "type": "s3", "config": {"path": "/etc/passwd"}},
@@ -98,7 +99,8 @@ async def test_dataset_schema_unresolvable_path_returns_400(client, db_session):
     """GET /api/pipeline/datasets/{id}/schema for a dataset with no resolvable
     file path used to raise an HTTPException(400) inside a try/except that
     caught it and re-raised as a generic 500 SkyulfException, masking the
-    real, actionable 400 error."""
+    real, actionable 400 error.
+    """
     import uuid
 
     ds = DataSource(

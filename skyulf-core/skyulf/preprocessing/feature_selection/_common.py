@@ -110,7 +110,7 @@ def _resolve_drop_list(params: dict[str, Any], existing_cols: list[str]) -> list
 
 
 def _drop_selected_polars(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
-    """Polars apply path for selectors that drop ``candidate \\ selected`` columns."""
+    r"""Polars apply path for selectors that drop ``candidate \ selected`` columns."""
     if not params.get("drop_columns", True):
         return X, y
     to_drop = _resolve_drop_list(params, list(X.columns))
@@ -120,7 +120,7 @@ def _drop_selected_polars(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, 
 
 
 def _drop_selected_pandas(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
-    """Pandas apply path for selectors that drop ``candidate \\ selected`` columns."""
+    r"""Pandas apply path for selectors that drop ``candidate \ selected`` columns."""
     if not params.get("drop_columns", True):
         return X, y
     to_drop = _resolve_drop_list(params, list(X.columns))
@@ -220,6 +220,18 @@ def _build_univariate_selector(method: str, score_func: Any, config: dict[str, A
     return builder(score_func, config) if builder else None
 
 
+def _resolve_rfe_n_features(config: dict[str, Any]) -> int | None:
+    """Resolve RFE's feature count from the UI's ``k`` or sklearn's own name.
+
+    The canvas labels this field "K (Number of Features)" and sends ``k`` for
+    both SelectKBest and RFE, but sklearn's ``RFE`` takes
+    ``n_features_to_select``. An explicit ``n_features_to_select`` wins so the
+    documented sklearn spelling keeps working; ``k`` is the alias the UI sends.
+    """
+    n_features = config.get("n_features_to_select")
+    return config.get("k") if n_features is None else n_features
+
+
 def _build_model_selector(method: str, estimator: Any, config: dict[str, Any]) -> Any | None:
     """Construct the sklearn model-based selector named by ``method``."""
     if method == "select_from_model":
@@ -236,7 +248,7 @@ def _build_model_selector(method: str, estimator: Any, config: dict[str, Any]) -
     if method == "rfe":
         return RFE(
             estimator=estimator,
-            n_features_to_select=config.get("n_features_to_select"),
+            n_features_to_select=_resolve_rfe_n_features(config),
             step=config.get("step", 1),
         )
     return None
@@ -247,7 +259,8 @@ def _fillna_zero_with_warning(X_pd: pd.DataFrame, cols: list[str]) -> pd.DataFra
     changes data (unlike ``_maybe_chi2_rescale``'s already-existing warning
     pattern, a silent ``fillna(0)`` can bias univariate/model-based feature
     scores whenever 0 is itself a meaningful value, or missingness is
-    correlated with the target)."""
+    correlated with the target).
+    """
     subset = X_pd[cols]
     if subset.isna().any().any():
         logger.warning(

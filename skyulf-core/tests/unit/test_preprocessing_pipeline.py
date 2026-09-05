@@ -265,7 +265,8 @@ def test_transform_applies_scaler_artifact(numeric_df: pd.DataFrame) -> None:
 def test_transform_skips_row_dropping_steps() -> None:
     """F-18: row-dropping steps (Deduplicate, DropMissingRows) must not run at
     inference — they would silently vanish requested rows, and prediction
-    responses carry no row keys for callers to tell which inputs disappeared."""
+    responses carry no row keys for callers to tell which inputs disappeared.
+    """
     train = pd.DataFrame({"a": [1.0, 1.0, 2.0, None], "b": [0, 1, 0, 1]})
     steps = _steps(
         _step("dedup", "Deduplicate"),
@@ -389,7 +390,6 @@ def test_node_id_prefix_used_in_step_ids(numeric_df: pd.DataFrame) -> None:
 
 def test_extract_y_for_resampling_tuple_path() -> None:
     """_extract_y_for_resampling must return y from (X, y) tuple."""
-
     X = pd.DataFrame({"f": [1, 2]})
     y = pd.Series([0, 1], name="label")
     fe = FeatureEngineer(steps_config=[])
@@ -452,7 +452,8 @@ def _make_imbalanced_df(n_major: int, n_minor: int) -> pd.DataFrame:
 def test_fit_transform_does_not_oversample_test_or_validation() -> None:
     """Oversampling must only ever run on train -- test/validation must pass
     through fit_transform byte-for-byte unchanged, not be synthetically
-    resampled."""
+    resampled.
+    """
     train = _make_imbalanced_df(40, 8)
     test = _make_imbalanced_df(10, 3)
     validation = _make_imbalanced_df(10, 2)
@@ -484,7 +485,8 @@ def test_fit_transform_does_not_oversample_test_or_validation() -> None:
 
 def test_fit_transform_does_not_undersample_test_or_validation() -> None:
     """Undersampling must only ever run on train -- test/validation must pass
-    through fit_transform byte-for-byte unchanged, not have rows dropped."""
+    through fit_transform byte-for-byte unchanged, not have rows dropped.
+    """
     train = _make_imbalanced_df(40, 8)
     test = _make_imbalanced_df(10, 3)
     validation = _make_imbalanced_df(10, 2)
@@ -516,7 +518,8 @@ def test_fit_transform_does_not_undersample_test_or_validation() -> None:
 
 def test_fit_transform_resampling_then_scaler_still_scales_all_splits() -> None:
     """A step AFTER resampling (e.g. a scaler) must still apply to every split
-    normally -- the test/validation skip is resampling-specific, not global."""
+    normally -- the test/validation skip is resampling-specific, not global.
+    """
     train = _make_imbalanced_df(40, 8)
     test = _make_imbalanced_df(10, 3)
     validation = _make_imbalanced_df(10, 2)

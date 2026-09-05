@@ -48,7 +48,8 @@ def test_advisor_generate_profile_all_null_nullable_boolean_column_does_not_cras
 
 def test_advisor_generate_profile_partially_null_nullable_int_column_computes_stats():
     """A partially-null nullable-int column should still compute real stats
-    for its non-null values (this must keep working after the fix)."""
+    for its non-null values (this must keep working after the fix).
+    """
     df = pd.DataFrame({"a": pd.array([1, 2, None], dtype="Int64")})
     profile = AdvisorProfiler.generate_profile(df)
     col = profile.columns["a"]
@@ -59,7 +60,8 @@ def test_advisor_generate_profile_partially_null_nullable_int_column_computes_st
 
 def test_ingestion_profiler_uint8_column_computes_statistics():
     """A ``pl.UInt8`` column was previously missing from the numeric
-    dtype allow-list, silently producing zero statistics."""
+    dtype allow-list, silently producing zero statistics.
+    """
     df = pl.DataFrame({"age": [1, 2, 3]}, schema={"age": pl.UInt8})
     result = IngestionProfiler.profile(df)
     stats = result["columns"]["age"]
@@ -71,7 +73,8 @@ def test_ingestion_profiler_uint8_column_computes_statistics():
 
 def test_ingestion_profiler_all_integer_dtype_variants_compute_statistics():
     """Every integer dtype variant in the allow-list must produce real stats,
-    not just the originally-covered Int32/Int64/Float32/Float64."""
+    not just the originally-covered Int32/Int64/Float32/Float64.
+    """
     for dtype in [pl.Int8, pl.Int16, pl.UInt16, pl.UInt32, pl.UInt64]:
         df = pl.DataFrame({"v": [1, 2, 3]}, schema={"v": dtype})
         stats = IngestionProfiler.profile(df)["columns"]["v"]

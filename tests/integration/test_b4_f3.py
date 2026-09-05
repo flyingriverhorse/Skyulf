@@ -1,7 +1,6 @@
-"""
-Tests for:
-  B4 — run_pipeline_batch_task (one Celery task per pipeline)
-  F3 — Sentry span no-op when sentry-sdk is absent
+"""Tests for:
+B4 — run_pipeline_batch_task (one Celery task per pipeline)
+F3 — Sentry span no-op when sentry-sdk is absent
 """
 
 import sys

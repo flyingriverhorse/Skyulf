@@ -75,8 +75,7 @@ def test_data_loader_accepts_polars_when_engine_polars(monkeypatch) -> None:
 
 
 def test_data_loader_rejects_polars_frame_when_engine_pandas(monkeypatch) -> None:
-    """An engine mismatch must fail loudly rather than silently degrading
-    SHAP/drift downstream."""
+    """An engine mismatch must fail loudly rather than silently degrading SHAP/drift downstream."""
     pl = pytest.importorskip("polars")
     settings = get_settings()
     monkeypatch.setattr(settings, "SKYULF_ENGINE", "pandas", raising=False)
@@ -95,7 +94,8 @@ def test_data_loader_rejects_non_frame_objects(monkeypatch) -> None:
 
 def test_normalize_train_frame_reattaches_single_column_dataframe_target() -> None:
     """A single-column DataFrame `y` must be squeezed back into the reference
-    frame, not silently dropped."""
+    frame, not silently dropped.
+    """
     X = pd.DataFrame({"f": [1, 2, 3]})
     y = pd.DataFrame({"target": [0, 1, 0]})
     out = _Artifacts()._normalize_train_frame((X, y), target_col="target")
@@ -115,7 +115,8 @@ def test_normalize_train_frame_reattaches_series_target() -> None:
 
 def test_normalize_train_frame_ignores_multi_column_polars_dataframe_target() -> None:
     """A multi-column Polars `y` is not a target; X is returned without a
-    bogus column — mirroring the pandas guard."""
+    bogus column — mirroring the pandas guard.
+    """
     pl = pytest.importorskip("polars")
     X = pl.DataFrame({"f": [1, 2, 3]})
     y = pl.DataFrame({"a": [0, 1, 0], "b": [1, 1, 1]})
@@ -127,7 +128,8 @@ def test_normalize_train_frame_ignores_multi_column_polars_dataframe_target() ->
 
 def test_normalize_train_frame_returns_none_for_non_frame_tuple() -> None:
     """A (X, y) tuple whose X is neither a pandas nor a Polars frame cannot
-    be normalized into a drift-reference frame; return None."""
+    be normalized into a drift-reference frame; return None.
+    """
     import numpy as np
 
     out = _Artifacts()._normalize_train_frame(
@@ -138,7 +140,8 @@ def test_normalize_train_frame_returns_none_for_non_frame_tuple() -> None:
 
 def test_normalize_train_frame_polars_skips_unrecognized_target_type() -> None:
     """A Polars X with a y of an unrecognized type is returned without a
-    target column instead of raising or fabricating data."""
+    target column instead of raising or fabricating data.
+    """
     pl = pytest.importorskip("polars")
     X = pl.DataFrame({"f": [1, 2, 3]})
     out = _Artifacts()._normalize_train_frame((X, "not-a-target"), target_col="target")
@@ -166,7 +169,8 @@ def test_save_reference_data_skips_empty_polars_frame() -> None:
 
 def test_data_preview_accepts_plain_polars_frame() -> None:
     """A bare Polars frame input must produce a fit_transform preview with a
-    'full' data summary, not fall through with an unknown operation mode."""
+    'full' data summary, not fall through with an unknown operation mode.
+    """
     pl = pytest.importorskip("polars")
 
     class _Preview(NodeRunnersMixin):
@@ -188,7 +192,8 @@ def test_data_preview_accepts_plain_polars_frame() -> None:
 
 def test_data_preview_leaves_unknown_mode_for_non_frame_input() -> None:
     """An input shape that is neither SplitDataset nor a frame must not be
-    mis-described; operation_mode stays unknown."""
+    mis-described; operation_mode stays unknown.
+    """
 
     class _Preview(NodeRunnersMixin):
         def __init__(self, data: Any) -> None:
@@ -211,7 +216,8 @@ def test_data_preview_leaves_unknown_mode_for_non_frame_input() -> None:
 
 def test_normalize_train_frame_accepts_polars_frame() -> None:
     """F-31: a polars training frame must yield a reference frame, not None
-    (None silently disables drift detection under the polars engine)."""
+    (None silently disables drift detection under the polars engine).
+    """
     pl = pytest.importorskip("polars")
     df = pl.DataFrame({"f": [1, 2, 3], "target": [0, 1, 0]})
     out = _Artifacts()._normalize_train_frame(df, target_col="target")
@@ -248,7 +254,8 @@ def test_normalize_train_frame_reattaches_target_for_polars_xy_tuple() -> None:
 
 def test_normalize_train_frame_reattaches_polars_single_column_dataframe_target() -> None:
     """A single-column Polars DataFrame `y` (a legitimate `split_xy` output)
-    must be squeezed back into the reference frame, mirroring the pandas path."""
+    must be squeezed back into the reference frame, mirroring the pandas path.
+    """
     pl = pytest.importorskip("polars")
     X = pl.DataFrame({"f": [1, 2, 3]})
     y = pl.DataFrame({"target": [0, 1, 0]})
@@ -278,7 +285,8 @@ def test_feature_names_for_importance_accepts_polars() -> None:
 
 def test_save_reference_data_persists_polars_frame() -> None:
     """F-31 end-to-end: a polars training frame must reach the artifact store
-    as the drift reference, not be dropped as 'unsupported data shape'."""
+    as the drift reference, not be dropped as 'unsupported data shape'.
+    """
     pl = pytest.importorskip("polars")
 
     class _Store(ArtifactsMixin):

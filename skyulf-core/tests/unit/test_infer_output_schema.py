@@ -321,7 +321,8 @@ DATA_DEPENDENT_CALCULATORS = [
 def test_data_dependent_returns_none_or_passthrough(calc_cls: type) -> None:
     """Each data-dependent Calculator must return either ``None`` (opaque)
     or the input schema unchanged (passthrough). Anything else would mean
-    the schema graph is making up columns that may not exist at runtime."""
+    the schema graph is making up columns that may not exist at runtime.
+    """
     s = SkyulfSchema.from_columns(["a", "b", "c"])
     out = calc_cls().infer_output_schema(s, {})
     assert out is None or out == s, (
@@ -349,7 +350,8 @@ def test_data_dependent_returns_none_or_passthrough(calc_cls: type) -> None:
 def test_infer_output_schema_contract(calc_cls: type) -> None:
     """``infer_output_schema(input_schema, config)`` must always return
     ``Optional[SkyulfSchema]`` for any reasonable config. It must never
-    raise and never return a non-schema, non-None value."""
+    raise and never return a non-schema, non-None value.
+    """
     s = SkyulfSchema.from_columns(["a", "b", "c"], {"a": "float64"})
     try:
         out = calc_cls().infer_output_schema(s, {})

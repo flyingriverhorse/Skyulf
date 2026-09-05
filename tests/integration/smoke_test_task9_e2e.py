@@ -451,6 +451,11 @@ def scenario_8_notebook_export():
         or "n_trials" in all_full_src
         or "logistic_regression" in all_full_src
     ), "Full notebook missing tuned-training content"
+    assert (
+        "tuning_config" in all_compact_src
+        or "n_trials" in all_compact_src
+        or "logistic_regression" in all_compact_src
+    ), "Compact notebook missing tuned-training content"
     print(f"  8a tuned-training full: {len(nb_full['cells'])} cells ✓")
     print(f"  8a tuned-training compact: {len(nb_compact['cells'])} cells ✓")
 

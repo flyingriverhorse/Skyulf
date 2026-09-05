@@ -133,7 +133,7 @@ async def test_toggle_endpoint_returns_400_when_no_saved_thresholds(async_sessio
 
 @pytest.mark.asyncio
 async def test_full_threshold_tuning_http_flow(async_session, client):
-    """preview -> save -> toggle -> clear works end-to-end over real HTTP requests."""
+    """Preview -> save -> toggle -> clear works end-to-end over real HTTP requests."""
     await _insert_job(async_session, "job-1")
 
     with patch(
@@ -232,7 +232,8 @@ async def test_get_endpoint_reflects_state_after_save_and_toggle(async_session, 
 @pytest.mark.asyncio
 async def test_get_endpoint_exposes_training_seed_source(async_session, client):
     """GET .../thresholds must surface the seeded 'training' source so the UI
-    can label training-time thresholds (the response model used to strip it)."""
+    can label training-time thresholds (the response model used to strip it).
+    """
     await _insert_job(async_session, "job-1")
     seeded = json.dumps(
         {

@@ -387,15 +387,20 @@ async def test_run_eda_analysis_full_success(real_csv_path):
     assert report.profile_data == {"summary": "ok"}
 
 
-async def test_run_eda_analysis_unexpected_exception_marks_failed():
-    """An unexpected exception during orchestration is caught and the report marked FAILED."""
+async def test_run_eda_analysis_fetch_failure_rolls_back_without_a_report():
+    """A failure while fetching the report is caught and the session rolled back.
+
+    ``_fail_report_safely`` only marks FAILED when it was given a report object.
+    Here ``session.get`` itself raises, so the code under test never has one and
+    the rollback is not followed by a commit.
+    """
     session = AsyncMock()
-    report = make_report()
     session.get.side_effect = RuntimeError("unexpected db failure")
 
     await tasks.run_eda_analysis(1, session)
 
     session.rollback.assert_awaited_once()
+    session.commit.assert_not_awaited()
 
 
 # --- run_eda_background -----------------------------------------------------------

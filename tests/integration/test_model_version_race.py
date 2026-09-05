@@ -37,7 +37,8 @@ async def _cleanup(dataset_id: str, model_type: str) -> None:
 async def test_concurrent_get_next_version_never_duplicates() -> None:
     """N concurrent callers (each with its own session, simulating N concurrent
     HTTP requests) must all receive distinct, contiguous version numbers -
-    never the same version twice."""
+    never the same version twice.
+    """
     dataset_id = "ds_race_concurrent"
     model_type = "rf_race_concurrent"
     await _cleanup(dataset_id, model_type)
@@ -63,7 +64,8 @@ async def test_concurrent_get_next_version_never_duplicates() -> None:
 async def test_get_next_version_seeds_from_existing_job_history() -> None:
     """When no counter row exists yet, the first allocation must seed from
     the max of pre-existing TrainingJob.version rows (either run_mode)
-    (backward compatibility for jobs created before the counter table existed)."""
+    (backward compatibility for jobs created before the counter table existed).
+    """
     dataset_id = "ds_race_seed"
     model_type = "rf_race_seed"
     await _cleanup(dataset_id, model_type)
@@ -95,7 +97,8 @@ async def test_get_next_version_seeds_from_existing_job_history() -> None:
 @pytest.mark.asyncio
 async def test_get_next_version_is_isolated_per_dataset_and_model_type() -> None:
     """Two different (dataset_id, model_type) pairs must not interfere with
-    each other's counters."""
+    each other's counters.
+    """
     await _cleanup("ds_race_a", "model_a")
     await _cleanup("ds_race_b", "model_b")
 

@@ -47,9 +47,7 @@ def _histogram_bin_counts(
 def calculate_histogram(
     df: pl.LazyFrame, col_name: str, bins: int = 20
 ) -> list[HistogramBin] | None:
-    """
-    Calculates histogram bins for a numeric column using Polars.
-    """
+    """Calculates histogram bins for a numeric column using Polars."""
     # We need to execute to get min/max for binning, or use an approximation.
     # For accurate bins, we need min/max.
     try:

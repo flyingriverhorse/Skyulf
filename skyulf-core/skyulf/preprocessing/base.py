@@ -85,8 +85,8 @@ class BaseCalculator(ABC):
     def fit(
         self, df: pd.DataFrame | SkyulfDataFrame | tuple, config: dict[str, Any]
     ) -> Mapping[str, Any]:
-        """
-        Calculates parameters from the training data.
+        """Calculates parameters from the training data.
+
         Returns a Mapping of fitted parameters (typically a TypedDict
         ``*Artifact`` declared in ``preprocessing._artifacts``). The return
         type is ``Mapping`` rather than ``Dict`` so concrete TypedDict
@@ -116,8 +116,7 @@ class BaseCalculator(ABC):
 class BaseApplier(ABC):
     @abstractmethod
     def apply(self, df: pd.DataFrame | SkyulfDataFrame | tuple, params: dict[str, Any]) -> Any:
-        """
-        Applies the transformation using fitted parameters.
+        """Applies the transformation using fitted parameters.
 
         The return type is intentionally `Any` because the concrete shape
         depends on the input: passing a `DataFrame` returns a `DataFrame`;

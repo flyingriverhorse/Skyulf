@@ -71,7 +71,8 @@ def _tokenizer_apply_pandas(
 
 def _tokenizer_apply_polars(X: Any, params: dict[str, Any]) -> Any:
     """Native-Polars tokenizer apply; returns ``None`` to fall back to pandas
-    when a text column is not String dtype (``astype(str)`` parity)."""
+    when a text column is not String dtype (``astype(str)`` parity).
+    """
     cols: list[str] = params.get("columns", [])
     drop_original: bool = params.get("drop_original", False)
     add_token_count: bool = params.get("add_token_count", False)

@@ -102,7 +102,7 @@ def test_sentence_embedder_accepts_wrapped_polars_frame() -> None:
     try:
         # The module imports sentence_transformers lazily inside _load_model,
         # so probe the optional extra here or fit() would raise ImportError.
-        import sentence_transformers  # ty: ignore[unresolved-import]
+        import sentence_transformers  # ty: ignore[unresolved-import]  # noqa: F401 - probe only
 
         from skyulf.preprocessing.vectorization.sentence_embedder import (
             SentenceEmbedderApplier,

@@ -87,7 +87,8 @@ def test_predict_use_tuned_thresholds_applies_stored_thresholds(sample_classific
 
 def test_predict_default_behavior_unchanged_when_flag_is_false(sample_classification_data):
     """Regression check: use_tuned_thresholds=False (the default) must behave
-    exactly like predict() did before this feature existed."""
+    exactly like predict() did before this feature existed.
+    """
     data = sample_classification_data.drop(columns=["category"])
     pipeline = SkyulfPipeline(_binary_config())
     pipeline.fit(data, target_column="target")

@@ -45,8 +45,6 @@ from skyulf.preprocessing.encoding import (
     OneHotEncoderCalculator,
     OrdinalEncoderApplier,
     OrdinalEncoderCalculator,
-    TargetEncoderApplier,
-    TargetEncoderCalculator,
 )
 
 # Feature Generation

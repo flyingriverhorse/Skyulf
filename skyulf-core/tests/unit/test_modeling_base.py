@@ -428,7 +428,8 @@ def test_fit_predict_preprocessing_routes_payload_to_calculator():
 def test_fit_predict_routes_preprocessing_validation_frames():
     """preprocessing_validation must reach the calculator as validation_frames
     (pre-transform space) while dataset.validation still flows through as
-    validation_data (post-transform space)."""
+    validation_data (post-transform space).
+    """
     X_arr, y_arr = make_classification(
         n_samples=200, n_features=5, n_informative=3, random_state=42
     )

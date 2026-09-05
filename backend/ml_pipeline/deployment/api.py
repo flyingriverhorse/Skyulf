@@ -28,9 +28,7 @@ async def get_async_session() -> AsyncGenerator[AsyncSession, None]:
 async def deploy_model(
     request: Request, job_id: str, session: AsyncSession = Depends(get_async_session)
 ):
-    """
-    Deploys a model from a completed job.
-    """
+    """Deploys a model from a completed job."""
     try:
         deployment = await DeploymentService.deploy_model(session, job_id)
         # Enrich with schema
@@ -44,9 +42,7 @@ async def deploy_model(
 
 @router.get("/active", response_model=DeploymentInfo)
 async def get_active_deployment(session: AsyncSession = Depends(get_async_session)):
-    """
-    Returns the currently active deployment.
-    """
+    """Returns the currently active deployment."""
     deployment = await DeploymentService.get_active_deployment(session)
     if not deployment:
         raise HTTPException(status_code=404, detail="No active deployment found")
@@ -59,8 +55,7 @@ async def get_active_deployment(session: AsyncSession = Depends(get_async_sessio
 async def list_deployments(
     limit: int | None = None, skip: int = 0, session: AsyncSession = Depends(get_async_session)
 ):
-    """
-    Lists deployment history, enriched with the same model-version lineage
+    """Lists deployment history, enriched with the same model-version lineage
     (dataset id, version, replacement chain) shown on the active deployment
     and Registry, so History rows are traceable rather than bare job ids.
 
@@ -75,9 +70,7 @@ async def list_deployments(
 
 @router.post("/deactivate")
 async def deactivate_deployment(session: AsyncSession = Depends(get_async_session)):
-    """
-    Deactivates the currently active deployment.
-    """
+    """Deactivates the currently active deployment."""
     await DeploymentService.deactivate_current_deployment(session)
     return {"status": "success", "message": "Deployment deactivated"}
 
@@ -89,9 +82,7 @@ async def predict(
     prediction_request: PredictionRequest,
     session: AsyncSession = Depends(get_async_session),
 ):
-    """
-    Makes predictions using the active model.
-    """
+    """Makes predictions using the active model."""
     try:
         max_rows = get_settings().MAX_PREDICT_REQUEST_ROWS
         if len(prediction_request.data) > max_rows:

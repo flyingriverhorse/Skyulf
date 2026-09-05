@@ -1,5 +1,4 @@
-"""
-Comprehensive cross-validation tests for all 5 CV methods across
+"""Comprehensive cross-validation tests for all 5 CV methods across
 both Simple (Basic Training) and Advanced (Tuning) flows.
 
 Tests:

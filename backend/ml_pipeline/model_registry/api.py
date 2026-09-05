@@ -17,9 +17,7 @@ router = APIRouter(prefix="/registry", tags=["Model Registry"])
 
 @router.get("/stats", response_model=RegistryStats)
 async def get_registry_stats(session: AsyncSession = Depends(get_async_session)):
-    """
-    Get statistics for the model registry.
-    """
+    """Get statistics for the model registry."""
     return await ModelRegistryService.get_registry_stats(session)
 
 
@@ -29,25 +27,19 @@ async def list_models(
     limit: int = Query(default=10, ge=1, le=100),
     session: AsyncSession = Depends(get_async_session),
 ):
-    """
-    List all models in the registry.
-    """
+    """List all models in the registry."""
     return await ModelRegistryService.list_models(session, skip=skip, limit=limit)
 
 
 @router.get("/models/{model_type}/versions", response_model=list[ModelVersion])
 async def get_model_versions(model_type: str, session: AsyncSession = Depends(get_async_session)):
-    """
-    Get all versions for a specific model type.
-    """
+    """Get all versions for a specific model type."""
     return await ModelRegistryService.get_model_versions(session, model_type)
 
 
 @router.get("/artifacts/{job_id}", response_model=ArtifactListResponse)
 async def list_job_artifacts(job_id: str, session: AsyncSession = Depends(get_async_session)):
-    """
-    List artifacts for a specific job.
-    """
+    """List artifacts for a specific job."""
     try:
         return await ModelRegistryService.get_job_artifacts(session, job_id)
     except ValueError as e:

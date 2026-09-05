@@ -6,9 +6,7 @@ from .schemas import DatasetProfile
 
 
 class EDAVisualizer:
-    """
-    Helper class to visualize Skyulf EDA results using Rich (terminal) and Matplotlib (plots).
-    """
+    """Helper class to visualize Skyulf EDA results using Rich (terminal) and Matplotlib (plots)."""
 
     def __init__(self, profile: DatasetProfile, df: pl.DataFrame | None = None):
         self.profile = profile

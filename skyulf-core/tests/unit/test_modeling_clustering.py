@@ -49,7 +49,8 @@ def test_fit_predict_with_empty_target_column_produces_labels_for_every_split(
     blobs_split_dataset,
 ):
     """fit_predict() with target_column='' (the "no target" sentinel) should fit on
-    train and predict cluster labels for both train and test splits."""
+    train and predict cluster labels for both train and test splits.
+    """
     estimator = StatefulEstimator(KMeansCalculator(), KMeansApplier(), "node1")
     predictions = estimator.fit_predict(blobs_split_dataset, "", {"params": {"n_clusters": 3}})
     assert set(predictions.keys()) == {"train", "test"}
@@ -59,7 +60,8 @@ def test_fit_predict_with_empty_target_column_produces_labels_for_every_split(
 
 def test_evaluate_with_empty_target_column_returns_clustering_report(blobs_split_dataset):
     """evaluate() should branch to the clustering path and return per-split reports
-    with silhouette/CH/DB metrics and no crash from the missing y_true."""
+    with silhouette/CH/DB metrics and no crash from the missing y_true.
+    """
     estimator = StatefulEstimator(KMeansCalculator(), KMeansApplier(), "node1")
     estimator.fit_predict(blobs_split_dataset, "", {"params": {"n_clusters": 3}})
     report = estimator.evaluate(blobs_split_dataset, "", job_id="job1")

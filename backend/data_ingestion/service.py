@@ -34,9 +34,7 @@ class DataIngestionService:
     async def list_sources(
         self, user_id: int | None = None, limit: int | None = None, skip: int = 0
     ) -> Sequence[DataSource]:
-        """
-        List all data sources.
-        """
+        """List all data sources."""
         effective_limit = limit if limit is not None else get_settings().DEFAULT_PAGE_SIZE
         query = select(DataSource)
         if user_id:
@@ -50,9 +48,7 @@ class DataIngestionService:
         return result.scalars().all()
 
     async def list_usable_sources(self, user_id: int | None = None) -> Sequence[DataSource]:
-        """
-        List only successfully ingested data sources.
-        """
+        """List only successfully ingested data sources."""
         query = select(DataSource).where(DataSource.test_status == "success")
         if user_id:
             query = query.where(DataSource.created_by == user_id)
@@ -61,9 +57,7 @@ class DataIngestionService:
         return result.scalars().all()
 
     async def get_source(self, source_id: int | str) -> DataSource | None:
-        """
-        Get a data source by ID (PK) or source_id (UUID).
-        """
+        """Get a data source by ID (PK) or source_id (UUID)."""
         stmt = select(DataSource)
 
         if isinstance(source_id, int):
@@ -82,8 +76,7 @@ class DataIngestionService:
         return await self.get_source(ds_id)
 
     async def delete_source(self, source_id: int | str) -> bool:
-        """
-        Delete a data source and its associated file if applicable.
+        """Delete a data source and its associated file if applicable.
 
         File removal is attempted before the DB row is deleted, but a
         failure to remove the file (permissions, file locked, already
@@ -121,8 +114,7 @@ class DataIngestionService:
         return True
 
     async def cancel_ingestion(self, source_id: int | str) -> bool:
-        """
-        Cancel an ongoing ingestion job.
+        """Cancel an ongoing ingestion job.
 
         Idempotent: returns True if the job is now in a non-running state
         (i.e. either we just cancelled it, or it had already finished /
@@ -275,9 +267,7 @@ class DataIngestionService:
         return []
 
     async def get_sample(self, source_id: int | str, limit: int | None = None) -> list[dict]:
-        """
-        Get a sample of data from the source.
-        """
+        """Get a sample of data from the source."""
         effective_limit = limit if limit is not None else get_settings().DEFAULT_SAMPLE_ROWS
 
         source = await self.get_source(source_id)
@@ -322,9 +312,7 @@ class DataIngestionService:
         user_id: int,
         background_tasks: BackgroundTasks | None = None,
     ) -> IngestionJobResponse:
-        """
-        Create a data source from an inline config (e.g. S3) and start ingestion.
-        """
+        """Create a data source from an inline config (e.g. S3) and start ingestion."""
         if payload.type not in self._INLINE_SOURCE_TYPES:
             raise HTTPException(
                 status_code=400,
@@ -517,9 +505,7 @@ class DataIngestionService:
         user_id: int,
         background_tasks: BackgroundTasks | None = None,
     ) -> IngestionJobResponse:
-        """
-        Handle file upload and create a data source entry.
-        """
+        """Handle file upload and create a data source entry."""
         settings = get_settings()
 
         # 0. Reject early via Content-Length if the client declares a size —
@@ -541,9 +527,7 @@ class DataIngestionService:
         )
 
     async def get_ingestion_status(self, source_id: int) -> dict[str, Any]:
-        """
-        Get the status of an ingestion job.
-        """
+        """Get the status of an ingestion job."""
         result = await self.session.execute(select(DataSource).where(DataSource.id == source_id))
         source = result.scalar_one_or_none()
 

@@ -57,7 +57,8 @@ def test_get_fitted_split_row_counts_match_configured_test_size(sample_classific
 
 def test_get_fitted_split_matches_pipeline_fit_row_counts(sample_classification_data):
     """The split get_fitted_split() returns should have the same row counts
-    as the split SkyulfPipeline.fit() uses internally, for a fixed random_state."""
+    as the split SkyulfPipeline.fit() uses internally, for a fixed random_state.
+    """
     data = sample_classification_data.drop(columns=["category"])
     fit_pipeline = SkyulfPipeline(_config())
     fit_pipeline.fit(data, target_column="target")
@@ -71,7 +72,8 @@ def test_get_fitted_split_matches_pipeline_fit_row_counts(sample_classification_
 
 def test_get_fitted_split_raises_without_a_configured_splitter(sample_classification_data):
     """If preprocessing doesn't produce a train/test split, raise a clear error
-    instead of returning a nonsensical single-split result."""
+    instead of returning a nonsensical single-split result.
+    """
     data = sample_classification_data.drop(columns=["category"])
     pipeline = SkyulfPipeline({"preprocessing": [], "modeling": {"type": "logistic_regression"}})
     with pytest.raises(ValueError, match="train/test split"):

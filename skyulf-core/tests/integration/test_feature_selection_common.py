@@ -131,7 +131,8 @@ class TestInferProblemType:
     ) -> None:
         """Regression test: the numeric <=10-unique-values classification
         heuristic is a coarse cutoff with no config knob, so a debug note
-        must be logged to make the inference visible in diagnostics."""
+        must be logged to make the inference visible in diagnostics.
+        """
         import logging
 
         s = pd.Series([1.0, 2.0, 3.0], dtype="float64")
@@ -216,7 +217,7 @@ class TestDropSelectedPandas:
         return pd.DataFrame({"a": [1, 2], "b": [3, 4], "c": [5, 6]})
 
     def test_y_returned_unchanged(self) -> None:
-        """y is not modified by the column-drop helper."""
+        """Y is not modified by the column-drop helper."""
         y = pd.Series([0, 1])
         params = {
             "drop_columns": True,
@@ -396,7 +397,8 @@ class TestFillnaZeroWithWarning:
     def test_warns_when_missing_values_present(self, caplog: pytest.LogCaptureFixture) -> None:
         """Regression test: a silent fillna(0) before scoring can bias
         univariate/model-based feature scores when 0 is meaningful or
-        missingness correlates with the target - must now warn."""
+        missingness correlates with the target - must now warn.
+        """
         import logging
 
         from skyulf.preprocessing.feature_selection._common import _fillna_zero_with_warning
@@ -439,13 +441,13 @@ class TestUnivariateScoreDicts:
         return sel, ["feat_a", "feat_b", "feat_c"]
 
     def test_scores_dict_has_all_columns(self) -> None:
-        """scores dict must have one key per candidate column."""
+        """Scores dict must have one key per candidate column."""
         sel, cols = self._fitted_selector()
         scores, _ = _univariate_score_dicts(sel, cols)
         assert set(scores.keys()) == set(cols)
 
     def test_pvalues_dict_has_all_columns(self) -> None:
-        """pvalues dict must have one key per candidate column."""
+        """Pvalues dict must have one key per candidate column."""
         sel, cols = self._fitted_selector()
         _, pvalues = _univariate_score_dicts(sel, cols)
         assert set(pvalues.keys()) == set(cols)
@@ -556,13 +558,14 @@ class TestRealShapedDataset:
     """
 
     def test_infer_problem_type_on_binary_churned_column(self) -> None:
-        """churned has only 2 unique integer values → must infer as classification."""
+        """Churned has only 2 unique integer values → must infer as classification."""
         df = load_sample_dataset("customers")
         assert _infer_problem_type(df["churned"]) == "classification"
 
     def test_resolve_candidate_columns_excludes_target_and_non_numeric(self) -> None:
         """Numeric columns (age, income, lat, lon, customer_id) minus churned
-        are candidates; string columns must not appear even with NaN present."""
+        are candidates; string columns must not appear even with NaN present.
+        """
         df = load_sample_dataset("customers")
         cols = _resolve_candidate_columns(df, {}, "churned")
         # Target must be excluded.

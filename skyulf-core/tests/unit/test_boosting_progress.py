@@ -111,7 +111,8 @@ def _binary_xy(n: int = 200) -> tuple[np.ndarray, np.ndarray]:
 @pytest.mark.parametrize("node_id", ["xgboost_classifier", "lgbm_classifier"])
 class TestRealBoostingFitEmitsIterations:
     """Real fits through the registered calculators: callback fires once per
-    iteration and the trained model is identical with or without it."""
+    iteration and the trained model is identical with or without it.
+    """
 
     def test_fit_emits_per_iteration_and_model_unchanged(self, node_id: str):
         from skyulf import NodeRegistry
@@ -191,7 +192,8 @@ class _FakeBoostingCalculator:
 
 class TestRefitForwardsIterationCallback:
     """TuningCalculator._refit_best_model must apply the calculator's boosting
-    fit kwargs when an iteration_callback is supplied — and stay plain without."""
+    fit kwargs when an iteration_callback is supplied — and stay plain without.
+    """
 
     def _refit(self, iteration_callback):
         from skyulf.modeling._tuning.engine import TuningCalculator
@@ -226,7 +228,8 @@ class TestRefitForwardsIterationCallback:
 class TestEndToEndStreaming:
     """Real boosting calculators streaming through tuning and plain fits —
     covers the refit hook invocation, callback detach, and the regression
-    XGB adapter path that the fake-calculator tests cannot reach."""
+    XGB adapter path that the fake-calculator tests cannot reach.
+    """
 
     def test_xgb_tuning_refit_streams_iterations_and_detaches_callbacks(self):
         pytest.importorskip("xgboost")
@@ -290,7 +293,8 @@ class TestEndToEndStreaming:
 
         class _PassthroughAdapter:
             """Never runs in practice — the exploded step.fit raises first —
-            but its presence switches tune() onto the wrapped searcher path."""
+            but its presence switches tune() onto the wrapped searcher path.
+            """
 
             def fit_transform(self, X, y):
                 return X, y

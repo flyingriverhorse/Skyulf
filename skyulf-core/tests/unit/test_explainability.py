@@ -379,7 +379,8 @@ def test_explainability_works_when_shap_exceptions_module_missing(
     monkeypatch: pytest.MonkeyPatch,
 ):
     """`shap.utils._exceptions` may not exist in all SHAP versions, but explainability
-    should still work — the import fallback must not silently return `None`."""
+    should still work — the import fallback must not silently return `None`.
+    """
     import builtins
 
     real_import = builtins.__import__
@@ -408,7 +409,8 @@ def test_non_additivity_exception_propagates_when_exceptions_module_missing(
 ):
     """When `_shap_exceptions` is None and the explainer raises a non-additivity
     exception, it must propagate (caught by the outer handler → `None`), not be
-    silently retried as if it were an additivity failure."""
+    silently retried as if it were an additivity failure.
+    """
     import builtins
 
     real_import = builtins.__import__

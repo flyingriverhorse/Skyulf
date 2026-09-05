@@ -37,6 +37,7 @@ def test_decode_int_like_decodes_integer_like_values(values, expected) -> None:
 
 def test_decode_int_like_decodes_stringified_integers() -> None:
     """y_proba's "classes" list comes from DataFrame column names (e.g.
+
     ``model.classes_``), which sklearn/pandas often stringifies (e.g.
     "0"/"1"/"2") even though they represent the same encoded integer
     indices as y_true/y_pred. Regression test for a bug where these were

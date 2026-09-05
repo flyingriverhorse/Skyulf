@@ -1,6 +1,4 @@
-"""
-Skyulf Core SDK
-"""
+"""Skyulf Core SDK"""
 
 from importlib.metadata import PackageNotFoundError, version
 

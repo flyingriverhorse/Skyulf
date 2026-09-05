@@ -44,7 +44,7 @@ def multiclass_data():
 
 
 def test_classification_metrics_accuracy_matches_sklearn(binary_data):
-    """accuracy metric must equal sklearn's accuracy_score on the same predictions."""
+    """Accuracy metric must equal sklearn's accuracy_score on the same predictions."""
     model, X, y = binary_data
     metrics = calculate_classification_metrics(model, X, y)
     expected = accuracy_score(y, model.predict(X))
@@ -72,7 +72,8 @@ def test_classification_metrics_binary_non_01_string_labels_still_produce_precis
     """Regression test: binary labels that aren't literally {0, 1} (e.g. string
     labels) must not silently drop precision/recall/f1. Previously
     average="binary" relied on sklearn's default pos_label=1, which raises for
-    non-{0,1} labels — swallowed by a bare `except Exception: pass`."""
+    non-{0,1} labels — swallowed by a bare `except Exception: pass`.
+    """
     rng = np.random.RandomState(0)
     X = pd.DataFrame({"f1": rng.normal(0, 1, 60), "f2": rng.normal(0, 1, 60)})
     y = pd.Series(np.where(X["f1"] + X["f2"] > 0, "yes", "no"), name="target")
@@ -91,7 +92,8 @@ def test_classification_metrics_binary_non_01_string_labels_still_produce_precis
 
 def test_classification_metrics_binary_negative_positive_int_labels():
     """Non-{0,1} integer binary labels (e.g. {-1, 1}) must also produce
-    precision/recall/f1 using the correct positive-class label."""
+    precision/recall/f1 using the correct positive-class label.
+    """
     rng = np.random.RandomState(2)
     X = pd.DataFrame({"f1": rng.normal(0, 1, 60), "f2": rng.normal(0, 1, 60)})
     y = pd.Series(np.where(X["f1"] + X["f2"] > 0, 1, -1), name="target")
@@ -129,7 +131,8 @@ def test_classification_metrics_multiclass_survives_fold_missing_a_trained_class
     when the evaluated split doesn't contain every class the model was
     trained on (common with small/imbalanced CV folds). Previously
     roc_auc_score raised "Number of classes in y_true not equal to the number
-    of columns in y_score", swallowed by a bare except."""
+    of columns in y_score", swallowed by a bare except.
+    """
     model, X, y = multiclass_data
     # Evaluate on a subset containing only 2 of the 3 trained classes.
     mask = y != 2
@@ -147,7 +150,8 @@ def test_classification_metrics_multiclass_split_missing_class_keeps_multiclass_
     """Regression test (OC-35): a 3-class model evaluated on a split that
     contains only two classes must NOT be treated as binary. Previously the
     binary gate looked at the unique labels in y_true, so such a split gained
-    unweighted precision/recall/f1 keys that don't belong to a multiclass model."""
+    unweighted precision/recall/f1 keys that don't belong to a multiclass model.
+    """
     model, X, y = multiclass_data
     mask = y != 2
     X_subset, y_subset = X[mask], y[mask]
@@ -164,7 +168,8 @@ def test_classification_metrics_multiclass_split_missing_class_keeps_multiclass_
 def test_classification_metrics_multiclass_split_missing_class_computes_log_loss(multiclass_data):
     """Regression test (OC-35): log_loss must be computed for a multiclass model
     on a split missing a class, using the full trained label set. Previously
-    log_loss raised "2 vs 3. Please provide labels" and the metric was dropped."""
+    log_loss raised "2 vs 3. Please provide labels" and the metric was dropped.
+    """
     from sklearn.metrics import log_loss
 
     model, X, y = multiclass_data
@@ -181,7 +186,8 @@ def test_evaluate_classification_model_split_missing_class_emits_no_null_curve_p
     multiclass_data,
 ):
     """Regression test (OC-35): per-class ROC/PR curves for a class absent from
-    the evaluated split must be skipped, not emitted with NaN (null) points."""
+    the evaluated split must be skipped, not emitted with NaN (null) points.
+    """
     import math
 
     from skyulf.modeling._evaluation.classification import evaluate_classification_model
@@ -219,7 +225,8 @@ def test_classification_metrics_multiclass_pr_auc_weighted_present(multiclass_da
 @pytest.fixture
 def strong_signal_binary():
     """Binary data with a learnable signal, so pr_auc is high (~0.97) and an
-    inverted computation (~0.32) is unmistakably distinguishable from it."""
+    inverted computation (~0.32) is unmistakably distinguishable from it.
+    """
     rng = np.random.RandomState(7)
     X = pd.DataFrame({"f1": rng.normal(0, 1, 400), "f2": rng.normal(0, 1, 400)})
     y = (X["f1"] - X["f2"] + rng.normal(0, 0.3, 400) > 0).astype(int).to_numpy()
@@ -264,7 +271,8 @@ def test_classification_metrics_pr_auc_invariant_under_label_reencoding(
 
 def test_classification_metrics_pr_auc_agrees_across_encodings(strong_signal_binary):
     """The {1,2} encoding must report the same pr_auc as the {0,1} control —
-    the two disagreed by 3x (0.32 vs 0.97) before the pos_label fix."""
+    the two disagreed by 3x (0.32 vs 0.97) before the pos_label fix.
+    """
     X, y_raw = strong_signal_binary
     reported = {}
     for encoding, y in (("{0,1}", y_raw), ("{1,2}", y_raw + 1)):
@@ -298,7 +306,7 @@ def test_classification_metrics_no_predict_proba_skips_probability_metrics():
 
 
 def test_regression_metrics_mae_matches_sklearn():
-    """mae metric must equal sklearn's mean_absolute_error."""
+    """Mae metric must equal sklearn's mean_absolute_error."""
     rng = np.random.RandomState(3)
     X = pd.DataFrame({"f1": rng.normal(0, 1, 50)})
     y = pd.Series(2 * X["f1"] + 1 + rng.normal(0, 0.1, 50))
@@ -309,7 +317,7 @@ def test_regression_metrics_mae_matches_sklearn():
 
 
 def test_regression_metrics_rmse_is_sqrt_of_mse():
-    """rmse must equal the square root of mse for consistency."""
+    """Rmse must equal the square root of mse for consistency."""
     rng = np.random.RandomState(4)
     X = pd.DataFrame({"f1": rng.normal(0, 1, 50)})
     y = pd.Series(3 * X["f1"] - 2 + rng.normal(0, 0.1, 50))
@@ -330,7 +338,7 @@ def test_regression_metrics_r2_matches_sklearn():
 
 
 def test_regression_metrics_mse_matches_sklearn():
-    """mse metric must equal sklearn's mean_squared_error."""
+    """Mse metric must equal sklearn's mean_squared_error."""
     rng = np.random.RandomState(6)
     X = pd.DataFrame({"f1": rng.normal(0, 1, 30)})
     y = pd.Series(X["f1"] + rng.normal(0, 0.05, 30))
@@ -471,7 +479,8 @@ def test_regression_metrics_returns_all_expected_keys():
 
 def test_one_failing_metric_does_not_drop_siblings(caplog, monkeypatch, binary_data):
     """When roc_auc fails, only roc_auc is omitted (and logged); pr_auc,
-    log_loss and the base metrics must still be present."""
+    log_loss and the base metrics must still be present.
+    """
     import logging
 
     model, X, y = binary_data
@@ -492,7 +501,8 @@ def test_one_failing_metric_does_not_drop_siblings(caplog, monkeypatch, binary_d
 
 def test_metric_failure_is_omitted_not_nan(caplog, monkeypatch, binary_data):
     """A failed metric must be absent (sanitize_metrics strips non-finite values
-    downstream), never recorded as nan which would poison tuning comparisons."""
+    downstream), never recorded as nan which would poison tuning comparisons.
+    """
     import logging
     import math
 

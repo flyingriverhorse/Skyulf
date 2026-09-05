@@ -171,7 +171,8 @@ def test_resolve_simple_columns_most_frequent_includes_all_columns() -> None:
 @pytest.mark.parametrize(*_iterative_estimator_cases)
 def test_build_iterative_estimator_alias(alias: str, module: str, class_name: str) -> None:
     """Each estimator alias (and the unrecognized-name default) must map to the
-    expected sklearn regressor class."""
+    expected sklearn regressor class.
+    """
     import importlib
 
     expected_cls = getattr(importlib.import_module(module), class_name)
@@ -282,7 +283,8 @@ def test_applier_pandas_noop(
     applier: str, df_data: dict, config: dict, imputer_kind: str | None
 ) -> None:
     """Applier must return X unchanged (pandas) when fitted columns are missing
-    from X, or no imputer object was fitted."""
+    from X, or no imputer object was fitted.
+    """
     df = pd.DataFrame(df_data)
     full_config = dict(config)
     if imputer_kind is not None:
@@ -293,8 +295,7 @@ def test_applier_pandas_noop(
 
 @pytest.mark.parametrize(*_applier_polars_noop_cases)
 def test_applier_polars_noop(applier: str, df_data: dict, config: dict, imputer_kind: str) -> None:
-    """Applier must return X unchanged (Polars) when fitted columns are missing
-    from X."""
+    """Applier must return X unchanged (Polars) when fitted columns are missing from X."""
     df = pl.DataFrame(df_data)
     full_config = dict(config)
     full_config["imputer_object"] = _IMPUTER_KIND[imputer_kind]()
@@ -309,7 +310,8 @@ def test_applier_transform_error_propagates(
 ) -> None:
     """When the underlying sklearn imputer's ``transform`` raises, the exception
     must propagate through the dispatcher (log-and-reraise), not be silently
-    swallowed and returned as the original, un-imputed data."""
+    swallowed and returned as the original, un-imputed data.
+    """
     config = {"columns": ["a"], "imputer_object": _BrokenImputer()}
     with caplog.at_level("ERROR"), pytest.raises(RuntimeError, match="boom"):
         if engine == "polars":
@@ -496,7 +498,7 @@ def test_simple_imputer_mode_alias_maps_to_most_frequent() -> None:
 
 
 def test_simple_imputer_constant_strategy_pandas() -> None:
-    """constant strategy fills NaNs with the configured fill_value."""
+    """Constant strategy fills NaNs with the configured fill_value."""
     df = pd.DataFrame({"a": [1.0, np.nan, 3.0]})
     calc = SimpleImputerCalculator()
     params = calc.fit(df, {"columns": ["a"], "strategy": "constant", "fill_value": -1.0})
@@ -508,7 +510,7 @@ def test_simple_imputer_constant_strategy_pandas() -> None:
 
 
 def test_simple_imputer_constant_strategy_polars() -> None:
-    """constant strategy works identically through the Polars branch."""
+    """Constant strategy works identically through the Polars branch."""
     pdf = pd.DataFrame({"a": [1.0, None, 3.0]})
     df = pl.from_pandas(pdf)
     calc = SimpleImputerCalculator()
@@ -618,7 +620,7 @@ def test_all_imputers_empty_dataframe_returns_empty_params(calculator: str) -> N
 
 
 def test_simple_imputer_all_nan_column_explicit_constant_strategy() -> None:
-    """sklearn skips all-NaN columns for constant strategy (needs 1+ observed value).
+    """Sklearn skips all-NaN columns for constant strategy (needs 1+ observed value).
 
     ``SimpleImputer.statistics_`` reports NaN rather than fill_value in this
     edge case (verified sklearn 1.8 behavior) -- documenting it here so a
@@ -825,8 +827,9 @@ def test_simple_imputer_polars_float_nan_parity_with_pandas() -> None:
 
 
 def test_simple_imputer_polars_most_frequent_ignores_float_nan() -> None:
-    """sklearn ``most_frequent`` treats NaN as missing; polars ``mode()`` counts
-    it as a candidate value, so NaN must be excluded before taking the mode."""
+    """Sklearn ``most_frequent`` treats NaN as missing; polars ``mode()`` counts
+    it as a candidate value, so NaN must be excluded before taking the mode.
+    """
     pdf = pd.DataFrame({"n": [1.0, 1.0, np.nan, 2.0, float("nan")]})
     ldf = pl.DataFrame({"n": [1.0, 1.0, None, 2.0, float("nan")]})
 
@@ -846,7 +849,8 @@ def test_pandas_nullable_int64_survives_all_three_imputers() -> None:
     Arrow-backed input) carries ``pd.NA``. The pandas path crashed on it in
     SimpleImputer (float mean into Int64), KNNImputer and IterativeImputer
     (``pd.NA`` dies in numpy/sklearn conversion) while Polars handled all
-    three. Pandas must produce the same values as Polars."""
+    three. Pandas must produce the same values as Polars.
+    """
     df_pd = pd.DataFrame(
         {
             "a": pd.array([1, 2, None, 4, 5, 6], dtype="Int64"),
@@ -892,7 +896,8 @@ def test_knn_iterative_fit_drops_all_missing_column(
 ) -> None:
     """OC-16: a column that is entirely missing at fit time is dropped from
     the artifact (sklearn silently drops it from transform() output, which
-    desynced the artifact's column list from the imputer's width)."""
+    desynced the artifact's column list from the imputer's width).
+    """
     config = {"columns": ["a", "b"]} | extra
     pdf = pd.DataFrame({"a": [1.0, 2.0, 3.0, 4.0], "b": [np.nan, np.nan, np.nan, np.nan]})
     ldf = pl.DataFrame({"a": [1.0, 2.0, 3.0, 4.0], "b": [None, None, None, None]})
@@ -916,7 +921,8 @@ def test_knn_iterative_fit_drops_all_missing_column(
 @pytest.mark.parametrize("calc,applier,extra", _KNN_ITERATIVE_CASES, ids=lambda c: type(c).__name__)
 def test_knn_iterative_fit_all_columns_all_missing_returns_empty(calc, applier, extra) -> None:
     """OC-16 edge: when every configured column is all-missing, fit returns
-    an empty artifact and apply is a no-op passthrough."""
+    an empty artifact and apply is a no-op passthrough.
+    """
     config = {"columns": ["a", "b"]} | extra
     pdf = pd.DataFrame({"a": [np.nan, np.nan], "b": [np.nan, np.nan]})
     ldf = pl.DataFrame({"a": [None, None], "b": [None, None]})
@@ -932,7 +938,8 @@ def test_knn_iterative_fit_all_columns_all_missing_returns_empty(calc, applier, 
 
 def test_drop_all_missing_columns_helper() -> None:
     """OC-16: the helper is a no-op without all-missing columns and drops
-    exactly the all-missing ones otherwise."""
+    exactly the all-missing ones otherwise.
+    """
     X = np.array([[1.0, np.nan], [2.0, np.nan], [3.0, np.nan]])
     X_out, cols_out = drop_all_missing_columns(X, ["a", "b"], "TestNode")
     assert cols_out == ["a"]

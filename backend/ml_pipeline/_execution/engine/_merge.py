@@ -218,19 +218,28 @@ class MergeMixin:
         more branches that each changed the same column.
         """
         owners = self._column_owners(frames, node_id)
-        indexed = list(enumerate(frames))
-        ordered = indexed if strategy == "last_wins" else list(reversed(indexed))
 
         result_cols: dict[str, pd.Series] = {}
         contested: list[str] = []
-        for idx, df in ordered:
+        # OC-157: walk the inputs in their own order under both strategies.
+        # first_wins used to be implemented by reversing this loop, which also
+        # reversed the output columns — result_cols' insertion order is the
+        # merged frame's column order, so the tiebreak direction leaked into
+        # the shape handed to positional consumers. Declining to overwrite an
+        # already-claimed column gives the same ownership; re-assigning an
+        # existing dict key keeps its position, so both strategies now emit
+        # columns in first-appearance input order.
+        for idx, df in enumerate(frames):
             df_aligned = df.reset_index(drop=True)
             for col in df.columns:
                 owner = owners.get(col)
                 if owner is not None and owner != idx:
                     continue
-                if col in result_cols and owner is None:
+                claimed = col in result_cols
+                if claimed and owner is None:
                     contested.append(col)
+                if claimed and strategy == "first_wins":
+                    continue
                 result_cols[col] = df_aligned[col]
 
         merged = pd.DataFrame(result_cols)
@@ -253,7 +262,7 @@ class MergeMixin:
         row_counts: list[int],
         col_sets: list[set[str]],
     ) -> pd.DataFrame:
-        """Merge frames row-wise on their common columns, warning about any dropped ones."""
+        """Merge frames row-wise on their common columns, surfacing the switch to the UI."""
         common_cols = col_sets[0]
         for cs in col_sets[1:]:
             common_cols = common_cols & cs
@@ -262,6 +271,43 @@ class MergeMixin:
                 f"{prefix}: cannot row-merge inputs — no common columns. "
                 f"Column sets: {[sorted(cs) for cs in col_sets]}"
             )
+
+        # OC-153: reaching this method at all is worth telling the user about.
+        # Wiring branches into a merge node expresses a feature union, but a
+        # union is impossible once the branches describe different numbers of
+        # rows, so the engine stacks them and returns a *taller* frame than
+        # either input. That used to be reported only when the column sets also
+        # differed, which left the identical-columns case — one branch filtered,
+        # the other not — stacking duplicated rows with no UI signal at all.
+        same_columns = all(cs == col_sets[0] for cs in col_sets)
+        counts = " vs ".join(str(rc) for rc in row_counts)
+        if same_columns:
+            remedy = (
+                " Identical columns with differing row counts usually means one branch "
+                "filtered rows (outlier removal, deduplication, dropna), so the rows it "
+                "kept now appear more than once and are reweighted in training — and can "
+                "land on both sides of a downstream split. Move the filtering step after "
+                "the merge to keep one row per observation."
+            )
+        else:
+            remedy = (
+                " This is expected when appending separate datasets, but a merge node "
+                "cannot join branches that no longer describe the same observations."
+            )
+        self.merge_warnings.append(
+            {
+                "node_id": node_id,
+                "kind": "row_count_mismatch",
+                "part": part_label or "rows",
+                "row_counts": list(row_counts),
+                "message": (
+                    f"Node '{node_id}': inputs have different row counts ({counts}), so "
+                    f"they were stacked row-wise into {sum(row_counts)} rows instead of "
+                    f"joined column-wise.{remedy}"
+                ),
+            }
+        )
+
         if any(common_cols != cs for cs in col_sets):
             extras = sorted(set().union(*col_sets) - common_cols)
             self.log(f"{prefix}: row-merge dropping non-shared columns {extras}")

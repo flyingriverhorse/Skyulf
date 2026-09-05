@@ -96,7 +96,8 @@ def test_aggregate_metrics_uses_union_of_keys_across_folds():
     """A metric present in only some folds must still be aggregated using
     just the folds that have it — regression guard against the old
     `fold_metrics[0].keys()` bug, which silently dropped any metric absent
-    from the first fold even if every other fold reported it."""
+    from the first fold even if every other fold reported it.
+    """
     fold_metrics = [
         {"accuracy": 0.8},
         {"accuracy": 0.9, "roc_auc": 0.95},
@@ -442,7 +443,8 @@ def test_perform_cross_validation_unknown_cv_type_warns_and_falls_back(caplog):
     through the same _build_splitter() helper as elsewhere, so an unknown
     cv_type value warns (instead of silently falling back to KFold with no
     signal) - previously this path duplicated the splitter branching inline
-    without the warning that _build_splitter already had."""
+    without the warning that _build_splitter already had.
+    """
     import logging
 
     X, y = _make_classification_xy(n=60)
@@ -489,7 +491,8 @@ def test_perform_nested_cv_inner_fold_failure_is_caught():
     """A failing inner-fold fit must be caught (not raised) and must not
     silently corrupt inner_cv_mean with a misleading 0.0 - for regression
     0.0 is itself a meaningful R^2 value, so an all-failed fold's mean must
-    surface as None (JSON-safe NaN) instead."""
+    surface as None (JSON-safe NaN) instead.
+    """
     X, y = _make_classification_xy(n=150)
     calc = _FlakyInnerCalculator()
     appl = LogisticRegressionApplier()
@@ -502,7 +505,8 @@ def test_perform_nested_cv_inner_fold_failure_is_caught():
 
 class _FlakyOnceCalculator(BaseModelCalculator):
     """Wraps LogisticRegressionCalculator but fails fit() exactly once per
-    outer fold (on the first inner-fold call), then succeeds for the rest."""
+    outer fold (on the first inner-fold call), then succeeds for the rest.
+    """
 
     def __init__(self):
         self._real = LogisticRegressionCalculator()
@@ -524,7 +528,8 @@ class _FlakyOnceCalculator(BaseModelCalculator):
         iteration_callback=None,
     ):
         """Raise on every 3rd call (the first inner-fold call per outer fold, since
-        each outer fold does 1 outer fit + inner_folds inner fits and inner_folds=2)."""
+        each outer fold does 1 outer fit + inner_folds inner fits and inner_folds=2).
+        """
         self._call_count += 1
         if self._call_count % 3 == 1:
             raise RuntimeError("Simulated single inner-fold failure")
@@ -534,7 +539,8 @@ class _FlakyOnceCalculator(BaseModelCalculator):
 def test_perform_nested_cv_partial_inner_failure_excludes_nan_from_mean():
     """Regression test: when only some inner folds fail, inner_cv_mean must be
     the mean of the *valid* scores only, not silently include the failed
-    fold as 0.0 (which would corrupt an otherwise-good mean)."""
+    fold as 0.0 (which would corrupt an otherwise-good mean).
+    """
     X, y = _make_classification_xy(n=150)
     calc = _FlakyOnceCalculator()
     appl = LogisticRegressionApplier()
@@ -648,7 +654,8 @@ def test_sort_by_time_polars_sorts_and_drops_time_column():
     """Regression test: _sort_by_time must sort Polars X/y in lockstep and
     drop the time column from features - previously this function only
     handled pandas, so a Polars X was returned completely unsorted with the
-    time column left in place (silently leaking into the model)."""
+    time column left in place (silently leaking into the model).
+    """
     import logging
 
     import polars as pl
@@ -669,7 +676,8 @@ def test_perform_cv_time_series_split_polars_prevents_leakage():
     sort by time_column and drop it from features - previously the pandas-only
     isinstance gate skipped this entirely for Polars, so an out-of-order time
     column perfectly correlated with y leaked directly into training, and folds
-    were built on arbitrary (unsorted) row order instead of chronological order."""
+    were built on arbitrary (unsorted) row order instead of chronological order.
+    """
     import polars as pl
 
     rng = np.random.RandomState(0)

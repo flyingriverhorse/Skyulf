@@ -90,7 +90,8 @@ def test_validate_leakage_safety_is_importable_from_package_top_level():
 def test_explicit_column_drop_before_splitter_is_allowed():
     """Dropping *named* columns is a user decision, not a learned statistic —
     safe before the split (edge case raised in review: 'directly dropping a
-    column to not include it in the model')."""
+    column to not include it in the model').
+    """
     config = {
         "preprocessing": [
             {
@@ -109,7 +110,8 @@ def test_explicit_column_drop_before_splitter_is_allowed():
 def test_threshold_based_column_drop_before_splitter_still_raises():
     """The same node with a positive missing-% threshold *learns* which
     columns to drop from the fitted rows — that decision must stay
-    post-split."""
+    post-split.
+    """
     config = {
         "preprocessing": [
             {
@@ -131,7 +133,8 @@ def test_non_numeric_threshold_column_drop_before_splitter_is_allowed():
     hand-edited pipeline JSON) cannot act as a learned threshold, so the
     node degrades to its explicit/no-op mode and stays allowed before the
     split — matching the node's own "non-positive/non-numeric threshold is
-    not configured" handling."""
+    not configured" handling.
+    """
     config = {
         "preprocessing": [
             {
@@ -204,7 +207,8 @@ def test_fit_warns_when_no_split_is_defined(caplog):
 
 def test_fit_stays_silent_for_externally_split_datasets(caplog):
     """When the caller supplies a SplitDataset the train/test boundary is
-    provided externally and enforced by construction — no advisory noise."""
+    provided externally and enforced by construction — no advisory noise.
+    """
     import logging
 
     from skyulf.data.dataset import SplitDataset
@@ -227,7 +231,8 @@ def test_fit_stays_silent_for_externally_split_datasets(caplog):
 
 def test_constant_imputation_before_splitter_is_allowed():
     """strategy='constant' fills with a user-fixed value — nothing is
-    learned from the rows, so it may run before the split."""
+    learned from the rows, so it may run before the split.
+    """
     config = {
         "preprocessing": [
             {
@@ -263,7 +268,8 @@ def test_statistic_imputation_before_splitter_still_raises():
 
 def test_explicit_missing_indicator_before_splitter_is_allowed():
     """Flagging *named* columns for missingness learns nothing from the rows —
-    the column list comes from the config, so it may run before the split."""
+    the column list comes from the config, so it may run before the split.
+    """
     config = {
         "preprocessing": [
             {
@@ -281,7 +287,8 @@ def test_explicit_missing_indicator_before_splitter_is_allowed():
 
 def test_auto_detected_missing_indicator_before_splitter_still_raises():
     """With no explicit column list the node discovers WHICH columns contain
-    missing values from the fitted rows — that decision must stay post-split."""
+    missing values from the fitted rows — that decision must stay post-split.
+    """
     config = {
         "preprocessing": [
             {"name": "flags", "transformer": "MissingIndicator", "params": {}},
@@ -296,7 +303,8 @@ def test_auto_detected_missing_indicator_before_splitter_still_raises():
 
 def test_explicit_hash_encoding_before_splitter_is_allowed():
     """HashEncoder with a user-chosen column list learns nothing: hashing is
-    deterministic and fit() only records the config's columns/n_features."""
+    deterministic and fit() only records the config's columns/n_features.
+    """
     config = {
         "preprocessing": [
             {
@@ -314,7 +322,8 @@ def test_explicit_hash_encoding_before_splitter_is_allowed():
 
 def test_explicit_empty_column_hash_encoding_before_splitter_is_allowed():
     """`columns: []` is the UI's 'nothing selected' no-op (fit returns {}),
-    so it learns nothing either."""
+    so it learns nothing either.
+    """
     config = {
         "preprocessing": [
             {"name": "hash", "transformer": "HashEncoder", "params": {"columns": []}},
@@ -328,7 +337,8 @@ def test_explicit_empty_column_hash_encoding_before_splitter_is_allowed():
 
 def test_auto_detected_hash_encoding_before_splitter_still_raises():
     """With no columns key the node auto-detects WHICH columns are
-    categorical from the fitted rows — that decision must stay post-split."""
+    categorical from the fitted rows — that decision must stay post-split.
+    """
     config = {
         "preprocessing": [
             {"name": "hash", "transformer": "HashEncoder", "params": {"n_features": 8}},

@@ -74,7 +74,8 @@ def test_adapter_imputer_statistics_come_from_the_fit_fold_only(engine: str):
 @pytest.mark.parametrize("engine", ["pandas", "polars"])
 def test_adapter_rebuilds_fresh_state_per_fit(engine: str):
     """A second fit_transform on different rows must not inherit statistics
-    from the first — reconstruction from steps_config is the clone."""
+    from the first — reconstruction from steps_config is the clone.
+    """
     X, y = _frame(engine)
     X_tr, X_val, y_tr, y_val = _split(engine, X, y)
 
@@ -101,7 +102,8 @@ def test_adapter_rebuilds_fresh_state_per_fit(engine: str):
 @pytest.mark.parametrize("engine", ["pandas", "polars"])
 def test_adapter_filters_out_splitter_steps(engine: str):
     """Splitter steps already ran upstream; re-executing them inside a fold
-    would re-split the fold. The adapter must drop them from the chain."""
+    would re-split the fold. The adapter must drop them from the chain.
+    """
     X, y = _frame(engine)
     X_tr, X_val, y_tr, y_val = _split(engine, X, y)
 
@@ -123,7 +125,8 @@ def test_adapter_filters_out_splitter_steps(engine: str):
 @pytest.mark.parametrize("engine", ["pandas", "polars"])
 def test_adapter_transform_keeps_all_held_out_rows(engine: str):
     """Row-dropping steps are train-only (F-18 discipline): transform must
-    never delete held-out rows."""
+    never delete held-out rows.
+    """
     X, y = _frame(engine)
     X_tr, X_val, y_tr, y_val = _split(engine, X, y)
 

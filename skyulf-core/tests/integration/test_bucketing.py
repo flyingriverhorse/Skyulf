@@ -333,7 +333,8 @@ def test_apply_pandas_logs_warning_when_column_binning_fails(
     """A column whose edges are degenerate (< 2 unique values) must be skipped
     without crashing the whole apply - but it must log a warning so a
     silently-unbinned column isn't a total mystery (regression for previously
-    fully-silent `except Exception: continue`)."""
+    fully-silent `except Exception: continue`).
+    """
     df = pd.DataFrame({"x": [1, 2, 3]})
     params: dict[str, Any] = {
         "bin_edges": {"x": [5.0, 5.0]},  # degenerate: only 1 unique edge
@@ -360,7 +361,8 @@ def test_fit_one_column_into_maps_logs_warning_on_failure(
     """A column that can't be fit under the chosen strategy (e.g. a
     non-numeric column with 'kmeans') must be skipped without raising, but
     the failure must be logged for visibility (regression for previously
-    fully-silent `except Exception: return`)."""
+    fully-silent `except Exception: return`).
+    """
     df = pd.DataFrame({"x": ["a", "b", "c", "a", "b"]})
     bin_edges_map: dict[str, list[float]] = {}
     custom_labels_map: dict[str, Any] = {}
@@ -512,7 +514,8 @@ def test_apply_polars_range_label_format_keeps_categorical_alias() -> None:
 
 def test_apply_range_label_format_matches_between_pandas_and_polars() -> None:
     """The exact range-format label TEXT must be identical across engines
-    for the same fitted bin_edges artifact."""
+    for the same fitted bin_edges artifact.
+    """
     df_pd = pd.DataFrame({"x": list(range(10))})
     config = {"columns": ["x"], "strategy": "equal_width", "n_bins": 5, "label_format": "range"}
     params = GeneralBinningCalculator().fit(df_pd, config)
@@ -531,7 +534,7 @@ def test_apply_range_label_format_matches_between_pandas_and_polars() -> None:
 
 
 def test_apply_range_format_with_missing_label_tags_out_of_range_category() -> None:
-    """range format + missing_strategy='label' must format the added string category as-is."""
+    """Range format + missing_strategy='label' must format the added string category as-is."""
     df = pd.DataFrame({"x": [-5.0, 2.0, 7.0]})
     params: dict[str, Any] = {
         "bin_edges": {"x": [0.0, 5.0, 10.0]},
@@ -757,7 +760,7 @@ def test_fit_general_binning_polars_input_matches_pandas_equal_frequency() -> No
 
 
 def test_fit_general_binning_polars_input_matches_pandas_kmeans() -> None:
-    """kmeans strategy (sklearn KBinsDiscretizer-backed) must produce identical
+    """Kmeans strategy (sklearn KBinsDiscretizer-backed) must produce identical
     bin edges regardless of whether the input is a raw Polars or pandas frame.
     """
     df_pl = _wide_polars_fixture()
@@ -857,7 +860,8 @@ class TestRealShapedDataset:
 
 class TestKBinsRegistry:
     """The KBinsDiscretizer node must be registered under its canonical ID so
-    the canvas and the API can resolve it to the Calculator/Applier pair."""
+    the canvas and the API can resolve it to the Calculator/Applier pair.
+    """
 
     def test_kbins_node_registered(self) -> None:
         assert NodeRegistry.get_calculator("KBinsDiscretizer") is KBinsDiscretizerCalculator
@@ -870,7 +874,8 @@ def test_apply_out_of_range_values_polars_matches_pandas_missing() -> None:
     """F-08: ``pd.cut`` yields NaN for values outside the fitted edge range,
     but polars ``cut()`` absorbed them into the outer bin, so the two engines
     silently disagreed at test time. Out-of-range values must be missing on
-    both engines; in-range values keep identical ordinal codes."""
+    both engines; in-range values keep identical ordinal codes.
+    """
     params: dict[str, Any] = {
         "bin_edges": {"x": [0.0, 5.0, 10.0]},
         "output_suffix": "_binned",

@@ -1,6 +1,4 @@
-"""
-Skyulf EDA Example: Time Series Analysis
-========================================
+"""Skyulf EDA Example: Time Series Analysis ========================================
 
 This script demonstrates how to use Skyulf's EDAAnalyzer to automatically detect
 and analyze time series data.

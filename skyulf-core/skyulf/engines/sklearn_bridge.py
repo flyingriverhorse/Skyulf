@@ -6,14 +6,11 @@ from .registry import get_engine
 
 
 class SklearnBridge:
-    """
-    Bridge between Skyulf DataFrames (Pandas/Polars) and Scikit-Learn (Numpy).
-    """
+    """Bridge between Skyulf DataFrames (Pandas/Polars) and Scikit-Learn (Numpy)."""
 
     @staticmethod
     def to_sklearn(X: Any) -> tuple[np.ndarray, Any]:
-        """
-        Convert input to Numpy array for Scikit-Learn.
+        """Convert input to Numpy array for Scikit-Learn.
 
         Args:
             X: Input data (Pandas, Polars, Wrapper, or (X, y) tuple).

@@ -48,7 +48,8 @@ def test_artifact_digest_is_deterministic_for_same_estimator() -> None:
 def test_artifact_digest_object_array_depends_on_values_not_pointers() -> None:
     """OC-62: object-dtype arrays must digest by element value, not by the
     raw PyObject* pointers ``tobytes()`` would serialise (allocator/ASLR
-    dependent, different on every process run)."""
+    dependent, different on every process run).
+    """
     a = np.array(["red", "green", "blue"], dtype=object)
     b = np.array(["red", "green", "blue"], dtype=object)
     assert artifact_digest(a) == artifact_digest(b)
@@ -72,7 +73,8 @@ def test_artifact_digest_object_array_includes_shape() -> None:
 
 def test_artifact_digest_detects_different_weights_same_hyperparams() -> None:
     """Identical hyperparameters but different fitted weights must digest
-    differently — this is the collision the old ``repr`` fallback caused."""
+    differently — this is the collision the old ``repr`` fallback caused.
+    """
     X, y = _small_xy()
     same = LogisticRegression(random_state=42).fit(X, y)
     flipped = LogisticRegression(random_state=42).fit(X, 1 - y)
@@ -83,7 +85,8 @@ def test_artifact_digest_detects_different_weights_same_hyperparams() -> None:
 
 def test_artifact_digest_raises_on_undigestible_object() -> None:
     """No silent ``repr`` fallback: an artifact without a canonical
-    representation must fail the seal, not pass it."""
+    representation must fail the seal, not pass it.
+    """
 
     class _Opaque:
         def __init__(self) -> None:
@@ -94,8 +97,7 @@ def test_artifact_digest_raises_on_undigestible_object() -> None:
 
 
 def test_artifact_digest_is_key_order_insensitive_for_dicts() -> None:
-    """Preprocessing artifacts are config dicts; insertion order must not
-    matter for the seal."""
+    """Preprocessing artifacts are config dicts; insertion order must not matter for the seal."""
     assert artifact_digest({"a": 1, "b": 2.0, "c": [1, 2]}) == artifact_digest(
         {"c": [1, 2], "b": 2.0, "a": 1}
     )
@@ -103,8 +105,9 @@ def test_artifact_digest_is_key_order_insensitive_for_dicts() -> None:
 
 
 def test_artifact_digest_covers_tree_structures() -> None:
-    """sklearn Tree objects are C extensions without ``__dict__``; the digest
-    must walk their node arrays."""
+    """Sklearn Tree objects are C extensions without ``__dict__``; the digest
+    must walk their node arrays.
+    """
     X, y = _small_xy()
     rf = RandomForestClassifier(n_estimators=3, random_state=42).fit(X, y)
     assert artifact_digest(rf) == artifact_digest(rf)
@@ -114,7 +117,8 @@ def test_artifact_digest_covers_tree_structures() -> None:
 
 def test_artifact_digest_covers_tuned_model_tuples() -> None:
     """Tuned models are stored as ``(estimator, TuningResult)``; both halves
-    must feed the digest."""
+    must feed the digest.
+    """
     X, y = _small_xy()
     est = LogisticRegression(random_state=42).fit(X, y)
     result = TuningResult(best_params={"C": 1.0}, best_score=0.9, n_trials=1, trials=[])
@@ -125,7 +129,8 @@ def test_artifact_digest_covers_tuned_model_tuples() -> None:
 
 def test_artifact_digest_covers_scalar_and_buffer_types() -> None:
     """Each canonical type tag must be exercised: complex, byte buffers,
-    sets, and numpy scalar variants."""
+    sets, and numpy scalar variants.
+    """
     assert artifact_digest(1 + 2j) != artifact_digest(1 + 3j)
     assert artifact_digest(b"abc") == artifact_digest(bytearray(b"abc"))
     assert artifact_digest(b"abc") == artifact_digest(memoryview(b"abc"))
@@ -154,7 +159,8 @@ def test_artifact_digest_covers_random_state_and_classes() -> None:
 
 def test_artifact_digest_skips_routine_and_module_attributes() -> None:
     """Methods and imported modules on an object must be skipped, while real
-    state still feeds the digest."""
+    state still feeds the digest.
+    """
     import json as _json
 
     class _Holder:
@@ -174,7 +180,8 @@ def test_artifact_digest_skips_routine_and_module_attributes() -> None:
 
 def test_fingerprint_of_tree_pipeline_is_deterministic_and_data_sensitive() -> None:
     """End-to-end: a RandomForest pipeline's fingerprint must be stable across
-    identical fits and change when the training data changes."""
+    identical fits and change when the training data changes.
+    """
     config = {
         "preprocessing": [],
         "modeling": {"type": "random_forest_classifier", "node_id": "m1", "n_estimators": 5},
@@ -243,7 +250,8 @@ def force_registry_miss(monkeypatch):
 )
 def test_init_model_estimator_resolves_known_types_from_registry(model_type: str) -> None:
     """Each known model_type must resolve its calculator/applier from the
-    NodeRegistry — since F-10 there is no hardcoded fallback map."""
+    NodeRegistry — since F-10 there is no hardcoded fallback map.
+    """
     expected_calc_cls = NodeRegistry.get_calculator(model_type)
     expected_applier_cls = NodeRegistry.get_applier(model_type)
 
@@ -265,8 +273,7 @@ def test_init_model_estimator_resolves_known_types_from_registry(model_type: str
 def test_init_model_estimator_hyperparameter_tuner_wraps_registry_base_model(
     base_model_type: str,
 ) -> None:
-    """hyperparameter_tuner must wrap the registry-resolved base model for
-    every known base type."""
+    """hyperparameter_tuner must wrap the registry-resolved base model for every known base type."""
     expected_calc_cls = NodeRegistry.get_calculator(base_model_type)
     expected_applier_cls = NodeRegistry.get_applier(base_model_type)
 
@@ -360,7 +367,8 @@ def test_init_model_estimator_partial_registration_raises_explicit_error(
     force_partial_registration,
 ) -> None:
     """If the registry resolves a calculator but not its applier, the pipeline
-    must raise a descriptive error — there is no hardcoded fallback anymore."""
+    must raise a descriptive error — there is no hardcoded fallback anymore.
+    """
     with pytest.raises(ValueError, match="only partially registered"):
         SkyulfPipeline({"modeling": {"type": "logistic_regression"}})
 
@@ -369,7 +377,8 @@ def test_init_model_estimator_tuner_partial_base_registration_raises(
     force_partial_registration,
 ) -> None:
     """Same partial-registration guard for the hyperparameter_tuner base-model
-    resolution path: an unresolvable base pair is an error, not a fallback."""
+    resolution path: an unresolvable base pair is an error, not a fallback.
+    """
     with pytest.raises(ValueError, match="Unknown base model type for tuner"):
         SkyulfPipeline(
             {
@@ -389,7 +398,8 @@ def test_init_model_estimator_tuner_partial_base_registration_raises(
 @pytest.fixture
 def numeric_classification_data() -> pd.DataFrame:
     """A purely-numeric classification dataset (no categorical columns), so
-    plain sklearn estimators can fit directly without an encoding step."""
+    plain sklearn estimators can fit directly without an encoding step.
+    """
     import numpy as np
 
     rng = np.random.default_rng(42)
@@ -405,7 +415,8 @@ def numeric_classification_data() -> pd.DataFrame:
 
 def test_fit_uses_split_dataset_produced_by_preprocessing(numeric_classification_data) -> None:
     """When preprocessing yields a SplitDataset, fit() must use it directly
-    (the `isinstance(transformed_data, SplitDataset)` branch), not wrap it."""
+    (the `isinstance(transformed_data, SplitDataset)` branch), not wrap it.
+    """
     config: dict[str, Any] = {
         "preprocessing": [
             {
@@ -428,7 +439,8 @@ def test_fit_uses_split_dataset_produced_by_preprocessing(numeric_classification
 
 def test_fit_records_modeling_error_when_evaluation_fails(numeric_classification_data) -> None:
     """If model_estimator.evaluate() raises, fit() must catch it and record
-    metrics['modeling_error'] instead of propagating the exception."""
+    metrics['modeling_error'] instead of propagating the exception.
+    """
     config: dict[str, Any] = {
         "preprocessing": [],
         "modeling": {"type": "logistic_regression"},

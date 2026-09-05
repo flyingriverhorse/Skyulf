@@ -1,5 +1,4 @@
-"""
-Engine Registry for Skyulf.
+"""Engine Registry for Skyulf.
 
 This module handles the auto-detection of the appropriate compute engine
 (Pandas, Polars, etc.) based on the input data type.
@@ -92,8 +91,7 @@ class EngineRegistry:
 
     @classmethod
     def resolve(cls, data: Any = None) -> type[BaseEngine]:
-        """
-        Auto-detect engine based on input data type.
+        """Auto-detect engine based on input data type.
 
         Args:
             data: The data object (DataFrame) to inspect.
@@ -151,9 +149,7 @@ class EngineRegistry:
 
     @classmethod
     def wrap(cls, data: Any) -> "SkyulfDataFrame":
-        """
-        Auto-detect engine and wrap the data.
-        """
+        """Auto-detect engine and wrap the data."""
         engine = cls.resolve(data)
         return engine.wrap(data)
 

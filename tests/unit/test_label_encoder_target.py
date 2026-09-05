@@ -57,13 +57,13 @@ def test_label_encoder_on_target_after_split():
     assert pd.api.types.is_integer_dtype(y_train_new) or pd.api.types.is_float_dtype(y_train_new)
     assert set(y_train_new.unique()).issubset({0, 1})
 
-    # Get the mapping from the encoder
+    # The fitted LabelEncoder's classes_ is the authoritative mapping,
+    # e.g. ['A', 'B'] -> A=0, B=1.
     encoder = le_params["encoders"]["__target__"]
-    # e.g. classes_ might be ['A', 'B'], so A->0, B->1
+    expected = {cls: int(i) for i, cls in enumerate(encoder.classes_)}
 
-    # Check consistency on Train
-    # We know y_train had 'A's and 'B's.
-    # Let's pick an index where y_train was 'A' and check if y_train_new is the encoded value of 'A'
+    # Check consistency on Train: pick one index per original label and require
+    # the encoded value to match the encoder's own mapping, not merely to differ.
     original_y_train = split_dataset.train[1]
 
     # Find an index for 'A'
@@ -74,7 +74,8 @@ def test_label_encoder_on_target_after_split():
     idx_B = original_y_train[original_y_train == "B"].index[0]
     encoded_B = y_train_new.loc[idx_B]
 
-    assert encoded_A != encoded_B
+    assert encoded_A == expected["A"]
+    assert encoded_B == expected["B"]
 
     # Apply on Test
     test_transformed = le_applier.apply(split_dataset.test, le_params)

@@ -297,7 +297,7 @@ def test_rolling_aggregate_pandas_null_group_matches_polars() -> None:
 
 
 def test_date_features_weekofyear_and_is_month_start() -> None:
-    """weekofyear and is_month_start are computed correctly, pandas + polars."""
+    """Weekofyear and is_month_start are computed correctly, pandas + polars."""
     df = pd.DataFrame({"d": pd.to_datetime(["2021-01-01", "2021-01-04"])})
     art = DateFeaturesCalculator().fit(
         df, {"columns": ["d"], "features": ["weekofyear", "is_month_start"]}

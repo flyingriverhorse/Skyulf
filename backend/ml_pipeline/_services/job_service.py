@@ -1,5 +1,4 @@
-"""
-Job Service
+"""Job Service
 -----------
 Centralized service for retrieving job entities (TrainingJob) from the
 database. TrainingJob is discriminated by `run_mode` ("fixed" | "tuned"),
@@ -23,8 +22,7 @@ class JobService:
 
     @staticmethod
     async def get_job_by_id(session: AsyncSession, job_id: str) -> TrainingJob | None:
-        """
-        Retrieves a job by ID.
+        """Retrieves a job by ID.
 
         Args:
             session: The async database session.

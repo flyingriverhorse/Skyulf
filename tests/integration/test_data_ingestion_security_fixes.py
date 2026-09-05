@@ -17,7 +17,6 @@
 """
 
 import uuid
-from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -63,7 +62,8 @@ async def _make_file_source(db_session, file_path: str) -> DataSource:
 
 class TestLocalFileConnectorResolveSafePath:
     """Unit tests for the shared containment helper (testing=False forces
-    the real containment check, bypassing the TESTING-mode skip)."""
+    the real containment check, bypassing the TESTING-mode skip).
+    """
 
     def test_contained_path_resolves(self, tmp_path):
         base = tmp_path / "uploads"
@@ -96,7 +96,8 @@ class TestLocalFileConnectorResolveSafePath:
 @pytest.mark.asyncio
 async def test_get_sample_file_branch_rejects_path_outside_upload_dir(db_session):
     """`get_sample()`'s file/csv/txt branch must reject a `file_path` that
-    escapes the upload directory instead of reading it directly."""
+    escapes the upload directory instead of reading it directly.
+    """
     service = DataIngestionService(session=db_session)
     source = await _make_file_source(db_session, "/etc/passwd")
 
@@ -137,7 +138,8 @@ async def test_get_sample_file_branch_allows_contained_path(db_session, tmp_path
 @pytest.mark.asyncio
 async def test_delete_source_logs_orphaned_file_and_still_deletes_record(db_session, caplog):
     """If on-disk file removal fails, the DB row must still be deleted and
-    a discoverable ERROR must be logged referencing the orphaned file."""
+    a discoverable ERROR must be logged referencing the orphaned file.
+    """
     service = DataIngestionService(session=db_session)
     source = await _make_file_source(db_session, "/nonexistent/does-not-matter.csv")
 
@@ -179,7 +181,8 @@ async def test_delete_source_removes_file_and_record_on_success(db_session, tmp_
 @pytest.mark.asyncio
 async def test_get_sample_s3_forbidden_maps_to_400(db_session):
     """A `ForbiddenException` from S3Connector must map to HTTP 400 via an
-    isinstance check, not by substring-matching the error message."""
+    isinstance check, not by substring-matching the error message.
+    """
     service = DataIngestionService(session=db_session)
     source = DataSource(
         source_id=f"test-s3-forbidden-{uuid.uuid4()}",
@@ -210,7 +213,8 @@ async def test_get_sample_s3_forbidden_maps_to_400(db_session):
 @pytest.mark.asyncio
 async def test_s3_connector_get_schema_classifies_403_as_forbidden_exception():
     """S3Connector.get_schema classifies a provider 403 error into a typed
-    `ForbiddenException` instead of leaving callers to string-match."""
+    `ForbiddenException` instead of leaving callers to string-match.
+    """
     from backend.data_ingestion.connectors.s3 import S3Connector
 
     connector = S3Connector("s3://bucket/private.bin", storage_options={})

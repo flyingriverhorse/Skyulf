@@ -63,15 +63,18 @@ def data_dependent_step_types() -> frozenset[str]:
     structure, duplicate sets, etc.). Fitting one of these on data that still
     includes the test/validation portion leaks that portion's information
     into the fitted parameters, even though the transformer is only ever
-    *applied* to train afterward. Derived from the skyulf-core registry."""
+    *applied* to train afterward. Derived from the skyulf-core registry.
+    """
     return data_dependent_transformers()
 
 
 def train_test_split_step_types() -> frozenset[str]:
     """Step types that partition rows into train/test (the leakage boundary).
+
     ``feature_target_split`` is deliberately not one — it only separates
     features (X) from the target (y) and creates no train/test boundary, so
-    preprocessing before it is not a leakage concern."""
+    preprocessing before it is not a leakage concern.
+    """
     return train_test_splitters()
 
 
@@ -169,7 +172,8 @@ def _build_descendant_map(nodes: list[NodeConfig]) -> dict[str, set[str]]:
 
 def _exemption_reason(step_type: str, params: dict, target_column: str | None) -> str | None:
     """Human-readable reason when a data-dependent node type is exempted by
-    its params (a stateless configuration of a stateful node), else None."""
+    its params (a stateless configuration of a stateful node), else None.
+    """
     if _is_target_only_encoding(step_type, params, target_column):
         return (
             "Encodes only the target column — a deterministic label-to-integer "

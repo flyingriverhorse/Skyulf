@@ -55,7 +55,7 @@ def test_is_finite_number_numpy_float():
 
 
 def test_is_finite_number_numpy_int():
-    """numpy integers are always finite."""
+    """Numpy integers are always finite."""
     from skyulf.modeling._evaluation.common import _is_finite_number
 
     assert _is_finite_number(np.int32(7)) is True
@@ -109,7 +109,7 @@ def test_sanitize_metrics_all_nan():
 
 
 def test_sanitize_metrics_converts_numpy_float():
-    """numpy floats should be cast to plain Python floats."""
+    """Numpy floats should be cast to plain Python floats."""
     metrics = {"score": np.float64(0.75)}
     result = sanitize_metrics(cast(dict[str, float], metrics))
     assert isinstance(result["score"], float)

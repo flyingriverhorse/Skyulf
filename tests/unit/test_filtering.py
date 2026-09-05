@@ -1,4 +1,3 @@
-import numpy as np
 import pandas as pd
 
 from skyulf.preprocessing.drop_and_missing import (
@@ -6,7 +5,6 @@ from skyulf.preprocessing.drop_and_missing import (
     DeduplicateCalculator,
     DropMissingColumnsApplier,
     DropMissingColumnsCalculator,
-    DropMissingRowsCalculator,
 )
 
 
@@ -23,18 +21,6 @@ def test_drop_columns():
     assert "B" not in res.columns
     assert "A" in res.columns
     assert "C" in res.columns
-
-
-def test_drop_missing():
-    df = pd.DataFrame({"A": [1, np.nan, 3], "B": [1, 2, 3]})
-
-    # Drop rows with any missing
-    DropMissingRowsCalculator()
-    # Assuming 'threshold' logic or similar. If not implemented, we skip.
-    # params = calc.fit(df, {'threshold': 0})
-
-    # applier = DropMissingRowsApplier()
-    # res = applier.apply(df, params)
 
 
 def test_deduplicate():

@@ -11,8 +11,7 @@ class MockNode:
 
 
 def test_create_catalog_detects_s3_from_nodes_dict():
-    """
-    Test that create_catalog_from_options detects S3 path in node params (dict format)
+    """Test that create_catalog_from_options detects S3 path in node params (dict format)
     even if storage_options is None.
     """
     nodes = [
@@ -28,8 +27,7 @@ def test_create_catalog_detects_s3_from_nodes_dict():
 
 
 def test_create_catalog_detects_s3_from_nodes_object():
-    """
-    Test that create_catalog_from_options detects S3 path in node params (object format)
+    """Test that create_catalog_from_options detects S3 path in node params (object format)
     even if storage_options is None.
     """
     nodes = [
@@ -45,9 +43,7 @@ def test_create_catalog_detects_s3_from_nodes_object():
 
 
 def test_create_catalog_fallback_to_filesystem():
-    """
-    Test that it falls back to FileSystemCatalog if no S3 path is found.
-    """
+    """Test that it falls back to FileSystemCatalog if no S3 path is found."""
     nodes = [{"params": {"dataset_id": "local.csv"}}, {"params": {"path": "uploads/data.csv"}}]
 
     catalog = create_catalog_from_options(storage_options=None, nodes=nodes)
@@ -55,9 +51,7 @@ def test_create_catalog_fallback_to_filesystem():
 
 
 def test_s3_catalog_init_with_env_vars():
-    """
-    Test that S3Catalog initializes s3fs correctly when relying on env vars.
-    """
+    """Test that S3Catalog initializes s3fs correctly when relying on env vars."""
     mock_s3fs = MagicMock()
 
     # Simulate env vars
@@ -72,7 +66,7 @@ def test_s3_catalog_init_with_env_vars():
         patch.dict("sys.modules", {"s3fs": mock_s3fs}),
     ):
         # Init with empty options
-        catalog = S3Catalog(bucket_name="test-bucket", storage_options={})
+        S3Catalog(bucket_name="test-bucket", storage_options={})
 
         # Verify s3fs.S3FileSystem was called
         # It should be called with empty kwargs if we rely on env vars,
@@ -90,9 +84,7 @@ def test_s3_catalog_init_with_env_vars():
 
 
 def test_s3_catalog_explicit_creds_mapping():
-    """
-    Test that S3Catalog maps explicit aws_access_key_id to key for s3fs.
-    """
+    """Test that S3Catalog maps explicit aws_access_key_id to key for s3fs."""
     mock_s3fs = MagicMock()
 
     options = {
@@ -102,7 +94,7 @@ def test_s3_catalog_explicit_creds_mapping():
     }
 
     with patch.dict("sys.modules", {"s3fs": mock_s3fs}):
-        catalog = S3Catalog(bucket_name="test-bucket", storage_options=options)
+        S3Catalog(bucket_name="test-bucket", storage_options=options)
 
         mock_s3fs.S3FileSystem.assert_called()
         call_kwargs = mock_s3fs.S3FileSystem.call_args[1]
@@ -113,14 +105,12 @@ def test_s3_catalog_explicit_creds_mapping():
 
 
 def test_s3_catalog_region_arg_priority():
-    """
-    Test that region_name argument in __init__ is respected.
-    """
+    """Test that region_name argument in __init__ is respected."""
     mock_s3fs = MagicMock()
 
     with patch.dict("sys.modules", {"s3fs": mock_s3fs}):
         # Pass region_name explicitly
-        catalog = S3Catalog(bucket_name="test-bucket", region_name="eu-central-1")
+        S3Catalog(bucket_name="test-bucket", region_name="eu-central-1")
 
         mock_s3fs.S3FileSystem.assert_called()
         call_kwargs = mock_s3fs.S3FileSystem.call_args[1]

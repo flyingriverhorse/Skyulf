@@ -7,15 +7,11 @@ logger = logging.getLogger(__name__)
 
 
 class DataProfiler:
-    """
-    Calculates basic statistics for a Polars DataFrame.
-    """
+    """Calculates basic statistics for a Polars DataFrame."""
 
     @staticmethod
     def profile(df: pl.DataFrame) -> dict[str, Any]:
-        """
-        Generate a profile of the dataframe.
-        """
+        """Generate a profile of the dataframe."""
         profile: dict[str, Any] = {
             "row_count": len(df),
             "column_count": len(df.columns),

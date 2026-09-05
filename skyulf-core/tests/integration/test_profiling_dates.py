@@ -143,7 +143,8 @@ def test_cast_date_columns_warns_on_ambiguous_dmy_mdy_tie(caplog) -> None:
     """When multiple date formats (e.g. %m/%d/%Y vs %d/%m/%Y) parse a sample
     equally well (same distinct-month count), the ambiguous D/M/Y-vs-M/D/Y
     choice must be surfaced via a warning instead of silently picking
-    whichever format happened to be tried first."""
+    whichever format happened to be tried first.
+    """
     import logging
 
     df = pl.DataFrame(

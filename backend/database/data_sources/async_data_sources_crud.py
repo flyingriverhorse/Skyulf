@@ -1,5 +1,4 @@
-"""
-Async orchestration layer for data_sources operations.
+"""Async orchestration layer for data_sources operations.
 
 This module centralizes the logic to write/read/update/delete the
 `data_sources` registry across PostgreSQL and SQLite. It intentionally
@@ -111,7 +110,6 @@ async def create(settings: Settings, row: dict[str, Any]) -> Any:
     1) Insert into primary database (SQLite or PostgreSQL)
     2) Optionally sync to secondary database if available (best-effort, non-blocking)
     """
-
     primary_db = get_primary_database(settings)
     peers = _DB_PEERS.get(primary_db)
     if peers is None:

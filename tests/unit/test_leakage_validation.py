@@ -1,5 +1,4 @@
-"""Focused unit tests for
-``backend.ml_pipeline._execution._leakage_validation``.
+"""Focused unit tests for ``backend.ml_pipeline._execution._leakage_validation``.
 
 These build small, synthetic ``NodeConfig`` graphs directly (no dataset,
 no execution) to exercise the pre-execution leakage guard in isolation —
@@ -51,7 +50,8 @@ def test_allows_scaler_after_splitter():
 
 def test_no_splitter_logs_explicit_diagnostic(caplog):
     """Pipelines with no train/test boundary get an explicit diagnostic
-    instead of silence (G1) — still non-blocking."""
+    instead of silence (G1) — still non-blocking.
+    """
     nodes = [
         _node("load", "DataLoader", []),
         _node("impute", "SimpleImputer", ["load"]),
@@ -113,7 +113,8 @@ def test_stateless_nodes_before_splitter_are_allowed():
 def test_reclassified_stateful_nodes_before_splitter_are_blocked(step_type, params):
     """F-16: nodes previously exempted as 'stateless' do learn from the data
     they are fitted on (hash bucket occupancy, missingness structure, drop
-    lists, duplicate sets) and are now gated."""
+    lists, duplicate sets) and are now gated.
+    """
     nodes = [
         _node("load", "DataLoader", []),
         _node("step", step_type, ["load"], params=params),
@@ -126,7 +127,8 @@ def test_reclassified_stateful_nodes_before_splitter_are_blocked(step_type, para
 
 def test_step_type_lists_are_derived_from_the_core_registry():
     """G2: the backend gate consumes the skyulf-core registry-derived lists;
-    there is no second hand-maintained copy to drift."""
+    there is no second hand-maintained copy to drift.
+    """
     from backend.ml_pipeline._execution import _leakage_validation
     from skyulf.leakage import data_dependent_transformers, train_test_splitters
 
@@ -174,7 +176,8 @@ def test_validate_returns_passed_verdict_for_a_clean_graph():
 
 def test_verdict_marks_checked_nodes_running_before_the_split():
     """A data-dependent node wired before the splitter is reported with
-    before_split=True so the modal can explain exactly what was checked."""
+    before_split=True so the modal can explain exactly what was checked.
+    """
     nodes = [
         _node("load", "DataLoader", []),
         _node("impute", "SimpleImputer", ["load"], params={"strategy": "median"}),
@@ -192,7 +195,8 @@ def test_verdict_marks_checked_nodes_running_before_the_split():
 
 def test_verdict_lists_exemptions_with_their_reasons():
     """Param-aware exemptions are reported so the modal can explain why a
-    data-dependent node type was allowed before the split."""
+    data-dependent node type was allowed before the split.
+    """
     nodes = [
         _node("load", "DataLoader", []),
         _node("fill", "SimpleImputer", ["load"], params={"strategy": "constant"}),
@@ -237,7 +241,8 @@ def test_warn_mode_verdict_carries_detail_alongside_messages():
 
 def test_no_split_verdict_still_lists_what_would_be_checked():
     """Without a splitter the verdict keeps its detail so the modal can show
-    which data-dependent nodes were examined."""
+    which data-dependent nodes were examined.
+    """
     nodes = [
         _node("load", "DataLoader", []),
         _node("scale", "StandardScaler", ["load"]),
@@ -269,7 +274,7 @@ def test_validate_returns_no_split_verdict_with_the_advisory_diagnostic(caplog):
 
 
 def test_validate_returns_warning_verdict_in_warn_mode():
-    """warn mode returns the violation messages instead of raising."""
+    """Warn mode returns the violation messages instead of raising."""
     nodes = [
         _node("load", "DataLoader", []),
         _node("scale", "StandardScaler", ["load"]),
@@ -283,7 +288,8 @@ def test_validate_returns_warning_verdict_in_warn_mode():
 
 def test_raises_for_indirect_ancestor_through_branching_graph():
     """The leaking node need not be directly wired to the splitter -
-    any path that reaches a splitter downstream counts."""
+    any path that reaches a splitter downstream counts.
+    """
     nodes = [
         _node("load", "DataLoader", []),
         _node("impute", "SimpleImputer", ["load"]),
@@ -298,7 +304,8 @@ def test_raises_for_indirect_ancestor_through_branching_graph():
 @pytest.mark.parametrize("step_type", ["LabelEncoder", "OrdinalEncoder"])
 def test_target_only_label_or_ordinal_encoding_before_split_is_allowed(step_type):
     """Label/Ordinal encoders with no `columns` selected only encode the
-    target (y), which is standard leak-free practice - not a leakage risk."""
+    target (y), which is standard leak-free practice - not a leakage risk.
+    """
     nodes = [
         _node("load", "DataLoader", []),
         _node("encode_target", step_type, ["load"], params={}),
@@ -311,7 +318,8 @@ def test_target_only_label_or_ordinal_encoding_before_split_is_allowed(step_type
 @pytest.mark.parametrize("step_type", ["LabelEncoder", "OrdinalEncoder"])
 def test_feature_column_label_or_ordinal_encoding_before_split_still_raises(step_type):
     """The same encoder types, configured with explicit feature `columns`,
-    still fit on feature statistics - the leakage risk is unchanged."""
+    still fit on feature statistics - the leakage risk is unchanged.
+    """
     nodes = [
         _node("load", "DataLoader", []),
         _node(
@@ -331,7 +339,8 @@ def test_feature_column_label_or_ordinal_encoding_before_split_still_raises(step
 def test_explicit_target_column_selection_before_split_is_allowed(step_type):
     """Users commonly pick the target column explicitly from the column
     picker (columns == [target_column]) instead of leaving `columns` empty -
-    this is still target-only encoding, not a leakage risk."""
+    this is still target-only encoding, not a leakage risk.
+    """
     nodes = [
         _node("load", "DataLoader", []),
         _node("encode_target", step_type, ["load"], params={"columns": ["species"]}),
@@ -349,7 +358,8 @@ def test_explicit_target_column_selection_before_split_is_allowed(step_type):
 @pytest.mark.parametrize("step_type", ["LabelEncoder", "OrdinalEncoder"])
 def test_target_plus_feature_columns_before_split_still_raises(step_type):
     """Mixing the target column with real feature columns still fits feature
-    statistics on the whole dataset - the leakage risk remains."""
+    statistics on the whole dataset - the leakage risk remains.
+    """
     nodes = [
         _node(
             "load",
@@ -376,7 +386,8 @@ def test_target_plus_feature_columns_before_split_still_raises(step_type):
 
 def test_explicit_column_drop_before_split_is_allowed():
     """Dropping explicitly named columns is a fixed user decision (no
-    learned statistic), so it may run before the train/test split."""
+    learned statistic), so it may run before the train/test split.
+    """
     nodes = [
         _node("load", "DataLoader", []),
         _node(
@@ -393,7 +404,8 @@ def test_explicit_column_drop_before_split_is_allowed():
 
 def test_threshold_based_column_drop_before_split_still_raises():
     """With a positive missing-% threshold the node learns WHICH columns to
-    drop from the fitted rows — that decision must stay after the split."""
+    drop from the fitted rows — that decision must stay after the split.
+    """
     nodes = [
         _node("load", "DataLoader", []),
         _node(
@@ -411,7 +423,8 @@ def test_threshold_based_column_drop_before_split_still_raises():
 
 def test_constant_imputation_before_split_is_allowed():
     """strategy='constant' fills with a user-fixed value — nothing is
-    learned from the rows, so it may run before the train/test split."""
+    learned from the rows, so it may run before the train/test split.
+    """
     nodes = [
         _node("load", "DataLoader", []),
         _node(
@@ -440,7 +453,8 @@ def test_statistic_imputation_before_split_still_raises():
 
 def test_explicit_missing_indicator_before_split_is_allowed():
     """Flagging explicitly named columns for missingness learns nothing
-    from the rows, so it may run before the train/test split."""
+    from the rows, so it may run before the train/test split.
+    """
     nodes = [
         _node("load", "DataLoader", []),
         _node(
@@ -457,7 +471,8 @@ def test_explicit_missing_indicator_before_split_is_allowed():
 
 def test_auto_detected_missing_indicator_before_split_still_raises():
     """With no explicit column list the node discovers WHICH columns contain
-    missing values from the fitted rows — must stay after the split."""
+    missing values from the fitted rows — must stay after the split.
+    """
     nodes = [
         _node("load", "DataLoader", []),
         _node("flags", "MissingIndicator", ["load"], params={}),
@@ -470,7 +485,8 @@ def test_auto_detected_missing_indicator_before_split_still_raises():
 
 def test_explicit_hash_encoding_before_split_is_allowed():
     """HashEncoder with a user-chosen column list learns nothing (deterministic
-    hashing), so it may run before the train/test split."""
+    hashing), so it may run before the train/test split.
+    """
     nodes = [
         _node("load", "DataLoader", []),
         _node("hash", "HashEncoder", ["load"], params={"columns": ["city"], "n_features": 8}),
@@ -482,7 +498,8 @@ def test_explicit_hash_encoding_before_split_is_allowed():
 
 def test_auto_detected_hash_encoding_before_split_still_raises():
     """With no columns key the node auto-detects WHICH columns are categorical
-    from the fitted rows — must stay after the split."""
+    from the fitted rows — must stay after the split.
+    """
     nodes = [
         _node("load", "DataLoader", []),
         _node("hash", "HashEncoder", ["load"], params={"n_features": 8}),
@@ -496,7 +513,8 @@ def test_auto_detected_hash_encoding_before_split_still_raises():
 def test_cyclic_preprocessing_graph_still_detects_leakage():
     """A hand-built cycle between preprocessing nodes must not hang the
     descendant walk (cycle guard returns an empty set) and the violation
-    through the non-cyclic edge to the splitter must still be detected."""
+    through the non-cyclic edge to the splitter must still be detected.
+    """
     nodes = [
         _node("scale", "StandardScaler", ["impute"]),
         _node("impute", "SimpleImputer", ["scale"]),  # cycle: scale <-> impute
@@ -508,7 +526,8 @@ def test_cyclic_preprocessing_graph_still_detects_leakage():
 
 def test_invalid_on_leakage_mode_rejected():
     """An unknown on_leakage mode is a programming error, rejected up front
-    rather than silently treated as one of the known modes."""
+    rather than silently treated as one of the known modes.
+    """
     nodes = [
         _node("load", "DataLoader", []),
         _node("split", "TrainTestSplitter", ["load"]),

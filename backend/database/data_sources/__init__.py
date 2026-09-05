@@ -1,5 +1,5 @@
-"""
-Async data sources module for FastAPI application.
+"""Async data sources module for FastAPI application.
+
 Contains async CRUD operations and queries for the data_sources table.
 """
 

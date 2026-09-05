@@ -59,7 +59,8 @@ def numeric_csv(tmp_path):
 
 class TestSplitDatasetMerge:
     """`_merge_inputs` must keep test/validation portions when all inputs are
-    SplitDatasets — previously they were silently flattened into train-only."""
+    SplitDatasets — previously they were silently flattened into train-only.
+    """
 
     def _make_node(self, engine, store, inputs):
         for nid, art in inputs:
@@ -137,7 +138,8 @@ class TestSplitDatasetMerge:
         """``TrainTestSplitter`` outputs ``(X, y)`` tuples. Merging two
         SplitDatasets that both wrap tuples must return a SplitDataset whose
         train/test are still tuples — otherwise the frontend collapses
-        ``train_X``/``train_y`` into a single ``train`` tab."""
+        ``train_X``/``train_y`` into a single ``train`` tab.
+        """
         y_train = pd.Series([0, 1, 0], name="target")
         y_test = pd.Series([1, 0], name="target")
 
@@ -174,12 +176,11 @@ class TestSplitDatasetMerge:
 
 class TestPreviewMerge:
     """Run Preview must merge multi-input nodes. Before the fix, a preview
-    node with two parents silently kept only the first edge."""
+    node with two parents silently kept only the first edge.
+    """
 
     def test_preview_merges_two_branches_from_dataset(self, numeric_csv, artifact_store, catalog):
-        """Dataset → StandardScaler(f1)
-        ↘ MinMaxScaler(f2)
-                ↘ Preview (must merge both)"""
+        """Dataset → StandardScaler(f1) ↘ MinMaxScaler(f2) ↘ Preview (must merge both)"""
         config = PipelineConfig(
             pipeline_id="preview_dataset_merge",
             nodes=[
@@ -225,9 +226,7 @@ class TestPreviewMerge:
         assert full["shape"][0] == 30
 
     def test_preview_merges_two_branches_from_split(self, numeric_csv, artifact_store, catalog):
-        """Dataset → Splitter → StandardScaler
-        ↘ MinMaxScaler
-                  ↘ Preview"""
+        """Dataset → Splitter → StandardScaler ↘ MinMaxScaler ↘ Preview"""
         config = PipelineConfig(
             pipeline_id="preview_split_merge",
             nodes=[
@@ -292,12 +291,14 @@ class TestPreviewMerge:
 
 class TestPreprocessingMerge:
     """A preprocessing transformer (not a model) with two parents must merge
-    rather than silently keep the first input."""
+    rather than silently keep the first input.
+    """
 
     def test_transformer_merges_two_parents(self, numeric_csv, artifact_store, catalog):
         """Dataset → StandardScaler(f1)
         ↘ MinMaxScaler(f2)
-                ↘ Deduplicate (multi-input transformer)"""
+                ↘ Deduplicate (multi-input transformer)
+        """
         config = PipelineConfig(
             pipeline_id="transformer_merge",
             nodes=[
@@ -345,9 +346,7 @@ class TestTrainingMerge:
     def test_training_after_split_merge_keeps_test_metrics(
         self, numeric_csv, artifact_store, catalog
     ):
-        """Dataset → Splitter → StandardScaler
-                                  ↘ MinMaxScaler
-                                            ↘ Training (merge SplitDatasets)
+        """Dataset → Splitter → StandardScaler ↘ MinMaxScaler ↘ Training (merge SplitDatasets)
 
         Before the fix the test halves were dropped at merge time, so
         ``test_*`` metrics never appeared in the result. This is the
@@ -413,7 +412,8 @@ class TestTrainingMerge:
 
     def test_training_merges_two_dataset_branches(self, numeric_csv, artifact_store, catalog):
         """Sanity check: two parallel preprocessing chains from raw dataset
-        still feed into a training node (existing behaviour, not regressed)."""
+        still feed into a training node (existing behaviour, not regressed).
+        """
         config = PipelineConfig(
             pipeline_id="training_dataset_merge",
             nodes=[
@@ -488,6 +488,116 @@ class TestMergeStrategyOverride:
         b = pd.DataFrame({"x": [99]})
         out = self._merge(engine, [a, b], strategy="nonsense")
         assert list(out["x"]) == [99]
+
+
+class TestMergeColumnOrderIsStrategyIndependent:
+    """OC-157 regression: the tiebreak direction must not reorder output columns.
+
+    ``first_wins`` was implemented by iterating the inputs in reverse, and
+    ``result_cols``' insertion order is the merged frame's column order — so the
+    same two branches came out ``['a','b','c','d']`` under ``last_wins`` and
+    ``['c','d','a','b']`` under ``first_wins``, contradicting the documented
+    semantics and handing positional consumers a different layout per config.
+    """
+
+    def _merge(self, engine, frames, strategy):
+        node_id = "merge_node"
+        engine._node_configs = {
+            node_id: NodeConfig(
+                node_id=node_id,
+                step_type="StandardScaler",
+                inputs=[f"in_{i}" for i in range(len(frames))],
+                params={"_merge_strategy": strategy},
+            )
+        }
+        return engine._merge_frames(frames, node_id)
+
+    @pytest.mark.parametrize("strategy", ["last_wins", "first_wins"])
+    def test_disjoint_columns_keep_input_order(self, engine, strategy):
+        a = pd.DataFrame({"a": [1, 2, 3], "b": [4, 5, 6]})
+        b = pd.DataFrame({"c": [7, 8, 9], "d": [10, 11, 12]})
+        out = self._merge(engine, [a, b], strategy)
+        assert list(out.columns) == ["a", "b", "c", "d"]
+
+    def test_contested_column_keeps_input_order_and_strategy_values(self, engine):
+        """Ordering is fixed without changing who wins a shared column."""
+        frames = [
+            pd.DataFrame({"a": [1, 2], "shared": ["first", "first"]}),
+            pd.DataFrame({"shared": ["last", "last"], "b": [3, 4]}),
+        ]
+        last = self._merge(engine, frames, "last_wins")
+        first = self._merge(engine, frames, "first_wins")
+
+        assert list(last.columns) == list(first.columns) == ["a", "shared", "b"]
+        assert list(last["shared"]) == ["last", "last"]
+        assert list(first["shared"]) == ["first", "first"]
+
+
+class TestRowCountMismatchIsSurfaced:
+    """OC-153 regression: the column-wise→row-wise switch must reach the UI.
+
+    Merging branches with different row counts stacks them into a taller frame
+    instead of joining them, which duplicates the rows of any branch that
+    filtered. ``_merge_frames_rowwise`` only warned when the column sets also
+    differed, so the identical-columns case — the most likely accidental one —
+    produced duplicated training rows behind zero advisories.
+    """
+
+    def _merge(self, engine, frames, part_label=""):
+        node_id = "merge_node"
+        engine._node_configs = {
+            node_id: NodeConfig(
+                node_id=node_id,
+                step_type="StandardScaler",
+                inputs=[f"in_{i}" for i in range(len(frames))],
+            )
+        }
+        return engine._merge_frames(frames, node_id, part_label)
+
+    @staticmethod
+    def _kinds(engine):
+        return [w.get("kind") for w in engine.merge_warnings]
+
+    def test_identical_columns_still_warns(self, engine):
+        """The case that used to be completely silent."""
+        raw = pd.DataFrame({"f1": [1, 2, 3, 4, 5], "target": [0, 1, 0, 1, 1]})
+        filtered = raw[raw["f1"] != 5].reset_index(drop=True)
+
+        out = self._merge(engine, [raw, filtered])
+
+        assert len(out) == 9, "stacked, not joined"
+        warning = next(w for w in engine.merge_warnings if w["kind"] == "row_count_mismatch")
+        assert warning["row_counts"] == [5, 4]
+        assert warning["node_id"] == "merge_node"
+        assert "stacked row-wise" in warning["message"]
+
+    def test_differing_columns_warns_about_both_facts(self, engine):
+        """Row stacking and column dropping are distinct advisories."""
+        a = pd.DataFrame({"f1": [1, 2, 3], "only_a": [7, 8, 9]})
+        b = pd.DataFrame({"f1": [4, 5], "only_b": [10, 11]})
+
+        self._merge(engine, [a, b])
+
+        assert set(self._kinds(engine)) == {"row_count_mismatch", "row_concat_drop"}
+
+    def test_equal_row_counts_emit_no_mismatch_warning(self, engine):
+        """Control: the advisory is discriminating, not unconditional noise."""
+        a = pd.DataFrame({"f1": [1, 2, 3]})
+        b = pd.DataFrame({"f2": [4, 5, 6]})
+
+        out = self._merge(engine, [a, b])
+
+        assert out.shape == (3, 2), "joined column-wise"
+        assert "row_count_mismatch" not in self._kinds(engine)
+
+    def test_part_label_is_carried_into_the_warning(self, engine):
+        a = pd.DataFrame({"f1": [1, 2, 3]})
+        b = pd.DataFrame({"f1": [4, 5]})
+
+        self._merge(engine, [a, b], part_label="train")
+
+        warning = next(w for w in engine.merge_warnings if w["kind"] == "row_count_mismatch")
+        assert warning["part"] == "train"
 
 
 # --- helpers ---------------------------------------------------------------

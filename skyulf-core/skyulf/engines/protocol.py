@@ -5,8 +5,7 @@ import pandas as pd
 
 @runtime_checkable
 class SkyulfDataFrame(Protocol):
-    """
-    The Universal DataFrame Interface for Skyulf.
+    """The Universal DataFrame Interface for Skyulf.
 
     This protocol defines the minimum set of operations that any compute engine
     (Pandas, Polars, Spark, Dask) must support to be used within Skyulf nodes.
@@ -55,8 +54,7 @@ class SkyulfDataFrame(Protocol):
 
     # Bridges
     def to_native(self) -> Any:
-        """
-        Return the underlying engine-native frame (a ``pandas.DataFrame`` or
+        """Return the underlying engine-native frame (a ``pandas.DataFrame`` or
         ``polars.DataFrame``) without any conversion.
 
         This is the documented way to escape the wrapper when native-engine
@@ -73,8 +71,8 @@ class SkyulfDataFrame(Protocol):
         ...
 
     def to_arrow(self) -> Any:
-        """
-        Convert to an Arrow Table/RecordBatch.
+        """Convert to an Arrow Table/RecordBatch.
+
         Critical for zero-copy data transfer between engines.
         """
         ...
@@ -86,8 +84,7 @@ class SkyulfDataFrame(Protocol):
 
 @runtime_checkable
 class PandasBackedFrame(SkyulfDataFrame, Protocol):
-    """
-    A :class:`SkyulfDataFrame` backed by pandas, exposing pandas-only
+    """A :class:`SkyulfDataFrame` backed by pandas, exposing pandas-only
     attributes (``.loc``, ``.iloc``, ``.select_dtypes``) that are not part of
     the engine-agnostic base protocol.
 
@@ -113,8 +110,7 @@ class PandasBackedFrame(SkyulfDataFrame, Protocol):
 
 @runtime_checkable
 class PolarsBackedFrame(SkyulfDataFrame, Protocol):
-    """
-    A :class:`SkyulfDataFrame` backed by polars, exposing polars-only
+    """A :class:`SkyulfDataFrame` backed by polars, exposing polars-only
     attributes (``.with_columns``, ``.filter``, ``.to_polars``) that are not
     part of the engine-agnostic base protocol.
 

@@ -1,5 +1,4 @@
-"""
-Async database initializer utility for FastAPI.
+"""Async database initializer utility for FastAPI.
 
 This module provides a simple `initialize()` function that will attempt to initialize
 one of the supported database backends based on the configuration.
@@ -88,8 +87,7 @@ async def _try_init_mongodb(settings: Settings):
 
 
 async def initialize(settings: Settings | None = None) -> bool:
-    """
-    Initialize the database backend based on configuration.
+    """Initialize the database backend based on configuration.
 
     Returns True on success, False on failure.
     """

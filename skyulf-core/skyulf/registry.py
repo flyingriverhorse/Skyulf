@@ -15,8 +15,7 @@ class NodeRegistry:
 
     @classmethod
     def register(cls, name: str, applier_cls: type, metadata: dict[str, Any] | None = None):
-        """
-        Decorator to register a Calculator/Applier pair.
+        """Decorator to register a Calculator/Applier pair.
 
         Args:
             name: The unique string identifier for the node (e.g. 'random_forest').

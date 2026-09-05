@@ -213,7 +213,8 @@ async def create_pipeline_version(
     session: AsyncSession = Depends(get_async_session),
 ) -> dict[str, Any]:
     """Explicitly create a snapshot. `kind` defaults to 'manual'; pass
-    'auto' from background callers (e.g. successful Run hooks)."""
+    'auto' from background callers (e.g. successful Run hooks).
+    """
     try:
         version = await PipelineVersionsService.create_version(
             session=session,
@@ -261,7 +262,8 @@ async def delete_pipeline_version(
     session: AsyncSession = Depends(get_async_session),
 ) -> dict[str, Any]:
     """Hard-delete a snapshot. Pinned rows are not protected from
-    explicit user deletion (matches the localStorage behavior)."""
+    explicit user deletion (matches the localStorage behavior).
+    """
     version = await PipelineVersionsService.get_version(session, version_id)
     if version is None or version.dataset_source_id != dataset_source_id:
         raise HTTPException(status_code=404, detail="Version not found")
