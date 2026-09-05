@@ -5,7 +5,7 @@ cleanup, exercising branches not covered by the higher-level flow tests in
 test_deployment.py (deploy -> predict happy path).
 """
 
-from datetime import UTC, datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -608,7 +608,6 @@ def test_predict_with_bundled_artifact_reorders_columns_to_match_training():
     the predict path must reindex to the recorded training feature order
     before passing to sklearn (which uses positional numpy arrays).
     """
-    from backend.ml_pipeline.artifacts.local import LocalArtifactStore
 
     # Create a transformer that adds column 'c'
     transformer = _ColumnAddingTransformer()

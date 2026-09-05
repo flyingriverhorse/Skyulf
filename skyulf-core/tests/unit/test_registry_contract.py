@@ -14,7 +14,6 @@ external libraries the generic fixture cannot provide.  Those are covered by
 their own targeted tests.
 """
 
-import logging
 from typing import Any
 
 import numpy as np
@@ -22,7 +21,6 @@ import pandas as pd
 import polars as pl
 import pytest
 
-import skyulf
 from skyulf.engines.polars_engine import SkyulfPolarsWrapper
 from skyulf.registry import NodeRegistry
 

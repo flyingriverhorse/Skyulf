@@ -4,7 +4,6 @@ from sqlalchemy import delete
 from backend.database import engine
 from backend.database.models import ModelVersionCounter, TrainingJob
 from backend.ml_pipeline._execution.jobs import JobManager
-from backend.ml_pipeline.constants import StepType
 
 
 @pytest.mark.asyncio
