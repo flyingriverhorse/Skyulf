@@ -51,6 +51,34 @@ export const MergeWarningsBanner: React.FC<MergeWarningsBannerProps> = ({
     {mergeWarningsOpen && (
       <div className="px-2 pb-2 space-y-1.5">
         {mergeWarnings.map((w, idx) => {
+          // Row counts differed, so the engine stacked the branches instead of
+          // joining them. Without this branch the warning falls through to the
+          // fan-in default below, which claims all columns were kept and offers
+          // to rewire as a chain — both wrong for a merge that added rows.
+          if (w.kind === 'row_count_mismatch') {
+            const counts = w.row_counts ?? [];
+            const total = counts.reduce((n, c) => n + c, 0);
+            return (
+              <div key={idx} className="flex items-start gap-2 text-xs text-amber-900 dark:text-amber-200 pl-5">
+                <AlertTriangle className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+                <div className="flex-1">
+                  <span className="font-medium">
+                    {nodeLabelMap[w.node_id] ?? w.node_id}
+                  </span>{' '}
+                  merged inputs with different row counts{w.part ? ` (${w.part})` : ''}:{' '}
+                  <span className="font-mono bg-amber-100 dark:bg-amber-900/40 px-1 rounded">
+                    {counts.join(' vs ')}
+                  </span>{' '}
+                  rows. They were stacked into{' '}
+                  <span className="font-mono font-semibold">{total}</span> rows instead of joined
+                  column-wise, so this merge added no features. If one branch filtered rows
+                  (outlier removal, deduplication), the rows it kept now appear more than once and
+                  are reweighted in training — move that step after the merge to keep one row per
+                  observation.
+                </div>
+              </div>
+            );
+          }
           // Row-wise merge dropped non-shared columns: render a
           // simpler advisory (no inputs / overlap to show).
           if (w.kind === 'row_concat_drop') {

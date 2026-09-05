@@ -538,6 +538,37 @@ def test_model_based_selection_apply_drops_unselected() -> None:
             assert col not in out.columns
 
 
+@pytest.mark.parametrize("count_key", ["k", "n_features_to_select"])
+def test_model_based_selection_rfe_honours_requested_feature_count(count_key: str) -> None:
+    """OC-25/OC-143 regression: RFE must select the count the user asked for.
+
+    ``n_features_to_select`` was read but written nowhere in the repository, so
+    it was always ``None`` and sklearn silently kept *half* the candidates —
+    3 of 6 — whatever the canvas's "K (Number of Features)" field said. ``k`` is
+    the alias the UI sends (``FeatureSelectionNode`` uses it for SelectKBest and
+    RFE alike); both spellings must reach sklearn.
+    """
+    rng = np.random.RandomState(0)
+    x1 = rng.normal(size=80)
+    frame: dict[str, Any] = {"x1": x1, "target": (x1 > 0).astype(int)}
+    for i in range(2, 7):  # x2..x6: five noise features, so 6 candidates total
+        frame[f"x{i}"] = rng.normal(size=80)
+    df = pd.DataFrame(frame)
+
+    art = ModelBasedSelectionCalculator().fit(
+        df,
+        {
+            "target_column": "target",
+            "method": "rfe",
+            "estimator": "logistic_regression",
+            "problem_type": "classification",
+            count_key: 2,
+        },
+    )
+    # Pre-fix this was 3 (sklearn's half-of-6 default), not the requested 2.
+    assert len(art["selected_columns"]) == 2
+
+
 @pytest.mark.parametrize(*_model_based_empty_cases)
 def test_model_based_selection_returns_empty(df_kind: str, config: dict[str, Any]) -> None:
     """Various bad configs/candidate sets must yield an empty artifact."""

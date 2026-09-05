@@ -103,8 +103,9 @@ export type BranchPreviews = Record<string, PreviewData>;
 export type BranchNodeIds = Record<string, string[]>;
 
 /** Engine-emitted advisory for a downstream node whose inputs share an
- * ancestor (column-union + last-wins merge semantics applied), or whose
- * row-wise merge had to drop non-shared columns. */
+ * ancestor (column-union + last-wins merge semantics applied), whose row counts
+ * differed so the branches were stacked instead of joined, or whose row-wise
+ * merge had to drop non-shared columns. */
 export interface MergeWarning {
   node_id: string;
   kind: string;
@@ -116,6 +117,8 @@ export interface MergeWarning {
   winner_input?: string;
   /** Row-wise merge: split label ("train" / "test" / "rows"). */
   part?: string;
+  /** Row-count mismatch: per-input row counts that forced row-wise stacking. */
+  row_counts?: number[];
   /** Row-wise merge: columns present in some inputs but not all. */
   dropped_columns?: string[];
   /** Row-wise merge: columns kept (intersection). */

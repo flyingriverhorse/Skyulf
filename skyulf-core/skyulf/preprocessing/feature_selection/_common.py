@@ -220,6 +220,18 @@ def _build_univariate_selector(method: str, score_func: Any, config: dict[str, A
     return builder(score_func, config) if builder else None
 
 
+def _resolve_rfe_n_features(config: dict[str, Any]) -> int | None:
+    """Resolve RFE's feature count from the UI's ``k`` or sklearn's own name.
+
+    The canvas labels this field "K (Number of Features)" and sends ``k`` for
+    both SelectKBest and RFE, but sklearn's ``RFE`` takes
+    ``n_features_to_select``. An explicit ``n_features_to_select`` wins so the
+    documented sklearn spelling keeps working; ``k`` is the alias the UI sends.
+    """
+    n_features = config.get("n_features_to_select")
+    return config.get("k") if n_features is None else n_features
+
+
 def _build_model_selector(method: str, estimator: Any, config: dict[str, Any]) -> Any | None:
     """Construct the sklearn model-based selector named by ``method``."""
     if method == "select_from_model":
@@ -236,7 +248,7 @@ def _build_model_selector(method: str, estimator: Any, config: dict[str, Any]) -
     if method == "rfe":
         return RFE(
             estimator=estimator,
-            n_features_to_select=config.get("n_features_to_select"),
+            n_features_to_select=_resolve_rfe_n_features(config),
             step=config.get("step", 1),
         )
     return None
