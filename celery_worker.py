@@ -14,6 +14,7 @@ from backend.config import get_settings
 # Ensure tasks register with the shared Celery app
 from backend.data_ingestion import tasks as _ingestion_tasks  # noqa: F401
 from backend.database.engine import init_db
+from backend.eda import tasks as _eda_tasks  # noqa: F401
 from backend.ml_pipeline import tasks as _ml_pipeline_tasks  # noqa: F401
 from backend.monitoring import tasks as _monitoring_tasks  # noqa: F401
 from backend.utils.logging_utils import setup_universal_logging
