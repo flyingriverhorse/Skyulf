@@ -1,3 +1,12 @@
+"""Packaging metadata for the published ``skyulf-core`` distribution.
+
+The hardcoded version literal inside the ``setup()`` call below is the release
+source of truth, not a copy of one: ``.github/workflows/release.yml`` greps it
+straight out of this file to decide whether a push to master publishes to PyPI.
+Keep it a plain literal (never derived from a file or a VCS tag, which the grep
+cannot see) and bump it in step with the root ``pyproject.toml``.
+"""
+
 from pathlib import Path
 
 from setuptools import find_packages, setup
@@ -7,7 +16,7 @@ long_description = (this_directory / "README.md").read_text(encoding="utf-8")
 
 setup(
     name="skyulf-core",
-    version="0.8.13",
+    version="0.8.14",
     description="The core machine learning library for Skyulf.",
     long_description=long_description,
     long_description_content_type="text/markdown",
