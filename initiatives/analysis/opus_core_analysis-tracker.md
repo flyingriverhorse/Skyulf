@@ -115,9 +115,9 @@ follow, grouped by domain.
 | OC-77 | 🟠 | `--maxfail=1` hides real failure count; `--cov-fail-under=45` vs 98.4% actual (two flag changes, `.github/workflows/skyulf-core-tests.yml:82-87`) | mechanical | ⬜ open |
 | OC-01 | 🟠 | `skyulf.__version__` ambiguous: stale `0.5.8` dist-info shadows real `0.8.8` (path-order dependent) — packaging-integrity cluster — re-verified 2026-09-05: the venv holds exactly one dist-info (`skyulf_core-0.8.13`), the stale `0.5.8` is gone, and `skyulf.__version__` reports `0.8.13` | small | ✅ resolved by the 0.8.13 install refresh |
 | OC-02 | 🟠 | Dev editable install dangling; `import skyulf` fails outside repo — packaging-integrity cluster — re-verified 2026-09-05 by importing from a CWD outside the repo: resolves to `skyulf-core/skyulf/__init__.py` at `0.8.13` | small | ✅ resolved by the 0.8.13 install refresh |
-| OC-78 | 🟡 | `py.typed` declared in packaging metadata but file does not exist — packaging-integrity cluster | 1 line | ⬜ open |
-| OC-79 | 🟡 | `joblib` imported at module scope but not in `install_requires` — packaging-integrity cluster | 1 line | ⬜ open |
-| OC-81 | ⚪ | No `License ::` classifier / SPDX field — packaging-integrity cluster | 1 line | ⬜ open |
+| OC-78 | 🟡 | `py.typed` declared in packaging metadata but file does not exist — packaging-integrity cluster | 1 line | ✅ fixed 2026-09-06 — created `skyulf-core/skyulf/py.typed`; verified setuptools `build_py` really copies it into the build lib (both `setup.py:31` and `MANIFEST.in:3` already referenced it), and re-confirmed during OC-81 inside an actual built wheel (`build_meta.build_wheel` → `skyulf/py.typed` present in the zip), which is the artifact PyPI receives. Without the marker PEP 561 treats the distribution as untyped, so downstream type checkers discarded the annotations the library does ship and fell back to `Any` at the import boundary |
+| OC-79 | 🟡 | `joblib` imported at module scope but not in `install_requires` — packaging-integrity cluster | 1 line | ✅ fixed 2026-09-06 — `joblib>=1.3.0` added to `setup.py` `install_requires`; the same undeclared-direct-import gap existed in the backend (`ml_pipeline/artifacts/local.py:8`, `s3.py:8`), so it went into root `pyproject.toml` and `requirements.txt` too. Floor matches `requirements-ci.txt:32` and sklearn 1.8's own `joblib>=1.3.0` |
+| OC-81 | ⚪ | No `License ::` classifier / SPDX field — packaging-integrity cluster | 1 line | ✅ fixed 2026-09-06 — **decision (owner): `skyulf-core` is Apache-2.0; backend + frontend stay AGPLv3**, i.e. `COMMERCIAL-LICENSE.md` was the authoritative one of the four disagreeing files. Declared as a **static** `license = "Apache-2.0"` in `skyulf-core/pyproject.toml`, deliberately *not* a `License ::` trove classifier: setuptools >= 77 deprecates those once an SPDX expression is present. The static placement is load-bearing — adding `"license"` to this file's `dynamic` list (how every other field here is deferred to `setup.py`) is accepted **without a warning** but emits the deprecated free-text `License:` field instead of PEP 639's `License-Expression:`, and PyPI only indexes the latter for license filtering; the same value passed to `setup()` also triggers `SetuptoolsWarning: license overwritten by pyproject.toml`. Verified by building a real wheel through `setuptools.build_meta.build_wheel`: `Metadata-Version: 2.4`, `License-Expression: Apache-2.0`, Apache `LICENSE` bundled at `dist-info/licenses/LICENSE`, zero warnings. Three contradicting files reconciled to the decision: `COPYRIGHT.md` (split stated **backwards** — "Backend & Core: Apache 2.0" — pointed that Apache claim at the root `LICENSE`, which is AGPLv3 text, and cited `frontend/feature-canvas/LICENSE`, a path that does not exist since the frontend became `frontend/ml-canvas`, which has no license file of its own and inherits root AGPLv3); `skyulf-core/README.md:410-413` (declared AGPLv3+ while linking the Apache-2.0 `LICENSE` beside it — and that README *is* the PyPI `long_description`, so the wrong license sat on the package's front page); and its shields.io badge (`github/license` reads the **repository root** `LICENSE`, so it rendered AGPLv3 on an Apache-2.0 package — replaced with a static badge). Root `pyproject.toml` (`license = { file = "LICENSE" }` + AGPLv3+ classifier) and root `LICENSE` were already correct and are unchanged. Version also synced to 0.8.15 in root `pyproject.toml` + frontend, since `setup.py:19` was already there and its docstring asks for the two to move in step |
 | OC-03 | 🟠 | Systemic `infer_output_schema` int→float misprediction across 22 nodes — one sweep + parametrized test (predicted schema == actual schema for every node) | ~1 day | ⬜ open |
 | OC-09 | 🟡 | Narrow `ruff select` hides ~500 missing docstrings + 84 unused args — **last**, widening first would bury the signal. Concrete cost measured 2026-09-05: `F401` was absent from `select`, so **27 unused imports** sat unpoliced — one was orphaned *inside the OC-152 security fix* by deleting the raw-SQL executors, and `ruff check`, `ruff format --check`, `ty check` and 1626 passing tests all stayed green; only an external pyflakes pass caught it. **`F401` closed 2026-09-05**: added to `select`, 22 dead imports auto-fixed, 4 availability/side-effect probes waived per-site, 1 redundant `import skyulf` dropped. **`F841` closed 2026-09-05**: 19 sites, all in tests, and three were tests whose bodies ended before any assertion so they had always passed trivially. **Docstring rules closed 2026-09-05**: `D` selected as a family with `convention = "google"`, the four auto-fixable rules (772 sites) taken by `ruff --fix`, D200/D301 (77) and then the remaining ten rules (**822 sites, 722 of them D1xx "missing docstring"**) written by hand across **188 files** — and then **82 more that ruff never reported at all**, because `D1xx` is privacy-gated on the *whole dotted module path*: a leading underscore on the module **or on any enclosing package** exempts everything beneath it, and 112 of the 327 in-scope modules live under one (`ml_pipeline/_internal/`, `_execution/`, `modeling/_tuning/`, `modeling/hyperparameters/`). `D2xx`/`D4xx` are **not** gated, which is why the earlier batches looked complete while the missing-docstring half of the same files stayed invisible to every gate. Recovered by copying each private file to a public name outside its package and linting the copy (byte-identical, so line numbers carry straight back): 64 backend + 18 core, re-measured to **0**. Total hand-written: **904**. Tests/examples/benchmarks carry a per-file `D` waiver (they held 2,528 of the 3,350 sites); enforcement covers `skyulf-core/skyulf/`, `backend/` and the entry points, matching `coding_standards` §4. `lint.ignore` is now down to five non-docstring entries. All **210** modified Python files AST-proven against `HEAD` — 199 docstring-only, 11 real code changes, each intended and itemised in the log entry; `ruff check .`, `ruff format --check .` (668 files), `ty check` clean; core **3668 passed / 70 skipped**, backend **1630 passed / 7 snapshots passed** — both exact baselines. **`ARG` deliberately not enabled** — measured 531 repo-wide, **121 in scope** across 73 files, of which 39 are an unused `config` and ~90 are Calculator/Applier protocol or framework contract signatures that cannot be renamed without breaking keyword callers. The triage's genuine defects were **fixed directly instead** (dead `fetch_data(query=)` and `safe_delete_path(force_delete=)` removed, `DataIngestionService.upload_dir` now from settings, the two profilers' duplicate-count parity break, the unimported `backend.eda.tasks` Celery bug), so enabling `ARG` would buy ~90 permanent `# noqa` waivers for no further yield. See the 2026-09-06 OC-09-closed log entry | done — `ARG` declined by decision (121 sites measured) | ✅ fixed 2026-09-06 — “Fixed as much as we did, no need to continue!” |
 
@@ -148,7 +148,7 @@ follow, grouped by domain.
 | OC-156 | 🟡 | `roc_auc` threshold-tuning objective scores hard predictions — bit-identical to `balanced_accuracy` (`threshold_tuning_service.py:77-92`) | small | ⬜ open |
 | OC-158 | 🟡 | Sync/async JSON serializers disagree: sync nulls 8 of 15 legitimate strings (`"nan"`, `"NaT"`, `"<NA>"`, `"inf"`…), async nulls none; 603-line module production-dead but test-covered (`serialization.py:369,435-446`) | half day | ⬜ open |
 | OC-131 | ⚪ | Diagnostics fail open — PSI returns `0.0` on any numeric failure (`profiling/drift.py:474-476`) | 1 line | ⬜ open |
-| OC-132 | ⚪ | Dead `dropped_features` branch (key appears exactly once in repo) (`graph_utils.py:534-537`) | 1 line | ⬜ open |
+| OC-132 | ⚪ | Dead `dropped_features` branch (key appears exactly once in repo) (`graph_utils.py:534-537`) | 1 line | ✅ fixed 2026-09-06 — branch deleted from `_extract_columns` (now `graph_utils.py:589`); the superseding runtime path (`job.metrics["dropped_columns"]` via `strategies.py` → `basic_training_manager.py`) is recorded in a new docstring so the branch is not re-added. Confirmed dead first: no test, fixture or writer references the key |
 | OC-152 | ⚪ | Two raw-SQL executors accept unconstrained query strings, zero callers — latent injection sink (`async_connection_manager.py:243-268`) — **broader than filed**: `AsyncSQLiteConnectionManager` carried a byte-identical pair, so four dead sinks were deleted, not two | small | ✅ fixed 2026-09-05 |
 | OC-157 | ⚪ | `first_wins` merge strategy reverses output column order, contradicting its docstring (`_merge.py:221-236`) — fixed by dropping the reversed iteration, so order is strategy-independent by construction | small | ✅ fixed 2026-09-05 — with OC-153 |
 | OC-159 | ⚪ | Empty filter dict compiles to WHERE-less `DELETE FROM data_sources`/`UPDATE`; dead call path today (`async_sqlite_queries.py:129-146`) | 1 line | ⬜ open |
@@ -169,7 +169,7 @@ follow, grouped by domain.
 | OC-111 | 🟡 | A profiling recommendation branch is unreachable | small | ⬜ open |
 | OC-114 | 🟡 | All-null tracked column yields 30 `NaN` autocorrelation lags as real analysis (≥1000-row datasets) (`temporal.py:167-191`) | small | ⬜ open |
 | OC-102 | ⚪ | Five tunable models return an empty search space from the live `/defaults` endpoint (`hyperparameters/_registry.py`) | small | ⬜ open |
-| OC-112 | ⚪ | Comment and code disagree about the applied threshold | 1 line | ⬜ open |
+| OC-112 | ⚪ | Comment and code disagree in the categorical profiler — the comment promises a rendered missing-value marker, the code `continue`s and discards the null category (`profiling/_analyzer/categorical.py:22-30`). *Filed as "disagree about the applied threshold"; the real subject is the null-category marker* | 1 line | ✅ fixed 2026-09-06 — comment-only, no behaviour change. Rewrote it to describe what the code does and why dropping is correct: `str(None)` would publish a literal `"None"` in `top_k` indistinguishable from a genuine category of that name, and null frequency is not lost because `ColumnProfile.missing_count`/`missing_percentage` report it separately (`profiling/schemas.py:163-164`) |
 | OC-121 | ⚪ | polars `Enum` columns invisible to text auto-detection, diverging from pandas `Categorical` (`_helpers.py:148-157`) | small | ⬜ open |
 | OC-122 | ⚪ | `TextCleaning` silently ignores unrecognised operation name (`cleaning/text.py:151-153`) | small | ⬜ open |
 | OC-90 | ⚪ | Unknown split config keys silently dropped instead of rejected (`preprocessing/split.py`) | small | ⬜ open |
@@ -181,19 +181,19 @@ follow, grouped by domain.
 | OC-140 | 🟠 | `InvalidValueReplacement` diverges across engines on non-numeric columns (pandas silently NaNs, polars raises) | small | ⬜ open |
 | OC-142 | 🟠 | EDA correlation ratio η exceeds 1.0 with nulls; null-heavy columns rank as strongest association | small | ⬜ open |
 | OC-143 | 🟠 | RFE ignores the UI's `k`, silently selecting half the features — **duplicate of OC-25**, same file and line; one fix retires both | small | ✅ fixed 2026-09-05 — with OC-25 |
-| OC-141 | ⚪ | `invalid_values` param declared in `node_meta` with zero consumers | 1 line | ⬜ open |
-| OC-144 | ⚪ | Geo distance column named `_km` even when the unit is miles | 1 line | ⬜ open |
+| OC-141 | ⚪ | `invalid_values` param declared in `node_meta` with zero consumers | 1 line | ✅ fixed 2026-09-06 — key deleted from `node_meta` params (`cleaning/invalid_value.py:215` → `{"columns": []}`). Re-verified zero consumers across `skyulf-core/`, `backend/`, `frontend/` and all `.ambr` snapshots first. Deletion is behaviour-neutral for the smoke test: `user_picked_no_columns` keys off `columns`, which stays declared, so `fit` still short-circuits identically. **Left open deliberately:** the other half of the divergence — the params the calculator really reads (`rule`/`mode`, `min_value`, `max_value`, `replacement`, `value`, `replace_inf`, `replace_neg_inf`) are still undeclared. Wiring those up expands the published contract and belongs to **R1 step 1**, not to this deletion |
+| OC-144 | ⚪ | Geo distance column named `_km` even when the unit is miles | ~~1 line~~ **small, not 1 line** — scoped 2026-09-06 | ⬜ open — **not a one-liner; blast radius measured.** Four code sites (`geo/distance.py:83` pandas apply, `:112` polars apply, `:163` `node_meta` default, `:185` `fit`), **10** assertions in `tests/integration/test_geo_nodes.py` (incl. `:91`, which reads `result_km["geo_distance_km"]` while converting to miles — the mislabel the finding describes, baked into a test), and `docs/reference/preprocessing_nodes.md:630`. **The structural detail that decides the fix:** the two apply-path fallbacks are unreachable in the normal pipeline, because `fit` always writes `output_column` into the artifact — so the *declared* `node_meta` default is what really picks the name. `node_meta` params are a static dict and cannot be unit-dependent, so `f"geo_distance_{unit}"` has to be resolved in `fit` (declaring `""` = auto, or dropping the key), not patched at the four sites independently. Frontend impact is nil — all of `geo/` is UI-unreachable per OC-06 |
 
 ### Remaining — cross-cutting & packaging
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
 | OC-04 | 🟡 | Cross-engine dtype divergence in 3 nodes (int64 vs int8/uint32) (`encoding/dummy.py`, `bucketing.py`) | small | ⬜ open |
-| OC-05 | 🟡 | `PowerTransformer` triggers a pandas deprecation that will become an error (`transformations/power.py:101`) | 1 line | ⬜ open |
+| OC-05 | 🟡 | `PowerTransformer` triggers a pandas deprecation that will become an error (`transformations/power.py:101`) | 1 line | ✅ fixed 2026-09-06 — **worse than filed**: it is not cosmetic. Reproduced on pandas 2.3.2 with `int64` columns — `df_out.loc[:, valid_cols] = <float array>` emits one `FutureWarning: Setting an item of incompatible dtype is deprecated and will raise in a future error` *per column*. When pandas makes that an error, the surrounding bare `except Exception` (which only calls `logger.exception`) swallows it and returns the frame **untransformed** — the same silent-skip failure mode as OC-28. Fix: cast each destination column to `float64` before the `.loc` write. Verified 0 warnings (was 2), values bit-identical to the float-input path, column order/index/non-target columns preserved, pandas↔polars parity holds and both now yield `Float64`. Pinned by `test_power_transformer_pandas_apply_integer_columns_avoids_dtype_warning`, which *records* warnings rather than promoting them to errors — a promoted warning would be caught by that same bare `except` and the test would pass while the transform silently no-ops, so it also asserts the values really changed |
 | OC-06 | 🟡 | 6 registered nodes unreachable from the UI (incl. all of `geo/`) — `registry.py` vs `frontend/` | small | ⬜ open — R1 step 3 catches this class |
 | OC-07 | 🟡 | Node-id naming split 55 PascalCase / 45 snake_case + redundant aliases (`registry.py`) | half day | ⬜ open |
 | OC-08 | 🟡 | Public-API name collision: `DatasetProfile` means two things (`skyulf/__init__.py:32-46`) | small | ⬜ open |
-| OC-10 | ⚪ | 4 dead `infer_output_schema` overrides that only `return None` (`vectorization/*`) | mechanical | ⬜ open |
+| OC-10 | ⚪ | 4 dead `infer_output_schema` overrides that only `return None` (`vectorization/*`) | mechanical | ⬜ open — **re-measured 2026-09-06: five, not four** (`count_vectorizer.py:147`, `hashing_vectorizer.py:135`, `tfidf_vectorizer.py:141`, `tokenizer.py:179`, `sentence_embedder.py:204`). `BaseCalculator.infer_output_schema` already ends in `return None` (`preprocessing/base.py:129`), so all five are behaviourally identical to inheriting. **Recommend folding into OC-03 rather than deleting standalone:** each override carries the per-node *reason* the schema is unknowable (learned vocabulary, model-loaded embedding width, data-dependent column survival), which is exactly the documentation OC-03's parametrized "predicted == actual for every node" test needs beside it, and OC-03 will touch these same five files |
 | OC-11 | ⚪ | Mega smoke test silently skips nodes with empty params (`tests/unit/test_all_nodes_smoke.py`) | small | ⬜ open |
 
 ### Remaining — encoding / cleaning / imputation / scaling / drop
@@ -209,7 +209,7 @@ follow, grouped by domain.
 | OC-172 | 🟡 | `StandardScaler` crashes on mixed pandas nullable numeric columns containing `pd.NA`; native sklearn and equivalent Polars input succeed (`preprocessing/scaling/standard.py:144,154`, `engines/sklearn_bridge.py:52`) | small | ⬜ open |
 | OC-18 | 🟡 | One-hot/dummy generated names can collide with existing columns (`encoding/one_hot.py:68-92`, `dummy.py:76-99`) | small | ⬜ open |
 | OC-21 | 🟡 | WOE additive smoothing not normalized over categories (`encoding/woe.py:130-145`) | small | ⬜ open |
-| OC-22 | ⚪ | `TargetEncoder.infer_output_schema` checks an impossible `regression` value (`encoding/target.py:340-360`) | 1 line | ⬜ open |
+| OC-22 | ⚪ | `TargetEncoder.infer_output_schema` checks an impossible `regression` value (`encoding/target.py:340-360`) | 1 line | ✅ fixed 2026-09-06 — `("binary", "regression")` → `("binary", "continuous")` (now `target.py:386`). Verified empirically against sklearn 1.8.0: `TargetEncoder`'s accepted set is `{auto, binary, multiclass, continuous}` and `"regression"` raises `InvalidParameterError`, while `_build_target_encoder` forwards the config value verbatim — so no working config could ever reach that branch, and the legitimate `"continuous"` case fell through to `None`. **Why it survived:** `tests/unit/test_infer_output_schema.py:207` asserted passthrough for `("binary", "regression")`, so the test was pinning the bug; updated to `continuous` and a second test added that pins both halves (sklearn really rejects `regression`, and the prediction stays opaque for it). Confirmed the new prediction is *correct*, not merely reachable: fitting+applying with `target_type="continuous"` on a continuous `y` encodes in place, returning the same column set. `InvalidParameterError` is matched via its public base `ValueError` — the class itself lives in the private `sklearn.utils._param_validation` |
 
 ### Remaining — feature generation / selection / vectorization / transformations
 
@@ -498,6 +498,152 @@ input and apply any keep-mask identically to y. Unlike OC-165, this reproduces
 without a target. Location: `preprocessing/time_series/lag.py:54-59`.
 
 ## Log
+
+### 2026-09-06 — OC-81 closed: the license decision arrived, and "1 line" turned out to be five files
+
+The previous entry left OC-81 **blocked** rather than open, on the grounds that
+"add a `License ::` classifier" presumes the license is known and four files in
+the repo disagreed about which one applies to `skyulf-core`. The owner's decision:
+**`skyulf-core` is Apache-2.0; the backend and frontend stay AGPLv3.** That makes
+`COMMERCIAL-LICENSE.md` the authoritative file of the four — it was the only one
+already stating the split correctly.
+
+**The fix is not in `setup.py`.** `skyulf-core/pyproject.toml` has a `[project]`
+table that defers every other field to `setup.py` by listing it in `dynamic`, so
+the obvious move is to add `"license"` there and put the value beside the version
+literal. That **silently produces the wrong metadata**: setuptools accepts it
+with no warning at all, but a dynamic license is emitted as the deprecated
+free-text `License: Apache-2.0` field, whereas PEP 639's `License-Expression:` —
+the only one PyPI indexes for license filtering — is produced *only* from a
+static `[project] license`. Passing it to `setup()` instead is worse, and at
+least loud: `SetuptoolsWarning: license overwritten by pyproject.toml`. Caught by
+generating the metadata rather than by reading the config. The classifier form
+the finding asked for was **not** used: setuptools >= 77 deprecates `License ::`
+trove classifiers once an SPDX expression is present.
+
+Verified by building a real wheel through `setuptools.build_meta.build_wheel`,
+not by inspecting the config: `Metadata-Version: 2.4`,
+`License-Expression: Apache-2.0`, `License-File: LICENSE` with the Apache text
+bundled at `dist-info/licenses/LICENSE`, `Requires-Dist: joblib>=1.3.0` (OC-79),
+`skyulf/py.typed` present in the zip (OC-78, now confirmed in the artifact PyPI
+actually receives rather than only in a `build_py` scratch dir), and **zero**
+setuptools warnings.
+
+**Three files were then reconciled to the decision**, which is where "1 line"
+went:
+
+- `COPYRIGHT.md` had the split **backwards** — "Backend & Core: Apache License,
+  Version 2.0" — pointed that Apache claim at the root `LICENSE`, which is AGPLv3
+  text, and cited `frontend/feature-canvas/LICENSE`: a path that does not exist,
+  since the frontend is `frontend/ml-canvas`, which has no license file of its
+  own and inherits the root AGPLv3. Two of those three errors would have
+  survived a fix that only added the classifier.
+- `skyulf-core/README.md:410-413` declared AGPLv3+ while linking the Apache-2.0
+  `LICENSE` sitting beside it. This one had the largest blast radius: that README
+  *is* the PyPI `long_description`, so the wrong license was on the package's
+  front page, on the one distribution whose entire selling point is that it can be
+  vendored into proprietary work.
+- Its shields.io badge read AGPLv3 for a subtler reason — the `github/license`
+  endpoint resolves the **repository root** `LICENSE`, not the nearest one. Any
+  subdirectory package in a split-license monorepo inherits the root's badge
+  unless the badge is pinned. Replaced with a static Apache-2.0 badge.
+
+**Version drift found on the way.** `skyulf-core/setup.py:19` was already at
+`0.8.15` while the root `pyproject.toml` — which its own docstring names as the
+thing to stay in step with — was at `0.8.14`, and the `v0.8.15` changelog section
+existed as an empty placeholder. Synced root to `0.8.15` and ran
+`npm run sync-version` for the frontend (diff is version-only, 3 lines across
+`package.json` + `package-lock.json`). No rebuild is implied: nothing under
+`frontend/ml-canvas/src` reads the package version and `dist/` is untracked.
+
+**Gate.** `ruff check .` clean. Two traps worth keeping: a Git Bash `mktemp -d`
+path (`/tmp/...`) is not resolvable by Windows Python, so a build probe pointed
+at one fails with `error in 'egg_base' option: does not exist` — use
+`tempfile.mkdtemp()` from inside Python instead; and `cd` persists between Bash
+calls, so a `cd skyulf-core` in one command makes the next command's relative
+pathspecs silently match nothing.
+
+### 2026-09-06 — OC-05/22/78/79/112/132/141 fixed: the "1 line" tier closed, and two of the seven were not what they claimed
+
+Took the whole `1 line` / `mechanical` effort tier that was still open. **Seven
+closed**, one **blocked on a decision**, two investigated and **re-scoped but left
+open**. Every claim below was verified by execution or by reading the call sites,
+not inferred from the audit text.
+
+**Two of the seven were mis-filed, and both were worse than the ⚪/🟡 they carried:**
+
+- **OC-05 was not cosmetic.** The pandas apply path wrote a float transform
+  result into `int64` columns via `.loc`, which pandas 2.3.2 warns about *per
+  column* and has said will become an error. The escalation is the bare
+  `except Exception` around it that only logs: once pandas raises, the transform
+  is **silently skipped** and the original data returned — OC-28's failure mode
+  arriving through OC-05. Fixed by casting the destination columns to `float64`
+  first. Verified 0 warnings (was 2), values bit-identical, column order and
+  index preserved, pandas↔polars parity intact.
+  The regression test **records** warnings instead of promoting them to errors,
+  because a promoted warning would be swallowed by that same `except` and the
+  test would pass while the transform no-ops — so it also asserts the values
+  really changed.
+- **OC-22 had a test pinning the bug.** `test_infer_output_schema.py:207`
+  asserted passthrough for `("binary", "regression")`. sklearn 1.8.0's
+  `TargetEncoder` accepts `{auto, binary, multiclass, continuous}` and raises
+  `InvalidParameterError` for `"regression"`, and `_build_target_encoder`
+  forwards the config value verbatim — so that assertion locked in a prediction
+  for a config that can never fit, while the legitimate `"continuous"` case fell
+  through to `None`. Changed to `"continuous"`, and confirmed the prediction is
+  *correct* rather than merely reachable: fitting+applying on a continuous `y`
+  does encode in place. The existing test was the reason the defect survived.
+
+**The five straightforward ones.** OC-78 created `skyulf-core/skyulf/py.typed`
+(declared in both `setup.py:31` and `MANIFEST.in:3`, absent on disk) and was
+proven by running setuptools' own `build_py` into a temp dir and finding the file
+in the build lib — `build`/`wheel` are not installed, and installing them was not
+mine to do. OC-79 declared `joblib>=1.3.0`; the filed finding was
+`install_requires`, but the backend has the identical undeclared-direct-import
+gap (`ml_pipeline/artifacts/local.py:8`, `s3.py:8`), so it went into root
+`pyproject.toml` and `requirements.txt` as well. OC-112 was comment-only. OC-132
+deleted a branch reading `dropped_features`, a key nothing in the repo writes,
+and recorded the superseding runtime path in a docstring so it is not re-added.
+OC-141 deleted the unconsumed `invalid_values` from `node_meta`, after
+re-verifying zero consumers and that `user_picked_no_columns` keys off `columns`,
+so the smoke test's short-circuit is unchanged.
+
+**OC-81 is blocked, not open.** "Add a `License ::` classifier" assumes the
+license is known. It is not — four files disagree about which license applies to
+`skyulf-core`, and the classifier would publish that choice to PyPI:
+`skyulf-core/LICENSE` is the full **Apache-2.0** text; `COMMERCIAL-LICENSE.md`
+says *AGPLv3 backend+frontend / Apache-2.0 core*; `COPYRIGHT.md` says the
+**opposite** split (*"Backend & Core: Apache 2.0"*, *"Frontend: AGPLv3"*) while
+pointing at a root `LICENSE` that is **AGPLv3**; and `skyulf-core/README.md:410-413`
+declares **AGPLv3+** while linking the Apache-2.0 file beside it. Needs a
+decision (and then the contradicting docs need fixing regardless of which way it
+goes). Marked ⛔ in the queue.
+
+**Two left open on purpose, both re-scoped from what the tracker said:**
+
+- **OC-10** is **five** overrides, not four, and `BaseCalculator.infer_output_schema`
+  already ends in `return None` (`preprocessing/base.py:129`), so all five are
+  behaviourally dead. Deferred because each carries the per-node *reason* the
+  schema is unknowable, and OC-03's sweep will touch these same five files —
+  deleting the rationale now would just cost OC-03 the documentation it needs.
+- **OC-144** is not a one-liner: 4 code sites, **10** assertions in
+  `test_geo_nodes.py` (one of which reads `geo_distance_km` while converting to
+  miles — the mislabel baked into a test), and a docs line. The detail that
+  decides the fix is that both apply-path fallbacks are unreachable, since `fit`
+  always writes `output_column` into the artifact, so the *declared* `node_meta`
+  default picks the name — and a static dict cannot be unit-dependent.
+
+**Gates.** `ruff check .` clean; `ruff format --check` clean on all 11 touched
+files; `ty check` clean. Core **3670 passed / 70 skipped** — the 3668 baseline
+plus the two new tests. Backend **1630 passed / 7 snapshots passed** — exact
+baseline. Two verification traps worth recording: `pytest --timeout=900` is not
+supported here (no `pytest-timeout`), and piping a gate through `tail` reports
+*`tail`'s* exit code, so a backgrounded `pytest … | tail` showed exit 0 for a run
+that had actually aborted on argument parsing. Read the output, not the status.
+
+Also noted while grepping: repo-wide `grep -r` matches `site/search/search_index.json`
+(built docs, ~140 KB single line) and floods the context; exclude `site/` and
+`.venv/`, and prefer the ripgrep-backed Grep tool with `--glob`.
 
 ### 2026-09-06 — OC-183–186 filed: four backend defects the OC-09 docstring pass surfaced, deferred by decision
 
