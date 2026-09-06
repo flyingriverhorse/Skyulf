@@ -2650,6 +2650,34 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="BaseBinningApplier">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#skyulf.preprocessing.bucketing.BaseBinningApplier.apply" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        apply
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#skyulf.preprocessing.bucketing.CustomBinningApplier" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CustomBinningApplier
+      
+    </span>
+  </a>
+  
 </li>
         
           <li class="md-nav__item">
@@ -2657,6 +2685,34 @@
     <span class="md-ellipsis">
       
         CustomBinningCalculator
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="CustomBinningCalculator">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#skyulf.preprocessing.bucketing.CustomBinningCalculator.fit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        fit
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#skyulf.preprocessing.bucketing.GeneralBinningApplier" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GeneralBinningApplier
       
     </span>
   </a>
@@ -2672,6 +2728,34 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="GeneralBinningCalculator">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#skyulf.preprocessing.bucketing.GeneralBinningCalculator.fit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        fit
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#skyulf.preprocessing.bucketing.KBinsDiscretizerApplier" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        KBinsDiscretizerApplier
+      
+    </span>
+  </a>
+  
 </li>
         
           <li class="md-nav__item">
@@ -2682,6 +2766,23 @@
       
     </span>
   </a>
+  
+    <nav class="md-nav" aria-label="KBinsDiscretizerCalculator">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#skyulf.preprocessing.bucketing.KBinsDiscretizerCalculator.fit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        fit
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
         
@@ -3222,7 +3323,15 @@ names to bin edges.</p>
 <span class="normal">284</span>
 <span class="normal">285</span>
 <span class="normal">286</span>
-<span class="normal">287</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">BaseBinningApplier</span><span class="p">(</span><span class="n">BaseApplier</span><span class="p">):</span>
+<span class="normal">287</span>
+<span class="normal">288</span>
+<span class="normal">289</span>
+<span class="normal">290</span>
+<span class="normal">291</span>
+<span class="normal">292</span>
+<span class="normal">293</span>
+<span class="normal">294</span>
+<span class="normal">295</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">BaseBinningApplier</span><span class="p">(</span><span class="n">BaseApplier</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""Shared Applier for all binning Calculators.</span>
 
 <span class="sd">    Expects ``bin_edges`` in params: ``Dict[str, List[float]]`` mapping column</span>
@@ -3231,9 +3340,138 @@ names to bin edges.</p>
 
     <span class="nd">@apply_method</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">apply</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">_y</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">params</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>  <span class="c1"># pylint: disable=arguments-differ</span>
+<span class="w">        </span><span class="sd">"""Dispatch through the mapping-keyed dual-engine path; ``y`` passes through.</span>
+
+<span class="sd">        Each entry in ``bin_edges`` gains a ``{col}{output_suffix}`` column, and</span>
+<span class="sd">        ``drop_original`` removes only the columns that were actually binned. A</span>
+<span class="sd">        column that cannot be binned (fewer than two unique edges, bad dtype) is</span>
+<span class="sd">        left unbinned rather than failing the whole frame — warned about on the</span>
+<span class="sd">        pandas path, silently skipped on the polars one.</span>
+<span class="sd">        """</span>
         <span class="k">return</span> <span class="n">apply_dual_engine</span><span class="p">(</span>
             <span class="n">X</span><span class="p">,</span> <span class="n">params</span><span class="p">,</span> <span class="p">{</span><span class="s2">"polars"</span><span class="p">:</span> <span class="n">_bucketing_apply_polars</span><span class="p">,</span> <span class="s2">"pandas"</span><span class="p">:</span> <span class="n">_bucketing_apply_pandas</span><span class="p">}</span>
         <span class="p">)</span>
+</code></pre></div></td></tr></table></div>
+              </details>
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="skyulf.preprocessing.bucketing.BaseBinningApplier.apply" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">apply</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">_y</span><span class="p">,</span> <span class="n">params</span><span class="p">)</span></code>
+
+</h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Dispatch through the mapping-keyed dual-engine path; <code>y</code> passes through.</p>
+<p>Each entry in <code>bin_edges</code> gains a <code>{col}{output_suffix}</code> column, and
+<code>drop_original</code> removes only the columns that were actually binned. A
+column that cannot be binned (fewer than two unique edges, bad dtype) is
+left unbinned rather than failing the whole frame — warned about on the
+pandas path, silently skipped on the polars one.</p>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>skyulf-core/skyulf/preprocessing/bucketing.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">283</span>
+<span class="normal">284</span>
+<span class="normal">285</span>
+<span class="normal">286</span>
+<span class="normal">287</span>
+<span class="normal">288</span>
+<span class="normal">289</span>
+<span class="normal">290</span>
+<span class="normal">291</span>
+<span class="normal">292</span>
+<span class="normal">293</span>
+<span class="normal">294</span>
+<span class="normal">295</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@apply_method</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">apply</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">_y</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">params</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>  <span class="c1"># pylint: disable=arguments-differ</span>
+<span class="w">    </span><span class="sd">"""Dispatch through the mapping-keyed dual-engine path; ``y`` passes through.</span>
+
+<span class="sd">    Each entry in ``bin_edges`` gains a ``{col}{output_suffix}`` column, and</span>
+<span class="sd">    ``drop_original`` removes only the columns that were actually binned. A</span>
+<span class="sd">    column that cannot be binned (fewer than two unique edges, bad dtype) is</span>
+<span class="sd">    left unbinned rather than failing the whole frame — warned about on the</span>
+<span class="sd">    pandas path, silently skipped on the polars one.</span>
+<span class="sd">    """</span>
+    <span class="k">return</span> <span class="n">apply_dual_engine</span><span class="p">(</span>
+        <span class="n">X</span><span class="p">,</span> <span class="n">params</span><span class="p">,</span> <span class="p">{</span><span class="s2">"polars"</span><span class="p">:</span> <span class="n">_bucketing_apply_polars</span><span class="p">,</span> <span class="s2">"pandas"</span><span class="p">:</span> <span class="n">_bucketing_apply_pandas</span><span class="p">}</span>
+    <span class="p">)</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="skyulf.preprocessing.bucketing.CustomBinningApplier" class="doc doc-heading">
+            <code>CustomBinningApplier</code>
+
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="GeneralBinningApplier (skyulf.preprocessing.bucketing.GeneralBinningApplier)" href="#skyulf.preprocessing.bucketing.GeneralBinningApplier">GeneralBinningApplier</a></code></p>
+
+
+
+        <p>Applier registered for the <code>CustomBinning</code> node id.</p>
+<p>Empty subclass — custom edges are applied by exactly the same cut logic as
+fitted ones, so nothing here needs to differ.</p>
+
+
+
+
+
+
+
+
+              <details class="mkdocstrings-source">
+                <summary>Source code in <code>skyulf-core/skyulf/preprocessing/bucketing.py</code></summary>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">507</span>
+<span class="normal">508</span>
+<span class="normal">509</span>
+<span class="normal">510</span>
+<span class="normal">511</span>
+<span class="normal">512</span>
+<span class="normal">513</span>
+<span class="normal">514</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">CustomBinningApplier</span><span class="p">(</span><span class="n">GeneralBinningApplier</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Applier registered for the ``CustomBinning`` node id.</span>
+
+<span class="sd">    Empty subclass — custom edges are applied by exactly the same cut logic as</span>
+<span class="sd">    fitted ones, so nothing here needs to differ.</span>
+<span class="sd">    """</span>
+
+    <span class="k">pass</span>
 </code></pre></div></td></tr></table></div>
               </details>
 
@@ -3286,39 +3524,48 @@ names to bin edges.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>skyulf-core/skyulf/preprocessing/bucketing.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">486</span>
-<span class="normal">487</span>
-<span class="normal">488</span>
-<span class="normal">489</span>
-<span class="normal">490</span>
-<span class="normal">491</span>
-<span class="normal">492</span>
-<span class="normal">493</span>
-<span class="normal">494</span>
-<span class="normal">495</span>
-<span class="normal">496</span>
-<span class="normal">497</span>
-<span class="normal">498</span>
-<span class="normal">499</span>
-<span class="normal">500</span>
-<span class="normal">501</span>
-<span class="normal">502</span>
-<span class="normal">503</span>
-<span class="normal">504</span>
-<span class="normal">505</span>
-<span class="normal">506</span>
-<span class="normal">507</span>
-<span class="normal">508</span>
-<span class="normal">509</span>
-<span class="normal">510</span>
-<span class="normal">511</span>
-<span class="normal">512</span>
-<span class="normal">513</span>
-<span class="normal">514</span>
-<span class="normal">515</span>
-<span class="normal">516</span>
-<span class="normal">517</span>
-<span class="normal">518</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">"CustomBinning"</span><span class="p">,</span> <span class="n">CustomBinningApplier</span><span class="p">)</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">517</span>
+<span class="normal">518</span>
+<span class="normal">519</span>
+<span class="normal">520</span>
+<span class="normal">521</span>
+<span class="normal">522</span>
+<span class="normal">523</span>
+<span class="normal">524</span>
+<span class="normal">525</span>
+<span class="normal">526</span>
+<span class="normal">527</span>
+<span class="normal">528</span>
+<span class="normal">529</span>
+<span class="normal">530</span>
+<span class="normal">531</span>
+<span class="normal">532</span>
+<span class="normal">533</span>
+<span class="normal">534</span>
+<span class="normal">535</span>
+<span class="normal">536</span>
+<span class="normal">537</span>
+<span class="normal">538</span>
+<span class="normal">539</span>
+<span class="normal">540</span>
+<span class="normal">541</span>
+<span class="normal">542</span>
+<span class="normal">543</span>
+<span class="normal">544</span>
+<span class="normal">545</span>
+<span class="normal">546</span>
+<span class="normal">547</span>
+<span class="normal">548</span>
+<span class="normal">549</span>
+<span class="normal">550</span>
+<span class="normal">551</span>
+<span class="normal">552</span>
+<span class="normal">553</span>
+<span class="normal">554</span>
+<span class="normal">555</span>
+<span class="normal">556</span>
+<span class="normal">557</span>
+<span class="normal">558</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">"CustomBinning"</span><span class="p">,</span> <span class="n">CustomBinningApplier</span><span class="p">)</span>
 <span class="nd">@node_meta</span><span class="p">(</span>
     <span class="nb">id</span><span class="o">=</span><span class="s2">"CustomBinning"</span><span class="p">,</span>
     <span class="n">name</span><span class="o">=</span><span class="s2">"Custom Binning"</span><span class="p">,</span>
@@ -3332,6 +3579,15 @@ names to bin edges.</p>
 
     <span class="nd">@fit_method</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">fit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">_y</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">GeneralBinningArtifact</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Attach one shared, sorted edge list from ``config["bins"]`` to every selected column.</span>
+
+<span class="sd">        Nothing is learned from the data (``learns_from_data=False``) — *X* is</span>
+<span class="sd">        only consulted for column resolution. Unlike :class:`GeneralBinningCalculator`</span>
+<span class="sd">        the same edges go to every column, so a multi-column selection spanning</span>
+<span class="sd">        different scales will push the out-of-scale columns' values outside the</span>
+<span class="sd">        outer bins, where both engines null them. An empty or absent ``bins``</span>
+<span class="sd">        leaves ``bin_edges`` empty, which makes apply a no-op.</span>
+<span class="sd">        """</span>
         <span class="k">if</span> <span class="n">user_picked_no_columns</span><span class="p">(</span><span class="n">config</span><span class="p">):</span>
             <span class="k">return</span> <span class="n">cast</span><span class="p">(</span><span class="n">GeneralBinningArtifact</span><span class="p">,</span> <span class="p">{})</span>
 
@@ -3351,6 +3607,168 @@ names to bin edges.</p>
         <span class="p">}</span>
         <span class="n">artifact</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">_passthrough_artifact_options</span><span class="p">(</span><span class="n">config</span><span class="p">))</span>
         <span class="k">return</span> <span class="n">cast</span><span class="p">(</span><span class="n">GeneralBinningArtifact</span><span class="p">,</span> <span class="n">artifact</span><span class="p">)</span>
+</code></pre></div></td></tr></table></div>
+              </details>
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="skyulf.preprocessing.bucketing.CustomBinningCalculator.fit" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">fit</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">_y</span><span class="p">,</span> <span class="n">config</span><span class="p">)</span></code>
+
+</h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Attach one shared, sorted edge list from <code>config["bins"]</code> to every selected column.</p>
+<p>Nothing is learned from the data (<code>learns_from_data=False</code>) — <em>X</em> is
+only consulted for column resolution. Unlike :class:<code>GeneralBinningCalculator</code>
+the same edges go to every column, so a multi-column selection spanning
+different scales will push the out-of-scale columns' values outside the
+outer bins, where both engines null them. An empty or absent <code>bins</code>
+leaves <code>bin_edges</code> empty, which makes apply a no-op.</p>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>skyulf-core/skyulf/preprocessing/bucketing.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">529</span>
+<span class="normal">530</span>
+<span class="normal">531</span>
+<span class="normal">532</span>
+<span class="normal">533</span>
+<span class="normal">534</span>
+<span class="normal">535</span>
+<span class="normal">536</span>
+<span class="normal">537</span>
+<span class="normal">538</span>
+<span class="normal">539</span>
+<span class="normal">540</span>
+<span class="normal">541</span>
+<span class="normal">542</span>
+<span class="normal">543</span>
+<span class="normal">544</span>
+<span class="normal">545</span>
+<span class="normal">546</span>
+<span class="normal">547</span>
+<span class="normal">548</span>
+<span class="normal">549</span>
+<span class="normal">550</span>
+<span class="normal">551</span>
+<span class="normal">552</span>
+<span class="normal">553</span>
+<span class="normal">554</span>
+<span class="normal">555</span>
+<span class="normal">556</span>
+<span class="normal">557</span>
+<span class="normal">558</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@fit_method</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">fit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">_y</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">GeneralBinningArtifact</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Attach one shared, sorted edge list from ``config["bins"]`` to every selected column.</span>
+
+<span class="sd">    Nothing is learned from the data (``learns_from_data=False``) — *X* is</span>
+<span class="sd">    only consulted for column resolution. Unlike :class:`GeneralBinningCalculator`</span>
+<span class="sd">    the same edges go to every column, so a multi-column selection spanning</span>
+<span class="sd">    different scales will push the out-of-scale columns' values outside the</span>
+<span class="sd">    outer bins, where both engines null them. An empty or absent ``bins``</span>
+<span class="sd">    leaves ``bin_edges`` empty, which makes apply a no-op.</span>
+<span class="sd">    """</span>
+    <span class="k">if</span> <span class="n">user_picked_no_columns</span><span class="p">(</span><span class="n">config</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">cast</span><span class="p">(</span><span class="n">GeneralBinningArtifact</span><span class="p">,</span> <span class="p">{})</span>
+
+    <span class="n">X</span><span class="p">,</span> <span class="n">columns</span> <span class="o">=</span> <span class="n">resolve_columns_then_to_pandas</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">config</span><span class="p">,</span> <span class="n">detect_numeric_columns</span><span class="p">)</span>
+    <span class="n">bins</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"bins"</span><span class="p">)</span>
+
+    <span class="n">bin_edges_map</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">list</span><span class="p">[</span><span class="nb">float</span><span class="p">]]</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="k">if</span> <span class="n">bins</span><span class="p">:</span>
+        <span class="n">sorted_bins</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">bins</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">col</span> <span class="ow">in</span> <span class="n">columns</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">col</span> <span class="ow">in</span> <span class="n">X</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+                <span class="n">bin_edges_map</span><span class="p">[</span><span class="n">col</span><span class="p">]</span> <span class="o">=</span> <span class="n">sorted_bins</span>
+
+    <span class="n">artifact</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s2">"type"</span><span class="p">:</span> <span class="s2">"general_binning"</span><span class="p">,</span>  <span class="c1"># Reuses GeneralBinningApplier.</span>
+        <span class="s2">"bin_edges"</span><span class="p">:</span> <span class="n">bin_edges_map</span><span class="p">,</span>
+    <span class="p">}</span>
+    <span class="n">artifact</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">_passthrough_artifact_options</span><span class="p">(</span><span class="n">config</span><span class="p">))</span>
+    <span class="k">return</span> <span class="n">cast</span><span class="p">(</span><span class="n">GeneralBinningArtifact</span><span class="p">,</span> <span class="n">artifact</span><span class="p">)</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="skyulf.preprocessing.bucketing.GeneralBinningApplier" class="doc doc-heading">
+            <code>GeneralBinningApplier</code>
+
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="BaseBinningApplier (skyulf.preprocessing.bucketing.BaseBinningApplier)" href="#skyulf.preprocessing.bucketing.BaseBinningApplier">BaseBinningApplier</a></code></p>
+
+
+
+        <p>Applier registered for the <code>GeneralBinning</code> node id.</p>
+<p>Empty subclass: every binning behaviour is inherited from
+:class:<code>BaseBinningApplier</code>. It exists as its own type so this node id
+registers against a distinct Applier class, and as the base for the
+<code>CustomBinning</code> and <code>KBinsDiscretizer</code> appliers.</p>
+
+
+
+
+
+
+
+
+              <details class="mkdocstrings-source">
+                <summary>Source code in <code>skyulf-core/skyulf/preprocessing/bucketing.py</code></summary>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">411</span>
+<span class="normal">412</span>
+<span class="normal">413</span>
+<span class="normal">414</span>
+<span class="normal">415</span>
+<span class="normal">416</span>
+<span class="normal">417</span>
+<span class="normal">418</span>
+<span class="normal">419</span>
+<span class="normal">420</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">GeneralBinningApplier</span><span class="p">(</span><span class="n">BaseBinningApplier</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Applier registered for the ``GeneralBinning`` node id.</span>
+
+<span class="sd">    Empty subclass: every binning behaviour is inherited from</span>
+<span class="sd">    :class:`BaseBinningApplier`. It exists as its own type so this node id</span>
+<span class="sd">    registers against a distinct Applier class, and as the base for the</span>
+<span class="sd">    ``CustomBinning`` and ``KBinsDiscretizer`` appliers.</span>
+<span class="sd">    """</span>
+
+    <span class="k">pass</span>
 </code></pre></div></td></tr></table></div>
               </details>
 
@@ -3403,23 +3821,7 @@ names to bin edges.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>skyulf-core/skyulf/preprocessing/bucketing.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">440</span>
-<span class="normal">441</span>
-<span class="normal">442</span>
-<span class="normal">443</span>
-<span class="normal">444</span>
-<span class="normal">445</span>
-<span class="normal">446</span>
-<span class="normal">447</span>
-<span class="normal">448</span>
-<span class="normal">449</span>
-<span class="normal">450</span>
-<span class="normal">451</span>
-<span class="normal">452</span>
-<span class="normal">453</span>
-<span class="normal">454</span>
-<span class="normal">455</span>
-<span class="normal">456</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">456</span>
 <span class="normal">457</span>
 <span class="normal">458</span>
 <span class="normal">459</span>
@@ -3442,7 +3844,32 @@ names to bin edges.</p>
 <span class="normal">476</span>
 <span class="normal">477</span>
 <span class="normal">478</span>
-<span class="normal">479</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">"GeneralBinning"</span><span class="p">,</span> <span class="n">GeneralBinningApplier</span><span class="p">)</span>
+<span class="normal">479</span>
+<span class="normal">480</span>
+<span class="normal">481</span>
+<span class="normal">482</span>
+<span class="normal">483</span>
+<span class="normal">484</span>
+<span class="normal">485</span>
+<span class="normal">486</span>
+<span class="normal">487</span>
+<span class="normal">488</span>
+<span class="normal">489</span>
+<span class="normal">490</span>
+<span class="normal">491</span>
+<span class="normal">492</span>
+<span class="normal">493</span>
+<span class="normal">494</span>
+<span class="normal">495</span>
+<span class="normal">496</span>
+<span class="normal">497</span>
+<span class="normal">498</span>
+<span class="normal">499</span>
+<span class="normal">500</span>
+<span class="normal">501</span>
+<span class="normal">502</span>
+<span class="normal">503</span>
+<span class="normal">504</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">"GeneralBinning"</span><span class="p">,</span> <span class="n">GeneralBinningApplier</span><span class="p">)</span>
 <span class="nd">@node_meta</span><span class="p">(</span>
     <span class="nb">id</span><span class="o">=</span><span class="s2">"GeneralBinning"</span><span class="p">,</span>
     <span class="n">name</span><span class="o">=</span><span class="s2">"General Binning"</span><span class="p">,</span>
@@ -3456,6 +3883,15 @@ names to bin edges.</p>
 
     <span class="nd">@fit_method</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">fit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">_y</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">GeneralBinningArtifact</span><span class="p">:</span>  <span class="c1"># pylint: disable=arguments-differ</span>
+<span class="w">        </span><span class="sd">"""Fit bin edges per column under each column's own strategy.</span>
+
+<span class="sd">        An explicitly empty ``columns`` list short-circuits to an empty artifact</span>
+<span class="sd">        (the user unchecked everything), whereas an absent one falls through to</span>
+<span class="sd">        :func:`detect_numeric_columns`. Only the selected columns are converted</span>
+<span class="sd">        to pandas, since the fits are ``pd.cut`` / ``pd.qcut`` / sklearn-bound.</span>
+<span class="sd">        Columns whose strategy cannot be fit are logged and skipped rather than</span>
+<span class="sd">        failing the node, so the artifact may cover fewer columns than requested.</span>
+<span class="sd">        """</span>
         <span class="k">if</span> <span class="n">user_picked_no_columns</span><span class="p">(</span><span class="n">config</span><span class="p">):</span>
             <span class="k">return</span> <span class="n">cast</span><span class="p">(</span><span class="n">GeneralBinningArtifact</span><span class="p">,</span> <span class="p">{})</span>
 
@@ -3482,6 +3918,176 @@ names to bin edges.</p>
         <span class="p">}</span>
         <span class="n">artifact</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">_passthrough_artifact_options</span><span class="p">(</span><span class="n">config</span><span class="p">))</span>
         <span class="k">return</span> <span class="n">cast</span><span class="p">(</span><span class="n">GeneralBinningArtifact</span><span class="p">,</span> <span class="n">artifact</span><span class="p">)</span>
+</code></pre></div></td></tr></table></div>
+              </details>
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="skyulf.preprocessing.bucketing.GeneralBinningCalculator.fit" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">fit</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">_y</span><span class="p">,</span> <span class="n">config</span><span class="p">)</span></code>
+
+</h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Fit bin edges per column under each column's own strategy.</p>
+<p>An explicitly empty <code>columns</code> list short-circuits to an empty artifact
+(the user unchecked everything), whereas an absent one falls through to
+:func:<code>detect_numeric_columns</code>. Only the selected columns are converted
+to pandas, since the fits are <code>pd.cut</code> / <code>pd.qcut</code> / sklearn-bound.
+Columns whose strategy cannot be fit are logged and skipped rather than
+failing the node, so the artifact may cover fewer columns than requested.</p>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>skyulf-core/skyulf/preprocessing/bucketing.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">468</span>
+<span class="normal">469</span>
+<span class="normal">470</span>
+<span class="normal">471</span>
+<span class="normal">472</span>
+<span class="normal">473</span>
+<span class="normal">474</span>
+<span class="normal">475</span>
+<span class="normal">476</span>
+<span class="normal">477</span>
+<span class="normal">478</span>
+<span class="normal">479</span>
+<span class="normal">480</span>
+<span class="normal">481</span>
+<span class="normal">482</span>
+<span class="normal">483</span>
+<span class="normal">484</span>
+<span class="normal">485</span>
+<span class="normal">486</span>
+<span class="normal">487</span>
+<span class="normal">488</span>
+<span class="normal">489</span>
+<span class="normal">490</span>
+<span class="normal">491</span>
+<span class="normal">492</span>
+<span class="normal">493</span>
+<span class="normal">494</span>
+<span class="normal">495</span>
+<span class="normal">496</span>
+<span class="normal">497</span>
+<span class="normal">498</span>
+<span class="normal">499</span>
+<span class="normal">500</span>
+<span class="normal">501</span>
+<span class="normal">502</span>
+<span class="normal">503</span>
+<span class="normal">504</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@fit_method</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">fit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">_y</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">GeneralBinningArtifact</span><span class="p">:</span>  <span class="c1"># pylint: disable=arguments-differ</span>
+<span class="w">    </span><span class="sd">"""Fit bin edges per column under each column's own strategy.</span>
+
+<span class="sd">    An explicitly empty ``columns`` list short-circuits to an empty artifact</span>
+<span class="sd">    (the user unchecked everything), whereas an absent one falls through to</span>
+<span class="sd">    :func:`detect_numeric_columns`. Only the selected columns are converted</span>
+<span class="sd">    to pandas, since the fits are ``pd.cut`` / ``pd.qcut`` / sklearn-bound.</span>
+<span class="sd">    Columns whose strategy cannot be fit are logged and skipped rather than</span>
+<span class="sd">    failing the node, so the artifact may cover fewer columns than requested.</span>
+<span class="sd">    """</span>
+    <span class="k">if</span> <span class="n">user_picked_no_columns</span><span class="p">(</span><span class="n">config</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">cast</span><span class="p">(</span><span class="n">GeneralBinningArtifact</span><span class="p">,</span> <span class="p">{})</span>
+
+    <span class="n">X</span><span class="p">,</span> <span class="n">columns</span> <span class="o">=</span> <span class="n">resolve_columns_then_to_pandas</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">config</span><span class="p">,</span> <span class="n">detect_numeric_columns</span><span class="p">)</span>
+
+    <span class="n">defaults</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s2">"default_n_bins"</span><span class="p">:</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"n_bins"</span><span class="p">,</span> <span class="mi">5</span><span class="p">),</span>
+        <span class="s2">"n_bins"</span><span class="p">:</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"equal_width_bins"</span><span class="p">,</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"n_bins"</span><span class="p">,</span> <span class="mi">5</span><span class="p">)),</span>
+        <span class="s2">"q_bins"</span><span class="p">:</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"equal_frequency_bins"</span><span class="p">,</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"n_bins"</span><span class="p">,</span> <span class="mi">5</span><span class="p">)),</span>
+        <span class="s2">"duplicates"</span><span class="p">:</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"duplicates"</span><span class="p">,</span> <span class="s2">"drop"</span><span class="p">),</span>
+    <span class="p">}</span>
+
+    <span class="n">valid_cols</span> <span class="o">=</span> <span class="p">[</span><span class="n">c</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">columns</span> <span class="k">if</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">X</span><span class="o">.</span><span class="n">columns</span><span class="p">]</span>
+    <span class="n">bin_edges_map</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">list</span><span class="p">[</span><span class="nb">float</span><span class="p">]]</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="n">custom_labels_map</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+
+    <span class="k">for</span> <span class="n">col</span> <span class="ow">in</span> <span class="n">valid_cols</span><span class="p">:</span>
+        <span class="n">_fit_one_column_into_maps</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">col</span><span class="p">,</span> <span class="n">config</span><span class="p">,</span> <span class="n">defaults</span><span class="p">,</span> <span class="n">bin_edges_map</span><span class="p">,</span> <span class="n">custom_labels_map</span><span class="p">)</span>
+
+    <span class="n">artifact</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s2">"type"</span><span class="p">:</span> <span class="s2">"general_binning"</span><span class="p">,</span>
+        <span class="s2">"bin_edges"</span><span class="p">:</span> <span class="n">bin_edges_map</span><span class="p">,</span>
+        <span class="s2">"custom_labels"</span><span class="p">:</span> <span class="n">custom_labels_map</span><span class="p">,</span>
+    <span class="p">}</span>
+    <span class="n">artifact</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">_passthrough_artifact_options</span><span class="p">(</span><span class="n">config</span><span class="p">))</span>
+    <span class="k">return</span> <span class="n">cast</span><span class="p">(</span><span class="n">GeneralBinningArtifact</span><span class="p">,</span> <span class="n">artifact</span><span class="p">)</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="skyulf.preprocessing.bucketing.KBinsDiscretizerApplier" class="doc doc-heading">
+            <code>KBinsDiscretizerApplier</code>
+
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="GeneralBinningApplier (skyulf.preprocessing.bucketing.GeneralBinningApplier)" href="#skyulf.preprocessing.bucketing.GeneralBinningApplier">GeneralBinningApplier</a></code></p>
+
+
+
+        <p>Applier registered for the <code>KBinsDiscretizer</code> node id.</p>
+<p>Empty subclass — sklearn only picks the edges at fit time; applying them is
+the same cut as for any other binning node.</p>
+
+
+
+
+
+
+
+
+              <details class="mkdocstrings-source">
+                <summary>Source code in <code>skyulf-core/skyulf/preprocessing/bucketing.py</code></summary>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">561</span>
+<span class="normal">562</span>
+<span class="normal">563</span>
+<span class="normal">564</span>
+<span class="normal">565</span>
+<span class="normal">566</span>
+<span class="normal">567</span>
+<span class="normal">568</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">KBinsDiscretizerApplier</span><span class="p">(</span><span class="n">GeneralBinningApplier</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Applier registered for the ``KBinsDiscretizer`` node id.</span>
+
+<span class="sd">    Empty subclass — sklearn only picks the edges at fit time; applying them is</span>
+<span class="sd">    the same cut as for any other binning node.</span>
+<span class="sd">    """</span>
+
+    <span class="k">pass</span>
 </code></pre></div></td></tr></table></div>
               </details>
 
@@ -3534,30 +4140,40 @@ names to bin edges.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>skyulf-core/skyulf/preprocessing/bucketing.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">525</span>
-<span class="normal">526</span>
-<span class="normal">527</span>
-<span class="normal">528</span>
-<span class="normal">529</span>
-<span class="normal">530</span>
-<span class="normal">531</span>
-<span class="normal">532</span>
-<span class="normal">533</span>
-<span class="normal">534</span>
-<span class="normal">535</span>
-<span class="normal">536</span>
-<span class="normal">537</span>
-<span class="normal">538</span>
-<span class="normal">539</span>
-<span class="normal">540</span>
-<span class="normal">541</span>
-<span class="normal">542</span>
-<span class="normal">543</span>
-<span class="normal">544</span>
-<span class="normal">545</span>
-<span class="normal">546</span>
-<span class="normal">547</span>
-<span class="normal">548</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">"KBinsDiscretizer"</span><span class="p">,</span> <span class="n">KBinsDiscretizerApplier</span><span class="p">)</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">571</span>
+<span class="normal">572</span>
+<span class="normal">573</span>
+<span class="normal">574</span>
+<span class="normal">575</span>
+<span class="normal">576</span>
+<span class="normal">577</span>
+<span class="normal">578</span>
+<span class="normal">579</span>
+<span class="normal">580</span>
+<span class="normal">581</span>
+<span class="normal">582</span>
+<span class="normal">583</span>
+<span class="normal">584</span>
+<span class="normal">585</span>
+<span class="normal">586</span>
+<span class="normal">587</span>
+<span class="normal">588</span>
+<span class="normal">589</span>
+<span class="normal">590</span>
+<span class="normal">591</span>
+<span class="normal">592</span>
+<span class="normal">593</span>
+<span class="normal">594</span>
+<span class="normal">595</span>
+<span class="normal">596</span>
+<span class="normal">597</span>
+<span class="normal">598</span>
+<span class="normal">599</span>
+<span class="normal">600</span>
+<span class="normal">601</span>
+<span class="normal">602</span>
+<span class="normal">603</span>
+<span class="normal">604</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">"KBinsDiscretizer"</span><span class="p">,</span> <span class="n">KBinsDiscretizerApplier</span><span class="p">)</span>
 <span class="nd">@node_meta</span><span class="p">(</span>
     <span class="nb">id</span><span class="o">=</span><span class="s2">"KBinsDiscretizer"</span><span class="p">,</span>
     <span class="n">name</span><span class="o">=</span><span class="s2">"K-Bins Discretizer"</span><span class="p">,</span>
@@ -3574,6 +4190,16 @@ names to bin edges.</p>
         <span class="n">df</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span> <span class="o">|</span> <span class="n">SkyulfDataFrame</span> <span class="o">|</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span> <span class="o">|</span> <span class="n">Any</span><span class="p">,</span>
         <span class="n">config</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">GeneralBinningArtifact</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Translate this node's public params onto GeneralBinning's internal names, then delegate.</span>
+
+<span class="sd">        On a copy of *config* (the caller's dict is never mutated) it forces</span>
+<span class="sd">        ``strategy="kbins"``, moves ``n_bins`` to ``kbins_n_bins``, and preserves</span>
+<span class="sd">        a user-chosen non-``kbins`` ``strategy`` as ``kbins_strategy`` so</span>
+<span class="sd">        ``quantile`` / ``uniform`` / ``kmeans`` still reach sklearn. Written with</span>
+<span class="sd">        the raw ``(df, config)`` signature rather than ``@fit_method`` because it</span>
+<span class="sd">        only rewrites config and forwards — the parent's decorated ``fit`` does</span>
+<span class="sd">        the ``(X, y)`` unpack.</span>
+<span class="sd">        """</span>
         <span class="n">new_config</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
         <span class="n">new_config</span><span class="p">[</span><span class="s2">"strategy"</span><span class="p">]</span> <span class="o">=</span> <span class="s2">"kbins"</span>
         <span class="k">if</span> <span class="s2">"n_bins"</span> <span class="ow">in</span> <span class="n">config</span><span class="p">:</span>
@@ -3596,6 +4222,78 @@ names to bin edges.</p>
 
 
 
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="skyulf.preprocessing.bucketing.KBinsDiscretizerCalculator.fit" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">fit</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">config</span><span class="p">)</span></code>
+
+</h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Translate this node's public params onto GeneralBinning's internal names, then delegate.</p>
+<p>On a copy of <em>config</em> (the caller's dict is never mutated) it forces
+<code>strategy="kbins"</code>, moves <code>n_bins</code> to <code>kbins_n_bins</code>, and preserves
+a user-chosen non-<code>kbins</code> <code>strategy</code> as <code>kbins_strategy</code> so
+<code>quantile</code> / <code>uniform</code> / <code>kmeans</code> still reach sklearn. Written with
+the raw <code>(df, config)</code> signature rather than <code>@fit_method</code> because it
+only rewrites config and forwards — the parent's decorated <code>fit</code> does
+the <code>(X, y)</code> unpack.</p>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>skyulf-core/skyulf/preprocessing/bucketing.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">583</span>
+<span class="normal">584</span>
+<span class="normal">585</span>
+<span class="normal">586</span>
+<span class="normal">587</span>
+<span class="normal">588</span>
+<span class="normal">589</span>
+<span class="normal">590</span>
+<span class="normal">591</span>
+<span class="normal">592</span>
+<span class="normal">593</span>
+<span class="normal">594</span>
+<span class="normal">595</span>
+<span class="normal">596</span>
+<span class="normal">597</span>
+<span class="normal">598</span>
+<span class="normal">599</span>
+<span class="normal">600</span>
+<span class="normal">601</span>
+<span class="normal">602</span>
+<span class="normal">603</span>
+<span class="normal">604</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">fit</span><span class="p">(</span>  <span class="c1"># pylint: disable=arguments-differ</span>
+    <span class="bp">self</span><span class="p">,</span>
+    <span class="n">df</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span> <span class="o">|</span> <span class="n">SkyulfDataFrame</span> <span class="o">|</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span> <span class="o">|</span> <span class="n">Any</span><span class="p">,</span>
+    <span class="n">config</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">GeneralBinningArtifact</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Translate this node's public params onto GeneralBinning's internal names, then delegate.</span>
+
+<span class="sd">    On a copy of *config* (the caller's dict is never mutated) it forces</span>
+<span class="sd">    ``strategy="kbins"``, moves ``n_bins`` to ``kbins_n_bins``, and preserves</span>
+<span class="sd">    a user-chosen non-``kbins`` ``strategy`` as ``kbins_strategy`` so</span>
+<span class="sd">    ``quantile`` / ``uniform`` / ``kmeans`` still reach sklearn. Written with</span>
+<span class="sd">    the raw ``(df, config)`` signature rather than ``@fit_method`` because it</span>
+<span class="sd">    only rewrites config and forwards — the parent's decorated ``fit`` does</span>
+<span class="sd">    the ``(X, y)`` unpack.</span>
+<span class="sd">    """</span>
+    <span class="n">new_config</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+    <span class="n">new_config</span><span class="p">[</span><span class="s2">"strategy"</span><span class="p">]</span> <span class="o">=</span> <span class="s2">"kbins"</span>
+    <span class="k">if</span> <span class="s2">"n_bins"</span> <span class="ow">in</span> <span class="n">config</span><span class="p">:</span>
+        <span class="n">new_config</span><span class="p">[</span><span class="s2">"kbins_n_bins"</span><span class="p">]</span> <span class="o">=</span> <span class="n">config</span><span class="p">[</span><span class="s2">"n_bins"</span><span class="p">]</span>
+    <span class="k">if</span> <span class="s2">"strategy"</span> <span class="ow">in</span> <span class="n">config</span> <span class="ow">and</span> <span class="n">config</span><span class="p">[</span><span class="s2">"strategy"</span><span class="p">]</span> <span class="o">!=</span> <span class="s2">"kbins"</span><span class="p">:</span>
+        <span class="n">new_config</span><span class="p">[</span><span class="s2">"kbins_strategy"</span><span class="p">]</span> <span class="o">=</span> <span class="n">config</span><span class="p">[</span><span class="s2">"strategy"</span><span class="p">]</span>
+    <span class="k">return</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">new_config</span><span class="p">)</span>  <span class="c1"># pylint: disable=no-value-for-parameter</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
 
 
 

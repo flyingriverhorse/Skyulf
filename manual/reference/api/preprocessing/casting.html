@@ -2666,6 +2666,79 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="casting">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#skyulf.preprocessing.casting.CastingApplier" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CastingApplier
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="CastingApplier">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#skyulf.preprocessing.casting.CastingApplier.apply" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        apply
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#skyulf.preprocessing.casting.CastingCalculator" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CastingCalculator
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="CastingCalculator">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#skyulf.preprocessing.casting.CastingCalculator.fit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        fit
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#skyulf.preprocessing.casting.CastingCalculator.infer_output_schema" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        infer_output_schema
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
     </ul>
@@ -3128,6 +3201,485 @@ split per dtype family (<code>float / int / bool / datetime / other</code>).</p>
 
 
 
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="skyulf.preprocessing.casting.CastingApplier" class="doc doc-heading">
+            <code>CastingApplier</code>
+
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="BaseApplier (skyulf.preprocessing.base.BaseApplier)" href="base.html#skyulf.preprocessing.base.BaseApplier">BaseApplier</a></code></p>
+
+
+
+        <p>Cast each column named in <code>type_map</code> to its target dtype on the active engine.</p>
+<p><code>coerce_on_error=True</code> (the default) is best-effort per column: the pandas
+path swallows any cast failure and leaves that column untouched, the polars
+path casts with <code>strict=False</code>. With it off, both engines raise. The
+awkward families are hand-written on each path because the native casts
+disagree — polars truncates fractional floats where pandas masks them, and
+pandas' <code>astype</code> clamps out-of-range integers where polars nulls or raises.
+Boolean targets additionally go through the shared alias table so
+"yes"/"no"-style strings coerce the same way on both engines in best-effort
+mode. Columns missing from the frame are skipped.</p>
+
+
+
+
+
+
+
+
+              <details class="mkdocstrings-source">
+                <summary>Source code in <code>skyulf-core/skyulf/preprocessing/casting.py</code></summary>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">402</span>
+<span class="normal">403</span>
+<span class="normal">404</span>
+<span class="normal">405</span>
+<span class="normal">406</span>
+<span class="normal">407</span>
+<span class="normal">408</span>
+<span class="normal">409</span>
+<span class="normal">410</span>
+<span class="normal">411</span>
+<span class="normal">412</span>
+<span class="normal">413</span>
+<span class="normal">414</span>
+<span class="normal">415</span>
+<span class="normal">416</span>
+<span class="normal">417</span>
+<span class="normal">418</span>
+<span class="normal">419</span>
+<span class="normal">420</span>
+<span class="normal">421</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">CastingApplier</span><span class="p">(</span><span class="n">BaseApplier</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Cast each column named in ``type_map`` to its target dtype on the active engine.</span>
+
+<span class="sd">    ``coerce_on_error=True`` (the default) is best-effort per column: the pandas</span>
+<span class="sd">    path swallows any cast failure and leaves that column untouched, the polars</span>
+<span class="sd">    path casts with ``strict=False``. With it off, both engines raise. The</span>
+<span class="sd">    awkward families are hand-written on each path because the native casts</span>
+<span class="sd">    disagree — polars truncates fractional floats where pandas masks them, and</span>
+<span class="sd">    pandas' ``astype`` clamps out-of-range integers where polars nulls or raises.</span>
+<span class="sd">    Boolean targets additionally go through the shared alias table so</span>
+<span class="sd">    "yes"/"no"-style strings coerce the same way on both engines in best-effort</span>
+<span class="sd">    mode. Columns missing from the frame are skipped.</span>
+<span class="sd">    """</span>
+
+    <span class="nd">@apply_method</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">apply</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">_y</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">params</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>  <span class="c1"># pylint: disable=arguments-differ</span>
+<span class="w">        </span><span class="sd">"""Dispatch through the mapping-keyed dual-engine path; ``y`` passes through."""</span>
+        <span class="k">return</span> <span class="n">apply_dual_engine</span><span class="p">(</span>
+            <span class="n">X</span><span class="p">,</span> <span class="n">params</span><span class="p">,</span> <span class="p">{</span><span class="s2">"polars"</span><span class="p">:</span> <span class="n">_casting_apply_polars</span><span class="p">,</span> <span class="s2">"pandas"</span><span class="p">:</span> <span class="n">_casting_apply_pandas</span><span class="p">}</span>
+        <span class="p">)</span>
+</code></pre></div></td></tr></table></div>
+              </details>
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="skyulf.preprocessing.casting.CastingApplier.apply" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">apply</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">_y</span><span class="p">,</span> <span class="n">params</span><span class="p">)</span></code>
+
+</h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Dispatch through the mapping-keyed dual-engine path; <code>y</code> passes through.</p>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>skyulf-core/skyulf/preprocessing/casting.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">416</span>
+<span class="normal">417</span>
+<span class="normal">418</span>
+<span class="normal">419</span>
+<span class="normal">420</span>
+<span class="normal">421</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@apply_method</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">apply</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">_y</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">params</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>  <span class="c1"># pylint: disable=arguments-differ</span>
+<span class="w">    </span><span class="sd">"""Dispatch through the mapping-keyed dual-engine path; ``y`` passes through."""</span>
+    <span class="k">return</span> <span class="n">apply_dual_engine</span><span class="p">(</span>
+        <span class="n">X</span><span class="p">,</span> <span class="n">params</span><span class="p">,</span> <span class="p">{</span><span class="s2">"polars"</span><span class="p">:</span> <span class="n">_casting_apply_polars</span><span class="p">,</span> <span class="s2">"pandas"</span><span class="p">:</span> <span class="n">_casting_apply_pandas</span><span class="p">}</span>
+    <span class="p">)</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="skyulf.preprocessing.casting.CastingCalculator" class="doc doc-heading">
+            <code>CastingCalculator</code>
+
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="BaseCalculator (skyulf.preprocessing.base.BaseCalculator)" href="base.html#skyulf.preprocessing.base.BaseCalculator">BaseCalculator</a></code></p>
+
+
+
+        <p>Normalise either accepted config shape into one canonical <code>type_map</code>.</p>
+<p>Purely config-driven (<code>learns_from_data=False</code>): nothing is read from the
+data beyond column presence, and dtype aliases are resolved through
+<code>TYPE_ALIASES</code> so the applier only ever sees canonical labels.</p>
+
+
+
+
+
+
+
+
+              <details class="mkdocstrings-source">
+                <summary>Source code in <code>skyulf-core/skyulf/preprocessing/casting.py</code></summary>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">424</span>
+<span class="normal">425</span>
+<span class="normal">426</span>
+<span class="normal">427</span>
+<span class="normal">428</span>
+<span class="normal">429</span>
+<span class="normal">430</span>
+<span class="normal">431</span>
+<span class="normal">432</span>
+<span class="normal">433</span>
+<span class="normal">434</span>
+<span class="normal">435</span>
+<span class="normal">436</span>
+<span class="normal">437</span>
+<span class="normal">438</span>
+<span class="normal">439</span>
+<span class="normal">440</span>
+<span class="normal">441</span>
+<span class="normal">442</span>
+<span class="normal">443</span>
+<span class="normal">444</span>
+<span class="normal">445</span>
+<span class="normal">446</span>
+<span class="normal">447</span>
+<span class="normal">448</span>
+<span class="normal">449</span>
+<span class="normal">450</span>
+<span class="normal">451</span>
+<span class="normal">452</span>
+<span class="normal">453</span>
+<span class="normal">454</span>
+<span class="normal">455</span>
+<span class="normal">456</span>
+<span class="normal">457</span>
+<span class="normal">458</span>
+<span class="normal">459</span>
+<span class="normal">460</span>
+<span class="normal">461</span>
+<span class="normal">462</span>
+<span class="normal">463</span>
+<span class="normal">464</span>
+<span class="normal">465</span>
+<span class="normal">466</span>
+<span class="normal">467</span>
+<span class="normal">468</span>
+<span class="normal">469</span>
+<span class="normal">470</span>
+<span class="normal">471</span>
+<span class="normal">472</span>
+<span class="normal">473</span>
+<span class="normal">474</span>
+<span class="normal">475</span>
+<span class="normal">476</span>
+<span class="normal">477</span>
+<span class="normal">478</span>
+<span class="normal">479</span>
+<span class="normal">480</span>
+<span class="normal">481</span>
+<span class="normal">482</span>
+<span class="normal">483</span>
+<span class="normal">484</span>
+<span class="normal">485</span>
+<span class="normal">486</span>
+<span class="normal">487</span>
+<span class="normal">488</span>
+<span class="normal">489</span>
+<span class="normal">490</span>
+<span class="normal">491</span>
+<span class="normal">492</span>
+<span class="normal">493</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">"Casting"</span><span class="p">,</span> <span class="n">CastingApplier</span><span class="p">)</span>
+<span class="nd">@node_meta</span><span class="p">(</span>
+    <span class="nb">id</span><span class="o">=</span><span class="s2">"Casting"</span><span class="p">,</span>
+    <span class="n">name</span><span class="o">=</span><span class="s2">"Type Casting"</span><span class="p">,</span>
+    <span class="n">category</span><span class="o">=</span><span class="s2">"Data Operations"</span><span class="p">,</span>
+    <span class="n">description</span><span class="o">=</span><span class="s2">"Cast columns to specific data types."</span><span class="p">,</span>
+    <span class="n">params</span><span class="o">=</span><span class="p">{</span><span class="s2">"type_map"</span><span class="p">:</span> <span class="p">{},</span> <span class="s2">"coerce_on_error"</span><span class="p">:</span> <span class="kc">True</span><span class="p">},</span>
+    <span class="n">learns_from_data</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">CastingCalculator</span><span class="p">(</span><span class="n">BaseCalculator</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Normalise either accepted config shape into one canonical ``type_map``.</span>
+
+<span class="sd">    Purely config-driven (``learns_from_data=False``): nothing is read from the</span>
+<span class="sd">    data beyond column presence, and dtype aliases are resolved through</span>
+<span class="sd">    ``TYPE_ALIASES`` so the applier only ever sees canonical labels.</span>
+<span class="sd">    """</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">infer_output_schema</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">input_schema</span><span class="p">:</span> <span class="n">SkyulfSchema</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">SkyulfSchema</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Rewrite the dtype labels of ``input_schema`` for every column the config targets.</span>
+
+<span class="sd">        Unlike :meth:`fit`, this cannot check column presence against a frame, so</span>
+<span class="sd">        requested dtypes are applied unconditionally — a config naming an absent</span>
+<span class="sd">        column predicts a schema that apply will not actually produce.</span>
+<span class="sd">        """</span>
+        <span class="c1"># Casting preserves the column set but rewrites dtype labels.</span>
+        <span class="n">column_types</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"column_types"</span><span class="p">,</span> <span class="p">{})</span> <span class="ow">or</span> <span class="p">{})</span>
+        <span class="n">target_type</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"target_type"</span><span class="p">)</span>
+        <span class="n">columns</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"columns"</span><span class="p">,</span> <span class="p">[])</span> <span class="ow">or</span> <span class="p">[]</span>
+        <span class="k">if</span> <span class="n">target_type</span> <span class="ow">and</span> <span class="n">columns</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">col</span> <span class="ow">in</span> <span class="n">columns</span><span class="p">:</span>
+                <span class="n">column_types</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="n">col</span><span class="p">,</span> <span class="n">target_type</span><span class="p">)</span>
+        <span class="n">new_schema</span> <span class="o">=</span> <span class="n">input_schema</span>
+        <span class="k">for</span> <span class="n">col</span><span class="p">,</span> <span class="n">dtype</span> <span class="ow">in</span> <span class="n">column_types</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="n">resolved</span> <span class="o">=</span> <span class="n">TYPE_ALIASES</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">dtype</span><span class="p">)</span><span class="o">.</span><span class="n">lower</span><span class="p">(),</span> <span class="nb">str</span><span class="p">(</span><span class="n">dtype</span><span class="p">))</span>
+            <span class="n">new_schema</span> <span class="o">=</span> <span class="n">new_schema</span><span class="o">.</span><span class="n">with_dtype</span><span class="p">(</span><span class="n">col</span><span class="p">,</span> <span class="n">resolved</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">new_schema</span>
+
+    <span class="nd">@fit_method</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">fit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">_y</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">CastingArtifact</span><span class="p">:</span>  <span class="c1"># pylint: disable=arguments-differ</span>
+<span class="w">        </span><span class="sd">"""Merge the two config shapes into a ``type_map`` of columns present on *X*.</span>
+
+<span class="sd">        Absent columns are dropped rather than erroring, so a config written</span>
+<span class="sd">        against a wider frame degrades to a partial cast; when both shapes name</span>
+<span class="sd">        the same column, ``target_type`` overwrites the ``column_types`` entry.</span>
+<span class="sd">        """</span>
+        <span class="c1"># Config supports two shapes:</span>
+        <span class="c1">#   {'columns': ['col1'], 'target_type': 'float'}</span>
+        <span class="c1">#   {'column_types': {'col1': 'float', 'col2': 'int'}}</span>
+        <span class="n">target_type</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"target_type"</span><span class="p">)</span>
+        <span class="n">columns</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"columns"</span><span class="p">,</span> <span class="p">[])</span>
+        <span class="n">column_types</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"column_types"</span><span class="p">,</span> <span class="p">{})</span>
+
+        <span class="n">final_map</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">for</span> <span class="n">col</span><span class="p">,</span> <span class="n">dtype</span> <span class="ow">in</span> <span class="n">column_types</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="k">if</span> <span class="n">col</span> <span class="ow">in</span> <span class="n">X</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+                <span class="n">final_map</span><span class="p">[</span><span class="n">col</span><span class="p">]</span> <span class="o">=</span> <span class="n">TYPE_ALIASES</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">dtype</span><span class="p">)</span><span class="o">.</span><span class="n">lower</span><span class="p">(),</span> <span class="n">dtype</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">target_type</span> <span class="ow">and</span> <span class="n">columns</span><span class="p">:</span>
+            <span class="n">resolved_type</span> <span class="o">=</span> <span class="n">TYPE_ALIASES</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">target_type</span><span class="p">)</span><span class="o">.</span><span class="n">lower</span><span class="p">(),</span> <span class="n">target_type</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">col</span> <span class="ow">in</span> <span class="n">columns</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">col</span> <span class="ow">in</span> <span class="n">X</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+                    <span class="n">final_map</span><span class="p">[</span><span class="n">col</span><span class="p">]</span> <span class="o">=</span> <span class="n">resolved_type</span>
+
+        <span class="k">return</span> <span class="p">{</span>
+            <span class="s2">"type"</span><span class="p">:</span> <span class="s2">"casting"</span><span class="p">,</span>
+            <span class="s2">"type_map"</span><span class="p">:</span> <span class="n">final_map</span><span class="p">,</span>
+            <span class="s2">"coerce_on_error"</span><span class="p">:</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"coerce_on_error"</span><span class="p">,</span> <span class="kc">True</span><span class="p">),</span>
+        <span class="p">}</span>
+</code></pre></div></td></tr></table></div>
+              </details>
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="skyulf.preprocessing.casting.CastingCalculator.fit" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">fit</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">_y</span><span class="p">,</span> <span class="n">config</span><span class="p">)</span></code>
+
+</h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Merge the two config shapes into a <code>type_map</code> of columns present on <em>X</em>.</p>
+<p>Absent columns are dropped rather than erroring, so a config written
+against a wider frame degrades to a partial cast; when both shapes name
+the same column, <code>target_type</code> overwrites the <code>column_types</code> entry.</p>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>skyulf-core/skyulf/preprocessing/casting.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">463</span>
+<span class="normal">464</span>
+<span class="normal">465</span>
+<span class="normal">466</span>
+<span class="normal">467</span>
+<span class="normal">468</span>
+<span class="normal">469</span>
+<span class="normal">470</span>
+<span class="normal">471</span>
+<span class="normal">472</span>
+<span class="normal">473</span>
+<span class="normal">474</span>
+<span class="normal">475</span>
+<span class="normal">476</span>
+<span class="normal">477</span>
+<span class="normal">478</span>
+<span class="normal">479</span>
+<span class="normal">480</span>
+<span class="normal">481</span>
+<span class="normal">482</span>
+<span class="normal">483</span>
+<span class="normal">484</span>
+<span class="normal">485</span>
+<span class="normal">486</span>
+<span class="normal">487</span>
+<span class="normal">488</span>
+<span class="normal">489</span>
+<span class="normal">490</span>
+<span class="normal">491</span>
+<span class="normal">492</span>
+<span class="normal">493</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@fit_method</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">fit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">_y</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">CastingArtifact</span><span class="p">:</span>  <span class="c1"># pylint: disable=arguments-differ</span>
+<span class="w">    </span><span class="sd">"""Merge the two config shapes into a ``type_map`` of columns present on *X*.</span>
+
+<span class="sd">    Absent columns are dropped rather than erroring, so a config written</span>
+<span class="sd">    against a wider frame degrades to a partial cast; when both shapes name</span>
+<span class="sd">    the same column, ``target_type`` overwrites the ``column_types`` entry.</span>
+<span class="sd">    """</span>
+    <span class="c1"># Config supports two shapes:</span>
+    <span class="c1">#   {'columns': ['col1'], 'target_type': 'float'}</span>
+    <span class="c1">#   {'column_types': {'col1': 'float', 'col2': 'int'}}</span>
+    <span class="n">target_type</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"target_type"</span><span class="p">)</span>
+    <span class="n">columns</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"columns"</span><span class="p">,</span> <span class="p">[])</span>
+    <span class="n">column_types</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"column_types"</span><span class="p">,</span> <span class="p">{})</span>
+
+    <span class="n">final_map</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="k">for</span> <span class="n">col</span><span class="p">,</span> <span class="n">dtype</span> <span class="ow">in</span> <span class="n">column_types</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="k">if</span> <span class="n">col</span> <span class="ow">in</span> <span class="n">X</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+            <span class="n">final_map</span><span class="p">[</span><span class="n">col</span><span class="p">]</span> <span class="o">=</span> <span class="n">TYPE_ALIASES</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">dtype</span><span class="p">)</span><span class="o">.</span><span class="n">lower</span><span class="p">(),</span> <span class="n">dtype</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">target_type</span> <span class="ow">and</span> <span class="n">columns</span><span class="p">:</span>
+        <span class="n">resolved_type</span> <span class="o">=</span> <span class="n">TYPE_ALIASES</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">target_type</span><span class="p">)</span><span class="o">.</span><span class="n">lower</span><span class="p">(),</span> <span class="n">target_type</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">col</span> <span class="ow">in</span> <span class="n">columns</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">col</span> <span class="ow">in</span> <span class="n">X</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+                <span class="n">final_map</span><span class="p">[</span><span class="n">col</span><span class="p">]</span> <span class="o">=</span> <span class="n">resolved_type</span>
+
+    <span class="k">return</span> <span class="p">{</span>
+        <span class="s2">"type"</span><span class="p">:</span> <span class="s2">"casting"</span><span class="p">,</span>
+        <span class="s2">"type_map"</span><span class="p">:</span> <span class="n">final_map</span><span class="p">,</span>
+        <span class="s2">"coerce_on_error"</span><span class="p">:</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"coerce_on_error"</span><span class="p">,</span> <span class="kc">True</span><span class="p">),</span>
+    <span class="p">}</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="skyulf.preprocessing.casting.CastingCalculator.infer_output_schema" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">infer_output_schema</span><span class="p">(</span><span class="n">input_schema</span><span class="p">,</span> <span class="n">config</span><span class="p">)</span></code>
+
+</h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Rewrite the dtype labels of <code>input_schema</code> for every column the config targets.</p>
+<p>Unlike :meth:<code>fit</code>, this cannot check column presence against a frame, so
+requested dtypes are applied unconditionally — a config naming an absent
+column predicts a schema that apply will not actually produce.</p>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>skyulf-core/skyulf/preprocessing/casting.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">441</span>
+<span class="normal">442</span>
+<span class="normal">443</span>
+<span class="normal">444</span>
+<span class="normal">445</span>
+<span class="normal">446</span>
+<span class="normal">447</span>
+<span class="normal">448</span>
+<span class="normal">449</span>
+<span class="normal">450</span>
+<span class="normal">451</span>
+<span class="normal">452</span>
+<span class="normal">453</span>
+<span class="normal">454</span>
+<span class="normal">455</span>
+<span class="normal">456</span>
+<span class="normal">457</span>
+<span class="normal">458</span>
+<span class="normal">459</span>
+<span class="normal">460</span>
+<span class="normal">461</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">infer_output_schema</span><span class="p">(</span>
+    <span class="bp">self</span><span class="p">,</span> <span class="n">input_schema</span><span class="p">:</span> <span class="n">SkyulfSchema</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">SkyulfSchema</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Rewrite the dtype labels of ``input_schema`` for every column the config targets.</span>
+
+<span class="sd">    Unlike :meth:`fit`, this cannot check column presence against a frame, so</span>
+<span class="sd">    requested dtypes are applied unconditionally — a config naming an absent</span>
+<span class="sd">    column predicts a schema that apply will not actually produce.</span>
+<span class="sd">    """</span>
+    <span class="c1"># Casting preserves the column set but rewrites dtype labels.</span>
+    <span class="n">column_types</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"column_types"</span><span class="p">,</span> <span class="p">{})</span> <span class="ow">or</span> <span class="p">{})</span>
+    <span class="n">target_type</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"target_type"</span><span class="p">)</span>
+    <span class="n">columns</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"columns"</span><span class="p">,</span> <span class="p">[])</span> <span class="ow">or</span> <span class="p">[]</span>
+    <span class="k">if</span> <span class="n">target_type</span> <span class="ow">and</span> <span class="n">columns</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">col</span> <span class="ow">in</span> <span class="n">columns</span><span class="p">:</span>
+            <span class="n">column_types</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="n">col</span><span class="p">,</span> <span class="n">target_type</span><span class="p">)</span>
+    <span class="n">new_schema</span> <span class="o">=</span> <span class="n">input_schema</span>
+    <span class="k">for</span> <span class="n">col</span><span class="p">,</span> <span class="n">dtype</span> <span class="ow">in</span> <span class="n">column_types</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="n">resolved</span> <span class="o">=</span> <span class="n">TYPE_ALIASES</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">dtype</span><span class="p">)</span><span class="o">.</span><span class="n">lower</span><span class="p">(),</span> <span class="nb">str</span><span class="p">(</span><span class="n">dtype</span><span class="p">))</span>
+        <span class="n">new_schema</span> <span class="o">=</span> <span class="n">new_schema</span><span class="o">.</span><span class="n">with_dtype</span><span class="p">(</span><span class="n">col</span><span class="p">,</span> <span class="n">resolved</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">new_schema</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
 
 
 

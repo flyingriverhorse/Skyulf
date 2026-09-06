@@ -2750,6 +2750,146 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="resampling">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#skyulf.preprocessing.resampling.OversamplingApplier" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        OversamplingApplier
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="OversamplingApplier">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#skyulf.preprocessing.resampling.OversamplingApplier.apply" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        apply
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#skyulf.preprocessing.resampling.OversamplingCalculator" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        OversamplingCalculator
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="OversamplingCalculator">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#skyulf.preprocessing.resampling.OversamplingCalculator.fit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        fit
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#skyulf.preprocessing.resampling.OversamplingCalculator.infer_output_schema" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        infer_output_schema
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#skyulf.preprocessing.resampling.UndersamplingApplier" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        UndersamplingApplier
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="UndersamplingApplier">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#skyulf.preprocessing.resampling.UndersamplingApplier.apply" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        apply
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#skyulf.preprocessing.resampling.UndersamplingCalculator" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        UndersamplingCalculator
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="UndersamplingCalculator">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#skyulf.preprocessing.resampling.UndersamplingCalculator.fit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        fit
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#skyulf.preprocessing.resampling.UndersamplingCalculator.infer_output_schema" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        infer_output_schema
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
     </ul>
@@ -3130,6 +3270,913 @@ stays at low CCN.</p>
 
 
 
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="skyulf.preprocessing.resampling.OversamplingApplier" class="doc doc-heading">
+            <code>OversamplingApplier</code>
+
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="BaseApplier (skyulf.preprocessing.base.BaseApplier)" href="base.html#skyulf.preprocessing.base.BaseApplier">BaseApplier</a></code></p>
+
+
+
+        <p>Grow the minority classes with the imblearn over-sampler named in the artifact.</p>
+<p>Sees the training split only: :mod:<code>.pipeline</code> excludes the resampling nodes
+from <code>apply_on_test</code>/<code>apply_on_validation</code>, so synthetic rows can never
+reach a held-out split and inflate its metrics.</p>
+
+
+
+
+
+
+
+
+              <details class="mkdocstrings-source">
+                <summary>Source code in <code>skyulf-core/skyulf/preprocessing/resampling.py</code></summary>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">225</span>
+<span class="normal">226</span>
+<span class="normal">227</span>
+<span class="normal">228</span>
+<span class="normal">229</span>
+<span class="normal">230</span>
+<span class="normal">231</span>
+<span class="normal">232</span>
+<span class="normal">233</span>
+<span class="normal">234</span>
+<span class="normal">235</span>
+<span class="normal">236</span>
+<span class="normal">237</span>
+<span class="normal">238</span>
+<span class="normal">239</span>
+<span class="normal">240</span>
+<span class="normal">241</span>
+<span class="normal">242</span>
+<span class="normal">243</span>
+<span class="normal">244</span>
+<span class="normal">245</span>
+<span class="normal">246</span>
+<span class="normal">247</span>
+<span class="normal">248</span>
+<span class="normal">249</span>
+<span class="normal">250</span>
+<span class="normal">251</span>
+<span class="normal">252</span>
+<span class="normal">253</span>
+<span class="normal">254</span>
+<span class="normal">255</span>
+<span class="normal">256</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">OversamplingApplier</span><span class="p">(</span><span class="n">BaseApplier</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Grow the minority classes with the imblearn over-sampler named in the artifact.</span>
+
+<span class="sd">    Sees the training split only: :mod:`.pipeline` excludes the resampling nodes</span>
+<span class="sd">    from ``apply_on_test``/``apply_on_validation``, so synthetic rows can never</span>
+<span class="sd">    reach a held-out split and inflate its metrics.</span>
+<span class="sd">    """</span>
+
+    <span class="nd">@apply_method</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">apply</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">y</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">params</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>  <span class="c1"># pylint: disable=arguments-differ</span>
+<span class="w">        </span><span class="sd">"""Resample ``(X, y)`` with the configured over-sampler.</span>
+
+<span class="sd">        ``y`` is lifted out of ``X`` via ``target_column`` when not supplied</span>
+<span class="sd">        separately; with no usable target the data passes through untouched, as</span>
+<span class="sd">        it does for a ``method`` no builder recognizes.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If any feature column is non-numeric, which imblearn</span>
+<span class="sd">                cannot resample. Encode first.</span>
+<span class="sd">        """</span>
+        <span class="k">return</span> <span class="n">apply_dual_engine</span><span class="p">(</span>
+            <span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">)</span> <span class="k">if</span> <span class="n">y</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">X</span><span class="p">,</span>
+            <span class="n">params</span><span class="p">,</span>
+            <span class="p">{</span>
+                <span class="s2">"polars"</span><span class="p">:</span> <span class="k">lambda</span> <span class="n">Xi</span><span class="p">,</span> <span class="n">yi</span><span class="p">,</span> <span class="n">p</span><span class="p">:</span> <span class="n">_resample_polars</span><span class="p">(</span>
+                    <span class="n">Xi</span><span class="p">,</span> <span class="n">yi</span><span class="p">,</span> <span class="n">p</span><span class="p">,</span> <span class="n">_build_oversampler</span><span class="p">,</span> <span class="s2">"smote"</span>
+                <span class="p">),</span>
+                <span class="s2">"pandas"</span><span class="p">:</span> <span class="k">lambda</span> <span class="n">Xi</span><span class="p">,</span> <span class="n">yi</span><span class="p">,</span> <span class="n">p</span><span class="p">:</span> <span class="n">_resample_pandas</span><span class="p">(</span>
+                    <span class="n">Xi</span><span class="p">,</span> <span class="n">yi</span><span class="p">,</span> <span class="n">p</span><span class="p">,</span> <span class="n">_build_oversampler</span><span class="p">,</span> <span class="s2">"smote"</span>
+                <span class="p">),</span>
+            <span class="p">},</span>
+        <span class="p">)</span>
+</code></pre></div></td></tr></table></div>
+              </details>
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="skyulf.preprocessing.resampling.OversamplingApplier.apply" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">apply</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">params</span><span class="p">)</span></code>
+
+</h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Resample <code>(X, y)</code> with the configured over-sampler.</p>
+<p><code>y</code> is lifted out of <code>X</code> via <code>target_column</code> when not supplied
+separately; with no usable target the data passes through untouched, as
+it does for a <code>method</code> no builder recognizes.</p>
+
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="ValueError">ValueError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If any feature column is non-numeric, which imblearn
+cannot resample. Encode first.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>skyulf-core/skyulf/preprocessing/resampling.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">233</span>
+<span class="normal">234</span>
+<span class="normal">235</span>
+<span class="normal">236</span>
+<span class="normal">237</span>
+<span class="normal">238</span>
+<span class="normal">239</span>
+<span class="normal">240</span>
+<span class="normal">241</span>
+<span class="normal">242</span>
+<span class="normal">243</span>
+<span class="normal">244</span>
+<span class="normal">245</span>
+<span class="normal">246</span>
+<span class="normal">247</span>
+<span class="normal">248</span>
+<span class="normal">249</span>
+<span class="normal">250</span>
+<span class="normal">251</span>
+<span class="normal">252</span>
+<span class="normal">253</span>
+<span class="normal">254</span>
+<span class="normal">255</span>
+<span class="normal">256</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@apply_method</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">apply</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">y</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">params</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>  <span class="c1"># pylint: disable=arguments-differ</span>
+<span class="w">    </span><span class="sd">"""Resample ``(X, y)`` with the configured over-sampler.</span>
+
+<span class="sd">    ``y`` is lifted out of ``X`` via ``target_column`` when not supplied</span>
+<span class="sd">    separately; with no usable target the data passes through untouched, as</span>
+<span class="sd">    it does for a ``method`` no builder recognizes.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        ValueError: If any feature column is non-numeric, which imblearn</span>
+<span class="sd">            cannot resample. Encode first.</span>
+<span class="sd">    """</span>
+    <span class="k">return</span> <span class="n">apply_dual_engine</span><span class="p">(</span>
+        <span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">)</span> <span class="k">if</span> <span class="n">y</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">X</span><span class="p">,</span>
+        <span class="n">params</span><span class="p">,</span>
+        <span class="p">{</span>
+            <span class="s2">"polars"</span><span class="p">:</span> <span class="k">lambda</span> <span class="n">Xi</span><span class="p">,</span> <span class="n">yi</span><span class="p">,</span> <span class="n">p</span><span class="p">:</span> <span class="n">_resample_polars</span><span class="p">(</span>
+                <span class="n">Xi</span><span class="p">,</span> <span class="n">yi</span><span class="p">,</span> <span class="n">p</span><span class="p">,</span> <span class="n">_build_oversampler</span><span class="p">,</span> <span class="s2">"smote"</span>
+            <span class="p">),</span>
+            <span class="s2">"pandas"</span><span class="p">:</span> <span class="k">lambda</span> <span class="n">Xi</span><span class="p">,</span> <span class="n">yi</span><span class="p">,</span> <span class="n">p</span><span class="p">:</span> <span class="n">_resample_pandas</span><span class="p">(</span>
+                <span class="n">Xi</span><span class="p">,</span> <span class="n">yi</span><span class="p">,</span> <span class="n">p</span><span class="p">,</span> <span class="n">_build_oversampler</span><span class="p">,</span> <span class="s2">"smote"</span>
+            <span class="p">),</span>
+        <span class="p">},</span>
+    <span class="p">)</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="skyulf.preprocessing.resampling.OversamplingCalculator" class="doc doc-heading">
+            <code>OversamplingCalculator</code>
+
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="BaseCalculator (skyulf.preprocessing.base.BaseCalculator)" href="base.html#skyulf.preprocessing.base.BaseCalculator">BaseCalculator</a></code></p>
+
+
+
+        <p>Configure class balancing by oversampling the minority class.</p>
+
+
+
+
+
+
+
+
+              <details class="mkdocstrings-source">
+                <summary>Source code in <code>skyulf-core/skyulf/preprocessing/resampling.py</code></summary>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">259</span>
+<span class="normal">260</span>
+<span class="normal">261</span>
+<span class="normal">262</span>
+<span class="normal">263</span>
+<span class="normal">264</span>
+<span class="normal">265</span>
+<span class="normal">266</span>
+<span class="normal">267</span>
+<span class="normal">268</span>
+<span class="normal">269</span>
+<span class="normal">270</span>
+<span class="normal">271</span>
+<span class="normal">272</span>
+<span class="normal">273</span>
+<span class="normal">274</span>
+<span class="normal">275</span>
+<span class="normal">276</span>
+<span class="normal">277</span>
+<span class="normal">278</span>
+<span class="normal">279</span>
+<span class="normal">280</span>
+<span class="normal">281</span>
+<span class="normal">282</span>
+<span class="normal">283</span>
+<span class="normal">284</span>
+<span class="normal">285</span>
+<span class="normal">286</span>
+<span class="normal">287</span>
+<span class="normal">288</span>
+<span class="normal">289</span>
+<span class="normal">290</span>
+<span class="normal">291</span>
+<span class="normal">292</span>
+<span class="normal">293</span>
+<span class="normal">294</span>
+<span class="normal">295</span>
+<span class="normal">296</span>
+<span class="normal">297</span>
+<span class="normal">298</span>
+<span class="normal">299</span>
+<span class="normal">300</span>
+<span class="normal">301</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">"Oversampling"</span><span class="p">,</span> <span class="n">OversamplingApplier</span><span class="p">)</span>
+<span class="nd">@node_meta</span><span class="p">(</span>
+    <span class="nb">id</span><span class="o">=</span><span class="s2">"Oversampling"</span><span class="p">,</span>
+    <span class="n">name</span><span class="o">=</span><span class="s2">"Oversampling"</span><span class="p">,</span>
+    <span class="n">category</span><span class="o">=</span><span class="s2">"Preprocessing"</span><span class="p">,</span>
+    <span class="n">description</span><span class="o">=</span><span class="s2">"Resample dataset to balance classes by oversampling minority class."</span><span class="p">,</span>
+    <span class="n">params</span><span class="o">=</span><span class="p">{</span><span class="s2">"method"</span><span class="p">:</span> <span class="s2">"smote"</span><span class="p">,</span> <span class="s2">"target_column"</span><span class="p">:</span> <span class="s2">"target"</span><span class="p">,</span> <span class="s2">"sampling_strategy"</span><span class="p">:</span> <span class="s2">"auto"</span><span class="p">},</span>
+    <span class="n">learns_from_data</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">OversamplingCalculator</span><span class="p">(</span><span class="n">BaseCalculator</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Configure class balancing by oversampling the minority class."""</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">infer_output_schema</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">input_schema</span><span class="p">:</span> <span class="n">SkyulfSchema</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">SkyulfSchema</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Return ``input_schema`` untouched."""</span>
+        <span class="c1"># Resampling changes row counts only; column set is preserved.</span>
+        <span class="k">return</span> <span class="n">input_schema</span>
+
+    <span class="nd">@fit_method</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">fit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">_X</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">_y</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">OversamplingArtifact</span><span class="p">:</span>  <span class="c1"># pylint: disable=arguments-differ</span>
+<span class="w">        </span><span class="sd">"""Snapshot the sampler settings from ``config`` into the artifact.</span>
+
+<span class="sd">        Neither ``_X`` nor ``_y`` is read: the artifact is pure configuration,</span>
+<span class="sd">        and the class imbalance it corrects is only observed when the applier</span>
+<span class="sd">        runs the sampler on the training split.</span>
+<span class="sd">        """</span>
+        <span class="k">return</span> <span class="p">{</span>
+            <span class="s2">"type"</span><span class="p">:</span> <span class="s2">"oversampling"</span><span class="p">,</span>
+            <span class="s2">"method"</span><span class="p">:</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"method"</span><span class="p">,</span> <span class="s2">"smote"</span><span class="p">),</span>
+            <span class="s2">"target_column"</span><span class="p">:</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"target_column"</span><span class="p">),</span>
+            <span class="s2">"sampling_strategy"</span><span class="p">:</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"sampling_strategy"</span><span class="p">,</span> <span class="s2">"auto"</span><span class="p">),</span>
+            <span class="s2">"random_state"</span><span class="p">:</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"random_state"</span><span class="p">,</span> <span class="mi">42</span><span class="p">),</span>
+            <span class="s2">"k_neighbors"</span><span class="p">:</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"k_neighbors"</span><span class="p">,</span> <span class="mi">5</span><span class="p">),</span>
+            <span class="s2">"m_neighbors"</span><span class="p">:</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"m_neighbors"</span><span class="p">,</span> <span class="mi">10</span><span class="p">),</span>
+            <span class="s2">"kind"</span><span class="p">:</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"kind"</span><span class="p">,</span> <span class="s2">"borderline-1"</span><span class="p">),</span>
+            <span class="s2">"svm_estimator"</span><span class="p">:</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"svm_estimator"</span><span class="p">),</span>
+            <span class="s2">"out_step"</span><span class="p">:</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"out_step"</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">),</span>
+            <span class="s2">"kmeans_estimator"</span><span class="p">:</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"kmeans_estimator"</span><span class="p">),</span>
+            <span class="s2">"cluster_balance_threshold"</span><span class="p">:</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"cluster_balance_threshold"</span><span class="p">,</span> <span class="mf">0.1</span><span class="p">),</span>
+            <span class="s2">"density_exponent"</span><span class="p">:</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"density_exponent"</span><span class="p">,</span> <span class="s2">"auto"</span><span class="p">),</span>
+            <span class="s2">"n_jobs"</span><span class="p">:</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"n_jobs"</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">),</span>
+        <span class="p">}</span>
+</code></pre></div></td></tr></table></div>
+              </details>
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="skyulf.preprocessing.resampling.OversamplingCalculator.fit" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">fit</span><span class="p">(</span><span class="n">_X</span><span class="p">,</span> <span class="n">_y</span><span class="p">,</span> <span class="n">config</span><span class="p">)</span></code>
+
+</h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Snapshot the sampler settings from <code>config</code> into the artifact.</p>
+<p>Neither <code>_X</code> nor <code>_y</code> is read: the artifact is pure configuration,
+and the class imbalance it corrects is only observed when the applier
+runs the sampler on the training split.</p>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>skyulf-core/skyulf/preprocessing/resampling.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">278</span>
+<span class="normal">279</span>
+<span class="normal">280</span>
+<span class="normal">281</span>
+<span class="normal">282</span>
+<span class="normal">283</span>
+<span class="normal">284</span>
+<span class="normal">285</span>
+<span class="normal">286</span>
+<span class="normal">287</span>
+<span class="normal">288</span>
+<span class="normal">289</span>
+<span class="normal">290</span>
+<span class="normal">291</span>
+<span class="normal">292</span>
+<span class="normal">293</span>
+<span class="normal">294</span>
+<span class="normal">295</span>
+<span class="normal">296</span>
+<span class="normal">297</span>
+<span class="normal">298</span>
+<span class="normal">299</span>
+<span class="normal">300</span>
+<span class="normal">301</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@fit_method</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">fit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">_X</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">_y</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">OversamplingArtifact</span><span class="p">:</span>  <span class="c1"># pylint: disable=arguments-differ</span>
+<span class="w">    </span><span class="sd">"""Snapshot the sampler settings from ``config`` into the artifact.</span>
+
+<span class="sd">    Neither ``_X`` nor ``_y`` is read: the artifact is pure configuration,</span>
+<span class="sd">    and the class imbalance it corrects is only observed when the applier</span>
+<span class="sd">    runs the sampler on the training split.</span>
+<span class="sd">    """</span>
+    <span class="k">return</span> <span class="p">{</span>
+        <span class="s2">"type"</span><span class="p">:</span> <span class="s2">"oversampling"</span><span class="p">,</span>
+        <span class="s2">"method"</span><span class="p">:</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"method"</span><span class="p">,</span> <span class="s2">"smote"</span><span class="p">),</span>
+        <span class="s2">"target_column"</span><span class="p">:</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"target_column"</span><span class="p">),</span>
+        <span class="s2">"sampling_strategy"</span><span class="p">:</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"sampling_strategy"</span><span class="p">,</span> <span class="s2">"auto"</span><span class="p">),</span>
+        <span class="s2">"random_state"</span><span class="p">:</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"random_state"</span><span class="p">,</span> <span class="mi">42</span><span class="p">),</span>
+        <span class="s2">"k_neighbors"</span><span class="p">:</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"k_neighbors"</span><span class="p">,</span> <span class="mi">5</span><span class="p">),</span>
+        <span class="s2">"m_neighbors"</span><span class="p">:</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"m_neighbors"</span><span class="p">,</span> <span class="mi">10</span><span class="p">),</span>
+        <span class="s2">"kind"</span><span class="p">:</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"kind"</span><span class="p">,</span> <span class="s2">"borderline-1"</span><span class="p">),</span>
+        <span class="s2">"svm_estimator"</span><span class="p">:</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"svm_estimator"</span><span class="p">),</span>
+        <span class="s2">"out_step"</span><span class="p">:</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"out_step"</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">),</span>
+        <span class="s2">"kmeans_estimator"</span><span class="p">:</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"kmeans_estimator"</span><span class="p">),</span>
+        <span class="s2">"cluster_balance_threshold"</span><span class="p">:</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"cluster_balance_threshold"</span><span class="p">,</span> <span class="mf">0.1</span><span class="p">),</span>
+        <span class="s2">"density_exponent"</span><span class="p">:</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"density_exponent"</span><span class="p">,</span> <span class="s2">"auto"</span><span class="p">),</span>
+        <span class="s2">"n_jobs"</span><span class="p">:</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"n_jobs"</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">),</span>
+    <span class="p">}</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="skyulf.preprocessing.resampling.OversamplingCalculator.infer_output_schema" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">infer_output_schema</span><span class="p">(</span><span class="n">input_schema</span><span class="p">,</span> <span class="n">config</span><span class="p">)</span></code>
+
+</h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Return <code>input_schema</code> untouched.</p>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>skyulf-core/skyulf/preprocessing/resampling.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">271</span>
+<span class="normal">272</span>
+<span class="normal">273</span>
+<span class="normal">274</span>
+<span class="normal">275</span>
+<span class="normal">276</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">infer_output_schema</span><span class="p">(</span>
+    <span class="bp">self</span><span class="p">,</span> <span class="n">input_schema</span><span class="p">:</span> <span class="n">SkyulfSchema</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">SkyulfSchema</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Return ``input_schema`` untouched."""</span>
+    <span class="c1"># Resampling changes row counts only; column set is preserved.</span>
+    <span class="k">return</span> <span class="n">input_schema</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="skyulf.preprocessing.resampling.UndersamplingApplier" class="doc doc-heading">
+            <code>UndersamplingApplier</code>
+
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="BaseApplier (skyulf.preprocessing.base.BaseApplier)" href="base.html#skyulf.preprocessing.base.BaseApplier">BaseApplier</a></code></p>
+
+
+
+        <p>Shrink the majority classes with the imblearn under-sampler named in the artifact.</p>
+<p>Sees the training split only: :mod:<code>.pipeline</code> excludes the resampling nodes
+from <code>apply_on_test</code>/<code>apply_on_validation</code>. That guard matters more here
+than for oversampling, because these samplers delete real rows rather than
+synthesise new ones.</p>
+
+
+
+
+
+
+
+
+              <details class="mkdocstrings-source">
+                <summary>Source code in <code>skyulf-core/skyulf/preprocessing/resampling.py</code></summary>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">361</span>
+<span class="normal">362</span>
+<span class="normal">363</span>
+<span class="normal">364</span>
+<span class="normal">365</span>
+<span class="normal">366</span>
+<span class="normal">367</span>
+<span class="normal">368</span>
+<span class="normal">369</span>
+<span class="normal">370</span>
+<span class="normal">371</span>
+<span class="normal">372</span>
+<span class="normal">373</span>
+<span class="normal">374</span>
+<span class="normal">375</span>
+<span class="normal">376</span>
+<span class="normal">377</span>
+<span class="normal">378</span>
+<span class="normal">379</span>
+<span class="normal">380</span>
+<span class="normal">381</span>
+<span class="normal">382</span>
+<span class="normal">383</span>
+<span class="normal">384</span>
+<span class="normal">385</span>
+<span class="normal">386</span>
+<span class="normal">387</span>
+<span class="normal">388</span>
+<span class="normal">389</span>
+<span class="normal">390</span>
+<span class="normal">391</span>
+<span class="normal">392</span>
+<span class="normal">393</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">UndersamplingApplier</span><span class="p">(</span><span class="n">BaseApplier</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Shrink the majority classes with the imblearn under-sampler named in the artifact.</span>
+
+<span class="sd">    Sees the training split only: :mod:`.pipeline` excludes the resampling nodes</span>
+<span class="sd">    from ``apply_on_test``/``apply_on_validation``. That guard matters more here</span>
+<span class="sd">    than for oversampling, because these samplers delete real rows rather than</span>
+<span class="sd">    synthesise new ones.</span>
+<span class="sd">    """</span>
+
+    <span class="nd">@apply_method</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">apply</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">y</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">params</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Resample ``(X, y)`` with the configured under-sampler.</span>
+
+<span class="sd">        ``y`` is lifted out of ``X`` via ``target_column`` when not supplied</span>
+<span class="sd">        separately; with no usable target the data passes through untouched, as</span>
+<span class="sd">        it does for a ``method`` no builder recognizes.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If any feature column is non-numeric, which imblearn</span>
+<span class="sd">                cannot resample. Encode first.</span>
+<span class="sd">        """</span>
+        <span class="k">return</span> <span class="n">apply_dual_engine</span><span class="p">(</span>
+            <span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">)</span> <span class="k">if</span> <span class="n">y</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">X</span><span class="p">,</span>
+            <span class="n">params</span><span class="p">,</span>
+            <span class="p">{</span>
+                <span class="s2">"polars"</span><span class="p">:</span> <span class="k">lambda</span> <span class="n">Xi</span><span class="p">,</span> <span class="n">yi</span><span class="p">,</span> <span class="n">p</span><span class="p">:</span> <span class="n">_resample_polars</span><span class="p">(</span>
+                    <span class="n">Xi</span><span class="p">,</span> <span class="n">yi</span><span class="p">,</span> <span class="n">p</span><span class="p">,</span> <span class="n">_build_undersampler</span><span class="p">,</span> <span class="s2">"random_under_sampling"</span>
+                <span class="p">),</span>
+                <span class="s2">"pandas"</span><span class="p">:</span> <span class="k">lambda</span> <span class="n">Xi</span><span class="p">,</span> <span class="n">yi</span><span class="p">,</span> <span class="n">p</span><span class="p">:</span> <span class="n">_resample_pandas</span><span class="p">(</span>
+                    <span class="n">Xi</span><span class="p">,</span> <span class="n">yi</span><span class="p">,</span> <span class="n">p</span><span class="p">,</span> <span class="n">_build_undersampler</span><span class="p">,</span> <span class="s2">"random_under_sampling"</span>
+                <span class="p">),</span>
+            <span class="p">},</span>
+        <span class="p">)</span>
+</code></pre></div></td></tr></table></div>
+              </details>
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="skyulf.preprocessing.resampling.UndersamplingApplier.apply" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">apply</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">params</span><span class="p">)</span></code>
+
+</h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Resample <code>(X, y)</code> with the configured under-sampler.</p>
+<p><code>y</code> is lifted out of <code>X</code> via <code>target_column</code> when not supplied
+separately; with no usable target the data passes through untouched, as
+it does for a <code>method</code> no builder recognizes.</p>
+
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="ValueError">ValueError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If any feature column is non-numeric, which imblearn
+cannot resample. Encode first.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>skyulf-core/skyulf/preprocessing/resampling.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">370</span>
+<span class="normal">371</span>
+<span class="normal">372</span>
+<span class="normal">373</span>
+<span class="normal">374</span>
+<span class="normal">375</span>
+<span class="normal">376</span>
+<span class="normal">377</span>
+<span class="normal">378</span>
+<span class="normal">379</span>
+<span class="normal">380</span>
+<span class="normal">381</span>
+<span class="normal">382</span>
+<span class="normal">383</span>
+<span class="normal">384</span>
+<span class="normal">385</span>
+<span class="normal">386</span>
+<span class="normal">387</span>
+<span class="normal">388</span>
+<span class="normal">389</span>
+<span class="normal">390</span>
+<span class="normal">391</span>
+<span class="normal">392</span>
+<span class="normal">393</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@apply_method</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">apply</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">y</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">params</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Resample ``(X, y)`` with the configured under-sampler.</span>
+
+<span class="sd">    ``y`` is lifted out of ``X`` via ``target_column`` when not supplied</span>
+<span class="sd">    separately; with no usable target the data passes through untouched, as</span>
+<span class="sd">    it does for a ``method`` no builder recognizes.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        ValueError: If any feature column is non-numeric, which imblearn</span>
+<span class="sd">            cannot resample. Encode first.</span>
+<span class="sd">    """</span>
+    <span class="k">return</span> <span class="n">apply_dual_engine</span><span class="p">(</span>
+        <span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">)</span> <span class="k">if</span> <span class="n">y</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">X</span><span class="p">,</span>
+        <span class="n">params</span><span class="p">,</span>
+        <span class="p">{</span>
+            <span class="s2">"polars"</span><span class="p">:</span> <span class="k">lambda</span> <span class="n">Xi</span><span class="p">,</span> <span class="n">yi</span><span class="p">,</span> <span class="n">p</span><span class="p">:</span> <span class="n">_resample_polars</span><span class="p">(</span>
+                <span class="n">Xi</span><span class="p">,</span> <span class="n">yi</span><span class="p">,</span> <span class="n">p</span><span class="p">,</span> <span class="n">_build_undersampler</span><span class="p">,</span> <span class="s2">"random_under_sampling"</span>
+            <span class="p">),</span>
+            <span class="s2">"pandas"</span><span class="p">:</span> <span class="k">lambda</span> <span class="n">Xi</span><span class="p">,</span> <span class="n">yi</span><span class="p">,</span> <span class="n">p</span><span class="p">:</span> <span class="n">_resample_pandas</span><span class="p">(</span>
+                <span class="n">Xi</span><span class="p">,</span> <span class="n">yi</span><span class="p">,</span> <span class="n">p</span><span class="p">,</span> <span class="n">_build_undersampler</span><span class="p">,</span> <span class="s2">"random_under_sampling"</span>
+            <span class="p">),</span>
+        <span class="p">},</span>
+    <span class="p">)</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="skyulf.preprocessing.resampling.UndersamplingCalculator" class="doc doc-heading">
+            <code>UndersamplingCalculator</code>
+
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="BaseCalculator (skyulf.preprocessing.base.BaseCalculator)" href="base.html#skyulf.preprocessing.base.BaseCalculator">BaseCalculator</a></code></p>
+
+
+
+        <p>Configure class balancing by undersampling the majority class.</p>
+
+
+
+
+
+
+
+
+              <details class="mkdocstrings-source">
+                <summary>Source code in <code>skyulf-core/skyulf/preprocessing/resampling.py</code></summary>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">396</span>
+<span class="normal">397</span>
+<span class="normal">398</span>
+<span class="normal">399</span>
+<span class="normal">400</span>
+<span class="normal">401</span>
+<span class="normal">402</span>
+<span class="normal">403</span>
+<span class="normal">404</span>
+<span class="normal">405</span>
+<span class="normal">406</span>
+<span class="normal">407</span>
+<span class="normal">408</span>
+<span class="normal">409</span>
+<span class="normal">410</span>
+<span class="normal">411</span>
+<span class="normal">412</span>
+<span class="normal">413</span>
+<span class="normal">414</span>
+<span class="normal">415</span>
+<span class="normal">416</span>
+<span class="normal">417</span>
+<span class="normal">418</span>
+<span class="normal">419</span>
+<span class="normal">420</span>
+<span class="normal">421</span>
+<span class="normal">422</span>
+<span class="normal">423</span>
+<span class="normal">424</span>
+<span class="normal">425</span>
+<span class="normal">426</span>
+<span class="normal">427</span>
+<span class="normal">428</span>
+<span class="normal">429</span>
+<span class="normal">430</span>
+<span class="normal">431</span>
+<span class="normal">432</span>
+<span class="normal">433</span>
+<span class="normal">434</span>
+<span class="normal">435</span>
+<span class="normal">436</span>
+<span class="normal">437</span>
+<span class="normal">438</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">"Undersampling"</span><span class="p">,</span> <span class="n">UndersamplingApplier</span><span class="p">)</span>
+<span class="nd">@node_meta</span><span class="p">(</span>
+    <span class="nb">id</span><span class="o">=</span><span class="s2">"Undersampling"</span><span class="p">,</span>
+    <span class="n">name</span><span class="o">=</span><span class="s2">"Undersampling"</span><span class="p">,</span>
+    <span class="n">category</span><span class="o">=</span><span class="s2">"Preprocessing"</span><span class="p">,</span>
+    <span class="n">description</span><span class="o">=</span><span class="s2">"Resample dataset to balance classes by undersampling majority class."</span><span class="p">,</span>
+    <span class="n">params</span><span class="o">=</span><span class="p">{</span>
+        <span class="s2">"method"</span><span class="p">:</span> <span class="s2">"random_under_sampling"</span><span class="p">,</span>
+        <span class="s2">"target_column"</span><span class="p">:</span> <span class="s2">"target"</span><span class="p">,</span>
+        <span class="s2">"sampling_strategy"</span><span class="p">:</span> <span class="s2">"auto"</span><span class="p">,</span>
+    <span class="p">},</span>
+    <span class="n">learns_from_data</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">UndersamplingCalculator</span><span class="p">(</span><span class="n">BaseCalculator</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Configure class balancing by undersampling the majority class."""</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">infer_output_schema</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">input_schema</span><span class="p">:</span> <span class="n">SkyulfSchema</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">SkyulfSchema</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Return ``input_schema`` untouched."""</span>
+        <span class="c1"># Resampling changes row counts only; column set is preserved.</span>
+        <span class="k">return</span> <span class="n">input_schema</span>
+
+    <span class="nd">@fit_method</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">fit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">_X</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">_y</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">UndersamplingArtifact</span><span class="p">:</span>  <span class="c1"># pylint: disable=arguments-differ</span>
+<span class="w">        </span><span class="sd">"""Snapshot the sampler settings from ``config`` into the artifact.</span>
+
+<span class="sd">        Neither ``_X`` nor ``_y`` is read: the artifact is pure configuration.</span>
+<span class="sd">        Several of its keys are sampler-specific, so each method consumes only</span>
+<span class="sd">        the subset its imblearn class accepts.</span>
+<span class="sd">        """</span>
+        <span class="k">return</span> <span class="p">{</span>
+            <span class="s2">"type"</span><span class="p">:</span> <span class="s2">"undersampling"</span><span class="p">,</span>
+            <span class="s2">"method"</span><span class="p">:</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"method"</span><span class="p">,</span> <span class="s2">"random_under_sampling"</span><span class="p">),</span>
+            <span class="s2">"target_column"</span><span class="p">:</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"target_column"</span><span class="p">),</span>
+            <span class="s2">"sampling_strategy"</span><span class="p">:</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"sampling_strategy"</span><span class="p">,</span> <span class="s2">"auto"</span><span class="p">),</span>
+            <span class="s2">"random_state"</span><span class="p">:</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"random_state"</span><span class="p">,</span> <span class="mi">42</span><span class="p">),</span>
+            <span class="s2">"replacement"</span><span class="p">:</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"replacement"</span><span class="p">,</span> <span class="kc">False</span><span class="p">),</span>
+            <span class="s2">"version"</span><span class="p">:</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"version"</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span>  <span class="c1"># For NearMiss</span>
+            <span class="s2">"n_neighbors"</span><span class="p">:</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"n_neighbors"</span><span class="p">,</span> <span class="mi">3</span><span class="p">),</span>  <span class="c1"># For EditedNearestNeighbours</span>
+            <span class="s2">"kind_sel"</span><span class="p">:</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"kind_sel"</span><span class="p">,</span> <span class="s2">"all"</span><span class="p">),</span>  <span class="c1"># For EditedNearestNeighbours</span>
+            <span class="s2">"n_jobs"</span><span class="p">:</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"n_jobs"</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">),</span>
+        <span class="p">}</span>
+</code></pre></div></td></tr></table></div>
+              </details>
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="skyulf.preprocessing.resampling.UndersamplingCalculator.fit" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">fit</span><span class="p">(</span><span class="n">_X</span><span class="p">,</span> <span class="n">_y</span><span class="p">,</span> <span class="n">config</span><span class="p">)</span></code>
+
+</h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Snapshot the sampler settings from <code>config</code> into the artifact.</p>
+<p>Neither <code>_X</code> nor <code>_y</code> is read: the artifact is pure configuration.
+Several of its keys are sampler-specific, so each method consumes only
+the subset its imblearn class accepts.</p>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>skyulf-core/skyulf/preprocessing/resampling.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">419</span>
+<span class="normal">420</span>
+<span class="normal">421</span>
+<span class="normal">422</span>
+<span class="normal">423</span>
+<span class="normal">424</span>
+<span class="normal">425</span>
+<span class="normal">426</span>
+<span class="normal">427</span>
+<span class="normal">428</span>
+<span class="normal">429</span>
+<span class="normal">430</span>
+<span class="normal">431</span>
+<span class="normal">432</span>
+<span class="normal">433</span>
+<span class="normal">434</span>
+<span class="normal">435</span>
+<span class="normal">436</span>
+<span class="normal">437</span>
+<span class="normal">438</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@fit_method</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">fit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">_X</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">_y</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">UndersamplingArtifact</span><span class="p">:</span>  <span class="c1"># pylint: disable=arguments-differ</span>
+<span class="w">    </span><span class="sd">"""Snapshot the sampler settings from ``config`` into the artifact.</span>
+
+<span class="sd">    Neither ``_X`` nor ``_y`` is read: the artifact is pure configuration.</span>
+<span class="sd">    Several of its keys are sampler-specific, so each method consumes only</span>
+<span class="sd">    the subset its imblearn class accepts.</span>
+<span class="sd">    """</span>
+    <span class="k">return</span> <span class="p">{</span>
+        <span class="s2">"type"</span><span class="p">:</span> <span class="s2">"undersampling"</span><span class="p">,</span>
+        <span class="s2">"method"</span><span class="p">:</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"method"</span><span class="p">,</span> <span class="s2">"random_under_sampling"</span><span class="p">),</span>
+        <span class="s2">"target_column"</span><span class="p">:</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"target_column"</span><span class="p">),</span>
+        <span class="s2">"sampling_strategy"</span><span class="p">:</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"sampling_strategy"</span><span class="p">,</span> <span class="s2">"auto"</span><span class="p">),</span>
+        <span class="s2">"random_state"</span><span class="p">:</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"random_state"</span><span class="p">,</span> <span class="mi">42</span><span class="p">),</span>
+        <span class="s2">"replacement"</span><span class="p">:</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"replacement"</span><span class="p">,</span> <span class="kc">False</span><span class="p">),</span>
+        <span class="s2">"version"</span><span class="p">:</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"version"</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span>  <span class="c1"># For NearMiss</span>
+        <span class="s2">"n_neighbors"</span><span class="p">:</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"n_neighbors"</span><span class="p">,</span> <span class="mi">3</span><span class="p">),</span>  <span class="c1"># For EditedNearestNeighbours</span>
+        <span class="s2">"kind_sel"</span><span class="p">:</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"kind_sel"</span><span class="p">,</span> <span class="s2">"all"</span><span class="p">),</span>  <span class="c1"># For EditedNearestNeighbours</span>
+        <span class="s2">"n_jobs"</span><span class="p">:</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"n_jobs"</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">),</span>
+    <span class="p">}</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="skyulf.preprocessing.resampling.UndersamplingCalculator.infer_output_schema" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">infer_output_schema</span><span class="p">(</span><span class="n">input_schema</span><span class="p">,</span> <span class="n">config</span><span class="p">)</span></code>
+
+</h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Return <code>input_schema</code> untouched.</p>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>skyulf-core/skyulf/preprocessing/resampling.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">412</span>
+<span class="normal">413</span>
+<span class="normal">414</span>
+<span class="normal">415</span>
+<span class="normal">416</span>
+<span class="normal">417</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">infer_output_schema</span><span class="p">(</span>
+    <span class="bp">self</span><span class="p">,</span> <span class="n">input_schema</span><span class="p">:</span> <span class="n">SkyulfSchema</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">SkyulfSchema</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Return ``input_schema`` untouched."""</span>
+    <span class="c1"># Resampling changes row counts only; column set is preserved.</span>
+    <span class="k">return</span> <span class="n">input_schema</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
 
 
 

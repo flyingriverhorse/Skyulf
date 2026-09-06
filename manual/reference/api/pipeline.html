@@ -3288,9 +3288,7 @@
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>skyulf-core/skyulf/pipeline/_pipeline.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 41</span>
-<span class="normal"> 42</span>
-<span class="normal"> 43</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 43</span>
 <span class="normal"> 44</span>
 <span class="normal"> 45</span>
 <span class="normal"> 46</span>
@@ -3762,7 +3760,8 @@
 <span class="normal">512</span>
 <span class="normal">513</span>
 <span class="normal">514</span>
-<span class="normal">515</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">SkyulfPipeline</span><span class="p">:</span>
+<span class="normal">515</span>
+<span class="normal">516</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">SkyulfPipeline</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""End-to-end ML Pipeline.</span>
 
 <span class="sd">    Encapsulates:</span>
@@ -3930,10 +3929,10 @@
         <span class="n">data</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span> <span class="o">|</span> <span class="n">pl</span><span class="o">.</span><span class="n">DataFrame</span> <span class="o">|</span> <span class="n">SkyulfDataFrame</span> <span class="o">|</span> <span class="n">SplitDataset</span><span class="p">,</span>
         <span class="n">target_column</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">,</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">]:</span>
-<span class="w">        </span><span class="sd">"""Run this pipeline's configured preprocessing chain and return the</span>
-<span class="sd">        resulting train/test split as plain pandas objects.</span>
+<span class="w">        </span><span class="sd">"""Run this pipeline's configured preprocessing chain and return the split.</span>
 
-<span class="sd">        Runs ``self.feature_engineer.fit_transform(data)`` — the same</span>
+<span class="sd">        The result is the train/test split as plain pandas objects. Runs</span>
+<span class="sd">        ``self.feature_engineer.fit_transform(data)`` — the same</span>
 <span class="sd">        preprocessing ``fit()`` uses internally — and extracts</span>
 <span class="sd">        ``(X_train, y_train, X_test, y_test)`` from the resulting split using</span>
 <span class="sd">        ``target_column``, converting any Polars/SkyulfDataFrame frames to</span>
@@ -3993,15 +3992,14 @@
         <span class="n">strategy</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">grid_points</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">101</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="nb">float</span><span class="p">]:</span>
-<span class="w">        </span><span class="sd">"""Search for per-class decision thresholds that maximize ``metric`` on</span>
-<span class="sd">        caller-supplied validation data, and store the result for later use</span>
-<span class="sd">        by ``predict(use_tuned_thresholds=True)``.</span>
+<span class="w">        </span><span class="sd">"""Search for per-class decision thresholds that maximize ``metric``.</span>
 
-<span class="sd">        Always uses the *explicit* ``(X_val, y_val)`` the caller passes in —</span>
-<span class="sd">        never the pipeline's internal train/test split. Get a clean,</span>
-<span class="sd">        independent holdout via ``get_fitted_split()`` (or your own split)</span>
-<span class="sd">        before calling this, the same way you would for any other</span>
-<span class="sd">        out-of-sample evaluation.</span>
+<span class="sd">        Runs on caller-supplied validation data and stores the result for later</span>
+<span class="sd">        use by ``predict(use_tuned_thresholds=True)``. Always uses the</span>
+<span class="sd">        *explicit* ``(X_val, y_val)`` the caller passes in — never the</span>
+<span class="sd">        pipeline's internal train/test split. Get a clean, independent holdout</span>
+<span class="sd">        via ``get_fitted_split()`` (or your own split) before calling this, the</span>
+<span class="sd">        same way you would for any other out-of-sample evaluation.</span>
 
 <span class="sd">        Args:</span>
 <span class="sd">            X_val: Validation features, *not* yet transformed (this method</span>
@@ -4301,9 +4299,7 @@
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>skyulf-core/skyulf/pipeline/_pipeline.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">53</span>
-<span class="normal">54</span>
-<span class="normal">55</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">55</span>
 <span class="normal">56</span>
 <span class="normal">57</span>
 <span class="normal">58</span>
@@ -4321,7 +4317,9 @@
 <span class="normal">70</span>
 <span class="normal">71</span>
 <span class="normal">72</span>
-<span class="normal">73</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="n">PipelineConfig</span> <span class="o">|</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]):</span>
+<span class="normal">73</span>
+<span class="normal">74</span>
+<span class="normal">75</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="n">PipelineConfig</span> <span class="o">|</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]):</span>
 <span class="w">    </span><span class="sd">"""Initialize the pipeline.</span>
 
 <span class="sd">    Args:</span>
@@ -4367,8 +4365,7 @@ to call before or after :meth:<code>fit</code>. Handy in notebooks and CI logs.<
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>skyulf-core/skyulf/pipeline/_pipeline.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">386</span>
-<span class="normal">387</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">387</span>
 <span class="normal">388</span>
 <span class="normal">389</span>
 <span class="normal">390</span>
@@ -4397,7 +4394,8 @@ to call before or after :meth:<code>fit</code>. Handy in notebooks and CI logs.<
 <span class="normal">413</span>
 <span class="normal">414</span>
 <span class="normal">415</span>
-<span class="normal">416</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">describe</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="normal">416</span>
+<span class="normal">417</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">describe</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""Return a human-readable, multi-line summary of the pipeline.</span>
 
 <span class="sd">    Renders the preprocessing chain (in order) and the model stage with</span>
@@ -4454,8 +4452,7 @@ under <code>"diagram"</code>. Intended for audit logs and model registries.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>skyulf-core/skyulf/pipeline/_pipeline.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">473</span>
-<span class="normal">474</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">474</span>
 <span class="normal">475</span>
 <span class="normal">476</span>
 <span class="normal">477</span>
@@ -4484,7 +4481,8 @@ under <code>"diagram"</code>. Intended for audit logs and model registries.</p>
 <span class="normal">500</span>
 <span class="normal">501</span>
 <span class="normal">502</span>
-<span class="normal">503</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">export_model_card</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+<span class="normal">503</span>
+<span class="normal">504</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">export_model_card</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
 <span class="w">    </span><span class="sd">"""Return a structured, JSON-friendly summary of the pipeline.</span>
 
 <span class="sd">    Captures lineage (preprocessing chain), the model and its hyperparameters,</span>
@@ -4543,8 +4541,7 @@ stable across library and pickle-protocol versions.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>skyulf-core/skyulf/pipeline/_pipeline.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">448</span>
-<span class="normal">449</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">449</span>
 <span class="normal">450</span>
 <span class="normal">451</span>
 <span class="normal">452</span>
@@ -4566,7 +4563,8 @@ stable across library and pickle-protocol versions.</p>
 <span class="normal">468</span>
 <span class="normal">469</span>
 <span class="normal">470</span>
-<span class="normal">471</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">fingerprint</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="normal">471</span>
+<span class="normal">472</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">fingerprint</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""Return a deterministic SHA-256 over topology + fitted artifacts.</span>
 
 <span class="sd">    The hash covers the pipeline graph (preprocessing + modeling config) and,</span>
@@ -4687,9 +4685,7 @@ stable across library and pickle-protocol versions.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>skyulf-core/skyulf/pipeline/_pipeline.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">134</span>
-<span class="normal">135</span>
-<span class="normal">136</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">136</span>
 <span class="normal">137</span>
 <span class="normal">138</span>
 <span class="normal">139</span>
@@ -4755,7 +4751,9 @@ stable across library and pickle-protocol versions.</p>
 <span class="normal">199</span>
 <span class="normal">200</span>
 <span class="normal">201</span>
-<span class="normal">202</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">fit</span><span class="p">(</span>
+<span class="normal">202</span>
+<span class="normal">203</span>
+<span class="normal">204</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">fit</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">data</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span> <span class="o">|</span> <span class="n">pl</span><span class="o">.</span><span class="n">DataFrame</span> <span class="o">|</span> <span class="n">SkyulfDataFrame</span> <span class="o">|</span> <span class="n">SplitDataset</span><span class="p">,</span>
     <span class="n">target_column</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
@@ -4841,9 +4839,9 @@ stable across library and pickle-protocol versions.</p>
 
     <div class="doc doc-contents ">
 
-        <p>Run this pipeline's configured preprocessing chain and return the
-resulting train/test split as plain pandas objects.</p>
-<p>Runs <code>self.feature_engineer.fit_transform(data)</code> — the same
+        <p>Run this pipeline's configured preprocessing chain and return the split.</p>
+<p>The result is the train/test split as plain pandas objects. Runs
+<code>self.feature_engineer.fit_transform(data)</code> — the same
 preprocessing <code>fit()</code> uses internally — and extracts
 <code>(X_train, y_train, X_test, y_test)</code> from the resulting split using
 <code>target_column</code>, converting any Polars/SkyulfDataFrame frames to
@@ -4953,9 +4951,7 @@ train/test split (e.g. no Splitter node configured).</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>skyulf-core/skyulf/pipeline/_pipeline.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">204</span>
-<span class="normal">205</span>
-<span class="normal">206</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">206</span>
 <span class="normal">207</span>
 <span class="normal">208</span>
 <span class="normal">209</span>
@@ -4997,15 +4993,17 @@ train/test split (e.g. no Splitter node configured).</p>
 <span class="normal">245</span>
 <span class="normal">246</span>
 <span class="normal">247</span>
-<span class="normal">248</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_fitted_split</span><span class="p">(</span>
+<span class="normal">248</span>
+<span class="normal">249</span>
+<span class="normal">250</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_fitted_split</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">data</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span> <span class="o">|</span> <span class="n">pl</span><span class="o">.</span><span class="n">DataFrame</span> <span class="o">|</span> <span class="n">SkyulfDataFrame</span> <span class="o">|</span> <span class="n">SplitDataset</span><span class="p">,</span>
     <span class="n">target_column</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">,</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">]:</span>
-<span class="w">    </span><span class="sd">"""Run this pipeline's configured preprocessing chain and return the</span>
-<span class="sd">    resulting train/test split as plain pandas objects.</span>
+<span class="w">    </span><span class="sd">"""Run this pipeline's configured preprocessing chain and return the split.</span>
 
-<span class="sd">    Runs ``self.feature_engineer.fit_transform(data)`` — the same</span>
+<span class="sd">    The result is the train/test split as plain pandas objects. Runs</span>
+<span class="sd">    ``self.feature_engineer.fit_transform(data)`` — the same</span>
 <span class="sd">    preprocessing ``fit()`` uses internally — and extracts</span>
 <span class="sd">    ``(X_train, y_train, X_test, y_test)`` from the resulting split using</span>
 <span class="sd">    ``target_column``, converting any Polars/SkyulfDataFrame frames to</span>
@@ -5064,11 +5062,11 @@ train/test split (e.g. no Splitter node configured).</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>skyulf-core/skyulf/pipeline/_pipeline.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">442</span>
-<span class="normal">443</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">443</span>
 <span class="normal">444</span>
 <span class="normal">445</span>
-<span class="normal">446</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">is_fitted</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="normal">446</span>
+<span class="normal">447</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">is_fitted</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""True once preprocessing has been fit (or a model has been trained)."""</span>
     <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">feature_engineer</span><span class="o">.</span><span class="n">fitted_steps</span><span class="p">:</span>
         <span class="k">return</span> <span class="kc">True</span>
@@ -5099,11 +5097,11 @@ train/test split (e.g. no Splitter node configured).</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>skyulf-core/skyulf/pipeline/_pipeline.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">511</span>
-<span class="normal">512</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">512</span>
 <span class="normal">513</span>
 <span class="normal">514</span>
-<span class="normal">515</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@classmethod</span>
+<span class="normal">515</span>
+<span class="normal">516</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@classmethod</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">load</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">path</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"SkyulfPipeline"</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""Load the pipeline from a file."""</span>
     <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="s2">"rb"</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
@@ -5125,14 +5123,13 @@ train/test split (e.g. no Splitter node configured).</p>
 
     <div class="doc doc-contents ">
 
-        <p>Search for per-class decision thresholds that maximize <code>metric</code> on
-caller-supplied validation data, and store the result for later use
-by <code>predict(use_tuned_thresholds=True)</code>.</p>
-<p>Always uses the <em>explicit</em> <code>(X_val, y_val)</code> the caller passes in —
-never the pipeline's internal train/test split. Get a clean,
-independent holdout via <code>get_fitted_split()</code> (or your own split)
-before calling this, the same way you would for any other
-out-of-sample evaluation.</p>
+        <p>Search for per-class decision thresholds that maximize <code>metric</code>.</p>
+<p>Runs on caller-supplied validation data and stores the result for later
+use by <code>predict(use_tuned_thresholds=True)</code>. Always uses the
+<em>explicit</em> <code>(X_val, y_val)</code> the caller passes in — never the
+pipeline's internal train/test split. Get a clean, independent holdout
+via <code>get_fitted_split()</code> (or your own split) before calling this, the
+same way you would for any other out-of-sample evaluation.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -5303,9 +5300,7 @@ model doesn't support <code>predict_proba</code>.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>skyulf-core/skyulf/pipeline/_pipeline.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">264</span>
-<span class="normal">265</span>
-<span class="normal">266</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">266</span>
 <span class="normal">267</span>
 <span class="normal">268</span>
 <span class="normal">269</span>
@@ -5369,7 +5364,8 @@ model doesn't support <code>predict_proba</code>.</p>
 <span class="normal">327</span>
 <span class="normal">328</span>
 <span class="normal">329</span>
-<span class="normal">330</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">optimize_thresholds</span><span class="p">(</span>
+<span class="normal">330</span>
+<span class="normal">331</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">optimize_thresholds</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">X_val</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span> <span class="o">|</span> <span class="n">SkyulfDataFrame</span><span class="p">,</span>
     <span class="n">y_val</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span> <span class="o">|</span> <span class="n">Any</span><span class="p">,</span>
@@ -5377,15 +5373,14 @@ model doesn't support <code>predict_proba</code>.</p>
     <span class="n">strategy</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">grid_points</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">101</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="nb">float</span><span class="p">]:</span>
-<span class="w">    </span><span class="sd">"""Search for per-class decision thresholds that maximize ``metric`` on</span>
-<span class="sd">    caller-supplied validation data, and store the result for later use</span>
-<span class="sd">    by ``predict(use_tuned_thresholds=True)``.</span>
+<span class="w">    </span><span class="sd">"""Search for per-class decision thresholds that maximize ``metric``.</span>
 
-<span class="sd">    Always uses the *explicit* ``(X_val, y_val)`` the caller passes in —</span>
-<span class="sd">    never the pipeline's internal train/test split. Get a clean,</span>
-<span class="sd">    independent holdout via ``get_fitted_split()`` (or your own split)</span>
-<span class="sd">    before calling this, the same way you would for any other</span>
-<span class="sd">    out-of-sample evaluation.</span>
+<span class="sd">    Runs on caller-supplied validation data and stores the result for later</span>
+<span class="sd">    use by ``predict(use_tuned_thresholds=True)``. Always uses the</span>
+<span class="sd">    *explicit* ``(X_val, y_val)`` the caller passes in — never the</span>
+<span class="sd">    pipeline's internal train/test split. Get a clean, independent holdout</span>
+<span class="sd">    via ``get_fitted_split()`` (or your own split) before calling this, the</span>
+<span class="sd">    same way you would for any other out-of-sample evaluation.</span>
 
 <span class="sd">    Args:</span>
 <span class="sd">        X_val: Validation features, *not* yet transformed (this method</span>
@@ -5568,8 +5563,7 @@ was never called on this instance.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>skyulf-core/skyulf/pipeline/_pipeline.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">332</span>
-<span class="normal">333</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">333</span>
 <span class="normal">334</span>
 <span class="normal">335</span>
 <span class="normal">336</span>
@@ -5620,7 +5614,8 @@ was never called on this instance.</p>
 <span class="normal">381</span>
 <span class="normal">382</span>
 <span class="normal">383</span>
-<span class="normal">384</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">predict</span><span class="p">(</span>
+<span class="normal">384</span>
+<span class="normal">385</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">predict</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">data</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span> <span class="o">|</span> <span class="n">SkyulfDataFrame</span><span class="p">,</span>
     <span class="n">use_tuned_thresholds</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
@@ -5695,11 +5690,11 @@ was never called on this instance.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>skyulf-core/skyulf/pipeline/_pipeline.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">505</span>
-<span class="normal">506</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">506</span>
 <span class="normal">507</span>
 <span class="normal">508</span>
-<span class="normal">509</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">save</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
+<span class="normal">509</span>
+<span class="normal">510</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">save</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""Save the pipeline to a file."""</span>
     <span class="c1"># We can use pickle to save the whole object since we removed external dependencies</span>
     <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="s2">"wb"</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
@@ -5728,13 +5723,13 @@ Useful in docs and PR descriptions. Pure read-only over <code>self.config</code>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>skyulf-core/skyulf/pipeline/_pipeline.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">422</span>
-<span class="normal">423</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">423</span>
 <span class="normal">424</span>
 <span class="normal">425</span>
 <span class="normal">426</span>
 <span class="normal">427</span>
-<span class="normal">428</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">to_mermaid</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="normal">428</span>
+<span class="normal">429</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">to_mermaid</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""Render the pipeline as a Mermaid ``flowchart`` string.</span>
 
 <span class="sd">    Produces a top-down graph ``data -&gt; [preprocessing steps] -&gt; model``.</span>
@@ -5766,8 +5761,7 @@ in Jupyter markdown cells.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>skyulf-core/skyulf/pipeline/_pipeline.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">430</span>
-<span class="normal">431</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">431</span>
 <span class="normal">432</span>
 <span class="normal">433</span>
 <span class="normal">434</span>
@@ -5776,7 +5770,8 @@ in Jupyter markdown cells.</p>
 <span class="normal">437</span>
 <span class="normal">438</span>
 <span class="normal">439</span>
-<span class="normal">440</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">to_mermaid_markdown</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">heading</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="s2">"Pipeline topology"</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="normal">440</span>
+<span class="normal">441</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">to_mermaid_markdown</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">heading</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="s2">"Pipeline topology"</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""Return the diagram as a Markdown snippet with a ``mermaid`` fence.</span>
 
 <span class="sd">    Includes a heading by default; pass ``heading=None`` for just the</span>
@@ -5809,9 +5804,9 @@ in Jupyter markdown cells.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>skyulf-core/skyulf/pipeline/_pipeline.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">418</span>
-<span class="normal">419</span>
-<span class="normal">420</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">validate_leakage_safety</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">on_leakage</span><span class="p">:</span> <span class="n">OnLeakage</span> <span class="o">=</span> <span class="s2">"raise"</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">419</span>
+<span class="normal">420</span>
+<span class="normal">421</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">validate_leakage_safety</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">on_leakage</span><span class="p">:</span> <span class="n">OnLeakage</span> <span class="o">=</span> <span class="s2">"raise"</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
 <span class="w">    </span><span class="sd">"""Diagnose preprocessing steps ordered before the train/test split."""</span>
     <span class="k">return</span> <span class="n">validate_leakage_safety</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">config</span><span class="p">,</span> <span class="n">on_leakage</span><span class="o">=</span><span class="n">on_leakage</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
