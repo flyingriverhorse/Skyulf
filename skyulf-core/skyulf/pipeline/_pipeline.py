@@ -210,14 +210,20 @@ class SkyulfPipeline:
     ) -> tuple[pd.DataFrame, pd.Series, pd.DataFrame, pd.Series]:
         """Run this pipeline's configured preprocessing chain and return the split.
 
-        The result is the train/test split as plain pandas objects. Runs
-        ``self.feature_engineer.fit_transform(data)`` — the same
-        preprocessing ``fit()`` uses internally — and extracts
+        The result is the train/test split as plain pandas objects. Runs a
+        **throwaway** ``FeatureEngineer`` over the same configured steps — the
+        same preprocessing ``fit()`` uses internally — and extracts
         ``(X_train, y_train, X_test, y_test)`` from the resulting split using
         ``target_column``, converting any Polars/SkyulfDataFrame frames to
         pandas. Saves callers from re-implementing this split/convert step
         themselves for custom evaluation harnesses (e.g. comparing multiple
         raw sklearn-style estimators against the same preprocessed split).
+
+        This pipeline's own fitted preprocessing is deliberately left alone.
+        Refitting it in place would swap the statistics a model already trained
+        against, leaving ``predict()`` silently transforming inputs with a
+        scaler the model never saw — so predictions must be identical before
+        and after this call.
 
         Args:
             data: Input data (DataFrame or SplitDataset).
@@ -230,7 +236,9 @@ class SkyulfPipeline:
             ValueError: If the configured preprocessing steps don't produce a
                 train/test split (e.g. no Splitter node configured).
         """
-        transformed_data, _ = self.feature_engineer.fit_transform(data)
+        transformed_data, _ = FeatureEngineer(
+            self.preprocessing_steps, _validated=True
+        ).fit_transform(data)
 
         if not isinstance(transformed_data, SplitDataset):
             raise ValueError(

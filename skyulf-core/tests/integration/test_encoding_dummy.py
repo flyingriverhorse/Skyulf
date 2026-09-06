@@ -110,6 +110,74 @@ def test_fit_apply_int_column_cross_engine_null_mismatch_does_not_lose_all_rows(
     assert row_sums.tolist() == [1, 1, 0]
 
 
+def test_known_category_encoding_does_not_depend_on_batch_composition() -> None:
+    """A value's category string must be a function of the value alone (OC-177).
+
+    The renderer once asked whether *every* value in the batch was integral
+    before normalizing, so ``1.0`` matched its fitted category when it arrived
+    alone and silently encoded to an all-zero row when a fractional ``2.5``
+    shared the batch — the same input, two different answers.
+    """
+    params = DummyEncoderCalculator().fit(pd.DataFrame({"x": [1.0, 2.0]}), {"columns": ["x"]})
+    assert params["categories"]["x"] == ["1", "2"]
+
+    alone = DummyEncoderApplier().apply(pd.DataFrame({"x": [1.0]}), dict(params))
+    accompanied = DummyEncoderApplier().apply(pd.DataFrame({"x": [1.0, 2.5]}), dict(params))
+
+    assert alone.loc[0, "x_1"] == 1
+    assert accompanied.loc[0, "x_1"] == 1
+    # 2.5 was never fitted, so it legitimately encodes to an all-zero row.
+    assert accompanied.loc[1].sum() == 0
+
+
+def test_float_categories_learn_identical_names_on_both_engines() -> None:
+    """One float dataset must yield one category list, whichever engine fits it.
+
+    Pandas normalized integral floats to ``"1"`` while Polars rendered
+    ``"1.0"``, so the two engines emitted differently *named* indicator
+    columns (``x_1`` vs ``x_1.0``) for the same data.
+    """
+    df_pd = pd.DataFrame({"x": [1.0, 2.0, 2.5]})
+    df_pl = pl.DataFrame({"x": [1.0, 2.0, 2.5]})
+
+    pd_params = DummyEncoderCalculator().fit(df_pd, {"columns": ["x"]})
+    pl_params = DummyEncoderCalculator().fit(df_pl, {"columns": ["x"]})
+
+    assert pd_params["categories"]["x"] == ["1", "2", "2.5"]
+    assert pl_params["categories"]["x"] == pd_params["categories"]["x"]
+
+    out_pd = DummyEncoderApplier().apply(df_pd, dict(pd_params))
+    out_pl = DummyEncoderApplier().apply(df_pl, dict(pl_params))
+    assert list(out_pd.columns) == out_pl.columns
+
+
+def test_fractional_float_values_keep_their_fractional_rendering() -> None:
+    """Stripping the integral ".0" must not round or truncate real fractions."""
+    df = pd.DataFrame({"x": [0.25, 1.5]})
+    params, out = _fit_apply(df, {"columns": ["x"]})
+    assert params["categories"]["x"] == ["0.25", "1.5"]
+    assert out.loc[0, "x_0.25"] == 1
+    assert out.loc[1, "x_1.5"] == 1
+
+
+def test_polars_fitted_float_categories_apply_on_pandas() -> None:
+    """An artifact fitted on one engine must encode correctly on the other."""
+    params = DummyEncoderCalculator().fit(pl.DataFrame({"x": [1.0, 2.0]}), {"columns": ["x"]})
+    out = DummyEncoderApplier().apply(pd.DataFrame({"x": [1.0, 2.5]}), dict(params))
+
+    assert out.loc[0, "x_1"] == 1
+    assert out.loc[1].sum() == 0
+
+
+def test_string_column_holding_a_dot_zero_literal_is_untouched() -> None:
+    """The ".0" strip is float-dtype only, so a genuine string category survives verbatim."""
+    df = pd.DataFrame({"code": ["1.0", "2", "1.0"]})
+    params, out = _fit_apply(df, {"columns": ["code"]})
+
+    assert params["categories"]["code"] == ["1.0", "2"]
+    assert out.loc[0, "code_1.0"] == 1
+
+
 def test_empty_dataframe_returns_empty_categories() -> None:
     """Fitting on a zero-row DataFrame yields an empty category list, no crash."""
     df = pd.DataFrame({"color": pd.Series([], dtype="object")})
