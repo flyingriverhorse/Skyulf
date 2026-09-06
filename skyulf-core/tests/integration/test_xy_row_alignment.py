@@ -321,6 +321,7 @@ def test_pandas_sort_positions_match_sort_values(
         assert positions is None
         assert out is df
         return
+    assert sort_by is not None  # positions are only produced for a real column key
     assert positions.tolist() == expected_positions
     expected = df.sort_values(sort_by, kind="mergesort")
     assert out.index.tolist() == expected.index.tolist()

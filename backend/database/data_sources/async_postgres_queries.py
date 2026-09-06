@@ -6,16 +6,28 @@ This is the async equivalent of the Flask db/data_sources/postgres_queries.py
 import logging
 from typing import Any
 
-from sqlalchemy import column, delete, literal_column, select, table, update
+from sqlalchemy import column, literal_column, select, table
 from sqlalchemy import text as sa_text
 
 from backend.config import Settings
 
 from ..adapter import async_session_or_connection
 
+# Engine-agnostic: both writers are implemented once in ``_common`` and re-exported
+# here so ``_DB_PEERS`` dispatch and the ``postgres_*`` names in ``__init__`` resolve.
+from ._common import delete_data_source, update_data_source
+
 logger = logging.getLogger(__name__)
 
 TABLE = "data_sources"
+
+__all__ = [
+    "delete_data_source",
+    "insert_data_source",
+    "select_data_source_by_file_hash",
+    "select_data_sources",
+    "update_data_source",
+]
 
 
 async def insert_data_source(settings: Settings, row: dict[str, Any]) -> dict[str, Any]:
@@ -70,76 +82,6 @@ async def select_data_sources(
 
         except Exception as e:
             logger.exception(f"Failed to select data sources: {e}")
-            raise
-
-
-async def update_data_source(
-    settings: Settings, filter_dict: dict[str, Any], update_data: dict[str, Any]
-):
-    """Update the data source records matching every key in ``filter_dict``.
-
-    An empty ``filter_dict`` is rejected rather than read as "match everything":
-    the WHERE clause is built one key at a time below, so with no keys the
-    statement compiles to an unscoped ``UPDATE data_sources SET ...`` that
-    rewrites every row and still reports ``affected_rows`` as though that had
-    been the requested operation. Checked before the session opens so no
-    transaction is started for a call that cannot run.
-    """
-    if not filter_dict:
-        raise ValueError("update_data_source requires a non-empty filter_dict")
-
-    async with async_session_or_connection(settings) as session:
-        try:
-            # Use SQLAlchemy Core for UPDATE
-            tbl = table(
-                TABLE,
-                *[column(c) for c in update_data] + [column(c) for c in filter_dict],
-            )
-
-            stmt = update(tbl).values(**update_data)
-
-            for k, v in filter_dict.items():
-                stmt = stmt.where(column(k) == v)
-
-            result = await session.execute(stmt)
-            await session.commit()
-
-            return {"affected_rows": result.rowcount}
-
-        except Exception as e:
-            logger.exception(f"Failed to update data source: {e}")
-            await session.rollback()
-            raise
-
-
-async def delete_data_source(settings: Settings, filter_dict: dict[str, Any]):
-    """Delete the data source records matching every key in ``filter_dict``.
-
-    An empty ``filter_dict`` is rejected rather than read as "match everything":
-    the WHERE clause is built one key at a time below, so with no keys the
-    statement compiles to a bare ``DELETE FROM data_sources`` that empties the
-    table and still reports ``affected_rows`` as though that had been the
-    requested operation. Checked before the session opens so no transaction is
-    started for a call that cannot run.
-    """
-    if not filter_dict:
-        raise ValueError("delete_data_source requires a non-empty filter_dict")
-
-    async with async_session_or_connection(settings) as session:
-        try:
-            tbl = table(TABLE, *[column(c) for c in filter_dict])
-            stmt = delete(tbl)
-            for k, v in filter_dict.items():
-                stmt = stmt.where(column(k) == v)
-
-            result = await session.execute(stmt)
-            await session.commit()
-
-            return {"affected_rows": result.rowcount}
-
-        except Exception as e:
-            logger.exception(f"Failed to delete data source: {e}")
-            await session.rollback()
             raise
 
 

@@ -4,10 +4,16 @@
 looping over ``filter_dict``, so an empty dict produces a statement with no
 predicate at all: a full-table DELETE/UPDATE that still returns
 ``affected_rows`` as though that had been the requested operation. Both the
-SQLite and the PostgreSQL query modules had the identical shape.
+SQLite and the PostgreSQL query modules had the identical shape — identical
+enough that the two are now one implementation in ``_common``, re-exported by
+each engine module, so the guard cannot be fixed in one engine and missed in
+the other.
 
 These tests pin the hazard itself (the compiled SQL) as well as the guard, so
 the reason the ``ValueError`` exists stays visible if the builder is refactored.
+The session patches target ``_common`` because that is the module whose globals
+the shared writers resolve ``async_session_or_connection`` from; patching an
+engine module would leave ``assert_not_called`` passing vacuously.
 """
 
 from unittest.mock import AsyncMock, patch
@@ -16,6 +22,7 @@ import pytest
 from sqlalchemy import column, delete, table, update
 
 from backend.config import get_settings
+from backend.database.data_sources import _common
 from backend.database.data_sources import async_data_sources_crud as crud
 from backend.database.data_sources import async_postgres_queries as pg_q
 from backend.database.data_sources import async_sqlite_queries as sqlite_q
@@ -61,9 +68,15 @@ def test_an_empty_filter_compiles_to_a_statement_with_no_where_clause():
 
 @pytest.mark.parametrize("mod", [sqlite_q, pg_q], ids=["sqlite", "postgres"])
 async def test_delete_rejects_an_empty_filter_before_opening_a_session(mod, settings):
-    """An empty filter must raise, and must not start a transaction to do it."""
+    """An empty filter must raise, and must not start a transaction to do it.
+
+    Both parameters resolve to the one shared writer in ``_common``; what the
+    parameter still pins is that each engine module re-exports it, since
+    ``_DB_PEERS`` dispatch and the public ``sqlite_*``/``postgres_*`` names both
+    reach the guard through those attributes.
+    """
     with (
-        patch.object(mod, "async_session_or_connection", new=AsyncMock()) as session,
+        patch.object(_common, "async_session_or_connection", new=AsyncMock()) as session,
         pytest.raises(ValueError, match="non-empty filter_dict"),
     ):
         await mod.delete_data_source(settings, {})
@@ -74,7 +87,7 @@ async def test_delete_rejects_an_empty_filter_before_opening_a_session(mod, sett
 async def test_update_rejects_an_empty_filter_before_opening_a_session(mod, settings):
     """Same guard on the update path: unscoped means every row is rewritten."""
     with (
-        patch.object(mod, "async_session_or_connection", new=AsyncMock()) as session,
+        patch.object(_common, "async_session_or_connection", new=AsyncMock()) as session,
         pytest.raises(ValueError, match="non-empty filter_dict"),
     ):
         await mod.update_data_source(settings, {}, {"name": "new"})
@@ -91,7 +104,7 @@ async def test_crud_delete_with_an_empty_filter_never_reaches_the_database(setti
     """
     with (
         patch.object(crud, "get_primary_database", return_value="sqlite"),
-        patch.object(crud.sqlite_q, "async_session_or_connection", new=AsyncMock()) as session,
+        patch.object(_common, "async_session_or_connection", new=AsyncMock()) as session,
         pytest.raises(RuntimeError, match="Failed to delete from primary database"),
     ):
         await crud.delete(settings, {})
