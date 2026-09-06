@@ -1,3 +1,10 @@
+"""Registry mapping node IDs to their Calculator/Applier classes and UI metadata.
+
+Nodes self-register as an import side effect: each node module decorates its
+Calculator with :meth:`NodeRegistry.register`, so importing the module is what
+makes the node resolvable. All state is class-level and process-wide.
+"""
+
 import logging
 import warnings
 from threading import Lock
@@ -7,6 +14,14 @@ logger = logging.getLogger(__name__)
 
 
 class NodeRegistry:
+    """Class-level store of every registered node, its Applier and its UI metadata.
+
+    There is no instance — callers use the classmethods directly. Writes are
+    serialized under a lock because concurrent imports can register at the same
+    time, and re-registering an existing ID overwrites it with a warning rather
+    than raising.
+    """
+
     _calculators: ClassVar[dict[str, type]] = {}
     _appliers: ClassVar[dict[str, type]] = {}
     _metadata: ClassVar[dict[str, dict[str, Any]]] = {}
@@ -56,6 +71,12 @@ class NodeRegistry:
 
     @classmethod
     def get_calculator(cls, name: str) -> type:
+        """Return the Calculator class registered under ``name``.
+
+        Raises ``ValueError`` listing the known node IDs when ``name`` is
+        absent. A deprecated alias only warns; it resolves because the alias ID
+        is registered in its own right, not because it is remapped.
+        """
         cls._warn_if_deprecated_alias(name)
         if name not in cls._calculators:
             raise ValueError(
@@ -65,6 +86,12 @@ class NodeRegistry:
 
     @classmethod
     def get_applier(cls, name: str) -> type:
+        """Return the Applier class registered under ``name``.
+
+        Raises ``ValueError`` when ``name`` is absent. As with
+        :meth:`get_calculator`, a deprecated alias only warns and is never
+        remapped.
+        """
         cls._warn_if_deprecated_alias(name)
         if name not in cls._appliers:
             raise ValueError(f"Node '{name}' not found in registry.")

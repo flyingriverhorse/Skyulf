@@ -1,4 +1,4 @@
-"""FastAPI Application Startup Script
+"""FastAPI Application Startup Script.
 
 © 2025 Murat Unsal — Skyulf Project
 

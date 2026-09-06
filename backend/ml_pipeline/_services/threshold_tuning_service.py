@@ -1,7 +1,6 @@
-"""Threshold Tuning Service
-------------------------
-Service for previewing, saving, toggling, and clearing per-job tuned
-decision thresholds. Tuning always operates on raw/undecoded target labels
+"""Threshold tuning service: preview, save, toggle and clear tuned decision thresholds.
+
+Thresholds are per-job. Tuning always operates on raw/undecoded target labels
 (via ``EvaluationService._load_raw_evaluation_data``) so the resulting
 threshold dict's keys match the live model's actual ``estimator.classes_``
 values at predict time.

@@ -1,7 +1,6 @@
-"""Prediction Utilities
---------------------
-Shared helper functions for decoding predictions and extracting label encoders.
-Used by DeploymentService and EvaluationService.
+"""Prediction utilities: decode predictions and extract label encoders.
+
+Shared helper functions used by DeploymentService and EvaluationService.
 """
 
 import logging

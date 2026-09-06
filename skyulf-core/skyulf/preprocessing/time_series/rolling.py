@@ -124,8 +124,11 @@ def _apply_pandas(X: Any, _y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
 
 
 class RollingAggregateApplier(BaseApplier):
+    """Append rolling-window aggregate columns for the configured columns."""
+
     @apply_method
     def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
+        """Compute the rolling aggregates on the active engine; ``y`` passes through."""
         return apply_dual_engine(
             (X, _y) if _y is not None else X,
             params,
@@ -151,11 +154,14 @@ class RollingAggregateApplier(BaseApplier):
     learns_from_data=False,
 )
 class RollingAggregateCalculator(BaseCalculator):
+    """Normalize the rolling-window configuration into the artifact."""
+
     def fit(
         self,
         df: pd.DataFrame | SkyulfDataFrame | tuple[Any, ...] | Any,
         config: dict[str, Any],
     ) -> RollingAggregateArtifact:
+        """Record the window, recognized aggregations, and sort/group settings."""
         return {
             "type": "rolling_aggregate",
             "columns": config.get("columns", []),
@@ -169,6 +175,7 @@ class RollingAggregateCalculator(BaseCalculator):
     def infer_output_schema(
         self, input_schema: SkyulfSchema, config: dict[str, Any]
     ) -> SkyulfSchema | None:
+        """Add one float64 ``{col}_roll_{agg}_{window}`` column per (column, aggregation)."""
         # Rolling outputs are float64 regardless of source dtype.
         cols = filter_existing_columns(config.get("columns", []), input_schema.column_list())
         aggs = coerce_aggregations(config.get("aggregations", ["mean"]))

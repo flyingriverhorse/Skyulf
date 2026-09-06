@@ -143,8 +143,17 @@ def _build_interaction_feature_names(
 
 
 class FeatureInteractionApplier(BaseApplier):
+    """Append the multiplicative interaction columns named by the artifact."""
+
     @apply_method
     def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
+        """Compute each artifact combination as a column product and append it.
+
+        A combination whose columns are absent from ``X`` is skipped rather than
+        raising, so the node survives an upstream column drop; ``include_bias``
+        adds a constant 1.0 ``interaction_bias`` column. When no column is
+        generated the frame is returned unchanged.
+        """
         return apply_dual_engine(
             X, params, {"polars": _interaction_apply_polars, "pandas": _interaction_apply_pandas}
         )
@@ -163,8 +172,21 @@ class FeatureInteractionApplier(BaseApplier):
     learns_from_data=False,
 )
 class FeatureInteractionCalculator(BaseCalculator):
+    """Resolve which cross-products to generate, without computing them."""
+
     @fit_method
     def fit(self, X: Any, _y: Any, config: dict[str, Any]) -> FeatureInteractionArtifact:  # pylint: disable=arguments-differ
+        """Validate the requested columns and degree, then enumerate the combinations.
+
+        Columns are sorted into the artifact so the generated names depend only
+        on the set of inputs, never on the order they were configured in. Fewer
+        columns than ``degree`` yields an empty combination list — an artifact
+        that generates nothing — rather than an error.
+
+        Raises:
+            ValueError: If a configured column is missing or non-numeric, or if
+                ``degree`` falls outside the supported ``(2, 3, 4)``.
+        """
         cols = list(config.get("columns", []))
         X_pd = select_then_to_pandas(X, cols)
 

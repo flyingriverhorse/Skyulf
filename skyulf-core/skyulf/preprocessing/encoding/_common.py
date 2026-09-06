@@ -105,10 +105,10 @@ def _exclude_target_column(
     encoder_name: str,
     y: Any = None,
 ) -> list[str]:
-    """Remove the target column from the encoding list for encoders that must
-    not encode it (column-destroying encoders, and supervised in-place
-    encoders that would produce a leaky/degenerate encoding against
-    themselves).
+    """Remove the target column from the encoding list for encoders that must not encode it.
+
+    Those are the column-destroying encoders, and the supervised in-place
+    encoders that would produce a leaky/degenerate encoding against themselves.
 
     Detects the target column from config['target_column'] or the name of y.
     Returns the filtered column list and logs a warning when a column is removed.
@@ -129,6 +129,14 @@ def _exclude_target_column(
 
 
 def detect_categorical_columns(df: Any) -> list[str]:
+    """Auto-detect the string/categorical columns an encoder should target.
+
+    The fallback every encoder passes to ``resolve_columns`` when the user
+    configured no explicit column list: polars frames are matched on
+    ``Utf8``/``Categorical``/``Object`` dtypes, pandas frames via
+    ``select_dtypes`` on ``object``/``category`` — so "encode categoricals"
+    means the same thing on either engine.
+    """
     engine = get_engine(df)
     if engine.name == EngineName.POLARS:
         df_pl: Any = df

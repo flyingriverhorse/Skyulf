@@ -77,8 +77,10 @@ class MultivariateMixin(_AnalyzerState):
 
     @staticmethod
     def _impute_matrix_drop_empty(X_df: pl.DataFrame) -> np.ndarray:
-        """Mean-impute (Polars fast path, sklearn fallback), dropping columns with no
-        observed values, matching ``SimpleImputer(strategy="mean")``'s default
+        """Mean-impute and drop columns with no observed values.
+
+        Uses the Polars fast path with a sklearn fallback, matching
+        ``SimpleImputer(strategy="mean")``'s default
         ``keep_empty_features=False`` behavior used by outlier detection.
 
         Unlike :meth:`_impute_matrix` (used for PCA/clustering, which must keep a

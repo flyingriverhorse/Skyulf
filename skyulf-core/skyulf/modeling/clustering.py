@@ -56,10 +56,12 @@ def _select_numeric_features(X: Any) -> tuple[Any, list[str]]:
 
 
 def _drop_reference_column(X: Any, reference_column: str) -> Any:
-    """Drop a user-designated "reference column" (e.g. a known label like
-    species name) by name, regardless of dtype — unlike ``_select_numeric_features``,
-    this also protects against a *numeric* reference column (e.g. a species code)
-    silently riding along into the distance calculation.
+    """Drop a user-designated "reference column" by name, regardless of dtype.
+
+    The column is a known label the user picked out (e.g. a species name).
+    Unlike ``_select_numeric_features``, this also protects against a *numeric*
+    reference column (e.g. a species code) silently riding along into the
+    distance calculation.
     """
     if reference_column and hasattr(X, "columns") and reference_column in X.columns:
         if isinstance(X, pd.DataFrame):
@@ -71,10 +73,11 @@ def _drop_reference_column(X: Any, reference_column: str) -> Any:
 
 
 class _NumericOnlyClusteringApplier(SklearnApplier):
-    """Applier mixin shared by every clustering model: drop non-numeric columns
-    (and any reference column recorded at fit time) before predicting, mirroring
-    the filtering the matching Calculator applies at fit time (see
-    ``_NumericOnlyClusteringCalculatorMixin``).
+    """Applier mixin shared by every clustering model.
+
+    Drops non-numeric columns (and any reference column recorded at fit time)
+    before predicting, mirroring the filtering the matching Calculator applies
+    at fit time (see ``_NumericOnlyClusteringCalculatorMixin``).
     """
 
     def predict(self, df: pd.DataFrame | SkyulfDataFrame, model_artifact: Any) -> Any:
@@ -87,12 +90,14 @@ class _NumericOnlyClusteringApplier(SklearnApplier):
 
 
 class _NumericOnlyClusteringCalculatorMixin:
-    """Calculator mixin shared by every clustering model: restrict fitting to
-    numeric columns (text/id columns aren't clusterable via distance metrics),
-    plus an optional named "reference column" the user wants excluded from
-    training but kept around (elsewhere) purely for post-hoc interpretation —
-    e.g. a species name in the Iris dataset used to check "which cluster is
-    which flower" without ever letting the model see it.
+    """Calculator mixin shared by every clustering model.
+
+    Restricts fitting to numeric columns (text/id columns aren't clusterable
+    via distance metrics), plus an optional named "reference column" the user
+    wants excluded from training but kept around (elsewhere) purely for
+    post-hoc interpretation — e.g. a species name in the Iris dataset used to
+    check "which cluster is which flower" without ever letting the model see
+    it.
     """
 
     def fit(
@@ -154,6 +159,7 @@ class KMeansCalculator(_NumericOnlyClusteringCalculatorMixin, SklearnCalculator)
     """K-Means Calculator."""
 
     def __init__(self):
+        """Pin the estimator to ``KMeans`` and default ``n_clusters=3``, ``n_init=10``."""
         super().__init__(
             model_class=KMeans,
             default_params={
@@ -186,6 +192,7 @@ class MiniBatchKMeansCalculator(_NumericOnlyClusteringCalculatorMixin, SklearnCa
     """Mini-Batch K-Means Calculator."""
 
     def __init__(self):
+        """Pin the estimator to ``MiniBatchKMeans``; K-Means defaults plus ``batch_size=1024``."""
         super().__init__(
             model_class=MiniBatchKMeans,
             default_params={
@@ -225,6 +232,7 @@ class GaussianMixtureCalculator(_NumericOnlyClusteringCalculatorMixin, SklearnCa
     """Gaussian Mixture Calculator."""
 
     def __init__(self):
+        """Pin the estimator to ``GaussianMixture`` with 3 full-covariance components."""
         super().__init__(
             model_class=GaussianMixture,
             default_params={
@@ -257,6 +265,7 @@ class BirchCalculator(_NumericOnlyClusteringCalculatorMixin, SklearnCalculator):
     """Birch Calculator."""
 
     def __init__(self):
+        """Pin the estimator to ``Birch``, ``threshold=0.5`` and ``branching_factor=50``."""
         super().__init__(
             model_class=Birch,
             default_params={

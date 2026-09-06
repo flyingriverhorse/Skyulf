@@ -1,7 +1,7 @@
-"""File System Utilities for Data Source Management
+"""File System Utilities for Data Source Management.
 
-Provides safe file and folder deletion functionality with backup options,
-plus file cleanup and maintenance utilities.
+Provides safe file and folder deletion, plus file cleanup and maintenance
+utilities.
 """
 
 import logging
@@ -23,7 +23,6 @@ def _is_within_base(path: Path, base: Path) -> bool:
 
 def safe_delete_path(
     path: str | Path,
-    force_delete: bool = True,
     files_only: bool = True,
     allowed_base: str | Path | None = None,
 ) -> bool:
@@ -31,7 +30,6 @@ def safe_delete_path(
 
     Args:
         path: Path to the file or directory to delete
-        force_delete: If True, delete immediately (default True, backup removed)
         files_only: If True, only delete files, not directories
         allowed_base: When provided, the path must resolve inside this directory.
             Requests that escape the base directory are rejected to prevent

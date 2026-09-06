@@ -133,8 +133,11 @@ def _apply_polars(X: Any, _y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
 
 
 class DateFeaturesApplier(BaseApplier):
+    """Append calendar-part columns extracted from the configured datetime columns."""
+
     @apply_method
     def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
+        """Extract the configured calendar features on the active engine; ``y`` passes through."""
         return apply_dual_engine(X, params, {"polars": _apply_polars, "pandas": _apply_pandas})
 
 
@@ -149,11 +152,14 @@ class DateFeaturesApplier(BaseApplier):
     learns_from_data=False,
 )
 class DateFeaturesCalculator(BaseCalculator):
+    """Normalize the requested calendar features into the artifact."""
+
     def fit(
         self,
         df: pd.DataFrame | SkyulfDataFrame | tuple[Any, ...] | Any,
         config: dict[str, Any],
     ) -> DateFeaturesArtifact:
+        """Record the columns and supported features, defaulting to year/month/day/dayofweek."""
         return {
             "type": "date_features",
             "columns": config.get("columns", []),
@@ -164,6 +170,7 @@ class DateFeaturesCalculator(BaseCalculator):
     def infer_output_schema(
         self, input_schema: SkyulfSchema, config: dict[str, Any]
     ) -> SkyulfSchema | None:
+        """Add a nullable-int column per (column, feature); drop originals on request."""
         # Calendar parts are nullable integers (an unparseable date yields a
         # null feature value, not 0/NaN) - "Int64" here is a best-effort,
         # engine-agnostic label communicating nullability; the *actual*

@@ -88,8 +88,11 @@ def _apply_pandas(X: Any, _y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
 
 
 class LagFeaturesApplier(BaseApplier):
+    """Append lagged copies of the configured columns, optionally within groups."""
+
     @apply_method
     def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
+        """Add lag columns on the active engine; ``drop_na`` drops rows containing nulls."""
         return apply_dual_engine(
             (X, _y) if _y is not None else X,
             params,
@@ -108,11 +111,14 @@ class LagFeaturesApplier(BaseApplier):
     learns_from_data=False,
 )
 class LagFeaturesCalculator(BaseCalculator):
+    """Normalize the lag configuration into the artifact."""
+
     def fit(
         self,
         df: pd.DataFrame | SkyulfDataFrame | tuple[Any, ...] | Any,
         config: dict[str, Any],
     ) -> LagFeaturesArtifact:
+        """Record the columns, deduplicated positive lags, and sort/group/drop settings."""
         return {
             "type": "lag_features",
             "columns": config.get("columns", []),
@@ -125,6 +131,7 @@ class LagFeaturesCalculator(BaseCalculator):
     def infer_output_schema(
         self, input_schema: SkyulfSchema, config: dict[str, Any]
     ) -> SkyulfSchema | None:
+        """Add one ``{col}_lag_{n}`` column per lag, mirroring the source dtype."""
         # Lag columns mirror the dtype of their source column, so the output
         # schema is derivable from config alone (shape is data-independent).
         cols = filter_existing_columns(config.get("columns", []), input_schema.column_list())

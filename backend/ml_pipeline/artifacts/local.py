@@ -1,3 +1,5 @@
+"""Local-filesystem artifact store: one directory of joblib files."""
+
 import logging
 import os
 from pathlib import Path
@@ -11,7 +13,15 @@ logger = logging.getLogger(__name__)
 
 
 class LocalArtifactStore(ArtifactStore):
+    """Artifact store writing joblib files directly under ``base_path``."""
+
     def __init__(self, base_path: str):
+        """Store artifacts under ``base_path``, creating the directory if absent.
+
+        Args:
+            base_path: Directory that owns this store's artifact files. Keys are
+                resolved inside it and rejected if they escape it.
+        """
         self.base_path = base_path
         Path(self.base_path).mkdir(parents=True, exist_ok=True)
 
@@ -27,6 +37,12 @@ class LocalArtifactStore(ArtifactStore):
         return resolved
 
     def save(self, key: str, data: Any) -> None:
+        """Write ``data`` to the store as a joblib file named after ``key``.
+
+        Separators inside ``key`` are flattened and ``.joblib`` is appended, so
+        the file always lands directly in ``base_path``; a key that would
+        resolve outside it raises ``PermissionError``.
+        """
         path = self._get_path(key)
         joblib.dump(data, path)
 
@@ -44,6 +60,7 @@ class LocalArtifactStore(ArtifactStore):
         return joblib.load(path)
 
     def exists(self, key: str) -> bool:
+        """Check if a key exists in the store."""
         path = self._get_path(key)
         return Path(path).exists()
 

@@ -1,3 +1,11 @@
+"""Celery task entry points for pipeline execution.
+
+Also owns what a worker needs around them: the sync SQLAlchemy session (Celery
+tasks are synchronous while ``DATABASE_URL`` is async), the optional Sentry span
+per run, and the fallback that marks a job failed when ``execute_pipeline``
+itself raises.
+"""
+
 import logging
 import threading
 import traceback
@@ -40,6 +48,14 @@ _engine_init_lock = threading.Lock()
 
 
 def get_db_session():
+    """Return a sync Session from the worker's cached engine, building it on first use.
+
+    Celery tasks are synchronous, so the async ``DATABASE_URL`` is rewritten to its
+    sync driver (``sqlite+aiosqlite`` → ``sqlite``, ``postgresql+asyncpg`` →
+    ``postgresql+psycopg2``) and the engine is created once per worker process
+    behind a double-checked lock. The caller owns the returned session and must
+    close it.
+    """
     global _sync_engine, _sync_session_factory
     if _sync_session_factory is None:
         with _engine_init_lock:
@@ -61,10 +77,12 @@ def get_db_session():
 
 
 def _mark_job_failed_if_unrecorded(job_id: str, error_msg: str) -> None:
-    """Best-effort fallback: mark the job row as failed when an exception
-    escapes ``execute_pipeline`` itself (which normally records failures on
-    its own). This only fires for infra-level failures — e.g. a bug in
-    ``execute_pipeline`` or a DB/session failure — so it must never raise.
+    """Best-effort fallback: mark the job row as failed after an unhandled error.
+
+    Applies when an exception escapes ``execute_pipeline`` itself (which normally
+    records failures on its own). This only fires for infra-level failures — e.g.
+    a bug in ``execute_pipeline`` or a DB/session failure — so it must never
+    raise.
     """
     try:
         session = get_db_session()

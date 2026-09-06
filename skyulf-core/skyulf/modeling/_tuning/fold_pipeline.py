@@ -44,6 +44,14 @@ class FoldAwareModelStep(BaseEstimator):
         preprocessor: Any = None,
         feature_names: tuple[str, ...] | None = None,
     ) -> None:
+        """Store the wrap targets verbatim; nothing is copied or fitted here.
+
+        Plain assignment with ``None`` defaults is what sklearn's
+        ``clone``/``get_params`` machinery requires — deep-copying is
+        deferred to ``fit`` so every searcher clone gets its own fitted
+        state. ``feature_names`` records the column contract used to
+        rebuild named frames when the searcher hands back plain arrays.
+        """
         self.estimator = estimator
         self.preprocessor = preprocessor
         self.feature_names = feature_names
@@ -98,6 +106,14 @@ class FoldAwareModelStep(BaseEstimator):
         )
 
     def __sklearn_tags__(self):
+        """Propagate the wrapped model's tags so sklearn sees its estimator type.
+
+        A bare ``BaseEstimator`` tags as neither classifier nor regressor,
+        so ``predict_proba``-based scorers would refuse this step inside a
+        searcher; copying the model's estimator/classifier/regressor/target
+        tags keeps the wrap invisible to sklearn's response-method
+        machinery.
+        """
         # Propagate the wrapped model's estimator type so sklearn's
         # response-method machinery (scorers, Pipeline delegation) sees a
         # classifier as a classifier — a bare BaseEstimator tags as neither
@@ -112,6 +128,14 @@ class FoldAwareModelStep(BaseEstimator):
         return tags
 
     def fit(self, X: Any, y: Any = None) -> "FoldAwareModelStep":
+        """Fit preprocessing and model on this fold's training rows only.
+
+        Preprocessor and estimator are deep-copied first, so clones made by
+        the searcher never share fitted state across folds or parallel
+        workers — this is what makes row-resampling and target-re-encoding
+        chains leakage-free inside the searcher's own CV. A label map is
+        built when the chain re-encoded ``y``, for ``predict`` to invert.
+        """
         X, y = self._ensure_frames(X, y)
         worker = copy.deepcopy(self.preprocessor)
         model = copy.deepcopy(self.estimator)
@@ -128,12 +152,24 @@ class FoldAwareModelStep(BaseEstimator):
         return X_t
 
     def predict(self, X: Any) -> Any:
+        """Predict with the fitted model on X run through the fitted chain.
+
+        Predictions made in an encoded label space are mapped back through
+        the fit-time label map so the searcher's scorer compares against
+        the untouched ``y`` it holds.
+        """
         pred = self.model_.predict(self._transform_x(X))
         if self.label_map_ is not None:
             pred = pd.Series(np.asarray(pred)).map(self.label_map_).to_numpy()
         return pred
 
     def predict_proba(self, X: Any) -> Any:
+        """Class probabilities from the fitted model over the transformed X.
+
+        Probabilities need no remapping: their columns already align with
+        the mapped-back ``classes_`` property, so scorers see a consistent
+        label space.
+        """
         return self.model_.predict_proba(self._transform_x(X))
 
     @property

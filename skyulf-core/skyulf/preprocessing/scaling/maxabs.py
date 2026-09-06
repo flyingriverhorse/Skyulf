@@ -19,8 +19,11 @@ from ._common import _select_subset_pandas, _select_subset_polars
 
 
 class MaxAbsScalerApplier(BaseApplier):
+    """Divide the selected columns by their fitted maximum absolute value."""
+
     @apply_method
     def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
+        """Scale ``X`` by the fitted max-abs values; ``y`` passes through."""
         return apply_dual_engine(
             X, params, {"polars": self._apply_polars, "pandas": self._apply_pandas}
         )
@@ -65,13 +68,17 @@ class MaxAbsScalerApplier(BaseApplier):
     learns_from_data=True,
 )
 class MaxAbsScalerCalculator(BaseCalculator):
+    """Fit per-column maximum-absolute-value statistics via sklearn's ``MaxAbsScaler``."""
+
     def infer_output_schema(
         self, input_schema: SkyulfSchema, config: dict[str, Any]
     ) -> SkyulfSchema:
+        """Return the input schema unchanged: scaling rewrites values, not columns."""
         return input_schema
 
     @fit_method
     def fit(self, X: Any, _y: Any, config: dict[str, Any]) -> MaxAbsScalerArtifact:  # pylint: disable=arguments-differ
+        """Dispatch the fit to the active engine and return the max-abs statistics artifact."""
         if user_picked_no_columns(config):
             return cast(MaxAbsScalerArtifact, {})
         return cast(

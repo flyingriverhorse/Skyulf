@@ -1,3 +1,9 @@
+"""Abstract data-access interface that decouples a pipeline from its storage.
+
+Concrete catalogs live outside the core library. They return either a pandas
+frame or an engine-neutral :class:`~skyulf.engines.SkyulfDataFrame`.
+"""
+
 from abc import ABC, abstractmethod
 
 import pandas as pd
@@ -27,6 +33,9 @@ class DataCatalog(ABC):
         Args:
             dataset_id: Unique identifier for the destination.
             data: The pandas/polars DataFrame to save.
+            **kwargs: Backend-specific write options. Implementations differ in
+                whether they honour or ignore them, so callers must not rely on
+                any particular key.
         """
 
     @abstractmethod

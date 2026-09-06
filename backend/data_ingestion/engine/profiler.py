@@ -1,3 +1,13 @@
+"""Column statistics profiler for ingested polars frames.
+
+``DataProfiler.profile`` computes the dataset-level totals — rows, columns,
+missing cells and duplicated rows — plus a per-column breakdown: dtype, null
+count and percentage, and cardinality for every column, extended with
+mean/std/min/max/median for numeric dtypes and the five most frequent values
+for string-like ones. The ingestion task stores the whole dict on
+``DataSource.source_metadata``.
+"""
+
 import logging
 from typing import Any
 

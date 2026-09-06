@@ -1,3 +1,5 @@
+"""Polars implementation of the ``SkyulfDataFrame`` protocol and its ``PolarsEngine`` adapter."""
+
 from collections.abc import Sequence
 from typing import Any
 
@@ -37,24 +39,30 @@ class SkyulfPolarsWrapper:
     """Wrapper for Polars DataFrame to implement SkyulfDataFrame protocol."""
 
     def __init__(self, df: Any):
+        """Store ``df``, the ``polars.DataFrame`` this wrapper adapts."""
         # df is pl.DataFrame
         self._df = df
 
     @property
     def columns(self) -> Sequence[str]:
+        """Column names as a ``list[str]``."""
         return self._df.columns
 
     @property
     def shape(self) -> tuple[int, int]:
+        """Row and column counts as a ``(rows, cols)`` tuple."""
         return self._df.shape
 
     def select(self, columns: list[str] | str) -> "SkyulfDataFrame":
+        """Return a new wrapper with only the selected column(s)."""
         return SkyulfPolarsWrapper(self._df.select(columns))
 
     def drop(self, columns: list[str]) -> "SkyulfDataFrame":
+        """Return a new wrapper without the given columns."""
         return SkyulfPolarsWrapper(self._df.drop(columns))
 
     def with_column(self, name: str, values: Any) -> "SkyulfDataFrame":
+        """Return a new wrapper with ``name`` set to ``values``; scalars broadcast to all rows."""
         # Polars with_columns takes expressions or series. Passing a bare
         # scalar to pl.Series(name, values) creates a length-1 Series, which
         # then fails to broadcast against a taller frame (unlike pandas'
@@ -68,21 +76,27 @@ class SkyulfPolarsWrapper:
         return SkyulfPolarsWrapper(self._df.with_columns(expr))
 
     def to_native(self) -> Any:
+        """Return the underlying ``polars.DataFrame`` without conversion."""
         return self._df
 
     def to_pandas(self) -> Any:
+        """Convert the frame to a ``pandas.DataFrame``."""
         return self._df.to_pandas()
 
     def to_arrow(self) -> Any:
+        """Convert the frame to an Arrow table."""
         return self._df.to_arrow()
 
     def copy(self) -> "SkyulfDataFrame":
+        """Return a new wrapper around a clone of the underlying frame."""
         return SkyulfPolarsWrapper(self._df.clone())
 
     def __getitem__(self, key):
+        """Delegate column/row selection to the underlying ``polars.DataFrame``."""
         return self._df[key]
 
     def __setitem__(self, key, value):
+        """Assign a scalar cell by ``(row, col)`` key; other keys raise ``NotImplementedError``."""
         # polars.DataFrame supports scalar cell assignment via a (row, col)
         # index tuple (e.g. ``df[0, "a"] = 99``), which mutates in place and
         # works fine. It does NOT support pandas-style whole-column
@@ -101,25 +115,32 @@ class SkyulfPolarsWrapper:
         )
 
     def __len__(self) -> int:
+        """Return the row count of the underlying frame."""
         return self._df.height
 
     def __getattr__(self, name):
+        """Delegate unknown attribute access to the underlying ``polars.DataFrame``."""
         return getattr(self._df, name)
 
 
 class PolarsEngine(BaseEngine):
+    """Engine adapter for polars-backed data; registered under ``"polars"``."""
+
     name = EngineName.POLARS
 
     @classmethod
     def is_compatible(cls, data: Any) -> bool:
+        """Return ``True`` if ``data`` is a ``polars.DataFrame``."""
         return isinstance(data, pl.DataFrame)
 
     @classmethod
     def from_pandas(cls, df: Any) -> Any:
+        """Convert a pandas DataFrame to a ``polars.DataFrame``."""
         return pl.from_pandas(df)
 
     @classmethod
     def to_numpy(cls, df: Any) -> Any:
+        """Convert ``df`` to a NumPy array, mirroring pandas' ``(n, 0)`` shape for empty frames."""
         # `SkyulfPolarsWrapper.__getattr__` delegates to the wrapped
         # `pl.DataFrame`, so `df.to_numpy()` and `df._df.to_numpy()` are
         # identical -- no need for a separate `isinstance` branch.
@@ -134,12 +155,14 @@ class PolarsEngine(BaseEngine):
 
     @classmethod
     def wrap(cls, data: Any) -> "SkyulfDataFrame":
+        """Wrap ``data`` in a ``SkyulfPolarsWrapper`` (idempotent for wrappers)."""
         if isinstance(data, SkyulfPolarsWrapper):
             return data
         return SkyulfPolarsWrapper(data)
 
     @classmethod
     def create_dataframe(cls, data: Any) -> Any:
+        """Build a ``polars.DataFrame`` from ``data`` (dict, list, etc.)."""
         return pl.DataFrame(data)
 
 

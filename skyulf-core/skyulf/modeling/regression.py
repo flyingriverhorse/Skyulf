@@ -67,6 +67,13 @@ class LinearRegressionCalculator(SklearnCalculator):
     """Linear Regression Calculator."""
 
     def __init__(self):
+        """Bind ``LinearRegression`` with sklearn's defaults and every core.
+
+        ``fit_intercept=True`` and ``copy_X=True`` are sklearn's own, restated
+        so the node's tunable surface is explicit. ``n_jobs=-1`` departs from
+        sklearn's ``None``: the solve is dispatched through joblib, which per
+        sklearn only pays off on extremely large problems.
+        """
         super().__init__(
             model_class=LinearRegression,
             default_params={
@@ -97,6 +104,13 @@ class RidgeRegressionCalculator(SklearnCalculator):
     """Ridge Regression Calculator."""
 
     def __init__(self):
+        """Bind ``Ridge`` with sklearn's own defaults.
+
+        ``alpha=1.0`` is the L2 penalty strength and ``solver="auto"`` lets
+        sklearn pick the solver from the data's shape and dtype. Both are
+        restated so the node's tunable surface is explicit; ``fit``'s config
+        overrides either.
+        """
         super().__init__(
             model_class=Ridge,
             default_params={
@@ -126,6 +140,13 @@ class RandomForestRegressorCalculator(SklearnCalculator):
     """Random Forest Regressor Calculator."""
 
     def __init__(self):
+        """Bind ``RandomForestRegressor`` with 50 shallow, constrained trees.
+
+        ``max_depth=10``, ``min_samples_split=5`` and ``min_samples_leaf=2``
+        restrict tree growth that sklearn leaves open by default, and the
+        forest is half sklearn's default size. ``n_jobs=-1`` fits across every
+        core. All are overridable from ``fit``'s config.
+        """
         super().__init__(
             model_class=RandomForestRegressor,
             default_params={
@@ -158,6 +179,13 @@ class LassoRegressionCalculator(SklearnCalculator):
     """Lasso Regression Calculator."""
 
     def __init__(self):
+        """Bind ``Lasso`` with sklearn's own defaults.
+
+        ``alpha=1.0`` is the L1 penalty strength, and ``selection="cyclic"``
+        walks the features in fixed order during coordinate descent rather
+        than randomly. Both are restated so the node's tunable surface is
+        explicit; ``fit``'s config overrides either.
+        """
         super().__init__(
             model_class=Lasso,
             default_params={"alpha": 1.0, "selection": "cyclic"},
@@ -184,6 +212,14 @@ class ElasticNetRegressionCalculator(SklearnCalculator):
     """ElasticNet Regression Calculator."""
 
     def __init__(self):
+        """Bind ``ElasticNet`` with sklearn's own defaults.
+
+        ``alpha=1.0`` is the total penalty strength and ``l1_ratio=0.5``
+        splits it evenly between the L1 and L2 priors; ``selection="cyclic"``
+        orders the coordinate-descent updates. All three are restated so the
+        node's tunable surface is explicit; ``fit``'s config overrides any of
+        them.
+        """
         super().__init__(
             model_class=ElasticNet,
             default_params={
@@ -214,6 +250,13 @@ class SVRCalculator(SklearnCalculator):
     """SVR Calculator."""
 
     def __init__(self):
+        """Bind ``SVR`` with sklearn's own defaults.
+
+        ``C=1.0``, ``kernel="rbf"`` and ``gamma="scale"`` are all sklearn's,
+        restated so the node's tunable surface is explicit. The width of the
+        epsilon-insensitive tube stays at sklearn's ``epsilon=0.1`` unless
+        ``fit``'s config overrides it.
+        """
         super().__init__(
             model_class=SVR,
             default_params={"C": 1.0, "kernel": "rbf", "gamma": "scale"},
@@ -240,6 +283,12 @@ class KNeighborsRegressorCalculator(SklearnCalculator):
     """K-Neighbors Regressor Calculator."""
 
     def __init__(self):
+        """Bind ``KNeighborsRegressor`` with an unweighted 5-neighbour mean.
+
+        ``algorithm="auto"`` leaves sklearn to pick the neighbour-search
+        structure from the data's shape and size, and ``n_jobs=-1``
+        parallelizes the queries.
+        """
         super().__init__(
             model_class=KNeighborsRegressor,
             default_params={
@@ -271,6 +320,14 @@ class DecisionTreeRegressorCalculator(SklearnCalculator):
     """Decision Tree Regressor Calculator."""
 
     def __init__(self):
+        """Bind ``DecisionTreeRegressor`` with sklearn's own unpruned defaults.
+
+        ``max_depth=None`` grows the tree until its leaves are pure or fall
+        below ``min_samples_split=2``, so unlike the forest and boosting nodes
+        in this module this one ships no regularization of its own.
+        ``criterion="squared_error"`` is the regression analogue of the
+        classifier node's ``gini`` default.
+        """
         super().__init__(
             model_class=DecisionTreeRegressor,
             default_params={
@@ -301,6 +358,11 @@ class GradientBoostingRegressorCalculator(SklearnCalculator):
     """Gradient Boosting Regressor Calculator."""
 
     def __init__(self):
+        """Bind ``GradientBoostingRegressor`` with 100 depth-3 trees at rate 0.1.
+
+        All three are exactly sklearn's own defaults, restated so the node's
+        tunable surface is explicit; ``fit``'s config overrides any of them.
+        """
         super().__init__(
             model_class=GradientBoostingRegressor,
             default_params={
@@ -331,6 +393,13 @@ class AdaBoostRegressorCalculator(SklearnCalculator):
     """AdaBoost Regressor Calculator."""
 
     def __init__(self):
+        """Bind ``AdaBoostRegressor`` with 50 weak learners at rate 1.0.
+
+        Both are sklearn's defaults. No base estimator is pinned here, so
+        ``fit``'s config may supply one; otherwise sklearn falls back to
+        ``DecisionTreeRegressor(max_depth=3)`` — a deeper weak learner than
+        the ``AdaBoostClassifier`` node's depth-1 stump.
+        """
         super().__init__(
             model_class=AdaBoostRegressor,
             default_params={
@@ -360,6 +429,14 @@ class ExtraTreesRegressorCalculator(SklearnCalculator):
     """Extra Trees Regressor Calculator."""
 
     def __init__(self):
+        """Bind ``ExtraTreesRegressor`` with 100 unpruned, non-bootstrapped trees.
+
+        ``bootstrap=False`` is the distinguishing default: extra-trees
+        randomizes split thresholds instead of resampling rows, so every tree
+        sees the whole sample. The remaining settings match sklearn's defaults
+        (``criterion="squared_error"`` being the regression analogue of
+        ``gini``), and ``n_jobs=-1`` fits across every core.
+        """
         super().__init__(
             model_class=ExtraTreesRegressor,
             default_params={
@@ -394,6 +471,14 @@ class HistGradientBoostingRegressorCalculator(SklearnCalculator):
     """HistGradientBoosting Regressor Calculator."""
 
     def __init__(self):
+        """Bind ``HistGradientBoostingRegressor`` with sklearn's own defaults.
+
+        Tree shape is governed leaf-wise — ``max_leaf_nodes=31`` with
+        ``max_depth=None`` — because this estimator bins features into
+        ``max_bins=255`` buckets and grows by best leaf rather than level by
+        level. That is the opposite of the level-wise boosting nodes elsewhere
+        in this module.
+        """
         super().__init__(
             model_class=HistGradientBoostingRegressor,
             default_params={
@@ -424,6 +509,7 @@ if LIGHTGBM_AVAILABLE:
         """
 
         def predict(self, df, model_artifact):
+            """Delegate to the base predict with the feature-name warning suppressed."""
             with warnings.catch_warnings():
                 warnings.filterwarnings("ignore", message=".*valid feature names.*")
                 return super().predict(df, model_artifact)
@@ -442,6 +528,14 @@ if LIGHTGBM_AVAILABLE:
         """LightGBM Regressor Calculator."""
 
         def __init__(self):
+            """Bind ``LGBMRegressor`` with an unregularized leaf-wise configuration.
+
+            ``max_depth=-1`` leaves depth unbounded, so ``num_leaves=31`` alone
+            governs tree shape, and both subsampling rates and both L1/L2
+            penalties start at their neutral values. ``verbose`` and
+            ``verbosity`` are pinned to -1 to quiet LightGBM's native logging
+            alongside the no-op logger registered at import time.
+            """
             super().__init__(
                 model_class=LGBMRegressor,
                 default_params={
@@ -472,6 +566,7 @@ if LIGHTGBM_AVAILABLE:
             validation_data=None,
             iteration_callback=None,
         ):
+            """Delegate to the base fit with the feature-name warning suppressed."""
             with warnings.catch_warnings():
                 warnings.filterwarnings("ignore", message=".*valid feature names.*")
                 return super().fit(
@@ -513,6 +608,14 @@ if XGBOOST_AVAILABLE:
         """XGBoost Regressor Calculator."""
 
         def __init__(self):
+            """Bind ``XGBRegressor`` with XGBoost's defaults plus row/column subsampling.
+
+            ``n_estimators=100``, ``max_depth=6`` and ``learning_rate=0.3`` are
+            XGBoost's own. ``subsample`` and ``colsample_bytree`` are pulled
+            down from XGBoost's 1.0 to 0.8, and neither appears in the node's
+            ``params`` metadata, so they are only reachable through ``fit``'s
+            config.
+            """
             super().__init__(
                 model_class=XGBRegressor,
                 default_params={

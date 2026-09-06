@@ -1,3 +1,11 @@
+"""Shared pipeline-configuration shapes and the default reproducibility seed.
+
+Every config type here is a ``total=False`` TypedDict, so all keys are
+optional: a partial pipeline config is well-typed and gets validated later,
+not at construction. :data:`DEFAULT_RANDOM_STATE` is the single owner of the
+fallback seed — explicit user configuration always wins over it.
+"""
+
 from typing import Any, TypedDict
 
 # Single owner for seeding: every component that needs a

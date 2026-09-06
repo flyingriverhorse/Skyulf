@@ -88,8 +88,11 @@ def _elliptic_mask_numpy(X: Any, models: dict[str, Any]) -> Any:
 
 
 class EllipticEnvelopeApplier(BaseApplier):
+    """Drop rows that any fitted per-column EllipticEnvelope model flags as an outlier."""
+
     @apply_method
     def apply(self, X: Any, y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
+        """Filter rows through the fitted per-column models on the active engine."""
         # apply_method already unpacked (X, y); re-wrap so apply_dual_engine's
         # own unpack_pipeline_input doesn't silently drop y (leaving it
         # unfiltered when X rows are removed). Omit the wrap when y is None
@@ -131,14 +134,18 @@ class EllipticEnvelopeApplier(BaseApplier):
     learns_from_data=True,
 )
 class EllipticEnvelopeCalculator(BaseCalculator):
+    """Fit one univariate EllipticEnvelope per numeric column at the configured contamination."""
+
     def infer_output_schema(
         self, input_schema: SkyulfSchema, config: dict[str, Any]
     ) -> SkyulfSchema:
+        """Return the input schema unchanged: row filtering preserves the column set."""
         # Elliptic envelope filters outlier *rows*; column set is preserved.
         return input_schema
 
     @fit_method
     def fit(self, X: Any, _y: Any, config: dict[str, Any]) -> EllipticEnvelopeArtifact:  # pylint: disable=arguments-differ
+        """Fit the per-column envelopes, skipping columns with fewer than five usable samples."""
         if user_picked_no_columns(config):
             return {}
 

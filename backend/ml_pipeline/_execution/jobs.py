@@ -223,6 +223,10 @@ class JobManager:
 
     @staticmethod
     async def get_latest_tuning_job_for_node(session: AsyncSession, node_id: str) -> JobInfo | None:
+        """Return the newest completed tuning job for a node, or None.
+
+        Facade over ``AdvancedTuningManager`` for ``GET /jobs/tuning/latest/{node_id}``.
+        """
         return await AdvancedTuningManager.get_latest_tuning_job_for_node(session, node_id)
 
     @staticmethod
@@ -354,12 +358,23 @@ class JobManager:
     async def get_best_tuning_job_for_model(
         session: AsyncSession, model_type: str
     ) -> JobInfo | None:
+        """Return the newest completed tuning job for a model type, or None.
+
+        Facade over ``AdvancedTuningManager`` for ``GET /jobs/tuning/best/{model_type}``;
+        "best" there means most recently finished, not highest-scoring.
+        """
         return await AdvancedTuningManager.get_best_tuning_job_for_model(session, model_type)
 
     @staticmethod
     async def get_tuning_jobs_for_model(
         session: AsyncSession, model_type: str, limit: int = 20
     ) -> list[JobInfo]:
+        """Return recent completed tuning jobs for a model type, newest first.
+
+        Facade over ``AdvancedTuningManager`` backing the tuning-history
+        endpoint ``GET /jobs/tuning/history/{model_type}``, capped at *limit*
+        rows.
+        """
         return await AdvancedTuningManager.get_tuning_jobs_for_model(session, model_type, limit)
 
     @staticmethod

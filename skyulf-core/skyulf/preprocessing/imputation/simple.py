@@ -30,6 +30,7 @@ class SimpleImputerApplier(BaseApplier):
 
     @apply_method
     def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
+        """Fill nulls and NaNs with the fitted per-column values; ``y`` passes through."""
         return apply_dual_engine(
             X, params, {"polars": self._apply_polars, "pandas": self._apply_pandas}
         )
@@ -118,11 +119,17 @@ class SimpleImputerCalculator(BaseCalculator):
     def infer_output_schema(
         self, input_schema: SkyulfSchema, config: dict[str, Any]
     ) -> SkyulfSchema:
+        """Return the input schema unchanged: imputation rewrites cells, not columns."""
         # Imputers fill NaNs in place; column set and order are preserved.
         return input_schema
 
     @fit_method
     def fit(self, X: Any, _y: Any, config: dict[str, Any]) -> SimpleImputerArtifact:  # pylint: disable=arguments-differ
+        """Resolve strategy and columns, then fit fill values on the active engine.
+
+        ``mode`` is accepted as an alias of ``most_frequent``; mean/median are
+        restricted to numeric columns.
+        """
         if user_picked_no_columns(config):
             return {}
 

@@ -1,3 +1,15 @@
+"""HTTP routes for data source registration, upload and ingestion control.
+
+Two routers are exported because the endpoints sit under two prefixes:
+``sources_router`` serves ``/data/api/sources`` (list, usable, get, sample,
+delete, export) and ``router`` serves ``/api/ingestion`` (upload, inline source
+creation, status, cancel). Upload and creation are rate-limited to 10/minute.
+
+Authorization is not wired up yet — the handlers list with ``user_id=None`` and
+create with a hardcoded ``user_id=1``, so every source is visible to every
+caller. Each site carries a ``KNOWN-GAP`` comment to that effect.
+"""
+
 from fastapi import (
     APIRouter,
     BackgroundTasks,

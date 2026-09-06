@@ -1,3 +1,5 @@
+"""Base classes and ``(X, y)`` unpack/pack decorators shared by every preprocessing node."""
+
 import functools
 import time
 import tracemalloc
@@ -27,7 +29,14 @@ class TrainTransformCalculatorProtocol(Protocol):
         self,
         df: pd.DataFrame | SkyulfDataFrame | tuple,
         config: dict[str, Any],
-    ) -> tuple[Mapping[str, Any], Any]: ...
+    ) -> tuple[Mapping[str, Any], Any]:
+        """Fit on the training data and return ``(artifact, train_representation)``.
+
+        Lets a calculator hand the training split a different representation
+        than ``apply`` would produce for held-out splits. The second element
+        must not be a ``SplitDataset``.
+        """
+        ...
 
 
 def apply_method(fn: Callable[..., Any]) -> Callable[..., Any]:
@@ -81,6 +90,13 @@ def fit_method[T: Mapping[str, Any]](fn: Callable[..., T]) -> Callable[..., T]:
 
 
 class BaseCalculator(ABC):
+    """Learning half of a node pair: derives parameters and returns them as an artifact.
+
+    Subclasses implement :meth:`fit` and hand back a plain mapping that the
+    matching :class:`BaseApplier` consumes. Calculators never transform data
+    and hold no state between calls.
+    """
+
     @abstractmethod
     def fit(
         self, df: pd.DataFrame | SkyulfDataFrame | tuple, config: dict[str, Any]
@@ -114,6 +130,13 @@ class BaseCalculator(ABC):
 
 
 class BaseApplier(ABC):
+    """Transforming half of a node pair: applies a fitted artifact to data.
+
+    Subclasses implement :meth:`apply`, taking everything they need from
+    ``params`` so the same applier instance can be reused across splits and
+    datasets without carrying state.
+    """
+
     @abstractmethod
     def apply(self, df: pd.DataFrame | SkyulfDataFrame | tuple, params: dict[str, Any]) -> Any:
         """Applies the transformation using fitted parameters.
@@ -143,6 +166,13 @@ class StatefulTransformer:
         apply_on_test: bool = True,
         apply_on_validation: bool = True,
     ):
+        """Store the node pair and which held-out splits it should be applied to.
+
+        ``apply_on_test``/``apply_on_validation`` turn the transform of those
+        splits off without dropping them from the result. ``params`` starts
+        empty and is filled by the first :meth:`fit_transform`; the profiling
+        counters are zeroed here and overwritten on every run.
+        """
         self.calculator = calculator
         self.applier = applier
         self.node_id = node_id
@@ -160,6 +190,15 @@ class StatefulTransformer:
         dataset: SplitDataset | pd.DataFrame | pl.DataFrame | SkyulfDataFrame | tuple,
         config: dict[str, Any],
     ) -> SplitDataset | pd.DataFrame | pl.DataFrame | SkyulfDataFrame | tuple:
+        """Fit on the training data, apply to the held-out splits, and profile the run.
+
+        Wall time, row counts and peak memory land on ``self`` rather than in
+        the return value, and are recorded in a ``finally`` so a failing node
+        still reports what it cost. ``tracemalloc`` is borrowed, not owned: if
+        the caller is already tracing, only the peak growth since entry can be
+        attributed to this step and tracing is left running; otherwise it is
+        started here and stopped again on exit.
+        """
         self.rows_in, _ = get_data_stats(dataset)
         tracing_was_active = tracemalloc.is_tracing()
         if not tracing_was_active:
@@ -268,6 +307,15 @@ class StatefulTransformer:
     def transform(
         self, dataset: SplitDataset | pd.DataFrame | pl.DataFrame | SkyulfDataFrame | tuple
     ) -> SplitDataset | pd.DataFrame | pl.DataFrame | SkyulfDataFrame | tuple:
+        """Apply the params stored by the last fit, without refitting.
+
+        Input detection mirrors :meth:`_fit_transform_inner` so a bare frame or
+        an ``(X, y)`` tuple goes straight to the applier, while a
+        ``SplitDataset`` is applied split-by-split honouring
+        ``apply_on_test``/``apply_on_validation``. Calling this before any
+        :meth:`fit_transform` hands the applier an empty params dict rather
+        than raising.
+        """
         # Use stored params
         params = self.params
 

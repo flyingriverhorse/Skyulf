@@ -26,13 +26,13 @@ def execute_search(
     config: TuningConfig,
     log_callback: Callable[[str], None] | None = None,
 ) -> list[str]:
-    """Fits the searcher, translating known sklearn/optuna failure messages into
-    actionable ``ValueError``s and re-raising anything else unchanged.
+    """Fits the searcher, mapping known sklearn/optuna failures to ``ValueError``s.
 
-    Returns the per-trial failure messages captured for optuna runs (one
-    entry per failed trial). Optuna logs these at WARNING level on its own
-    logger — without capturing them the only visible symptom is the generic
-    "no trials completed" error, with the real cause stuck in stderr.
+    Translates recognised failure messages into actionable errors and re-raises
+    anything else unchanged. Returns the per-trial failure messages captured for
+    optuna runs (one entry per failed trial). Optuna logs these at WARNING level
+    on its own logger — without capturing them the only visible symptom is the
+    generic "no trials completed" error, with the real cause stuck in stderr.
     """
     captured: list[str] = []
     optuna_logger: logging.Logger | None = None
@@ -95,9 +95,11 @@ def execute_search(
 
 
 def extract_best_result(searcher: Any, first_trial_error: str | None = None) -> tuple[Any, float]:
-    """Reads ``best_params_``/``best_score_`` off a fitted searcher, translating the
-    "no completed trials" ``ValueError`` into a clearer, actionable message that
-    carries the first captured per-trial error when available.
+    """Reads ``best_params_``/``best_score_`` off a fitted searcher.
+
+    Translates the "no completed trials" ``ValueError`` into a clearer,
+    actionable message that carries the first captured per-trial error when
+    available.
     """
     try:
         # Accessing best_params_ raises ValueError if no trials completed successfully
@@ -144,9 +146,10 @@ def collect_trials(searcher: Any, config: TuningConfig) -> list[dict[str, Any]]:
 
 
 def strip_model_prefix(params: Any) -> Any:
-    """Removes the internal ``model__estimator__`` pipeline prefix from
-    extracted params (see ``tune``'s wrapped Pipeline path) so callers see
-    the original search-space keys.
+    """Removes the internal ``model__estimator__`` pipeline prefix from params.
+
+    Extracted params pick it up on ``tune``'s wrapped Pipeline path; stripping
+    it means callers see the original search-space keys.
     """
     if not isinstance(params, dict):
         return params
@@ -163,8 +166,10 @@ def log_final_completion(
     best_score: float,
     best_params: Any,
 ) -> None:
-    """Emits the completion log for searcher-based strategies that don't emit
-    per-trial callbacks (halving_grid / halving_random / optuna).
+    """Emits the completion log for searcher-based strategies.
+
+    Covers the strategies that emit no per-trial callbacks of their own
+    (halving_grid / halving_random / optuna).
     """
     if log_callback and config.strategy in [
         "halving_grid",

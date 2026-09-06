@@ -176,6 +176,7 @@
   dict({
     '$defs': dict({
       'NodeConfigModel': dict({
+        'description': 'One canvas node inside a `PipelineConfigModel` request body.',
         'properties': dict({
           'inputs': dict({
             'default': list([
@@ -210,6 +211,12 @@
         'type': 'object',
       }),
     }),
+    'description': '''
+      Graph description posted to /run, /preview and /schema-preview.
+      
+      Carries the canvas nodes plus `target_node_id` and `job_type`, which is how
+      one body distinguishes a training run from a tuning run or a preview.
+    ''',
     'properties': dict({
       'job_type': dict({
         'anyOf': list([

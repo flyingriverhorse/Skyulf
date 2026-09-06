@@ -1,3 +1,16 @@
+"""Turn the changelog into a GitHub release draft's tag, title and notes.
+
+Run by ``release-drafter.yml`` as its ``changelog`` step. Reads the version from
+the root ``pyproject.toml``, cuts the matching ``## v<version>`` block out of
+``changelog/<major>.<minor>.x.md``, writes it to ``temp_release_notes.md`` and
+exports ``version``/``title``/``notes_file`` through ``$GITHUB_OUTPUT`` for the
+next step's ``gh release edit``. A missing changelog file or header is a hard
+error rather than an empty draft, so a release can never ship without notes.
+
+Outside CI (no ``$GITHUB_OUTPUT``) it prints the same values instead, so the
+extraction can be checked by hand before a release.
+"""
+
 import os
 import re
 import tomllib
@@ -5,6 +18,13 @@ from pathlib import Path
 
 
 def main():
+    """Extract the current version's changelog block and hand it to the workflow.
+
+    Raises:
+        FileNotFoundError: no ``changelog/<major>.<minor>.x.md`` exists for this
+            version's major.minor series.
+        ValueError: that file exists but contains no ``## v<version>`` header.
+    """
     # 1. Read version from pyproject.toml
     root_dir = Path(__file__).resolve().parents[2]
     pyproject_path = root_dir / "pyproject.toml"

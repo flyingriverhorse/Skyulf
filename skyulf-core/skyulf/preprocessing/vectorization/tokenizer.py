@@ -70,8 +70,10 @@ def _tokenizer_apply_pandas(
 
 
 def _tokenizer_apply_polars(X: Any, params: dict[str, Any]) -> Any:
-    """Native-Polars tokenizer apply; returns ``None`` to fall back to pandas
-    when a text column is not String dtype (``astype(str)`` parity).
+    """Native-Polars tokenizer apply.
+
+    Returns ``None`` to fall back to pandas when a text column is not String
+    dtype (``astype(str)`` parity).
     """
     cols: list[str] = params.get("columns", [])
     drop_original: bool = params.get("drop_original", False)
@@ -97,8 +99,21 @@ def _tokenizer_apply_polars(X: Any, params: dict[str, Any]) -> Any:
 
 
 class TokenizerApplier(BaseApplier):
+    """Emit one space-joined token string per source column, not one column per token.
+
+    Keeping the tokens in a single ``{col}__tokens`` string is deliberate: it
+    stays inspectable and can feed a downstream vectorizer, whereas exploding to
+    columns would make the output width data-dependent. ``add_token_count`` adds
+    a companion ``{col}__token_count`` integer column. Nulls are coerced to empty
+    strings before tokenizing, and sources survive unless ``drop_original`` is
+    set. The node is stateless — the sklearn analyzer is rebuilt from ``params``
+    on every call. The polars path runs natively and falls back to pandas when a
+    text column is not String dtype.
+    """
+
     @apply_method
     def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
+        """Dispatch through the text-specific dual-engine path; ``y`` passes through."""
         return apply_text_dual_engine(X, params, _tokenizer_apply_pandas, _tokenizer_apply_polars)
 
 
@@ -155,11 +170,25 @@ def _build_tokenizer_artifact(config: dict[str, Any], valid_cols: list[str]) -> 
     learns_from_data=False,
 )
 class TokenizerCalculator(BaseCalculator):
+    """Record the resolved text columns and the tokenizer settings — nothing is fitted.
+
+    ``learns_from_data=False``: the artifact is pure configuration, so it is
+    reproducible across runs and safe to reuse on data the calculator never saw.
+    """
+
     def infer_output_schema(self, input_schema: Any, config: dict[str, Any]) -> None:
+        """Return ``None``: which configured columns survive resolution depends on the data."""
         return None
 
     @fit_method
     def fit(self, X: Any, _y: Any, config: dict[str, Any]) -> TokenizerArtifact:  # pylint: disable=arguments-differ
+        """Resolve the configured text column names and record them with the tokenizer settings.
+
+        Uses the column-names-only resolver rather than the data-narrowing
+        sibling, so a polars input is never converted to pandas just to fit. An
+        empty or wholly-absent selection yields an empty artifact so the applier
+        no-ops.
+        """
         valid_cols = resolve_fit_text_valid_columns(X, config)
         if valid_cols is None:
             return {}

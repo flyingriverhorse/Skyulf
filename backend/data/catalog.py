@@ -1,3 +1,13 @@
+"""Storage backends behind ``skyulf``'s ``DataCatalog`` interface.
+
+``FileSystemCatalog`` reads and writes the local upload directory, ``S3Catalog``
+does the same against a bucket with a local read cache in front of it, and
+``SmartCatalog`` sits above both: it turns a numeric ``DataSource`` primary key
+into a real path or S3 key and delegates to whichever backend that location
+implies. ``create_catalog_from_options`` assembles the right stack for a
+pipeline run.
+"""
+
 import contextlib
 import logging
 import os
@@ -22,6 +32,13 @@ class FileSystemCatalog(DataCatalog):
     """
 
     def __init__(self, base_path: str | None = None):
+        """Set the directory that dataset ids resolve inside.
+
+        ``base_path`` defaults to the ``UPLOAD_DIR`` setting and does double duty:
+        it is both the root a relative id is joined onto and the containment
+        boundary ``_get_path`` enforces, so it has to be the real upload directory
+        for the traversal checks to mean anything.
+        """
         if base_path is None:
             base_path = get_settings().UPLOAD_DIR
         self.base_path = base_path
@@ -62,6 +79,22 @@ class FileSystemCatalog(DataCatalog):
         return resolved
 
     def load(self, dataset_id: str, **kwargs) -> Any:
+        """Read a dataset from disk, resolving its extension and applying ``limit``.
+
+        Args:
+            dataset_id: File name relative to ``base_path``, or an absolute path
+                already resolved from the database.
+            **kwargs: ``limit`` caps how many rows are read; other keys are ignored.
+
+        Returns:
+            A pandas frame, or a polars one when ``SKYULF_ENGINE`` is ``polars``.
+
+        Raises:
+            FileNotFoundError: nothing matches, even after the ``.parquet``/``.csv``
+                extension probe that legacy ids rely on.
+            ValueError: the file is there but its extension is unrecognized and it
+                does not read as parquet either.
+        """
         path = self._resolve_dataset_path(dataset_id)
         limit = kwargs.get("limit")
 
@@ -154,6 +187,21 @@ class FileSystemCatalog(DataCatalog):
             raise ValueError(f"Unsupported format or file not found: {dataset_id}") from None
 
     def save(self, dataset_id: str, data: Any, **kwargs) -> None:
+        """Write ``data`` under ``dataset_id``, defaulting to parquet.
+
+        Creates the parent directory first. A ``.csv`` id writes CSV; anything else
+        is written as parquet, with ``.parquet`` appended when the id carries no
+        extension of its own.
+
+        The writers called here are the pandas ones (``to_csv``/``to_parquet`` with
+        ``index=False``), so a polars frame has to be converted before it reaches
+        this method even when ``SKYULF_ENGINE`` is ``polars``.
+
+        Args:
+            dataset_id: Destination name or path, contained by ``base_path``.
+            data: The pandas frame to write.
+            **kwargs: accepted for interface parity and ignored.
+        """
         path = self._get_path(dataset_id)
 
         # Ensure directory exists
@@ -170,6 +218,13 @@ class FileSystemCatalog(DataCatalog):
             data.to_parquet(path, index=False)
 
     def exists(self, dataset_id: str) -> bool:
+        """Report whether ``dataset_id`` resolves to a path present on disk.
+
+        This goes through ``_get_path`` and not ``_resolve_dataset_path``, so it
+        skips the ``.parquet``/``.csv`` extension probe: a legacy id whose file was
+        stored with an added extension reports ``False`` here even though ``load``
+        would find and read it.
+        """
         return Path(self._get_path(dataset_id)).exists()
 
 
@@ -187,6 +242,21 @@ class S3Catalog(DataCatalog):
         cache_dir: str | None = None,
         storage_options: dict | None = None,
     ):
+        """Connect to ``bucket_name`` and prepare the local read cache.
+
+        Args:
+            bucket_name: Bucket that a bare key is prefixed with to form its
+                ``s3://`` URI.
+            region_name: Region for the S3 client, folded into the stored options
+                and moved to ``client_kwargs['region_name']`` per call.
+            cache_dir: Directory for cached reads; defaults to ``skyulf_s3_cache``
+                under the system temp dir and is created if absent.
+            storage_options: Credentials and client options in AWS naming. Copied,
+                not retained, and mapped to s3fs names on each use rather than here.
+
+        Raises:
+            ImportError: ``s3fs`` is not installed.
+        """
         self.bucket_name = bucket_name
         self.storage_options = (storage_options or {}).copy()
 
@@ -355,6 +425,21 @@ class S3Catalog(DataCatalog):
             logger.warning(f"Failed to write to cache {cache_path}: {e}")
 
     def load(self, dataset_id: str, **kwargs) -> Any:
+        """Read a dataset from S3, serving a fresh local cache copy when there is one.
+
+        Args:
+            dataset_id: A full ``s3://`` URI, or a bare key prefixed with the bucket.
+            **kwargs: ``limit`` caps how many rows are read; ``storage_options``
+                supplies per-call credentials merged over the instance ones.
+
+        Returns:
+            A pandas frame, or a polars one when ``SKYULF_ENGINE`` is ``polars``.
+
+        Per-call ``storage_options`` bypass the cache in both directions — it is
+        neither validated against nor written from a differently-credentialed read —
+        and a ``limit``ed read is never cached either, so the cache only ever holds
+        complete objects fetched with the instance credentials.
+        """
         path = self._get_s3_path(dataset_id)
         limit = kwargs.get("limit")
 
@@ -388,6 +473,17 @@ class S3Catalog(DataCatalog):
             raise e
 
     def save(self, dataset_id: str, data: Any, **kwargs) -> None:
+        """Write ``data`` to S3 and refresh its local cache copy.
+
+        Args:
+            dataset_id: A full ``s3://`` URI, or a bare key prefixed with the bucket.
+            data: The pandas frame to write.
+            **kwargs: accepted for interface parity and ignored.
+
+        A ``.csv`` key writes CSV; anything else is written as parquet, with
+        ``.parquet`` appended when the key carries no extension. The cache refresh
+        afterwards is best-effort — a failure is logged and does not fail the save.
+        """
         path = self._get_s3_path(dataset_id)
         logger.info(f"Saving to S3: {path}")
 
@@ -412,6 +508,13 @@ class S3Catalog(DataCatalog):
             logger.warning(f"Failed to update cache after save for {path}: {e}")
 
     def exists(self, dataset_id: str) -> bool:
+        """Ask S3 whether ``dataset_id`` is present.
+
+        Builds a throwaway ``S3FileSystem`` for the call instead of reusing
+        ``self.fs``, and hands it the instance ``storage_options`` raw — without the
+        ``_prepare_s3fs_options`` name mapping that ``load`` and ``save`` apply, so
+        AWS-style option names are not translated to their s3fs equivalents here.
+        """
         # This is a bit expensive, but accurate
         import s3fs  # ty: ignore[unresolved-import]
 
@@ -421,7 +524,9 @@ class S3Catalog(DataCatalog):
 
 
 class SmartCatalog(DataCatalog):
-    """A wrapper catalog that resolves Database IDs to file paths/keys
+    """Route a dataset id to whichever catalog owns the storage it resolves to.
+
+    A wrapper catalog that resolves Database IDs to file paths/keys
     and dispatches to the appropriate underlying catalog (S3 or FileSystem).
     """
 
@@ -431,6 +536,17 @@ class SmartCatalog(DataCatalog):
         fs_catalog: FileSystemCatalog | None = None,
         s3_catalog: S3Catalog | None = None,
     ):
+        """Wire the delegate catalogs around a database ``session``.
+
+        Args:
+            session: SQLAlchemy session used to resolve numeric ids to locations.
+            fs_catalog: Filesystem delegate; defaults to one rooted at ``UPLOAD_DIR``.
+            s3_catalog: S3 delegate. When omitted, one is built only if the
+                ``S3_BUCKET_NAME`` *process* environment variable is set. That read
+                goes through ``os.getenv`` rather than ``Settings``, so a bucket
+                configured solely in ``.env`` is not seen and S3 support stays off;
+                a missing ``s3fs`` is suppressed the same way.
+        """
         self.session = session
         self.fs_catalog = fs_catalog or FileSystemCatalog()
         self.s3_catalog = s3_catalog
@@ -490,6 +606,20 @@ class SmartCatalog(DataCatalog):
         return self.fs_catalog
 
     def load(self, dataset_id: str, **kwargs) -> pd.DataFrame:
+        """Load a dataset, resolving a numeric id through the database first.
+
+        Args:
+            dataset_id: A ``DataSource`` primary key, or a path/S3 key used as-is.
+            **kwargs: forwarded to the delegate; ``storage_options`` here overrides
+                the credentials stored on the ``DataSource`` row.
+
+        Storage options recovered from the database are merged *under* the caller's,
+        so call-time values win on any key they both set. The resolved location then
+        selects the S3 or filesystem delegate.
+
+        The return annotation is a cast, not a guarantee: the delegate hands back a
+        polars frame when ``SKYULF_ENGINE`` is ``polars``.
+        """
         resolved_id, options = self._resolve_id(dataset_id)
 
         # Merge resolved options (from DB) with call-time kwargs
@@ -508,6 +638,17 @@ class SmartCatalog(DataCatalog):
         return cast(pd.DataFrame, catalog.load(resolved_id, **kwargs))
 
     def save(self, dataset_id: str, data: Any, **kwargs) -> None:
+        """Save a dataset through the delegate its resolved location implies.
+
+        Args:
+            dataset_id: A ``DataSource`` primary key, or a path/S3 key used as-is.
+            data: The frame to write.
+            **kwargs: forwarded to the delegate, as in ``load``.
+
+        Id resolution does run here, so saving over a numeric id overwrites the file
+        that ``DataSource`` points at rather than writing a fresh artifact. Storage
+        options merge the same way as in ``load``: the caller's win.
+        """
         # We generally don't resolve IDs for saving (usually saving to new artifacts)
         # But if we wanted to overwrite a dataset by ID, we could.
         resolved_id, options = self._resolve_id(dataset_id)
@@ -524,6 +665,12 @@ class SmartCatalog(DataCatalog):
         return catalog.save(resolved_id, data, **kwargs)
 
     def exists(self, dataset_id: str) -> bool:
+        """Report whether a dataset exists, resolving a numeric id first.
+
+        Unlike ``load`` and ``save``, the storage options recovered from the
+        ``DataSource`` row are discarded rather than forwarded, so the delegate
+        answers using only its own instance credentials.
+        """
         resolved_id, _ = self._resolve_id(dataset_id)
         catalog = self._get_catalog_for_path(resolved_id)
         return catalog.exists(resolved_id)

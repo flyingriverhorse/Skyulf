@@ -1,3 +1,17 @@
+"""The EDA job body: load a dataset, profile it, persist the profile.
+
+``run_eda_analysis`` is the whole job — resolve the ``DataSource`` file path, load
+it (polars forced), run ``skyulf``'s ``EDAAnalyzer`` over the frame and store the
+resulting profile on ``EDAReport`` as JSON. Each fallible step marks the report
+``FAILED`` with the reason and returns rather than raising, because both callers
+are background tasks with nobody left to propagate to.
+
+Two entry points wrap it: ``run_eda_background`` for FastAPI ``BackgroundTasks``,
+which opens its own session, and ``generate_profile_celery`` for Celery. The
+latter is defined only when ``backend.celery_app`` imports cleanly — the guard
+swallows the ``ImportError``, so the name can be absent from this module.
+"""
+
 import asyncio
 import logging
 from pathlib import Path

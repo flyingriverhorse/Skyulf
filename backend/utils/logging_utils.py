@@ -1,4 +1,4 @@
-"""Simple logging utility for data actions Replaces the Flask log_data_action function"""
+"""Simple logging utility for data actions. Replaces the Flask log_data_action function."""
 
 import logging
 import os
@@ -12,7 +12,7 @@ data_logger = logging.getLogger("data_actions")
 
 
 def log_data_action(action: str, success: bool = True, details: str | None = None):
-    """Log data-related actions for monitoring and debugging
+    """Log data-related actions for monitoring and debugging.
 
     Args:
         action: The action being performed
@@ -232,6 +232,18 @@ def setup_universal_logging(
     Args:
         log_file: Path to log file (creates directory if needed)
         log_level: Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+        rotation_type: "time" or "timed" (case-insensitive) selects a
+            TimedRotatingFileHandler; any other value, including the default
+            "size", selects a size-capped RotatingFileHandler
+        rotation_when: ``when`` code for timed rotation, defaulting to "midnight";
+            ignored unless ``rotation_type`` is time-based
+        rotation_interval: number of ``rotation_when`` units between rotations;
+            ignored unless ``rotation_type`` is time-based
+        max_bytes: per-file size cap before rotating, used only by the size-based
+            handler — and not at all on Windows, where that branch falls back to a
+            plain FileHandler to dodge RotatingFileHandler's file-locking errors
+        backup_count: rotated files to keep before the oldest is dropped; applies
+            to both rotation modes except the Windows size-rotation fallback
         console_log_level: Logging level for console output
     """
     # Create log directory with better error handling

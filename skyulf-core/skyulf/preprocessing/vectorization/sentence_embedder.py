@@ -100,8 +100,10 @@ def _embed_apply_pandas(
 
 
 def _embed_apply_polars(X: Any, params: dict[str, Any]) -> Any:
-    """Native-Polars embed apply; returns ``None`` to fall back to pandas when
-    a text column is not String dtype.
+    """Native-Polars embed apply.
+
+    Returns ``None`` to fall back to pandas when a text column is not String
+    dtype.
     """
     cols: list[str] = params.get("columns", [])
     output_columns: list[str] = params.get("output_columns", [])
@@ -126,8 +128,24 @@ def _embed_apply_polars(X: Any, params: dict[str, Any]) -> Any:
 
 
 class SentenceEmbedderApplier(BaseApplier):
+    """Encode the joined text of the configured columns into ``embedding_dim`` float columns.
+
+    All configured columns are concatenated into one corpus, so a multi-column
+    selection yields a single embedding whose name prefix joins the source names.
+    Width is set by the model, not by config, and is recorded in the artifact at
+    fit time. Models are looked up in a module-level cache keyed by
+    ``model_name``, so repeated applies on the same model reuse loaded weights
+    instead of paying for another download. ``normalize=True`` (the default)
+    yields unit-length vectors ready for cosine similarity. Because the optional
+    ``sentence-transformers`` import is lazy, a missing extra surfaces here as an
+    ``ImportError`` carrying the install hint rather than at skyulf import time.
+    The polars path keeps the frame native around the encode, but the encoding
+    itself always runs outside the dataframe engine.
+    """
+
     @apply_method
     def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
+        """Dispatch through the text-specific dual-engine path; ``y`` passes through."""
         return apply_text_dual_engine(X, params, _embed_apply_pandas, _embed_apply_polars)
 
 
@@ -176,11 +194,26 @@ def _build_sentence_embedder_artifact(
     learns_from_data=False,
 )
 class SentenceEmbedderCalculator(BaseCalculator):
+    """Resolve the text columns and load the pretrained model to read its embedding dimension.
+
+    ``learns_from_data=False`` — the weights come pretrained and are never
+    adjusted here — but fitting is not free: it performs the lazy
+    ``sentence-transformers`` import and, on a cold cache, downloads the model.
+    """
+
     def infer_output_schema(self, input_schema: Any, config: dict[str, Any]) -> None:
+        """Return ``None``: the embedding width is only known once the model is loaded."""
         return None
 
     @fit_method
     def fit(self, X: Any, _y: Any, config: dict[str, Any]) -> SentenceEmbedderArtifact:  # pylint: disable=arguments-differ
+        """Resolve the configured text column names and record the model's embedding width.
+
+        Uses the column-names-only resolver rather than the data-narrowing
+        sibling, so a polars input is never converted to pandas just to fit. An
+        empty or wholly-absent selection yields an empty artifact so the applier
+        no-ops — and, importantly, skips loading the model at all.
+        """
         valid_cols = resolve_fit_text_valid_columns(X, config)
         if valid_cols is None:
             return {}

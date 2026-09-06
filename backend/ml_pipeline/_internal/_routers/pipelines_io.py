@@ -212,8 +212,10 @@ async def create_pipeline_version(
     payload: PipelineVersionCreateModel,
     session: AsyncSession = Depends(get_async_session),
 ) -> dict[str, Any]:
-    """Explicitly create a snapshot. `kind` defaults to 'manual'; pass
-    'auto' from background callers (e.g. successful Run hooks).
+    """Explicitly create a snapshot.
+
+    `kind` defaults to 'manual'; pass 'auto' from background callers (e.g.
+    successful Run hooks).
     """
     try:
         version = await PipelineVersionsService.create_version(
@@ -261,8 +263,10 @@ async def delete_pipeline_version(
     version_id: int,
     session: AsyncSession = Depends(get_async_session),
 ) -> dict[str, Any]:
-    """Hard-delete a snapshot. Pinned rows are not protected from
-    explicit user deletion (matches the localStorage behavior).
+    """Hard-delete a snapshot.
+
+    Pinned rows are not protected from explicit user deletion (matches the
+    localStorage behavior).
     """
     version = await PipelineVersionsService.get_version(session, version_id)
     if version is None or version.dataset_source_id != dataset_source_id:
@@ -348,6 +352,8 @@ async def get_pipeline_audit_log(
         kind: Restrict to saves of this kind (e.g. `save`, `autosave`).
         created_after: ISO-8601 lower bound (inclusive) on `created_at`.
         created_before: ISO-8601 upper bound (inclusive) on `created_at`.
+        session: Async database session supplied by the `get_async_session`
+            dependency.
 
     Returns:
         A mapping with the dataset id, `total` matching the applied filters,

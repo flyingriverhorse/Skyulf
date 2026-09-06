@@ -1,3 +1,5 @@
+"""S3 artifact store: joblib files under one bucket prefix, read/written via s3fs."""
+
 import contextlib
 import logging
 from pathlib import Path
@@ -13,7 +15,29 @@ logger = logging.getLogger(__name__)
 
 
 class S3ArtifactStore(ArtifactStore):
+    """Artifact store writing joblib files under ``s3://<bucket>/<prefix>/``.
+
+    ``s3fs`` is imported lazily, so importing this module never requires it.
+    Keys are restricted to a single path segment inside the prefix, which keeps
+    one store owning one job's flat artifact folder.
+    """
+
     def __init__(self, bucket_name: str, prefix: str = "", storage_options: dict | None = None):
+        """Connect to ``bucket_name`` after normalizing ``storage_options`` for s3fs.
+
+        Args:
+            bucket_name: Target bucket.
+            prefix: Folder inside the bucket that owns this store's keys, usually
+                the job's artifact folder name.
+            storage_options: Credentials, endpoint and region in either the
+                ``aws_*`` or the s3fs spelling; remapped in place before use.
+
+        Raises:
+            ValueError: If ``bucket_name`` is empty.
+            PermissionError: If ``prefix`` contains a ``.`` or ``..`` segment.
+            ImportError: If ``s3fs`` is not installed.
+            RuntimeError: If the s3fs client cannot be created.
+        """
         self.bucket_name = bucket_name.strip()
         self.prefix = self._normalize_prefix(prefix)
         self.storage_options = storage_options or {}
@@ -110,6 +134,12 @@ class S3ArtifactStore(ArtifactStore):
         return f"s3://{self.bucket_name}/{safe_key}"
 
     def save(self, key: str, data: Any) -> None:
+        """Write ``data`` to ``s3://<bucket>/<prefix>/<key>.joblib`` as a joblib dump.
+
+        Raises:
+            RuntimeError: If the upload fails. The underlying error is logged with
+                credentials redacted and never included in the raised message.
+        """
         path = self._get_s3_path(key)
         logger.info(f"Saving artifact to S3: {path}")
 
@@ -143,6 +173,12 @@ class S3ArtifactStore(ArtifactStore):
             raise RuntimeError(f"Failed to load artifact from S3: {path}") from e
 
     def exists(self, key: str) -> bool:
+        """Check if a key exists in the store.
+
+        Raises:
+            RuntimeError: If the existence check itself fails, rather than
+                reporting a missing artifact.
+        """
         path = self._get_s3_path(key)
         try:
             return bool(self.fs.exists(path))
@@ -192,11 +228,13 @@ class S3ArtifactStore(ArtifactStore):
         return self._get_s3_path(key)
 
     def close(self) -> None:
+        """Close the s3fs client when it exposes a ``close``, and do nothing otherwise."""
         close = getattr(self.fs, "close", None)
         if callable(close):
             close()
 
     def __del__(self) -> None:
+        """Close the client when the store is garbage collected, suppressing any failure."""
         # best-effort cleanup; logging is unsafe during interpreter shutdown
         with contextlib.suppress(Exception):
             self.close()

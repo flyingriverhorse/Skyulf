@@ -1,3 +1,10 @@
+"""Preprocessing nodes: one ``Calculator``/``Applier`` pair per pipeline step.
+
+Importing this package re-exports the public node surface listed in ``__all__``
+and, as a side effect, runs every ``@NodeRegistry.register`` decorator — which
+is why the imports below are explicit rather than auto-discovered.
+"""
+
 from ._schema import SchemaMismatchError, SkyulfSchema, validate_schema
 from .base import BaseApplier, BaseCalculator, StatefulTransformer
 from .bucketing import (

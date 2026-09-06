@@ -108,8 +108,18 @@ def _normalize_rule(
 
 
 class InvalidValueReplacementApplier(BaseApplier):
+    """Replace values violating the configured rule — and optionally ±inf — with a sentinel.
+
+    The pandas and polars paths must agree value-for-value: ``inf``/``-inf``
+    are replaced first when flagged, then the rule (``negative``, ``zero`` or
+    ``custom_range``, which honours a single bound when only one is given). A
+    column with neither a rule nor an inf flag configured is skipped outright,
+    so its values and dtype survive untouched.
+    """
+
     @apply_method
     def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
+        """Dispatch the rule to the pandas or polars path; ``y`` passes through."""
         return apply_dual_engine(
             X, params, {"polars": self._apply_polars, "pandas": self._apply_pandas}
         )
@@ -206,14 +216,25 @@ class InvalidValueReplacementApplier(BaseApplier):
     learns_from_data=False,
 )
 class InvalidValueReplacementCalculator(BaseCalculator):
+    """Resolve invalid-value config into an artifact; nothing is learned from data."""
+
     def infer_output_schema(
         self, input_schema: SkyulfSchema, config: dict[str, Any]
     ) -> SkyulfSchema:
+        """Pass the input schema through: sentinels are rewritten in place."""
         # Replaces invalid sentinel values with NaN in place; columns preserved.
         return input_schema
 
     @fit_method
     def fit(self, X: Any, _y: Any, config: dict[str, Any]) -> InvalidValueReplacementArtifact:  # pylint: disable=arguments-differ
+        """Build the artifact, auto-detecting numeric columns when none are named.
+
+        An explicit empty column selection yields an empty artifact, which
+        makes the applier a no-op. UI convenience modes are canonicalised here
+        rather than in each engine: ``percentage_bounds``/``age_bounds`` become
+        a ``custom_range`` carrying their default bounds unless the user
+        overrode them, and ``zero_to_nan`` becomes ``zero``.
+        """
         if user_picked_no_columns(config):
             return {}
         cols = resolve_columns(X, config, _auto_detect_numeric_columns)

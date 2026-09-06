@@ -63,8 +63,14 @@ def _extract_scaler_params(transformer: PowerTransformer, standardize: bool) -> 
 
 
 class PowerTransformerApplier(BaseApplier):
+    """Apply the fitted Box-Cox / Yeo-Johnson transform to the selected columns."""
+
     @apply_method
     def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
+        """Rebuild the transformer from stored lambdas and transform ``X``; ``y`` untouched.
+
+        A failed transform is logged and leaves the data unchanged (fail open).
+        """
         return apply_dual_engine(
             X, params, {"polars": self._apply_polars, "pandas": self._apply_pandas}
         )
@@ -116,14 +122,18 @@ class PowerTransformerApplier(BaseApplier):
     learns_from_data=True,
 )
 class PowerTransformerCalculator(BaseCalculator):
+    """Fit one shared PowerTransformer across the selected columns."""
+
     def infer_output_schema(
         self, input_schema: SkyulfSchema, config: dict[str, Any]
     ) -> SkyulfSchema:
+        """Return the input schema unchanged: the transform rewrites columns in place."""
         # Power transforms are applied in place on the same columns.
         return input_schema
 
     @fit_method
     def fit(self, X: Any, _y: Any, config: dict[str, Any]) -> PowerTransformerArtifact:  # pylint: disable=arguments-differ
+        """Fit per-column lambdas, dropping columns Box-Cox cannot accept."""
         if user_picked_no_columns(config):
             return {}
 

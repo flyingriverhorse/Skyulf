@@ -1,3 +1,12 @@
+"""Local-file connector for the ingestion pipeline.
+
+Reads CSV, Excel, Parquet and JSON out of the configured upload directory.
+Two constraints shape this module: every path is resolved through
+:meth:`LocalFileConnector.resolve_safe_path` so a caller cannot escape
+``UPLOAD_DIR``, and the formats polars can scan are read lazily so that
+previewing a multi-GB file never materialises it.
+"""
+
 from pathlib import Path
 from typing import cast
 
@@ -23,6 +32,17 @@ class LocalFileConnector(BaseConnector):
     _LAZY_EXTENSIONS = {".csv", ".parquet"}
 
     def __init__(self, file_path: str, **kwargs):
+        """Resolve and containment-check the path, then reset the memo caches.
+
+        Args:
+            file_path: Source file path. Relative values are resolved against
+                ``settings.UPLOAD_DIR``; anything that escapes that directory
+                raises ``PermissionError`` here, before it is stored. The check
+                is skipped while ``TESTING`` is set, so fixtures may live
+                outside the upload directory.
+            **kwargs: Extra reader options forwarded verbatim to whichever
+                ``polars.scan_*`` / ``polars.read_*`` call the extension selects.
+        """
         settings = get_settings()
         self.base_path = Path(settings.UPLOAD_DIR).expanduser().resolve()
         self._testing = getattr(settings, "TESTING", False)
@@ -43,8 +63,9 @@ class LocalFileConnector(BaseConnector):
         base_path: Path | None = None,
         testing: bool | None = None,
     ) -> Path:
-        """Resolve ``file_path`` against the configured upload directory and
-        enforce that the result stays contained within it.
+        """Resolve ``file_path`` against the configured upload directory.
+
+        Enforces that the result stays contained within it.
 
         This is the single source of truth for local-path containment used
         by ``LocalFileConnector.__init__``. Call sites that resolve a local
@@ -75,6 +96,14 @@ class LocalFileConnector(BaseConnector):
         return resolved
 
     async def connect(self) -> bool:
+        """Check that the file exists and its extension is on the allow-list.
+
+        No file content is read.
+
+        Raises:
+            FileNotFoundError: If the resolved path does not exist.
+            ValueError: If the extension is not in ``SUPPORTED_EXTENSIONS``.
+        """
         if not Path(self.file_path).exists():
             raise FileNotFoundError(f"File not found: {self.file_path}")
 
@@ -119,6 +148,12 @@ class LocalFileConnector(BaseConnector):
             raise RuntimeError(f"Failed to read file {Path(self.file_path).name}") from e
 
     async def get_schema(self) -> dict[str, str]:
+        """Return the column-name to dtype mapping, memoised after the first call.
+
+        Reads only the CSV header or Parquet footer when the format can be
+        scanned; otherwise materialises the whole file, which is the only way
+        to type Excel and JSON.
+        """
         if self._schema is not None:
             return self._schema
 
@@ -147,8 +182,14 @@ class LocalFileConnector(BaseConnector):
         except Exception:  # noqa: BLE001 - lazy schema probe, eager fallback follows
             return None
 
-    async def fetch_data(self, query: str | None = None, limit: int | None = None) -> pl.DataFrame:
-        lazy_head = self._try_lazy_head(query=query, limit=limit)
+    async def fetch_data(self, limit: int | None = None) -> pl.DataFrame:
+        """Return up to ``limit`` rows, streaming them when the format allows.
+
+        CSV and Parquet satisfy a bounded request through a lazy ``head`` so a
+        preview never materialises the file. Every other case reads the file in
+        full and truncates afterwards.
+        """
+        lazy_head = self._try_lazy_head(limit=limit)
         if lazy_head is not None:
             return lazy_head
 
@@ -163,13 +204,12 @@ class LocalFileConnector(BaseConnector):
 
         return df
 
-    def _try_lazy_head(self, *, query: str | None, limit: int | None) -> pl.DataFrame | None:
+    def _try_lazy_head(self, *, limit: int | None) -> pl.DataFrame | None:
         """Stream a bounded head from CSV/Parquet without materialising the file."""
         if (
             limit is None
             or limit <= 0
             or self._df is not None
-            or query is not None
             or self._ext() not in self._LAZY_EXTENSIONS
         ):
             return None
@@ -182,4 +222,5 @@ class LocalFileConnector(BaseConnector):
             return None
 
     async def validate(self) -> bool:
+        """Validate by running :meth:`connect`, so existence and extension are the whole check."""
         return await self.connect()

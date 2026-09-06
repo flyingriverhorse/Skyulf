@@ -1,6 +1,7 @@
-"""Decision-threshold tuning: search per-class thresholds against a
-caller-supplied metric, and apply them to convert predicted probabilities
-into class predictions.
+"""Decision-threshold tuning for classification probabilities.
+
+Searches per-class thresholds against a caller-supplied metric, and applies
+them to convert predicted probabilities into class predictions.
 
 Unlike ``predict()``'s default decision rule (argmax for multiclass, 0.5 for
 binary), the thresholds this module searches for are tuned against whatever

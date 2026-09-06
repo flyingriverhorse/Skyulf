@@ -16,8 +16,11 @@ from ..dispatcher import apply_dual_engine
 
 
 class WinsorizeApplier(BaseApplier):
+    """Clip values to the fitted percentile bounds; rows are never removed."""
+
     @apply_method
     def apply(self, X: Any, y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
+        """Clip ``X`` to the fitted per-column bounds; ``y`` passes through untouched."""
         # apply_method already unpacked (X, y); re-wrap so apply_dual_engine's
         # own unpack_pipeline_input doesn't silently drop y. Winsorize never
         # filters rows, but the wrap keeps behavior consistent with the other
@@ -74,14 +77,18 @@ class WinsorizeApplier(BaseApplier):
     learns_from_data=True,
 )
 class WinsorizeCalculator(BaseCalculator):
+    """Fit per-column clip bounds at the configured lower/upper percentiles."""
+
     def infer_output_schema(
         self, input_schema: SkyulfSchema, config: dict[str, Any]
     ) -> SkyulfSchema:
+        """Return the input schema unchanged: clipping rewrites values, not columns."""
         # Winsorize clips values in place; column set is preserved.
         return input_schema
 
     @fit_method
     def fit(self, X: Any, _y: Any, config: dict[str, Any]) -> WinsorizeArtifact:  # pylint: disable=arguments-differ
+        """Compute each column's lower/upper quantiles; warn on empty or non-numeric ones."""
         if user_picked_no_columns(config):
             return {}
 

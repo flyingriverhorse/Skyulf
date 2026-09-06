@@ -400,8 +400,22 @@ def _casting_apply_pandas(X: Any, y: Any, params: dict[str, Any]) -> Any:
 
 
 class CastingApplier(BaseApplier):
+    """Cast each column named in ``type_map`` to its target dtype on the active engine.
+
+    ``coerce_on_error=True`` (the default) is best-effort per column: the pandas
+    path swallows any cast failure and leaves that column untouched, the polars
+    path casts with ``strict=False``. With it off, both engines raise. The
+    awkward families are hand-written on each path because the native casts
+    disagree — polars truncates fractional floats where pandas masks them, and
+    pandas' ``astype`` clamps out-of-range integers where polars nulls or raises.
+    Boolean targets additionally go through the shared alias table so
+    "yes"/"no"-style strings coerce the same way on both engines in best-effort
+    mode. Columns missing from the frame are skipped.
+    """
+
     @apply_method
     def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
+        """Dispatch through the mapping-keyed dual-engine path; ``y`` passes through."""
         return apply_dual_engine(
             X, params, {"polars": _casting_apply_polars, "pandas": _casting_apply_pandas}
         )
@@ -417,9 +431,22 @@ class CastingApplier(BaseApplier):
     learns_from_data=False,
 )
 class CastingCalculator(BaseCalculator):
+    """Normalise either accepted config shape into one canonical ``type_map``.
+
+    Purely config-driven (``learns_from_data=False``): nothing is read from the
+    data beyond column presence, and dtype aliases are resolved through
+    ``TYPE_ALIASES`` so the applier only ever sees canonical labels.
+    """
+
     def infer_output_schema(
         self, input_schema: SkyulfSchema, config: dict[str, Any]
     ) -> SkyulfSchema:
+        """Rewrite the dtype labels of ``input_schema`` for every column the config targets.
+
+        Unlike :meth:`fit`, this cannot check column presence against a frame, so
+        requested dtypes are applied unconditionally — a config naming an absent
+        column predicts a schema that apply will not actually produce.
+        """
         # Casting preserves the column set but rewrites dtype labels.
         column_types = dict(config.get("column_types", {}) or {})
         target_type = config.get("target_type")
@@ -435,6 +462,12 @@ class CastingCalculator(BaseCalculator):
 
     @fit_method
     def fit(self, X: Any, _y: Any, config: dict[str, Any]) -> CastingArtifact:  # pylint: disable=arguments-differ
+        """Merge the two config shapes into a ``type_map`` of columns present on *X*.
+
+        Absent columns are dropped rather than erroring, so a config written
+        against a wider frame degrades to a partial cast; when both shapes name
+        the same column, ``target_type`` overwrites the ``column_types`` entry.
+        """
         # Config supports two shapes:
         #   {'columns': ['col1'], 'target_type': 'float'}
         #   {'column_types': {'col1': 'float', 'col2': 'int'}}

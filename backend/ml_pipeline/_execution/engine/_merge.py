@@ -25,6 +25,20 @@ logger = logging.getLogger(__name__)
 
 
 class MergeMixin:
+    """Frame coercion and multi-input fan-in merging for :class:`PipelineEngine`.
+
+    Owns the whole merge path a node with several incoming edges takes:
+    per-node strategy resolution (``last_wins`` / ``first_wins``), best-effort
+    coercion of each artifact (DataFrame, ``SplitDataset``, ``(X, y)`` tuple) to
+    a frame, column-wise merging when row counts agree and row-wise stacking
+    when they do not, and ``SplitDataset``-aware merging that keeps
+    train/test/validation separate. Overlapping columns are attributed to the
+    branch that actually changed them, using the nearest common ancestor as the
+    "before" snapshot, so a bypass branch cannot silently win — and every
+    discard, stack or resurrected drop is recorded on ``self.merge_warnings``
+    for the UI.
+    """
+
     # Type-only stubs so ty can resolve attributes/methods provided by
     # :class:`PipelineEngine` (or its sibling mixins). No runtime impact.
     _node_configs: dict[str, NodeConfig]
@@ -34,7 +48,6 @@ class MergeMixin:
     _merge_input_order: Any
     _ancestors_of: Any
     artifact_store: Any
-    """Frame coercion + multi-input merging split out of :class:`PipelineEngine`."""
 
     def _nearest_common_ancestor_id(self, node_id: str) -> str | None:
         """Deepest ancestor shared by every input of ``node_id``, or ``None``.

@@ -1,3 +1,16 @@
+"""Small identifier- and DB-lookup helpers shared by the execution layer.
+
+Two unrelated jobs live here because both are needed by the training/tuning job
+managers and by ``monitoring/router.py``:
+
+* decode the ``<parent>__branch_<n>`` pipeline-id convention back into the
+  parent pipeline id and branch index, so a parallel branch can be presented
+  under its originating pipeline;
+* resolve a job's ``dataset_source_id`` to a human dataset name — the id may be
+  an integer primary key or a UUID string, either one row at a time or as a
+  bulk map for list endpoints.
+"""
+
 import re
 
 from sqlalchemy import select

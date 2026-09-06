@@ -94,6 +94,11 @@ class LogisticRegressionCalculator(SklearnCalculator):
     }
 
     def __init__(self):
+        """Bind ``LogisticRegression`` with ``max_iter=1000`` and ``solver="lbfgs"``.
+
+        Both are defaults, not fixtures: ``fit``'s config may override either,
+        and the resulting pair is then checked against ``_SOLVER_PENALTIES``.
+        """
         super().__init__(
             model_class=LogisticRegression,
             default_params={
@@ -113,6 +118,7 @@ class LogisticRegressionCalculator(SklearnCalculator):
         validation_data: Any = None,
         iteration_callback: Callable[..., Any] | None = None,
     ) -> Any:
+        """Reject an unsupported solver/penalty pair, then delegate to the base fit."""
         self._validate_solver_penalty(config)
         return super().fit(
             X,
@@ -228,6 +234,13 @@ class CalibratedClassifierCalculator(SklearnCalculator):
     STRUCTURAL_TUNING_KEYS: tuple[str, ...] = ("base_estimator",)
 
     def __init__(self):
+        """Bind ``CalibratedClassifierCV`` over a logistic-regression base estimator.
+
+        Fixes ``method="sigmoid"`` and ``cv=5`` alongside that base estimator as
+        overridable defaults, and starts ``_tuning_base_config`` empty so
+        :attr:`default_params` yields the bound estimator until
+        :meth:`prepare_tuning_params` records a different selection.
+        """
         super().__init__(
             model_class=CalibratedClassifierCV,
             default_params={
@@ -241,6 +254,12 @@ class CalibratedClassifierCalculator(SklearnCalculator):
 
     @property
     def default_params(self) -> dict[str, Any]:
+        """Return the defaults with any tuning-selected base estimator resolved in.
+
+        An unrecognized ``base_estimator`` key warns and falls back to logistic
+        regression rather than raising. The factory runs on every access, so
+        separate tuning trials never share one estimator instance.
+        """
         params = dict(self._default_params)
         if self._tuning_base_config:
             key = self._tuning_base_config.get("base_estimator")
@@ -255,6 +274,11 @@ class CalibratedClassifierCalculator(SklearnCalculator):
         return params
 
     def prepare_tuning_params(self, config: dict[str, Any]) -> None:
+        """Absorb ``base_estimator`` so it selects an estimator instead of being tuned.
+
+        Only keys named in :attr:`STRUCTURAL_TUNING_KEYS` are taken, read from
+        either the nested ``params`` dict or the flat config.
+        """
         src = config.get("params") if isinstance(config.get("params"), dict) else config
         src = src or {}
         self._tuning_base_config = {k: src[k] for k in self.STRUCTURAL_TUNING_KEYS if k in src}
@@ -269,6 +293,7 @@ class CalibratedClassifierCalculator(SklearnCalculator):
         validation_data: Any = None,
         iteration_callback: Callable[..., Any] | None = None,
     ) -> Any:
+        """Resolve the base estimator in ``config``, then delegate to the base fit."""
         config = self._resolve_base_estimator(config)
         return super().fit(
             X,
@@ -327,6 +352,13 @@ class RandomForestClassifierCalculator(SklearnCalculator):
     """Random Forest Classifier Calculator."""
 
     def __init__(self):
+        """Bind ``RandomForestClassifier`` with 50 shallow, constrained trees.
+
+        ``max_depth=10``, ``min_samples_split=5`` and ``min_samples_leaf=2``
+        restrict tree growth that sklearn leaves open by default, and the forest
+        is half sklearn's default size. ``n_jobs=-1`` fits across every core.
+        All are overridable from ``fit``'s config.
+        """
         super().__init__(
             model_class=RandomForestClassifier,
             default_params={
@@ -359,6 +391,14 @@ class SVCCalculator(SklearnCalculator):
     """SVC Calculator."""
 
     def __init__(self):
+        """Bind ``SVC`` with an RBF kernel and probability estimates switched on.
+
+        ``probability=True`` is the load-bearing default — without it the
+        applier would have no ``predict_proba`` to call — and it costs extra
+        cross-validation at fit time, because Platt scaling is fitted on top of
+        the margins. ``C=1.0``, ``kernel="rbf"`` and ``gamma="scale"`` are
+        sklearn's own defaults.
+        """
         super().__init__(
             model_class=SVC,
             default_params={
@@ -390,6 +430,12 @@ class KNeighborsClassifierCalculator(SklearnCalculator):
     """K-Neighbors Classifier Calculator."""
 
     def __init__(self):
+        """Bind ``KNeighborsClassifier`` with an unweighted 5-neighbour vote.
+
+        ``algorithm="auto"`` leaves sklearn to pick the neighbour-search
+        structure from the data's shape and size, and ``n_jobs=-1`` parallelizes
+        the queries.
+        """
         super().__init__(
             model_class=KNeighborsClassifier,
             default_params={
@@ -421,6 +467,12 @@ class DecisionTreeClassifierCalculator(SklearnCalculator):
     """Decision Tree Classifier Calculator."""
 
     def __init__(self):
+        """Bind ``DecisionTreeClassifier`` with sklearn's own unpruned defaults.
+
+        ``max_depth=None`` grows the tree until its leaves are pure or fall
+        below ``min_samples_split=2``, so unlike the forest and boosting nodes
+        in this module this one ships no regularization of its own.
+        """
         super().__init__(
             model_class=DecisionTreeClassifier,
             default_params={
@@ -451,6 +503,11 @@ class GradientBoostingClassifierCalculator(SklearnCalculator):
     """Gradient Boosting Classifier Calculator."""
 
     def __init__(self):
+        """Bind ``GradientBoostingClassifier`` with 100 depth-3 trees at rate 0.1.
+
+        All three are exactly sklearn's own defaults, restated so the node's
+        tunable surface is explicit; ``fit``'s config overrides any of them.
+        """
         super().__init__(
             model_class=GradientBoostingClassifier,
             default_params={
@@ -481,6 +538,12 @@ class AdaBoostClassifierCalculator(SklearnCalculator):
     """AdaBoost Classifier Calculator."""
 
     def __init__(self):
+        """Bind ``AdaBoostClassifier`` with 50 weak learners at rate 1.0.
+
+        Both are sklearn's defaults. No base estimator is pinned here, so
+        ``fit``'s config may supply one; sklearn's depth-1 decision stump is
+        used when it does not.
+        """
         super().__init__(
             model_class=AdaBoostClassifier,
             default_params={
@@ -511,6 +574,14 @@ if XGBOOST_AVAILABLE:
         """XGBoost Classifier Calculator."""
 
         def __init__(self):
+            """Bind ``XGBClassifier`` with XGBoost's defaults plus row/column subsampling.
+
+            ``n_estimators=100``, ``max_depth=6`` and ``learning_rate=0.3`` are
+            XGBoost's own. ``subsample`` and ``colsample_bytree`` are pulled
+            down from XGBoost's 1.0 to 0.8, and neither appears in the node's
+            ``params`` metadata, so they are only reachable through ``fit``'s
+            config.
+            """
             super().__init__(
                 model_class=XGBClassifier,
                 default_params={
@@ -560,6 +631,13 @@ class ExtraTreesClassifierCalculator(SklearnCalculator):
     """Extra Trees Classifier Calculator."""
 
     def __init__(self):
+        """Bind ``ExtraTreesClassifier`` with 100 unpruned, non-bootstrapped trees.
+
+        ``bootstrap=False`` is the distinguishing default: extra-trees randomizes
+        split thresholds instead of resampling rows, so every tree sees the whole
+        sample. The remaining settings match sklearn's defaults, and
+        ``n_jobs=-1`` fits across every core.
+        """
         super().__init__(
             model_class=ExtraTreesClassifier,
             default_params={
@@ -594,6 +672,14 @@ class HistGradientBoostingClassifierCalculator(SklearnCalculator):
     """HistGradientBoosting Classifier Calculator."""
 
     def __init__(self):
+        """Bind ``HistGradientBoostingClassifier`` with sklearn's own defaults.
+
+        Tree shape is governed leaf-wise — ``max_leaf_nodes=31`` with
+        ``max_depth=None`` — because this estimator bins features into
+        ``max_bins=255`` buckets and grows by best leaf rather than level by
+        level. That is the opposite of the level-wise boosting nodes elsewhere
+        in this module.
+        """
         super().__init__(
             model_class=HistGradientBoostingClassifier,
             default_params={
@@ -624,11 +710,13 @@ if LIGHTGBM_AVAILABLE:
         """
 
         def predict(self, df, model_artifact):
+            """Delegate to the base predict with the feature-name warning suppressed."""
             with warnings.catch_warnings():
                 warnings.filterwarnings("ignore", message=".*valid feature names.*")
                 return super().predict(df, model_artifact)
 
         def predict_proba(self, df, model_artifact):
+            """Delegate to the base predict_proba with the same warning suppressed."""
             with warnings.catch_warnings():
                 warnings.filterwarnings("ignore", message=".*valid feature names.*")
                 return super().predict_proba(df, model_artifact)
@@ -647,6 +735,14 @@ if LIGHTGBM_AVAILABLE:
         """LightGBM Classifier Calculator."""
 
         def __init__(self):
+            """Bind ``LGBMClassifier`` with an unregularized leaf-wise configuration.
+
+            ``max_depth=-1`` leaves depth unbounded, so ``num_leaves=31`` alone
+            governs tree shape, and both subsampling rates and both L1/L2
+            penalties start at their neutral values. ``verbose`` and
+            ``verbosity`` are pinned to -1 to quiet LightGBM's native logging
+            alongside the no-op logger registered at import time.
+            """
             super().__init__(
                 model_class=LGBMClassifier,
                 default_params={
@@ -677,6 +773,7 @@ if LIGHTGBM_AVAILABLE:
             validation_data=None,
             iteration_callback=None,
         ):
+            """Delegate to the base fit with the feature-name warning suppressed."""
             with warnings.catch_warnings():
                 warnings.filterwarnings("ignore", message=".*valid feature names.*")
                 return super().fit(
@@ -717,6 +814,13 @@ class GaussianNBCalculator(SklearnCalculator):
     """Gaussian Naive Bayes Calculator."""
 
     def __init__(self):
+        """Bind ``GaussianNB``, whose only knob is ``var_smoothing=1e-9``.
+
+        Naive Bayes estimates each feature's variance from the training data, so
+        there is little to configure up front. ``var_smoothing`` is sklearn's own
+        default: the portion of the largest variance of all features added to
+        every variance for numerical stability.
+        """
         super().__init__(
             model_class=GaussianNB,
             default_params={"var_smoothing": 1e-9},
@@ -759,6 +863,13 @@ class SGDClassifierCalculator(SklearnCalculator):
     """SGD Classifier Calculator."""
 
     def __init__(self):
+        """Bind ``SGDClassifier`` as a logistic-regression approximation.
+
+        ``loss="log_loss"`` replaces sklearn's default ``"hinge"``, and that is
+        what makes ``predict_proba`` available to the applier — a hinge loss
+        yields a linear SVM with no probability output. ``l1_ratio=0.15`` stays
+        inert unless ``penalty`` is switched to ``"elasticnet"``.
+        """
         super().__init__(
             model_class=SGDClassifier,
             default_params={

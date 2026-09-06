@@ -1,5 +1,7 @@
-"""Tree-based ensemble models: Random Forest, Decision Tree, Extra Trees,
-Gradient Boosting, AdaBoost, XGBoost, HistGradientBoosting, LightGBM.
+"""Tuning search spaces for tree-based ensemble models.
+
+Random Forest, Decision Tree, Extra Trees, Gradient Boosting, AdaBoost,
+XGBoost, HistGradientBoosting and LightGBM.
 """
 
 from ._field import HyperparameterField, random_state_field

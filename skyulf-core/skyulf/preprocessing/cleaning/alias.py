@@ -60,8 +60,18 @@ def _normalize_alias_pandas(val: Any, mapping: dict[str, str]) -> Any:
 
 
 class AliasReplacementApplier(BaseApplier):
+    """Canonicalise near-duplicate text values in the resolved columns.
+
+    The pandas and polars paths must agree value-for-value: each cell is
+    normalised (lowercased, punctuation and spaces stripped) and looked up in
+    the alias map, and a cell that matches nothing is left exactly as it was.
+    ``punctuation`` mode is the exception — it strips punctuation only,
+    preserving case and spaces.
+    """
+
     @apply_method
     def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
+        """Dispatch the replacement to the pandas or polars path; ``y`` passes through."""
         return apply_dual_engine(
             X, params, {"polars": self._apply_polars, "pandas": self._apply_pandas}
         )
@@ -145,14 +155,24 @@ class AliasReplacementApplier(BaseApplier):
     learns_from_data=False,
 )
 class AliasReplacementCalculator(BaseCalculator):
+    """Resolve alias-replacement config into an artifact; nothing is learned from data."""
+
     def infer_output_schema(
         self, input_schema: SkyulfSchema, config: dict[str, Any]
     ) -> SkyulfSchema:
+        """Pass the input schema through, since only cell values are rewritten."""
         # Alias normalization replaces values in place; column set is preserved.
         return input_schema
 
     @fit_method
     def fit(self, X: Any, _y: Any, config: dict[str, Any]) -> AliasReplacementArtifact:  # pylint: disable=arguments-differ
+        """Build the artifact, auto-detecting text columns when none are named.
+
+        An explicit empty column selection yields an empty artifact, which
+        makes the applier a no-op. Legacy ``alias_type`` spellings are remapped
+        and ``custom_map`` keys are normalised exactly like runtime values, so
+        a hand-written map still matches.
+        """
         if user_picked_no_columns(config):
             return {}
 

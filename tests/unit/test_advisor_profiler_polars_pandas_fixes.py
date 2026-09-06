@@ -79,3 +79,21 @@ def test_ingestion_profiler_all_integer_dtype_variants_compute_statistics():
         df = pl.DataFrame({"v": [1, 2, 3]}, schema={"v": dtype})
         stats = IngestionProfiler.profile(df)["columns"]["v"]
         assert stats["mean"] == 2.0, f"failed for dtype {dtype}"
+
+
+def test_both_profilers_agree_on_duplicate_row_count():
+    """The two profilers feed one field, so they must use one convention.
+
+    ``GET /datasets/{dataset_id}/schema`` returns ``AnalysisProfile`` from
+    either branch: the cached profile reads the ingestion profiler's polars
+    ``is_duplicated().sum()`` (every row in a duplicate group) while the
+    fresh-sample branch counts pandas' ``duplicated()`` default ``keep='first'``
+    (only the extras). The same file therefore reported a different duplicate
+    count depending on whether its profile happened to be cached.
+    """
+    rows = {"a": [1, 1, 1, 2], "b": ["x", "x", "x", "y"]}
+    polars_profile = IngestionProfiler.profile(pl.DataFrame(rows))
+    pandas_profile = AdvisorProfiler.generate_profile(pd.DataFrame(rows))
+
+    assert polars_profile["duplicate_rows"] == 3
+    assert pandas_profile.duplicate_row_count == polars_profile["duplicate_rows"]

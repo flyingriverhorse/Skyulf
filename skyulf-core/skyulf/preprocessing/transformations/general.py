@@ -73,8 +73,11 @@ def _apply_power_to_pandas_col(df_out: Any, item: dict[str, Any]) -> Any:
 
 
 class GeneralTransformationApplier(BaseApplier):
+    """Apply per-column simple ops or fitted Box-Cox/Yeo-Johnson transforms."""
+
     @apply_method
     def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
+        """Run each configured transformation on the active engine; ``y`` passes through."""
         return apply_dual_engine(
             X, params, {"polars": self._apply_polars, "pandas": self._apply_pandas}
         )
@@ -159,15 +162,23 @@ def _fit_power_for_column(X: Any, col: str, method: str, is_polars: bool) -> dic
     learns_from_data=False,
 )
 class GeneralTransformationCalculator(BaseCalculator):
+    """Resolve configured transformations, fitting lambdas for the power methods."""
+
     def infer_output_schema(
         self, input_schema: SkyulfSchema, config: dict[str, Any]
     ) -> SkyulfSchema:
+        """Return the input schema unchanged: each transformation replaces its column in place."""
         # Transformations are keyed by source column and replace it in place;
         # column set is preserved.
         return input_schema
 
     @fit_method
     def fit(self, X: Any, _y: Any, config: dict[str, Any]) -> GeneralTransformationArtifact:  # pylint: disable=arguments-differ
+        """Fit per-column power lambdas; pass simple ops through as configured.
+
+        Box-Cox is skipped (with a warning) for columns holding non-positive
+        values, and a per-column fit failure logs and skips that column.
+        """
         # Config: {'transformations': [{'column': 'col1', 'method': 'log'},
         #                              {'column': 'col2', 'method': 'yeo-johnson'}]}
         is_polars = get_engine(X).name == EngineName.POLARS

@@ -14,6 +14,22 @@ findings (2 🟠 / 4 🟡) outside the source audit. OC-169 (1 🟡) was filed t
 day out of the OC-150 fix pass. They are tracked below with reproduction evidence
 in the log; the historical baseline counts above are unchanged.
 
+**File-by-file follow-up (2026-09-05):** OC-170–176 add seven execution-reproduced
+findings (7 🟡): three from the preceding source pass and four from the bounded
+10-file outliers/time-series batch. Coverage is recorded in
+[`core_source_review_2026-09-05.md`](core_source_review_2026-09-05.md).
+
+**Cleaning/encoding follow-up (2026-09-06):** OC-177–182 add six more
+execution-reproduced findings (1 🟠 / 5 🟡) from another bounded 10-file batch.
+Historical baseline counts remain unchanged.
+
+**Docstring-pass by-product (2026-09-06):** OC-183–186 add four backend findings
+(3 🟠 / 1 🟡) surfaced while writing docstrings against the code during the OC-09
+pass. Unlike the batches above these were verified by reading the call sites and
+grepping for consumers, **not** reproduced by execution, and none is fixed: each
+changes behaviour rather than documentation, so all four are filed open by
+decision for a later session. Historical baseline counts remain unchanged.
+
 The queue below follows the master report's suggested fix order (4 tiers), then the
 remaining findings grouped by domain. R1 (the systemic core↔frontend contract fix)
 retires 8 findings as a class and is tracked separately.
@@ -58,6 +74,7 @@ follow, grouped by domain.
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
+| OC-177 | 🟠 | Pandas `DummyEncoder` changes a known category's encoding with batch composition: after fitting `[1.0,2.0]`, `1.0` encodes as known alone but all-zero when accompanied by `2.5` (`preprocessing/encoding/dummy.py:60-64`) | small | ⬜ open |
 | OC-163 | 🟠 | `LagFeatures` / `RollingAggregate` sort X without reordering tuple y on both engines — `[3,1,2]` times become `[1,2,3]` while targets remain `[300,100,200]`, silently training on wrong labels (`preprocessing/time_series/lag.py:45,81`, `rolling.py:63,119`) | small | ⬜ open |
 | OC-164 | 🟠 | `get_fitted_split()` on new data replaces a trained pipeline's preprocessing while retaining its old model — the same input's prediction changed from 50 to −950 (`pipeline/_pipeline.py:234`) | small | ⬜ open |
 | OC-13 | 🟠 | Drop-Rows UI settings ignored; every canvas run becomes "drop any missing" (`pipelineConverter.ts:249-253`) | small | ✅ fixed 2026-09-03 |
@@ -102,7 +119,7 @@ follow, grouped by domain.
 | OC-79 | 🟡 | `joblib` imported at module scope but not in `install_requires` — packaging-integrity cluster | 1 line | ⬜ open |
 | OC-81 | ⚪ | No `License ::` classifier / SPDX field — packaging-integrity cluster | 1 line | ⬜ open |
 | OC-03 | 🟠 | Systemic `infer_output_schema` int→float misprediction across 22 nodes — one sweep + parametrized test (predicted schema == actual schema for every node) | ~1 day | ⬜ open |
-| OC-09 | 🟡 | Narrow `ruff select` hides ~500 missing docstrings + 84 unused args — **last**, widening first would bury the signal. Concrete cost measured 2026-09-05: `F401` was absent from `select`, so **27 unused imports** sat unpoliced — one was orphaned *inside the OC-152 security fix* by deleting the raw-SQL executors, and `ruff check`, `ruff format --check`, `ty check` and 1626 passing tests all stayed green; only an external pyflakes pass caught it. **`F401` half closed 2026-09-05**: added to `select`, 22 dead imports auto-fixed, 4 availability/side-effect probes waived per-site, 1 redundant `import skyulf` dropped; `ruff check .` clean, `ty` clean, core **3669 passed**, backend **1626 passed**. Still open: **`F841` unused-variable, the docstring rules and unused-args** | half day (F401 done; ~2h remain) | ⬜ open |
+| OC-09 | 🟡 | Narrow `ruff select` hides ~500 missing docstrings + 84 unused args — **last**, widening first would bury the signal. Concrete cost measured 2026-09-05: `F401` was absent from `select`, so **27 unused imports** sat unpoliced — one was orphaned *inside the OC-152 security fix* by deleting the raw-SQL executors, and `ruff check`, `ruff format --check`, `ty check` and 1626 passing tests all stayed green; only an external pyflakes pass caught it. **`F401` closed 2026-09-05**: added to `select`, 22 dead imports auto-fixed, 4 availability/side-effect probes waived per-site, 1 redundant `import skyulf` dropped. **`F841` closed 2026-09-05**: 19 sites, all in tests, and three were tests whose bodies ended before any assertion so they had always passed trivially. **Docstring rules closed 2026-09-05**: `D` selected as a family with `convention = "google"`, the four auto-fixable rules (772 sites) taken by `ruff --fix`, D200/D301 (77) and then the remaining ten rules (**822 sites, 722 of them D1xx "missing docstring"**) written by hand across **188 files** — and then **82 more that ruff never reported at all**, because `D1xx` is privacy-gated on the *whole dotted module path*: a leading underscore on the module **or on any enclosing package** exempts everything beneath it, and 112 of the 327 in-scope modules live under one (`ml_pipeline/_internal/`, `_execution/`, `modeling/_tuning/`, `modeling/hyperparameters/`). `D2xx`/`D4xx` are **not** gated, which is why the earlier batches looked complete while the missing-docstring half of the same files stayed invisible to every gate. Recovered by copying each private file to a public name outside its package and linting the copy (byte-identical, so line numbers carry straight back): 64 backend + 18 core, re-measured to **0**. Total hand-written: **904**. Tests/examples/benchmarks carry a per-file `D` waiver (they held 2,528 of the 3,350 sites); enforcement covers `skyulf-core/skyulf/`, `backend/` and the entry points, matching `coding_standards` §4. `lint.ignore` is now down to five non-docstring entries. All **210** modified Python files AST-proven against `HEAD` — 199 docstring-only, 11 real code changes, each intended and itemised in the log entry; `ruff check .`, `ruff format --check .` (668 files), `ty check` clean; core **3668 passed / 70 skipped**, backend **1630 passed / 7 snapshots passed** — both exact baselines. **`ARG` deliberately not enabled** — measured 531 repo-wide, **121 in scope** across 73 files, of which 39 are an unused `config` and ~90 are Calculator/Applier protocol or framework contract signatures that cannot be renamed without breaking keyword callers. The triage's genuine defects were **fixed directly instead** (dead `fetch_data(query=)` and `safe_delete_path(force_delete=)` removed, `DataIngestionService.upload_dir` now from settings, the two profilers' duplicate-count parity break, the unimported `backend.eda.tasks` Celery bug), so enabling `ARG` would buy ~90 permanent `# noqa` waivers for no further yield. See the 2026-09-06 OC-09-closed log entry | done — `ARG` declined by decision (121 sites measured) | ✅ fixed 2026-09-06 — “Fixed as much as we did, no need to continue!” |
 
 ### Remaining — evaluation & explainability
 
@@ -136,7 +153,10 @@ follow, grouped by domain.
 | OC-157 | ⚪ | `first_wins` merge strategy reverses output column order, contradicting its docstring (`_merge.py:221-236`) — fixed by dropping the reversed iteration, so order is strategy-independent by construction | small | ✅ fixed 2026-09-05 — with OC-153 |
 | OC-159 | ⚪ | Empty filter dict compiles to WHERE-less `DELETE FROM data_sources`/`UPDATE`; dead call path today (`async_sqlite_queries.py:129-146`) | 1 line | ⬜ open |
 | OC-169 | 🟡 | Filed while fixing OC-150 — the global `ErrorHandlerMiddleware` logs `{exc}`, `traceback.format_exc()` **and** `exc_info=True` with no redaction, so any *uncaught* exception whose message or frames carry a credential leaks it to the log regardless of call-site scrubbing; the S3 paths now redact their own `logger.error` but still `raise ConnectionError(...) from e`, leaving `e` reachable from the chained traceback (`middleware/error_handler.py:53-65`) | small | ⬜ open |
-
+| OC-183 | 🟠 | `SmartCatalog` S3 auto-init is dead for `.env`-only config, and the two docs name different variables — **OC-130's root cause repeating**. `backend/data/catalog.py:556` reads `os.getenv("S3_BUCKET_NAME")`, but pydantic-settings loads the dotenv into the model and never exports it into `os.environ`, so a bucket configured only in `.env` is invisible and `s3_catalog` silently stays `None` (falling back to local disk with no error or warning). Worse, `S3_BUCKET_NAME` is **not a `Settings` field at all**: `config/mixins/aws.py:12` declares `AWS_BUCKET_NAME`, which is what `docs/guides/backend_configuration.md:146` documents, while `README.md:105` documents `S3_BUCKET_NAME` — so following the README sets a variable nothing reads. Needs a canonical-name decision before the one-line code fix | small | ⬜ open |
+| OC-184 | 🟠 | `ProductionSettings.SECURITY_HEADERS` is declared and never sent. `_PROD_SECURITY_HEADERS` (HSTS, `X-Frame-Options: DENY`, CSP, …) is assigned at `config/environments.py:84` and referenced nowhere else in the repo — no middleware reads it — so a production boot logs "Running in PRODUCTION mode with enhanced security" while emitting none of those headers. Fixing means adding a security-headers middleware in `main.py::_add_middleware`, where order is load-bearing (CORS must stay outermost), i.e. a behaviour change and not a config fix | half day | ⬜ open |
+| OC-185 | 🟡 | Authorization is stubbed in three mutually inconsistent pieces. `database/models.py:157 has_permission` is `return True  # Placeholder` with **zero callers**; `data_ingestion/dependencies.py:26,31 require_data_access`/`require_data_admin` are async no-ops wired to no route; and `data_ingestion/router.py:148,169` hardcode `user_id = 1` under an explicit `# KNOWN-GAP: Auth not implemented yet`, so every source belongs to one user and is visible to everyone. Nothing is exploitable *through* `has_permission` today precisely because nothing calls it — the risk is that the first caller gets an always-yes check shaped like a real API. Needs an authz decision before code | decision + ~1 week | ⬜ open |
+| OC-186 | 🟠 | `S3Catalog.exists` skips the option-name mapping that every sibling method applies. `catalog.py:521` builds a throwaway `s3fs.S3FileSystem(**self.storage_options)` from the raw instance options, while `__init__`:275, `load`:452 and `save`:491 all pass through `_prepare_s3fs_options`, which maps `aws_access_key_id`→`key` and `aws_secret_access_key`→`secret` and moves region into `client_kwargs['region_name']`. With AWS-named credentials `exists()` therefore authenticates differently from the methods it is supposed to agree with, and reports `False` for (or errors on) an object `load()` reads fine — so callers that gate on `exists` before `load` take the wrong branch | 1 line | ⬜ open |
 ### Remaining — direct-audit modules
 
 | ID | Sev | Item | Effort | Status |
@@ -180,6 +200,13 @@ follow, grouped by domain.
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
+| OC-178 | 🟡 | `HashEncoder` hashes the same missing value into different buckets across Polars, pandas object, and pandas nullable string inputs, even with one shared fitted artifact (`preprocessing/encoding/hash.py:45,76`) | small | ⬜ open |
+| OC-179 | 🟡 | `DummyEncoder(drop_first=True)` retains a single-category indicator on Polars but removes it on pandas, changing feature width across engines (`preprocessing/encoding/dummy.py:33`) | small | ⬜ open |
+| OC-180 | 🟡 | Pandas `TextCleaning(normalize_slash_dates)` crashes on `pd.NA` in a nullable string column; equivalent Polars input preserves the missing value (`preprocessing/cleaning/text.py:35-37,116`) | small | ⬜ open |
+| OC-181 | 🟡 | `ValueReplacement` coerces every unrecognized boolean mapping key to `False`: mapping `{"banana": true}` changes `[true,false]` to `[true,true]` on both engines (`preprocessing/cleaning/value_replacement.py:31-32`) | small | ⬜ open |
+| OC-182 | 🟡 | Encoder auto-detection ignores pandas `StringDtype` columns: Dummy/Hash encoding silently leaves strings untouched unless columns are selected explicitly (`preprocessing/encoding/_common.py:140`) | small | ⬜ open |
+| OC-171 | 🟡 | Pandas `SimpleImputer` silently excludes explicitly selected constant/binary numeric columns for mean/median, leaving missing values unfilled; Polars honors the selection (`preprocessing/imputation/simple.py:173-177`) | small | ⬜ open |
+| OC-172 | 🟡 | `StandardScaler` crashes on mixed pandas nullable numeric columns containing `pd.NA`; native sklearn and equivalent Polars input succeed (`preprocessing/scaling/standard.py:144,154`, `engines/sklearn_bridge.py:52`) | small | ⬜ open |
 | OC-18 | 🟡 | One-hot/dummy generated names can collide with existing columns (`encoding/one_hot.py:68-92`, `dummy.py:76-99`) | small | ⬜ open |
 | OC-21 | 🟡 | WOE additive smoothing not normalized over categories (`encoding/woe.py:130-145`) | small | ⬜ open |
 | OC-22 | ⚪ | `TargetEncoder.infer_output_schema` checks an impossible `regression` value (`encoding/target.py:340-360`) | 1 line | ⬜ open |
@@ -216,6 +243,7 @@ follow, grouped by domain.
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
+| OC-170 | 🟡 | `validate_leakage_safety()` rejects registered stateless nodes before the split as unknown/data-dependent, including `TextCleaning`, `DateFeatures`, `Casting`, and `feature_target_split` (`leakage.py:140-156`) | small | ⬜ open |
 | OC-63 | 🟠 | `artifact_digest` raises `RecursionError` instead of the documented `TypeError` on cyclic graphs (`pipeline/seal.py`) | small | ⬜ open |
 | OC-64 | 🟠 | **F-14 only partially fixed** — engine registry global still an unlocked race (`engines/registry.py:60,86-91`) | small | ⬜ open |
 | OC-65 | 🟡 | polars `to_numpy()` zero-width "parity fix" does not achieve parity (`engines/polars_engine.py`) | small | ⬜ open |
@@ -229,6 +257,10 @@ follow, grouped by domain.
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
+| OC-173 | 🟡 | Pandas `EllipticEnvelope` reselects valid values by duplicated index labels, can feed NaN back into prediction, then fails open and retains an outlier that a unique-index control removes (`preprocessing/outliers/elliptic.py:32-43`) | small | ⬜ open |
+| OC-174 | 🟡 | Polars `DateFeatures` crashes on an entirely invalid string date column despite `strict=False`; pandas produces nullable calendar features (`preprocessing/time_series/date_features.py:102`) | small | ⬜ open |
+| OC-175 | 🟡 | Polars `RollingAggregate` propagates float NaN through windows instead of ignoring missing observations like pandas — `[1,NaN,3]` with window 2 yields mean `[1,NaN,NaN]` vs `[1,1,3]` (`preprocessing/time_series/rolling.py:48`) | small | ⬜ open |
+| OC-176 | 🟡 | Polars `LagFeatures(drop_na=True)` removes nulls but retains float NaN in source/lag columns; equivalent pandas input drops those rows (`preprocessing/time_series/lag.py:54-59`) — independent of OC-165's y desynchronization | small | ⬜ open |
 | OC-59 | 🟠 | `DatasetProfile` numeric-column coverage completely different between engines (`preprocessing/inspection/`) | small | ⬜ open |
 | OC-60 | 🟠 | `GeneralBinning`'s `missing_strategy: "label"` silent no-op on polars (`preprocessing/bucketing.py`) | small | ⬜ open |
 | OC-165 | 🟡 | Pandas `LagFeatures(drop_na=True)` removes X rows but leaves tuple y untouched — 3 rows become 2 features / 3 targets even with a unique index (`preprocessing/time_series/lag.py:85-87`) | small | ⬜ open |
@@ -277,7 +309,301 @@ key — also the fastest way to find drift the audit missed).
 
 ---
 
+## New findings;
+### 2026-09-05 — OC-163–168 filed: supplemental core review, six additional reproduced bugs
+
+All six were reproduced through executed Python probes against the working tree and checked against the existing tracker and relevant source-audit reports. IDs follow the review's reported order. Two high-severity findings enter **Next**; the four medium-severity findings enter their domain queues. All remain **open**. This filing changes only the tracker; no implementation fixes or regression tests were added.
+
+**OC-163 — time-series sort loses X/y alignment (🟠).** With tuple input `X = {time: [3,1,2], value: [30,10,20]}` and `y = [300,100,200]`, fit/apply `LagFeatures` with `columns=["value"], lags=[1], sort_by="time"`, or `RollingAggregate` with `columns=["value"], window=2, sort_by="time"`. Both pandas and Polars return times `[1,2,3]` but targets `[300,100,200]`; the correct targets are `[100,200,300]`. The engine branches sort only X and return the original y. Downstream conversion to NumPy consumes these mismatched rows positionally, silently corrupting supervised training. Locations: `skyulf-core/skyulf/preprocessing/time_series/lag.py:45,81` and `rolling.py:63,119`. **Fix/verification target:** apply the same positional permutation to X and y; cover both nodes, both engines, and sorting combined with lag row removal. This is separate from OC-162's reserved-column collision in cross-validation and OC-165's filtering-only failure.
+
+**OC-164 — split extraction invalidates an existing trained model (🟠).** Train a `SkyulfPipeline` containing `StandardScaler(columns=["x"])` and `linear_regression` on a `SplitDataset`: data has `x = arange(20)`, `target = 10*x`, first 15 rows train and last 5 test. `predict(x=5)` returns **50.0**. Call `get_fitted_split()` on the same split with x shifted by +100, then predict the original `x=5` again: **−949.9999999999998**, with no error. `pipeline/_pipeline.py:234` calls the live `feature_engineer.fit_transform(data)`, replacing its fitted scaler while retaining the model trained against the previous scaler. Refitting preprocessing is documented for this helper; the defect is leaving an already-fitted model usable with incompatible preprocessing. **Fix/verification target:** isolate split extraction from the trained pipeline's state, or explicitly invalidate the retained model when refitting preprocessing. Pin unchanged predictions for a non-mutating implementation, or a clear unfitted-state error if invalidation is chosen.
+
+**OC-165 — pandas lag filtering leaves y unfiltered (🟡).** Fit/apply `LagFeatures` to pandas `X = {value: [10,20,30]}`, `y = [100,200,300]` with `columns=["value"], lags=[1], drop_na=True` and no sorting. Output X has **2 rows**, while y still has **3**; expected y is `[200,300]`. `lag.py:85-87` drops missing rows from the feature frame and returns the original target. The equivalent Polars Series probe correctly returns 2/2 rows, providing an engine control. This is independent of OC-163 and distinct from OC-12, which concerned duplicate-index expansion in `DropMissingRows` / `Deduplicate`. **Fix/verification target:** filter y with the same positional keep-mask as X, including duplicate-index coverage; sorting and filtering must compose correctly.
+
+**OC-166 — Polars outlier helpers skip NumPy targets (🟡).** With Polars `X = {x: [1.,2.,3.,4.,100.]}` and NumPy `y = [10,20,30,40,1000]`, fit/apply `IQR(columns=["x"])`, `ZScore(columns=["x"], threshold=1)`, or `ManualBounds(bounds={"x": {"lower": 0, "upper": 10}})`. Each removes x=100 but returns all five targets: **4 X rows / 5 y rows**. Repeating each probe with Polars Series y returns the correct four targets. The dispatcher accepts engine-neutral NumPy targets, but `_filter_y_polars` in `preprocessing/outliers/_common.py:9-15` filters only Polars Series/DataFrames and silently returns other types. **Fix/verification target:** preserve positional alignment for supported array-like targets, with NumPy and native-Polars controls across the affected nodes. No reserved helper-column name is involved, so this does not duplicate OC-160.
+
+**OC-167 — ambiguous canonical serialization creates fingerprint collisions (🟡).** `artifact_digest(np.array(["a", "bstr:c"], dtype=object))` equals the digest of `np.array(["astr:b", "c"], dtype=object)`: strings contribute `b"str:" + value` without a length prefix, and object-array elements have no boundary markers. Ordinary lists also collide: `["a", "b,str:c"]` versus `["a,str:b", "c"]`. Confirmed through the public pipeline API: two otherwise identical `LabelEncoder(columns=["x"])` pipelines fitted on the first pair of category lists return **identical `fingerprint()` values**, but transform input `"a"` to **0 versus −1**. Locations: `pipeline/seal.py:52,64` (and the list serialization branch). This is deterministic aliasing of distinct values, not OC-62's process-dependent pointer hashing, and not OC-63's cycle handling. **Fix/verification target:** make the canonical byte encoding unambiguous for strings/bytes and nested containers; regress both direct digest collisions and differing fitted pipeline behavior, while preserving process stability.
+
+**OC-168 — refitting leaves old decision thresholds active (🟡).** Fit a logistic-regression pipeline on `x = arange(40)`, `target = (x >= 20).astype(int)`, using the frame as both train and test for this lifecycle probe. Tune on the same features/labels with `accuracy_score`, obtaining `{0: 0.5, 1: 0.5}`. Refit the same pipeline instance with labels mapped to `{0: "no", 1: "yes"}`. Normal prediction at x=25 returns `"yes"`, but `predict(..., use_tuned_thresholds=True)` raises `ValueError: thresholds is missing entries for classes: ['no', 'yes']`. `_tuned_thresholds` is initialized in `__init__` and assigned by optimization, but never reset by `fit()` (`pipeline/_pipeline.py:135,380-389`). With unchanged labels the same stale thresholds remain accepted, even though they belong to a previous model. **Fix/verification target:** invalidate tuned thresholds when retraining begins and require fresh tuning for the replacement model; cover both changed and unchanged label sets. This is lifecycle state retention, separate from OC-36's degenerate validation search and OC-147's tie comparison.
+
+**Verification during the review:** full command `.venv/Scripts/python.exe -m pytest skyulf-core/tests -q --no-cov --tb=short -o addopts=''` produced **3680 passed, 56 skipped, 1 failed, 2 errors** in 130.11 seconds. The three unsuccessful tests were environmental: two serializer fixtures could not access pytest's default temporary directory, and the wrapped-Polars sentence-embedder test hit restricted network access while checking the model cache. All three passed on a targeted rerun with a writable temporary directory and `HF_HUB_OFFLINE=1` (cached model available): **3 passed**. These suite results are separate from the six successful bug reproductions; no fixes are implied by the rerun. Temporary verification files were removed after use.
+
+### 2026-09-05 — OC-160/161/162 filed: internal Polars helper-column names collide with valid user columns
+These are outside the Opus inventory. **OC-160:** the row-dropping implementation creates a physical `__idx__` column to retain X/y positional alignment. Polars rejects the operation if X (in `DropMissingRows`) or DataFrame-shaped y already has that perfectly valid name, so data-cleaning fails instead of returning the filtered frame. The failure was executed and reproduced as `polars.exceptions.DuplicateError`. It also affects the y-aware `Deduplicate` path, which creates the same temporary column.
+
+**OC-161:** native Polars clustering evaluation appends labels as `__skyulf_cluster__`, then removes that column from each cluster subset. If a numeric input feature already uses that name, the append overwrites it and the removal deletes it. The centroid helper still iterates the original feature-name list, so selecting the missing feature raises `polars.exceptions.ColumnNotFoundError`. This was executed through the public `evaluate_clustering_model` entry point.
+
+**OC-162:** the Polars time-sort helper uses `__cv_y__` whenever y is a list/array or an unnamed Series. `with_columns` replaces an existing feature of that name; the following `drop([y_name, sort_col])` removes the replacement, permanently excluding the real feature from cross-validation. The source path is deterministic and the current test suite covers only a named target (`target`), not this collision. Add regression coverage for all three names and ensure internal columns use collision-free names or avoid materialising them as user-visible columns.
+
+### 2026-09-05 — OC-170–176 filed: source review plus bounded 10-file follow-up
+
+No implementation changes. All seven findings below were reproduced against the
+local source, including working controls where applicable. The final batch read
+every line of five remaining `outliers/` files and all five `time_series/` files;
+the coverage ledger lists the exact files and the remaining review scope.
+Existing targeted suites passed **141 tests** (one pytest-cache permission warning),
+so the additional probes expose gaps not covered by those passing suites.
+
+**OC-170 — registered stateless nodes rejected by the leakage validator (🟡).**
+Call `validate_leakage_safety({"preprocessing": [{"transformer": name, "params": {}},
+{"transformer": "TrainTestSplitter", "params": {}}]})` for each of `TextCleaning`,
+`DateFeatures`, `Casting`, and `feature_target_split`. All four raise `ValueError`
+and claim the node is not known, although their registry metadata declares
+`learns_from_data=False`. The validator constructs a set of learners, then treats
+every node outside that set as unregistered unless one of four special-case
+predicates accepts it. **Fix/verification target:** distinguish registered
+stateless nodes from genuinely unknown nodes; keep learned-before-split and
+unknown-node rejection tests. This is the core linear-config validator, not
+OC-70's backend branch-protection issue. Location: `skyulf/leakage.py:140-156`.
+
+**OC-171 — explicit mean/median imputation silently skipped (🟡).** Fit/apply
+`SimpleImputer` with `columns=["x"]` and either `strategy="mean"` or `"median"`
+on pandas `x=[1.0,None,1.0]` or `x=[0.0,None,1.0]`. The fitted artifact is `{}`
+and the missing cell survives. Equivalent Polars inputs fill it with **1.0**
+and **0.5**, respectively. The pandas safety filter calls
+`detect_numeric_columns()` with its default constant/binary exclusions, discarding
+the user's explicit selection. **Fix/verification target:** validate numeric
+dtype without applying auto-selection exclusions to explicitly chosen columns;
+test both strategies and both engines. Unlike OC-16/17, the columns contain
+valid observations. Location: `preprocessing/imputation/simple.py:173-177`.
+
+**OC-172 — nullable pandas scaling fails at the NumPy boundary (🟡).** Construct
+`X=pd.DataFrame({"x": pd.Series([1,None,3], dtype="Int64"), "z":
+pd.Series([2,None,4], dtype="Float64")})`. Calling
+`StandardScalerCalculator().fit(X, {"columns":["x","z"]})` raises
+`TypeError: float() argument must be a string or a real number, not 'NAType'`.
+Native sklearn `StandardScaler().fit(X)` succeeds with means `[2,3]`, as does
+the Skyulf calculator on `pl.from_pandas(X)`. The scaler's subset enters the
+generic bridge without the nullable-to-float/NaN normalization already present
+in `resolve_columns_then_to_numpy`. **Fix/verification target:** cover mixed
+nullable numeric columns with missing cells; preserve missing values as `np.nan`
+and verify other scaler callers of the same bridge. This reproduction requires
+the mixed-column case; a single nullable integer column was not found broken.
+Locations: `preprocessing/scaling/standard.py:144,154`,
+`engines/sklearn_bridge.py:52`.
+
+**OC-173 — duplicate pandas indexes disable EllipticEnvelope filtering (🟡).**
+Fit `EllipticEnvelope` on `x=[-2,-1,-0.5,0,0.5,1,2,100]` with
+`columns=["x"], contamination=0.125`. Apply to `x=[0,100,None,1]` with indexes
+`[0,0,1,1]`: all four rows survive and a warning says prediction received NaN.
+The same values with a unique index return `[0,NaN,1]`, correctly removing 100.
+`series.dropna().index` followed by `series.loc[valid_idx]` expands duplicate
+labels and reintroduces the missing row; the broad exception handler skips
+that column's filtering. **Fix/verification target:** select and scatter by row
+position, testing duplicate labels with and without missing values and X/y
+alignment. This is not OC-12's already-fixed DropMissingRows/Deduplicate target
+selection. Location: `preprocessing/outliers/elliptic.py:32-43`.
+
+**OC-174 — wholly invalid date strings crash the Polars date node (🟡).**
+Fit/apply `DateFeatures` with `columns=["d"], features=["year"]` to a Polars
+String column `d=["bad","invalid"]`: `ComputeError: could not find an appropriate
+format to parse dates, please define a format`. Pandas returns two nullable
+missing years. Controls with `["2024-03-01","bad"]` and an all-null String
+column succeed in both engines. `str.to_datetime(strict=False)` tolerates
+individual parse failures but still requires an inferable format.
+**Fix/verification target:** make the all-unparseable case follow the documented
+invalid-date-to-null behavior; retain mixed-valid/invalid and all-null tests.
+Location: `preprocessing/time_series/date_features.py:102`.
+
+**OC-175 — rolling float NaN semantics diverge across engines (🟡).** Fit/apply
+`RollingAggregate` to numeric `x=[1.0,float("nan"),3.0]` using `columns=["x"],
+window=2, min_periods=1, aggregations=["mean"]`. Pandas emits `[1,1,3]`; a native
+Polars Float64 column emits `[1,NaN,NaN]`. Sum/min/max/median show the same
+divergence in the probe. The Polars expression passes NaN directly into rolling
+operators; pandas treats it as a missing observation. **Fix/verification target:**
+normalize numeric missing-value semantics before aggregation and cover actual
+float NaN, not just Polars null, across aggregations and grouped windows.
+This concerns generated feature values, not OC-163's sorting/target alignment.
+Location: `preprocessing/time_series/rolling.py:48`.
+
+**OC-176 — lag drop-na leaves float NaN rows on Polars (🟡).** Fit/apply
+`LagFeatures` to numeric `x=[1.0,float("nan"),3.0]` with `columns=["x"], lags=[1],
+drop_na=True`, with no target and no sorting. Pandas returns zero rows because
+every row has a missing source or lag; Polars retains two rows, each with NaN
+in one of those columns. Its filtering uses only `is_null()`/`drop_nulls()`.
+**Fix/verification target:** treat NaN and null consistently for floating columns
+without calling numeric-only checks on other dtypes; cover frame-only and tuple
+input and apply any keep-mask identically to y. Unlike OC-165, this reproduces
+without a target. Location: `preprocessing/time_series/lag.py:54-59`.
+
 ## Log
+
+### 2026-09-06 — OC-183–186 filed: four backend defects the OC-09 docstring pass surfaced, deferred by decision
+
+All four were found while writing docstrings against the code, and all four were
+*verified by grep and by reading the call sites* rather than inferred — but none
+was fixed, because each changes behaviour rather than documentation. Filed for
+the next session by decision; the OC-09 log entry carries the same list in prose.
+
+**OC-183 — `SmartCatalog` S3 auto-init reads a variable no `Settings` field answers to (🟠).**
+`backend/data/catalog.py:556` does `bucket = os.getenv("S3_BUCKET_NAME")` and builds
+an `S3Catalog` only if it is truthy. Two independent problems. (1) It is the exact
+failure mode OC-130 was filed for: pydantic-settings loads `.env` into the model and
+never exports it into `os.environ`, so a bare `os.getenv` cannot see the documented
+configuration file — a bucket set only in `.env` leaves `s3_catalog` as `None`, and
+`SmartCatalog` silently routes everything to `FileSystemCatalog` instead. No error,
+no warning. (2) The *name* is wrong too: `config/mixins/aws.py:12` declares
+`AWS_BUCKET_NAME`, `docs/guides/backend_configuration.md:146` documents
+`AWS_BUCKET_NAME`, and `README.md:105` documents `S3_BUCKET_NAME`. The two docs
+contradict each other and the code reads the one that is not a field, so even a real
+process environment variable only works by accident of naming. The fix is one line
+plus a README correction, but it needs a canonical-name decision first — silently
+switching to `AWS_BUCKET_NAME` would break anyone who set the README's name in a
+real environment.
+
+**OC-184 — `ProductionSettings.SECURITY_HEADERS` is configured and never emitted (🟠).**
+`config/environments.py:39` defines `_PROD_SECURITY_HEADERS` and `:84` assigns it to
+`ProductionSettings.SECURITY_HEADERS`. A repo-wide grep finds those two lines and the
+docstring that describes them — **no consumer**. `main.py::_add_middleware` installs
+TrustedHost, Logging, ErrorHandler and CORS and never reads the setting, so production
+boots logging "Running in PRODUCTION mode with enhanced security" while sending none
+of HSTS, `X-Frame-Options: DENY` or the CSP. This is a behaviour change to fix, not a
+lint or config fix: a headers middleware has to be added, and its position matters
+because `add_middleware` *wraps* — CORS must remain outermost or error responses lose
+`Access-Control-Allow-Origin`. Two prior initiative docs noticed the declaration
+(`initiatives/backend-and-core-review/README.md:57`,
+`initiatives/enterprise-readiness/2026-08-11-data-governance-audit.md:183`) but it was
+never filed here as a finding.
+
+**OC-185 — authorization is stubbed three different ways at once (🟡).**
+`database/models.py:157` `has_permission(self, permission) -> bool` is
+`return True  # Placeholder` and has **zero callers** anywhere in the repo.
+`data_ingestion/dependencies.py:26,31` define `require_data_access` and
+`require_data_admin` as async no-ops, and no route declares them as a dependency.
+`data_ingestion/router.py:148,169` hardcode `user_id = 1` under an explicit
+`# KNOWN-GAP: Auth not implemented yet`, and the module docstring says the same, so
+every data source is owned by one user and visible to every other. Filed at 🟡 rather
+than 🟠 because the hardcoding is self-documented and `has_permission` is unreachable
+today; the finding is that a permission API, two route guards and the routers disagree
+with each other, so whichever one someone wires up first will look authoritative and
+not be. Effort is recorded as `decision + ~1 week` because the real work is choosing
+an authz model, not editing `return True`.
+
+**OC-186 — `S3Catalog.exists` authenticates differently from `load` and `save` (🟠).**
+`_prepare_s3fs_options` (`catalog.py:283`) is the single place that translates
+AWS-named options into s3fs names: `aws_access_key_id`→`key`,
+`aws_secret_access_key`→`secret`, region→`client_kwargs['region_name']`, plus the
+endpoint handling. `__init__`:275, `load`:452 and `save`:491 all call it.
+`exists`:521 does not — it builds `s3fs.S3FileSystem(**self.storage_options)` from the
+raw instance dict. So for a catalog constructed with AWS-style credentials, `exists()`
+runs with unmapped options while `load()` runs with mapped ones, and the two can
+disagree about the same key: `exists` returns `False` (or raises on the unexpected
+kwargs) for an object `load` reads successfully. Any caller that gates on `exists`
+before `load` — the natural pattern — therefore takes the wrong branch. One-line fix:
+pass `self._prepare_s3fs_options(self.storage_options)`.
+
+**Related, recorded but not filed separately.** The same `exists`/`load` asymmetry
+appears on the filesystem side and is already documented in the code by the OC-09 pass:
+`FileSystemCatalog.exists`:228 goes through `_get_path` and so skips the
+`.parquet`/`.csv` extension probe `_resolve_dataset_path` uses, reporting `False` for a
+legacy id that `load` would find; and `FileSystemCatalog.save`:211-213 calls the pandas
+writers (`to_csv`/`to_parquet(index=False)`) although `load` returns polars, so a polars
+frame must be converted by the caller even when `SKYULF_ENGINE=polars`. Lower severity
+than OC-186 because neither mis-authenticates; both are honest-contract limitations
+rather than silent divergence.
+
+### 2026-09-06 — OC-09 closed: 904 hand-written docstrings, and a ruff privacy gate that hid 82 of them from every check we run
+
+**The audit's estimate was wrong by an order of magnitude, so the scope was decided by measurement.** OC-09 was filed as "half day, ~2h remain" for "~500 missing docstrings + 84 unused args". Measured instead: **3,350** `D` sites and **531** `ARG` sites repo-wide. Only 81 had an auto-fix available and every `D` fix ruff offers is marked *unsafe*, so `--fix` was never an option for the rest — ~4,000 human judgements, not a two-hour sweep. Two decisions followed. (1) **`D` is waived for `tests/**`, `skyulf-core/tests/**`, `benchmarks/`, `docs/examples/` and `skyulf-core/examples/`** via per-file-ignores: they held 2,528 of the 3,350 sites, and writing 1,852 "missing docstring" stubs into test files would have found no defects while burying the rules that matter. This is a *linting* decision, not a change to the standard — `coding_standards.instructions.md` §4 still asks for a docstring on every function, tests included, so `AGENTS.md` now says explicitly that new tests get a one-line docstring stating what breaks if the test fails, and that nothing will remind you. (2) The remaining sites in `skyulf-core/skyulf/`, `backend/` and the entry points were written by hand. `lint.ignore` is now `["E203", "UP042", "UP046", "UP047", "B008"]` — five entries, none of them docstring rules, with 34 `D` rules confirmed live in `linter.rules.enabled`. Pre-commit runs ruff with `args: [--fix]` (safe fixes only), so a future missing docstring fails the commit rather than being silently rewritten.
+
+**The blind spot: `D1xx` is privacy-gated on the *whole dotted module path*, and 112 of our 327 in-scope modules are private.** Ruff's "missing docstring" rules fire only on *public* definitions, and publicity is derived from the module path — a leading underscore on the module **or on any enclosing package** makes everything beneath it private and exempt. This repo leans hard on underscore-prefixed packages for encapsulation (`ml_pipeline/_internal/`, `_execution/`, `modeling/_tuning/`, `modeling/hyperparameters/`), so **82 sites were never reported by any gate we run**: 64 in `backend/`, 18 in `skyulf-core/`. `D2xx`/`D4xx` *formatting* rules are **not** privacy-gated, which is why the earlier batches looked complete while the missing-docstring half of the same files stayed invisible. Adding an `__init__.py` to an underscore-named directory is enough to switch its whole subtree off — verified empirically. **The audit technique that recovers them:** copy the file to a public filename *outside* its package and lint the copy with a standalone `select = ["D"]` config; the copy is byte-identical, so reported line numbers carry straight back. Renaming the real file is not an option — the underscore is deliberate. All 82 are now written (64 backend across 16 files, 18 core across 7), and re-measurement reports **0**. Recorded in `pyproject.toml`, `AGENTS.md` and the `skyulf-codebase-map` skill, because the failure mode is silent: a clean `ruff check .` is not evidence that a private module has docstrings.
+
+**Verification, because 200+ files were edited by parallel agents and "cosmetic only" had to be proved, not asserted.** Parse each file and its `HEAD` version, strip every leading docstring `Expr` from both, compare `ast.dump`. Identical ⇒ no statement, decorator, default, annotation or import moved. **210 modified Python files: 199 provably docstring-only, 11 real code changes, each one intended and itemised below.** Gates: `ruff check .` clean, `ruff format --check .` clean over 668 files, `ty check` clean, core **3668 passed / 70 skipped**, backend **1630 passed / 7 snapshots passed** — both exact baselines, so no test moved. A second, weaker gate also had to be closed by hand: `E501` is not in `select` and `ruff format` will not reflow prose, so an over-long docstring line passes everything. Eleven such lines were shortened across 8 core files; the pre-existing >100 *code* lines carrying `# pylint: disable=arguments-differ` in the same files were left alone, since reflowing them would be a code change.
+
+**Two agent reports were wrong and only measurement caught them.** One claimed "124/124 cleared" while its own `bucketing.py` still held 7 live `D101`/`D102` sites. Another hit its turn limit and reported nothing, yet had in fact finished all 31 of its files. Lesson: for a pass this wide, re-derive the count from the linter after every batch and treat an agent's summary as a claim, not a result.
+
+**Defects the pass surfaced, then fixed — a docstring is a contract statement, and writing one against the code broke the illusion in six places.**
+
+- **`eda.generate_profile` was invisible to the Celery worker.** `celery_worker.py` imported `data_ingestion.tasks`, `ml_pipeline.tasks` and `monitoring.tasks` — but not `backend.eda.tasks`, and `celery_app.py` does no autodiscovery. With `USE_CELERY=True`, `eda/router.py` calls `generate_profile_celery.delay(...)` and the worker rejects `eda.generate_profile`, leaving the report PENDING forever. Hidden by the default `USE_CELERY=False` BackgroundTasks path. Fixed by adding the import, and pinned by `tests/unit/test_celery_worker_task_registration.py`, a static AST guard asserting every task module is imported by `celery_worker.py` (plus a guard-the-guard test, needed because `@shared_task` is a bare `ast.Name` while `@celery_app.task` is attribute access).
+- **The two profilers disagreed on what a duplicate row is.** `GET /datasets/{dataset_id}/schema` returns `AnalysisProfile` from *either* branch: the cached profile reads the ingestion profiler's polars `is_duplicated().sum()` (every row in a duplicate group), while the fresh-sample branch used pandas' `duplicated()` default `keep='first'` (only the extras). The same file therefore reported a different duplicate count depending on whether its profile happened to be cached. Fixed at the outlier — `_advisor.py` now uses `duplicated(keep=False).sum()` — because core's polars analyzer and `expect_unique` already establish `keep=False` as the repo convention; changing the ingestion profiler instead would have created a backend/core divergence. TDD: failing test (`assert 2 == 3`) → one-line fix → `test_both_profilers_agree_on_duplicate_row_count`.
+- **Dead parameters removed, after proving no caller passed them.** `BaseConnector.fetch_data(query=...)` was ignored by all three connectors and only ever served to *disable* the lazy path; `safe_delete_path(force_delete=...)` was never read while its docstring still advertised removed "backup options". Both dropped across the ABC, both implementations, `_try_lazy_head` and the affected tests. `DataIngestionService.upload_dir` hardcoded `"uploads/data"` instead of `settings.UPLOAD_DIR`, so a file written through the service was not readable back through `LocalFileConnector`, which resolves against the setting; it now defaults to `get_settings().UPLOAD_DIR` with `.expanduser()`, pinned by two new tests.
+- **`MergeMixin.__doc__` was `None` at runtime.** Its description sat as a bare string literal *after* the type-only attribute stubs, so Python never treated it as a docstring — which is why `D101` fired. Proper docstring added at the top and the orphaned literal deleted, because it sat immediately after `artifact_store: Any` where mkdocstrings-style tooling would render it as *that attribute's* documentation.
+- **`backend/data_ingestion/engine/` had no `__init__.py`** and was imported as `backend.data_ingestion.engine.profiler` from three places via implicit namespace package, while every sibling directory has one. Added, matching the `connectors/` and `schemas/` style.
+- **Two copyright lines had silently lost their `©` and `—`** (`backend/dependencies.py`), and `backend/config/routes.py` had the copyright as its `D415` summary with the real description demoted to paragraph two — the reverse of the pattern the rest of the batch established. `git log -S` confirmed the characters were never present in tracked history, so this pre-dated the pass.
+
+**Still open, deliberately not fixed inside a lint pass.** `SmartCatalog` reads `os.getenv("S3_BUCKET_NAME")` — a *repeat of OC-130*, since pydantic-settings does not export dotenv values into `os.environ`. Worse, the name is not a `Settings` field at all: `backend/config/mixins/aws.py` declares `AWS_BUCKET_NAME`, `docs/guides/backend_configuration.md` documents `AWS_BUCKET_NAME`, and `README.md:105` documents `S3_BUCKET_NAME` — the two docs contradict each other and the code reads the one that no `Settings` field answers to, so S3 auto-init is dead for any `.env`-only configuration. Needs a name decision before a code fix. `ProductionSettings.SECURITY_HEADERS` is declared but read by nothing — grep finds it only in `config/environments.py` — so production security headers are configured and never sent; fixing it means adding a middleware, i.e. a behaviour change, not a lint fix. Also open: `S3Catalog.exists` skips `_prepare_s3fs_options`, so AWS-named credentials and region are never mapped; `FileSystemCatalog.save` is pandas-only (`to_parquet(index=False)`) although `load` returns polars, and its `exists` skips the extension probe `load` uses; `models.py has_permission` is `return True  # Placeholder` with zero callers. The remainder are engine-parity divergences (`casting.py` strict-mode string→bool raises on pandas and succeeds on polars; `invalid_value.py` NaNs a non-numeric column on pandas and raises `ComputeError` on polars) and `node_meta` advertising params the code never reads (`hash.py` says `n_features: 8`, all three paths default to 10; `KBinsDiscretizer` advertises `encode`, `_fit_kbins` hardcodes `"ordinal"`; `casting.py` advertises `type_map` and its `infer_output_schema` and `fit` disagree on precedence, so the predicted schema can contradict the applied cast), plus dead surface (`ScatterSample` is a public model never constructed).
+
+**`ARG` will not be enabled.** 121 in-scope sites across 73 files: 39 are an unused `config`, and ~90 are Calculator/Applier protocol or framework contract signatures (`fit(X, y, config)` on a transformer that needs no `y`, FastAPI's `request`, Celery's `sender`, sklearn-parity `progress_callback`). Enabling it would mean ~90 permanent `# noqa` waivers to police a rule class whose entire in-scope yield was the handful of defects above — all of which were fixable directly, and were. `AGENTS.md` now carries **"never rename an identifier to silence a linter"** as a hard rule, because a prior session prefixed an unused `config` → `_config`, broke keyword callers, and collected a wall of `ty` errors instead of a lint win. One further trap recorded there: **a pydantic model's docstring is wire format** — it becomes the `description` in `model_json_schema()` and reaches clients through OpenAPI, so writing docstrings on `NodeConfigModel`/`PipelineConfigModel` legitimately changed the served schema and the snapshot had to be updated on purpose (7 insertions, 0 deletions; descriptions only, no renamed field and no new required key).
+
+### 2026-09-06 — OC-177–182 filed: 10-file cleaning/encoding continuation
+
+Read all six `preprocessing/cleaning/` files and encoding `__init__.py`,
+`_common.py`, `dummy.py`, and `hash.py`. All six findings were reproduced with
+the public Calculator/Applier interfaces. Seven existing targeted suites passed
+**218 tests** with pytest's cache disabled. No implementation changes were made;
+the cumulative source-read ledger is now **79/188 files**, with 109 remaining.
+
+**OC-177 — dummy encoding depends on unrelated prediction rows (🟠).** Fit
+`DummyEncoderCalculator` on pandas `x=[1.0,2.0]` with `columns=["x"]` and default
+`drop_first=False`; the artifact records categories `["1","2"]`. Applying that
+same artifact to `x=[1.0]` gives `x_1=[1], x_2=[0]`. Applying it to
+`x=[1.0,2.5]` gives `x_1=[0,0], x_2=[0,0]`: the identical first row is now encoded
+as unseen. `_pandas_col_to_str` converts floats to nullable integers only when
+**every** non-null value in the current batch is integral, so an unrelated
+fractional value changes `1.0`'s string from `"1"` to `"1.0"`. This can change
+model predictions depending on batching. **Fix/verification target:** use a
+stable per-value representation or a fit-time conversion policy, and assert
+that transforming concatenated batches equals concatenating their transforms.
+Distinct from OC-18's generated-column collision. Location:
+`preprocessing/encoding/dummy.py:60-64`.
+
+**OC-178 — missing categories hash differently across engines/dtypes (🟡).** Fit
+`HashEncoder` on Polars `x=["a",None]` with `columns=["x"], n_features=1000`.
+Apply this single artifact to the equivalent Polars frame, pandas object frame,
+and pandas `pd.Series(["a",None], dtype="string")` frame. Outputs are respectively
+`[928,171]`, `[928,915]`, and `[928,870]`. The ordinary category is consistent;
+the missing category is not. Polars fills nulls with `"nan"`, while pandas
+`astype(str)` renders `None` as `"None"` and nullable missing as `"<NA>"`.
+**Fix/verification target:** canonicalize missing inputs before hashing, testing
+None, NaN, and pd.NA with a shared artifact and preserving ordinary strings.
+The earlier F-11 shared-hash fix did not address this input-normalization gap;
+this is not OC-26's separate HashingVectorizer norm failure. Locations:
+`preprocessing/encoding/hash.py:45,76`.
+
+**OC-179 — singleton drop-first produces different feature sets (🟡).** Fit/apply
+`DummyEncoder` to `x=["a","a"], keep=[1,2]` with `columns=["x"], drop_first=True`.
+Pandas returns only `keep`; Polars returns `keep` and `x_a`. The Polars helper
+only drops the first category when `len(cats)>1`, whereas pandas drops it even
+when it is the sole category. A retained numeric column makes the mismatch
+observable without relying on zero-width-frame semantics. **Fix/verification
+target:** match the documented pandas.get_dummies behavior for zero, one, and
+multiple categories, including engine-crossing application of one artifact.
+Distinct from OC-04's dummy integer-width difference and OC-18's name collision.
+Location: `preprocessing/encoding/dummy.py:33`.
+
+**OC-180 — slash-date normalization cannot handle nullable missing text (🟡).**
+Construct pandas `x=pd.Series(["1/5/2024",None], dtype="string")`; fit/apply
+`TextCleaning` with `columns=["x"], operations=[{"op":"regex",
+"mode":"normalize_slash_dates"}]`. It raises `TypeError: expected string or
+bytes-like object, got 'NAType'`. Equivalent Polars text input returns
+`["2024-01-05",None]`. `_normalize_slash_dates_text` guards None and float NaN
+but sends pd.NA to `re.Pattern.sub`. **Fix/verification target:** preserve all
+supported missing-text representations before regex evaluation; cover object
+and nullable string inputs. This is a recognized operation, unlike OC-122's
+unknown-operation handling. Locations: `preprocessing/cleaning/text.py:35-37,116`.
+
+**OC-181 — unrecognized boolean mapping keys overwrite False values (🟡).**
+Fit/apply `ValueReplacement` to boolean `x=[True,False]` with `columns=["x"],
+mapping={"banana":True}`. Both engines return `[True,True]` despite no input
+value matching `"banana"`. `_coerce_key` returns `key.lower() in ("true","1")`
+for *any* string key on a boolean column, silently treating every other token
+as False. **Fix/verification target:** explicitly recognize accepted true/false
+spellings; reject or leave unmatched other tokens rather than converting them
+to an existing boolean value. Test valid and invalid string keys on both
+engines and nullable booleans. Location:
+`preprocessing/cleaning/value_replacement.py:31-32`.
+
+**OC-182 — pandas nullable string columns invisible to encoder auto-selection (🟡).**
+Construct pandas `x=pd.Series(["a","b"], dtype="string")`. Fit/apply DummyEncoder
+or HashEncoder with config `{}`: both return the original text column, with
+DummyEncoder recording `columns=[]` and HashEncoder returning `{}`. Repeating
+with `columns=["x"]` successfully encodes it. Object-dtype pandas and Polars
+String controls are detected. The shared detector selects only `object` and
+`category`, omitting pandas StringDtype. **Fix/verification target:** include
+supported pandas text extension dtypes; verify omitted selection still differs
+from an explicit empty list (intentional no-op). This is a pandas encoder
+detector issue, distinct from OC-121's Polars Enum text-helper exclusion.
+Location: `preprocessing/encoding/_common.py:140`.
 
 ### 2026-09-05 — OC-09 half closed: `F401` enabled repo-wide, after two orphans inside my own security fix proved the gap was not cosmetic
 

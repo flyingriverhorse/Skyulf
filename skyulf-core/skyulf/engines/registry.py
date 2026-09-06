@@ -15,6 +15,8 @@ logger = logging.getLogger(__name__)
 
 
 class EngineName(StrEnum):
+    """Enumeration of the compute-engine identities (``pandas``, ``polars``, ``base``)."""
+
     PANDAS = "pandas"
     POLARS = "polars"
     BASE = "base"
@@ -52,6 +54,8 @@ class BaseEngine:
 
 
 class EngineRegistry:
+    """Registry mapping engine names to ``BaseEngine`` classes and resolving the active one."""
+
     _engines: ClassVar[dict[str, type[BaseEngine]]] = {}
     # Deliberate default: pandas is the safer, better-covered path. Polars is
     # opt-in — either call EngineRegistry.set_active_engine("polars"), or
@@ -156,4 +160,5 @@ class EngineRegistry:
 
 # Global Helper
 def get_engine(data: Any = None) -> type[BaseEngine]:
+    """Return the ``BaseEngine`` that handles ``data`` (shortcut for ``EngineRegistry.resolve``)."""
     return EngineRegistry.resolve(data)

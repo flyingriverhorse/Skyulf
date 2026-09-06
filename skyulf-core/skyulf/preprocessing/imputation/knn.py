@@ -16,8 +16,11 @@ from ._common import _sklearn_transform_subset, drop_all_missing_columns
 
 
 class KNNImputerApplier(BaseApplier):
+    """Fill missing values from the fitted k-nearest-neighbors imputer."""
+
     @apply_method
     def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
+        """Impute ``X`` with the stored sklearn imputer; ``y`` passes through."""
         return apply_dual_engine(
             X, params, {"polars": self._apply_polars, "pandas": self._apply_pandas}
         )
@@ -49,14 +52,18 @@ class KNNImputerApplier(BaseApplier):
     learns_from_data=True,
 )
 class KNNImputerCalculator(BaseCalculator):
+    """Fit a sklearn ``KNNImputer`` on the selected numeric columns."""
+
     def infer_output_schema(
         self, input_schema: SkyulfSchema, config: dict[str, Any]
     ) -> SkyulfSchema:
+        """Return the input schema unchanged: imputation fills cells, not columns."""
         # KNN imputation fills NaNs in place; column set is preserved.
         return input_schema
 
     @fit_method
     def fit(self, X: Any, _y: Any, config: dict[str, Any]) -> KNNImputerArtifact:  # pylint: disable=arguments-differ
+        """Fit the neighbor imputer, dropping all-missing columns sklearn cannot impute."""
         if user_picked_no_columns(config):
             return {}
 

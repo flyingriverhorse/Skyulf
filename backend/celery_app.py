@@ -1,3 +1,21 @@
+"""The shared Celery app and the reliability settings every task inherits.
+
+One ``Celery`` instance built from ``Settings`` read at import time, which the
+task modules and the worker bootstrap both import. No tasks are declared or
+autodiscovered here: registration happens purely by importing the task modules,
+which is what ``celery_worker.py`` does for the worker process. A task module
+nobody imports is therefore invisible to the worker even though the web process
+can still enqueue it.
+
+The configuration trades duplicated work for lost work — ``task_acks_late`` with
+``task_reject_on_worker_lost`` re-queues a task whose worker dies mid-run, and
+``worker_prefetch_multiplier=1`` stops a worker reserving tasks it has not
+started. Serialization is JSON in both directions, so task arguments have to be
+JSON-encodable rather than arbitrary Python objects.
+
+``beat_schedule`` prunes the ``error_events`` table once a day.
+"""
+
 from celery import Celery
 
 from backend.config import get_settings

@@ -1,3 +1,12 @@
+"""The ``SkyulfException`` hierarchy the API raises and renders as JSON.
+
+Every class here carries two class attributes — the HTTP ``status_code`` it maps
+to and a stable machine-readable ``error_code`` — so raising one is enough for
+``backend.exceptions.handlers`` to build the response without the call site
+knowing anything about HTTP. A new application error belongs here as a subclass
+overriding both, rather than as a bare ``HTTPException`` at the raise site.
+"""
+
 from typing import Any
 
 
@@ -8,6 +17,16 @@ class SkyulfException(Exception):
     error_code: str = "INTERNAL_SERVER_ERROR"
 
     def __init__(self, message: str, details: dict[str, Any] | None = None):
+        """Store the caller-facing ``message`` and optional structured ``details``.
+
+        Args:
+            message: Human-readable explanation. Also passed to ``Exception``, so
+                ``str(exc)`` and ``exc.message`` are the same text and a log line
+                that interpolates the exception shows what the client will see.
+            details: Structured context to return alongside the message. ``None``
+                is normalized to an empty dict, so handlers serialize it without a
+                None check.
+        """
         self.message = message
         self.details = details or {}
         super().__init__(self.message)

@@ -108,8 +108,19 @@ def _label_apply_pandas(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, An
 
 
 class LabelEncoderApplier(BaseApplier):
+    """Replace categorical values in place with the integer ids their fitted encoder assigned.
+
+    The engines only agree because two conventions line up: values are
+    stringified before lookup, and polars fills nulls with the literal ``"nan"``
+    to mirror pandas' ``astype(str)``, so a null resolves to the ``"nan"`` class
+    the encoder actually learned instead of falling back to ``missing_code``.
+    Values unseen at fit time do map to ``missing_code``. ``y`` is encoded too
+    when the artifact carries a ``__target__`` encoder.
+    """
+
     @apply_method
     def apply(self, X: Any, y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
+        """Dispatch to the engine-specific encode, forwarding ``(X, y)`` only when ``y`` exists."""
         return apply_dual_engine(
             (X, y) if y is not None else X,
             params,
@@ -287,15 +298,26 @@ def _label_fit_pandas(X: Any, y: Any, config: dict[str, Any]) -> Mapping[str, An
     learns_from_data=True,
 )
 class LabelEncoderCalculator(BaseCalculator):
+    """Fit one LabelEncoder per named column, plus one for the target when it qualifies.
+
+    Unlike its sibling encoders this node deliberately does *not* auto-detect
+    feature columns: an empty ``columns`` means "encode the target only",
+    mirroring sklearn's convention that ``LabelEncoder`` is a 1-D label
+    transformer and ``OrdinalEncoder`` is the tool for feature columns. Fitting
+    zero encoders logs a warning rather than passing a silent no-op downstream.
+    """
+
     def infer_output_schema(
         self, input_schema: SkyulfSchema, config: dict[str, Any]
     ) -> SkyulfSchema:
+        """Pass the input schema through: encoded columns keep their name and position."""
         # Label encoding replaces categorical values with ints in place;
         # column set is preserved.
         return input_schema
 
     @fit_method
     def fit(self, X: Any, y: Any, config: dict[str, Any]) -> LabelEncoderArtifact:  # pylint: disable=arguments-differ
+        """Fit the encoders on the frame's own engine, forwarding ``y`` when present."""
         return cast(
             LabelEncoderArtifact,
             fit_dual_engine(

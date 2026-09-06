@@ -130,8 +130,10 @@ def build_kfold_cv(config: TuningConfig) -> Any:
 
 
 def select_cv_by_type(config: TuningConfig, problem_type: str) -> Any:
-    """Picks a CV splitter from ``config`` (holdout, nested CV inner folds, time series,
-    shuffle, stratified, or plain K-fold), based on ``cv_enabled``/``cv_type``.
+    """Picks a CV splitter from ``config``, based on ``cv_enabled``/``cv_type``.
+
+    Choices are holdout, nested CV inner folds, time series, shuffle,
+    stratified, or plain K-fold.
     """
     if not config.cv_enabled:
         # Single split validation (20% holdout)

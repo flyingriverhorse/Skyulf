@@ -1,3 +1,13 @@
+"""Application service for data source registration, sampling and ingestion.
+
+Sits between the ingestion routes and the database: it validates and persists
+``DataSource`` rows, samples their contents by routing to a local-file, S3 or
+Parquet reader according to path and source type, and delegates the actual
+ingest work to the Celery task. That work is dispatched three ways — Celery,
+FastAPI ``BackgroundTasks``, or a thread fallback — chosen from ``USE_CELERY``
+and from whether the request supplied a background-task queue.
+"""
+
 import logging
 import uuid
 from collections.abc import Sequence
@@ -25,9 +35,28 @@ logger = logging.getLogger(__name__)
 
 
 class DataIngestionService:
-    def __init__(self, session: AsyncSession, upload_dir: str = "uploads/data"):
+    """Coordinates the data source lifecycle against one async session.
+
+    Built per request by ``get_data_service``. Construction is not side-effect
+    free: it creates the upload directory.
+    """
+
+    def __init__(self, session: AsyncSession, upload_dir: str | None = None):
+        """Bind the session and make sure the upload directory exists.
+
+        Args:
+            session: The request's async SQLAlchemy session. Shared, not owned —
+                the methods here commit on it directly.
+            upload_dir: Where uploaded files are written, created eagerly with
+                ``mkdir -p``. Defaults to ``settings.UPLOAD_DIR`` — the same value
+                ``LocalFileConnector`` resolves against, expanded the same way, so
+                a file written here is readable back through a connector. Pass an
+                explicit path to write somewhere else.
+        """
         self.session = session
-        self.upload_dir = Path(upload_dir)
+        if upload_dir is None:
+            upload_dir = get_settings().UPLOAD_DIR
+        self.upload_dir = Path(upload_dir).expanduser()
         self.upload_dir.mkdir(parents=True, exist_ok=True)
         self.data_service = DataService()
 

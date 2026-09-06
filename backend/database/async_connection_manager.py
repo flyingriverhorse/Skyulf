@@ -1,5 +1,7 @@
-"""Async Database Connection Manager
-Handles async connection pooling and concurrent access optimization for SQLite and PostgreSQL
+"""Async database connection manager.
+
+Handles async connection pooling and concurrent access optimization for SQLite
+and PostgreSQL.
 """
 
 import asyncio
@@ -24,9 +26,20 @@ logger = logging.getLogger(__name__)
 
 
 class AsyncSQLiteConnectionManager:
-    """Async SQLite connection manager with optimized settings"""
+    """Async SQLite connection manager with optimized settings."""
 
     def __init__(self, database_path: str, pool_size: int = 10, timeout: int = 30):
+        """Record the connection target and bound concurrency before any I/O.
+
+        Args:
+            database_path: Filesystem path of the SQLite file. Its parent
+                directory is created on ``initialize()``.
+            pool_size: Ceiling on simultaneously open connections. Enforced by
+                a semaphore rather than a real pool — each ``get_connection()``
+                opens and closes its own short-lived connection.
+            timeout: Seconds ``aiosqlite.connect`` waits on a locked database
+                file before raising.
+        """
         self.database_path = database_path
         self.pool_size = pool_size
         self.timeout = timeout
@@ -37,7 +50,7 @@ class AsyncSQLiteConnectionManager:
         atexit.register(self._sync_close_all)
 
     async def initialize(self):
-        """Initialize the async SQLite manager with optimized settings"""
+        """Initialize the async SQLite manager with optimized settings."""
         try:
             # Ensure database directory exists
             Path(self.database_path).parent.mkdir(parents=True, exist_ok=True)
@@ -53,7 +66,7 @@ class AsyncSQLiteConnectionManager:
             raise
 
     async def _setup_database_optimizations(self):
-        """Setup WAL mode and performance optimizations"""
+        """Setup WAL mode and performance optimizations."""
         try:
             async with aiosqlite.connect(self.database_path, timeout=self.timeout) as conn:
                 # Enable WAL mode (Write-Ahead Logging)
@@ -84,7 +97,7 @@ class AsyncSQLiteConnectionManager:
 
     @asynccontextmanager
     async def get_connection(self):
-        """Get an async SQLite connection with semaphore limiting"""
+        """Get an async SQLite connection with semaphore limiting."""
         if not self._initialized:
             raise RuntimeError("Async SQLite manager not initialized")
 
@@ -123,9 +136,18 @@ class AsyncSQLiteConnectionManager:
 
 
 class AsyncPostgreSQLConnectionManager:
-    """Async PostgreSQL connection manager with SQLAlchemy async pooling"""
+    """Async PostgreSQL connection manager with SQLAlchemy async pooling."""
 
     def __init__(self, connection_string: str, pool_size: int = 10):
+        """Store the DSN and pool size; the engine itself is built lazily.
+
+        Args:
+            connection_string: SQLAlchemy async DSN, e.g.
+                ``postgresql+asyncpg://...``.
+            pool_size: Steady-state pool size. ``initialize()`` additionally
+                hardcodes ``max_overflow=20``, so peak concurrency is
+                ``pool_size + 20``.
+        """
         self.connection_string = connection_string
         self.pool_size = pool_size
         self._engine: AsyncEngine | None = None
@@ -133,7 +155,7 @@ class AsyncPostgreSQLConnectionManager:
         self._initialized = False
 
     async def initialize(self):
-        """Initialize async SQLAlchemy engine with connection pooling"""
+        """Initialize async SQLAlchemy engine with connection pooling."""
         try:
             # Create async engine with optimized pool settings
             self._engine = create_async_engine(
@@ -176,7 +198,7 @@ class AsyncPostgreSQLConnectionManager:
 
     @asynccontextmanager
     async def get_connection(self):
-        """Get an async connection from the SQLAlchemy pool"""
+        """Get a transactional async connection from the SQLAlchemy pool."""
         if not self._engine:
             raise RuntimeError("Async PostgreSQL engine not initialized")
 
@@ -189,7 +211,7 @@ class AsyncPostgreSQLConnectionManager:
 
     @asynccontextmanager
     async def get_session(self):
-        """Get an async session from the session maker"""
+        """Get an async session from the session maker."""
         if not self._session_maker:
             raise RuntimeError("Async PostgreSQL session maker not initialized")
 
@@ -201,23 +223,33 @@ class AsyncPostgreSQLConnectionManager:
                 raise
 
     async def close(self):
-        """Close the async engine and all connections"""
+        """Close the async engine and all connections."""
         if self._engine:
             await self._engine.dispose()
             logger.info("[OK] Async PostgreSQL connection pool closed")
 
 
 class AsyncDatabaseManager:
-    """Unified async database manager that handles both SQLite and PostgreSQL"""
+    """Unified async database manager that handles both SQLite and PostgreSQL."""
 
     def __init__(self, settings: Settings):
+        """Hold the settings that decide which backends are brought up.
+
+        Args:
+            settings: Application settings. ``DB_PATH`` enables the SQLite
+                manager (with ``sqlite_pool_size`` / ``sqlite_timeout``),
+                ``postgres_url`` enables the PostgreSQL one (with
+                ``postgres_pool_size``), and ``DB_PRIMARY`` picks which of the
+                two ``get_primary_db_manager()`` returns. Both managers stay
+                ``None`` until ``initialize()`` runs.
+        """
         self.settings = settings
         self.sqlite_manager: AsyncSQLiteConnectionManager | None = None
         self.postgres_manager: AsyncPostgreSQLConnectionManager | None = None
         self._initialized = False
 
     async def initialize(self):
-        """Initialize database managers based on settings"""
+        """Initialize database managers based on settings."""
         try:
             # Initialize SQLite if configured
             sqlite_path = getattr(self.settings, "DB_PATH", None)
@@ -246,7 +278,7 @@ class AsyncDatabaseManager:
             raise
 
     def get_primary_db_manager(self):
-        """Get the primary database manager"""
+        """Get the primary database manager."""
         if not self._initialized:
             raise RuntimeError("Async database manager not initialized")
 
@@ -264,19 +296,23 @@ class AsyncDatabaseManager:
             raise ValueError(f"Unknown database primary: {primary}")
 
     def get_sqlite_manager(self):
-        """Get async SQLite connection manager"""
+        """Get async SQLite connection manager."""
         if not self.sqlite_manager:
             raise RuntimeError("Async SQLite manager not available")
         return self.sqlite_manager
 
     def get_postgres_manager(self):
-        """Get async PostgreSQL connection manager"""
+        """Get async PostgreSQL connection manager."""
         if not self.postgres_manager:
             raise RuntimeError("Async PostgreSQL manager not available")
         return self.postgres_manager
 
     async def close_all(self):
-        """Close all async database connections"""
+        """Close all async database connections.
+
+        Only the PostgreSQL engine holds a pool to dispose; the SQLite manager
+        opens and closes a connection per call, so it has nothing to tear down.
+        """
         tasks: list[Any] = []
 
         if self.postgres_manager:
@@ -293,7 +329,7 @@ _async_db_manager: AsyncDatabaseManager | None = None
 
 
 async def initialize_async_database_manager(settings: Settings):
-    """Initialize the global async database manager"""
+    """Initialize the global async database manager."""
     global _async_db_manager
     _async_db_manager = AsyncDatabaseManager(settings)
     await _async_db_manager.initialize()
@@ -301,12 +337,12 @@ async def initialize_async_database_manager(settings: Settings):
 
 
 def get_async_database_manager() -> AsyncDatabaseManager | None:
-    """Get the global async database manager"""
+    """Get the global async database manager."""
     return _async_db_manager
 
 
 async def close_async_database_manager():
-    """Close the global async database manager"""
+    """Close the global async database manager."""
     global _async_db_manager
     if _async_db_manager:
         await _async_db_manager.close_all()

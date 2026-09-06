@@ -1,3 +1,12 @@
+# Syrupy's `.ambr` files are generated too, and rewriting their whitespace is
+# actively wrong: a multi-line snapshot value is serialised as an indented `'''`
+# block, so a blank line *inside the value* is written as an indentation-only
+# line. trim-trailing-whitespace strips it, the reader then round-trips a
+# different string, and the snapshot test fails on a value nothing edited. This
+# first bit `PipelineConfigModel`'s schema description, which pydantic derives
+# from the model docstring — so it is a documented model, not a stray space.
+# Regenerate snapshots with `--snapshot-update`; never hand-edit them.
+#
 # Generated/minified build outputs must never be touched by the auto-fix
 # hooks (trailing-whitespace, end-of-file-fixer, ruff-format). Rewriting their
 # whitespace is pointless and, when a file is partially staged, triggers
@@ -6,7 +15,8 @@ exclude: |
   (?x)^(
     static/ml_canvas/assets/.*|
     frontend/ml-canvas/dist/.*|
-    .*\.min\.(js|css)
+    .*\.min\.(js|css)|
+    .*__snapshots__/.*\.ambr
   )$
 
 repos:

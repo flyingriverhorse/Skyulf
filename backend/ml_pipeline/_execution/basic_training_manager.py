@@ -1,3 +1,11 @@
+"""Persistence layer for fixed-hyperparameter training jobs (``run_mode="fixed"``).
+
+Owns the training half of the unified ``TrainingJob`` table: creating queued
+or preview rows, projecting them onto the ``JobInfo`` API schema, applying
+status/log/result writes from the Celery worker, cancelling, and the get/list
+lookups the job endpoints use.
+"""
+
 import uuid
 from datetime import UTC, datetime
 from typing import Any
@@ -25,6 +33,13 @@ from backend.ml_pipeline.model_registry.service import ModelRegistryService
 
 
 class BasicTrainingManager(TrainingJobManagerBase):
+    """CRUD and status-update operations for fixed-parameter training jobs.
+
+    Counterpart of ``AdvancedTuningManager``; both read and write the same
+    ``TrainingJob`` table and are disambiguated by ``run_mode="fixed"``, so
+    every query here scopes on it.
+    """
+
     @staticmethod
     async def create_training_job(
         session: AsyncSession,
@@ -71,6 +86,14 @@ class BasicTrainingManager(TrainingJobManagerBase):
 
     @staticmethod
     def map_training_job_to_info(job: TrainingJob, dataset_name: str | None) -> JobInfo:
+        """Project a training job row onto the ``JobInfo`` API schema.
+
+        Hyperparameters and target column come from the stored graph, with
+        ``job.hyperparameters`` as a defensive fallback when that extraction
+        yields nothing. ``metrics.dropped_columns`` is merged into the
+        graph-declared ones so columns dropped at runtime (e.g. by Feature
+        Selection) still reach the Job Details view.
+        """
         # Extract details from graph
         (
             hyperparameters,

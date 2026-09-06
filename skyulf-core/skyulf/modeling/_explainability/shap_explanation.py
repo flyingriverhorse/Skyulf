@@ -37,9 +37,9 @@ _DEFAULT_MAX_INTERACTION_FEATURES = 8
 
 
 def _build_explainer(shap_module: Any, model: Any, sample: pd.DataFrame) -> tuple[Any, bool]:
-    """Build the most exact SHAP explainer available for `model`, preferring
-    `feature_perturbation="tree_path_dependent"` for tree ensembles.
+    """Build the most exact SHAP explainer available for `model`.
 
+    Prefers `feature_perturbation="tree_path_dependent"` for tree ensembles:
     `tree_path_dependent` computes exact Shapley values straight from each
     tree's own path/sample-weight structure — it needs no background data
     and, unlike `feature_perturbation="interventional"`, isn't susceptible to
@@ -136,10 +136,10 @@ def _predicted_class_index(model: Any, sample: pd.DataFrame, n_classes: int) -> 
 def _resolve_base_per_row(
     expected_value: Any, n_samples: int, n_classes: int | None, class_idx: np.ndarray | None
 ) -> np.ndarray:
-    """Reduce SHAP's `base_values` (which may be scalar, per-class, per-row,
-    or per-row-per-class) down to one base value per row.
+    """Reduce SHAP's `base_values` down to one base value per row.
 
-    Newer `shap` versions return `base_values` shaped `(n_samples, n_classes)`
+    The input may be scalar, per-class, per-row, or per-row-per-class. Newer
+    `shap` versions return `base_values` shaped `(n_samples, n_classes)`
     for multi-output models — a naive class-only or row-only reduction would
     silently pick the wrong value, so every shape is handled explicitly.
     """
@@ -271,8 +271,10 @@ def compute_shap_explanation(
     max_samples: int = 200,
     max_display_samples: int = _DEFAULT_MAX_DISPLAY_SAMPLES,
 ) -> dict[str, Any] | None:
-    """Compute a SHAP explanation for a trained model: a global summary plus
-    a small set of per-sample explanations for richer single-run plots.
+    """Compute a SHAP explanation for a trained model.
+
+    Pairs a global summary with a small set of per-sample explanations for
+    richer single-run plots.
 
     Best-effort: returns `None` (never raises) if `shap` isn't installed,
     the model type is unsupported, or computation fails for any reason.

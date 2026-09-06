@@ -29,8 +29,15 @@ logger = logging.getLogger(__name__)
 
 
 class UnivariateSelectionApplier(BaseApplier):
+    """Remove the columns a univariate statistical test rejected."""
+
     @apply_method
     def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
+        """Drop ``candidate_columns - selected_columns`` from ``X``.
+
+        Honours the artifact's ``drop_columns`` flag; the recorded
+        ``feature_scores`` and ``p_values`` are reporting metadata only.
+        """
         return apply_dual_engine(
             X, params, {"polars": _drop_selected_polars, "pandas": _drop_selected_pandas}
         )
@@ -46,8 +53,18 @@ class UnivariateSelectionApplier(BaseApplier):
     learns_from_data=True,
 )
 class UnivariateSelectionCalculator(BaseCalculator):
+    """Fit a univariate statistical selector over numeric candidate columns."""
+
     @fit_method
     def fit(self, X: Any, y: Any, config: dict[str, Any]) -> UnivariateSelectionArtifact:  # pylint: disable=arguments-differ
+        """Return the features the score function's support keeps.
+
+        A missing target is normally an error, but ``allow_missing_target``
+        downgrades it to a keep-everything artifact so unsupervised pipelines
+        can still run this node. The scoring inputs are adjusted first — missing
+        values become 0, and chi2 features are MinMax-rescaled when any value is
+        negative — because both shift the resulting scores.
+        """
         target_col = config.get("target_column")
         # Resolve candidates natively on the raw frame first (Polars-safe),
         # then convert only the columns actually needed.

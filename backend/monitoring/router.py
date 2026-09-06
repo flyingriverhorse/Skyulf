@@ -1,3 +1,12 @@
+"""Monitoring endpoints: drift checks and alerts, the error tracker, slow nodes, run logs.
+
+Most screens here read data already persisted at run time — recorded error events,
+pipeline run logs, per-node execution timings on completed jobs — so no view has to
+load a model artifact to answer an operator's question. The one live computation is
+``POST /monitoring/drift/calculate``, which scores an uploaded file against a job's
+stored reference data and records the outcome as a durable alert.
+"""
+
 import io
 import logging
 import re
@@ -41,6 +50,14 @@ router = APIRouter(prefix="/monitoring", tags=["Monitoring"])
 
 
 class DriftJobOption(BaseModel):
+    """A job offered in the drift UI, plus the reference snapshot it would be compared against.
+
+    Only jobs whose artifact store actually holds a reference file are listed, and
+    ``created_at`` is that file's timestamp — it is also the list's sort key. The
+    model, target, description and metric fields are enriched from the job's DB row
+    and stay ``None`` when that row is missing or incomplete.
+    """
+
     job_id: str
     dataset_name: str
     filename: str
@@ -152,6 +169,8 @@ async def list_drift_jobs(db: AsyncSession = Depends(get_db)):
 
 
 class JobDescriptionUpdate(BaseModel):
+    """Body of `PATCH /jobs/{job_id}/description`: the job's new free-text description."""
+
     description: str
 
 
@@ -497,6 +516,27 @@ async def calculate_drift(
     threshold_kl: float | None = Form(None),
     db: AsyncSession = Depends(get_db),
 ) -> EnrichedDriftReport:
+    """Compare an uploaded dataset against the reference data stored for a job.
+
+    The upload is read as Parquet when its filename ends in ``.parquet`` and as CSV
+    otherwise, capped at ``MAX_UPLOAD_SIZE`` (413 when exceeded, 400 when
+    unparseable). ``dataset_name`` is optional and only used to prefer an exact
+    reference-file match over a scan of the job's artifacts.
+
+    The response carries per-column drift metrics — PSI, KS, Wasserstein and KL —
+    the columns missing from or new to the upload, and, when the job recorded them,
+    its training feature importances, so a drifted column can be weighed against
+    its influence on the model. ``alert_id``/``severity`` identify the alert that
+    was written for this check.
+
+    Every call leaves a durable alert behind, including the ``no_baseline`` (404)
+    and ``failed`` outcomes, so history distinguishes "never checked" from "checked
+    with nothing to compare against". The threshold set actually applied is pinned
+    to a version returned as ``threshold_version``; any of the four thresholds may
+    be overridden per call, and omitted ones fall back to skyulf-core's defaults.
+
+    Rate limited to 20 requests per minute per client address.
+    """
     # 1. Find the job folder (via the storage seam) and its artifact store.
     artifact_store = ArtifactFactory.get_discovery().get_store_for_job(job_id)
 
@@ -746,6 +786,13 @@ async def update_drift_alert_disposition(
 
 
 class DriftStatusSummary(BaseModel):
+    """Roll-up behind the monitoring badge, derived from the 50 most recent alerts.
+
+    Every counter is taken over the latest alert per job within that window, so a
+    critical alert superseded by a newer check on the same job is not counted as
+    unacknowledged.
+    """
+
     has_drift: bool
     drifted_jobs: int
     latest_check: str | None = None
@@ -802,6 +849,8 @@ async def get_drift_status(
 
 
 class ErrorEventResponse(BaseModel):
+    """One recorded error event, as served by the error-tracker endpoints."""
+
     id: int
     route: str
     error_type: str
@@ -816,14 +865,23 @@ class ErrorEventResponse(BaseModel):
 
 
 class ErrorCountResponse(BaseModel):
+    """Result of `GET /errors/count`: how many events are still unresolved."""
+
     count: int
 
 
 class ErrorDeleteResponse(BaseModel):
+    """Result of `DELETE /errors`: how many stored events were removed."""
+
     deleted: int
 
 
 class ErrorGroupedEntry(BaseModel):
+    """One `(error_type, route)` bucket from `GET /errors/grouped`, unresolved events only.
+
+    ``sample_id`` is the oldest event id in the bucket, not a representative one.
+    """
+
     error_type: str
     route: str
     count: int
@@ -833,6 +891,8 @@ class ErrorGroupedEntry(BaseModel):
 
 
 class ErrorTimelineEntry(BaseModel):
+    """One hourly bucket from `GET /errors/timeline`, oldest first, zero counts included."""
+
     hour: str
     count: int
 
@@ -850,6 +910,8 @@ class ErrorFacets(BaseModel):
 
 
 class ErrorEventFiltersEcho(BaseModel):
+    """The filters the server actually applied to an error search, echoed back to the client."""
+
     since: str | None = None
     show_resolved: bool = False
     severity: str | None = None
@@ -859,6 +921,14 @@ class ErrorEventFiltersEcho(BaseModel):
 
 
 class ErrorEventSearchResponse(BaseModel):
+    """One page of error events, with the totals and facets behind it.
+
+    ``total`` counts the filtered matches while ``total_unfiltered`` counts the whole
+    stored history (resolved events included), so a client can show a filtered count
+    against the full history. ``entries`` is bounded by the clamped ``limit`` — 500 at
+    most.
+    """
+
     total: int
     total_unfiltered: int
     facets: ErrorFacets
@@ -1217,6 +1287,13 @@ _CONTRIBUTING_RUNS_LIMIT = 5
 
 
 class SlowNodeAggregate(BaseModel):
+    """Execution-time aggregate for one display step type over the scanned window.
+
+    ``step_type`` is the human-readable label, not the raw engine id (see
+    ``_display_step_type``). ``p95_seconds`` is a nearest-rank percentile over every
+    run in the group, while ``contributing_runs`` echoes only the five slowest.
+    """
+
     step_type: str
     count: int
     total_seconds: float
@@ -1234,6 +1311,13 @@ class SlowNodeAggregate(BaseModel):
 
 
 class SlowNodesResponse(BaseModel):
+    """Result of `GET /slow-nodes`: the window scanned plus the top aggregates.
+
+    ``days`` is the clamped lookback actually used, and ``aggregates`` is truncated
+    to the clamped ``limit``, ordered by total cumulative seconds, so the first row
+    is where the most time went. ``unit`` is always ``"seconds"``.
+    """
+
     days: int
     unit: str = "seconds"
     total_jobs_scanned: int
@@ -1503,6 +1587,12 @@ async def list_slow_nodes(
 
 
 class PipelineLogEntry(BaseModel):
+    """One client-reported log line inside a `PipelineLogBatch`.
+
+    ``level`` defaults to ``"error"``; the node identity and logger name are optional
+    and stored exactly as reported.
+    """
+
     node_id: str | None = None
     node_type: str | None = None
     level: str = "error"
@@ -1511,11 +1601,18 @@ class PipelineLogEntry(BaseModel):
 
 
 class PipelineLogBatch(BaseModel):
+    """Body of `POST /pipeline-logs`: one pipeline's worth of client-reported log lines.
+
+    An empty ``entries`` list is accepted and stores nothing.
+    """
+
     pipeline_id: str | None = None
     entries: list[PipelineLogEntry]
 
 
 class PipelineRunLogResponse(BaseModel):
+    """One stored pipeline run-log row, as served by the pipeline-log endpoints."""
+
     id: int
     pipeline_id: str | None = None
     node_id: str | None = None
@@ -1536,6 +1633,8 @@ class PipelineLogFacets(BaseModel):
 
 
 class PipelineLogFiltersEcho(BaseModel):
+    """The filters the server actually applied to a pipeline-log search, echoed to the client."""
+
     since: str | None = None
     pipeline_id: str | None = None
     level: str | None = None
@@ -1545,6 +1644,13 @@ class PipelineLogFiltersEcho(BaseModel):
 
 
 class PipelineLogSearchResponse(BaseModel):
+    """One page of pipeline run logs, with the totals and facets behind it.
+
+    ``total`` counts the filtered matches while ``total_unfiltered`` counts the whole
+    stored table, so a client can show a filtered count against the full history.
+    ``entries`` is bounded by the clamped ``limit`` — 500 at most.
+    """
+
     total: int
     total_unfiltered: int
     facets: PipelineLogFacets
@@ -1720,12 +1826,20 @@ async def clear_pipeline_logs(
 
 
 class NodeNeighbor(BaseModel):
+    """An upstream or downstream node of the inspected node, reduced to id, step type and label."""
+
     node_id: str
     step_type: str
     label: str
 
 
 class NodeInspectorDetail(BaseModel):
+    """The inspected node as reconstructed from the job's stored graph.
+
+    Neighbours are resolved from that same stored graph, so they describe the run as
+    it happened rather than the pipeline as it may have been edited since.
+    """
+
     node_id: str
     step_type: str
     label: str
@@ -1737,12 +1851,21 @@ class NodeInspectorDetail(BaseModel):
 
 
 class NodeInspectorLogEntry(BaseModel):
+    """One of the ten most recent run-log lines for the inspected node, newest first."""
+
     level: str
     message: str
     run_at: str | None = None
 
 
 class NodeInspectorResponse(BaseModel):
+    """What the inspector shows about one node in one run, from stored columns only.
+
+    ``node_found`` is False and ``node`` is None when the job's stored graph no longer
+    holds the requested node id; the job-level identity, timing and log fields are
+    still returned, so the screen degrades instead of 404-ing.
+    """
+
     job_id: str
     node_id: str
     node_found: bool

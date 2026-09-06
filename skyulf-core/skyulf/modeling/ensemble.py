@@ -542,6 +542,7 @@ class VotingClassifierCalculator(_BaseEnsembleCalculator):
     HAS_VOTING = True
 
     def __init__(self):
+        """Pin the meta-estimator to ``VotingClassifier`` with ``voting="soft"``."""
         super().__init__(
             model_class=VotingClassifier,
             default_params={"voting": "soft"},
@@ -581,6 +582,7 @@ class StackingClassifierCalculator(_BaseEnsembleCalculator):
     IS_STACKING = True
 
     def __init__(self):
+        """Pin the meta-estimator to ``StackingClassifier`` with ``cv=5``."""
         super().__init__(
             model_class=StackingClassifier,
             default_params={"cv": 5},
@@ -616,6 +618,7 @@ class VotingRegressorCalculator(_BaseEnsembleCalculator):
     MODEL_KEY = "voting_regressor"
 
     def __init__(self):
+        """Pin the meta-estimator to ``VotingRegressor``, with no estimator-level defaults."""
         super().__init__(
             model_class=VotingRegressor,
             default_params={},
@@ -655,6 +658,7 @@ class StackingRegressorCalculator(_BaseEnsembleCalculator):
     IS_STACKING = True
 
     def __init__(self):
+        """Pin the meta-estimator to ``StackingRegressor`` with ``cv=5``."""
         super().__init__(
             model_class=StackingRegressor,
             default_params={"cv": 5},

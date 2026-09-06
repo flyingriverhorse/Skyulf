@@ -23,8 +23,15 @@ def _drop_missing_cols_apply_pandas(X: Any, y: Any, params: dict[str, Any]) -> t
 
 
 class DropMissingColumnsApplier(BaseApplier):
+    """Drop the columns the calculator selected, skipping names no longer on the frame.
+
+    The selection is already baked into ``params``; this half is a pure drop
+    and leaves ``y`` alone, so both engine paths are identical by construction.
+    """
+
     @apply_method
     def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
+        """Dispatch the column drop to the pandas or polars path; ``y`` passes through."""
         return apply_dual_engine(
             X,
             params,
@@ -107,9 +114,23 @@ def _drop_missing_cols_fit_pandas(
     learns_from_data=True,
 )
 class DropMissingColumnsCalculator(BaseCalculator):
+    """Select columns to drop: an explicit list unioned with those over the missing-% threshold.
+
+    The threshold half is data-dependent, so ``fit`` runs an engine-specific
+    path and the two must agree on the missing count. They do not for free:
+    polars' ``null_count()`` ignores NaN where pandas' ``isna()`` counts it, so
+    float columns add an explicit NaN count on the polars side.
+    """
+
     def infer_output_schema(
         self, input_schema: SkyulfSchema, config: dict[str, Any]
     ) -> SkyulfSchema | None:
+        """Predict the surviving columns, or ``None`` when a threshold makes that data-dependent.
+
+        Without a positive threshold the result is exactly the input minus the
+        explicit list; with one, which columns go depends on the data and
+        callers must fall back to runtime introspection.
+        """
         # Threshold path is data-dependent; only predictable when the user
         # supplied an explicit column list and no positive threshold.
         if _resolve_threshold(config.get("missing_threshold")) is not None:
@@ -118,6 +139,7 @@ class DropMissingColumnsCalculator(BaseCalculator):
         return input_schema if not explicit else input_schema.drop(explicit)
 
     def fit(self, df: Any, config: dict[str, Any]) -> DropMissingColumnsArtifact:
+        """Compute the drop set on the frame's own engine and return it as the artifact."""
         return cast(
             DropMissingColumnsArtifact,
             fit_dual_engine(

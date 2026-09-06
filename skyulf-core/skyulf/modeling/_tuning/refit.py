@@ -147,8 +147,9 @@ def tune_decision_thresholds(
     validation_data: tuple[Any, Any] | None,
     log_callback: Callable[[str], None] | None,
 ) -> None:
-    """F-13: search a decision threshold on the validation split for a binary
-    classifier and store it on ``tuning_result``.
+    """F-13: search a decision threshold on the validation split.
+
+    Applies to a binary classifier and stores the result on ``tuning_result``.
 
     Gates: classification problem, a model exposing ``predict_proba`` and
     ``classes_``, an exactly-binary target, and a provided validation split.

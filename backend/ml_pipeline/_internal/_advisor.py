@@ -20,6 +20,13 @@ from pydantic import BaseModel
 
 
 class Recommendation(BaseModel):
+    """A single advisor suggestion row the canvas lists above "Run pipeline".
+
+    `type`/`rule_id` identify the rule that fired, `target_columns` the columns
+    it applies to, and `message`/`suggestion` the human-readable text the UI
+    renders for it.
+    """
+
     type: str  # "imputation", "cleaning", "encoding", "outlier", "transformation"
     rule_id: str | None = None
     target_columns: list[str]
@@ -30,6 +37,13 @@ class Recommendation(BaseModel):
 
 
 class AnalysisProfile(BaseModel):
+    """Cheap statistics snapshot of a sample that `AdvisorEngine` rules read.
+
+    `columns` maps a column name to its stats dict — dtype, column_type,
+    missing count/ratio, unique count and, for numeric columns, min/max/mean/
+    std/skewness (any of which may be ``None`` when unavailable).
+    """
+
     row_count: int
     column_count: int
     duplicate_row_count: int
@@ -37,6 +51,8 @@ class AnalysisProfile(BaseModel):
 
 
 class DataProfiler:
+    """Turns a sample dataframe into the `AnalysisProfile` the advisor reads."""
+
     @staticmethod
     def _safe_float(value: Any) -> float | None:
         """Convert a pandas scalar aggregate to ``float``, or ``None`` if missing.
@@ -55,6 +71,18 @@ class DataProfiler:
 
     @staticmethod
     def generate_profile(df: Any) -> AnalysisProfile:
+        """Collect per-column statistics for a sample into an `AnalysisProfile`.
+
+        Args:
+            df: A pandas dataframe, or any frame exposing ``to_pandas()`` (a
+                Polars frame from a catalog read is converted first — samples
+                are small, so the cost is negligible).
+
+        Returns:
+            An `AnalysisProfile` holding one stats dict per column. A statistic
+            that cannot be computed (e.g. an all-null numeric column) is
+            reported as ``None`` instead of aborting the profile.
+        """
         # The profiler is pandas-based; catalog reads now honor SKYULF_ENGINE
         # and may hand us a Polars frame. Samples are small (<=1000 rows), so
         # converting here is cheap and keeps the stats engine single.
@@ -79,12 +107,19 @@ class DataProfiler:
         return AnalysisProfile(
             row_count=len(df),
             column_count=len(df.columns),
-            duplicate_row_count=int(df.duplicated().sum()),
+            duplicate_row_count=int(df.duplicated(keep=False).sum()),
             columns=columns,
         )
 
 
 class AdvisorEngine:
+    """Heuristic rules mapping an `AnalysisProfile` to `Recommendation` rows.
+
+    Each private ``_recommend_*`` rule covers one concern (imputation,
+    cleaning, encoding, outliers, power transforms); `analyze` runs them all
+    and concatenates whatever they emit.
+    """
+
     @staticmethod
     def _recommend_imputation(profile: AnalysisProfile) -> list[Recommendation]:
         """Recommends imputation for columns that have any missing values."""
@@ -185,7 +220,7 @@ class AdvisorEngine:
 
     @staticmethod
     def _find_skewed_columns(profile: AnalysisProfile) -> tuple[list[str], list[str]]:
-        """Splits numeric columns with |skewness| > 1.0 into positive- and non-positive-valued groups."""
+        """Split numeric columns with |skewness| > 1.0 into positive and non-positive groups."""
         pos_skewed_cols = []
         neg_skewed_cols = []
         for col, stats in profile.columns.items():

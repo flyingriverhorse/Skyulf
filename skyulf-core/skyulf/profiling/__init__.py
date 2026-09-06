@@ -1,3 +1,12 @@
+"""Exploratory data analysis, dataset expectations and drift detection.
+
+This package is the public profiling surface: the EDA analyzer and its
+terminal/matplotlib visualizer, the ``expect_*`` dataset assertions, and the
+drift calculator with its report models. The Pydantic schemas those return are
+re-exported here, so ``from skyulf.profiling import EDAAnalyzer`` is the
+intended contract.
+"""
+
 from .analyzer import EDAAnalyzer
 from .drift import ColumnDrift, DriftCalculator, DriftMetric, DriftReport
 from .expect import (

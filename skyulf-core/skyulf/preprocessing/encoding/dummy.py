@@ -100,8 +100,19 @@ def _dummy_apply_pandas(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, An
 
 
 class DummyEncoderApplier(BaseApplier):
+    """Replace each categorical column with one ``<col>_<category>`` indicator column.
+
+    The originals are always dropped. Parity depends on both engines rendering
+    a value to the *same* string before comparing it with the learned
+    categories — see ``_pandas_col_to_str``, which undoes pandas' null-induced
+    ``float64`` upcast so ``1`` does not become ``"1.0"`` and silently miss
+    every category. A value unseen at fit time yields an all-zero row rather
+    than raising.
+    """
+
     @apply_method
     def apply(self, X: Any, y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
+        """Dispatch to the engine-specific dummy encoding, forwarding ``(X, y)`` when present."""
         return apply_dual_engine(
             (X, y) if y is not None else X,
             params,
@@ -158,8 +169,18 @@ def _dummy_fit_pandas(X: Any, y: Any, config: dict[str, Any]) -> Mapping[str, An
     learns_from_data=True,
 )
 class DummyEncoderCalculator(BaseCalculator):
+    """Learn the sorted category list for each resolved categorical column.
+
+    The target column is excluded first: dummy encoding replaces the column it
+    encodes with several derived ones, which would break a downstream
+    Feature/Target Split. Nulls are dropped before the list is built, so they
+    never become a category. An explicit ``columns: []`` yields an empty
+    artifact so the applier no-ops.
+    """
+
     @fit_method
     def fit(self, X: Any, y: Any, config: dict[str, Any]) -> DummyEncoderArtifact:  # pylint: disable=arguments-differ
+        """Short-circuit an explicit empty column selection, else learn the categories."""
         if user_picked_no_columns(config):
             return {}
         return cast(

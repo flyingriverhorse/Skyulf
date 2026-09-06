@@ -72,11 +72,14 @@ def _profile_fit_pandas(X: Any, _y: Any, _config: dict[str, Any]) -> DatasetProf
 
 
 class DatasetProfileApplier(BaseApplier):
+    """Passthrough applier; the profile is produced entirely at fit time."""
+
     def apply(
         self,
         df: pd.DataFrame | SkyulfDataFrame | tuple[Any, ...] | Any,
         params: dict[str, Any],
     ) -> Any:
+        """Return ``df`` unchanged, ignoring the fitted profile."""
         # Inspection nodes do not modify data.
         return df
 
@@ -91,14 +94,23 @@ class DatasetProfileApplier(BaseApplier):
     learns_from_data=False,
 )
 class DatasetProfileCalculator(BaseCalculator):
+    """Summarise shape, dtypes, missingness and numeric statistics."""
+
     def infer_output_schema(
         self, input_schema: SkyulfSchema, config: dict[str, Any]
     ) -> SkyulfSchema:
+        """Return ``input_schema`` untouched."""
         # Inspection nodes are read-only; schema is unchanged.
         return input_schema
 
     @fit_method
     def fit(self, X: Any, _y: Any, config: dict[str, Any]) -> DatasetProfileArtifact:  # pylint: disable=arguments-differ
+        """Collect row/column counts, dtypes, missing counts and numeric stats.
+
+        Numeric statistics come from Polars ``describe()`` or pandas
+        ``describe()`` depending on the engine, so the per-column metric names
+        are not identical across engines.
+        """
         return cast(
             DatasetProfileArtifact,
             fit_dual_engine(
@@ -123,11 +135,14 @@ def _snapshot_fit_pandas(X: Any, _y: Any, config: dict[str, Any]) -> DataSnapsho
 
 
 class DataSnapshotApplier(BaseApplier):
+    """Passthrough applier; the snapshot is produced entirely at fit time."""
+
     def apply(
         self,
         df: pd.DataFrame | SkyulfDataFrame | tuple[Any, ...] | Any,
         params: dict[str, Any],
     ) -> Any:
+        """Return ``df`` unchanged, ignoring the captured snapshot."""
         return df
 
 
@@ -141,14 +156,22 @@ class DataSnapshotApplier(BaseApplier):
     learns_from_data=False,
 )
 class DataSnapshotCalculator(BaseCalculator):
+    """Capture the leading rows of the input as plain record dicts."""
+
     def infer_output_schema(
         self, input_schema: SkyulfSchema, config: dict[str, Any]
     ) -> SkyulfSchema:
+        """Return ``input_schema`` untouched."""
         # Inspection nodes are read-only; schema is unchanged.
         return input_schema
 
     @fit_method
     def fit(self, X: Any, _y: Any, config: dict[str, Any]) -> DataSnapshotArtifact:  # pylint: disable=arguments-differ
+        """Return the first ``config["n_rows"]`` rows (default 5) as dicts.
+
+        Rows are serialised eagerly at fit time, so the snapshot is unaffected
+        by later mutation of the source frame.
+        """
         return cast(
             DataSnapshotArtifact,
             fit_dual_engine(

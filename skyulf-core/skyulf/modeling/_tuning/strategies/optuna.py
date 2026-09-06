@@ -40,9 +40,10 @@ _optuna_load_lock = threading.Lock()
 
 
 def _ensure_optuna_loaded() -> bool:
-    """Lazily import Optuna and resolve its sklearn-compatible OptunaSearchCV
-    integration, memoizing the result under a lock so repeated (possibly
-    concurrent) tuning calls don't re-attempt the multi-path fallback import.
+    """Lazily import Optuna and resolve its sklearn-compatible ``OptunaSearchCV``.
+
+    Memoizes the result under a lock so repeated (possibly concurrent) tuning
+    calls don't re-attempt the multi-path fallback import.
 
     Populates ``_optuna_state`` on success; the ``build_optuna_*`` helpers
     read from it, and are only ever called from ``build_optuna_searcher``

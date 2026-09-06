@@ -1,8 +1,10 @@
-"""Shared PowerTransformer reconstruction, used by both ``power.py`` (fitted
-subset of columns) and ``general.py`` (fitted single columns via the general
-transformation node). Both need to rebuild a fitted sklearn ``PowerTransformer``
-(plus its optional internal ``StandardScaler``) from artifact-stored lambdas
-and scaler params, at apply time, without a real ``.fit()`` call.
+"""Shared PowerTransformer reconstruction, used by both ``power.py`` and ``general.py``.
+
+``power.py`` handles a fitted subset of columns, ``general.py`` fitted single
+columns via the general transformation node. Both need to rebuild a fitted
+sklearn ``PowerTransformer`` (plus its optional internal ``StandardScaler``)
+from artifact-stored lambdas and scaler params, at apply time, without a real
+``.fit()`` call.
 """
 
 from typing import Any

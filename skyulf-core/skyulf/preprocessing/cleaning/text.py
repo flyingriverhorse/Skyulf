@@ -132,8 +132,19 @@ _TEXT_OPS_PANDAS: dict[str, Callable[[pd.Series, dict[str, Any]], pd.Series]] = 
 
 
 class TextCleaningApplier(BaseApplier):
+    """Apply an ordered chain of text operations to the resolved columns.
+
+    The pandas and polars paths must agree value-for-value. Each column is
+    coerced to string first, then every entry in ``operations`` is applied in
+    list order so later operations see earlier results. The pandas coercion
+    masks nulls back afterwards, otherwise ``astype(str)`` would turn them into
+    the literal ``"nan"``. Unrecognised operation names are skipped rather than
+    raising, and an empty column set or empty operation list is a no-op.
+    """
+
     @apply_method
     def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
+        """Dispatch the operation chain to the pandas or polars path; ``y`` passes through."""
         return apply_dual_engine(
             X, params, {"polars": self._apply_polars, "pandas": self._apply_pandas}
         )
@@ -188,14 +199,24 @@ class TextCleaningApplier(BaseApplier):
     learns_from_data=False,
 )
 class TextCleaningCalculator(BaseCalculator):
+    """Resolve text-cleaning config into an artifact; nothing is learned from data."""
+
     def infer_output_schema(
         self, input_schema: SkyulfSchema, config: dict[str, Any]
     ) -> SkyulfSchema:
+        """Pass the input schema through: string values are rewritten in place."""
         # Text cleaning rewrites string values in place; column set is preserved.
         return input_schema
 
     @fit_method
     def fit(self, X: Any, _y: Any, config: dict[str, Any]) -> TextCleaningArtifact:  # pylint: disable=arguments-differ
+        """Build the artifact, auto-detecting text columns when none are named.
+
+        Two cases short-circuit to an empty artifact: an explicit
+        ``columns: []`` from the UI, and auto-detection finding no text columns
+        at all. Both make the applier a no-op rather than coercing numeric
+        columns to text.
+        """
         if user_picked_no_columns(config):
             return {}
         cols = resolve_columns(X, config, _auto_detect_text_columns)

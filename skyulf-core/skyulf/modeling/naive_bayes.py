@@ -48,6 +48,7 @@ class MultinomialNBCalculator(SklearnCalculator):
     """Multinomial Naive Bayes Calculator."""
 
     def __init__(self):
+        """Pin the estimator to ``MultinomialNB`` with ``alpha=1.0`` and ``fit_prior=True``."""
         super().__init__(
             model_class=MultinomialNB,
             default_params={"alpha": 1.0, "fit_prior": True},
@@ -56,6 +57,7 @@ class MultinomialNBCalculator(SklearnCalculator):
 
     @property
     def problem_type(self) -> str:
+        """Return a constant ``"classification"``, so the base's stored value goes unused."""
         return "classification"
 
 
@@ -84,6 +86,7 @@ class BernoulliNBCalculator(SklearnCalculator):
     """Bernoulli Naive Bayes Calculator."""
 
     def __init__(self):
+        """Pin the estimator to ``BernoulliNB``, adding ``binarize=0.0`` to the NB defaults."""
         super().__init__(
             model_class=BernoulliNB,
             default_params={"alpha": 1.0, "binarize": 0.0, "fit_prior": True},
@@ -92,4 +95,5 @@ class BernoulliNBCalculator(SklearnCalculator):
 
     @property
     def problem_type(self) -> str:
+        """Return a constant ``"classification"``, so the base's stored value goes unused."""
         return "classification"

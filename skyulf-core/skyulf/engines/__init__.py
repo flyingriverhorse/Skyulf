@@ -1,3 +1,5 @@
+"""Engine abstraction: the ``SkyulfDataFrame`` protocol, pandas/polars adapters and registry."""
+
 from .pandas_engine import PandasEngine
 from .polars_engine import (
     POLARS_NUMERIC_BOOL_DTYPES,

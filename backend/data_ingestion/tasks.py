@@ -1,3 +1,11 @@
+"""Celery tasks that ingest a data source and persist its profile.
+
+Runs in a worker process, which has no event loop and so cannot use the async
+session from ``backend.database.engine``. A sync engine and session factory are
+therefore built once behind a lock (see ``get_db_session``), and the async
+connector pipeline is driven to completion on a private event loop per task.
+"""
+
 import asyncio
 import logging
 import threading
@@ -23,6 +31,14 @@ _engine_init_lock = threading.Lock()
 
 
 def get_db_session():
+    """Return a sync SQLAlchemy session, building the shared engine on first use.
+
+    Celery workers have no running event loop, so the async ``DATABASE_URL`` is
+    rewritten to its sync driver — ``sqlite+aiosqlite://`` to ``sqlite://``,
+    ``postgresql+asyncpg://`` to ``postgresql+psycopg2://``. Initialization is
+    double-checked behind ``_engine_init_lock`` so concurrent tasks cannot build
+    two engines. The caller owns ``session.close()``.
+    """
     global _sync_engine, _sync_session_factory
     if _sync_session_factory is None:
         with _engine_init_lock:

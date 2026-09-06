@@ -35,6 +35,8 @@ class RegistryItem(BaseModel):
 
 
 class NodeConfigModel(BaseModel):
+    """One canvas node inside a `PipelineConfigModel` request body."""
+
     node_id: str
     step_type: str
     params: dict[str, Any] = {}
@@ -42,6 +44,12 @@ class NodeConfigModel(BaseModel):
 
 
 class PipelineConfigModel(BaseModel):
+    """Graph description posted to /run, /preview and /schema-preview.
+
+    Carries the canvas nodes plus `target_node_id` and `job_type`, which is how
+    one body distinguishes a training run from a tuning run or a preview.
+    """
+
     pipeline_id: str
     nodes: list[NodeConfigModel]
     metadata: dict[str, Any] = {}
@@ -51,6 +59,12 @@ class PipelineConfigModel(BaseModel):
 
 
 class RunPipelineResponse(BaseModel):
+    """Acknowledgement returned by POST /run once the job has been queued.
+
+    `job_ids` lists every job when the graph fans out into parallel branches;
+    `job_id` remains the primary one for clients that only track a single run.
+    """
+
     message: str
     pipeline_id: str
     job_id: str
@@ -58,6 +72,14 @@ class RunPipelineResponse(BaseModel):
 
 
 class PreviewResponse(BaseModel):
+    """Payload returned by POST /preview for a sample run of the graph.
+
+    Bundles the capped sample rows with everything the canvas annotates them
+    with: advisor `recommendations`, engine `merge_warnings` and the
+    `node_warnings` captured while the nodes ran. When the graph is parallel
+    the rows themselves arrive grouped per branch.
+    """
+
     pipeline_id: str
     status: str
     node_results: dict[str, Any]
@@ -88,6 +110,12 @@ class PreviewResponse(BaseModel):
 
 
 class SavedPipelineModel(BaseModel):
+    """Body for POST /save/{dataset_id}, the canvas "Save pipeline" call.
+
+    `graph` is the React Flow snapshot stored verbatim; a successful save also
+    stamps a `pipeline_versions` row out of the same payload.
+    """
+
     name: str
     description: str | None = None
     graph: dict[str, Any]

@@ -1,3 +1,10 @@
+"""Terminal and matplotlib rendering of a ``DatasetProfile``.
+
+Wraps the optional ``rich`` and ``matplotlib`` extras: a renderer whose
+dependency is missing prints an install hint or returns silently instead of
+raising, so profiling stays usable without them.
+"""
+
 from datetime import datetime
 
 import polars as pl
@@ -9,6 +16,11 @@ class EDAVisualizer:
     """Helper class to visualize Skyulf EDA results using Rich (terminal) and Matplotlib (plots)."""
 
     def __init__(self, profile: DatasetProfile, df: pl.DataFrame | None = None):
+        """Hold the profile to render, plus the source frame some plots need.
+
+        ``df`` is optional and only the scatter-matrix plot consumes it; that
+        plot is skipped when ``df`` is ``None``.
+        """
         self.profile = profile
         self.df = df
 

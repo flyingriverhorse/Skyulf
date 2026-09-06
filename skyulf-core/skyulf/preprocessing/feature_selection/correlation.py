@@ -145,8 +145,15 @@ def _polars_correlation_columns_to_drop(
 
 
 class CorrelationThresholdApplier(BaseApplier):
+    """Remove the columns a fitted correlation threshold marked redundant."""
+
     @apply_method
     def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
+        """Drop the artifact's precomputed ``columns_to_drop`` from ``X``.
+
+        The list is resolved at fit time, so apply never recomputes a correlation
+        matrix; ``drop_columns=False`` leaves the frame untouched.
+        """
         return apply_dual_engine(
             X, params, {"polars": _corr_drop_polars, "pandas": _corr_drop_pandas}
         )
@@ -162,8 +169,17 @@ class CorrelationThresholdApplier(BaseApplier):
     learns_from_data=True,
 )
 class CorrelationThresholdCalculator(BaseCalculator):
+    """Fit a pairwise-correlation threshold over numeric columns."""
+
     @fit_method
     def fit(self, X: Any, _y: Any, config: dict[str, Any]) -> CorrelationThresholdArtifact:  # pylint: disable=arguments-differ
+        """Return columns whose correlation with an earlier one exceeds the threshold.
+
+        Within each over-threshold pair the later column is the one dropped. The
+        native Polars path is used only where it can honour the same contract;
+        Kendall and callable methods fall back to pandas. Returns an empty
+        artifact — a no-op passthrough — when fewer than two columns resolve.
+        """
         threshold = config.get("threshold", 0.95)
         drop_columns = config.get("drop_columns", True)
         # Prefer "correlation_method" — falling back to "method" can collide with the

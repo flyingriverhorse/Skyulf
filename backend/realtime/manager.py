@@ -32,18 +32,35 @@ class ConnectionManager:
     """Tracks live WebSocket clients and fans out Redis events to them."""
 
     def __init__(self) -> None:
+        """Start with no clients and no subscriber task running.
+
+        ``_lock`` guards the client set against a connect, disconnect or broadcast
+        landing concurrently, and ``_stop`` is the event both subscriber loops poll
+        to know when to exit.
+        """
         self._clients: set[WebSocket] = set()
         self._lock = asyncio.Lock()
         self._subscriber_task: asyncio.Task[None] | None = None
         self._stop = asyncio.Event()
 
     async def connect(self, ws: WebSocket) -> None:
+        """Accept ``ws``, then add it to the broadcast set.
+
+        The accept comes first, so a socket that is refused never enters the set
+        and can never be broadcast to.
+        """
         await ws.accept()
         async with self._lock:
             self._clients.add(ws)
         logger.debug("WS client connected (now %d)", len(self._clients))
 
     async def disconnect(self, ws: WebSocket) -> None:
+        """Drop ``ws`` from the broadcast set without closing it.
+
+        Closing the socket stays the route handler's job; ``broadcast`` likewise
+        only discards a socket whose send failed and leaves the close to whoever
+        owns the connection.
+        """
         async with self._lock:
             self._clients.discard(ws)
         logger.debug("WS client disconnected (now %d)", len(self._clients))

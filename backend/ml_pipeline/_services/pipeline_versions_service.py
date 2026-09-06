@@ -1,7 +1,7 @@
-"""Pipeline Versions Service (L7) ------------------------------
+"""Pipeline versions service (L7): CRUD over `PipelineVersion` rows.
 
-CRUD over `PipelineVersion` rows. Replaces the per-browser localStorage
-"Recent" ring buffer with a durable, server-side history.
+Replaces the per-browser localStorage "Recent" ring buffer with a durable,
+server-side history.
 
 Versions are keyed by `dataset_source_id` (not `pipelines.id`) because
 `FeatureEngineeringPipeline` is upserted-by-dataset today; one active
@@ -20,8 +20,10 @@ logger = logging.getLogger(__name__)
 
 
 def _count_graph(graph: Any) -> tuple[int, int]:
-    """Best-effort node/edge counts. Tolerates either RF snapshot shape
-    ({nodes, edges}) or engine config shape (list of nodes).
+    """Best-effort node/edge counts.
+
+    Tolerates either RF snapshot shape ({nodes, edges}) or engine config shape
+    (list of nodes).
     """
     if isinstance(graph, dict):
         nodes = graph.get("nodes")
@@ -50,6 +52,16 @@ class PipelineVersionsService:
         user_id: int | None = None,
         pinned: bool = False,
     ) -> PipelineVersion:
+        """Insert and commit the next version snapshot for a dataset.
+
+        Stores `graph` verbatim alongside best-effort node/edge counts. `kind`
+        records the origin — ``"manual"`` for an explicit save, ``"auto"`` for a
+        background snapshot — and `pinned` marks rows the history list keeps at
+        the top.
+
+        Returns:
+            The committed `PipelineVersion`, refreshed from the database.
+        """
         # Next version_int = max+1 for this dataset.
         stmt = select(PipelineVersion.version_int).where(
             PipelineVersion.dataset_source_id == dataset_source_id
@@ -79,6 +91,10 @@ class PipelineVersionsService:
 
     @staticmethod
     async def list_versions(session: AsyncSession, dataset_source_id: str) -> list[PipelineVersion]:
+        """Return one dataset's version history for the canvas versions modal.
+
+        Pinned versions come first, then the rest newest-first by `version_int`.
+        """
         # Pinned first, then newest first.
         stmt = (
             select(PipelineVersion)
@@ -93,6 +109,7 @@ class PipelineVersionsService:
 
     @staticmethod
     async def get_version(session: AsyncSession, version_id: int) -> PipelineVersion | None:
+        """Fetch a single version by primary key, or ``None`` if it does not exist."""
         return await session.get(PipelineVersion, version_id)
 
     @staticmethod
@@ -104,6 +121,16 @@ class PipelineVersionsService:
         note: str | None = None,
         pinned: bool | None = None,
     ) -> PipelineVersion | None:
+        """Apply the supplied rename, re-note and (un)pin changes, then commit.
+
+        Fields left as ``None`` are skipped, so a PATCH only touches what the
+        client actually sent. A `name` that is blank after stripping is ignored,
+        which keeps a rename from clearing the label, while an empty `note` is
+        stored as ``NULL``.
+
+        Returns:
+            The updated row, or ``None`` when `version_id` does not exist.
+        """
         version = await session.get(PipelineVersion, version_id)
         if version is None:
             return None
@@ -121,6 +148,7 @@ class PipelineVersionsService:
 
     @staticmethod
     async def delete_version(session: AsyncSession, version_id: int) -> bool:
+        """Remove a version row, returning whether anything was actually deleted."""
         version = await session.get(PipelineVersion, version_id)
         if version is None:
             return False

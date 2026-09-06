@@ -1,8 +1,7 @@
-"""Job Service
------------
-Centralized service for retrieving job entities (TrainingJob) from the
-database. TrainingJob is discriminated by `run_mode` ("fixed" | "tuned"),
-so a single query by id is always unambiguous.
+"""Job service: centralized retrieval of job entities (TrainingJob) from the database.
+
+TrainingJob is discriminated by `run_mode` ("fixed" | "tuned"), so a single query
+by id is always unambiguous.
 """
 
 from sqlalchemy import select

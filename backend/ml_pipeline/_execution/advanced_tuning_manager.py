@@ -1,3 +1,12 @@
+"""Persistence layer for hyperparameter-tuning jobs (``run_mode="tuned"``).
+
+Owns the tuning half of the unified ``TrainingJob`` table: creating queued
+rows with their resolved search strategy, projecting them onto the
+``JobInfo`` API schema, applying status/log/result writes from the Celery
+worker, cancelling, and the per-node / per-model lookups the tuning-history
+endpoints use.
+"""
+
 import uuid
 from datetime import UTC, datetime
 from typing import Any
@@ -25,6 +34,13 @@ from backend.ml_pipeline.model_registry.service import ModelRegistryService
 
 
 class AdvancedTuningManager(TrainingJobManagerBase):
+    """CRUD and status-update operations for hyperparameter-tuning jobs.
+
+    Counterpart of ``BasicTrainingManager``; both read and write the same
+    ``TrainingJob`` table and are disambiguated by ``run_mode="tuned"``, so
+    every query here scopes on it.
+    """
+
     @staticmethod
     async def create_tuning_job(
         session: AsyncSession,
@@ -68,6 +84,15 @@ class AdvancedTuningManager(TrainingJobManagerBase):
 
     @staticmethod
     def map_tuning_job_to_info(job: TrainingJob, dataset_name: str | None) -> JobInfo:
+        """Project a tuning job row onto the ``JobInfo`` API schema.
+
+        Reports the winning ``best_params`` as the job's hyperparameters once
+        the run has completed, and the raw ``search_space`` while it is still
+        queued or running, so the Experiments table always shows what the user
+        cares about. ``best_params``, ``best_score`` and ``scoring`` are also
+        echoed into ``result`` alongside the metrics dict (falling back to a
+        synthetic ``{"score": best_score}`` when no metrics were written).
+        """
         # Extract details from graph
         (
             node_params,
@@ -265,6 +290,15 @@ class AdvancedTuningManager(TrainingJobManagerBase):
 
     @staticmethod
     async def get_latest_tuning_job_for_node(session: AsyncSession, node_id: str) -> JobInfo | None:
+        """Return the most recently finished tuning job for a canvas node.
+
+        Backs ``GET /jobs/tuning/latest/{node_id}`` so a tuner node can be
+        re-opened with the parameters its last completed run found. Only
+        ``completed`` rows qualify, ordered by ``finished_at`` descending;
+        the dataset name is left unresolved (None) because the caller keys on
+        the node, not the dataset. Returns None if the node never finished a
+        tuning run.
+        """
         result = await session.execute(
             select(TrainingJob)
             .where(TrainingJob.run_mode == "tuned")
@@ -283,6 +317,14 @@ class AdvancedTuningManager(TrainingJobManagerBase):
     async def get_best_tuning_job_for_model(
         session: AsyncSession, model_type: str
     ) -> JobInfo | None:
+        """Return the newest completed tuning job for a model type, or None.
+
+        Backs ``GET /jobs/tuning/best/{model_type}``. Note the name is
+        aspirational: rows are ordered by ``finished_at`` descending, not by
+        ``best_score``, so this yields the latest finished tuning run for
+        that model family rather than its highest-scoring one. The dataset
+        name is left unresolved (None) because the lookup is model-scoped.
+        """
         result = await session.execute(
             select(TrainingJob)
             .where(TrainingJob.run_mode == "tuned")

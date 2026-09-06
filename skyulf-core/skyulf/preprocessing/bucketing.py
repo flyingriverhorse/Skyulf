@@ -282,6 +282,14 @@ class BaseBinningApplier(BaseApplier):
 
     @apply_method
     def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
+        """Dispatch through the mapping-keyed dual-engine path; ``y`` passes through.
+
+        Each entry in ``bin_edges`` gains a ``{col}{output_suffix}`` column, and
+        ``drop_original`` removes only the columns that were actually binned. A
+        column that cannot be binned (fewer than two unique edges, bad dtype) is
+        left unbinned rather than failing the whole frame — warned about on the
+        pandas path, silently skipped on the polars one.
+        """
         return apply_dual_engine(
             X, params, {"polars": _bucketing_apply_polars, "pandas": _bucketing_apply_pandas}
         )
@@ -401,6 +409,14 @@ def _passthrough_artifact_options(config: dict[str, Any]) -> dict[str, Any]:
 
 
 class GeneralBinningApplier(BaseBinningApplier):
+    """Applier registered for the ``GeneralBinning`` node id.
+
+    Empty subclass: every binning behaviour is inherited from
+    :class:`BaseBinningApplier`. It exists as its own type so this node id
+    registers against a distinct Applier class, and as the base for the
+    ``CustomBinning`` and ``KBinsDiscretizer`` appliers.
+    """
+
     pass
 
 
@@ -451,6 +467,15 @@ class GeneralBinningCalculator(BaseCalculator):
 
     @fit_method
     def fit(self, X: Any, _y: Any, config: dict[str, Any]) -> GeneralBinningArtifact:  # pylint: disable=arguments-differ
+        """Fit bin edges per column under each column's own strategy.
+
+        An explicitly empty ``columns`` list short-circuits to an empty artifact
+        (the user unchecked everything), whereas an absent one falls through to
+        :func:`detect_numeric_columns`. Only the selected columns are converted
+        to pandas, since the fits are ``pd.cut`` / ``pd.qcut`` / sklearn-bound.
+        Columns whose strategy cannot be fit are logged and skipped rather than
+        failing the node, so the artifact may cover fewer columns than requested.
+        """
         if user_picked_no_columns(config):
             return cast(GeneralBinningArtifact, {})
 
@@ -480,6 +505,12 @@ class GeneralBinningCalculator(BaseCalculator):
 
 
 class CustomBinningApplier(GeneralBinningApplier):
+    """Applier registered for the ``CustomBinning`` node id.
+
+    Empty subclass — custom edges are applied by exactly the same cut logic as
+    fitted ones, so nothing here needs to differ.
+    """
+
     pass
 
 
@@ -497,6 +528,15 @@ class CustomBinningCalculator(BaseCalculator):
 
     @fit_method
     def fit(self, X: Any, _y: Any, config: dict[str, Any]) -> GeneralBinningArtifact:
+        """Attach one shared, sorted edge list from ``config["bins"]`` to every selected column.
+
+        Nothing is learned from the data (``learns_from_data=False``) — *X* is
+        only consulted for column resolution. Unlike :class:`GeneralBinningCalculator`
+        the same edges go to every column, so a multi-column selection spanning
+        different scales will push the out-of-scale columns' values outside the
+        outer bins, where both engines null them. An empty or absent ``bins``
+        leaves ``bin_edges`` empty, which makes apply a no-op.
+        """
         if user_picked_no_columns(config):
             return cast(GeneralBinningArtifact, {})
 
@@ -519,6 +559,12 @@ class CustomBinningCalculator(BaseCalculator):
 
 
 class KBinsDiscretizerApplier(GeneralBinningApplier):
+    """Applier registered for the ``KBinsDiscretizer`` node id.
+
+    Empty subclass — sklearn only picks the edges at fit time; applying them is
+    the same cut as for any other binning node.
+    """
+
     pass
 
 
@@ -539,6 +585,16 @@ class KBinsDiscretizerCalculator(GeneralBinningCalculator):
         df: pd.DataFrame | SkyulfDataFrame | tuple[Any, ...] | Any,
         config: dict[str, Any],
     ) -> GeneralBinningArtifact:
+        """Translate this node's public params onto GeneralBinning's internal names, then delegate.
+
+        On a copy of *config* (the caller's dict is never mutated) it forces
+        ``strategy="kbins"``, moves ``n_bins`` to ``kbins_n_bins``, and preserves
+        a user-chosen non-``kbins`` ``strategy`` as ``kbins_strategy`` so
+        ``quantile`` / ``uniform`` / ``kmeans`` still reach sklearn. Written with
+        the raw ``(df, config)`` signature rather than ``@fit_method`` because it
+        only rewrites config and forwards — the parent's decorated ``fit`` does
+        the ``(X, y)`` unpack.
+        """
         new_config = config.copy()
         new_config["strategy"] = "kbins"
         if "n_bins" in config:

@@ -39,8 +39,11 @@ def _manual_bounds_col_mask_pandas(series: pd.Series, bound: dict[str, Any]) -> 
 
 
 class ManualBoundsApplier(BaseApplier):
+    """Drop rows outside the user-specified per-column lower/upper bounds."""
+
     @apply_method
     def apply(self, X: Any, y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
+        """Filter rows through the configured bounds on the active engine."""
         # apply_method already unpacked (X, y); re-wrap so apply_dual_engine's
         # own unpack_pipeline_input doesn't silently drop y (leaving it
         # unfiltered when X rows are removed). Omit the wrap when y is None
@@ -91,13 +94,17 @@ class ManualBoundsApplier(BaseApplier):
     learns_from_data=False,
 )
 class ManualBoundsCalculator(BaseCalculator):
+    """Package the user-configured bounds into an artifact without reading the data."""
+
     def infer_output_schema(
         self, input_schema: SkyulfSchema, config: dict[str, Any]
     ) -> SkyulfSchema:
+        """Return the input schema unchanged: row filtering preserves the column set."""
         # Manual bounds filter rows; column set is preserved.
         return input_schema
 
     @fit_method
     def fit(self, _X: Any, _y: Any, config: dict[str, Any]) -> ManualBoundsArtifact:  # pylint: disable=arguments-differ
+        """Return the ``bounds`` config as-is; no statistics are computed."""
         # Config: {'bounds': {'col1': {'lower': 0, 'upper': 100}, ...}}
         return {"type": "manual_bounds", "bounds": config.get("bounds", {})}

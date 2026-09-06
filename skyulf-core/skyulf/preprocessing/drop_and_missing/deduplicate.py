@@ -62,8 +62,21 @@ def _dedup_apply_pandas(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, An
 
 
 class DeduplicateApplier(BaseApplier):
+    """Drop duplicate rows, keeping ``y`` aligned with the survivors.
+
+    Both engines must agree on which rows survive. ``y`` is filtered by kept
+    *positions*, never by label — a label-based ``.loc`` returns every row
+    matching a duplicated index label. On polars the dedup key has to be
+    resolved to the real columns before the tracking row index is added,
+    because ``unique(subset=None)`` would include that always-unique index and
+    defeat deduplication entirely. ``keep="none"`` drops every member of a
+    duplicate group and is spelled ``False`` for pandas but ``"none"`` for
+    polars.
+    """
+
     @apply_method
     def apply(self, X: Any, y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
+        """Dispatch to the engine-specific dedup, forwarding ``(X, y)`` only when ``y`` exists."""
         # Note: dedup must propagate row drops to y, so we route X+y as a tuple
         # through apply_dual_engine which handles unpack/pack.
         return apply_dual_engine(
@@ -83,13 +96,21 @@ class DeduplicateApplier(BaseApplier):
     learns_from_data=True,
 )
 class DeduplicateCalculator(BaseCalculator):
+    """Resolve dedup config into an artifact.
+
+    The node is flagged ``learns_from_data`` because which rows survive depends
+    on the data, but ``fit`` itself only reads ``config``.
+    """
+
     def infer_output_schema(
         self, input_schema: SkyulfSchema, config: dict[str, Any]
     ) -> SkyulfSchema:
+        """Pass the input schema through: rows are dropped, columns are preserved."""
         # Deduplication removes rows; column set is preserved.
         return input_schema
 
     def fit(self, df: Any, config: dict[str, Any]) -> DeduplicateArtifact:
+        """Carry the ``subset`` and ``keep`` policy into the artifact."""
         return {
             "type": "deduplicate",
             "subset": config.get("subset"),

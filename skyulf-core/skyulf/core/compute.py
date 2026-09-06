@@ -45,6 +45,7 @@ class LocalComputeBackend(ComputeBackend):
     name = "local"
 
     def execute[R](self, func: Callable[..., R], *args: Any, **kwargs: Any) -> R:
+        """Run ``func(*args, **kwargs)`` directly in the current process."""
         return func(*args, **kwargs)
 
 

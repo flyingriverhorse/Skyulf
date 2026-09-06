@@ -1,3 +1,25 @@
+"""Pure graph helpers for the execution layer: ordering, partitioning, metadata.
+
+Stateless functions over a :class:`.schemas.PipelineConfig` or a persisted
+canvas graph dict — no engine state and no I/O beyond the lazily imported node
+registry. Three groups:
+
+* **Ordering and partitioning** — :func:`topological_order` re-sorts an
+  acyclic-but-misordered node list into a runnable order;
+  :func:`partition_parallel_pipeline` splits a graph into one sub-pipeline per
+  training terminal (plus per-input branches for auto-parallel previews);
+  :func:`partition_for_preview` splits per unconsumed data leaf for the
+  multi-tab "Path A / Path B" preview.
+* **Job metadata extraction** — :func:`extract_tuning_strategy`,
+  :func:`determine_search_strategy` and :func:`extract_job_details` read the
+  search strategy, hyperparameters, target column and dropped columns back out
+  of the graph a job actually ran.
+* **Model-family resolution** — :func:`resolve_model_family`,
+  :func:`resolve_training_model_type` and :func:`resolve_training_model_family`
+  are the single code path the Jobs list and Slow Nodes share, so the two
+  surfaces can never disagree on a job's task label.
+"""
+
 import logging
 import uuid
 from collections import defaultdict
@@ -46,7 +68,9 @@ def _dedupe_preserve_order(items: list[str]) -> list[str]:
 
 
 def _unique_inputs(node: NodeConfig) -> list[str]:
-    """Multi-handle splitters (TrainTestSplitter, FeatureTargetSplitter) emit
+    """Return the node's input ids de-duplicated, preserving order.
+
+    Multi-handle splitters (TrainTestSplitter, FeatureTargetSplitter) emit
     several edges from the same source into one downstream node. The frontend
     converter dedupes ``inputs`` already, but older saved pipelines may still
     contain duplicates — so the partition logic must also be defensive: count

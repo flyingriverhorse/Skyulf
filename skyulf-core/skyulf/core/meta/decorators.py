@@ -1,9 +1,13 @@
+"""Registry metadata for pipeline nodes and the ``@node_meta`` decorator that attaches it."""
+
 from dataclasses import dataclass, field
 from typing import Any
 
 
 @dataclass
 class NodeMetadata:
+    """Registry metadata for a node: id, category, leakage/splitter flags, params, tags."""
+
     id: str  # pylint: disable=redefined-builtin
     name: str
     category: str

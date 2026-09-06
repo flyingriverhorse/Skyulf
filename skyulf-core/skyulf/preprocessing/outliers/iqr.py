@@ -17,8 +17,11 @@ from ._common import _apply_pandas_mask, _filter_y_polars
 
 
 class IQRApplier(BaseApplier):
+    """Drop rows outside the fitted per-column IQR bounds; null/NaN values are kept."""
+
     @apply_method
     def apply(self, X: Any, y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
+        """Filter rows through the fitted per-column bounds on the active engine."""
         # apply_method already unpacked (X, y); re-wrap so apply_dual_engine's
         # own unpack_pipeline_input doesn't silently drop y (leaving it
         # unfiltered when X rows are removed). Omit the wrap when y is None
@@ -71,14 +74,18 @@ class IQRApplier(BaseApplier):
     learns_from_data=True,
 )
 class IQRCalculator(BaseCalculator):
+    """Fit per-column bounds at the quartiles widened by ``multiplier`` times the IQR."""
+
     def infer_output_schema(
         self, input_schema: SkyulfSchema, config: dict[str, Any]
     ) -> SkyulfSchema:
+        """Return the input schema unchanged: row filtering preserves the column set."""
         # IQR removes outlier *rows*; column set is preserved.
         return input_schema
 
     @fit_method
     def fit(self, X: Any, _y: Any, config: dict[str, Any]) -> IQRArtifact:  # pylint: disable=arguments-differ
+        """Compute quartile bounds per numeric column; warn on empty or non-numeric ones."""
         if user_picked_no_columns(config):
             return {}
 

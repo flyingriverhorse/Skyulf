@@ -1,4 +1,4 @@
-"""Error Handling Middleware
+"""Error Handling Middleware.
 
 Centralizes error handling and logging for the FastAPI application.
 """
@@ -21,6 +21,14 @@ class ErrorHandlerMiddleware(BaseHTTPMiddleware):
     """Middleware to handle uncaught exceptions and standardize error responses."""
 
     def __init__(self, app: ASGIApp):
+        """Wrap the downstream ASGI ``app`` so its requests pass through ``dispatch``.
+
+        A pass-through to ``BaseHTTPMiddleware``'s own constructor: the class keeps
+        no state of its own. The ``request_id`` every response and error log carries
+        is minted per call inside ``dispatch`` and stamped onto ``request.state``,
+        which is where the logging middleware and the exception handlers read it
+        from — this middleware is added outside those, so it runs first.
+        """
         super().__init__(app)
 
     async def dispatch(self, request: Request, call_next: Callable) -> Response:

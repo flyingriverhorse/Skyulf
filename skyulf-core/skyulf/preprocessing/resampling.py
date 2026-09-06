@@ -223,8 +223,25 @@ def _build_oversampler(method: str, params: dict[str, Any]) -> Any:
 
 
 class OversamplingApplier(BaseApplier):
+    """Grow the minority classes with the imblearn over-sampler named in the artifact.
+
+    Sees the training split only: :mod:`.pipeline` excludes the resampling nodes
+    from ``apply_on_test``/``apply_on_validation``, so synthetic rows can never
+    reach a held-out split and inflate its metrics.
+    """
+
     @apply_method
     def apply(self, X: Any, y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
+        """Resample ``(X, y)`` with the configured over-sampler.
+
+        ``y`` is lifted out of ``X`` via ``target_column`` when not supplied
+        separately; with no usable target the data passes through untouched, as
+        it does for a ``method`` no builder recognizes.
+
+        Raises:
+            ValueError: If any feature column is non-numeric, which imblearn
+                cannot resample. Encode first.
+        """
         return apply_dual_engine(
             (X, y) if y is not None else X,
             params,
@@ -249,14 +266,23 @@ class OversamplingApplier(BaseApplier):
     learns_from_data=True,
 )
 class OversamplingCalculator(BaseCalculator):
+    """Configure class balancing by oversampling the minority class."""
+
     def infer_output_schema(
         self, input_schema: SkyulfSchema, config: dict[str, Any]
     ) -> SkyulfSchema:
+        """Return ``input_schema`` untouched."""
         # Resampling changes row counts only; column set is preserved.
         return input_schema
 
     @fit_method
     def fit(self, _X: Any, _y: Any, config: dict[str, Any]) -> OversamplingArtifact:  # pylint: disable=arguments-differ
+        """Snapshot the sampler settings from ``config`` into the artifact.
+
+        Neither ``_X`` nor ``_y`` is read: the artifact is pure configuration,
+        and the class imbalance it corrects is only observed when the applier
+        runs the sampler on the training split.
+        """
         return {
             "type": "oversampling",
             "method": config.get("method", "smote"),
@@ -333,8 +359,26 @@ def _build_undersampler(method: str, params: dict[str, Any]) -> Any:
 
 
 class UndersamplingApplier(BaseApplier):
+    """Shrink the majority classes with the imblearn under-sampler named in the artifact.
+
+    Sees the training split only: :mod:`.pipeline` excludes the resampling nodes
+    from ``apply_on_test``/``apply_on_validation``. That guard matters more here
+    than for oversampling, because these samplers delete real rows rather than
+    synthesise new ones.
+    """
+
     @apply_method
     def apply(self, X: Any, y: Any, params: dict[str, Any]) -> Any:
+        """Resample ``(X, y)`` with the configured under-sampler.
+
+        ``y`` is lifted out of ``X`` via ``target_column`` when not supplied
+        separately; with no usable target the data passes through untouched, as
+        it does for a ``method`` no builder recognizes.
+
+        Raises:
+            ValueError: If any feature column is non-numeric, which imblearn
+                cannot resample. Encode first.
+        """
         return apply_dual_engine(
             (X, y) if y is not None else X,
             params,
@@ -363,14 +407,23 @@ class UndersamplingApplier(BaseApplier):
     learns_from_data=True,
 )
 class UndersamplingCalculator(BaseCalculator):
+    """Configure class balancing by undersampling the majority class."""
+
     def infer_output_schema(
         self, input_schema: SkyulfSchema, config: dict[str, Any]
     ) -> SkyulfSchema:
+        """Return ``input_schema`` untouched."""
         # Resampling changes row counts only; column set is preserved.
         return input_schema
 
     @fit_method
     def fit(self, _X: Any, _y: Any, config: dict[str, Any]) -> UndersamplingArtifact:  # pylint: disable=arguments-differ
+        """Snapshot the sampler settings from ``config`` into the artifact.
+
+        Neither ``_X`` nor ``_y`` is read: the artifact is pure configuration.
+        Several of its keys are sampler-specific, so each method consumes only
+        the subset its imblearn class accepts.
+        """
         return {
             "type": "undersampling",
             "method": config.get("method", "random_under_sampling"),

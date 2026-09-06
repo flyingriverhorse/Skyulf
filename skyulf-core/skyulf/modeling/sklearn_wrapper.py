@@ -27,6 +27,11 @@ class SklearnCalculator(BaseModelCalculator):
         default_params: dict[str, Any],
         problem_type: str,
     ):
+        """Bind the wrapped estimator class, its default params and its task type.
+
+        Every per-estimator subclass supplies all three; the rest of ``fit``
+        stays generic across estimators.
+        """
         # `Any` because sklearn stubs make BaseEstimator subclasses appear non-callable.
         self.model_class: Any = model_class
         self._default_params = default_params
@@ -34,10 +39,12 @@ class SklearnCalculator(BaseModelCalculator):
 
     @property
     def default_params(self) -> dict[str, Any]:
+        """Expose the per-estimator defaults that :meth:`fit` merges ``config`` over."""
         return self._default_params
 
     @property
     def problem_type(self) -> str:
+        """Expose the task type fixed at construction; it drives evaluation dispatch."""
         return self._problem_type
 
     def fit(
@@ -212,17 +219,20 @@ class SklearnCalculator(BaseModelCalculator):
         return valid_params
 
     def _constructor_accepts_class_weight(self) -> bool:
-        """True if the wrapped model's constructor explicitly declares a
-        `class_weight` parameter (e.g. RandomForestClassifier, LGBMClassifier,
-        LogisticRegression) — as opposed to merely accepting arbitrary
-        **kwargs (e.g. XGBoost's sklearn wrapper) that silently swallow it.
+        """Check whether the wrapped model's constructor declares `class_weight`.
+
+        True if the parameter is explicitly named (e.g. RandomForestClassifier,
+        LGBMClassifier, LogisticRegression) — as opposed to merely accepting
+        arbitrary **kwargs (e.g. XGBoost's sklearn wrapper) that silently
+        swallow it.
         """
         sig = inspect.signature(self.model_class)
         return "class_weight" in sig.parameters
 
     def _compute_sample_weight_for_fit(self, model: Any, class_weight: Any, y_np: Any) -> Any:
-        """Translate a `class_weight` value into a per-sample weight array for
-        models with no native `class_weight` support, raising a clear error
+        """Translate a `class_weight` value into a per-sample weight array.
+
+        For models with no native `class_weight` support, raising a clear error
         instead of silently no-op'ing if the model's `.fit()` doesn't accept
         `sample_weight` either.
         """
@@ -240,6 +250,11 @@ class SklearnApplier(BaseModelApplier):
     """Base applier for Scikit-Learn models."""
 
     def predict(self, df: pd.DataFrame | SkyulfDataFrame, model_artifact: Any) -> Any:
+        """Predict over a frame and return the labels as a pandas ``Series``.
+
+        The input index is preserved for pandas frames; polars and wrapper
+        inputs fall back to a default index.
+        """
         # Convert to Numpy
         X_np, _ = SklearnBridge.to_sklearn(df)
 
@@ -258,6 +273,11 @@ class SklearnApplier(BaseModelApplier):
         return pd.Series(preds, index=index)
 
     def predict_proba(self, df: pd.DataFrame | SkyulfDataFrame, model_artifact: Any) -> Any | None:
+        """Return per-class probabilities as a ``DataFrame``, or ``None`` if unsupported.
+
+        An estimator with no ``predict_proba`` yields ``None`` instead of
+        raising; column labels come from ``classes_`` when it is exposed.
+        """
         if not hasattr(model_artifact, "predict_proba"):
             return None
 

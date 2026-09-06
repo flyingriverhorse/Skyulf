@@ -1,3 +1,13 @@
+"""Reference-vs-production drift detection over polars frames.
+
+Every column shared by the two datasets is scored with distribution metrics —
+PSI, Wasserstein distance, KS and KL divergence for numeric columns, PSI over
+the category frequencies for categorical ones — and columns present on only
+one side are reported separately as schema drift. Thresholds are per-metric
+and caller-overridable; the KS verdict is taken on the statistic rather than
+the p-value, which shrinks with sample size.
+"""
+
 import numpy as np
 import polars as pl
 from pydantic import BaseModel
@@ -41,6 +51,8 @@ class DriftMetric(BaseModel):
 
 
 class DriftBin(BaseModel):
+    """One histogram bucket with the count each dataset placed inside it."""
+
     bin_start: float
     bin_end: float
     reference_count: int
@@ -48,10 +60,14 @@ class DriftBin(BaseModel):
 
 
 class DriftDistribution(BaseModel):
+    """Reference and current distributions for one column, binned over a shared range."""
+
     bins: list[DriftBin]
 
 
 class ColumnDrift(BaseModel):
+    """Drift verdict for one column: its per-metric results and remediation suggestions."""
+
     column: str
     metrics: list[DriftMetric]
     drift_detected: bool
@@ -60,6 +76,8 @@ class ColumnDrift(BaseModel):
 
 
 class DriftReport(BaseModel):
+    """Drift across a whole dataset, counting schema-level changes alongside value drift."""
+
     reference_rows: int
     current_rows: int
     drifted_columns_count: int
@@ -80,6 +98,12 @@ class DriftCalculator:
     _MAX_CATEGORICAL_CARDINALITY = 50
 
     def __init__(self, reference_df: pl.DataFrame, current_df: pl.DataFrame):
+        """Hold the two frames to compare and pin the columns present in both.
+
+        Only ``common_columns`` are scored for value drift; columns unique to
+        either side are surfaced separately as schema drift by
+        :meth:`calculate_drift`.
+        """
         self.reference_df = reference_df
         self.current_df = current_df
         self.common_columns = [col for col in reference_df.columns if col in current_df.columns]
@@ -405,9 +429,10 @@ class DriftCalculator:
     def _calculate_categorical_drift(
         self, col: str, thresholds: dict[str, float]
     ) -> "ColumnDrift | None":
-        """Calculates PSI-based drift for a categorical/text/boolean column using
-        the category frequency distribution (union of categories seen in
-        either dataset). Returns ``None`` if the column looks like free-text
+        """Calculates PSI-based drift for a categorical/text/boolean column.
+
+        Uses the category frequency distribution — the union of categories seen
+        in either dataset. Returns ``None`` if the column looks like free-text
         or a high-cardinality identifier (not a meaningful categorical
         distribution), or if either side has no non-null values.
         """

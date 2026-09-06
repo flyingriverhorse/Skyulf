@@ -255,11 +255,11 @@ def _build_model_selector(method: str, estimator: Any, config: dict[str, Any]) -
 
 
 def _fillna_zero_with_warning(X_pd: pd.DataFrame, cols: list[str]) -> pd.DataFrame:
-    """Fill missing values with 0 before scoring, warning when this actually
-    changes data (unlike ``_maybe_chi2_rescale``'s already-existing warning
-    pattern, a silent ``fillna(0)`` can bias univariate/model-based feature
-    scores whenever 0 is itself a meaningful value, or missingness is
-    correlated with the target).
+    """Fill missing values with 0 before scoring, warning when this actually changes data.
+
+    Unlike ``_maybe_chi2_rescale``'s already-existing warning pattern, a silent
+    ``fillna(0)`` can bias univariate/model-based feature scores whenever 0 is
+    itself a meaningful value, or missingness is correlated with the target.
     """
     subset = X_pd[cols]
     if subset.isna().any().any():

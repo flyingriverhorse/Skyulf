@@ -94,8 +94,20 @@ def _onehot_apply_pandas(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, A
 
 
 class OneHotEncoderApplier(BaseApplier):
+    """Expand each categorical column into its one-hot indicator columns.
+
+    Parity here comes from both engines transforming through the *same* fitted
+    sklearn encoder carried in the artifact, not from two parallel
+    implementations. Nulls are filled with the sentinel token before
+    transforming, which only lines up when ``include_missing`` was set at fit
+    time too — the encoder knows that level solely if it saw it. Indicator
+    columns are concatenated on and the originals dropped unless
+    ``drop_original`` is false.
+    """
+
     @apply_method
     def apply(self, X: Any, y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
+        """Dispatch to the engine-specific transform, forwarding ``(X, y)`` only when present."""
         return apply_dual_engine(
             (X, y) if y is not None else X,
             params,
@@ -216,8 +228,19 @@ def _onehot_fit_pandas(X: Any, y: Any, config: dict[str, Any]) -> Mapping[str, A
     learns_from_data=True,
 )
 class OneHotEncoderCalculator(BaseCalculator):
+    """Fit a sklearn ``OneHotEncoder`` on the resolved categorical columns.
+
+    The target column is excluded before fitting: one-hot replaces the column
+    it encodes with several derived ones, which would break a downstream
+    Feature/Target Split. An explicit ``columns: []``, or auto-detection
+    finding no categorical columns, yields an empty artifact so the applier
+    no-ops. Degenerate columns (zero categories, or one category with
+    ``drop_first``) are warned about rather than silently producing nothing.
+    """
+
     @fit_method
     def fit(self, X: Any, y: Any, config: dict[str, Any]) -> OneHotArtifact:  # pylint: disable=arguments-differ
+        """Short-circuit an explicit empty column selection, else fit on the frame's own engine."""
         if user_picked_no_columns(config):
             return {}
         return cast(

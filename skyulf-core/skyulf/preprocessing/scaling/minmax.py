@@ -19,8 +19,11 @@ from ._common import _select_subset_pandas, _select_subset_polars
 
 
 class MinMaxScalerApplier(BaseApplier):
+    """Rescale the selected columns into the fitted ``feature_range``."""
+
     @apply_method
     def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
+        """Apply the fitted affine scale/shift to ``X``; ``y`` passes through."""
         return apply_dual_engine(
             X, params, {"polars": self._apply_polars, "pandas": self._apply_pandas}
         )
@@ -66,13 +69,17 @@ class MinMaxScalerApplier(BaseApplier):
     learns_from_data=True,
 )
 class MinMaxScalerCalculator(BaseCalculator):
+    """Fit scale/offset statistics that map the data into ``feature_range``."""
+
     def infer_output_schema(
         self, input_schema: SkyulfSchema, config: dict[str, Any]
     ) -> SkyulfSchema:
+        """Return the input schema unchanged: scaling rewrites values, not columns."""
         return input_schema
 
     @fit_method
     def fit(self, X: Any, _y: Any, config: dict[str, Any]) -> MinMaxScalerArtifact:  # pylint: disable=arguments-differ
+        """Dispatch the fit to the active engine and return the scaler-statistics artifact."""
         if user_picked_no_columns(config):
             return cast(MinMaxScalerArtifact, {})
         return cast(

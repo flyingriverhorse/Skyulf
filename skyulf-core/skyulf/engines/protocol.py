@@ -1,3 +1,5 @@
+"""Engine-agnostic DataFrame protocols: ``SkyulfDataFrame`` and its pandas/polars refinements."""
+
 from typing import Any, Protocol, runtime_checkable
 
 import pandas as pd
@@ -54,10 +56,10 @@ class SkyulfDataFrame(Protocol):
 
     # Bridges
     def to_native(self) -> Any:
-        """Return the underlying engine-native frame (a ``pandas.DataFrame`` or
-        ``polars.DataFrame``) without any conversion.
+        """Return the underlying engine-native frame without any conversion.
 
-        This is the documented way to escape the wrapper when native-engine
+        The frame is a ``pandas.DataFrame`` or ``polars.DataFrame``, depending on the
+        engine. This is the documented way to escape the wrapper when native-engine
         APIs are required (e.g. ``pl.concat``, ``write_parquet``). It replaces
         reaching into the private ``._df`` attribute. Unlike ``to_pandas()``,
         which always yields a pandas frame (a no-op for pandas-backed data but
@@ -84,9 +86,10 @@ class SkyulfDataFrame(Protocol):
 
 @runtime_checkable
 class PandasBackedFrame(SkyulfDataFrame, Protocol):
-    """A :class:`SkyulfDataFrame` backed by pandas, exposing pandas-only
-    attributes (``.loc``, ``.iloc``, ``.select_dtypes``) that are not part of
-    the engine-agnostic base protocol.
+    """A :class:`SkyulfDataFrame` backed by pandas.
+
+    Exposes pandas-only attributes (``.loc``, ``.iloc``, ``.select_dtypes``)
+    that are not part of the engine-agnostic base protocol.
 
     Use this in signatures when a function genuinely needs pandas semantics;
     the type checker then verifies the attribute exists instead of silently
@@ -110,9 +113,10 @@ class PandasBackedFrame(SkyulfDataFrame, Protocol):
 
 @runtime_checkable
 class PolarsBackedFrame(SkyulfDataFrame, Protocol):
-    """A :class:`SkyulfDataFrame` backed by polars, exposing polars-only
-    attributes (``.with_columns``, ``.filter``, ``.to_polars``) that are not
-    part of the engine-agnostic base protocol.
+    """A :class:`SkyulfDataFrame` backed by polars.
+
+    Exposes polars-only attributes (``.with_columns``, ``.filter``,
+    ``.to_polars``) that are not part of the engine-agnostic base protocol.
 
     Use this in signatures when a function genuinely needs polars semantics;
     the type checker then verifies the attribute exists instead of silently

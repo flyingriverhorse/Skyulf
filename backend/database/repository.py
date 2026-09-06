@@ -1,4 +1,4 @@
-"""Repository Pattern for Database Operations
+"""Repository pattern for database operations.
 
 Provides async CRUD operations that mirror the existing Flask db/crud.py functionality.
 Uses the repository pattern to separate database operations from business logic.
@@ -28,6 +28,14 @@ class BaseRepository[ModelType: Base]:
     """
 
     def __init__(self, session: AsyncSession, model: type[ModelType]):
+        """Bind a repository to an existing session and model class.
+
+        Args:
+            session: The caller's session. It is shared, not owned — the
+                mutating methods below commit on it directly, so a repository
+                cannot be used to stage work inside an outer transaction.
+            model: The SQLAlchemy model class the queries are built against.
+        """
         self.session = session
         self.model = model
 
@@ -185,6 +193,7 @@ class UserRepository(BaseRepository[User]):
     """Repository for User model operations."""
 
     def __init__(self, session: AsyncSession):
+        """Bind the generic repository to the ``User`` model on the caller's session."""
         super().__init__(session, User)
 
     async def get_by_username(self, username: str) -> User | None:
@@ -222,6 +231,7 @@ class DataSourceRepository(BaseRepository[DataSource]):
     """Repository for DataSource model operations."""
 
     def __init__(self, session: AsyncSession):
+        """Bind the generic repository to the ``DataSource`` model on the caller's session."""
         super().__init__(session, DataSource)
 
     async def get_by_name(self, name: str) -> DataSource | None:
