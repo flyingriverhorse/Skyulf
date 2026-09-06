@@ -100,13 +100,19 @@ const PropertiesContent: React.FC<{
         </div>
         <div className="flex items-center gap-1">
           <button
+            type="button"
             onClick={toggleExpand}
+            aria-label={isExpanded ? 'Collapse settings panel' : 'Expand settings panel'}
+            title={isExpanded ? 'Collapse settings panel' : 'Expand settings panel'}
             className="p-1.5 hover:bg-accent rounded-md text-muted-foreground hover:text-foreground transition-colors"
           >
             {isExpanded ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
           </button>
           <button
+            type="button"
             onClick={handleClose}
+            aria-label="Close settings panel"
+            title="Close settings panel"
             className="p-1.5 hover:bg-accent rounded-md text-muted-foreground hover:text-foreground transition-colors"
           >
             <X className="w-4 h-4" />
