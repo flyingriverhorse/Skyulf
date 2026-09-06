@@ -244,6 +244,45 @@ class TestS3Catalog:
                 prepared["client_kwargs"]["endpoint_url"] == "https://trusted-minio.internal:9000"
             )
 
+    def test_exists_maps_aws_option_names_like_load_and_save_do(self):
+        """``exists`` must authenticate the way its siblings do (OC-186).
+
+        It used to hand the raw instance options to ``S3FileSystem``, so
+        ``aws_access_key_id``/``aws_secret_access_key`` never became s3fs'
+        ``key``/``secret`` and ``region`` was passed where s3fs expects
+        ``client_kwargs['region_name']``. ``exists`` then answered for different
+        credentials than ``load`` uses, and a caller gating ``load`` on ``exists``
+        took the wrong branch.
+        """
+        fs_module = MagicMock()
+        with (
+            patch.dict("sys.modules", {"s3fs": fs_module}),
+            patch("backend.data.catalog.get_settings") as mock_settings,
+        ):
+            mock_settings.return_value = MagicMock(AWS_ENDPOINT_URL=None)
+            catalog = S3Catalog(
+                bucket_name="my-bucket",
+                region_name="eu-central-1",
+                storage_options={
+                    "aws_access_key_id": "AKIAIOSFODNN7EXAMPLE",
+                    "aws_secret_access_key": "wJalrXUtnFEMI/EXAMPLE/KEY",
+                },
+            )
+            # __init__ already built one filesystem; only the exists() call matters.
+            fs_module.S3FileSystem.reset_mock()
+            fs = fs_module.S3FileSystem.return_value
+
+            assert catalog.exists("data.csv") is fs.exists.return_value
+
+            kwargs = fs_module.S3FileSystem.call_args.kwargs
+            assert kwargs["key"] == "AKIAIOSFODNN7EXAMPLE"
+            assert kwargs["secret"] == "wJalrXUtnFEMI/EXAMPLE/KEY"
+            assert kwargs["client_kwargs"]["region_name"] == "eu-central-1"
+            assert "aws_access_key_id" not in kwargs
+            assert "aws_secret_access_key" not in kwargs
+            assert "region" not in kwargs
+            fs.exists.assert_called_once_with("s3://my-bucket/data.csv")
+
 
 class TestS3CatalogPolarsPaths:
     """S3Catalog reads/writes must honor SKYULF_ENGINE=polars end to end."""

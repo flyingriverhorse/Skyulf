@@ -7,6 +7,7 @@ failure messages into actionable errors.
 
 import contextlib
 import logging
+import math
 import warnings
 from collections.abc import Callable
 from typing import Any, cast
@@ -94,12 +95,36 @@ def execute_search(
     return captured
 
 
+def _all_trials_failed(first_trial_error: str | None) -> ValueError:
+    """Build the error raised when a search produced no usable winning score.
+
+    Shared by both failure shapes so "the search scored nothing" reads the same
+    whichever way the searcher reported it, and always carries the first captured
+    per-trial error when there is one.
+    """
+    detail = f" First trial error: {first_trial_error}" if first_trial_error else ""
+    return ValueError(
+        "Hyperparameter tuning failed: All trials failed. "
+        "This often happens if the model produces NaN scores "
+        "(e.g., due to unscaled data for linear models/SVMs, exploding gradients, "
+        "or mismatched parameters). "
+        "Try adding a 'Scale' node before this model or checking for NaN/Infinity in your data."
+        + detail
+    )
+
+
 def extract_best_result(searcher: Any, first_trial_error: str | None = None) -> tuple[Any, float]:
     """Reads ``best_params_``/``best_score_`` off a fitted searcher.
 
     Translates the "no completed trials" ``ValueError`` into a clearer,
     actionable message that carries the first captured per-trial error when
     available.
+
+    A non-finite winning score is rejected the same way. Halving searchers and
+    optuna report ``nan`` rather than raising when the winning candidate's folds
+    errored, so without the check the caller refits a model and logs a completion
+    for a search that scored nothing — while the grid strategy fails on the
+    identical folds.
     """
     try:
         # Accessing best_params_ raises ValueError if no trials completed successfully
@@ -107,16 +132,10 @@ def extract_best_result(searcher: Any, first_trial_error: str | None = None) -> 
         best_score = searcher.best_score_
     except ValueError as e:
         if "No trials are completed yet" in str(e):
-            detail = f" First trial error: {first_trial_error}" if first_trial_error else ""
-            raise ValueError(
-                "Hyperparameter tuning failed: All trials failed. "
-                "This often happens if the model produces NaN scores "
-                "(e.g., due to unscaled data for linear models/SVMs, exploding gradients, "
-                "or mismatched parameters). "
-                "Try adding a 'Scale' node before this model or checking for NaN/Infinity in your data."
-                + detail
-            ) from e
+            raise _all_trials_failed(first_trial_error) from e
         raise e
+    if not math.isfinite(best_score):
+        raise _all_trials_failed(first_trial_error)
     return best_params, best_score
 
 

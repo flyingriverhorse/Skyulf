@@ -55,7 +55,10 @@ def evaluate_candidate_cv(
     """Cross-validates one grid/random-search candidate and returns its mean fold score.
 
     Fold failures are logged and penalized with ``-inf`` instead of raised, so a single
-    bad hyperparameter combination doesn't abort the whole search.
+    bad hyperparameter combination doesn't abort the whole search. A candidate whose
+    folds only *partly* succeeded is penalized the same way: the mean of the survivors
+    is not a complete-CV score, and ranking candidates over different surviving subsets
+    lets a broken candidate win on folds the healthy one was never scored on.
     """
     fold_scores = []
 
@@ -87,9 +90,15 @@ def evaluate_candidate_cv(
         )
         fold_scores.append(score)
 
-    # Filter out failed folds for mean calculation if possible, or penalize
-    valid_scores = [s for s in fold_scores if s != -float("inf")]
-    return float(np.mean(valid_scores)) if valid_scores else -float("inf")
+    n_failed = sum(1 for s in fold_scores if s == -float("inf"))
+    if n_failed:
+        if log_callback and n_failed < len(fold_scores):
+            log_callback(
+                f"  [Candidate {candidate_idx + 1}] disqualified: "
+                f"{n_failed}/{len(fold_scores)} CV folds failed"
+            )
+        return -float("inf")
+    return float(np.mean(fold_scores)) if fold_scores else -float("inf")
 
 
 def fit_and_score_candidate_fold(

@@ -285,7 +285,7 @@ def test_select_rows_by_position_passes_through_none() -> None:
 
 def test_select_rows_by_position_rejects_unknown_shape() -> None:
     """An unselectable target must raise, not silently desync from X."""
-    with pytest.raises(TypeError, match="Cannot select rows from y"):
+    with pytest.raises(TypeError, match="Unsupported y type for select_rows_by_position: dict"):
         select_rows_by_position({"a": 1}, np.array([0]))
 
 

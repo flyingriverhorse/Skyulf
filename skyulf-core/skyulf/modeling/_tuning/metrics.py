@@ -6,12 +6,15 @@ string-label targets lives here so the fold loop and the searcher
 strategies share one resolution path.
 """
 
+from collections.abc import Callable
 from typing import Any
 
 import numpy as np
 import pandas as pd
-from sklearn.metrics import get_scorer, make_scorer
+from sklearn.metrics import average_precision_score, get_scorer, make_scorer
+from sklearn.preprocessing import label_binarize
 
+from .._evaluation.metrics import geometric_mean_score
 from .schemas import TuningConfig
 
 INVALID_REGRESSION_METRICS = frozenset(
@@ -53,6 +56,7 @@ METRIC_ALIAS_MAP: dict[str, str] = {
     "roc_auc_ovo": "roc_auc_ovo",
     "roc_auc_ovr_weighted": "roc_auc_ovr_weighted",
     "roc_auc_ovo_weighted": "roc_auc_ovo_weighted",
+    "pr_auc": "average_precision",
     "log_loss": "neg_log_loss",
     "matthews_corrcoef": "matthews_corrcoef",
 }
@@ -61,8 +65,78 @@ METRIC_ALIAS_MAP: dict[str, str] = {
 # roc_auc looks like one but isn't: roc_auc_score has no pos_label
 # parameter (it derives the positive class from the label space), and
 # multiclass variants (f1_weighted, ...) plus accuracy/balanced_accuracy/
-# matthews_corrcoef don't take it either.
-BINARY_POS_LABEL_METRICS: frozenset[str] = frozenset({"f1", "precision", "recall"})
+# matthews_corrcoef don't take it either. ``average_precision`` (the scorer
+# ``pr_auc`` aliases to) does default to pos_label=1, so it needs the same
+# pinning as f1.
+BINARY_POS_LABEL_METRICS: frozenset[str] = frozenset(
+    {"average_precision", "f1", "precision", "recall"}
+)
+
+
+def _weighted_pr_auc(y_true: Any, proba: Any) -> float:
+    """Weighted PR-AUC over probabilities, as the evaluation node reports it.
+
+    A binary target arrives as a single column — sklearn hands a ``predict_proba``
+    scorer only the positive class — so it is scored directly instead of being
+    binarized, and the positive class is named because ``average_precision_score``
+    defaults to ``pos_label=1``, which a string label space does not contain.
+    """
+    classes = np.unique(np.asarray(y_true))
+    proba = np.asarray(proba)
+    if proba.ndim == 1:
+        return average_precision_score(y_true, proba, pos_label=classes[-1])
+    return average_precision_score(
+        label_binarize(y_true, classes=classes), proba, average="weighted"
+    )
+
+
+def _pr_auc_weighted_scorer() -> Any:
+    """Builds the weighted PR-AUC scorer, read off ``predict_proba``."""
+    return make_scorer(_weighted_pr_auc, response_method="predict_proba")
+
+
+_G_SCORE_NEEDS_IMBLEARN = (
+    "Configuration Error: 'g_score' requires the imbalanced-learn package. "
+    "Install it, or select a metric that does not need it (e.g. 'f1_weighted')."
+)
+
+
+def _g_score(y_true: Any, y_pred: Any) -> float:
+    """Weighted geometric-mean recall over hard predictions.
+
+    ``geometric_mean_score`` cannot be handed to ``make_scorer`` directly: its
+    signature declares ``pos_label``, so sklearn injects one, and resolving it
+    raises ``pos_label=1 is not a valid label`` on a string label space. This
+    signature declares no such parameter, so nothing is injected and
+    ``average="weighted"`` ignores imblearn's own default.
+    """
+    metric = geometric_mean_score
+    if metric is None:
+        raise ValueError(_G_SCORE_NEEDS_IMBLEARN)
+    return metric(y_true, y_pred, average="weighted")
+
+
+def _g_score_scorer() -> Any:
+    """Builds the weighted geometric-mean-recall scorer, read off ``predict``.
+
+    Raises:
+        ValueError: If ``imbalanced-learn`` is absent. Refusing here is what makes
+            the search fail as a configuration error instead of scoring nothing and
+            reporting "All trials failed".
+    """
+    if geometric_mean_score is None:
+        raise ValueError(_G_SCORE_NEEDS_IMBLEARN)
+    return make_scorer(_g_score, response_method="predict")
+
+
+# Tuning metrics sklearn has no scorer name for. Held as builders, not scorers, so
+# a missing optional dependency surfaces as one clear configuration error when the
+# metric is asked for rather than at import time or as the stock
+# "'g_score' is not a valid scoring value".
+CUSTOM_SCORER_BUILDERS: dict[str, Callable[[], Any]] = {
+    "pr_auc_weighted": _pr_auc_weighted_scorer,
+    "g_score": _g_score_scorer,
+}
 
 
 def validate_metric_for_problem_type(problem_type: str, metric: str) -> None:
@@ -92,6 +166,10 @@ def weight_metric_for_multiclass(metric: str, original_metric: str) -> str:
     # roc_auc needs special handling (ovr/ovo) usually, but weighted often works for simple cases
     if original_metric == "roc_auc":  # Check original config metric name just in case
         return "roc_auc_ovr_weighted"
+    # ``pr_auc`` is aliased to sklearn's ``average_precision``, whose suffixed form
+    # is not a scorer; the weighted PR-AUC is built locally instead.
+    if original_metric == "pr_auc":
+        return "pr_auc_weighted"
     return weighted
 
 
@@ -119,14 +197,23 @@ def resolve_metric(config: TuningConfig, y: Any, problem_type: str) -> str:
 
         # If multiclass and metric is binary-default, switch to weighted
         # Note: We check against the mapped names now (e.g. "f1", "precision")
-        if is_multiclass and metric in ["f1", "precision", "recall", "roc_auc"]:
+        if is_multiclass and metric in [
+            "average_precision",
+            "f1",
+            "precision",
+            "recall",
+            "roc_auc",
+        ]:
             metric = weight_metric_for_multiclass(metric, config.metric)
 
     return metric
 
 
 def resolve_scorer(metric: str, y: Any, problem_type: str | None) -> Any:
-    """The sklearn scorer for *metric*, with the binary ``pos_label`` default fixed.
+    """The scorer for *metric*, with the binary ``pos_label`` default fixed.
+
+    Names sklearn has no scorer for (``pr_auc_weighted``, ``g_score``) are built
+    locally; everything else goes through ``get_scorer``.
 
     f1/precision/recall scorers assume ``pos_label=1``; targets whose
     label space does not contain 1 (e.g. raw string labels the fold-aware
@@ -136,6 +223,9 @@ def resolve_scorer(metric: str, y: Any, problem_type: str | None) -> Any:
     ``apply_thresholds`` uses for the positive class — whenever the default
     cannot match. Numeric targets containing 1 keep the stock scorer.
     """
+    builder = CUSTOM_SCORER_BUILDERS.get(metric)
+    if builder is not None:
+        return builder()
     scorer = get_scorer(metric)
     if problem_type != "classification":
         return scorer

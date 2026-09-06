@@ -20,6 +20,7 @@ import warnings
 from collections.abc import Callable
 from typing import Any
 
+from ..params import clean_search_space
 from ..schemas import TuningConfig
 
 logger = logging.getLogger(__name__)
@@ -105,14 +106,19 @@ def __getattr__(name: str) -> Any:
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
+def _is_number(x: Any) -> bool:
+    """Returns whether ``x`` is an ``int`` or ``float``, excluding ``bool``.
+
+    ``bool`` subclasses ``int``, so without the exclusion a Boolean search list
+    reads as the integer range 0..1: Optuna then samples ``fit_intercept=1`` and
+    sklearn rejects the value it was happy to fit as ``True``.
+    """
+    return isinstance(x, (int, float)) and not isinstance(x, bool)
+
+
 def is_use_cmaes_numeric_list(v: Any, use_cmaes: bool) -> bool:
     """Returns whether ``v`` is a non-empty numeric list that should become a continuous range."""
-    return (
-        isinstance(v, list)
-        and use_cmaes
-        and bool(v)
-        and all(isinstance(x, (int, float)) for x in v)
-    )
+    return isinstance(v, list) and use_cmaes and bool(v) and all(_is_number(x) for x in v)
 
 
 def numeric_range_distribution(v: list) -> Any:
@@ -192,7 +198,10 @@ def build_optuna_searcher(
     # the noisy warning via warn_independent_sampling=False.
     strategy_params = getattr(config, "strategy_params", {})
     use_cmaes = strategy_params.get("sampler", "tpe") == "cmaes"
-    distributions = build_optuna_distributions(config.search_space, use_cmaes)
+    # Normalized here rather than in the dispatcher because every strategy owns its
+    # own normalization (``grid_random`` and ``halving`` both call it). Skipping it
+    # left ``max_depth=['none']`` reaching the estimator as the string 'none'.
+    distributions = build_optuna_distributions(clean_search_space(config.search_space), use_cmaes)
 
     # Optuna callbacks
     callbacks = []

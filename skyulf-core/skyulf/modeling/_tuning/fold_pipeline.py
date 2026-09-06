@@ -17,11 +17,30 @@ and routes the search space through ``model__estimator__<param>``.
 """
 
 import copy
+from collections.abc import Callable
 from typing import Any
 
 import numpy as np
 import pandas as pd
 from sklearn.base import BaseEstimator, is_classifier
+from sklearn.utils.metaestimators import available_if
+
+
+def _fitted_model_has(attr: str) -> Callable[[Any], bool]:
+    """Build the ``available_if`` predicate for one response method of the wrapped model.
+
+    Reads the fitted copy when there is one and the constructor argument otherwise,
+    so ``hasattr`` answers correctly both before ``fit`` — when the searcher clones
+    the step — and after it, when a scorer asks. Letting the inner ``getattr`` raise
+    is what keeps the resulting ``AttributeError`` naming the estimator that really
+    lacks the method.
+    """
+
+    def _check(self: Any) -> bool:
+        getattr(getattr(self, "model_", self.estimator), attr)
+        return True
+
+    return _check
 
 
 class FoldAwareModelStep(BaseEstimator):
@@ -163,14 +182,29 @@ class FoldAwareModelStep(BaseEstimator):
             pred = pd.Series(np.asarray(pred)).map(self.label_map_).to_numpy()
         return pred
 
+    @available_if(_fitted_model_has("predict_proba"))
     def predict_proba(self, X: Any) -> Any:
         """Class probabilities from the fitted model over the transformed X.
 
         Probabilities need no remapping: their columns already align with
         the mapped-back ``classes_`` property, so scorers see a consistent
-        label space.
+        label space. Present only when the wrapped model has the method —
+        offering it unconditionally made scorers prefer it over a working
+        ``decision_function`` and then fail on estimators that cannot
+        produce probabilities.
         """
         return self.model_.predict_proba(self._transform_x(X))
+
+    @available_if(_fitted_model_has("decision_function"))
+    def decision_function(self, X: Any) -> Any:
+        """Decision scores from the fitted model over the transformed X.
+
+        Scores need no remapping for the same reason probabilities do not:
+        they are laid out per class in the fitted model's own order, and the
+        label map preserves that order when it maps ``classes_`` back, so
+        column *i* still belongs to ``classes_[i]``.
+        """
+        return self.model_.decision_function(self._transform_x(X))
 
     @property
     def classes_(self) -> Any:

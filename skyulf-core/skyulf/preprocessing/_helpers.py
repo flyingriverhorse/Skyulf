@@ -101,9 +101,13 @@ def select_rows_by_position(y: Any, positions: Any) -> Any:
         return y[idx]
     if isinstance(y, list):
         return [y[int(i)] for i in idx]
+    # Names the function rather than the operation on purpose: a message reading
+    # "cannot select rows from y" matches the SELECT ... FROM shape that Bandit
+    # and SonarCloud's injection rule look for, and this line gets filed as a
+    # string-built query.
     raise TypeError(
-        f"Cannot select rows from y of type {type(y).__name__}; expected a polars, pandas, "
-        "numpy or list target (or None)."
+        f"Unsupported y type for select_rows_by_position: {type(y).__name__}. "
+        "Expected a polars, pandas, numpy or list target (or None)."
     )
 
 

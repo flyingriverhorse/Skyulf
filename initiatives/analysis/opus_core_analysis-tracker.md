@@ -26,13 +26,19 @@ Historical baseline counts remain unchanged.
 **Docstring-pass by-product (2026-09-06):** OC-183–186 add four backend findings
 (3 🟠 / 1 🟡) surfaced while writing docstrings against the code during the OC-09
 pass. Unlike the batches above these were verified by reading the call sites and
-grepping for consumers, **not** reproduced by execution, and none is fixed: each
-changes behaviour rather than documentation, so all four are filed open by
-decision for a later session. Historical baseline counts remain unchanged.
+grepping for consumers, **not** reproduced by execution. Each changes behaviour
+rather than documentation, so all four were filed open for a later session;
+OC-186 has since been fixed and pinned by a test (see the Log), leaving
+OC-183–185 open. Historical baseline counts remain unchanged.
 
 **Remaining-source continuation (2026-09-06):** OC-187–206 add 20 executed
-findings (5 🟠 / 14 🟡 / 1 ⚪), filed directly in the continuation table under
-**New findings**. All remain open. The original core-source ledger now records
+findings (5 🟠 / 14 🟡 / 1 ⚪). Five are fixed — OC-200/201/202/203/205, closed
+in one pass with OC-67 from an earlier batch (see the Log); the other 15 remain open.
+Their queue rows are routed into the **Live — fix queue** by domain — 8 profiling,
+9 modeling/tuning, 3 evaluation & explainability — so that section is the single
+place to read what is outstanding; **New findings** below keeps their reproduction
+evidence.
+The original core-source ledger now records
 **188/188 files read**; the 45 selected modeling/profiling test files passed
 **909 tests** (142 warnings). The exact command is recorded in
 [`core_source_review_2026-09-05.md`](core_source_review_2026-09-05.md).
@@ -168,7 +174,7 @@ follow, grouped by domain.
 | OC-183 | 🟠 | `SmartCatalog` S3 auto-init is dead for `.env`-only config, and the two docs name different variables — **OC-130's root cause repeating**. `backend/data/catalog.py:556` reads `os.getenv("S3_BUCKET_NAME")`, but pydantic-settings loads the dotenv into the model and never exports it into `os.environ`, so a bucket configured only in `.env` is invisible and `s3_catalog` silently stays `None` (falling back to local disk with no error or warning). Worse, `S3_BUCKET_NAME` is **not a `Settings` field at all**: `config/mixins/aws.py:12` declares `AWS_BUCKET_NAME`, which is what `docs/guides/backend_configuration.md:146` documents, while `README.md:105` documents `S3_BUCKET_NAME` — so following the README sets a variable nothing reads. Needs a canonical-name decision before the one-line code fix | small | ⬜ open |
 | OC-184 | 🟠 | `ProductionSettings.SECURITY_HEADERS` is declared and never sent. `_PROD_SECURITY_HEADERS` (HSTS, `X-Frame-Options: DENY`, CSP, …) is assigned at `config/environments.py:84` and referenced nowhere else in the repo — no middleware reads it — so a production boot logs "Running in PRODUCTION mode with enhanced security" while emitting none of those headers. Fixing means adding a security-headers middleware in `main.py::_add_middleware`, where order is load-bearing (CORS must stay outermost), i.e. a behaviour change and not a config fix | half day | ⬜ open |
 | OC-185 | 🟡 | Authorization is stubbed in three mutually inconsistent pieces. `database/models.py:157 has_permission` is `return True  # Placeholder` with **zero callers**; `data_ingestion/dependencies.py:26,31 require_data_access`/`require_data_admin` are async no-ops wired to no route; and `data_ingestion/router.py:148,169` hardcode `user_id = 1` under an explicit `# KNOWN-GAP: Auth not implemented yet`, so every source belongs to one user and is visible to everyone. Nothing is exploitable *through* `has_permission` today precisely because nothing calls it — the risk is that the first caller gets an always-yes check shaped like a real API. Needs an authz decision before code | decision + ~1 week | ⬜ open |
-| OC-186 | 🟠 | `S3Catalog.exists` skips the option-name mapping that every sibling method applies. `catalog.py:521` builds a throwaway `s3fs.S3FileSystem(**self.storage_options)` from the raw instance options, while `__init__`:275, `load`:452 and `save`:491 all pass through `_prepare_s3fs_options`, which maps `aws_access_key_id`→`key` and `aws_secret_access_key`→`secret` and moves region into `client_kwargs['region_name']`. With AWS-named credentials `exists()` therefore authenticates differently from the methods it is supposed to agree with, and reports `False` for (or errors on) an object `load()` reads fine — so callers that gate on `exists` before `load` take the wrong branch | 1 line | ⬜ open |
+| OC-186 | 🟠 | `S3Catalog.exists` skips the option-name mapping that every sibling method applies. `catalog.py:521` builds a throwaway `s3fs.S3FileSystem(**self.storage_options)` from the raw instance options, while `__init__`:275, `load`:452 and `save`:491 all pass through `_prepare_s3fs_options`, which maps `aws_access_key_id`→`key` and `aws_secret_access_key`→`secret` and moves region into `client_kwargs['region_name']`. With AWS-named credentials `exists()` therefore authenticates differently from the methods it is supposed to agree with, and reports `False` for (or errors on) an object `load()` reads fine — so callers that gate on `exists` before `load` take the wrong branch | 1 line | ✅ fixed 2026-09-06 — `S3Catalog.exists` goes through `_prepare_s3fs_options` like the methods it must agree with, which also brings it under the SSRF guard. See the log entry |
 ### Remaining — direct-audit modules
 
 | ID | Sev | Item | Effort | Status |
@@ -291,15 +297,15 @@ follow, grouped by domain.
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
 | OC-194 | 🟠 | Pandas time-series CV sorts with `Series.argsort()`'s `-1` missing-date sentinels as row positions, duplicating/dropping observations and destroying chronological order (`modeling/cross_validation.py:327-330`) | small | ⬜ open |
-| OC-200 | 🟠 | Halving search accepts an all-NaN score set as a successful best result and refits a model; grid search correctly fails on identical folds (`modeling/_tuning/strategies/runner.py:110-127`) | small | ⬜ open |
-| OC-205 | 🟠 | Grid/random tuning discards failed folds from each candidate's average, allowing a partially failed candidate to win with an apparently valid score and no failure count in the result (`modeling/_tuning/grid_random.py:91-92`) | small | ⬜ open |
+| OC-200 | 🟠 | Halving search accepts an all-NaN score set as a successful best result and refits a model; grid search correctly fails on identical folds (`modeling/_tuning/strategies/runner.py:110-127`) | small | ✅ fixed 2026-09-06 — with OC-205: a search left with no fully-scored candidate now fails with grid's "All trials failed" instead of returning `nan` and refitting. See the log entry |
+| OC-205 | 🟠 | Grid/random tuning discards failed folds from each candidate's average, allowing a partially failed candidate to win with an apparently valid score and no failure count in the result (`modeling/_tuning/grid_random.py:91-92`) | small | ✅ fixed 2026-09-06 — with OC-200: a candidate is eligible only if every fold scored, and a partly-failed one is logged as disqualified. See the log entry |
 | OC-187 | 🟡 | LightGBM's advertised `subsample` control and default search dimension have no effect: both calculators retain native `subsample_freq=0`, disabling row bagging (`modeling/hyperparameters/_tree.py:576`, `_registry.py:298,309`; `classification.py:754`, `regression.py:547`) | small | ⬜ open |
-| OC-201 | 🟡 | Optuna skips search-space normalization: `max_depth=['none']` works in grid search but fails every Optuna trial (`modeling/_tuning/strategies/optuna.py:199`) | small | ⬜ open |
-| OC-202 | 🟡 | Fold-aware tuning wrapper omits `decision_function` and unconditionally advertises `predict_proba`, breaking ROC-AUC scoring for SVC without probability support (`modeling/_tuning/fold_pipeline.py:164-172`) | small | ⬜ open |
-| OC-203 | 🟡 | Optuna CMA-ES treats Boolean candidates as integers, turning valid `fit_intercept=[True,False]` into invalid sklearn parameter values (`modeling/_tuning/strategies/optuna.py:113-140`) | small | ⬜ open |
+| OC-201 | 🟡 | Optuna skips search-space normalization: `max_depth=['none']` works in grid search but fails every Optuna trial (`modeling/_tuning/strategies/optuna.py:199`) | small | ✅ fixed 2026-09-06 — Optuna now runs `clean_search_space` like grid/random and halving already did. See the log entry |
+| OC-202 | 🟡 | Fold-aware tuning wrapper omits `decision_function` and unconditionally advertises `predict_proba`, breaking ROC-AUC scoring for SVC without probability support (`modeling/_tuning/fold_pipeline.py:164-172`) | small | ✅ fixed 2026-09-06 — both response methods are gated by `available_if`, so the wrapper advertises exactly what the wrapped model can do. See the log entry |
+| OC-203 | 🟡 | Optuna CMA-ES treats Boolean candidates as integers, turning valid `fit_intercept=[True,False]` into invalid sklearn parameter values (`modeling/_tuning/strategies/optuna.py:113-140`) | small | ✅ fixed 2026-09-06 — one `_is_number` predicate excludes `bool`, so Boolean lists stay categorical under CMA-ES. See the log entry |
 | OC-204 | 🟡 | `fit_predict` drops an embedded target during training but keeps it in held-out tuple features when explicit y is also supplied, causing prediction to fail (`modeling/base.py:317-324`) | small | ⬜ open |
 | OC-206 | ⚪ | Ensemble configuration resolution shallow-copies nested base-model parameters, so fitting mutates the caller's configuration (`modeling/ensemble.py:473,484`) | small | ⬜ open |
-| OC-67 | 🟡 | Tuning metrics `pr_auc`/`pr_auc_weighted`/`g_score` crash the entire search (`modeling/_tuning/metrics.py:19-36,127-146`) | small | ⬜ open |
+| OC-67 | 🟡 | Tuning metrics `pr_auc`/`pr_auc_weighted`/`g_score` crash the entire search (`modeling/_tuning/metrics.py:19-36,127-146`) | small | ✅ fixed 2026-09-06 — `pr_auc` now aliases to `average_precision` and the two names sklearn has no scorer for are built locally. See the log entry |
 | OC-168 | 🟡 | `SkyulfPipeline.fit()` retains the previous model's tuned thresholds — refitting with new class labels makes thresholded prediction crash; unchanged labels reuse stale cutoffs (`pipeline/_pipeline.py:135,380-389`) | small | ⬜ open |
 
 ### Remaining — frontend
@@ -338,13 +344,17 @@ key — also the fastest way to find drift the audit missed).
 
 ---
 
-## New findings;
+## New findings
 ### 2026-09-06 — remaining-source continuation (findings added as verified)
 
 All entries below have executed reproduction evidence. Source paths are
 relative to `skyulf-core/skyulf/`; line numbers refer to the source read during
 the review and may move with concurrent edits. The main reviewer independently
 reproduced the filed symptoms before completing the source ledger.
+
+Each finding's queue row — severity, effort, status — now lives in the
+**Live — fix queue** above, under the domain table it belongs to. What follows
+here is the reproduction detail those rows deliberately do not repeat.
 
 
 **OC-206 — fitting an ensemble mutates caller configuration.** Executed
@@ -653,6 +663,102 @@ input and apply any keep-mask identically to y. Unlike OC-165, this reproduces
 without a target. Location: `preprocessing/time_series/lag.py:54-59`.
 
 ## Log
+
+### 2026-09-06 — OC-200/205/201/203/202/67 fixed: modeling/_tuning closed as one pass
+
+Two of the six were one disagreement seen from both sides. Grid averaged whichever
+folds survived, so a candidate erroring on one of two folds **won** with
+`best_score=0.0` (5 rows, `KNeighborsRegressor(n_neighbors=3)`, unshuffled);
+halving/optuna are built with `error_score=np.nan`, so an all-failed search reported
+`nan` as the winning score and the caller refit a model and logged a completion where
+grid raised (4 rows / 4 folds / Ridge — both measured pre-fix). The rule now shared:
+**a candidate is eligible only if every fold scored, and a search left with no eligible
+candidate fails with grid's existing actionable "All trials failed"** — sklearn's own
+`error_score=nan` semantics. `evaluate_candidate_cv` disqualifies on `n_failed` and logs
+`disqualified: 1/2 CV folds failed`; `extract_best_result` rejects a non-finite winner
+through the same `_all_trials_failed(...)` builder the "No trials are completed yet"
+path uses. A partly-failed candidate still loses to a healthy one instead of taking the
+search down (`n_neighbors=2` wins, `3` records `-inf`).
+
+OC-201: `build_optuna_searcher` was the only strategy converting `config.search_space`
+without `clean_search_space` (`grid_random.py:27` and `halving.py:42,67,80` all call
+it), so `max_depth=['none']` reached the estimator as a string — grid returned
+`{'max_depth': None}`, Optuna failed every trial. Fixed at the call site rather than in
+the dispatcher: each strategy already owns its normalization, and a second
+`replace(config, ...)` in `engine.py` would have created one more config copy for the
+halving-builder spies to disagree with. OC-203: `isinstance(x, (int, float))` is true
+for `bool`, so `fit_intercept=[True,False]` became `IntDistribution(high=1, low=0)` and
+every trial passed `1` where sklearn fits `True` (both confirmed directly against
+sklearn). One `_is_number` predicate excludes `bool`, so Boolean lists stay
+`CategoricalDistribution(choices=(True, False))` as the comment above the call already
+promised, while integer lists still span a range (`max_iter=[50,100,200]` →
+`IntDistribution(high=200, low=50)`) — CMA-ES behaviour unchanged.
+
+OC-202 reproduced exactly as filed, run against the pristine pre-fix module:
+`SVC(probability=False)` on 40 alternating-label rows scores **0.525** unwrapped and
+raised `AttributeError: This 'SVC' has no attribute 'predict_proba'` wrapped. Both
+response methods are now gated by `available_if`, whose predicate reads the fitted
+`model_` when present and the constructor argument otherwise, so `hasattr` also answers
+correctly on the unfitted clones a searcher makes. Neither needs label remapping: their
+columns follow the fitted model's class order, which the label map preserves when it
+maps `classes_` back. Wrapped roc_auc now equals the native 0.525.
+
+OC-67: the three names sat in `INVALID_REGRESSION_METRICS` — the module knew them — but
+not in `METRIC_ALIAS_MAP`, so `get_scorer` raised `'pr_auc' is not a valid scoring
+value`, and the strategies failed *differently*: grid swallowed it per fold and reported
+the misleading "All trials failed", while halving/optuna call `resolve_scorer` outside
+any try (`engine.py:624`) and crashed the search outright. `pr_auc` now aliases to
+`average_precision` and joins `BINARY_POS_LABEL_METRICS` (its `pos_label=1` default is
+the same trap as `f1`); a multiclass target switches it to `pr_auc_weighted` through its
+own branch in `weight_metric_for_multiclass`, because suffixing the alias would ask for
+`average_precision_weighted`, which does not exist; the two names sklearn has no scorer
+for are built locally behind `CUSTOM_SCORER_BUILDERS`, whose `g_score` builder refuses
+up front when imblearn is missing so that failure stays a configuration error rather
+than an all-fold one. Two traps fell out of verification, both documented where they are
+avoided: sklearn hands a `predict_proba` scorer **only the positive column** for a
+binary target (measured — the 1-D response equals `predict_proba(X)[:, 1]`), so indexing
+it as a matrix raised `IndexError`; and `make_scorer` injects a `pos_label` into any
+score function whose signature declares one, which is why `geometric_mean_score` raised
+`pos_label=1 is not a valid label` on string labels — a two-argument `_g_score` wrapper
+stops the injection, where passing an explicit `pos_label` only traded it for imblearn's
+"pos_label is ignored when average != 'binary'" warning. Verified over 5 strategies ×
+{binary, string, multiclass} × 3 metrics = 45 runs, all finite, grid/halving/optuna
+agreeing to the digit (0.4758 / 0.4699 / 0.3431); the scorers pickle, which matters
+because `n_jobs > 1` sends them to workers. Core 3790 (+21 tests), backend 1646 (+8),
+ruff/format/ty clean. No open finding remains in `modeling/_tuning/`; the modeling rows
+still open (OC-187/194/204/206/168) all sit outside that package.
+
+### 2026-09-06 — OC-186 fixed, plus two CI follow-ups on the previous session's commits
+
+`S3Catalog.exists` built its throwaway filesystem from the raw instance options while
+`__init__`, `load` and `save` all went through `_prepare_s3fs_options`, so with
+AWS-named credentials it authenticated differently from the methods it is supposed to
+agree with. One line routes it through the same mapping, which also brings it under
+`_apply_s3_endpoint`'s SSRF guard (caller-supplied `endpoint_url` dropped, only
+`AWS_ENDPOINT_URL` honoured). The new test failed pre-fix with `KeyError: 'key'` —
+`exists` was handing s3fs `aws_access_key_id` verbatim — and now pins
+`key`/`secret`/`client_kwargs['region_name']`, the absence of the AWS-named keys, and
+the `s3://bucket/id` path. OC-183–185 stay open.
+
+**Codecov** put `data_sources/_common.py` — extracted the previous session for the
+byte-identical sqlite/postgres writers — at **34.14%** patch coverage, 26 lines missing,
+because only the empty-filter guard had tests. `test_data_sources_common_writers.py` now
+runs both writers against an in-memory SQLite `data_sources` table: statement building,
+the commit, `affected_rows`, a multi-key filter's AND semantics, and rollback-and-reraise
+on a bogus column → **100%**. The two bare `raise` lines resisted the real-database
+tests, and turned out to be a coverage-tracer loss across SQLAlchemy's `greenlet_spawn`
+await — three scratch probes showed the identical shape reporting 100% without greenlets
+— so a mock-session pair asserts the handler's contract directly
+(`rollback.assert_awaited_once()` / `commit.assert_not_awaited()`), which is also the
+only test able to distinguish "rolled back" from "never applied".
+
+**SonarCloud** filed a MEDIUM "SQL Injection — possible SQL injection vector through
+string-based query construction" on `preprocessing/_helpers.py:104`, the `TypeError`
+message the OC-163/165/166 fix added. False positive: Bandit's B608 matches a
+SELECT…FROM word pair *inside a string literal*, and "Cannot select rows from y of
+type…" contains "select rows from y". Reworded to name the function instead of the
+operation (`Unsupported y type for select_rows_by_position: dict`) with a comment saying
+why, rather than a `# nosec`/`NOSONAR` that would hide the next real one.
 
 ### 2026-09-06 — OC-163/165/166 fixed: five improvised y-selections replaced by one positional helper, and three unfiled copies of the same bug fell out
 
