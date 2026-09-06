@@ -79,11 +79,20 @@ jobs:
         # bug that pattern used to cause when both suites shared one job).
         # No -s: keeps captured stdout/print output out of the log for
         # passing tests (still shown automatically for any failure).
+        # No --maxfail: the suite finishes in ~2 minutes, so bailing out early
+        # saves nothing and costs the real failure count — a PR that broke
+        # thirty tests used to report "1 failed" and had to be re-run once per
+        # fix to discover the rest.
+        # Floor is 90 against a measured 96% (CI run 34032836551). The 45 it
+        # replaces was 51 points below the suite's actual coverage, so it could
+        # never fail and was not a ratchet at all. 90 keeps enough headroom for
+        # optional-extras variance between runners while still failing loudly
+        # if a whole subsystem loses its tests.
         run: |
-          bash .github/scripts/run_check.sh "pytest skyulf-core/tests (coverage ≥ 45%)" \
-            pytest skyulf-core/tests -q --maxfail=1 --disable-warnings \
+          bash .github/scripts/run_check.sh "pytest skyulf-core/tests (coverage ≥ 90%)" \
+            pytest skyulf-core/tests -q --disable-warnings \
               --cov=skyulf-core/skyulf --cov-branch --cov-report=term-missing \
-              --cov-report=xml --cov-fail-under=45
+              --cov-report=xml --cov-fail-under=90
 
       - name: Build and verify distributable wheel
         run: |

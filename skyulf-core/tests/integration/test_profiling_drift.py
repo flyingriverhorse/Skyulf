@@ -1,5 +1,7 @@
 """Tests for skyulf.profiling.drift.DriftCalculator."""
 
+import logging
+
 import numpy as np
 import polars as pl
 import pytest
@@ -467,8 +469,14 @@ def test_calculate_distribution_handles_unexpected_exception(
     assert dist.bins == []
 
 
-def test_calculate_psi_handles_unexpected_exception(monkeypatch: pytest.MonkeyPatch) -> None:
-    """_calculate_psi should fall back to 0.0 if the percentile computation errors."""
+def test_calculate_psi_handles_unexpected_exception(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    """_calculate_psi should fall back to 0.0 if the percentile computation errors.
+
+    The fallback must also be *observable*: 0.0 is what a genuinely stable column
+    reports, so without the warning a lost metric is indistinguishable from no drift.
+    """
     import skyulf.profiling.drift as drift_module
 
     calc = DriftCalculator(pl.DataFrame({"a": [1.0]}), pl.DataFrame({"a": [1.0]}))
@@ -477,12 +485,20 @@ def test_calculate_psi_handles_unexpected_exception(monkeypatch: pytest.MonkeyPa
         raise RuntimeError("boom")
 
     monkeypatch.setattr(drift_module.np, "percentile", boom)
-    psi = calc._calculate_psi(np.array([1.0, 2.0, 3.0]), np.array([1.0, 2.0, 3.0]))
+    with caplog.at_level(logging.WARNING, logger=drift_module.__name__):
+        psi = calc._calculate_psi(np.array([1.0, 2.0, 3.0]), np.array([1.0, 2.0, 3.0]))
     assert psi == 0.0
+    assert "PSI computation failed" in caplog.text
+    assert "RuntimeError: boom" in caplog.text
 
 
-def test_calculate_kl_handles_unexpected_exception(monkeypatch: pytest.MonkeyPatch) -> None:
-    """_calculate_kl should fall back to 0.0 if the percentile computation errors."""
+def test_calculate_kl_handles_unexpected_exception(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    """_calculate_kl should fall back to 0.0 if the percentile computation errors.
+
+    Same observability requirement as PSI: the silent 0.0 must leave a log trail.
+    """
     import skyulf.profiling.drift as drift_module
 
     calc = DriftCalculator(pl.DataFrame({"a": [1.0]}), pl.DataFrame({"a": [1.0]}))
@@ -491,8 +507,38 @@ def test_calculate_kl_handles_unexpected_exception(monkeypatch: pytest.MonkeyPat
         raise RuntimeError("boom")
 
     monkeypatch.setattr(drift_module.np, "percentile", boom)
-    kl = calc._calculate_kl(np.array([1.0, 2.0, 3.0]), np.array([1.0, 2.0, 3.0]))
+    with caplog.at_level(logging.WARNING, logger=drift_module.__name__):
+        kl = calc._calculate_kl(np.array([1.0, 2.0, 3.0]), np.array([1.0, 2.0, 3.0]))
     assert kl == 0.0
+    assert "KL divergence computation failed" in caplog.text
+    assert "RuntimeError: boom" in caplog.text
+
+
+def test_uncastable_column_is_dropped_from_the_report_loudly(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    """A column that cannot be cast is dropped whole, so the log must name it.
+
+    This is the worst of the three fail-open paths: an absent column reads as
+    "no drift" to anyone consuming the report, which is a stronger claim than
+    the 0.0 a PSI failure produces.
+    """
+    import skyulf.profiling.drift as drift_module
+
+    reference = pl.DataFrame({"a": [1.0, 2.0, 3.0]})
+    current = pl.DataFrame({"a": ["x", "y", "z"]})
+
+    def boom(self: object, *args: object, **kwargs: object) -> None:
+        raise RuntimeError("cannot cast")
+
+    monkeypatch.setattr(pl.Series, "cast", boom)
+    with caplog.at_level(logging.WARNING, logger=drift_module.__name__):
+        report = DriftCalculator(reference, current).calculate_drift()
+
+    assert "a" not in report.column_drifts
+    assert report.drifted_columns_count == 0
+    assert "Could not cast current column 'a'" in caplog.text
+    assert "RuntimeError: cannot cast" in caplog.text
 
 
 class TestRealShapedDataset:

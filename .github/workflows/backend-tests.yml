@@ -96,9 +96,17 @@ jobs:
         # and runs in skyulf-core-tests.yml instead.
         # No -s: keeps captured stdout/print output out of the log for
         # passing tests (still shown automatically for any failure).
+        # No --maxfail: same reasoning as skyulf-core-tests.yml — the suite
+        # finishes in under two minutes, so aborting on the first failure
+        # saves nothing and hides how many tests a PR actually broke, once
+        # per matrix leg.
+        # No --cov-fail-under: OC-77 scoped the ratchet to skyulf-core, whose
+        # floor of 45 sat 51 points under its actual coverage. Backend measures
+        # 77% on both engine legs (CI run 34032836559), so a floor here is a
+        # separate decision — it has to be chosen against 77, not copied.
         run: |
           bash .github/scripts/run_check.sh "pytest tests (backend)" \
-            pytest tests -q --maxfail=1 --disable-warnings \
+            pytest tests -q --disable-warnings \
               --cov=backend --cov-branch --cov-report=term-missing --cov-report=xml
 
       - name: Upload coverage reports to Codecov

@@ -112,14 +112,14 @@ follow, grouped by domain.
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
 | OC-76 | 🟠 | Cross-engine parity tests cover 9 of 100 nodes and never compare applied output — directly caused OC-04/23/24/58 to go unnoticed | ~3 days | ⬜ open |
-| OC-77 | 🟠 | `--maxfail=1` hides real failure count; `--cov-fail-under=45` vs 98.4% actual (two flag changes, `.github/workflows/skyulf-core-tests.yml:82-87`) | mechanical | ⬜ open |
+| OC-77 | 🟠 | `--maxfail=1` hides real failure count; `--cov-fail-under=45` vs 98.4% actual (two flag changes, `.github/workflows/skyulf-core-tests.yml:82-87`) | mechanical | ✅ fixed 2026-09-06 — floor raised 45 → 90 against a measured 96% (CI run 34032836551), and `--maxfail=1` removed here **and** in `backend-tests.yml`, which carried the same flag unfilled. See the log entry |
 | OC-01 | 🟠 | `skyulf.__version__` ambiguous: stale `0.5.8` dist-info shadows real `0.8.8` (path-order dependent) — packaging-integrity cluster — re-verified 2026-09-05: the venv holds exactly one dist-info (`skyulf_core-0.8.13`), the stale `0.5.8` is gone, and `skyulf.__version__` reports `0.8.13` | small | ✅ resolved by the 0.8.13 install refresh |
 | OC-02 | 🟠 | Dev editable install dangling; `import skyulf` fails outside repo — packaging-integrity cluster — re-verified 2026-09-05 by importing from a CWD outside the repo: resolves to `skyulf-core/skyulf/__init__.py` at `0.8.13` | small | ✅ resolved by the 0.8.13 install refresh |
-| OC-78 | 🟡 | `py.typed` declared in packaging metadata but file does not exist — packaging-integrity cluster | 1 line | ✅ fixed 2026-09-06 — created `skyulf-core/skyulf/py.typed`; verified setuptools `build_py` really copies it into the build lib (both `setup.py:31` and `MANIFEST.in:3` already referenced it), and re-confirmed during OC-81 inside an actual built wheel (`build_meta.build_wheel` → `skyulf/py.typed` present in the zip), which is the artifact PyPI receives. Without the marker PEP 561 treats the distribution as untyped, so downstream type checkers discarded the annotations the library does ship and fell back to `Any` at the import boundary |
-| OC-79 | 🟡 | `joblib` imported at module scope but not in `install_requires` — packaging-integrity cluster | 1 line | ✅ fixed 2026-09-06 — `joblib>=1.3.0` added to `setup.py` `install_requires`; the same undeclared-direct-import gap existed in the backend (`ml_pipeline/artifacts/local.py:8`, `s3.py:8`), so it went into root `pyproject.toml` and `requirements.txt` too. Floor matches `requirements-ci.txt:32` and sklearn 1.8's own `joblib>=1.3.0` |
-| OC-81 | ⚪ | No `License ::` classifier / SPDX field — packaging-integrity cluster | 1 line | ✅ fixed 2026-09-06 — **decision (owner): `skyulf-core` is Apache-2.0; backend + frontend stay AGPLv3**, i.e. `COMMERCIAL-LICENSE.md` was the authoritative one of the four disagreeing files. Declared as a **static** `license = "Apache-2.0"` in `skyulf-core/pyproject.toml`, deliberately *not* a `License ::` trove classifier: setuptools >= 77 deprecates those once an SPDX expression is present. The static placement is load-bearing — adding `"license"` to this file's `dynamic` list (how every other field here is deferred to `setup.py`) is accepted **without a warning** but emits the deprecated free-text `License:` field instead of PEP 639's `License-Expression:`, and PyPI only indexes the latter for license filtering; the same value passed to `setup()` also triggers `SetuptoolsWarning: license overwritten by pyproject.toml`. Verified by building a real wheel through `setuptools.build_meta.build_wheel`: `Metadata-Version: 2.4`, `License-Expression: Apache-2.0`, Apache `LICENSE` bundled at `dist-info/licenses/LICENSE`, zero warnings. Three contradicting files reconciled to the decision: `COPYRIGHT.md` (split stated **backwards** — "Backend & Core: Apache 2.0" — pointed that Apache claim at the root `LICENSE`, which is AGPLv3 text, and cited `frontend/feature-canvas/LICENSE`, a path that does not exist since the frontend became `frontend/ml-canvas`, which has no license file of its own and inherits root AGPLv3); `skyulf-core/README.md:410-413` (declared AGPLv3+ while linking the Apache-2.0 `LICENSE` beside it — and that README *is* the PyPI `long_description`, so the wrong license sat on the package's front page); and its shields.io badge (`github/license` reads the **repository root** `LICENSE`, so it rendered AGPLv3 on an Apache-2.0 package — replaced with a static badge). Root `pyproject.toml` (`license = { file = "LICENSE" }` + AGPLv3+ classifier) and root `LICENSE` were already correct and are unchanged. Version also synced to 0.8.15 in root `pyproject.toml` + frontend, since `setup.py:19` was already there and its docstring asks for the two to move in step |
+| OC-78 | 🟡 | `py.typed` declared in packaging metadata but file does not exist — packaging-integrity cluster | 1 line | ✅ fixed 2026-09-06 — created `skyulf-core/skyulf/py.typed`, verified first through setuptools' own `build_py` and then inside an actually built wheel. See the OC-05/22/78/79/112/132/141 log entry |
+| OC-79 | 🟡 | `joblib` imported at module scope but not in `install_requires` — packaging-integrity cluster | 1 line | ✅ fixed 2026-09-06 — `joblib>=1.3.0` declared in core `install_requires`, and in root `pyproject.toml`/`requirements.txt` for the backend's identical undeclared-import gap. See the log entry |
+| OC-81 | ⚪ | No `License ::` classifier / SPDX field — packaging-integrity cluster | 1 line | ✅ fixed 2026-09-06 — owner decided `skyulf-core` = Apache-2.0 with backend + frontend staying AGPLv3, declared **statically** in `skyulf-core/pyproject.toml` so it emits PEP 639 `License-Expression:` rather than the deprecated free-text field, and the three files that contradicted the decision reconciled to it. See the OC-81 log entry |
 | OC-03 | 🟠 | Systemic `infer_output_schema` int→float misprediction across 22 nodes — one sweep + parametrized test (predicted schema == actual schema for every node) | ~1 day | ⬜ open |
-| OC-09 | 🟡 | Narrow `ruff select` hides ~500 missing docstrings + 84 unused args — **last**, widening first would bury the signal. Concrete cost measured 2026-09-05: `F401` was absent from `select`, so **27 unused imports** sat unpoliced — one was orphaned *inside the OC-152 security fix* by deleting the raw-SQL executors, and `ruff check`, `ruff format --check`, `ty check` and 1626 passing tests all stayed green; only an external pyflakes pass caught it. **`F401` closed 2026-09-05**: added to `select`, 22 dead imports auto-fixed, 4 availability/side-effect probes waived per-site, 1 redundant `import skyulf` dropped. **`F841` closed 2026-09-05**: 19 sites, all in tests, and three were tests whose bodies ended before any assertion so they had always passed trivially. **Docstring rules closed 2026-09-05**: `D` selected as a family with `convention = "google"`, the four auto-fixable rules (772 sites) taken by `ruff --fix`, D200/D301 (77) and then the remaining ten rules (**822 sites, 722 of them D1xx "missing docstring"**) written by hand across **188 files** — and then **82 more that ruff never reported at all**, because `D1xx` is privacy-gated on the *whole dotted module path*: a leading underscore on the module **or on any enclosing package** exempts everything beneath it, and 112 of the 327 in-scope modules live under one (`ml_pipeline/_internal/`, `_execution/`, `modeling/_tuning/`, `modeling/hyperparameters/`). `D2xx`/`D4xx` are **not** gated, which is why the earlier batches looked complete while the missing-docstring half of the same files stayed invisible to every gate. Recovered by copying each private file to a public name outside its package and linting the copy (byte-identical, so line numbers carry straight back): 64 backend + 18 core, re-measured to **0**. Total hand-written: **904**. Tests/examples/benchmarks carry a per-file `D` waiver (they held 2,528 of the 3,350 sites); enforcement covers `skyulf-core/skyulf/`, `backend/` and the entry points, matching `coding_standards` §4. `lint.ignore` is now down to five non-docstring entries. All **210** modified Python files AST-proven against `HEAD` — 199 docstring-only, 11 real code changes, each intended and itemised in the log entry; `ruff check .`, `ruff format --check .` (668 files), `ty check` clean; core **3668 passed / 70 skipped**, backend **1630 passed / 7 snapshots passed** — both exact baselines. **`ARG` deliberately not enabled** — measured 531 repo-wide, **121 in scope** across 73 files, of which 39 are an unused `config` and ~90 are Calculator/Applier protocol or framework contract signatures that cannot be renamed without breaking keyword callers. The triage's genuine defects were **fixed directly instead** (dead `fetch_data(query=)` and `safe_delete_path(force_delete=)` removed, `DataIngestionService.upload_dir` now from settings, the two profilers' duplicate-count parity break, the unimported `backend.eda.tasks` Celery bug), so enabling `ARG` would buy ~90 permanent `# noqa` waivers for no further yield. See the 2026-09-06 OC-09-closed log entry | done — `ARG` declined by decision (121 sites measured) | ✅ fixed 2026-09-06 — “Fixed as much as we did, no need to continue!” |
+| OC-09 | 🟡 | Narrow `ruff select` hides ~500 missing docstrings + 84 unused args — **last**, widening first would bury the signal | done — `ARG` declined by decision (121 in-scope sites measured) | ✅ fixed 2026-09-06 — `F401`/`F841`/the `D` family now enforced on `skyulf-core/skyulf/` + `backend/`, 904 docstrings hand-written (82 of them invisible to ruff because `D1xx` is privacy-gated on the whole dotted module path), and `ARG` declined by decision; closed by the owner as “fixed as much as we did, no need to continue”. See the 2026-09-05 and 2026-09-06 OC-09 log entries |
 
 ### Remaining — evaluation & explainability
 
@@ -147,11 +147,11 @@ follow, grouped by domain.
 | OC-151 | 🟡 | Trial-buffer `clear_*` hooks documented but never called — 110.9 MB retained for process lifetime (`realtime/trial_buffer.py:56-59,103-106`) | small | ⬜ open |
 | OC-156 | 🟡 | `roc_auc` threshold-tuning objective scores hard predictions — bit-identical to `balanced_accuracy` (`threshold_tuning_service.py:77-92`) | small | ⬜ open |
 | OC-158 | 🟡 | Sync/async JSON serializers disagree: sync nulls 8 of 15 legitimate strings (`"nan"`, `"NaT"`, `"<NA>"`, `"inf"`…), async nulls none; 603-line module production-dead but test-covered (`serialization.py:369,435-446`) | half day | ⬜ open |
-| OC-131 | ⚪ | Diagnostics fail open — PSI returns `0.0` on any numeric failure (`profiling/drift.py:474-476`) | 1 line | ⬜ open |
-| OC-132 | ⚪ | Dead `dropped_features` branch (key appears exactly once in repo) (`graph_utils.py:534-537`) | 1 line | ✅ fixed 2026-09-06 — branch deleted from `_extract_columns` (now `graph_utils.py:589`); the superseding runtime path (`job.metrics["dropped_columns"]` via `strategies.py` → `basic_training_manager.py`) is recorded in a new docstring so the branch is not re-added. Confirmed dead first: no test, fixture or writer references the key |
+| OC-131 | ⚪ | Diagnostics fail open — PSI returns `0.0` on any numeric failure (`profiling/drift.py:474-476`) | 1 line | ✅ fixed 2026-09-06 — `drift.py` was the only module under `profiling/` with no logger, so all three fail-open paths (PSI, KL, and the uncastable-column drop the finding missed) now warn; the finite `0.0` contract is kept and documented, since `None` is a three-layer change and `inf` cannot survive `JSONResponse`'s `allow_nan=False`. See the log entry |
+| OC-132 | ⚪ | Dead `dropped_features` branch (key appears exactly once in repo) (`graph_utils.py:534-537`) | 1 line | ✅ fixed 2026-09-06 — branch deleted after confirming no test, fixture or writer references the key; the superseding runtime path is recorded in a docstring at the site so the branch is not re-added. See the log entry |
 | OC-152 | ⚪ | Two raw-SQL executors accept unconstrained query strings, zero callers — latent injection sink (`async_connection_manager.py:243-268`) — **broader than filed**: `AsyncSQLiteConnectionManager` carried a byte-identical pair, so four dead sinks were deleted, not two | small | ✅ fixed 2026-09-05 |
 | OC-157 | ⚪ | `first_wins` merge strategy reverses output column order, contradicting its docstring (`_merge.py:221-236`) — fixed by dropping the reversed iteration, so order is strategy-independent by construction | small | ✅ fixed 2026-09-05 — with OC-153 |
-| OC-159 | ⚪ | Empty filter dict compiles to WHERE-less `DELETE FROM data_sources`/`UPDATE`; dead call path today (`async_sqlite_queries.py:129-146`) | 1 line | ⬜ open |
+| OC-159 | ⚪ | Empty filter dict compiles to WHERE-less `DELETE FROM data_sources`/`UPDATE`; dead call path today (`async_sqlite_queries.py:129-146`) | 1 line | ✅ fixed 2026-09-06 — all four sites (sqlite + postgres × delete + update) raise `ValueError` before opening a session; the path is dead today, but `_normalize_filter(None) → {}` means the signature itself accepts the table-wiping input. See the log entry |
 | OC-169 | 🟡 | Filed while fixing OC-150 — the global `ErrorHandlerMiddleware` logs `{exc}`, `traceback.format_exc()` **and** `exc_info=True` with no redaction, so any *uncaught* exception whose message or frames carry a credential leaks it to the log regardless of call-site scrubbing; the S3 paths now redact their own `logger.error` but still `raise ConnectionError(...) from e`, leaving `e` reachable from the chained traceback (`middleware/error_handler.py:53-65`) | small | ⬜ open |
 | OC-183 | 🟠 | `SmartCatalog` S3 auto-init is dead for `.env`-only config, and the two docs name different variables — **OC-130's root cause repeating**. `backend/data/catalog.py:556` reads `os.getenv("S3_BUCKET_NAME")`, but pydantic-settings loads the dotenv into the model and never exports it into `os.environ`, so a bucket configured only in `.env` is invisible and `s3_catalog` silently stays `None` (falling back to local disk with no error or warning). Worse, `S3_BUCKET_NAME` is **not a `Settings` field at all**: `config/mixins/aws.py:12` declares `AWS_BUCKET_NAME`, which is what `docs/guides/backend_configuration.md:146` documents, while `README.md:105` documents `S3_BUCKET_NAME` — so following the README sets a variable nothing reads. Needs a canonical-name decision before the one-line code fix | small | ⬜ open |
 | OC-184 | 🟠 | `ProductionSettings.SECURITY_HEADERS` is declared and never sent. `_PROD_SECURITY_HEADERS` (HSTS, `X-Frame-Options: DENY`, CSP, …) is assigned at `config/environments.py:84` and referenced nowhere else in the repo — no middleware reads it — so a production boot logs "Running in PRODUCTION mode with enhanced security" while emitting none of those headers. Fixing means adding a security-headers middleware in `main.py::_add_middleware`, where order is load-bearing (CORS must stay outermost), i.e. a behaviour change and not a config fix | half day | ⬜ open |
@@ -169,7 +169,7 @@ follow, grouped by domain.
 | OC-111 | 🟡 | A profiling recommendation branch is unreachable | small | ⬜ open |
 | OC-114 | 🟡 | All-null tracked column yields 30 `NaN` autocorrelation lags as real analysis (≥1000-row datasets) (`temporal.py:167-191`) | small | ⬜ open |
 | OC-102 | ⚪ | Five tunable models return an empty search space from the live `/defaults` endpoint (`hyperparameters/_registry.py`) | small | ⬜ open |
-| OC-112 | ⚪ | Comment and code disagree in the categorical profiler — the comment promises a rendered missing-value marker, the code `continue`s and discards the null category (`profiling/_analyzer/categorical.py:22-30`). *Filed as "disagree about the applied threshold"; the real subject is the null-category marker* | 1 line | ✅ fixed 2026-09-06 — comment-only, no behaviour change. Rewrote it to describe what the code does and why dropping is correct: `str(None)` would publish a literal `"None"` in `top_k` indistinguishable from a genuine category of that name, and null frequency is not lost because `ColumnProfile.missing_count`/`missing_percentage` report it separately (`profiling/schemas.py:163-164`) |
+| OC-112 | ⚪ | Comment and code disagree in the categorical profiler — the comment promises a rendered missing-value marker, the code `continue`s and discards the null category (`profiling/_analyzer/categorical.py:22-30`). *Filed as "disagree about the applied threshold"; the real subject is the null-category marker* | 1 line | ✅ fixed 2026-09-06 — comment-only, no behaviour change; the reasoning for why dropping the null category is correct now lives in the code comment it rewrote. See the log entry |
 | OC-121 | ⚪ | polars `Enum` columns invisible to text auto-detection, diverging from pandas `Categorical` (`_helpers.py:148-157`) | small | ⬜ open |
 | OC-122 | ⚪ | `TextCleaning` silently ignores unrecognised operation name (`cleaning/text.py:151-153`) | small | ⬜ open |
 | OC-90 | ⚪ | Unknown split config keys silently dropped instead of rejected (`preprocessing/split.py`) | small | ⬜ open |
@@ -181,7 +181,7 @@ follow, grouped by domain.
 | OC-140 | 🟠 | `InvalidValueReplacement` diverges across engines on non-numeric columns (pandas silently NaNs, polars raises) | small | ⬜ open |
 | OC-142 | 🟠 | EDA correlation ratio η exceeds 1.0 with nulls; null-heavy columns rank as strongest association | small | ⬜ open |
 | OC-143 | 🟠 | RFE ignores the UI's `k`, silently selecting half the features — **duplicate of OC-25**, same file and line; one fix retires both | small | ✅ fixed 2026-09-05 — with OC-25 |
-| OC-141 | ⚪ | `invalid_values` param declared in `node_meta` with zero consumers | 1 line | ✅ fixed 2026-09-06 — key deleted from `node_meta` params (`cleaning/invalid_value.py:215` → `{"columns": []}`). Re-verified zero consumers across `skyulf-core/`, `backend/`, `frontend/` and all `.ambr` snapshots first. Deletion is behaviour-neutral for the smoke test: `user_picked_no_columns` keys off `columns`, which stays declared, so `fit` still short-circuits identically. **Left open deliberately:** the other half of the divergence — the params the calculator really reads (`rule`/`mode`, `min_value`, `max_value`, `replacement`, `value`, `replace_inf`, `replace_neg_inf`) are still undeclared. Wiring those up expands the published contract and belongs to **R1 step 1**, not to this deletion |
+| OC-141 | ⚪ | `invalid_values` param declared in `node_meta` with zero consumers | 1 line | ✅ fixed 2026-09-06 — key deleted from `node_meta` after re-verifying zero consumers across all three layers and the `.ambr` snapshots, behaviour-neutral because `user_picked_no_columns` keys off `columns`. The other half of the divergence (the params the calculator really reads are still undeclared) is left to **R1 step 1**. See the log entry |
 | OC-144 | ⚪ | Geo distance column named `_km` even when the unit is miles | ~~1 line~~ **small, not 1 line** — scoped 2026-09-06 | ⬜ open — **not a one-liner; blast radius measured.** Four code sites (`geo/distance.py:83` pandas apply, `:112` polars apply, `:163` `node_meta` default, `:185` `fit`), **10** assertions in `tests/integration/test_geo_nodes.py` (incl. `:91`, which reads `result_km["geo_distance_km"]` while converting to miles — the mislabel the finding describes, baked into a test), and `docs/reference/preprocessing_nodes.md:630`. **The structural detail that decides the fix:** the two apply-path fallbacks are unreachable in the normal pipeline, because `fit` always writes `output_column` into the artifact — so the *declared* `node_meta` default is what really picks the name. `node_meta` params are a static dict and cannot be unit-dependent, so `f"geo_distance_{unit}"` has to be resolved in `fit` (declaring `""` = auto, or dropping the key), not patched at the four sites independently. Frontend impact is nil — all of `geo/` is UI-unreachable per OC-06 |
 
 ### Remaining — cross-cutting & packaging
@@ -189,7 +189,7 @@ follow, grouped by domain.
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
 | OC-04 | 🟡 | Cross-engine dtype divergence in 3 nodes (int64 vs int8/uint32) (`encoding/dummy.py`, `bucketing.py`) | small | ⬜ open |
-| OC-05 | 🟡 | `PowerTransformer` triggers a pandas deprecation that will become an error (`transformations/power.py:101`) | 1 line | ✅ fixed 2026-09-06 — **worse than filed**: it is not cosmetic. Reproduced on pandas 2.3.2 with `int64` columns — `df_out.loc[:, valid_cols] = <float array>` emits one `FutureWarning: Setting an item of incompatible dtype is deprecated and will raise in a future error` *per column*. When pandas makes that an error, the surrounding bare `except Exception` (which only calls `logger.exception`) swallows it and returns the frame **untransformed** — the same silent-skip failure mode as OC-28. Fix: cast each destination column to `float64` before the `.loc` write. Verified 0 warnings (was 2), values bit-identical to the float-input path, column order/index/non-target columns preserved, pandas↔polars parity holds and both now yield `Float64`. Pinned by `test_power_transformer_pandas_apply_integer_columns_avoids_dtype_warning`, which *records* warnings rather than promoting them to errors — a promoted warning would be caught by that same bare `except` and the test would pass while the transform silently no-ops, so it also asserts the values really changed |
+| OC-05 | 🟡 | `PowerTransformer` triggers a pandas deprecation that will become an error (`transformations/power.py:101`) | 1 line | ✅ fixed 2026-09-06 — **worse than filed**: casting each destination column to `float64` before the `.loc` write removes a per-column pandas FutureWarning that the surrounding bare `except` would otherwise swallow into a silent no-op, i.e. OC-28's failure mode arriving through OC-05. See the log entry |
 | OC-06 | 🟡 | 6 registered nodes unreachable from the UI (incl. all of `geo/`) — `registry.py` vs `frontend/` | small | ⬜ open — R1 step 3 catches this class |
 | OC-07 | 🟡 | Node-id naming split 55 PascalCase / 45 snake_case + redundant aliases (`registry.py`) | half day | ⬜ open |
 | OC-08 | 🟡 | Public-API name collision: `DatasetProfile` means two things (`skyulf/__init__.py:32-46`) | small | ⬜ open |
@@ -209,7 +209,7 @@ follow, grouped by domain.
 | OC-172 | 🟡 | `StandardScaler` crashes on mixed pandas nullable numeric columns containing `pd.NA`; native sklearn and equivalent Polars input succeed (`preprocessing/scaling/standard.py:144,154`, `engines/sklearn_bridge.py:52`) | small | ⬜ open |
 | OC-18 | 🟡 | One-hot/dummy generated names can collide with existing columns (`encoding/one_hot.py:68-92`, `dummy.py:76-99`) | small | ⬜ open |
 | OC-21 | 🟡 | WOE additive smoothing not normalized over categories (`encoding/woe.py:130-145`) | small | ⬜ open |
-| OC-22 | ⚪ | `TargetEncoder.infer_output_schema` checks an impossible `regression` value (`encoding/target.py:340-360`) | 1 line | ✅ fixed 2026-09-06 — `("binary", "regression")` → `("binary", "continuous")` (now `target.py:386`). Verified empirically against sklearn 1.8.0: `TargetEncoder`'s accepted set is `{auto, binary, multiclass, continuous}` and `"regression"` raises `InvalidParameterError`, while `_build_target_encoder` forwards the config value verbatim — so no working config could ever reach that branch, and the legitimate `"continuous"` case fell through to `None`. **Why it survived:** `tests/unit/test_infer_output_schema.py:207` asserted passthrough for `("binary", "regression")`, so the test was pinning the bug; updated to `continuous` and a second test added that pins both halves (sklearn really rejects `regression`, and the prediction stays opaque for it). Confirmed the new prediction is *correct*, not merely reachable: fitting+applying with `target_type="continuous"` on a continuous `y` encodes in place, returning the same column set. `InvalidParameterError` is matched via its public base `ValueError` — the class itself lives in the private `sklearn.utils._param_validation` |
+| OC-22 | ⚪ | `TargetEncoder.infer_output_schema` checks an impossible `regression` value (`encoding/target.py:340-360`) | 1 line | ✅ fixed 2026-09-06 — the `("binary", "regression")` passthrough was pinned by a test asserting a prediction for a config sklearn 1.8 rejects outright; changed to `"continuous"` and confirmed it really encodes rather than merely being reachable. See the log entry |
 
 ### Remaining — feature generation / selection / vectorization / transformations
 
@@ -220,7 +220,7 @@ follow, grouped by domain.
 | OC-25 | 🟠 | RFE "K" chosen in UI ignored by backend (`feature_selection/_common.py:236-240`) | small | ✅ fixed 2026-09-05 — closes OC-143 too |
 | OC-26 | 🟠 | `HashingVectorizer` UI "none" norm is an invalid sklearn value → crash (`hashing_vectorizer.py:59`) | small | ⬜ open |
 | OC-27 | 🟠 | `GeneralTransformation` ignores the UI `standardize` toggle (`transformations/general.py:34-39,138-139`) | small | ⬜ open |
-| OC-28 | 🟠 | Box-Cox transform failures silently return untransformed data (`transformations/power.py:97-104`) | small | ⬜ open |
+| OC-28 | 🟠 | Box-Cox transform failures silently return untransformed data (`transformations/power.py:97-104`) | small | ✅ fixed 2026-09-06 — the silent path was the `valid_cols` filter, not the `except` (which has logged since the node was created); both engines now share `_fitted_columns_present`, which names the fitted columns the frame lacks, and fail-open is kept by decision. See the log entry |
 | OC-29 | 🟡 | `FeatureGeneration` advertises `polynomial` but silently skips it (`feature_generation/_common.py:24-31`) | small | ⬜ open |
 | OC-30 | 🟡 | Datetime extraction ignores the UI output name, overwrites collisions (`_pandas_ops.py:173-184`) | small | ⬜ open |
 | OC-31 | 🟡 | Frontend wrongly requires a target for unsupervised CorrelationThreshold (`FeatureSelectionNode.tsx:564-566`) | small | ⬜ open |
@@ -278,7 +278,7 @@ follow, grouped by domain.
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
 | OC-54 | 🟡 | `DebugNode` is dead code that would silently no-op if wired up (`nodes/DebugNode.tsx`) | small | ⬜ open |
-| OC-55 | 🟡 | `tsc --noEmit` fails: `mermaid` declared but not installed (`frontend/ml-canvas/package.json`) | 1 line | ⬜ open |
+| OC-55 | 🟡 | `tsc --noEmit` fails: `mermaid` declared but not installed (`frontend/ml-canvas/package.json`) | 1 line | ✅ verified stale 2026-09-06 — `mermaid@11.17.2` is in `dependencies`, in the lockfile, installed and lazy-imported into its own chunk; the exact CI `tsc --noEmit` exits 0, `npm run build` succeeds, and the 5 real-parser tests pass. No change needed |
 | OC-56 | ⚪ | `useSchemaPreview` does not cancel in-flight requests on unmount (`hooks/useSchemaPreview.ts`) | small | ⬜ open |
 | OC-57 | ⚪ | `any`-typed chart props bypass type safety in EDA components (`modules/eda/`) | small | ⬜ open |
 
@@ -498,6 +498,85 @@ input and apply any keep-mask identically to y. Unlike OC-165, this reproduces
 without a target. Location: `preprocessing/time_series/lag.py:54-59`.
 
 ## Log
+
+### 2026-09-06 — OC-159/131/28/77 fixed, OC-55 verified stale: three fail-open paths and a coverage floor 51 points below reality
+
+**OC-159 — an empty filter is a table-wide write.** Both functions build their
+WHERE clause one key at a time from `filter_dict`, so with no keys the statement
+compiles to a bare `DELETE FROM data_sources` (or a WHERE-less `UPDATE`) that
+empties or rewrites the table and still reports `affected_rows` as though that had
+been requested. The tracker called it a dead call path and that is correct — all 8
+exports of `backend/database/data_sources/` have zero external references, and the
+app's real delete goes through the ORM (`data_ingestion/service.py:107-143`).
+Fixed anyway, because `_normalize_filter(None) → {}`
+(`async_data_sources_crud.py:161`) means the *signature itself* accepts the
+table-wiping input. Guards raise `ValueError` **before** the session opens, on all
+four sites (sqlite + postgres × delete + update). Note the crud layer wraps every
+exception as `RuntimeError(...) from None`, so callers there see "Failed to delete
+from primary database" — masking that predates this fix, pinned as-is.
+
+**OC-131 — the fail-open was never the problem; the silence was.** `drift.py` was
+the **only** module under `skyulf/profiling/` with no logger (13 siblings each have
+one), so a column whose histogram blew up reported as perfectly stable with no
+trace. Rejected alternatives: `None` needs `DriftMetric.value` optional, a contract
+change across core + backend mirror + the frontend sliders that re-derive
+`value > threshold`; `inf` fails closed but Starlette's `JSONResponse` uses
+`allow_nan=False` and raises; NaN compares False, so it reads as no drift *and*
+breaks the response. Kept the finite `0.0`, documented why, and made all three
+fail-open paths observable — including the worst one the finding missed:
+`_calculate_numeric_column_drift` returns `None` on an uncastable column, so the
+**whole column disappears** and its absence reads as "no drift". The NaN poisoning
+I expected was already closed upstream by F-13's `drop_nans()`.
+
+**OC-28 — filed against the wrong line.** The `except` blocks have called
+`logger.exception` since the node was created (`2d605197`). The unlogged path is
+the `valid_cols` filter: a frame missing columns the transformer was fitted on
+passes them through raw while the node reports success — train/serve skew, not a
+no-op. Both engines now share `_fitted_columns_present`, which names the missing
+columns, so they cannot drift apart. Did **not** switch to fail-closed:
+`general.py` fails open the same way three times, there are 25 `except Exception`
+sites under `preprocessing/`, and `apply` runs at inference where a raise turns a
+degraded prediction into a 500 — that decision is now on the `apply` docstring.
+Also fixed an engine asymmetry found on the way: pandas copied the frame *before*
+the try, so a failure returned a copy already cast to `float64` while polars
+returned the untouched original. The transform is now computed first and a failure
+hands back the caller's own object on both engines, pinned with `out is df`.
+
+**OC-77 — the floor was 51 points below reality.** CI run 34032836551 reports
+`TOTAL 13982 346 4012 265 96%` (97% locally), so `--cov-fail-under=45` could never
+fail. Raised to 90: headroom for optional-extras variance, since CI installs fewer
+than a dev venv (`sentence_transformers`, `causallearn`, `torch`, `transformers`
+are local-only — which is why CI measures a point lower). `--maxfail=1` removed, as
+the suite finishes in ~2 minutes and bailing early only cost the real failure
+count. **The same flag was in `backend-tests.yml:101` and is removed there too**,
+though OC-77 filed only core. No backend floor: it measures 77% on both legs (run
+34032836559, 2367 vs 2364 missed — so the existing "both legs produce the same
+coverage" comment is right) and needs its own number chosen against 77.
+
+**OC-55 — stale, no change.** `mermaid@11.17.2` is in `dependencies`, in the
+lockfile, installed, and lazy-imported into its own chunk. The exact CI command
+`npx tsc --project tsconfig.json --noEmit` exits 0, `npm run build` succeeds and
+emits `mermaid.core-*.js`, and the 5 real-parser tests pass.
+
+**Gates.** Core **3672 passed / 70 skipped** (3670 + 2 new), backend **1637 passed
+/ 7 snapshots** (1630 + the OC-159 file's 7 cases). `ruff check`, `ruff format
+--check`, `ty check backend skyulf-core/skyulf` clean. Both workflows parse, and
+the new flags were proven by running them: `--collect-only` reports `FAIL Required
+test coverage of 90% not reached. Total coverage: 26.32%` — the floor firing, not a
+flag error. The tracked frontend build output (71 files under `static/ml_canvas/`)
+came back byte-identical.
+
+**Tracker hygiene, per the owner's instruction.** Status cells are now one sentence
+with detail here, and the nine longest existing cells were trimmed the same way
+(OC-09, OC-81, OC-22, OC-05, OC-141, OC-112, OC-132, OC-78, OC-79) — 7,115
+characters out of the tables. Each was checked against its Log entry before
+trimming; the two whose detail lived only in the cell were relocated, not lost —
+OC-112's reasoning is verbatim in the comment the fix rewrote
+(`profiling/_analyzer/categorical.py:22-30`), and OC-141's deferred half stays in
+its cell as a live pointer to R1 step 1. OC-09's 3,064-character *Item* cell had
+become a running fix log and is back to the finding as filed. OC-01/OC-02 were left
+alone: already one-sentence status cells, and OC-02 has no Log entry, so trimming
+its re-verification note would have destroyed the only record of it.
 
 ### 2026-09-06 — OC-81 closed: the license decision arrived, and "1 line" turned out to be five files
 

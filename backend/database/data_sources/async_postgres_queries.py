@@ -76,7 +76,18 @@ async def select_data_sources(
 async def update_data_source(
     settings: Settings, filter_dict: dict[str, Any], update_data: dict[str, Any]
 ):
-    """Update data source records."""
+    """Update the data source records matching every key in ``filter_dict``.
+
+    An empty ``filter_dict`` is rejected rather than read as "match everything":
+    the WHERE clause is built one key at a time below, so with no keys the
+    statement compiles to an unscoped ``UPDATE data_sources SET ...`` that
+    rewrites every row and still reports ``affected_rows`` as though that had
+    been the requested operation. Checked before the session opens so no
+    transaction is started for a call that cannot run.
+    """
+    if not filter_dict:
+        raise ValueError("update_data_source requires a non-empty filter_dict")
+
     async with async_session_or_connection(settings) as session:
         try:
             # Use SQLAlchemy Core for UPDATE
@@ -102,7 +113,18 @@ async def update_data_source(
 
 
 async def delete_data_source(settings: Settings, filter_dict: dict[str, Any]):
-    """Delete data source records."""
+    """Delete the data source records matching every key in ``filter_dict``.
+
+    An empty ``filter_dict`` is rejected rather than read as "match everything":
+    the WHERE clause is built one key at a time below, so with no keys the
+    statement compiles to a bare ``DELETE FROM data_sources`` that empties the
+    table and still reports ``affected_rows`` as though that had been the
+    requested operation. Checked before the session opens so no transaction is
+    started for a call that cannot run.
+    """
+    if not filter_dict:
+        raise ValueError("delete_data_source requires a non-empty filter_dict")
+
     async with async_session_or_connection(settings) as session:
         try:
             tbl = table(TABLE, *[column(c) for c in filter_dict])

@@ -5,6 +5,7 @@ plus edge cases: non-positive data with box-cox, missing columns, negative
 inputs for log/sqrt, and pandas/polars parity for simple transformations.
 """
 
+import logging
 import warnings
 
 import numpy as np
@@ -162,29 +163,75 @@ def test_power_transformer_apply_polars_missing_lambdas_is_noop() -> None:
     assert out.equals(pl_df)
 
 
-def test_power_transformer_apply_polars_no_valid_columns_is_noop() -> None:
-    """Polars apply where none of the fitted columns exist must no-op (line 105)."""
+def test_power_transformer_apply_polars_no_valid_columns_is_noop(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Polars apply where none of the fitted columns exist must no-op (line 105).
+
+    The no-op is still a no-op, but it must not be quiet: a frame missing every
+    column the transformer was fitted on is train/serve skew, and the node
+    reports success either way.
+    """
     df = pd.DataFrame({"a": [1.0, 2.0, 3.0]})
     art = PowerTransformerCalculator().fit(df, {"method": "yeo-johnson", "columns": ["a"]})
     other_df = pd.DataFrame({"b": [1.0, 2.0, 3.0]})
     pl_df = pl.from_pandas(other_df)
-    out = PowerTransformerApplier().apply(pl_df, art)
+    with caplog.at_level(logging.WARNING, logger="skyulf.preprocessing.transformations.power"):
+        out = PowerTransformerApplier().apply(pl_df, art)
     assert out.equals(pl_df)
+    assert "['a']" in caplog.text
+    assert "pass through untransformed" in caplog.text
 
 
-def test_power_transformer_apply_pandas_no_valid_columns_is_noop() -> None:
-    """Pandas apply where none of the fitted columns exist must no-op (line 123)."""
+def test_power_transformer_apply_pandas_no_valid_columns_is_noop(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Pandas apply where none of the fitted columns exist must no-op (line 123).
+
+    Same requirement as the polars path: the shared helper must warn on both.
+    """
     df = pd.DataFrame({"a": [1.0, 2.0, 3.0]})
     art = PowerTransformerCalculator().fit(df, {"method": "yeo-johnson", "columns": ["a"]})
     other_df = pd.DataFrame({"b": [1.0, 2.0, 3.0]})
-    out = PowerTransformerApplier().apply(other_df, art)
+    with caplog.at_level(logging.WARNING, logger="skyulf.preprocessing.transformations.power"):
+        out = PowerTransformerApplier().apply(other_df, art)
     pd.testing.assert_frame_equal(out, other_df)
+    assert "['a']" in caplog.text
+
+
+def test_power_transformer_apply_transforms_present_columns_and_names_missing_ones(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Partial overlap must transform the present column and warn about the absent one.
+
+    This is the case that reads as success while half the frame went through raw:
+    the present column gets its own lambda (not the missing one's), and the log
+    names what was skipped.
+    """
+    df = pd.DataFrame({"a": [1.0, 2.0, 3.0], "b": [4.0, 5.0, 6.0]})
+    art = PowerTransformerCalculator().fit(df, {"method": "yeo-johnson", "columns": ["a", "b"]})
+    partial = pd.DataFrame({"a": [1.0, 2.0, 3.0]})
+
+    with caplog.at_level(logging.WARNING, logger="skyulf.preprocessing.transformations.power"):
+        out = PowerTransformerApplier().apply(partial, art)
+
+    assert list(out.columns) == ["a"]
+    assert not out["a"].equals(partial["a"])
+    solo = PowerTransformerCalculator().fit(df, {"method": "yeo-johnson", "columns": ["a"]})
+    expected = PowerTransformerApplier().apply(df, solo)["a"]
+    pd.testing.assert_series_equal(out["a"], expected, check_names=False)
+    assert "['b']" in caplog.text
 
 
 def test_power_transformer_apply_polars_swallows_exception(
     monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
-    """A transform failure on the polars path must be logged, not raised (lines 112-114)."""
+    """A transform failure on the polars path must be logged, not raised (lines 112-114).
+
+    Fail-open is only defensible while it stays observable, so the ERROR record
+    and its traceback are pinned alongside the unchanged frame.
+    """
     import skyulf.preprocessing.transformations.power as power_mod
 
     df = pd.DataFrame({"a": [1.0, 2.0, 3.0]})
@@ -195,27 +242,41 @@ def test_power_transformer_apply_polars_swallows_exception(
 
     monkeypatch.setattr(power_mod, "_power_transform_array", _boom)
     pl_df = pl.from_pandas(df)
-    out = PowerTransformerApplier().apply(pl_df, art)
+    with caplog.at_level(logging.ERROR, logger="skyulf.preprocessing.transformations.power"):
+        out = PowerTransformerApplier().apply(pl_df, art)
     # Exception swallowed; original frame returned unchanged.
     assert out.equals(pl_df)
+    assert "PowerTransformer (Polars) application failed" in caplog.text
+    assert "RuntimeError: simulated transform failure" in caplog.text
 
 
 def test_power_transformer_apply_pandas_swallows_exception(
     monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
-    """A transform failure on the pandas path must be logged, not raised (lines 130-131)."""
+    """A transform failure on the pandas path must be logged, not raised (lines 130-131).
+
+    The caller's own frame must come back, not a copy whose columns were already
+    cast to float64 — the polars path returns the untouched original, and a
+    failed transform should not change dtypes on either engine.
+    """
     import skyulf.preprocessing.transformations.power as power_mod
 
-    df = pd.DataFrame({"a": [1.0, 2.0, 3.0]})
+    df = pd.DataFrame({"a": [1, 2, 3]})
     art = PowerTransformerCalculator().fit(df, {"method": "yeo-johnson", "columns": ["a"]})
 
     def _boom(*args, **kwargs):
         raise RuntimeError("simulated transform failure")
 
     monkeypatch.setattr(power_mod, "_power_transform_array", _boom)
-    out = PowerTransformerApplier().apply(df, art)
+    with caplog.at_level(logging.ERROR, logger="skyulf.preprocessing.transformations.power"):
+        out = PowerTransformerApplier().apply(df, art)
     # Exception swallowed; original values returned unchanged.
     pd.testing.assert_frame_equal(out, df)
+    assert out is df
+    assert str(out["a"].dtype) == "int64"
+    assert "PowerTransformer (Pandas) application failed" in caplog.text
+    assert "RuntimeError: simulated transform failure" in caplog.text
 
 
 # ---------------------------------------------------------------------------
