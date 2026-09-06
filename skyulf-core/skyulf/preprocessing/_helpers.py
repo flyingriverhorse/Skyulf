@@ -62,6 +62,51 @@ def to_pandas(X: Any) -> pd.DataFrame:
     return X.to_pandas() if hasattr(X, "to_pandas") else X
 
 
+def select_rows_by_position(y: Any, positions: Any) -> Any:
+    """Return ``y`` restricted and reordered to exactly ``positions``.
+
+    ``positions`` is an integer array-like of row indices into the *original*
+    ``y``, so one value serves both row-changing operations: the kept indices
+    of a filter and the argsort of a sort. ``X`` and ``y`` are given the same
+    ``positions``, which is what keeps them aligned by construction rather than
+    by two independently-correct-looking selections.
+
+    Every ``y`` shape the dispatcher accepts is handled, and the input's type is
+    preserved. Returning ``y`` untouched for an unrecognised shape is what
+    silently desynchronised ``X`` and ``y`` — and
+    ``_check_xy_engine_parity`` documents lists and numpy arrays as
+    engine-neutral, so both really do reach here on either engine.
+
+    Args:
+        y: The paired target. ``None`` passes straight through.
+        positions: Integer row positions, or ``None`` when no row changed.
+
+    Returns:
+        ``y`` holding exactly the requested rows, in the requested order.
+
+    Raises:
+        TypeError: If ``y`` is a shape whose rows cannot be selected here.
+    """
+    if y is None or positions is None:
+        return y
+    if isinstance(y, (pl.Series, pl.DataFrame)):
+        # ``gather`` accepts a polars Series, a numpy array or a list of ints.
+        return y.gather(positions)
+    # A polars Series of positions cannot index a pandas frame or a numpy array,
+    # and numpy arrays have no ``.to_numpy()``, so normalise for both origins.
+    idx = positions.to_numpy() if hasattr(positions, "to_numpy") else np.asarray(positions)
+    if isinstance(y, (pd.Series, pd.DataFrame)):
+        return y.iloc[idx]
+    if isinstance(y, np.ndarray):
+        return y[idx]
+    if isinstance(y, list):
+        return [y[int(i)] for i in idx]
+    raise TypeError(
+        f"Cannot select rows from y of type {type(y).__name__}; expected a polars, pandas, "
+        "numpy or list target (or None)."
+    )
+
+
 def resolve_columns_then_to_pandas(
     X: Any,
     config: dict[str, Any],

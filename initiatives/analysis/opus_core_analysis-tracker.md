@@ -75,7 +75,7 @@ follow, grouped by domain.
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
 | OC-177 | 🟠 | Pandas `DummyEncoder` changes a known category's encoding with batch composition: after fitting `[1.0,2.0]`, `1.0` encodes as known alone but all-zero when accompanied by `2.5` (`preprocessing/encoding/dummy.py:60-64`) | small | ⬜ open |
-| OC-163 | 🟠 | `LagFeatures` / `RollingAggregate` sort X without reordering tuple y on both engines — `[3,1,2]` times become `[1,2,3]` while targets remain `[300,100,200]`, silently training on wrong labels (`preprocessing/time_series/lag.py:45,81`, `rolling.py:63,119`) | small | ⬜ open |
+| OC-163 | 🟠 | `LagFeatures` / `RollingAggregate` sort X without reordering tuple y on both engines — `[3,1,2]` times become `[1,2,3]` while targets remain `[300,100,200]`, silently training on wrong labels (`preprocessing/time_series/lag.py:45,81`, `rolling.py:63,119`) | small | ✅ fixed 2026-09-06 — both engines now derive one positional permutation and hand it to X and y alike, which retired OC-165 and OC-166 in the same pass. See the log entry |
 | OC-164 | 🟠 | `get_fitted_split()` on new data replaces a trained pipeline's preprocessing while retaining its old model — the same input's prediction changed from 50 to −950 (`pipeline/_pipeline.py:234`) | small | ⬜ open |
 | OC-13 | 🟠 | Drop-Rows UI settings ignored; every canvas run becomes "drop any missing" (`pipelineConverter.ts:249-253`) | small | ✅ fixed 2026-09-03 |
 | OC-14 | 🟠 | Iterative Imputer UI estimator choices silently fall back to BayesianRidge (`imputation/_common.py:103-111`) | small | ✅ fixed 2026-09-03 |
@@ -263,8 +263,8 @@ follow, grouped by domain.
 | OC-176 | 🟡 | Polars `LagFeatures(drop_na=True)` removes nulls but retains float NaN in source/lag columns; equivalent pandas input drops those rows (`preprocessing/time_series/lag.py:54-59`) — independent of OC-165's y desynchronization | small | ⬜ open |
 | OC-59 | 🟠 | `DatasetProfile` numeric-column coverage completely different between engines (`preprocessing/inspection/`) | small | ⬜ open |
 | OC-60 | 🟠 | `GeneralBinning`'s `missing_strategy: "label"` silent no-op on polars (`preprocessing/bucketing.py`) | small | ⬜ open |
-| OC-165 | 🟡 | Pandas `LagFeatures(drop_na=True)` removes X rows but leaves tuple y untouched — 3 rows become 2 features / 3 targets even with a unique index (`preprocessing/time_series/lag.py:85-87`) | small | ⬜ open |
-| OC-166 | 🟡 | Polars `IQR`, `ZScore`, and `ManualBounds` filter X but leave NumPy y untouched — 5 rows become 4 features / 5 targets; Polars Series y works (`preprocessing/outliers/_common.py:9-15`) | small | ⬜ open |
+| OC-165 | 🟡 | Pandas `LagFeatures(drop_na=True)` removes X rows but leaves tuple y untouched — 3 rows become 2 features / 3 targets even with a unique index (`preprocessing/time_series/lag.py:85-87`) | small | ✅ fixed 2026-09-06 — with OC-163; `drop_na` now filters y through the same positional keep-mask as X, duplicate-index case included. See the log entry |
+| OC-166 | 🟡 | Polars `IQR`, `ZScore`, and `ManualBounds` filter X but leave NumPy y untouched — 5 rows become 4 features / 5 targets; Polars Series y works (`preprocessing/outliers/_common.py:9-15`) | small | ✅ fixed 2026-09-06 — with OC-163, and **broader than filed**: a fourth copy of the same silent pass-through sat inline in `EllipticEnvelope`, and list targets failed too (crashing on pandas, no-opping on polars). See the log entry |
 
 ### Remaining — modeling / tuning
 
@@ -498,6 +498,81 @@ input and apply any keep-mask identically to y. Unlike OC-165, this reproduces
 without a target. Location: `preprocessing/time_series/lag.py:54-59`.
 
 ## Log
+
+### 2026-09-06 — OC-163/165/166 fixed: five improvised y-selections replaced by one positional helper, and three unfiled copies of the same bug fell out
+
+Filed as three findings across two tiers, this was one root cause. Five call sites
+each hand-rolled "adjust y to match X's rows", and **four of them silently returned
+y untouched for a shape they did not recognise** — which is the bug, since a helper
+that no-ops on an unrecognised target is exactly how X loses rows while y keeps them.
+The fix is a single leaf helper, `select_rows_by_position(y, positions)` in
+`preprocessing/_helpers.py`: one integer-position value serves *both* row-changing
+operations (the argsort of a sort, the kept indices of a filter), so X and y agree
+**by construction** rather than by two independently-correct-looking selections.
+It handles every shape the dispatcher accepts — polars Series/DataFrame via `gather`,
+pandas via `.iloc`, numpy, list — preserves the input's type (the tuple path returns
+`(X, y)` verbatim through `pack_pipeline_output`), and raises `TypeError` on anything
+else instead of passing it through, following `drop_and_missing/_common.py`'s OC-12
+precedent. Positions are always positional, never label-based: `.loc`/`get_indexer`
+on a duplicated index returns every matching row or the first occurrence, the same
+defect in a different hat.
+
+`time_series/_common.py` gains `sort_with_positions_pandas` / `_polars` and keeps
+`sort_pandas` as a delegating wrapper — two JSON-driven test files pin it, and one
+sort implementation means nothing can drift. The pandas positions are read off a
+RangeIndex'd copy of the sort key run through pandas' own `sort_values`, so the order
+is identical by construction rather than by a second sort I have to keep in sync; the
+polars side uses `pl.arg_sort_by`, the expression form of `DataFrame.sort` taking the
+same `nulls_last`/`maintain_order` flags, so `X.gather(order)` *is* the `X.sort(...)`
+it replaces. **No new reserved helper-column name was introduced** — OC-160 is still
+open, and materialising `__pos__` into a user frame would be a fresh instance of that
+collision class. Proved by running the whole matrix against a frame with a column
+literally named `__pos__`.
+
+Three defects this pass exposed that were never filed, all the same silent
+pass-through and all now routed through the helper: (1) **`EllipticEnvelopeApplier`
+had a fourth inline copy of OC-166** — `y.filter(mask) if hasattr(y, "filter") else y`
+— so the finding's "IQR, ZScore, ManualBounds" list was one node short;
+(2) polars `LagFeatures(drop_na=True)` called `.filter` **directly** on y, raising
+`AttributeError: 'numpy.ndarray' object has no attribute 'filter'` for the very
+targets `_check_xy_engine_parity` documents as engine-neutral and accepts;
+(3) the pandas outlier path did `y[mask]`, raising `TypeError: list indices must be
+integers or slices, not Series` on a list y. So OC-166 was broader than filed twice
+over: list targets failed as well as numpy, and the two engines failed *differently*
+— a crash on pandas, a silent no-op on polars. The silent variant is the dangerous
+one; the crash at least announces itself.
+
+A test had pinned the bug as the contract.
+`test_polars_tuple_xy_with_non_polars_y_passthrough` asserted `y_out is y`, with a
+docstring naming "the `_filter_y_polars` fallback branch" as the behaviour to
+preserve — that branch *is* OC-166. Rewritten (not deleted) as a parametrized
+list/numpy case asserting y is filtered in sync, with y mirroring the `val` column so
+it pins *which* rows survived, not merely how many: a y filtered through the wrong
+mask would still have the right length.
+
+Deliberately left open: **OC-173** is a different defect in the same file
+(`_elliptic_filter_pandas` reselecting valid values by duplicated index labels), and
+I verified no interaction — `X_pd[mask]` and `X_pd.iloc[keep]` are identical on
+duplicate labels. `winsorize.py` was checked and never filters rows. **OC-160** is
+untouched, and this fix adds no reserved names for it to collide with.
+
+Verification: new `tests/integration/test_xy_row_alignment.py` (127 tests)
+parametrizes the full engine × y-shape product — 2 engines × list/numpy/Series/
+DataFrame = 8 ids — across `LagFeatures`, `RollingAggregate`, `IQR`, `ZScore`,
+`ManualBounds` and `EllipticEnvelope`, plus sorting composed with `drop_na`, and
+helper-level tests pinning the sort positions against `sort_values`/`DataFrame.sort`
+on ties, nulls, dates and duplicated indexes. **Genuineness proved:** reverting only
+the four node files to HEAD (helpers left present-but-unused so imports still
+resolve, making every failure behavioural rather than a collection error) gives
+**45 failed, 82 passed** — and the 82 passes are precisely the controls the findings
+themselves named: polars Series y already filtered correctly, X-only sorting
+unchanged. Restored with `md5sum -c`, all four OK. One incidental change: the pandas
+`drop_na` positions moved off `~df.isna().any(axis=1).to_numpy()` because ty types
+`DataFrame.any(axis=1)` as `Series | bool`; the replacement
+`df.notna().to_numpy().all(axis=1)` is the same predicate numpy-side and matches
+`df.dropna()` on 11 edge cases (zero-column, all-null column, object dtype, nullable
+`Int64`, duplicated and non-monotonic indexes). Core 3672 → **3783**, backend
+**1637** unchanged, ruff check/format and ty clean.
 
 ### 2026-09-06 — OC-159/131/28/77 fixed, OC-55 verified stale: three fail-open paths and a coverage floor 51 points below reality
 

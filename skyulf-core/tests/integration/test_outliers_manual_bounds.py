@@ -12,6 +12,7 @@ Covers:
 
 import typing
 
+import numpy as np
 import pandas as pd
 import polars as pl
 import pytest
@@ -284,15 +285,27 @@ class TestManualBoundsApplierPolars:
         assert isinstance(y_out, pl.DataFrame)
         assert X_out.height == y_out.height
 
-    def test_polars_tuple_xy_with_non_polars_y_passthrough(self, df_polars: pl.DataFrame) -> None:
-        """A non-Polars, non-None ``y`` alongside a Polars X must be returned
-        unchanged (the ``_filter_y_polars`` fallback branch).
+    @pytest.mark.parametrize(
+        "as_y",
+        [pytest.param(list, id="list"), pytest.param(np.asarray, id="numpy")],
+    )
+    def test_polars_tuple_xy_with_engine_neutral_y_filtered_in_sync(
+        self, df_polars: pl.DataFrame, as_y: typing.Callable[[list], typing.Any]
+    ) -> None:
+        """An engine-neutral ``y`` (list or numpy) beside a Polars X is filtered in sync.
+
+        Regression for OC-166: ``_filter_y_polars`` used to return any non-Polars
+        target untouched, so X lost the outlier rows while y kept all six, and
+        downstream training consumed the pair positionally. ``y`` mirrors the
+        ``val`` column so this pins *which* rows survived, not just how many — a y
+        filtered through a different mask would still have the right length.
         """
-        y = [0, 1, 2, 3, 4, 5]
+        y = as_y(df_polars["val"].to_list())
         config = {"bounds": {"val": {"lower": 0.0, "upper": 50.0}}}
         params = ManualBoundsCalculator().fit(df_polars.to_pandas(), config)
-        _, y_out = self._APPLIER.apply((df_polars, y), params)
-        assert y_out is y
+        X_out, y_out = self._APPLIER.apply((df_polars, y), params)
+        assert len(y_out) == X_out.height
+        assert list(y_out) == X_out["val"].to_list()
 
 
 # ---------------------------------------------------------------------------
