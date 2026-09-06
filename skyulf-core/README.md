@@ -13,7 +13,7 @@ it: sklearn remains the modeling foundation while Skyulf provides pipeline
 configuration, artifacts, metrics, and safe execution conventions.
 
 <!-- Quick badges + links -->
-[![Docs](https://img.shields.io/website?down_color=red&down_message=offline&up_message=online&url=https://www.skyulf.com/manual/)](https://www.skyulf.com/manual/) [![PyPI](https://img.shields.io/pypi/v/skyulf-core.svg)](https://pypi.org/project/skyulf-core) [![License](https://img.shields.io/github/license/flyingriverhorse/Skyulf)](LICENSE)
+[![Docs](https://img.shields.io/website?down_color=red&down_message=offline&up_message=online&url=https://www.skyulf.com/manual/)](https://www.skyulf.com/manual/) [![PyPI](https://img.shields.io/pypi/v/skyulf-core.svg)](https://pypi.org/project/skyulf-core) [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![Downloads](https://img.shields.io/pypi/dm/skyulf-core.svg)](https://pypi.org/project/skyulf-core) [![issues](https://img.shields.io/github/issues/flyingriverhorse/Skyulf.svg)](https://github.com/flyingriverhorse/Skyulf/issues) [![contributors](https://img.shields.io/github/contributors/flyingriverhorse/Skyulf.svg)](https://github.com/flyingriverhorse/Skyulf/graphs/contributors)
 
 **Website & Documentation**
@@ -409,5 +409,12 @@ mindmap
 
 ## License
 
-This project is licensed under the GNU Affero General Public License v3.0
-or later (AGPLv3+); see the [LICENSE](LICENSE) file.
+`skyulf-core` — this standalone Python library — is licensed under the
+**Apache License 2.0**; see the [LICENSE](LICENSE) file beside it.
+
+That is the permissive half of a split model: the Skyulf **backend and
+frontend are GNU AGPLv3**. You can use `skyulf-core` in proprietary projects
+without restriction, while running a modified backend or frontend as a network
+service carries AGPLv3's copyleft obligations. See
+[COMMERCIAL-LICENSE.md](https://github.com/flyingriverhorse/Skyulf/blob/master/COMMERCIAL-LICENSE.md)
+for the full terms.

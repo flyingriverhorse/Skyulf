@@ -58,6 +58,7 @@ openpyxl>=3.1.0                      # Excel reading support (used by Pandas int
 pandas>=2.0.0,<3.0.0
 numpy>=1.24.0
 scikit-learn>=1.8.0,<2.0.0
+joblib>=1.3.0                        # Artifact serialization + parallel backends (transitive via scikit-learn, imported directly)
 xgboost>=2.1.4                       # XGBoost classifier/regressor models
 lightgbm>=4.0.0                      # LightGBM classifier/regressor models (leaf-wise boosting)
 shap>=0.46.0,<1.0.0                  # SHAP explainability for model interpretability
