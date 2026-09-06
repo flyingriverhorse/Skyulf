@@ -73,7 +73,7 @@ export const Sidebar: React.FC = () => {
         <div className="flex items-center justify-between">
           <div>
             <h2 className="font-semibold tracking-tight">Components</h2>
-            <p className="text-xs text-muted-foreground">Drag and drop to canvas</p>
+            <p className="text-xs text-muted-foreground">Click or drag to add a node</p>
           </div>
           <button
             onClick={() => setSidebarOpen(false)}
@@ -114,25 +114,26 @@ export const Sidebar: React.FC = () => {
               </h3>
               <div className="space-y-2">
                 {categoryNodes.map((node) => (
-                  // eslint-disable-next-line jsx-a11y/click-events-have-key-events,jsx-a11y/no-static-element-interactions -- draggable item; drag is the primary interaction
-                  <div
+                  <button
+                    type="button"
                     key={node.type}
                     data-testid={`sidebar-node-${node.type}`}
-                    className="group flex items-center p-3 border rounded-lg bg-card hover:border-primary/50 hover:shadow-sm cursor-grab active:cursor-grabbing transition-all"
+                    aria-label={`Add ${node.label} node`}
+                    className="group flex w-full items-center p-3 border rounded-lg bg-card text-left hover:border-primary/50 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background cursor-grab active:cursor-grabbing transition-all"
                     draggable
                     onDragStart={(e) => { handleDragStart(e, node.type); }}
                     onClick={() => { handleAddNodeClick(node.type); }}
                   >
-                    <div className="p-2 bg-primary/5 group-hover:bg-primary/10 rounded-md mr-3 transition-colors">
+                    <span className="p-2 bg-primary/5 group-hover:bg-primary/10 rounded-md mr-3 transition-colors">
                       {node.icon && <node.icon className="w-4 h-4 text-primary" />}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium truncate">{node.label}</div>
-                      <div className="text-xs text-muted-foreground truncate">
+                    </span>
+                    <span className="flex-1 min-w-0">
+                      <span className="block text-sm font-medium truncate">{node.label}</span>
+                      <span className="block text-xs text-muted-foreground truncate">
                         {node.description}
-                      </div>
-                    </div>
-                  </div>
+                      </span>
+                    </span>
+                  </button>
                 ))}
               </div>
             </div>
