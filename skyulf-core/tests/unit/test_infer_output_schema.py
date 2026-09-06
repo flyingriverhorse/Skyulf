@@ -2,6 +2,7 @@
 
 import pandas as pd
 import pytest
+from sklearn.preprocessing import TargetEncoder
 
 from skyulf.preprocessing import SkyulfSchema
 from skyulf.preprocessing.base import BaseCalculator
@@ -200,13 +201,37 @@ def test_phase_a_passthrough(calc_cls: type) -> None:
     assert calc_cls().infer_output_schema(s, {}) == s
 
 
-def test_target_encoder_binary_regression_is_passthrough() -> None:
-    # Unlike the multiclass/"auto" case (covered in test_encoding_target.py),
-    # explicit binary/regression target_type is confidently in-place.
+def test_target_encoder_binary_continuous_is_passthrough() -> None:
+    """Explicit binary/continuous ``target_type`` encodes in place, so its schema is predictable.
+
+    Breaks if the encoder ever starts fanning out columns for these two target
+    types, or if the in-place prediction is lost for the regression case —
+    ``"continuous"`` is sklearn's spelling, not ``"regression"``.
+    """
     s = SkyulfSchema.from_columns(["a", "b", "c"], {"a": "float64"})
-    for target_type in ("binary", "regression"):
+    for target_type in ("binary", "continuous"):
         out = TargetEncoderCalculator().infer_output_schema(s, {"target_type": target_type})
         assert out == s
+
+
+def test_target_encoder_regression_spelling_is_rejected_and_opaque() -> None:
+    """``"regression"`` is not a sklearn ``target_type``, so the schema must stay opaque for it.
+
+    Pins OC-22: this file used to assert passthrough for ``"regression"``, which
+    promised an output shape no working pipeline could ever produce — the value
+    is forwarded to ``TargetEncoder(target_type=...)`` verbatim and raises at
+    fit. Breaks if sklearn starts accepting the alias, or if the prediction
+    starts answering for a config that cannot fit.
+    """
+    X = pd.DataFrame({"cat": ["a", "b", "a", "b"]})
+    y = pd.Series([0, 1, 0, 1])
+    # sklearn raises InvalidParameterError, which subclasses ValueError; the class
+    # itself lives in the private sklearn.utils._param_validation, so match the base.
+    with pytest.raises(ValueError, match="target_type"):
+        TargetEncoder(target_type="regression").fit(X, y)
+
+    s = SkyulfSchema.from_columns(["cat"], {"cat": "object"})
+    assert TargetEncoderCalculator().infer_output_schema(s, {"target_type": "regression"}) is None
 
 
 # ---------- Phase A: config-driven Calculators ----------
@@ -300,7 +325,7 @@ DATA_DEPENDENT_CALCULATORS = [
     DummyEncoderCalculator,
     HashEncoderCalculator,  # passthrough actually — kept here pending review
     TargetEncoderCalculator,  # returns None for the default "auto"/multiclass
-    # target_type (data-dependent column fan-out); binary/regression stays
+    # target_type (data-dependent column fan-out); binary/continuous stays
     # passthrough, covered separately in test_encoding_target.py.
     # Bucketing — output column set depends on fitted bin edges.
     GeneralBinningCalculator,

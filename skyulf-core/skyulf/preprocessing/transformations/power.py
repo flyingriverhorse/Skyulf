@@ -106,6 +106,12 @@ class PowerTransformerApplier(BaseApplier):
         try:
             X_vals = df_out[valid_cols].to_numpy()
             X_trans = _power_transform_array(X_vals, params, cols, valid_cols)
+            # The transform result is float; writing it into an integer column is
+            # the pandas "incompatible dtype" FutureWarning, slated to become an
+            # error — which the bare except below would swallow into a silent
+            # no-op that returns untransformed data. Cast first.
+            for col in valid_cols:
+                df_out[col] = df_out[col].astype("float64")
             df_out.loc[:, valid_cols] = np.asarray(X_trans)
         except Exception:
             logger.exception("PowerTransformer (Pandas) application failed")

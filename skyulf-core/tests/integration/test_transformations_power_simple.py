@@ -5,6 +5,8 @@ plus edge cases: non-positive data with box-cox, missing columns, negative
 inputs for log/sqrt, and pandas/polars parity for simple transformations.
 """
 
+import warnings
+
 import numpy as np
 import pandas as pd
 import polars as pl
@@ -86,6 +88,37 @@ def test_power_transformer_polars_apply_matches_pandas() -> None:
     np.testing.assert_allclose(
         pandas_out["a"].to_numpy(), np.array(polars_out["a"].to_list()), rtol=1e-6, atol=1e-6
     )
+
+
+def test_power_transformer_pandas_apply_integer_columns_avoids_dtype_warning() -> None:
+    """Applying to integer-dtype columns must not trip pandas' incompatible-dtype deprecation.
+
+    Pins OC-05: the float transform result used to be written straight into the
+    original ``int64`` columns with ``.loc``, which pandas deprecates and will
+    turn into an error. That would be silent rather than loud, because the apply
+    body swallows every exception and returns the frame unchanged — so warnings
+    are *recorded* here instead of promoted to errors, and the test also asserts
+    the transform genuinely ran.
+    """
+    df = pd.DataFrame({"keep": ["x", "y", "z", "w"], "a": [1, 2, 3, 4], "b": [2, 3, 4, 5]})
+    art = PowerTransformerCalculator().fit(df, {"method": "yeo-johnson", "columns": ["a", "b"]})
+
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        out = PowerTransformerApplier().apply(df, art)
+
+    assert [str(w.message) for w in caught if "incompatible dtype" in str(w.message)] == []
+    assert list(out.columns) == ["keep", "a", "b"]
+    assert out["a"].dtype == np.float64
+    assert out["b"].dtype == np.float64
+    assert out["keep"].tolist() == ["x", "y", "z", "w"]
+    # Not a swallowed no-op: the values really were transformed.
+    assert not np.allclose(out["a"].to_numpy(), df["a"].to_numpy())
+
+    # The cast must not perturb the math — identical to the float-input frame.
+    float_df = df.astype({"a": "float64", "b": "float64"})
+    float_out = PowerTransformerApplier().apply(float_df, art)
+    np.testing.assert_allclose(out[["a", "b"]].to_numpy(), float_out[["a", "b"]].to_numpy())
 
 
 def test_power_transformer_standardize_false_skips_scaler() -> None:

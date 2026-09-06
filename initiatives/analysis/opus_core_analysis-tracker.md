@@ -310,6 +310,77 @@ key — also the fastest way to find drift the audit missed).
 ---
 
 ## New findings;
+### 2026-09-06 — remaining-source continuation (findings added as verified)
+
+| ID | Sev | Item | Effort | Status |
+|---|---|---|---|---|
+| OC-187 | 🟡 | LightGBM's advertised `subsample` control and default search dimension have no effect: both calculators retain native `subsample_freq=0`, disabling row bagging (`modeling/hyperparameters/_tree.py:576`, `_registry.py:298,309`; `classification.py:754`, `regression.py:547`) | small | ⬜ open |
+| OC-188 | 🟠 | Rule discovery decodes sklearn class positions against Polars' shared category dictionary, publishing labels absent from the target while reporting perfect accuracy (`profiling/_analyzer/rules.py:169-170,196-198,295-298`) | small | ⬜ open |
+| OC-189 | 🟡 | Classification rule text reports `Samples: 1` for leaves containing multiple rows: it sums sklearn's normalized class proportions instead of using the leaf sample count (`profiling/_analyzer/rules.py:299-301`) | small | ⬜ open |
+| OC-190 | 🟡 | A categorical column named `count` crashes profiling and categorical drift because `value_counts()` generates the same column name (`profiling/analyzer.py:286-290`, `profiling/drift.py:380-381`) | small | ⬜ open |
+| OC-191 | 🟡 | All-null and Polars Enum columns are classified as text and sent to string-only aggregates, aborting the whole profile (`profiling/analyzer.py`, `_analyzer/column.py`) | small | ⬜ open |
+| OC-192 | 🟡 | Decomposition's categorical null bucket displays as `Unknown`, but drilling into it filters for the literal string and silently loses the bucket's rows (`profiling/_analyzer/decomposition.py:71-76`) | small | ⬜ open |
+| OC-193 | 🟡 | A single missing timestamp removes time-series analysis at the 1,000-row resampling boundary: dynamic grouping receives null date keys and the exception is swallowed (`profiling/_analyzer/temporal.py:232,243`) | small | ⬜ open |
+
+**OC-188/189 — wrong rule labels and support counts.** Keep
+`held = pl.Series(['unrelated_1','unrelated_2']).cast(pl.Categorical)` alive,
+then discover classification rules for `x=[0,0,0,1,1,1]` and
+`target=['no','no','no','yes','yes','yes']`. Executed
+`EDAAnalyzer(df)._discover_rules(['x'], 'target', 'classification')` returns
+accuracy **1.0** but predicts **unrelated_1 / unrelated_2** in its nodes and
+rule text. Both leaf nodes have `samples=3`, while the text says **Samples: 1**.
+The first defect confuses encoded class values with sklearn class-array
+positions; the second independently treats normalized proportions as counts.
+**Fix/verification targets:** decode through fitted `clf.classes_` and the
+matching category mapping; use the actual leaf count for textual support.
+Cover non-contiguous category codes and leaves containing multiple samples.
+
+**OC-190 — reserved count column.** Executed
+`EDAAnalyzer(pl.DataFrame({'count': ['a']*99 + ['b']})).analyze()` raises
+`DuplicateError: using value_counts on a column/series named 'count' would
+lead to duplicate column names`. The categorical drift path reproduces the
+same failure. **Fix/verification target:** choose collision-safe internal
+count names and cover profile and drift entry points with user columns named
+`count`. This is distinct from OC-161's clustering feature overwrite.
+
+**OC-191 — unsupported string aggregation on valid dtypes.** Executed
+`EDAAnalyzer(pl.DataFrame({'x': [None,None]})).analyze()` raises
+`SchemaError: expected String, got null`; using
+`pl.Series(['a','b'], dtype=pl.Enum(['a','b']))` raises the equivalent Enum
+error. **Fix/verification target:** handle null-only columns and recognize or
+normalize Enum before text aggregates. OC-121 concerns preprocessing
+auto-selection; this finding concerns profiling aborting completely.
+
+**OC-192 — categorical null drill-down loses the selected group.** With
+`group=['a',None,'b']` and `v=[1,2,3]`, a decomposition sum split publishes an
+`Unknown` bucket valued **2**. Applying
+`{'column':'group','operator':'==','value':'Unknown'}` returns a total of
+**0**. Only numeric columns recognize the null sentinel.
+**Fix/verification target:** preserve null identity across split output and
+filter input for every dtype, including genuine literal `Unknown` values.
+
+**OC-193 — nullable dates break large-frame time analysis.** Executed the
+same daily-date/value construction with the final date missing: **999 rows**
+yield **998** trend points, while **1,000 rows** yield `timeseries=None` and
+log `null values in dynamic group_by not supported`. The larger-frame branch
+resamples without removing null date keys. **Fix/verification target:** apply
+an explicit missing-timestamp policy before resampling and test both sides of
+the row-count boundary. OC-114 instead concerns all-null numeric ACF results.
+
+**OC-187 — LightGBM row-subsampling control is inert.** Executed both public
+`LGBMRegressorCalculator.fit` and `LGBMClassifierCalculator.fit` on 300-row,
+6-feature sklearn generated datasets (`random_state=7`). With 20 trees, one
+worker and seed 7, changing only `subsample` from 1.0 to 0.4 produced exactly
+identical predictions/probabilities (maximum difference **0.0**). Setting
+`subsample_freq=1` as a control produced maximum differences **85.66120232221425**
+for regression and **0.16583687788133306** for classification. The metadata
+exposes `subsample` but no frequency control; the default search proposes
+`[0.6, 0.8, 1.0]` while the estimator frequency remains zero. This silently
+ignores a requested regularization setting and wastes trials on equivalent
+models. **Fix/verification target:** define and expose the bagging activation
+policy for supported boosting modes, and verify a selected fraction changes
+the fitted model when bagging is enabled. No implementation change made.
+
 ### 2026-09-05 — OC-163–168 filed: supplemental core review, six additional reproduced bugs
 
 All six were reproduced through executed Python probes against the working tree and checked against the existing tracker and relevant source-audit reports. IDs follow the review's reported order. Two high-severity findings enter **Next**; the four medium-severity findings enter their domain queues. All remain **open**. This filing changes only the tracker; no implementation fixes or regression tests were added.
