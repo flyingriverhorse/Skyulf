@@ -30,6 +30,15 @@ grepping for consumers, **not** reproduced by execution, and none is fixed: each
 changes behaviour rather than documentation, so all four are filed open by
 decision for a later session. Historical baseline counts remain unchanged.
 
+**Remaining-source continuation (2026-09-06):** OC-187–206 add 20 executed
+findings (5 🟠 / 14 🟡 / 1 ⚪), filed directly in the continuation table under
+**New findings**. All remain open. The original core-source ledger now records
+**188/188 files read**; the 45 selected modeling/profiling test files passed
+**909 tests** (142 warnings). The exact command is recorded in
+[`core_source_review_2026-09-05.md`](core_source_review_2026-09-05.md).
+Historical baseline counts remain unchanged; no implementation fixes were made
+by this review.
+
 The queue below follows the master report's suggested fix order (4 tiers), then the
 remaining findings grouped by domain. R1 (the systemic core↔frontend contract fix)
 retires 8 findings as a class and is tracked separately.
@@ -312,6 +321,11 @@ key — also the fastest way to find drift the audit missed).
 ## New findings;
 ### 2026-09-06 — remaining-source continuation (findings added as verified)
 
+All entries below have executed reproduction evidence. Source paths are
+relative to `skyulf-core/skyulf/`; line numbers refer to the source read during
+the review and may move with concurrent edits. The main reviewer independently
+reproduced the filed symptoms before completing the source ledger.
+
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
 | OC-187 | 🟡 | LightGBM's advertised `subsample` control and default search dimension have no effect: both calculators retain native `subsample_freq=0`, disabling row bagging (`modeling/hyperparameters/_tree.py:576`, `_registry.py:298,309`; `classification.py:754`, `regression.py:547`) | small | ⬜ open |
@@ -321,6 +335,149 @@ key — also the fastest way to find drift the audit missed).
 | OC-191 | 🟡 | All-null and Polars Enum columns are classified as text and sent to string-only aggregates, aborting the whole profile (`profiling/analyzer.py`, `_analyzer/column.py`) | small | ⬜ open |
 | OC-192 | 🟡 | Decomposition's categorical null bucket displays as `Unknown`, but drilling into it filters for the literal string and silently loses the bucket's rows (`profiling/_analyzer/decomposition.py:71-76`) | small | ⬜ open |
 | OC-193 | 🟡 | A single missing timestamp removes time-series analysis at the 1,000-row resampling boundary: dynamic grouping receives null date keys and the exception is swallowed (`profiling/_analyzer/temporal.py:232,243`) | small | ⬜ open |
+| OC-194 | 🟠 | Pandas time-series CV sorts with `Series.argsort()`'s `-1` missing-date sentinels as row positions, duplicating/dropping observations and destroying chronological order (`modeling/cross_validation.py:327-330`) | small | ⬜ open |
+| OC-195 | 🟡 | Clustering numeric-feature selection skips `SkyulfPandasWrapper`, so wrapping a working pandas frame with text columns makes fitting fail (`modeling/clustering.py:40-53`) | small | ⬜ open |
+| OC-196 | 🟡 | GaussianMixture probability prediction omits the feature/reference filtering used for fit and ordinary prediction, causing a feature-count mismatch on the same input (`modeling/clustering.py:83-89`, `modeling/sklearn_wrapper.py:266-279`) | small | ⬜ open |
+| OC-197 | 🟡 | Polars clustering reference crosstabs crash for reference columns named `count` or `__skyulf_cluster__` (`modeling/_evaluation/clustering.py:137-146`) | small | ⬜ open |
+| OC-198 | 🟠 | Profiling a string target overwrites an existing `<target>_encoded` feature, then duplicate selection prevents correlation and causal analysis (`profiling/analyzer.py:341-348`) | small | ⬜ open |
+| OC-199 | 🟡 | Explicit latitude/longitude selections bypass `exclude_cols`, returning coordinates for columns excluded from the profile (`profiling/_analyzer/geo.py:58-59`) | small | ⬜ open |
+| OC-200 | 🟠 | Halving search accepts an all-NaN score set as a successful best result and refits a model; grid search correctly fails on identical folds (`modeling/_tuning/strategies/runner.py:110-127`) | small | ⬜ open |
+| OC-201 | 🟡 | Optuna skips search-space normalization: `max_depth=['none']` works in grid search but fails every Optuna trial (`modeling/_tuning/strategies/optuna.py:199`) | small | ⬜ open |
+| OC-202 | 🟡 | Fold-aware tuning wrapper omits `decision_function` and unconditionally advertises `predict_proba`, breaking ROC-AUC scoring for SVC without probability support (`modeling/_tuning/fold_pipeline.py:164-172`) | small | ⬜ open |
+| OC-203 | 🟡 | Optuna CMA-ES treats Boolean candidates as integers, turning valid `fit_intercept=[True,False]` into invalid sklearn parameter values (`modeling/_tuning/strategies/optuna.py:113-140`) | small | ⬜ open |
+| OC-204 | 🟡 | `fit_predict` drops an embedded target during training but keeps it in held-out tuple features when explicit y is also supplied, causing prediction to fail (`modeling/base.py:317-324`) | small | ⬜ open |
+| OC-205 | 🟠 | Grid/random tuning discards failed folds from each candidate's average, allowing a partially failed candidate to win with an apparently valid score and no failure count in the result (`modeling/_tuning/grid_random.py:91-92`) | small | ⬜ open |
+| OC-206 | ⚪ | Ensemble configuration resolution shallow-copies nested base-model parameters, so fitting mutates the caller's configuration (`modeling/ensemble.py:473,484`) | small | ⬜ open |
+
+**OC-206 — fitting an ensemble mutates caller configuration.** Executed
+`VotingClassifierCalculator().fit` with one decision-tree base learner,
+`base_estimator_params={'decision_tree':{'max_depth':2}}`, and
+`decision_tree__min_samples_leaf=3`. After fitting, the caller's original
+`base_estimator_params['decision_tree']` has gained `min_samples_leaf:3`.
+Only the outer mapping is copied before nested keys are absorbed. Reusing the
+configuration after removing a temporary override therefore retains it.
+**Fix/verification target:** copy the nested parameter mappings before
+normalization and pin non-mutation of caller-owned configuration.
+
+**OC-204 — tuple target extraction differs between train and test.** Executed
+`StatefulEstimator(LogisticRegressionCalculator(),LogisticRegressionApplier(),'probe')`
+with `X=DataFrame({'x':range(10),'target':[0]*5+[1]*5})`, and a `SplitDataset`
+whose train/test splits both contain `(X,X.target)`. `fit_predict(...,
+'target',{})` fits one feature, then raises
+`X has 2 features, but LogisticRegression is expecting 1 features as input`.
+Changing tuple y to `None` succeeds for both splits. **Fix/verification target:**
+use the same target-column exclusion contract for training, test and validation,
+regardless of whether y is supplied separately.
+
+**OC-205 — failed folds improve candidate eligibility.** Executed public
+grid tuning of `KNeighborsRegressor` on five rows (`x=range(5)`, all-zero y),
+with two unshuffled folds, metric `mse`, and `n_neighbors=[3]`. Fold 1 fails
+because its training set has two rows; fold 2 scores **0.0**. The search
+returns a fitted model, `best_score=0.0`, and a trial containing only the
+successful mean. The custom loop removes `-inf` failure sentinels before
+averaging, so candidates can be compared over different surviving subsets.
+**Fix/verification target:** define consistent candidate failure semantics
+and expose fold failures; do not present a partial-fold mean as a successful
+complete-CV result. Separate from OC-200's all-NaN halving acceptance.
+
+**OC-200 — invalid halving scores still produce a fitted result.** Executed
+`TuningCalculator(SklearnCalculator(Ridge,{},'regression')).fit` on
+`X=DataFrame({'x':range(4)})`, `y=Series(range(4))`, with metric `r2`, four
+folds, `search_space={'alpha':[1.]}` and `min_resources=4`. Grid search raises
+`All trials failed` because each validation fold has only one row. Changing
+the strategy to `halving_grid` returns a fitted model, `best_score=nan` and
+a trial score of `nan`. **Fix/verification target:** require a finite winning
+score before logging completion or refitting, consistently across strategies;
+preserve actionable scorer failures. This is independent of the invalid
+metric-name lookup already tracked by OC-67.
+
+**OC-201 — strategy-dependent null parameter handling.** On
+`X=DataFrame({'x':range(40)})`, `y=Series(arange(40)%2)`, tune a
+`DecisionTreeClassifier` with two folds, one trial and
+`search_space={'max_depth':['none']}`. Executed grid search succeeds with
+`best_params={'max_depth':None}`. Optuna instead fails all trials because it
+constructs distributions directly from the uncleaned string. **Fix/verification
+target:** normalize once before strategy dispatch and pin equivalent candidate
+values across grid, random, halving and Optuna.
+
+**OC-202 — fold-aware scoring loses estimator response methods.** Executed
+ROC-AUC scoring of `SVC(probability=False)` on 40 alternating-label rows:
+the fitted native model returns **0.525**. Wrap the same estimator in
+`FoldAwareModelStep` with identity `fit_transform`/`transform`, and the same
+scorer raises `AttributeError: This 'SVC' has no attribute 'predict_proba'`.
+The wrapper exposes that method even when the estimator cannot implement it,
+and does not forward the working `decision_function`. A halving search with
+identity preprocessing also reproduces invalid scores, interacting with
+OC-200. **Fix/verification target:** delegate response methods conditionally
+and preserve decision scores through preprocessing and label mapping.
+
+**OC-203 — Boolean CMA-ES choices become integer candidates.** Executed
+`build_optuna_distributions({'fit_intercept':[True,False]}, True)` yields an
+`IntDistribution` spanning 0–1 because `isinstance(True,int)` is true. Native
+`Ridge(fit_intercept=True)` fits, while integer `fit_intercept=1` raises
+`InvalidParameterError`. Public tuning with the Boolean search space, Optuna
+and `strategy_params={'sampler':'cmaes'}` fails every trial on the same
+40-row dataset. **Fix/verification target:** keep Boolean lists categorical
+before numeric-range detection, including a successful end-to-end Boolean
+parameter search. The source's comment already promises this behavior.
+
+**OC-194 — missing dates corrupt time-series CV rows.** Executed
+`_sort_pandas_by_column` with dates
+`['2024-01-03',None,'2024-01-01',None,'2024-01-02']`, row IDs
+`[0,1,2,3,4]`, and targets `[100,101,102,103,104]`. It returns row IDs
+**[1,4,2,4,0]** and targets **[101,104,102,104,100]**. Row 3 disappears and
+row 4 occurs twice; the retained dated rows are not chronological. Pandas
+also emits a warning about the missing-value `argsort` behavior. The helper
+consumes sentinel positions as valid negative `iloc` positions before dropping
+the date column. **Fix/verification target:** construct a genuine positional
+sort permutation with an explicit missing-date policy; verify one-to-one row
+preservation, chronological order, and X/y alignment. Separate from OC-162's
+Polars temporary-column collision.
+
+**OC-195 — wrapped pandas clustering loses numeric filtering.** Executed
+`KMeansCalculator().fit(X,None,{'n_clusters':2})` for pandas
+`x=[0.,.1,.2,10.,10.1,10.2]`, `text=['name']*6`: it fits one feature.
+Passing `SkyulfPandasWrapper(X)` instead raises
+`ValueError: could not convert string to float: 'name'`.
+**Fix/verification target:** recognize both supported wrappers through the
+public adapter interface and preserve the raw-frame behavior for every
+clustering calculator/applier sharing the helper.
+
+**OC-196 — GaussianMixture fit/predict/probability feature mismatch.** Fit
+`GaussianMixtureCalculator` on pandas
+`x=[0.,.1,.2,10.,10.1,10.2]`, `ref=[0,0,0,1,1,1]`, with
+`reference_column='ref', n_components=2`. On that same frame, the public
+applier's `predict` succeeds, while `predict_proba` raises
+`X has 2 features, but GaussianMixture is expecting 1 features as input`.
+**Fix/verification target:** share fitted feature selection between prediction
+methods; verify probabilities also work with excluded text/reference columns.
+
+**OC-197 — reference-crosstab internal names collide.** Executed
+`_compute_reference_crosstab_polars` with labels `[0,0,1,1]` and reference
+values `['a','b','a','b']`: a Series named `species` yields the expected four
+counts. Naming it `count` raises `DuplicateError`; naming it
+`__skyulf_cluster__` raises a duplicate-group-key error. The review also
+reproduced `count` through public clustering evaluation. **Fix/verification
+target:** choose independent collision-safe names for cluster, reference and
+count columns. OC-161 concerns centroid features; this is the separate
+reference-label aggregation path.
+
+**OC-198 — profiling target encoding overwrites a real feature.** Executed
+`EDAAnalyzer` on `x=[1,2,3]`, `target=['a','a','b']`,
+`target_encoded=[100,200,300]`, then `analyze(target_col='target')`.
+The analyzer's `target_encoded` values become **[0,0,1]**. Correlation and
+causal discovery log duplicate-projection errors because the helper's name
+is also appended to the feature list. **Fix/verification target:** avoid
+overwriting user columns and duplicating feature names when materializing
+an encoded target; preserve the original values across repeated analysis.
+
+**OC-199 — explicitly selected coordinates survive exclusion.** Executed
+`EDAAnalyzer(pl.DataFrame({'lat':[1.,2.,3.], 'lon':[10.,20.,30.],
+'x':[1.,2.,3.]})).analyze(exclude_cols=['lat','lon'],lat_col='lat',lon_col='lon')`.
+The result still contains all three coordinate pairs in
+`geospatial.sample_points`, plus their bounds and centroid, although the
+per-column profile excludes them. **Fix/verification target:** apply the
+exclusion policy consistently before explicit geospatial selection.
 
 **OC-188/189 — wrong rule labels and support counts.** Keep
 `held = pl.Series(['unrelated_1','unrelated_2']).cast(pl.Categorical)` alive,

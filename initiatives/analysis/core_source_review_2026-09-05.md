@@ -4,12 +4,11 @@ Scope: the 188 Python files under `skyulf-core/skyulf/` (34,383 lines in the
 initial inventory). Tests, examples, packaging files, and other repository
 layers are not part of this file-by-file count.
 
-Status: **118 files read; 70 remaining.** Last updated: 2026-09-06. The earlier conversational count was
-approximate; this ledger reconciles the completed reads, including six
-`drop_and_missing/` files and outlier `_common.py`/`manual_bounds.py` read before
-the final batch. A checked file means its full source was read, not that it is
-proven bug-free. Unchecked files may have been inspected selectively in the
-initial bug hunt but have not completed this file-by-file pass.
+Status: **188 files read; 0 remaining in the original core-source inventory.**
+Last updated: 2026-09-06. The final continuation read the remaining 47
+modeling and 23 profiling files. A checked file means its full source was
+read, not that it is proven bug-free. This ledger records historical reads;
+it does not certify later concurrent edits or cover backend/frontend files.
 
 ## Outliers/time-series batch — 10 files
 
@@ -66,13 +65,54 @@ Separate in-memory probes reproduced all seven new findings, with pandas/Polars,
 unique-index, and native sklearn controls as recorded in the tracker. No full
 suite rerun or implementation fix is claimed for this batch.
 
+## Modeling/profiling completion — 70 files (2026-09-06)
+
+Completed full-source reads of all 47 `modeling/` and 23 `profiling/` files:
+20 modeling/evaluation/explainability files and 23 profiling files were read
+by separate reviewers; the main review read all 11 hyperparameter files and
+the remaining 16 tuning/CV files, and independently executed the filed bug
+reproductions. Truncated source output was recovered before counting files.
+
+Added **OC-187–206** directly to
+[the tracker](opus_core_analysis-tracker.md) as findings were verified:
+20 new findings (**5 high / 14 medium / 1 low**), all open. They cover
+incorrect rule labels and support counts, nullable-date row corruption,
+profiling exclusions and name collisions, model feature-selection mismatches,
+ineffective LightGBM subsampling, invalid tuning scores/search candidates,
+and caller-configuration mutation. Each entry records executed evidence and
+a fix/verification target. Existing findings were checked for duplication;
+no implementation code or permanent regression tests were changed.
+
+Verification: **909 passed, 142 warnings** across **45 existing test files**
+in 48.15 seconds, cache and coverage disabled. An earlier focused run of the
+three hyperparameter suites passed 49 tests; those are included in the 909,
+not additional unique tests. Reproduction probes are separate from passing
+suite tests and demonstrate uncovered behavior, not fixes.
+
+Exact test selection and command (PowerShell, repository root):
+
+```powershell
+$env:OMP_NUM_THREADS='1'
+$env:HF_HUB_OFFLINE='1'
+$reviewTests = @(rg --files skyulf-core/tests/unit skyulf-core/tests/integration |
+    Where-Object {
+        $_ -match 'test_(profiling_|modeling|evaluation_|tuning|cross_validation|cv_per_fold_refit|ensemble|hyperparameters)' -and
+        $_ -like '*.py'
+    })
+./.venv/Scripts/python.exe -m pytest @reviewTests -q --no-cov -p no:cacheprovider -o addopts='' --tb=short
+```
+
+This completes the original 188-file source-reading pass. Backend, frontend,
+tests, examples and packaging remain outside that inventory. No full
+repository test/build result or implementation fix is claimed.
+
 ## File-by-file ledger
 
 Continuation checkpoint (2026-09-06): all preprocessing files have now been
 read. All 3 `data/` and 11 `core/` files were re-read in their current state;
 no additional bug was confirmed in those folders. Their focused tests passed
-78 cases. Modeling (47 files) and profiling (23 files) remain in progress.
-New findings are being reproduced and deduplicated before tracker assignment.
+78 cases. Modeling (47 files) and profiling (23 files) are now fully read;
+their continuation findings and verification are recorded above.
 
 
 ### package root
@@ -116,53 +156,53 @@ New findings are being reproduced and deduplicated before tracker assignment.
 
 ### modeling
 
-- [ ] `modeling/__init__.py` (103 lines)
-- [ ] `modeling/_boosting_progress.py` (90 lines)
-- [ ] `modeling/_evaluation/__init__.py` (45 lines)
-- [ ] `modeling/_evaluation/classification.py` (173 lines)
-- [ ] `modeling/_evaluation/clustering.py` (286 lines)
-- [ ] `modeling/_evaluation/common.py` (77 lines)
-- [ ] `modeling/_evaluation/metrics.py` (494 lines)
-- [ ] `modeling/_evaluation/regression.py` (87 lines)
-- [ ] `modeling/_evaluation/schemas.py` (88 lines)
-- [ ] `modeling/_evaluation/thresholds.py` (246 lines)
-- [ ] `modeling/_explainability/__init__.py` (7 lines)
-- [ ] `modeling/_explainability/shap_explanation.py` (413 lines)
-- [ ] `modeling/_sklearn_compat.py` (47 lines)
-- [ ] `modeling/_tuning/__init__.py` (4 lines)
-- [ ] `modeling/_tuning/engine.py` (721 lines)
-- [ ] `modeling/_tuning/fold_pipeline.py` (145 lines)
-- [ ] `modeling/_tuning/grid_random.py` (292 lines)
-- [ ] `modeling/_tuning/metrics.py` (150 lines)
-- [ ] `modeling/_tuning/params.py` (81 lines)
-- [ ] `modeling/_tuning/refit.py` (220 lines)
-- [ ] `modeling/_tuning/reporter.py` (81 lines)
-- [ ] `modeling/_tuning/schemas.py` (65 lines)
-- [ ] `modeling/_tuning/splitters.py` (173 lines)
-- [ ] `modeling/_tuning/strategies/__init__.py` (7 lines)
-- [ ] `modeling/_tuning/strategies/halving.py` (91 lines)
-- [ ] `modeling/_tuning/strategies/optuna.py` (242 lines)
-- [ ] `modeling/_tuning/strategies/runner.py` (177 lines)
-- [ ] `modeling/base.py` (620 lines)
-- [ ] `modeling/classification.py` (772 lines)
-- [ ] `modeling/clustering.py` (268 lines)
-- [ ] `modeling/cross_validation.py` (663 lines)
-- [ ] `modeling/ensemble.py` (662 lines)
-- [ ] `modeling/fold_preprocessing.py` (33 lines)
-- [ ] `modeling/hyperparameters/__init__.py` (106 lines)
-- [ ] `modeling/hyperparameters/_bayes.py` (68 lines)
-- [ ] `modeling/hyperparameters/_calibration.py` (51 lines)
-- [ ] `modeling/hyperparameters/_clustering.py` (121 lines)
-- [ ] `modeling/hyperparameters/_ensemble.py` (196 lines)
-- [ ] `modeling/hyperparameters/_field.py` (65 lines)
-- [ ] `modeling/hyperparameters/_linear.py` (241 lines)
-- [ ] `modeling/hyperparameters/_neighbors.py` (40 lines)
-- [ ] `modeling/hyperparameters/_registry.py` (616 lines)
-- [ ] `modeling/hyperparameters/_svm.py` (39 lines)
-- [ ] `modeling/hyperparameters/_tree.py` (651 lines)
-- [ ] `modeling/naive_bayes.py` (95 lines)
-- [ ] `modeling/regression.py` (543 lines)
-- [ ] `modeling/sklearn_wrapper.py` (279 lines)
+- [x] `modeling/__init__.py` (103 lines)
+- [x] `modeling/_boosting_progress.py` (90 lines)
+- [x] `modeling/_evaluation/__init__.py` (45 lines)
+- [x] `modeling/_evaluation/classification.py` (173 lines)
+- [x] `modeling/_evaluation/clustering.py` (286 lines)
+- [x] `modeling/_evaluation/common.py` (77 lines)
+- [x] `modeling/_evaluation/metrics.py` (494 lines)
+- [x] `modeling/_evaluation/regression.py` (87 lines)
+- [x] `modeling/_evaluation/schemas.py` (88 lines)
+- [x] `modeling/_evaluation/thresholds.py` (246 lines)
+- [x] `modeling/_explainability/__init__.py` (7 lines)
+- [x] `modeling/_explainability/shap_explanation.py` (413 lines)
+- [x] `modeling/_sklearn_compat.py` (47 lines)
+- [x] `modeling/_tuning/__init__.py` (4 lines)
+- [x] `modeling/_tuning/engine.py` (721 lines)
+- [x] `modeling/_tuning/fold_pipeline.py` (145 lines)
+- [x] `modeling/_tuning/grid_random.py` (292 lines)
+- [x] `modeling/_tuning/metrics.py` (150 lines)
+- [x] `modeling/_tuning/params.py` (81 lines)
+- [x] `modeling/_tuning/refit.py` (220 lines)
+- [x] `modeling/_tuning/reporter.py` (81 lines)
+- [x] `modeling/_tuning/schemas.py` (65 lines)
+- [x] `modeling/_tuning/splitters.py` (173 lines)
+- [x] `modeling/_tuning/strategies/__init__.py` (7 lines)
+- [x] `modeling/_tuning/strategies/halving.py` (91 lines)
+- [x] `modeling/_tuning/strategies/optuna.py` (242 lines)
+- [x] `modeling/_tuning/strategies/runner.py` (177 lines)
+- [x] `modeling/base.py` (620 lines)
+- [x] `modeling/classification.py` (772 lines)
+- [x] `modeling/clustering.py` (268 lines)
+- [x] `modeling/cross_validation.py` (663 lines)
+- [x] `modeling/ensemble.py` (662 lines)
+- [x] `modeling/fold_preprocessing.py` (33 lines)
+- [x] `modeling/hyperparameters/__init__.py` (106 lines)
+- [x] `modeling/hyperparameters/_bayes.py` (68 lines)
+- [x] `modeling/hyperparameters/_calibration.py` (51 lines)
+- [x] `modeling/hyperparameters/_clustering.py` (121 lines)
+- [x] `modeling/hyperparameters/_ensemble.py` (196 lines)
+- [x] `modeling/hyperparameters/_field.py` (65 lines)
+- [x] `modeling/hyperparameters/_linear.py` (241 lines)
+- [x] `modeling/hyperparameters/_neighbors.py` (40 lines)
+- [x] `modeling/hyperparameters/_registry.py` (616 lines)
+- [x] `modeling/hyperparameters/_svm.py` (39 lines)
+- [x] `modeling/hyperparameters/_tree.py` (651 lines)
+- [x] `modeling/naive_bayes.py` (95 lines)
+- [x] `modeling/regression.py` (543 lines)
+- [x] `modeling/sklearn_wrapper.py` (279 lines)
 
 ### pipeline
 
@@ -263,29 +303,29 @@ New findings are being reproduced and deduplicated before tracker assignment.
 
 ### profiling
 
-- [ ] `profiling/__init__.py` (28 lines)
-- [ ] `profiling/_analyzer/__init__.py` (36 lines)
-- [ ] `profiling/_analyzer/_utils.py` (91 lines)
-- [ ] `profiling/_analyzer/categorical.py` (35 lines)
-- [ ] `profiling/_analyzer/causal.py` (133 lines)
-- [ ] `profiling/_analyzer/column.py` (347 lines)
-- [ ] `profiling/_analyzer/dates.py` (171 lines)
-- [ ] `profiling/_analyzer/decomposition.py` (194 lines)
-- [ ] `profiling/_analyzer/geo.py` (159 lines)
-- [ ] `profiling/_analyzer/multivariate.py` (406 lines)
-- [ ] `profiling/_analyzer/numeric.py` (64 lines)
-- [ ] `profiling/_analyzer/recommendations.py` (213 lines)
-- [ ] `profiling/_analyzer/rules.py` (370 lines)
-- [ ] `profiling/_analyzer/target.py` (229 lines)
-- [ ] `profiling/_analyzer/temporal.py` (260 lines)
-- [ ] `profiling/_analyzer/text.py` (126 lines)
-- [ ] `profiling/analyzer.py` (651 lines)
-- [ ] `profiling/correlations.py` (170 lines)
-- [ ] `profiling/distributions.py` (82 lines)
-- [ ] `profiling/drift.py` (541 lines)
-- [ ] `profiling/expect.py` (209 lines)
-- [ ] `profiling/schemas.py` (322 lines)
-- [ ] `profiling/visualizer.py` (824 lines)
+- [x] `profiling/__init__.py` (28 lines)
+- [x] `profiling/_analyzer/__init__.py` (36 lines)
+- [x] `profiling/_analyzer/_utils.py` (91 lines)
+- [x] `profiling/_analyzer/categorical.py` (35 lines)
+- [x] `profiling/_analyzer/causal.py` (133 lines)
+- [x] `profiling/_analyzer/column.py` (347 lines)
+- [x] `profiling/_analyzer/dates.py` (171 lines)
+- [x] `profiling/_analyzer/decomposition.py` (194 lines)
+- [x] `profiling/_analyzer/geo.py` (159 lines)
+- [x] `profiling/_analyzer/multivariate.py` (406 lines)
+- [x] `profiling/_analyzer/numeric.py` (64 lines)
+- [x] `profiling/_analyzer/recommendations.py` (213 lines)
+- [x] `profiling/_analyzer/rules.py` (370 lines)
+- [x] `profiling/_analyzer/target.py` (229 lines)
+- [x] `profiling/_analyzer/temporal.py` (260 lines)
+- [x] `profiling/_analyzer/text.py` (126 lines)
+- [x] `profiling/analyzer.py` (651 lines)
+- [x] `profiling/correlations.py` (170 lines)
+- [x] `profiling/distributions.py` (82 lines)
+- [x] `profiling/drift.py` (541 lines)
+- [x] `profiling/expect.py` (209 lines)
+- [x] `profiling/schemas.py` (322 lines)
+- [x] `profiling/visualizer.py` (824 lines)
 
 ### package root
 
