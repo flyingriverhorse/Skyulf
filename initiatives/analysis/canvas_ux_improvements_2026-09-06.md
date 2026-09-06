@@ -1,7 +1,7 @@
 # Canvas UX improvement backlog
 
 Date: 2026-09-06
-Status: Recommendations recorded; implementation not started.
+Status: CUX-08 in progress; panel labels, sidebar keyboard access, and primary field labels complete.
 
 ## Purpose and review scope
 
@@ -33,7 +33,7 @@ before implementation because other work may have changed these components.
 | CUX-05 | Medium | Navigate from validation issues to the exact setting | Open |
 | CUX-06 | Medium | Reduce connection and settings visual noise | Open |
 | CUX-07 | Medium | Inspect a selected node's input and output | Open |
-| CUX-08 | High, alongside related work | Fix keyboard and accessible-name gaps | Open |
+| CUX-08 | High, alongside related work | Fix keyboard and accessible-name gaps | In progress; panel labels, sidebar keyboard access, and primary field labels complete |
 
 ### CUX-01 — Preserve canvas space
 
@@ -205,18 +205,33 @@ backend work; this item is not assumed to be frontend-only.
 
 ### CUX-08 — Accessibility fixes
 
-**Observed:** Properties-panel expand/close buttons lack accessible names.
-Sidebar cards are clickable draggable divs without keyboard activation.
+**Observed during review:** Properties-panel expand/close buttons lacked accessible names.
+Sidebar cards were clickable draggable divs without keyboard activation.
 Some settings use visual text rather than associated form labels.
+
+**Progress (2026-09-06):** Properties-panel buttons now have accessible names
+and native hover tooltips: "Expand settings panel," "Collapse settings panel,"
+and "Close settings panel." The expansion label follows the current state.
+Sidebar cards now use native buttons with accessible action names and visible
+keyboard focus. Tab reaches them; Enter or Space adds a node using the existing
+placement and viewport behavior. Mouse clicks and dragging remain supported.
+Select Dataset, Model Type, and Target Column now use associated form labels
+with instance-specific IDs. Target Column keeps its label when switching
+between a text input and a dropdown populated from the connected dataset.
+The eight tuning/CV fields also have associated labels: Search Method, Metric,
+Trials, Random State, Folds, Method, Time Column, and Fold Split Seed.
 
 **Proposal:** Address these gaps alongside the affected interaction changes.
 Use semantic controls, associated labels, and visible keyboard focus.
 
 **Acceptance criteria:**
 
-- [ ] Icon-only controls have meaningful accessible names.
-- [ ] Sidebar nodes can be reached and added using the keyboard.
-- [ ] Form controls have programmatically associated labels.
+- [x] Properties-panel expand/collapse and close buttons have accessible names and tooltips.
+- [ ] Remaining icon-only controls have meaningful accessible names.
+- [x] Sidebar nodes can be reached and added using the keyboard.
+- [x] Select Dataset, Model Type, and both Target Column variants have associated labels.
+- [x] Tuning and cross-validation fields have associated labels, including conditional fields.
+- [ ] Remaining form controls have programmatically associated labels.
 - [ ] Focus remains visible through panel changes and issue navigation.
 - [ ] Targeted accessibility checks cover the changed states and interactions.
 
@@ -235,8 +250,8 @@ Reference used in the review:
 4. **Understanding results:** CUX-07 after checking available backend payloads.
 
 For each item, review the current behavior, settle the interaction details,
-implement a bounded change, and record verification here. This backlog does
-not imply implementation has started or every proposed detail is settled.
+implement a bounded change, and record verification here. Only the progress
+explicitly recorded above is complete; remaining interaction details need review.
 
 ## Verification for future implementation
 
@@ -253,3 +268,31 @@ not imply implementation has started or every proposed detail is settled.
 
 - 2026-09-06: Recorded the canvas UX review and acceptance criteria. No source
   implementation changes were made as part of this document.
+- 2026-09-06: Completed the settings-panel button-label subset of CUX-08 in
+  `src/components/layout/PropertiesPanel.tsx`. Added state-aware accessible
+  names, hover tooltips, and explicit button types. Verification: all 6 existing
+  PropertiesPanel tests passed, `npm run lint` passed, and `npm run build`
+  passed. Tests emitted connection-error logs; the build retained its existing
+  circular-chunk and empty-chunk warnings. Other CUX-08 work remains open.
+- 2026-09-06: Completed sidebar keyboard access in `src/components/layout/Sidebar.tsx`.
+  Replaced clickable card divs with native buttons, added accessible action names
+  and focus rings, and updated the helper text to mention click-to-add.
+  Verification: a Playwright browser check with mocked API responses passed Tab
+  navigation, visible focus, Enter/Space adding exactly one node per activation,
+  retained focus, mouse click, and a synthesized drag/drop adding a node.
+  `npm run lint` and `npm run build` passed. Remaining CUX-08 criteria stay open.
+- 2026-09-06: Connected the primary dataset/training labels to their controls in
+  `src/modules/nodes/data/DatasetNode.tsx` and
+  `src/modules/nodes/modeling/TrainingSettings.tsx`, using React `useId`.
+  Verification: a Playwright browser check with mocked dataset/schema/model
+  responses passed accessible-name lookup and label-click focus for Select
+  Dataset, Model Type, and both Target Column variants; values persisted when
+  the target input changed to a dropdown after connecting a dataset.
+  `npm run lint` and `npm run build` passed. Other settings labels remain open.
+- 2026-09-07: Connected all eight tuning/CV field labels in
+  `src/modules/nodes/modeling/TrainingSettings.tsx` using instance-specific IDs.
+  A Playwright browser check with mocked model metadata passed accessible-name
+  lookup and label-click focus for every changed field, edited-value persistence,
+  conditional time-series controls, and disabled trial counts for grid search.
+  `npm run lint` and `npm run build` passed. Dynamic hyperparameter controls and
+  other remaining form-label gaps still need review; CUX-08 remains in progress.

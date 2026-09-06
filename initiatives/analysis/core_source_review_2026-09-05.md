@@ -50,9 +50,12 @@ concurrent edits to already-reviewed files.
 
 ## Findings and verification
 
-New entries are documented in [the tracker](opus_core_analysis-tracker.md):
-OC-170–172 from the preceding source pass, and OC-173–176 from the final
-10-file batch. Existing OC-163/165/166 were not filed again. No implementation
+New entries are documented in the tracker, which split on 2026-09-06: all seven
+are still open, so they now live in
+[the open queue](opus_core_analysis-open_queue.md) (closed findings and the fix
+Log stay in [the tracker](opus_core_analysis-tracker.md)). OC-170–172 come from
+the preceding source pass, and OC-173–176 from the final 10-file batch.
+Existing OC-163/165/166 were not filed again. No implementation
 code was changed. The review used the Skyulf codebase map to trace shared
 helpers and decorators, and reproduction-driven checks to separate suspected
 bugs from confirmed findings.
@@ -73,9 +76,12 @@ by separate reviewers; the main review read all 11 hyperparameter files and
 the remaining 16 tuning/CV files, and independently executed the filed bug
 reproductions. Truncated source output was recovered before counting files.
 
-Added **OC-187–206** directly to
-[the tracker](opus_core_analysis-tracker.md) as findings were verified:
-20 new findings (**5 high / 14 medium / 1 low**), all open. They cover
+Added **OC-187–206** directly to the tracker as findings were verified:
+20 new findings (**5 high / 14 medium / 1 low**), all open at the time — five
+(OC-200/201/202/203/205) were fixed later on 2026-09-06. Since the tracker split
+that day, the 15 still open live in
+[the open queue](opus_core_analysis-open_queue.md) and the closed ones in
+[the tracker](opus_core_analysis-tracker.md). They cover
 incorrect rule labels and support counts, nullable-date row corruption,
 profiling exclusions and name collisions, model feature-selection mismatches,
 ineffective LightGBM subsampling, invalid tuning scores/search candidates,
