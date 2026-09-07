@@ -10,6 +10,7 @@ from ...core.meta.decorators import node_meta
 from ...registry import NodeRegistry
 from ...utils import detect_numeric_columns, user_picked_no_columns
 from .._artifacts import SimpleImputerArtifact
+from .._helpers import promote_configured_columns_to_float64
 from .._schema import SkyulfSchema
 from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
 from ..dispatcher import apply_dual_engine, fit_dual_engine
@@ -120,21 +121,12 @@ class SimpleImputerCalculator(BaseCalculator):
         self, input_schema: SkyulfSchema, config: dict[str, Any]
     ) -> SkyulfSchema:
         """Return ``input_schema`` and promote float-only imputation targets to ``float64``."""
-        selected = config.get("columns", input_schema.column_list())
-        if not selected:
-            return input_schema
-
         strategy = config.get("strategy", "mean")
         if strategy == "mode":
             strategy = "most_frequent"
         if strategy not in {"mean", "median"}:
             return input_schema
-
-        out = input_schema
-        for col in selected:
-            if col in input_schema.columns:
-                out = out.with_dtype(col, "float64")
-        return out
+        return promote_configured_columns_to_float64(input_schema, config)
 
     @fit_method
     def fit(self, X: Any, _y: Any, config: dict[str, Any]) -> SimpleImputerArtifact:  # pylint: disable=arguments-differ

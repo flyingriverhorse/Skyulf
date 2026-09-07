@@ -49,7 +49,14 @@ def promote_configured_columns_to_float64(
     input_schema: SkyulfSchema, config: dict[str, Any]
 ) -> SkyulfSchema:
     """Promote configured, existing columns to ``float64`` in a schema."""
-    selected = config.get("columns", input_schema.column_list())
+    if "columns" in config:
+        selected = config["columns"]
+    else:
+        selected = [
+            col
+            for col in input_schema.column_list()
+            if _is_numeric_schema_dtype(input_schema.dtypes.get(col))
+        ]
     if not selected:
         return input_schema
 
@@ -58,6 +65,11 @@ def promote_configured_columns_to_float64(
         if col in input_schema.columns:
             out = out.with_dtype(col, "float64")
     return out
+
+
+def _is_numeric_schema_dtype(dtype: str | None) -> bool:
+    """Return whether an engine-neutral schema dtype is numeric."""
+    return bool(dtype) and dtype.lower().startswith(("int", "uint", "float"))
 
 
 def safe_scale(scale_arr: np.ndarray) -> np.ndarray:

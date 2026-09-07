@@ -165,8 +165,8 @@ def test_scalers_passthrough_schema(cls) -> None:
         (
             "SimpleImputer",
             SimpleImputerCalculator,
-            pd.DataFrame({"x": [1.0, None, 3.0], "y": [1.0, 2.0, 3.0]}),
-            {"strategy": "mean", "columns": ["x"]},
+            pd.DataFrame({"x": [1.0, None, 3.0], "y": [1.0, 2.0, 3.0], "text": ["a", "b", "c"]}),
+            {"strategy": "mean"},
         ),
         (
             "KNNImputer",
