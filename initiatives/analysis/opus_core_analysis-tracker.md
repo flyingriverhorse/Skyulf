@@ -146,6 +146,7 @@ uses, so a fixed finding stays where it was filed.
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
+| OC-38 | ⚪ | Clustering metrics treat DBSCAN `-1` noise as a real cluster (`metrics.py:432-459`) | small | ✅ fixed 2026-09-07 — DBSCAN noise rows are excluded from cluster counts and quality scores; regression coverage added |
 | OC-146 | 🔴 | Binary `pr_auc` scored against wrong class on `{1,n}` labels — reports 0.32 vs true 0.97, no warning (`metrics.py:324-326`) | small | ✅ fixed 2026-09-05 |
 | OC-37 | 🟡 | Binary PR-AUC dropped for string-labeled classifiers (`metrics.py:324-327`) | small | ✅ fixed 2026-09-05 — same one-arg fix as OC-146 |
 | OC-147 | ⚪ | `optimize_thresholds` returns a dict shape that bypasses its own documented binary rule, flipping `>=` to `>` on exact ties (`thresholds.py:66-88`) | small | ✅ fixed 2026-09-05 — with OC-36 |
@@ -298,6 +299,15 @@ batch's context are in [the live queue](opus_core_analysis-open_queue.md).
 ---
 
 ## Log
+
+### 2026-09-07 — OC-38 fixed: DBSCAN noise is excluded from clustering metrics
+
+`calculate_clustering_metrics()` now removes rows labelled `-1` before counting
+clusters or calculating silhouette, Calinski–Harabasz, and Davies–Bouldin
+scores. This matches DBSCAN's contract that `-1` means noise, not a learned
+cluster. A regression test verifies both the reported cluster count and the
+feature/label arrays passed to the quality metrics; the no-noise path remains
+allocation-free for the existing large-label memory guard.
 
 ### 2026-09-07 — OC-148 fixed: phone PII detection no longer flags ordinary identifiers
 

@@ -55,7 +55,6 @@ closed that on 2026-09-07.
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
-| OC-38 | ⚪ | Clustering metrics treat DBSCAN `-1` noise as a real cluster (`metrics.py:432-459`) | small | ⬜ open |
 
 ### Remaining — backend infrastructure
 
