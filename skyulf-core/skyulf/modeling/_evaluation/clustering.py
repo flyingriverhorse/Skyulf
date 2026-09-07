@@ -82,7 +82,10 @@ def _compute_centroids_polars(X_numeric: pl.DataFrame, labels: np.ndarray) -> li
         casted = frame.select([pl.col(c).cast(pl.Float64).alias(c) for c in columns])
         means = casted.select([pl.col(c).mean().alias(c) for c in columns]).row(0)
         stds = casted.select([pl.col(c).std(ddof=1).alias(c) for c in columns]).row(0)
-        mean_dict = {c: float(v) for c, v in zip(columns, means, strict=True)}
+        mean_dict = {
+            c: (float(v) if v is not None else float("nan"))
+            for c, v in zip(columns, means, strict=True)
+        }
         std_dict = {
             c: (float(v) if v is not None else 0.0) for c, v in zip(columns, stds, strict=True)
         }

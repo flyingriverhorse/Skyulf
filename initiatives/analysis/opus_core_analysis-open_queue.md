@@ -55,9 +55,7 @@ closed that on 2026-09-07.
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
-| OC-149 | 🟠 | Clustering evaluation crashes on polars when a numeric feature is all-null within one cluster (`clustering.py:83-88`) | small | ⬜ open |
 | OC-195 | 🟡 | Clustering numeric-feature selection skips `SkyulfPandasWrapper`, so wrapping a working pandas frame with text columns makes fitting fail (`modeling/clustering.py:40-53`) | small | ⬜ open |
-| OC-196 | 🟡 | GaussianMixture probability prediction omits the feature/reference filtering used for fit and ordinary prediction, causing a feature-count mismatch on the same input (`modeling/clustering.py:83-89`, `modeling/sklearn_wrapper.py:266-279`) | small | ⬜ open |
 | OC-197 | 🟡 | Polars clustering reference crosstabs crash for reference columns named `count` or `__skyulf_cluster__` (`modeling/_evaluation/clustering.py:137-146`) | small | ⬜ open |
 | OC-148 | 🟡 | PII detector flags ordinary 7+ digit numeric ID columns as "Email/Phone" (`profiling/_analyzer/text.py:107-128`) | small | ⬜ open |
 | OC-38 | ⚪ | Clustering metrics treat DBSCAN `-1` noise as a real cluster (`metrics.py:432-459`) | small | ⬜ open |
@@ -105,7 +103,6 @@ closed that on 2026-09-07.
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
-| OC-04 | 🟡 | Remaining cross-engine dtype divergence in bucketing (`bucketing.py`); DummyEncoder and MissingIndicator parity is fixed by OC-76 coverage | small | ⬜ open |
 | OC-06 | 🟡 | 6 registered nodes unreachable from the UI (incl. all of `geo/`) — `registry.py` vs `frontend/` | small | ⬜ open — R1 step 3 catches this class |
 | OC-07 | 🟡 | Node-id naming split 55 PascalCase / 45 snake_case + redundant aliases (`registry.py`) | half day | ⬜ open |
 | OC-08 | 🟡 | Public-API name collision: `DatasetProfile` means two things (`skyulf/__init__.py:32-46`) | small | ⬜ open |

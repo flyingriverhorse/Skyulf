@@ -182,6 +182,20 @@ def test_apply_ordinal_label_format_assigns_expected_bin_indices() -> None:
     assert result["x_binned"].tolist() == expected.tolist()
 
 
+def test_apply_ordinal_dtype_matches_between_pandas_and_polars() -> None:
+    """Ordinal bin outputs must keep one integer dtype when no values are missing."""
+    df_pd = _series_0_to_9()
+    params = GeneralBinningCalculator().fit(
+        df_pd, {"columns": ["x"], "strategy": "equal_width", "n_bins": 5}
+    )
+
+    result_pd = GeneralBinningApplier().apply(df_pd, params)
+    result_pl = GeneralBinningApplier().apply(pl.from_pandas(df_pd), params).to_pandas()
+
+    assert result_pd["x_binned"].dtype == np.int64
+    assert result_pl["x_binned"].dtype == result_pd["x_binned"].dtype
+
+
 def test_apply_range_label_format_produces_interval_strings() -> None:
     """label_format='range' must produce '[a, b]'/'(a, b]' style string labels."""
     df = _series_0_to_9()

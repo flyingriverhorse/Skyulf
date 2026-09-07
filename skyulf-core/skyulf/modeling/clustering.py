@@ -80,13 +80,26 @@ class _NumericOnlyClusteringApplier(SklearnApplier):
     at fit time (see ``_NumericOnlyClusteringCalculatorMixin``).
     """
 
-    def predict(self, df: pd.DataFrame | SkyulfDataFrame, model_artifact: Any) -> Any:
+    def _prepare_prediction_frame(
+        self, df: pd.DataFrame | SkyulfDataFrame, model_artifact: Any
+    ) -> pd.DataFrame | SkyulfDataFrame:
+        """Apply the same reference-column and numeric filtering used during fit."""
         reference_column = getattr(model_artifact, "reference_column_", "")
         working_df = _drop_reference_column(df, reference_column)
         numeric_df, dropped = _select_numeric_features(working_df)
         if dropped:
             logger.info(f"Dropping non-numeric column(s) before predicting: {dropped}")
-        return super().predict(numeric_df, model_artifact)
+        return numeric_df
+
+    def predict(self, df: pd.DataFrame | SkyulfDataFrame, model_artifact: Any) -> Any:
+        """Predict labels after applying the fitted feature-column contract."""
+        return super().predict(self._prepare_prediction_frame(df, model_artifact), model_artifact)
+
+    def predict_proba(self, df: pd.DataFrame | SkyulfDataFrame, model_artifact: Any) -> Any | None:
+        """Predict probabilities after applying the fitted feature-column contract."""
+        return super().predict_proba(
+            self._prepare_prediction_frame(df, model_artifact), model_artifact
+        )
 
 
 class _NumericOnlyClusteringCalculatorMixin:

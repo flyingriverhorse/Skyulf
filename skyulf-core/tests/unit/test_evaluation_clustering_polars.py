@@ -16,7 +16,10 @@ import polars as pl
 import pytest
 
 from skyulf.engines.polars_engine import SkyulfPolarsWrapper
-from skyulf.modeling._evaluation.clustering import evaluate_clustering_model
+from skyulf.modeling._evaluation.clustering import (
+    _compute_centroids_polars,
+    evaluate_clustering_model,
+)
 
 _FIXTURE = {
     "id": ["r1", "r2", "r3", "r4", "r5", "r6"],
@@ -137,6 +140,22 @@ def test_evaluate_clustering_model_no_numeric_columns_raises_like_sklearn(engine
     df = pd.DataFrame(fixture) if engine == "pandas" else pl.DataFrame(fixture)
     with pytest.raises(ValueError, match="0 feature"):
         evaluate_clustering_model(None, df, [0, 1, 1], dataset_name="empty", reference_column="ref")
+
+
+def test_compute_centroids_polars_preserves_nan_for_cluster_local_nulls() -> None:
+    """A feature null within one cluster must yield pandas-compatible NaN, not crash."""
+    frame = pl.DataFrame(
+        {
+            "a": [1.0, 2.0, 5.0, 6.0],
+            "b": [10.0, 20.0, None, None],
+        }
+    )
+
+    centroids = _compute_centroids_polars(frame, np.array([0, 0, 1, 1]))
+
+    assert centroids[0].center == {"a": 1.5, "b": 15.0}
+    assert centroids[1].center["a"] == 5.5
+    assert math.isnan(centroids[1].center["b"])
 
 
 def test_evaluate_clustering_model_reference_crosstab_null_value_matches_pandas() -> None:
