@@ -1,7 +1,7 @@
 # Canvas UX improvement backlog
 
 Date: 2026-09-06
-Status: CUX-01, CUX-05, and CUX-06 complete; CUX-03, CUX-04, and CUX-08 in progress. Completed portions are recorded below.
+Status: CUX-01, CUX-02, CUX-05, and CUX-06 complete; CUX-03, CUX-04, and CUX-08 in progress. Completed portions are recorded below.
 
 ## Purpose and review scope
 
@@ -27,13 +27,14 @@ before implementation because other work may have changed these components.
 | ID | Priority | Improvement | Status |
 |---|---|---|---|
 | CUX-01 | High | Preserve canvas space with resizable panels | Complete at checked desktop/laptop sizes |
-| CUX-02 | High | Guide node connections and adding the next step | Open |
+| CUX-02 | High | Guide node connections and adding the next step | Complete; drag guidance and keyboard next-step picker verified |
 | CUX-03 | High | Clearly distinguish previewing data from training | In progress; visible action labels and training guidance complete |
 | CUX-04 | Medium | Improve component discovery | In progress; task search, readable results, and collapsible categories complete; preprocessing subgroups remain |
 | CUX-05 | Medium | Navigate from validation issues to the exact setting | Complete; field navigation and general-issue fallback verified |
 | CUX-06 | Medium | Reduce connection and settings visual noise | Complete; contextual connection controls and node details verified |
 | CUX-07 | Medium | Inspect a selected node's input and output | Open |
 | CUX-08 | High, alongside related work | Fix keyboard and accessible-name gaps | In progress; panel labels, sidebar keyboard access, and primary field labels complete |
+| CUX-09 | Medium | Make possible PII findings easy to review without exposing raw values | Open; core accessors are planned, frontend UX is not implemented |
 
 ### CUX-01 — Preserve canvas space
 
@@ -103,14 +104,38 @@ still needs to know which step or input is appropriate before connecting it.
 show the reason for incompatibility near the attempted destination, and offer
 an output-handle “Add next step” action with compatible suggestions.
 
+**Progress (2026-09-07):** Output labels now include a small plus and open a
+searchable Next step popover. Add new node lists compatible registered steps;
+Existing node lists named input ports and explains unavailable connections.
+The picker reuses task search, focuses search on opening, supports native
+keyboard controls, and restores focus on dismissal. New node insertion
+initializes defaults and adds its edge in a single graph update, places it near
+the source, and reveals both nodes. It can be undone/redone as one action. Existing leakage and
+multi-input confirmations remain; cancelling leaves no orphan node or history
+entry. Shared validation covers cycles, model endpoints, missing ports, port
+kinds, and duplicate connections. During dragging, compatible ports receive a
+ring and incompatible destinations show an actionable floating message above
+nodes, bounded by the viewport. Both drag directions use the same source/target
+orientation. Connecting any Train/Test output groups both, plus Validation when
+enabled, into one junction and downstream connection. X/y behaves the same way.
+This applies to manual wiring and both picker paths. Groups use one canonical
+edge for deletion, undo/redo, and copy/paste; loading legacy graphs folds duplicate
+split edges. Validation changes update the visible group immediately. Split ports
+share the compact body area with the summary, without extra rows enlarging the
+card. Ensemble's shared input is labeled Data /
+Models to reflect its existing contract.
+Read-only mode disables handles, hides the picker, and blocks mutations; returning to edit mode
+does not reopen an old menu. Implementation notes:
+`canvas_connections_2026-09-07.md`.
+
 **Acceptance criteria:**
 
-- [ ] Compatibility guidance agrees with the existing graph validation rules.
-- [ ] Invalid connections explain the cause and the next action.
-- [ ] An output can open a relevant node picker and connect the chosen node.
-- [ ] Adding and connecting a node can be undone cleanly.
-- [ ] Keyboard users have an equivalent way to choose endpoints.
-- [ ] Train/validation/test ports and ensemble model inputs remain distinguishable.
+- [x] Compatibility guidance agrees with the existing graph validation rules.
+- [x] Invalid connections explain the cause and the next action.
+- [x] An output can open a relevant node picker and connect the chosen node.
+- [x] Adding and connecting a node can be undone cleanly.
+- [x] Keyboard users have an equivalent way to choose endpoints.
+- [x] Train/validation/test ports and ensemble model inputs remain distinguishable.
 
 **Starting points:** `src/components/canvas/FlowCanvas.tsx`,
 `CustomNodeWrapper.tsx`, `src/core/store/useGraphStore.ts`,
@@ -335,12 +360,47 @@ Use semantic controls, associated labels, and visible keyboard focus.
 Reference used in the review:
 [Web Interface Guidelines](https://raw.githubusercontent.com/vercel-labs/web-interface-guidelines/main/command.md).
 
+### CUX-09 — Review possible PII findings without exposing raw values
+
+**Observed:** Profiling can emit `PII` alerts for columns that may contain
+email addresses or phone numbers, but the current consumer must inspect the
+generic alert list manually. There is no focused review surface, and the core
+API requires callers to filter `profile.alerts` themselves.
+
+**Proposal:** Add a PII review view within the selected dataset's profiling
+experience rather than a global page. Show the flagged column, detected
+category, severity, and advisory explanation; never render raw email, phone,
+or sample values. Include a clear note that detection is heuristic and does
+not mask, delete, block, or classify data as legally sensitive.
+
+The core profile API should provide direct accessors for this view:
+`profile.has_pii`, `profile.pii_columns`, and `profile.pii_alerts`. The
+frontend should consume structured profile data and preserve the generic
+alerts view for other data-quality findings.
+
+**Acceptance criteria:**
+
+- [ ] A selected dataset has a dedicated PII tab or panel in its profiling view.
+- [ ] The view lists flagged column names, detector category, severity, and explanation.
+- [ ] Raw values and profiling samples are not rendered in the PII view.
+- [ ] Empty and loading states explain whether the dataset has no findings or
+      has not been profiled yet.
+- [ ] The view explains that findings are advisory heuristics, not compliance
+      classifications or automatic remediation.
+- [ ] Email/phone alerts remain available in the generic alerts view.
+- [ ] The view is keyboard accessible and works in light and dark themes.
+
+**Starting points:** the dataset profile API/client types, the EDA/profile
+results view, and the existing generic alert rendering. Recheck the current
+backend response shape before implementing the frontend panel.
+
 ## Suggested implementation order
 
 1. **Workspace and actions:** CUX-01 and CUX-03, with relevant CUX-08 fixes.
 2. **Connecting and correcting:** CUX-02 and CUX-05, followed by CUX-06.
 3. **Discovery:** CUX-04, with keyboard support from CUX-08.
-4. **Understanding results:** CUX-07 after checking available backend payloads.
+4. **Understanding results:** CUX-07 and CUX-09 after checking available
+   backend payloads.
 
 For each item, review the current behavior, settle the interaction details,
 implement a bounded change, and record verification here. Only the progress
@@ -580,3 +640,31 @@ explicitly recorded above is complete; remaining interaction details need review
   TypeScript, and the production build. Independent review found no blockers.
   Served assets were rebuilt and v0.8.16 notes updated. Preprocessing subgroups
   remain open. Browser checks use mocked APIs; existing build warnings remain.
+- 2026-09-07: Completed CUX-02 guided connections. Pure connection validation is
+  shared by drag guidance, React Flow acceptance, picker suggestions, and graph
+  mutations. Existing confirmation logic now serves both manual wiring and
+  atomic connected-node insertion. Five new unit tests cover split-port
+  preservation, cancellation, stale/read-only rejection, duplicate/cycle/model
+  validation, and single-step undo/redo. Five new browser tests cover keyboard
+  insertion and canvas focus, existing-node selection and Escape, drag guidance
+  in both directions, model-to-Ensemble acceptance, viewport bounds, and
+  read-only menu lifecycle. All 914 frontend unit tests and 35 focused browser
+  checks passed, along with lint, TypeScript, and production build. Independent
+  review found no blockers. Served assets were rebuilt and v0.8.16 notes updated.
+  Browser checks use mocked APIs; existing circular/empty chunk warnings remain.
+- 2026-09-07: Refined CUX-02 following split-output and placement feedback.
+  Train/Test with enabled Validation, and X/y, now converge into one connection
+  for manual wiring and picker actions. Legacy duplicate edges normalize on load;
+  validation toggles, whole-group deletion, undo/redo, and copy/paste are covered.
+  New nodes use nearby free positions and reveal both endpoints. Split labels
+  have dedicated rows, and read-only handles no longer accept drag initiation.
+  All 919 frontend unit tests and 29 browser checks passed. The seven guided
+  connection checks passed again after the final port-layout adjustment, with
+  screenshot inspection. Lint and the production build passed; served assets and
+  v0.8.16 notes were updated. Browser APIs are mocked; existing circular/empty
+  chunk warnings remain.
+- 2026-09-07: Restored compact split cards after size feedback. Removed the
+  added spacer rows and fixed header height; output labels now share the body
+  with the summary. Both default cards fit within 110px, with non-overlapping
+  labels inside their bounds. Seven guided-connection browser checks, lint, and
+  the production build passed; screenshots were inspected and assets rebuilt.

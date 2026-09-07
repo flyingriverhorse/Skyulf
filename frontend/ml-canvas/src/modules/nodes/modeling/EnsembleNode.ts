@@ -55,5 +55,6 @@ export const EnsembleNode = createModelingNode({
       return { isValid: false, message: 'Select at least two base models.', field: 'base_estimators' };
     return { isValid: true };
   },
+  inputs: [{ id: 'in', label: 'Data / Models', type: 'any' }],
   outputs: [{ id: 'model', label: 'Ensemble Model', type: 'model' }],
 });

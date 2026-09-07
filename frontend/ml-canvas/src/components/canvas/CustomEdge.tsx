@@ -6,6 +6,7 @@ import {
   Position,
   getSmoothStepPath,
   getStraightPath,
+  getBezierPath,
   useReactFlow,
 } from '@xyflow/react';
 import { X } from 'lucide-react';
@@ -14,6 +15,7 @@ import { ConnectionHoverCard } from './ConnectionHoverCard';
 
 export const CustomEdge: React.FC<EdgeProps> = memo(({
   id,
+  source,
   sourceX,
   sourceY,
   targetX,
@@ -26,7 +28,7 @@ export const CustomEdge: React.FC<EdgeProps> = memo(({
   selected,
   deletable,
 }) => {
-  const { deleteElements } = useReactFlow();
+  const { deleteElements, getInternalNode } = useReactFlow();
   const [hovered, setHovered] = useState(false);
   const [buttonFocused, setButtonFocused] = useState(false);
   const tooltipId = useId();
@@ -39,6 +41,17 @@ export const CustomEdge: React.FC<EdgeProps> = memo(({
   const showControls = hovered || buttonFocused || selected || data?.isFocused === true;
   const showTooltip = hovered || buttonFocused || data?.isFocused === true;
   const canDelete = deletable && data?.readOnly !== true;
+  const splitHandles = Array.isArray(data?.splitHandles) ? data.splitHandles as string[] : [];
+  const sourceNode = splitHandles.length ? getInternalNode(source) : undefined;
+  const splitPoints = splitHandles.flatMap(handleId => {
+    const handle = sourceNode?.internals.handleBounds?.source?.find(port => port.id === handleId);
+    return handle && sourceNode ? [{ id: handleId,
+      x: sourceNode.internals.positionAbsolute.x + handle.x + handle.width / 2,
+      y: sourceNode.internals.positionAbsolute.y + handle.y + handle.height / 2 }] : [];
+  });
+  const grouped = splitPoints.length > 1;
+  const trunkSourceX = grouped ? sourceX + Math.min(64, Math.max(24, (targetX - sourceX) * 0.45)) : sourceX;
+  const trunkSourceY = grouped ? (Math.min(...splitPoints.map(point => point.y)) + Math.max(...splitPoints.map(point => point.y))) / 2 : sourceY;
 
   // When source and target handles are almost collinear along the handle
   // axis (e.g. Right -> Left with nearly identical Y), `getSmoothStepPath`
@@ -53,17 +66,17 @@ export const CustomEdge: React.FC<EdgeProps> = memo(({
     (sourcePosition === Position.Top || sourcePosition === Position.Bottom) &&
     (targetPosition === Position.Top || targetPosition === Position.Bottom);
   const perpendicularOffset = horizontalAxis
-    ? Math.abs(targetY - sourceY)
+    ? Math.abs(targetY - trunkSourceY)
     : verticalAxis
-      ? Math.abs(targetX - sourceX)
+      ? Math.abs(targetX - trunkSourceX)
       : Number.POSITIVE_INFINITY;
   const useStraight = (horizontalAxis || verticalAxis) && perpendicularOffset < 6;
 
   const [edgePath, labelX, labelY] = useStraight
-    ? getStraightPath({ sourceX, sourceY, targetX, targetY })
+    ? getStraightPath({ sourceX: trunkSourceX, sourceY: trunkSourceY, targetX, targetY })
     : getSmoothStepPath({
-        sourceX,
-        sourceY,
+        sourceX: trunkSourceX,
+        sourceY: trunkSourceY,
         sourcePosition,
         targetX,
         targetY,
@@ -102,6 +115,12 @@ export const CustomEdge: React.FC<EdgeProps> = memo(({
   return (
     <>
       <g onMouseEnter={enter} onMouseLeave={leave}>
+        {grouped && splitPoints.map(point => <g key={point.id} data-split-handle={point.id}>
+          <BaseEdge path={getBezierPath({ sourceX: point.x, sourceY: point.y, sourcePosition: Position.Right,
+            targetX: trunkSourceX, targetY: trunkSourceY, targetPosition: Position.Left })[0]}
+            style={edgeStyle} interactionWidth={24} />
+        </g>)}
+        {grouped && <circle data-split-junction="true" cx={trunkSourceX} cy={trunkSourceY} r={3} fill={branchColor || String(edgeStyle.stroke || 'hsl(var(--primary))')} />}
         <BaseEdge
           path={edgePath}
           {...(markerEnd ? { markerEnd } : {})}

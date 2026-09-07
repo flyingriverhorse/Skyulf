@@ -12,12 +12,10 @@ import '@xyflow/react/dist/style.css';
 
 import {
   useGraphStore,
-  wouldCreateCycle,
-  isModelEndpointViolation,
   collectGraphValidationIssues,
-  CYCLE_CONNECTION_MESSAGE,
-  MODEL_ENDPOINT_CONNECTION_MESSAGE,
 } from '../../core/store/useGraphStore';
+import { connectionIssue } from '../../core/utils/connectionValidation';
+import { ConnectionGuidance } from './ConnectionGuidance';
 import { toast } from '../../core/toast';
 import { useViewStore } from '../../core/store/useViewStore';
 import { useClipboard } from '../../core/hooks/useClipboard';
@@ -37,6 +35,7 @@ import {
 } from '../../core/hooks/useKeyboardShortcuts';
 import { PerfOverlayLegend } from './PerfOverlayLegend';
 import { nodeDisplayNames } from '../../core/utils/nodeDisplayNames';
+import { splitOutputHandles } from '../../core/utils/splitConnections';
 
 const nodeTypes = {
   custom: CustomNodeWrapper
@@ -61,7 +60,7 @@ function useBranchStableNodes(nodes: Node[]): Node[] {
   const signature = nodes
     .map((n) => {
       const data = n.data as Record<string, unknown>;
-      return `${n.id}:${data.definitionType as string}:${(data.model_type as string) ?? ''}:${(data.label as string) ?? ''}:${(data.title as string) ?? ''}`;
+      return `${n.id}:${data.definitionType as string}:${(data.model_type as string) ?? ''}:${(data.label as string) ?? ''}:${(data.title as string) ?? ''}:${String(data.validation_size ?? 0)}`;
     })
     .join('|');
   const ref = useRef<{ signature: string; nodes: Node[] }>({ signature: '', nodes });
@@ -224,6 +223,7 @@ const FlowCanvasContent: React.FC = () => {
           readOnly,
           sourceLabel,
           targetLabel,
+          splitHandles: splitOutputHandles(branchStableNodes.find(node => node.id === edge.source)),
           isFocused: focusedEdgeId === edge.id,
           branchColor: info?.color,
           branchLabel: info?.label,
@@ -232,7 +232,7 @@ const FlowCanvasContent: React.FC = () => {
         },
       };
     });
-  }, [edges, branchColorMap, winnerEdgeIds, displayNames, focusedEdgeId, readOnly]);
+  }, [edges, branchColorMap, winnerEdgeIds, displayNames, focusedEdgeId, readOnly, branchStableNodes]);
 
   const onDragOver = useCallback((event: React.DragEvent) => {
     event.preventDefault();
@@ -307,7 +307,7 @@ const FlowCanvasContent: React.FC = () => {
         const toolbar = wrapper.parentElement?.parentElement?.querySelector<HTMLElement>('[data-canvas-toolbar]');
         const coveredTop = toolbar ? Math.max(0, toolbar.getBoundingClientRect().bottom - rect.top) : 48;
         void fitView({
-          nodes: [{ id: request.id }],
+          nodes: [...new Set([request.id, ...(request.relatedNodeIds ?? [])])].map(id => ({ id })),
           duration: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 250,
           padding: { top: `${coveredTop + 24}px`, left: '64px', right: '24px', bottom: `${coveredHeight + 24}px` },
           maxZoom: 1,
@@ -386,29 +386,24 @@ const FlowCanvasContent: React.FC = () => {
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
-        isValidConnection={(connection) => {
-          if (wouldCreateCycle(edges, connection.source ?? '', connection.target ?? '')) return false;
-          const sourceType = nodes.find((n) => n.id === connection.source)?.data.definitionType as
-            | string
-            | undefined;
-          const targetType = nodes.find((n) => n.id === connection.target)?.data.definitionType as
-            | string
-            | undefined;
-          if (sourceType && targetType && isModelEndpointViolation(sourceType, targetType)) return false;
-          return true;
-        }}
+        isValidConnection={connection => !connectionIssue(nodes, edges, {
+          source: connection.source, target: connection.target,
+          sourceHandle: connection.sourceHandle ?? null, targetHandle: connection.targetHandle ?? null,
+        })}
         // isValidConnection rejects silently and suppresses onConnect (where the
         // store's explanatory toasts live), so re-fire the same wording here
         // when a drag is released on a rejected handle.
         onConnectEnd={(_event, state) => {
-          if (state.isValid !== false || !state.fromNode || !state.toNode) return;
-          const sourceType = state.fromNode.data.definitionType as string | undefined;
-          const targetType = state.toNode.data.definitionType as string | undefined;
-          if (sourceType && targetType && isModelEndpointViolation(sourceType, targetType)) {
-            toast.error('Invalid connection', MODEL_ENDPOINT_CONNECTION_MESSAGE);
-          } else if (wouldCreateCycle(edges, state.fromNode.id, state.toNode.id)) {
-            toast.error('Invalid connection', CYCLE_CONNECTION_MESSAGE);
+          if (state.isValid !== false || !state.fromHandle || !state.toHandle) return;
+          if (state.fromHandle.type === state.toHandle.type) {
+            toast.error('Invalid connection', 'Choose an input for an output, or an output for an input.');
+            return;
           }
+          const source = state.fromHandle.type === 'source' ? state.fromHandle : state.toHandle;
+          const target = state.fromHandle.type === 'target' ? state.fromHandle : state.toHandle;
+          const issue = connectionIssue(nodes, edges, { source: source.nodeId, target: target.nodeId,
+            sourceHandle: source.id ?? null, targetHandle: target.id ?? null });
+          if (issue) toast.error('Invalid connection', issue);
         }}
         nodeTypes={nodeTypes}
         onDragOver={onDragOver}
@@ -444,6 +439,7 @@ const FlowCanvasContent: React.FC = () => {
         onBeforeDelete={onBeforeDelete}
       >
         <Background />
+        <ConnectionGuidance />
         <Controls
           position="bottom-left"
           style={{
