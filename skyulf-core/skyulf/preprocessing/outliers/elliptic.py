@@ -17,7 +17,7 @@ from .._helpers import resolve_columns_then_to_pandas
 from .._schema import SkyulfSchema
 from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
 from ..dispatcher import apply_dual_engine
-from ._common import _apply_pandas_mask
+from ._common import _apply_pandas_mask, _filter_y_polars
 
 logger = logging.getLogger(__name__)
 
@@ -109,11 +109,7 @@ class EllipticEnvelopeApplier(BaseApplier):
             return X, y
 
         mask = pl.Series(_elliptic_mask_numpy(X, models))
-        X_out = X.filter(mask)
-        if y is None:
-            return X_out, y
-        y_out = y.filter(mask) if hasattr(y, "filter") else y
-        return X_out, y_out
+        return X.filter(mask), _filter_y_polars(y, mask)
 
     @staticmethod
     def _apply_pandas(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, Any]:

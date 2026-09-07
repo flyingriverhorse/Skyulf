@@ -21,7 +21,21 @@ import { ExperimentsPage } from '../pages/ExperimentsPage';
 import { InferencePage } from '../pages/InferencePage';
 
 export const MainLayout: React.FC = () => {
-  const { activeView, isPropertiesPanelExpanded } = useViewStore();
+  const { activeView, isPropertiesPanelExpanded, resultsPanelHeight } = useViewStore();
+  const canvasAreaRef = React.useRef<HTMLDivElement>(null);
+  const [canvasHeight, setCanvasHeight] = React.useState(624);
+  React.useEffect(() => {
+    const area = canvasAreaRef.current;
+    if (!area) return;
+    const observer = new ResizeObserver(([entry]) => {
+      if (entry && entry.contentRect.height > 0) setCanvasHeight(entry.contentRect.height);
+    });
+    observer.observe(area);
+    return () => observer.disconnect();
+  }, []);
+  // Reserve room for the graph and zoom controls without overwriting the
+  // preferred results height when the viewport temporarily becomes smaller.
+  const maxResultsHeight = Math.max(200, Math.min(720, Math.floor(canvasHeight - 240)));
   // Mount each of the three top-level views lazily, on first visit, then
   // keep them mounted (hidden via display:none) forever after so their
   // local state survives subsequent switches. Eagerly mounting all three
@@ -90,12 +104,16 @@ export const MainLayout: React.FC = () => {
       <div style={{ display: activeView === 'canvas' ? 'contents' : 'none' }}>
         <div className="flex flex-1 overflow-hidden relative">
           {!readOnly && <Sidebar />}
-          <main className="flex-1 h-full relative flex flex-col transition-all duration-300 ease-in-out">
+          <main className="flex-1 min-w-0 h-full relative flex flex-col transition-all duration-300 ease-in-out">
             {!isPropertiesPanelExpanded && <Toolbar />}
-            <div className="flex-1 relative">
+            <div
+              ref={canvasAreaRef}
+              className="flex-1 min-h-0 relative"
+              style={{ '--results-panel-height': `${Math.min(resultsPanelHeight, maxResultsHeight)}px` } as React.CSSProperties}
+            >
               <FlowCanvas />
               <RestoreSessionBanner />
-              <ResultsPanel />
+              <ResultsPanel maxHeight={maxResultsHeight} />
             </div>
           </main>
           {!readOnly && <PropertiesPanel />}

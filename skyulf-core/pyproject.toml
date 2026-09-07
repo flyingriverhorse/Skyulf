@@ -6,3 +6,9 @@ build-backend = "setuptools.build_meta"
 name = "skyulf-core"
 dynamic = ["version", "description", "readme", "authors", "dependencies", "optional-dependencies", "classifiers", "urls"]
 requires-python = ">=3.12"
+# Static, not dynamic: a license supplied through setup.py is emitted as the
+# deprecated free-text `License:` field, whereas PEP 639's `License-Expression:`
+# — the one PyPI indexes for license filtering — is only produced from here.
+# The backend and frontend are AGPLv3 (root LICENSE); only this standalone
+# library is Apache-2.0. See COMMERCIAL-LICENSE.md for the split.
+license = "Apache-2.0"

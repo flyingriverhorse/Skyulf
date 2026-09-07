@@ -109,7 +109,7 @@ test.describe('Run Preview happy path', () => {
     });
 
     // Toolbar gates Run Preview on `canRunPreview` (dataset + outgoing edge).
-    const runPreview = page.getByRole('button', { name: /run preview/i });
+    const runPreview = page.getByRole('button', { name: 'Preview data', exact: true });
     await expect(runPreview).toBeVisible({ timeout: 5_000 });
     await runPreview.click();
 

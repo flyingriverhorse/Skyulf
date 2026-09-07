@@ -576,6 +576,13 @@ from backend.ml_pipeline.constants import StepType  # noqa: E402
 
 
 def _extract_columns(ntype: str, params: dict[str, Any]) -> list[str]:
+    """Return the columns a drop-style node's config names explicitly.
+
+    ``feature_selection`` is deliberately absent: which features a selector
+    drops is a runtime result (it depends on the fitted threshold/``k``), so it
+    reaches ``JobInfo`` via ``job.metrics["dropped_columns"]`` instead — written
+    in ``_execution/strategies.py``, merged in ``basic_training_manager.py``.
+    """
     dropped: list[str] = []
     if ntype in [
         "drop_missing_columns",
@@ -586,10 +593,6 @@ def _extract_columns(ntype: str, params: dict[str, Any]) -> list[str]:
         cols = params.get("columns")
         if isinstance(cols, list):
             dropped.extend(cols)
-    if ntype == "feature_selection":
-        dropped_feats = params.get("dropped_features")
-        if isinstance(dropped_feats, list):
-            dropped.extend(dropped_feats)
     return dropped
 
 

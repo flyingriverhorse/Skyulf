@@ -106,7 +106,7 @@ export const DataDriftPage: React.FC = () => {
                     <button
                         onClick={() => void handleCalculate()}
                         disabled={loading || !selectedJob || !file}
-                        className="flex items-center justify-center gap-2 px-5 py-2.5 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shrink-0"
+                        className="flex items-center justify-center gap-2 px-5 py-2.5 action-primary rounded-md text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed transition-colors shrink-0"
                     >
                         {loading ? <Loader2 className="animate-spin" size={16} /> : <BarChart2 size={16} />}
                         {loading ? 'Analyzing...' : 'Run Analysis'}

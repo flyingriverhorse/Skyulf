@@ -13,7 +13,7 @@ it: sklearn remains the modeling foundation while Skyulf provides pipeline
 configuration, artifacts, metrics, and safe execution conventions.
 
 <!-- Quick badges + links -->
-[![Docs](https://img.shields.io/website?down_color=red&down_message=offline&up_message=online&url=https://www.skyulf.com/manual/)](https://www.skyulf.com/manual/) [![PyPI](https://img.shields.io/pypi/v/skyulf-core.svg)](https://pypi.org/project/skyulf-core) [![License](https://img.shields.io/github/license/flyingriverhorse/Skyulf)](LICENSE)
+[![Docs](https://img.shields.io/website?down_color=red&down_message=offline&up_message=online&url=https://www.skyulf.com/manual/)](https://www.skyulf.com/manual/) [![PyPI](https://img.shields.io/pypi/v/skyulf-core.svg)](https://pypi.org/project/skyulf-core) [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![Downloads](https://img.shields.io/pypi/dm/skyulf-core.svg)](https://pypi.org/project/skyulf-core) [![issues](https://img.shields.io/github/issues/flyingriverhorse/Skyulf.svg)](https://github.com/flyingriverhorse/Skyulf/issues) [![contributors](https://img.shields.io/github/contributors/flyingriverhorse/Skyulf.svg)](https://github.com/flyingriverhorse/Skyulf/graphs/contributors)
 
 **Website & Documentation**
@@ -202,8 +202,13 @@ for binary) is rarely optimal for imbalanced classes or a metric you actually
 care about (F1, MCC, balanced accuracy, ...). `pipeline.optimize_thresholds(
 X_val, y_val, metric=...)` searches per-class thresholds against a metric you
 supply — evaluated on validation data you pass in explicitly (never the
-pipeline's internal split; get a clean holdout via `get_fitted_split()` above)
-— and `predict(use_tuned_thresholds=True)` then applies them. The same search
+pipeline's internal split) — and `predict(use_tuned_thresholds=True)` then
+applies them. `X_val` must be **raw**: the method runs the pipeline's fitted
+preprocessing on it itself, exactly once, so that the cutoffs are fitted
+against the same probabilities `predict()` later reproduces. `get_fitted_split()`
+above is therefore *not* a source for it — those frames are already
+preprocessed, and passing them here transforms the holdout a second time.
+Carve the holdout off the raw data before `fit()` instead. The same search
 is available as standalone array-level functions,
 `from skyulf.modeling import optimize_thresholds, apply_thresholds`, for use
 outside a pipeline. See the
@@ -409,5 +414,12 @@ mindmap
 
 ## License
 
-This project is licensed under the GNU Affero General Public License v3.0
-or later (AGPLv3+); see the [LICENSE](LICENSE) file.
+`skyulf-core` — this standalone Python library — is licensed under the
+**Apache License 2.0**; see the [LICENSE](LICENSE) file beside it.
+
+That is the permissive half of a split model: the Skyulf **backend and
+frontend are GNU AGPLv3**. You can use `skyulf-core` in proprietary projects
+without restriction, while running a modified backend or frontend as a network
+service carries AGPLv3's copyleft obligations. See
+[COMMERCIAL-LICENSE.md](https://github.com/flyingriverhorse/Skyulf/blob/master/COMMERCIAL-LICENSE.md)
+for the full terms.

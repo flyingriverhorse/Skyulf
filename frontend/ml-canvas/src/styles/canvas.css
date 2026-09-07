@@ -15,30 +15,30 @@
 }
 
 .dark .react-flow__controls {
-  background-color: #1e293b; /* slate-800 */
-  border-color: #334155; /* slate-700 */
+  background-color: hsl(var(--card));
+  border-color: hsl(var(--border));
   box-shadow: 0 0 2px 1px rgba(0, 0, 0, 0.4);
 }
 
 .react-flow__controls-button {
-  background-color: #ffffff;
-  border-bottom: 1px solid #eeeeee;
-  color: #555;
+  background-color: hsl(var(--card));
+  border-bottom: 1px solid hsl(var(--border));
+  color: hsl(var(--foreground));
 }
 
 .dark .react-flow__controls-button {
-  background-color: #1e293b; /* slate-800 */
-  border-bottom: 1px solid #334155; /* slate-700 */
-  color: #94a3b8; /* slate-400 */
+  background-color: hsl(var(--card));
+  border-bottom: 1px solid hsl(var(--border));
+  color: hsl(var(--foreground));
 }
 
 .react-flow__controls-button:hover {
-  background-color: #f4f4f4;
+  background-color: hsl(var(--accent));
 }
 
 .dark .react-flow__controls-button:hover {
-  background-color: #334155; /* slate-700 */
-  color: #e2e8f0; /* slate-200 */
+  background-color: hsl(var(--accent));
+  color: hsl(var(--foreground));
 }
 
 .react-flow__controls-button svg {

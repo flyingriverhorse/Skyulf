@@ -2,6 +2,7 @@
 
 from typing import Any
 
+import numpy as np
 import pandas as pd
 import polars as pl
 
@@ -9,10 +10,16 @@ from ...core.meta.decorators import node_meta
 from ...engines import SkyulfDataFrame
 from ...registry import NodeRegistry
 from .._artifacts import LagFeaturesArtifact
+from .._helpers import select_rows_by_position
 from .._schema import SkyulfSchema
 from ..base import BaseApplier, BaseCalculator, apply_method
 from ..dispatcher import apply_dual_engine
-from ._common import coerce_lags, filter_existing_columns, sort_pandas
+from ._common import (
+    coerce_lags,
+    filter_existing_columns,
+    sort_with_positions_pandas,
+    sort_with_positions_polars,
+)
 
 
 def _lag_name(col: str, lag: int) -> str:
@@ -37,26 +44,23 @@ def _polars_lag_exprs(
 def _apply_polars(X: Any, _y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
     columns: list[str] = params.get("columns", [])
     lags: list[int] = params.get("lags", [])
-    sort_by: str | None = params.get("sort_by")
     if not columns or not lags:
         return X, _y
 
-    X_out = (
-        X.sort(sort_by, nulls_last=True, maintain_order=True)
-        if sort_by and sort_by in X.columns
-        else X
-    )
+    X_out, sort_positions = sort_with_positions_polars(X, params.get("sort_by"))
+    _y = select_rows_by_position(_y, sort_positions)
     exprs = _polars_lag_exprs(columns, list(X_out.columns), lags, params.get("group_by") or None)
     if exprs:
         X_out = X_out.with_columns(exprs)
     if params.get("drop_na"):
-        if _y is not None:
+        if _y is None:
+            X_out = X_out.drop_nulls()
+        else:
             null_mask = pl.any_horizontal([pl.col(c).is_null() for c in X_out.columns])
             mask_series = X_out.select(null_mask.alias("__null")).get_column("__null")
-            X_out = X_out.filter(~mask_series)
-            _y = _y.filter(~mask_series)
-        else:
-            X_out = X_out.drop_nulls()
+            keep = (~mask_series).arg_true()
+            X_out = X_out.gather(keep)
+            _y = select_rows_by_position(_y, keep)
     return X_out, _y
 
 
@@ -78,12 +82,15 @@ def _apply_pandas(X: Any, _y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
     if not columns or not lags:
         return X, _y
 
-    df = sort_pandas(X.copy(), params.get("sort_by"))
+    df, sort_positions = sort_with_positions_pandas(X.copy(), params.get("sort_by"))
+    _y = select_rows_by_position(_y, sort_positions)
     for col in columns:
         if col in df.columns:
             _pandas_lag_column(df, col, lags, group_by)
     if params.get("drop_na"):
-        df = df.dropna()
+        keep = np.flatnonzero(df.notna().to_numpy().all(axis=1))
+        df = df.iloc[keep]
+        _y = select_rows_by_position(_y, keep)
     return df, _y
 
 
@@ -131,14 +138,13 @@ class LagFeaturesCalculator(BaseCalculator):
     def infer_output_schema(
         self, input_schema: SkyulfSchema, config: dict[str, Any]
     ) -> SkyulfSchema | None:
-        """Add one ``{col}_lag_{n}`` column per lag, mirroring the source dtype."""
-        # Lag columns mirror the dtype of their source column, so the output
-        # schema is derivable from config alone (shape is data-independent).
+        """Add one ``{col}_lag_{n}`` column per lag, as ``float64``."""
+        # Shifted lag columns are nullable by construction; pandas/polars keep
+        # them as ``float64`` because of the inserted missing row.
         cols = filter_existing_columns(config.get("columns", []), input_schema.column_list())
         lags = coerce_lags(config.get("lags", [1]))
         schema = input_schema
         for col in cols:
-            dtype = input_schema.dtypes.get(col, "unknown")
             for lag in lags:
-                schema = schema.add(_lag_name(col, lag), dtype)
+                schema = schema.add(_lag_name(col, lag), "float64")
         return schema

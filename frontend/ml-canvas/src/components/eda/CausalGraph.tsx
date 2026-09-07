@@ -33,16 +33,16 @@ const getNodeStyle = (): React.CSSProperties => {
         textAlign: 'center',
         borderWidth: '1px',
         borderStyle: 'solid',
-        backgroundColor: isDark ? '#1f2937' : '#ffffff',
-        color: isDark ? '#f3f4f6' : '#111827',
-        borderColor: isDark ? '#4b5563' : '#d1d5db',
+        backgroundColor: isDark ? '#222529' : '#ffffff',
+        color: isDark ? '#f3f4f6' : '#17102b',
+        borderColor: isDark ? '#666d77' : '#b9b3c8',
     };
 };
 
 const getEdgeStrokeColor = (type: string): string => {
     const isDark = document.documentElement.classList.contains('dark');
-    if (type === 'directed') return isDark ? '#93c5fd' : '#333333';
-    return isDark ? '#6b7280' : '#999999';
+    if (type === 'directed') return isDark ? '#9acbfa' : '#3b4bc4';
+    return isDark ? '#abafb7' : '#6b6485';
 };
 
 export const CausalGraph: React.FC<CausalGraphProps> = ({ graph }) => {
@@ -141,7 +141,8 @@ export const CausalGraph: React.FC<CausalGraphProps> = ({ graph }) => {
                 animated: true,
                 type: 'default',
                 label: e.type === 'directed' ? 'causes' : (e.type === 'bidirected' ? 'confounded' : 'related'),
-                labelStyle: { fill: document.documentElement.classList.contains('dark') ? '#d1d5db' : '#374151', fontSize: 12 },
+                labelStyle: { fill: 'hsl(var(--foreground))', fontSize: 12 },
+                labelBgStyle: { fill: 'hsl(var(--card))' },
                 style: { stroke, strokeDasharray: e.type === 'directed' ? '0' : '5 5' },
                 ...(endArrow ? { markerEnd: endArrow } : {}),
                 ...(startArrow ? { markerStart: startArrow } : {}),

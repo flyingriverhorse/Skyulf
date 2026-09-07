@@ -2,7 +2,7 @@
 
 [project]
 name = "skyulf"
-version = "0.8.14"
+version = "0.8.15"
 description = "MLOps web application for privacy-preserving ML workflows"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -35,6 +35,7 @@ dependencies = [
     "python-multipart>=0.0.27",
     "redis>=5.0.0,<6.0.0",
     "scikit-learn>=1.8.0,<2.0.0",
+    "joblib>=1.3.0",
     "imbalanced-learn>=0.14.1,<1.0.0",
     "scipy>=1.10.0,<2.0.0",
     "statsmodels>=0.14.0,<1.0.0",

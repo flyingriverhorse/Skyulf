@@ -8,6 +8,8 @@ and caller-overridable; the KS verdict is taken on the statistic rather than
 the p-value, which shrinks with sample size.
 """
 
+import logging
+
 import numpy as np
 import polars as pl
 from pydantic import BaseModel
@@ -18,6 +20,8 @@ try:
     SCIPY_AVAILABLE = True
 except ImportError:
     SCIPY_AVAILABLE = False
+
+logger = logging.getLogger(__name__)
 
 # PSI interpretation bands (standard convention): above the critical band the
 # shift is severe enough to retrain; above the moderate band it warrants monitoring.
@@ -187,7 +191,14 @@ class DriftCalculator:
                 # Try to cast current to match reference (e.g. Int to Float, or String to Float)
                 curr_series = curr_series.cast(dtype, strict=False)
             except Exception:  # noqa: BLE001 - uncastable column contributes no drift metric
-                # If casting fails completely (unlikely with strict=False), skip
+                # If casting fails completely (unlikely with strict=False), skip.
+                # Logged because skipping drops the column from the report whole:
+                # an absent column reads as "no drift measured", not as "not measured".
+                logger.warning(
+                    "Could not cast current column %r to the reference dtype; skipping it",
+                    col,
+                    exc_info=True,
+                )
                 return None  # nosec B112
 
         # drop_nans() first: pl.read_csv turns literal 'NaN' tokens into float
@@ -478,7 +489,17 @@ class DriftCalculator:
         )
 
     def _calculate_psi(self, expected: np.ndarray, actual: np.ndarray, buckets: int = 10) -> float:
-        """Calculate Population Stability Index (PSI)."""
+        """Calculate Population Stability Index (PSI).
+
+        Returns a finite ``0.0`` — "no shift measured" — for every input the
+        binning cannot score: an empty or constant reference, fewer than two
+        distinct breakpoints, or any numeric failure. ``0.0`` is indistinguishable
+        from a genuinely stable column in the report, so the failure branch logs;
+        it cannot instead return ``None`` (``DriftMetric.value`` is a non-optional
+        float that the UI re-compares against its threshold) or ``inf`` (the value
+        is serialized into a JSON response, and Starlette's ``JSONResponse`` uses
+        ``allow_nan=False``, which raises on non-finite floats).
+        """
         breakpoints = np.arange(0, buckets + 1) / (buckets) * 100
 
         if len(expected) == 0 or len(actual) == 0:
@@ -520,10 +541,19 @@ class DriftCalculator:
             return float(psi_value)
 
         except Exception:  # noqa: BLE001 - PSI numeric failure reports no drift (0.0)
+            logger.warning(
+                "PSI computation failed; reporting 0.0 (no drift) for this column", exc_info=True
+            )
             return 0.0
 
     def _calculate_kl(self, reference: np.ndarray, current: np.ndarray, buckets: int = 10) -> float:
-        """Calculates KL Divergence (Current || Reference)."""
+        """Calculates KL Divergence (Current || Reference).
+
+        Shares ``_calculate_psi``'s fail-open contract: any input the binning
+        cannot score yields a finite ``0.0`` ("no divergence measured"), and the
+        failure branch logs because ``0.0`` is indistinguishable from a genuinely
+        stable column in the report.
+        """
         try:
             if len(reference) == 0 or len(current) == 0:
                 return 0.0
@@ -554,4 +584,8 @@ class DriftCalculator:
 
             return float(entropy(curr_percents, ref_percents))
         except Exception:  # noqa: BLE001 - KL numeric failure reports no divergence (0.0)
+            logger.warning(
+                "KL divergence computation failed; reporting 0.0 (no divergence) for this column",
+                exc_info=True,
+            )
             return 0.0

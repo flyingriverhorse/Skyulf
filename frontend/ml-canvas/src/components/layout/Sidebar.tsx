@@ -1,9 +1,10 @@
-import React, { useRef, useState } from 'react';
+import React, { useCallback, useId, useLayoutEffect, useRef, useState } from 'react';
 import { registry } from '../../core/registry/NodeRegistry';
 import { useGraphStore } from '../../core/store/useGraphStore';
 import { useViewStore } from '../../core/store/useViewStore';
+import { useSidebarOpen } from '../../core/hooks/useSidebarOpen';
 import { FOCUS_NODE_EVENT } from '../../core/hooks/useKeyboardShortcuts';
-import { Search, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import { Search, PanelLeftClose, PanelLeftOpen, ChevronDown, ChevronRight } from 'lucide-react';
 
 export const Sidebar: React.FC = () => {
   // Legacy node types (e.g. the old Basic Training / Advanced Tuning nodes,
@@ -11,8 +12,26 @@ export const Sidebar: React.FC = () => {
   // compatibility but are excluded from the drag-and-drop palette.
   const nodes = registry.getAll().filter((n) => !n.hidden);
   const addNode = useGraphStore((state) => state.addNode);
-  const { isSidebarOpen, setSidebarOpen } = useViewStore();
+  const setSidebarOpen = useViewStore((state) => state.setSidebarOpen);
+  const isSidebarOpen = useSidebarOpen();
+  const contentRef = useRef<HTMLElement | null>(null);
+  const restoreFocus = useRef(false);
+  // Ref detachment runs before the old sidebar DOM disappears, while its
+  // focused control can still be identified. Do not steal focus from settings.
+  const trackContent = useCallback((element: HTMLElement | null) => {
+    if (!element && contentRef.current?.contains(document.activeElement)) restoreFocus.current = true;
+    contentRef.current = element;
+  }, []);
+  useLayoutEffect(() => {
+    if (restoreFocus.current) {
+      const content = contentRef.current;
+      (content?.querySelector<HTMLInputElement>('input') ?? content?.querySelector<HTMLButtonElement>('button'))?.focus();
+      restoreFocus.current = false;
+    }
+  }, [isSidebarOpen]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [collapsedCategories, setCollapsedCategories] = useState<Record<string, boolean>>({});
+  const categoryListId = useId();
   // Cascades click-to-add nodes so repeated clicks don't stack them on top of each other.
   const placementCounterRef = useRef(0);
 
@@ -47,10 +66,11 @@ export const Sidebar: React.FC = () => {
 
   if (!isSidebarOpen) {
     return (
-      <div className="absolute left-4 top-4 z-10">
+      <div ref={trackContent} className="absolute left-4 top-4 z-10">
         <button
+          type="button"
           onClick={() => setSidebarOpen(true)}
-          className="p-2 bg-background border shadow-md rounded-md text-muted-foreground hover:text-foreground transition-colors"
+          className="p-2 bg-background border shadow-md rounded-md text-muted-foreground hover:text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
           title="Expand Components"
           aria-label="Expand components sidebar"
         >
@@ -60,24 +80,27 @@ export const Sidebar: React.FC = () => {
     );
   }
 
+  const searchQuery = searchTerm.trim().toLowerCase();
   const filteredNodes = nodes.filter(n =>
-    n.label.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    n.category.toLowerCase().includes(searchTerm.toLowerCase())
+    n.label.toLowerCase().includes(searchQuery) ||
+    n.category.toLowerCase().includes(searchQuery) ||
+    n.description.toLowerCase().includes(searchQuery)
   );
 
   const categories = ['Data Source', 'Preprocessing', 'Modeling', 'Evaluation', 'Utility'];
 
   return (
-    <aside className="w-64 shrink-0 border-r bg-background flex flex-col h-full shadow-sm z-10 transition-all duration-300">
+    <aside ref={trackContent} aria-label="Components" className="w-64 shrink-0 border-r bg-background flex flex-col h-full shadow-sm z-10 transition-all duration-300">
       <div className="p-4 border-b space-y-3">
         <div className="flex items-center justify-between">
           <div>
             <h2 className="font-semibold tracking-tight">Components</h2>
-            <p className="text-xs text-muted-foreground">Drag and drop to canvas</p>
+            <p className="text-xs text-muted-foreground">Click or drag to add a node</p>
           </div>
           <button
+            type="button"
             onClick={() => setSidebarOpen(false)}
-            className="p-1 hover:bg-accent rounded-md text-muted-foreground hover:text-foreground transition-colors"
+            className="p-1 hover:bg-accent rounded-md text-muted-foreground hover:text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
             title="Collapse Sidebar"
             aria-label="Collapse sidebar"
           >
@@ -103,36 +126,55 @@ export const Sidebar: React.FC = () => {
             <p className="text-xs text-muted-foreground mt-1">Try a different search term.</p>
           </div>
         )}
-        {categories.map((category) => {
+        {categories.map((category, index) => {
           const categoryNodes = filteredNodes.filter(n => n.category === category);
           if (categoryNodes.length === 0) return null;
+          // Search reveals every matching group without changing the browsing layout.
+          const isSearching = searchQuery.length > 0;
+          const isExpanded = isSearching || !collapsedCategories[category];
+          const contentId = `${categoryListId}-${index}`;
 
           return (
             <div key={category}>
-              <h3 className="text-[10px] font-bold text-muted-foreground mb-2 uppercase tracking-wider px-1">
-                {category}
+              <h3 className="mb-2">
+                <button
+                  type="button"
+                  aria-expanded={isExpanded}
+                  aria-controls={contentId}
+                  disabled={isSearching}
+                  title={isSearching ? 'Clear search to collapse categories' : undefined}
+                  onClick={() => setCollapsedCategories(current => ({ ...current, [category]: !current[category] }))}
+                  className="flex w-full items-center gap-1.5 rounded px-1 py-1 text-left text-[10px] font-bold uppercase tracking-wider text-muted-foreground enabled:hover:bg-accent enabled:hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                >
+                  {isExpanded
+                    ? <ChevronDown aria-hidden="true" className="h-3.5 w-3.5 shrink-0" />
+                    : <ChevronRight aria-hidden="true" className="h-3.5 w-3.5 shrink-0" />}
+                  <span className="flex-1">{category}</span>
+                  <span aria-hidden="true" className="rounded bg-muted px-1.5 py-0.5 tabular-nums">{categoryNodes.length}</span>
+                </button>
               </h3>
-              <div className="space-y-2">
+              <div id={contentId} hidden={!isExpanded} className="space-y-2">
                 {categoryNodes.map((node) => (
-                  // eslint-disable-next-line jsx-a11y/click-events-have-key-events,jsx-a11y/no-static-element-interactions -- draggable item; drag is the primary interaction
-                  <div
+                  <button
+                    type="button"
                     key={node.type}
                     data-testid={`sidebar-node-${node.type}`}
-                    className="group flex items-center p-3 border rounded-lg bg-card hover:border-primary/50 hover:shadow-sm cursor-grab active:cursor-grabbing transition-all"
+                    aria-label={`Add ${node.label} node`}
+                    className="group flex w-full items-center p-3 border rounded-lg bg-card text-left hover:border-primary/50 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background cursor-grab active:cursor-grabbing transition-all"
                     draggable
                     onDragStart={(e) => { handleDragStart(e, node.type); }}
                     onClick={() => { handleAddNodeClick(node.type); }}
                   >
-                    <div className="p-2 bg-primary/5 group-hover:bg-primary/10 rounded-md mr-3 transition-colors">
+                    <span className="p-2 bg-primary/5 group-hover:bg-primary/10 rounded-md mr-3 transition-colors">
                       {node.icon && <node.icon className="w-4 h-4 text-primary" />}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium truncate">{node.label}</div>
-                      <div className="text-xs text-muted-foreground truncate">
+                    </span>
+                    <span className="flex-1 min-w-0">
+                      <span className="block text-sm font-medium truncate">{node.label}</span>
+                      <span className="block text-xs text-muted-foreground truncate">
                         {node.description}
-                      </div>
-                    </div>
-                  </div>
+                      </span>
+                    </span>
+                  </button>
                 ))}
               </div>
             </div>

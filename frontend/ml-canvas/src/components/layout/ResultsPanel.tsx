@@ -4,7 +4,6 @@ import { useViewStore } from '../../core/store/useViewStore';
 import { AlertTriangle, ChevronUp, ChevronDown, Maximize2, Minimize2, Table, X, XCircle } from 'lucide-react';
 import type { PreviewDataRows, PreviewData } from '../../core/api/client';
 import { generateBranchColors } from '../../core/hooks/useBranchColors';
-import { clickableProps } from '../../core/utils/a11y';
 import { useConfirm } from '../shared';
 import { BranchTabs } from './resultsPanel/BranchTabs';
 import { SplitTabs } from './resultsPanel/SplitTabs';
@@ -23,7 +22,7 @@ function toDatasetMap(previewData: PreviewData | null | undefined): Record<strin
 type ResultsPane = 'data' | 'issues' | 'steps';
 
 /** Shows preview results alongside canvas validation and run failure summaries. */
-export const ResultsPanel: React.FC = () => {
+export const ResultsPanel: React.FC<{ maxHeight?: number }> = ({ maxHeight = 720 }) => {
   const executionResult = useGraphStore((state) => state.executionResult);
   const setExecutionResult = useGraphStore((state) => state.setExecutionResult);
   const setLastRunError = useGraphStore((state) => state.setLastRunError);
@@ -40,7 +39,14 @@ export const ResultsPanel: React.FC = () => {
     setResultsPanelMaximized: setIsMaximized,
     isResultsPanelDismissed: dismissed,
     setResultsPanelDismissed: setDismissed,
+    resultsPanelHeight,
+    setResultsPanelHeight,
   } = useViewStore();
+  const panelId = React.useId();
+  const dragStart = React.useRef<{ y: number; height: number } | null>(null);
+  const panelHeight = Math.min(resultsPanelHeight, maxHeight);
+  const resizeTo = (height: number) => setResultsPanelHeight(Math.max(200, Math.min(maxHeight, height)));
+  const stopResizing = () => { dragStart.current = null; };
   const [activeBranch, setActiveBranch] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<string | null>(null);
   const [mergeWarningsOpen, setMergeWarningsOpen] = useState<boolean>(false);
@@ -293,18 +299,68 @@ export const ResultsPanel: React.FC = () => {
 
   return (
     <div
-      className={`absolute bottom-0 left-0 right-0 bg-background border-t shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] transition-all duration-300 z-20 flex flex-col ${
-        !isResultsPanelExpanded ? 'h-10' : isMaximized ? 'top-0' : 'h-96'
-      }`}
+      id={panelId}
+      role="region"
+      aria-label="Preview results"
+      style={{ height: !isResultsPanelExpanded ? 40 : isMaximized ? '100%' : panelHeight }}
+      className="absolute bottom-0 left-0 right-0 bg-background border-t shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] z-20 flex flex-col"
     >
+      {isResultsPanelExpanded && !isMaximized && (
+        // eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions, jsx-a11y/no-noninteractive-tabindex -- A focusable ARIA separator is an interactive pane-resize widget.
+        <div role="separator" tabIndex={0}
+          aria-label="Resize results panel"
+          aria-orientation="horizontal"
+          aria-controls={panelId}
+          aria-valuemin={200}
+          aria-valuemax={maxHeight}
+          aria-valuenow={panelHeight}
+          aria-valuetext={`${panelHeight} pixels tall`}
+          title="Drag to resize. Up arrow grows; Down arrow shrinks. Home resets; End maximizes."
+          className="absolute inset-x-0 -top-1 z-20 h-2 cursor-row-resize touch-none hover:bg-primary/20 focus-visible:bg-primary/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary"
+          onPointerDown={(event) => {
+            if (event.button !== 0) return;
+            event.preventDefault();
+            event.currentTarget.focus();
+            event.currentTarget.setPointerCapture(event.pointerId);
+            dragStart.current = { y: event.clientY, height: panelHeight };
+          }}
+          onPointerMove={(event) => {
+            if (dragStart.current) resizeTo(dragStart.current.height + dragStart.current.y - event.clientY);
+          }}
+          onPointerUp={stopResizing}
+          onPointerCancel={stopResizing}
+          onLostPointerCapture={stopResizing}
+          onKeyDown={(event) => {
+            const heights: Record<string, number> = {
+              ArrowUp: panelHeight + 20,
+              ArrowDown: panelHeight - 20,
+              Home: 384,
+              End: maxHeight,
+            };
+            const height = heights[event.key];
+            if (height === undefined) return;
+            event.preventDefault();
+            // Home resets the preference even when this viewport cannot fit it.
+            if (event.key === 'Home') setResultsPanelHeight(height);
+            else resizeTo(height);
+          }}
+        >
+          <span aria-hidden="true" className="absolute left-1/2 top-1/2 h-1 w-8 -translate-x-1/2 -translate-y-1/2 rounded-full bg-muted-foreground/40" />
+        </div>
+      )}
       {/* Header */}
       <div
-        className="flex items-center justify-between gap-2 px-4 py-2 bg-muted/10 cursor-pointer hover:bg-muted/20 border-b select-none"
-        {...clickableProps(() => setResultsPanelExpanded(!isResultsPanelExpanded))}
+        className="flex items-center justify-between gap-2 px-4 py-2 bg-muted/10 border-b select-none shrink-0"
       >
-        <div className="flex items-center gap-2 min-w-0">
+        <button
+          type="button"
+          aria-label="Toggle preview results"
+          aria-expanded={isResultsPanelExpanded}
+          onClick={() => setResultsPanelExpanded(!isResultsPanelExpanded)}
+          className="flex flex-1 items-center gap-2 min-w-0 text-left text-foreground rounded hover:bg-muted/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+        >
           <Table className="w-4 h-4 text-primary shrink-0" />
-          <span className="font-semibold text-sm shrink-0">Preview Results</span>
+          <span className="font-semibold text-sm truncate">Preview Results</span>
           {executionResult && (
             <span className="text-xs text-muted-foreground truncate">
               {currentRows.length === currentTotal
@@ -317,16 +373,16 @@ export const ResultsPanel: React.FC = () => {
             <span className="text-xs text-red-600 font-bold shrink-0">(Failed)</span>
           )}
           {issueCount > 0 && (
-            <span className="shrink-0 text-[11px] font-medium px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300">
+            <span className="shrink-0 text-[11px] font-medium px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300 whitespace-nowrap">
               {issueCount} {issueCount === 1 ? 'issue' : 'issues'}
             </span>
           )}
-        </div>
+        </button>
         <div className="flex items-center gap-1 shrink-0">
           {isResultsPanelExpanded && (
             <button
               type="button"
-              className="p-1 hover:bg-muted rounded"
+              className="p-1 hover:bg-muted rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
               aria-label={isMaximized ? 'Restore results panel' : 'Maximize results panel'}
               onClick={(e) => {
                 e.stopPropagation();
@@ -336,13 +392,19 @@ export const ResultsPanel: React.FC = () => {
               {isMaximized ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
             </button>
           )}
-          <button type="button" className="p-1 hover:bg-muted rounded" aria-label={isResultsPanelExpanded ? 'Collapse results panel' : 'Expand results panel'}>
+          <button
+            type="button"
+            className="p-1 hover:bg-muted rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            aria-label={isResultsPanelExpanded ? 'Collapse results panel' : 'Expand results panel'}
+            aria-expanded={isResultsPanelExpanded}
+            onClick={() => setResultsPanelExpanded(!isResultsPanelExpanded)}
+          >
             {isResultsPanelExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
           </button>
           {(executionResult || lastRunError || validationIssues.length > 0) && (
             <button
               type="button"
-              className="p-1 hover:bg-muted rounded"
+              className="p-1 hover:bg-muted rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
               aria-label="Close preview results"
               title="Close preview results"
               onClick={(e) => {

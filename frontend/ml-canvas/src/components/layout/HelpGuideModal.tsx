@@ -102,7 +102,7 @@ export const HelpGuideModal: React.FC<HelpGuideModalProps> = ({ isOpen, onClose 
 
       <Section icon={<Play className="w-3.5 h-3.5" />} title="Preview vs running experiments">
         <p>
-          <span className="font-medium">Run Preview</span> (Ctrl+Enter) executes the whole
+          <span className="font-medium">Preview data</span> (Ctrl+Enter) executes the whole
           graph right away and shows the resulting rows in the Preview Results panel at the
           bottom &mdash; the fastest way to check that your columns and shapes come out right.
         </p>

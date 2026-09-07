@@ -270,7 +270,7 @@ export const PipelineVersionsModal: React.FC<PipelineVersionsModalProps> = ({
                     <div className="flex items-center gap-2">
                       <button
                         onClick={() => { void commitEdit(entry); }}
-                        className="flex items-center gap-1 px-2 py-1 text-xs bg-primary text-primary-foreground rounded hover:opacity-90"
+                        className="flex items-center gap-1 px-2 py-1 text-xs action-primary rounded hover:opacity-90"
                       >
                         <Save className="w-3 h-3" /> Save
                       </button>

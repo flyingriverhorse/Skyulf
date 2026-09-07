@@ -9,7 +9,11 @@ from ...core.meta.decorators import node_meta
 from ...registry import NodeRegistry
 from ...utils import detect_numeric_columns, user_picked_no_columns
 from .._artifacts import WinsorizeArtifact
-from .._helpers import auto_detect_numeric_columns, resolve_columns_then_to_pandas
+from .._helpers import (
+    auto_detect_numeric_columns,
+    promote_configured_columns_to_float64,
+    resolve_columns_then_to_pandas,
+)
 from .._schema import SkyulfSchema
 from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
 from ..dispatcher import apply_dual_engine
@@ -82,9 +86,10 @@ class WinsorizeCalculator(BaseCalculator):
     def infer_output_schema(
         self, input_schema: SkyulfSchema, config: dict[str, Any]
     ) -> SkyulfSchema:
-        """Return the input schema unchanged: clipping rewrites values, not columns."""
-        # Winsorize clips values in place; column set is preserved.
-        return input_schema
+        """Return a schema with selected columns promoted to ``float64``."""
+        if not isinstance(input_schema, SkyulfSchema):
+            return input_schema
+        return promote_configured_columns_to_float64(input_schema, config)
 
     @fit_method
     def fit(self, X: Any, _y: Any, config: dict[str, Any]) -> WinsorizeArtifact:  # pylint: disable=arguments-differ

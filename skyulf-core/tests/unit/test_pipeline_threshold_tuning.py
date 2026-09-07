@@ -3,6 +3,7 @@
 import numpy as np
 import pytest
 from sklearn.metrics import f1_score
+from sklearn.model_selection import train_test_split
 
 from skyulf.pipeline import SkyulfPipeline
 
@@ -25,24 +26,70 @@ def _binary_config(test_size=0.25, random_state=42):
     }
 
 
+def _scaling_config(test_size=0.25, random_state=42):
+    """Binary config whose preprocessing is *not* idempotent.
+
+    A second pass through ``StandardScaler`` shifts the features again, so a
+    double transform shows up in the predicted probabilities. Mean imputation
+    cannot serve here: imputing an already-imputed frame changes nothing.
+    """
+    return {
+        "preprocessing": [
+            {
+                "name": "split",
+                "transformer": "TrainTestSplitter",
+                "params": {"test_size": test_size, "random_state": random_state},
+            },
+            {
+                "name": "imputer",
+                "transformer": "SimpleImputer",
+                "params": {"strategy": "mean"},
+            },
+            {
+                "name": "scaler",
+                "transformer": "StandardScaler",
+                "params": {"columns": ["feature1", "feature2"]},
+            },
+        ],
+        "modeling": {"type": "logistic_regression"},
+    }
+
+
+def _raw_holdout(data, target_column="target", test_size=0.25, random_state=0):
+    """Carve the raw validation holdout ``optimize_thresholds()`` expects.
+
+    Returns ``(train_raw, X_val, y_val)`` with the target still on ``train_raw``
+    and already off ``X_val``, so both halves are untransformed rows.
+    """
+    train_raw, val_raw = train_test_split(data, test_size=test_size, random_state=random_state)
+    return train_raw, val_raw.drop(columns=[target_column]), val_raw[target_column]
+
+
+def _macro_f1(y_true, y_pred):
+    """Macro F1, the caller-supplied metric the parity test maximizes."""
+    return f1_score(y_true, y_pred, average="macro")
+
+
 def test_optimize_thresholds_returns_dict_covering_both_classes(sample_classification_data):
+    """The tuned dict carries one cutoff per class present in the holdout."""
     data = sample_classification_data.drop(columns=["category"])
     pipeline = SkyulfPipeline(_binary_config())
-    X_train, y_train, X_val, y_val = pipeline.get_fitted_split(data, target_column="target")
-    pipeline.fit(data, target_column="target")
+    train_raw, X_val, y_val = _raw_holdout(data)
+    pipeline.fit(train_raw, target_column="target")
 
     def metric(y_true, y_pred):
         return f1_score(y_true, y_pred, average="macro")
 
     thresholds = pipeline.optimize_thresholds(X_val, y_val, metric=metric)
-    assert set(thresholds.keys()) == set(np.unique(y_train))
+    assert set(thresholds.keys()) == set(np.unique(y_val))
 
 
 def test_optimize_thresholds_stores_result_on_instance(sample_classification_data):
+    """The search result is kept on the instance for predict(use_tuned_thresholds=True)."""
     data = sample_classification_data.drop(columns=["category"])
     pipeline = SkyulfPipeline(_binary_config())
-    pipeline.fit(data, target_column="target")
-    _, _, X_val, y_val = pipeline.get_fitted_split(data, target_column="target")
+    train_raw, X_val, y_val = _raw_holdout(data)
+    pipeline.fit(train_raw, target_column="target")
 
     assert pipeline._tuned_thresholds is None
     thresholds = pipeline.optimize_thresholds(
@@ -75,14 +122,64 @@ def test_predict_use_tuned_thresholds_raises_before_tuning(sample_classification
 def test_predict_use_tuned_thresholds_applies_stored_thresholds(sample_classification_data):
     data = sample_classification_data.drop(columns=["category"])
     pipeline = SkyulfPipeline(_binary_config())
-    pipeline.fit(data, target_column="target")
-    _, _, X_val, y_val = pipeline.get_fitted_split(data, target_column="target")
+    train_raw, X_val, y_val = _raw_holdout(data)
+    pipeline.fit(train_raw, target_column="target")
     pipeline.optimize_thresholds(X_val, y_val, metric=lambda a, b: f1_score(a, b, average="macro"))
 
     X_test = data.drop(columns=["target"])
     tuned_preds = pipeline.predict(X_test, use_tuned_thresholds=True)
     assert len(tuned_preds) == len(X_test)
     assert set(np.unique(tuned_preds)).issubset(set(np.unique(data["target"])))
+
+
+def test_optimize_thresholds_sees_the_same_probabilities_as_predict(
+    sample_classification_data, monkeypatch
+):
+    """Tuning and predict(use_tuned_thresholds=True) must feed the model identical probabilities.
+
+    ``optimize_thresholds()`` runs the fitted preprocessing on ``X_val`` exactly
+    once, the same single pass ``predict()`` makes. Handing it the
+    already-preprocessed frames ``get_fitted_split()`` returns transforms the
+    holdout a second time, so the cutoffs get fitted against a distribution
+    inference never reproduces — silently, because the returned dict still looks
+    plausible.
+    """
+    data = sample_classification_data.drop(columns=["category"])
+    pipeline = SkyulfPipeline(_scaling_config())
+    train_raw, X_val, y_val = _raw_holdout(data)
+    pipeline.fit(train_raw, target_column="target")
+
+    seen: list[np.ndarray] = []
+    estimator = pipeline.model_estimator
+    assert estimator is not None, "fit() must install the model estimator"
+    applier = estimator.applier
+    real_predict_proba = applier.predict_proba
+
+    def spy(transformed, model):
+        proba = real_predict_proba(transformed, model)
+        seen.append(np.asarray(proba))
+        return proba
+
+    monkeypatch.setattr(applier, "predict_proba", spy)
+
+    pipeline.optimize_thresholds(X_val, y_val, metric=_macro_f1)
+    assert len(seen) == 1, "tuning must transform X_val exactly once"
+    tuning_proba = seen[0]
+
+    seen.clear()
+    pipeline.predict(X_val, use_tuned_thresholds=True)
+    assert len(seen) == 1, "inference must transform its input exactly once"
+    inference_proba = seen[0]
+
+    np.testing.assert_allclose(tuning_proba, inference_proba)
+
+    # Teeth: the same rows handed over pre-transformed — what get_fitted_split()
+    # returns — make tuning see a different distribution than inference does.
+    seen.clear()
+    pipeline.optimize_thresholds(
+        pipeline.feature_engineer.transform(X_val), y_val, metric=_macro_f1
+    )
+    assert not np.allclose(seen[0], inference_proba)
 
 
 def test_predict_default_behavior_unchanged_when_flag_is_false(sample_classification_data):

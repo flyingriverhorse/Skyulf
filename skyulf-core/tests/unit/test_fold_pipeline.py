@@ -10,8 +10,10 @@ import pandas as pd
 import pytest
 from sklearn.base import clone
 from sklearn.linear_model import LinearRegression, LogisticRegression
+from sklearn.metrics import get_scorer
 from sklearn.model_selection import GridSearchCV
 from sklearn.pipeline import Pipeline
+from sklearn.svm import SVC
 
 from skyulf.modeling._tuning.fold_pipeline import FoldAwareModelStep
 
@@ -315,3 +317,48 @@ def test_searcher_scorers_align_with_original_label_space(scoring: str, adapter_
     preds = best.predict(X)
     assert set(np.unique(preds)) <= set(np.unique(y))
     assert set(np.asarray(best.classes_).tolist()) == set(np.unique(y).tolist())
+
+
+# ---------------------------------------------------------------------------
+# Response methods follow the wrapped model (OC-202)
+# ---------------------------------------------------------------------------
+
+
+def test_a_model_without_proba_does_not_advertise_one() -> None:
+    """``SVC(probability=False)`` scores on decision values, so the wrapper must not claim proba.
+
+    Offering ``predict_proba`` unconditionally made ``roc_auc`` select it and then
+    raise ``AttributeError`` on a model that cannot produce probabilities — and
+    with no ``decision_function`` forwarded either, the wrapped estimator could not
+    be scored at all while the same model scored fine unwrapped.
+    """
+    X, y = _xy_int(n=40)
+    native = SVC(probability=False).fit(X, y)
+    step = FoldAwareModelStep(estimator=SVC(probability=False), preprocessor=IdentityAdapter())
+    step.fit(X, y)
+
+    assert not hasattr(step, "predict_proba")
+    assert hasattr(step, "decision_function")
+    assert get_scorer("roc_auc")(step, X, y) == pytest.approx(get_scorer("roc_auc")(native, X, y))
+
+
+def test_response_method_availability_does_not_depend_on_fit() -> None:
+    """The searcher clones the step before fitting it, so a clone must answer too.
+
+    Reading the constructor argument when there is no fitted ``model_`` is what
+    keeps ``hasattr`` correct on an unfitted clone.
+    """
+    assert not hasattr(FoldAwareModelStep(estimator=SVC(probability=False)), "predict_proba")
+    assert hasattr(FoldAwareModelStep(estimator=SVC(probability=False)), "decision_function")
+    assert hasattr(FoldAwareModelStep(estimator=LogisticRegression()), "predict_proba")
+
+
+def test_a_regressor_advertises_neither_classifier_response_method() -> None:
+    """A wrapped regressor must not look scorable by a classification scorer."""
+    X = pd.DataFrame({"a": np.arange(30, dtype=float)})
+    y = pd.Series(np.linspace(0, 1, 30), name="target")
+    step = FoldAwareModelStep(estimator=LinearRegression(), preprocessor=IdentityAdapter())
+    step.fit(X, y)
+
+    assert not hasattr(step, "predict_proba")
+    assert not hasattr(step, "decision_function")

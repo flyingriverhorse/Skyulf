@@ -22,17 +22,19 @@ The functionality is available at three levels:
 ## Pipeline usage
 
 Tune against explicit, out-of-sample validation data — **never** the
-pipeline's internal train/test split. Get a clean holdout via
-[`get_fitted_split()`](validation_vs_sklearn.md) (or your own split) first:
+pipeline's internal train/test split. Carve the holdout out of the **raw**
+data before fitting, and pass those raw rows in:
 
 ```python
 from sklearn.metrics import f1_score
+from sklearn.model_selection import train_test_split
 
-# Clean, independent holdout for tuning (uses the pipeline's configured preprocessing).
-X_train, y_train, X_val, y_val = pipeline.get_fitted_split(
-    customers, target_column="purchased"
-)
-pipeline.fit(customers, target_column="purchased")
+# Raw holdout, carved before fit(): optimize_thresholds() preprocesses it itself.
+train_raw, val_raw = train_test_split(customers, test_size=0.2, random_state=42)
+X_val = val_raw.drop(columns=["purchased"])
+y_val = val_raw["purchased"]
+
+pipeline.fit(train_raw, target_column="purchased")
 
 thresholds = pipeline.optimize_thresholds(
     X_val,
@@ -47,11 +49,28 @@ tuned_predictions = pipeline.predict(new_customers, use_tuned_thresholds=True)
 ```
 
 `optimize_thresholds()` runs the pipeline's already-fitted preprocessing on
-`X_val` internally, calls the model's `predict_proba`, searches thresholds,
-and stores the result on the pipeline. `predict(use_tuned_thresholds=True)`
-then applies those stored thresholds; it raises a `ValueError` if
-`optimize_thresholds()` was never called, and requires a model that supports
-`predict_proba`.
+`X_val` internally — exactly once, the same single pass `predict()` makes —
+then calls the model's `predict_proba`, searches thresholds, and stores the
+result on the pipeline. That one pass is why `X_val` has to be raw: it is what
+makes the probabilities the cutoffs are fitted against the same probabilities
+`predict(use_tuned_thresholds=True)` later reproduces.
+`predict(use_tuned_thresholds=True)` then applies those stored thresholds; it
+raises a `ValueError` if `optimize_thresholds()` was never called, and requires
+a model that supports `predict_proba`.
+
+**Do not tune on [`get_fitted_split()`](../reference/api/pipeline.md) output.**
+That helper returns frames the preprocessing chain has **already transformed**;
+it exists so you can compare raw sklearn/XGBoost/CatBoost estimators against
+the exact split the pipeline would use. Handing its `X_test` to
+`optimize_thresholds()` preprocesses the holdout a *second* time, so the search
+fits cutoffs against a distribution inference never reproduces. Nothing errors
+— the returned dict looks plausible, and the metric can even score *better* on
+the doubly-transformed fold, which is why the mismatch stays invisible.
+
+If your config already contains a `TrainTestSplitter`, fitting on `train_raw`
+splits it a second time internally. That is fine, and it is what keeps the
+model off your tuning data: the model trains on the splitter's train part, and
+`val_raw` is untouched by both.
 
 ### `SkyulfPipeline.optimize_thresholds` signature
 
@@ -178,7 +197,12 @@ tuning run.
   exclusive of the endpoints). Metrics like F1 are piecewise constant in the
   cutoff, so exactly-tied plateaus are common; ties break toward the default
   `0.5` cut. Applying the returned per-class thresholds reproduces the same
-  `>=` rule the search scored with, an exact tie included.
+  `>=` rule the search scored with, an exact tie included. When *every*
+  candidate ties — a validation split holding one class, probabilities so
+  saturated that no cutoff straddles a boundary, or a metric that ignores its
+  predictions — there is no signal to tune against: the search keeps the default
+  `0.5` cut and logs a warning saying so, rather than silently returning cutoffs
+  indistinguishable from a genuine optimum.
 - **Multiclass** uses Nelder–Mead optimization over a scaled-argmax rule.
   Equal thresholds across all classes reduce to plain `argmax`, so the tuned
   result can only match or beat the default rule on the tuning metric.

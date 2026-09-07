@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useId, useState } from 'react';
 import { NodeDefinition } from '../../../core/types/nodes';
 import { Database, TableProperties, Plus } from 'lucide-react';
 import { DatasetService } from '../../../core/api/datasets';
@@ -16,6 +16,7 @@ const DatasetSettings: React.FC<{ config: DatasetNodeConfig; onChange: (c: Datas
   config,
   onChange,
 }) => {
+  const datasetSelectId = useId();
   const [showUpload, setShowUpload] = useState(false);
   const { data: schema, isLoading: isSchemaLoading } = useDatasetSchema(config.datasetId);
 
@@ -55,10 +56,10 @@ const DatasetSettings: React.FC<{ config: DatasetNodeConfig; onChange: (c: Datas
     <div className="p-4 space-y-4">
       <div className="space-y-2">
         <div className="flex justify-between items-center">
-          <span className="block text-sm font-medium">Select Dataset</span>
+          <label htmlFor={datasetSelectId} className="block text-sm font-medium">Select Dataset</label>
           <button
             onClick={() => { setShowUpload(true); }}
-            className="text-xs flex items-center gap-1 text-blue-600 hover:text-blue-700 font-medium"
+            className="text-xs flex items-center gap-1 text-link hover:underline font-medium focus-ring"
           >
             <Plus size={14} />
             New Upload
@@ -69,6 +70,7 @@ const DatasetSettings: React.FC<{ config: DatasetNodeConfig; onChange: (c: Datas
           <div className="text-xs text-muted-foreground">Loading datasets...</div>
         ) : (
           <select
+            id={datasetSelectId}
             className="w-full p-2 border rounded bg-background focus:ring-1 focus:ring-primary outline-none"
             value={config.datasetId || ''}
             onChange={handleChange}

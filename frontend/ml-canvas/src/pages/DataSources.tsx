@@ -247,8 +247,7 @@ export const DataSources: React.FC = () => {
           </button>
           <button
             onClick={() => { setShowUpload(!showUpload); }}
-            className="flex items-center gap-2 text-white px-4 py-2 rounded-md shadow-sm transition-all hover:opacity-90"
-            style={{ background: 'var(--main-gradient)' }}
+            className="flex items-center gap-2 action-primary px-4 py-2 rounded-md shadow-sm transition-all hover:opacity-90 focus-ring"
           >
             <Plus size={18} />
             {showUpload ? 'Cancel Upload' : 'Upload File'}

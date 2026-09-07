@@ -21,11 +21,11 @@ class CategoricalMixin(_AnalyzerState):
                         continue
                     value = item[val_key]
                     if value is None:
-                        # Polars' `value_counts` includes null as a real
-                        # category; render it as an actual missing marker
-                        # rather than the literal string "None", which would
-                        # otherwise look like (and be indistinguishable
-                        # from) a genuine category value of that name.
+                        # Polars' `value_counts` includes null as a real category.
+                        # Drop it rather than stringify it: `str(None)` would put a
+                        # literal "None" in top_k, indistinguishable from a genuine
+                        # category value of that name. Null frequency is still
+                        # reported by ColumnProfile.missing_count/missing_percentage.
                         continue
                     top_k.append({"value": str(value), "count": item["count"]})
 

@@ -146,7 +146,7 @@ const FlowCanvasContent: React.FC = () => {
 
   // Whether the Preview Results panel is showing (mirrors ResultsPanel's
   // visibility rule) and how tall it is, so the zoom controls lift above
-  // it: 40px for the collapsed bar, 384px (h-96) when expanded. Uses the
+  // it: 40px for the collapsed bar, the layout's clamped height when expanded. Uses the
   // branch-stable nodes so drags don't re-validate every frame.
   const validationIssueCount = useMemo(
     () => collectGraphValidationIssues(branchStableNodes, edges).length,
@@ -276,20 +276,53 @@ const FlowCanvasContent: React.FC = () => {
     return () => window.removeEventListener('skyulf:add-node-at-center', handler);
   }, [screenToFlowPosition, addNode]);
 
-  // CAN-001: pan/zoom the just-added node into view. Fired by the
-  // Sidebar after a palette click, since it sits outside
-  // <ReactFlowProvider> and can't call fitView itself. Drag-and-drop
-  // and the command-palette insertion above already place nodes at a
-  // point the user is already looking at, so they don't need this.
+  // Reveal requests from settings, sidebar additions, and deep links share
+  // the same unobscured viewport. Wait for panel width transitions to settle
+  // before fitting; ordinary resizing/panning must not keep recentering nodes.
   useEffect(() => {
+    const wrapper = reactFlowWrapper.current;
+    if (!wrapper) return;
+    let pending: FocusNodeDetail | null = null;
+    let timer: ReturnType<typeof setTimeout>;
+    const scheduleFit = () => {
+      if (!pending) return;
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        const request = pending;
+        pending = null;
+        if (!request || !useGraphStore.getState().nodes.some(node => node.id === request.id)) return;
+        const rect = wrapper.getBoundingClientRect();
+        if (rect.width === 0 || rect.height === 0) return;
+        const results = wrapper.parentElement?.querySelector<HTMLElement>('[aria-label="Preview results"]');
+        const coveredHeight = results ? Math.max(0, rect.bottom - results.getBoundingClientRect().top) : 0;
+        const toolbar = wrapper.parentElement?.parentElement?.querySelector<HTMLElement>('[data-canvas-toolbar]');
+        const coveredTop = toolbar ? Math.max(0, toolbar.getBoundingClientRect().bottom - rect.top) : 48;
+        void fitView({
+          nodes: [{ id: request.id }],
+          duration: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 250,
+          padding: { top: `${coveredTop + 24}px`, left: '64px', right: '24px', bottom: `${coveredHeight + 24}px` },
+          maxZoom: 1,
+        });
+        if (request.focusWrapper) wrapper.focus();
+      }, 80);
+    };
+    const observer = new ResizeObserver(scheduleFit);
+    observer.observe(wrapper);
     const handler = (e: Event): void => {
       const detail = (e as CustomEvent<FocusNodeDetail>).detail;
       if (!detail?.id) return;
-      fitView({ nodes: [{ id: detail.id }], duration: 250, padding: 0.4, maxZoom: 1 });
-      if (detail.focusWrapper) reactFlowWrapper.current?.focus();
+      pending = detail;
+      const view = useViewStore.getState();
+      view.setPropertiesPanelExpanded(false);
+      view.setResultsPanelMaximized(false);
+      scheduleFit();
     };
     window.addEventListener(FOCUS_NODE_EVENT, handler);
-    return () => window.removeEventListener(FOCUS_NODE_EVENT, handler);
+    return () => {
+      clearTimeout(timer);
+      observer.disconnect();
+      window.removeEventListener(FOCUS_NODE_EVENT, handler);
+    };
   }, [fitView]);
 
   // CAN-003: after a graph is restored from any recovery source, fit the
@@ -327,7 +360,7 @@ const FlowCanvasContent: React.FC = () => {
 
   return (
     <div
-      className="w-full h-full outline-none relative"
+      className="w-full h-full outline-none relative focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary"
       ref={reactFlowWrapper}
       // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- canvas wrapper must be focusable to capture keyboard shortcuts
       tabIndex={0}
@@ -401,16 +434,15 @@ const FlowCanvasContent: React.FC = () => {
           style={{
             // Maximizing the panel covers the whole canvas, so the controls
             // have nowhere to lift to — hide them instead of burying them.
-            ...(isResultsPanelMaximized && resultsPanelVisible
+            ...(isResultsPanelExpanded && isResultsPanelMaximized && resultsPanelVisible
               ? { display: 'none' }
               : {
                   marginBottom: resultsPanelVisible
                     ? isResultsPanelExpanded
-                      ? '384px'
+                      ? 'var(--results-panel-height, 384px)'
                       : '40px'
                     : '0px',
                 }),
-            transition: 'margin-bottom 0.3s ease-in-out',
           }}
         />
       </ReactFlow>
@@ -438,7 +470,7 @@ const FlowCanvasContent: React.FC = () => {
               type="button"
               onClick={() => window.dispatchEvent(new CustomEvent(SHOW_TEMPLATES_EVENT))}
               data-testid="empty-state-templates"
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium action-primary"
             >
               <Sparkles className="w-3.5 h-3.5" />
               Browse templates

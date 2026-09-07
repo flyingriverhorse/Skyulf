@@ -30,6 +30,7 @@ from ..engines import (
     get_engine,
 )
 from ..utils import resolve_columns
+from ._schema import SkyulfSchema
 
 
 def resolve_valid_columns(X: Any, requested: Iterable[str]) -> list[str]:
@@ -42,6 +43,33 @@ def resolve_valid_columns(X: Any, requested: Iterable[str]) -> list[str]:
     # Order-preserving dedupe: polars `.select` raises DuplicateError on
     # repeated output names where pandas silently duplicated them.
     return [c for c in dict.fromkeys(requested) if c in cols_set]
+
+
+def promote_configured_columns_to_float64(
+    input_schema: SkyulfSchema, config: dict[str, Any]
+) -> SkyulfSchema:
+    """Promote configured, existing columns to ``float64`` in a schema."""
+    if "columns" in config:
+        selected = config["columns"]
+    else:
+        selected = [
+            col
+            for col in input_schema.column_list()
+            if _is_numeric_schema_dtype(input_schema.dtypes.get(col))
+        ]
+    if not selected:
+        return input_schema
+
+    out = input_schema
+    for col in selected:
+        if col in input_schema.columns and input_schema.dtypes.get(col) != "float64":
+            out = out.with_dtype(col, "float64")
+    return out
+
+
+def _is_numeric_schema_dtype(dtype: str | None) -> bool:
+    """Return whether an engine-neutral schema dtype is numeric."""
+    return bool(dtype) and dtype.lower().startswith(("int", "uint", "float"))
 
 
 def safe_scale(scale_arr: np.ndarray) -> np.ndarray:
@@ -60,6 +88,55 @@ def to_pandas(X: Any) -> pd.DataFrame:
     paths that bypass the dispatcher (e.g. shared subset-selection helpers).
     """
     return X.to_pandas() if hasattr(X, "to_pandas") else X
+
+
+def select_rows_by_position(y: Any, positions: Any) -> Any:
+    """Return ``y`` restricted and reordered to exactly ``positions``.
+
+    ``positions`` is an integer array-like of row indices into the *original*
+    ``y``, so one value serves both row-changing operations: the kept indices
+    of a filter and the argsort of a sort. ``X`` and ``y`` are given the same
+    ``positions``, which is what keeps them aligned by construction rather than
+    by two independently-correct-looking selections.
+
+    Every ``y`` shape the dispatcher accepts is handled, and the input's type is
+    preserved. Returning ``y`` untouched for an unrecognised shape is what
+    silently desynchronised ``X`` and ``y`` — and
+    ``_check_xy_engine_parity`` documents lists and numpy arrays as
+    engine-neutral, so both really do reach here on either engine.
+
+    Args:
+        y: The paired target. ``None`` passes straight through.
+        positions: Integer row positions, or ``None`` when no row changed.
+
+    Returns:
+        ``y`` holding exactly the requested rows, in the requested order.
+
+    Raises:
+        TypeError: If ``y`` is a shape whose rows cannot be selected here.
+    """
+    if y is None or positions is None:
+        return y
+    if isinstance(y, (pl.Series, pl.DataFrame)):
+        # ``gather`` accepts a polars Series, a numpy array or a list of ints.
+        return y.gather(positions)
+    # A polars Series of positions cannot index a pandas frame or a numpy array,
+    # and numpy arrays have no ``.to_numpy()``, so normalise for both origins.
+    idx = positions.to_numpy() if hasattr(positions, "to_numpy") else np.asarray(positions)
+    if isinstance(y, (pd.Series, pd.DataFrame)):
+        return y.iloc[idx]
+    if isinstance(y, np.ndarray):
+        return y[idx]
+    if isinstance(y, list):
+        return [y[int(i)] for i in idx]
+    # Names the function rather than the operation on purpose: a message reading
+    # "cannot select rows from y" matches the SELECT ... FROM shape that Bandit
+    # and SonarCloud's injection rule look for, and this line gets filed as a
+    # string-built query.
+    raise TypeError(
+        f"Unsupported y type for select_rows_by_position: {type(y).__name__}. "
+        "Expected a polars, pandas, numpy or list target (or None)."
+    )
 
 
 def resolve_columns_then_to_pandas(

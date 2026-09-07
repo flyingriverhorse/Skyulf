@@ -20,6 +20,7 @@ from skyulf.modeling._evaluation.thresholds import apply_thresholds
 from skyulf.modeling._tuning import engine as engine_mod
 from skyulf.modeling._tuning import splitters as splitters_mod
 from skyulf.modeling._tuning.engine import TuningApplier, TuningCalculator
+from skyulf.modeling._tuning.metrics import resolve_metric
 from skyulf.modeling._tuning.schemas import TuningConfig
 from skyulf.modeling._tuning.strategies import halving as halving_mod
 from skyulf.modeling._tuning.strategies import runner as runner_mod
@@ -1390,6 +1391,71 @@ def test_fit_optuna_cmaes_with_integer_search_space():
     assert result.n_trials > 0
 
 
+def test_fit_optuna_cmaes_keeps_a_boolean_search_space_categorical():
+    """A Boolean list must stay categorical under CMA-ES, not span 0..1 (OC-203).
+
+    ``bool`` subclasses ``int``, so ``fit_intercept=[True, False]`` used to become
+    ``IntDistribution(0, 1)`` and every trial handed the estimator ``1`` — a value
+    sklearn rejects where it fits ``True``.
+    """
+    pytest.importorskip("optuna")
+    pytest.importorskip("cmaes")
+    X, y = _clf_xy(n=150)
+    tuner = _tuner_clf()
+    cfg = TuningConfig(
+        strategy="optuna",
+        metric="accuracy",
+        search_space={"fit_intercept": [True, False]},
+        n_trials=3,
+        cv_folds=3,
+        random_state=42,
+        strategy_params={"sampler": "cmaes"},
+    )
+    model, result = tuner.fit(X, y, config=cfg.__dict__)
+
+    assert result.n_trials > 0
+    assert all(isinstance(t["params"]["fit_intercept"], bool) for t in result.trials)
+    assert isinstance(result.best_params["fit_intercept"], bool)
+    assert hasattr(model, "predict")
+
+
+def test_fit_optuna_normalizes_the_none_string_like_grid_does():
+    """``max_depth=['none']`` must reach the estimator as ``None`` under Optuna (OC-201).
+
+    Grid and halving normalize their own search space; Optuna built distributions
+    from the raw config, so the same space succeeded under grid and failed every
+    Optuna trial with the string still in place.
+    """
+    pytest.importorskip("optuna")
+    X = pd.DataFrame({"x": range(40)})
+    y = pd.Series(np.arange(40) % 2)
+    space = {"max_depth": ["none"]}
+    tuner = TuningCalculator(RandomForestClassifierCalculator())
+
+    _grid_model, grid_result = tuner.fit(
+        X,
+        y,
+        config=TuningConfig(
+            strategy="grid", metric="accuracy", search_space=space, cv_folds=2
+        ).__dict__,
+    )
+    _optuna_model, optuna_result = tuner.fit(
+        X,
+        y,
+        config=TuningConfig(
+            strategy="optuna",
+            metric="accuracy",
+            search_space=space,
+            n_trials=1,
+            cv_folds=2,
+            random_state=42,
+        ).__dict__,
+    )
+
+    assert grid_result.best_params == {"max_depth": None}
+    assert optuna_result.best_params == grid_result.best_params
+
+
 def test_fit_optuna_with_non_list_search_space_value():
     """A non-list search_space value (a pre-built Optuna distribution) should
     be passed through to Optuna unchanged rather than converted.
@@ -1825,6 +1891,88 @@ def test_resolve_scorer_keeps_stock_scorer_for_numeric_binary_target():
     assert "pos_label" not in tuner._resolve_scorer("accuracy", y_str)._kwargs
     y_multi = pd.Series(["a"] * 10 + ["b"] * 10 + ["c"] * 10)
     assert "pos_label" not in tuner._resolve_scorer("f1", y_multi)._kwargs
+
+
+# ---------------------------------------------------------------------------
+# Metrics the tuning surface advertises but sklearn has no scorer name for (OC-67)
+# ---------------------------------------------------------------------------
+
+_TUNE_METRIC_LABEL_SPACES = [
+    pytest.param(pd.Series([0] * 20 + [1] * 20), id="binary"),
+    pytest.param(pd.Series(["no"] * 20 + ["yes"] * 20), id="string"),
+    pytest.param(pd.Series(["a"] * 10 + ["b"] * 10 + ["c"] * 10), id="multiclass"),
+]
+
+
+@pytest.mark.parametrize("metric", ["pr_auc", "pr_auc_weighted", "g_score"])
+@pytest.mark.parametrize("y", _TUNE_METRIC_LABEL_SPACES)
+def test_pr_auc_family_and_g_score_resolve_to_a_working_scorer(metric, y):
+    """Every metric name the tuning surface accepts must resolve to a scorer (OC-67).
+
+    These three were listed in ``INVALID_REGRESSION_METRICS`` — so the module knew
+    them — but absent from the alias map, and ``get_scorer`` raised
+    ``'pr_auc' is not a valid scoring value``.
+    """
+    resolved = resolve_metric(TuningConfig(metric=metric), y, "classification")
+    X = pd.DataFrame({"x": np.arange(len(y), dtype=float) % 7})
+    model = LogisticRegression(max_iter=300).fit(X, y)
+
+    score = _tuner_clf()._resolve_scorer(resolved, y)(model, X, y)
+
+    assert np.isfinite(score)
+
+
+def test_pr_auc_becomes_weighted_for_multiclass_targets():
+    """``average_precision`` is binary-default, so a multiclass target must switch.
+
+    The switch has to name the locally built weighted PR-AUC: suffixing the alias
+    would ask sklearn for ``average_precision_weighted``, which does not exist.
+    """
+    binary = pd.Series([0] * 10 + [1] * 10)
+    multi = pd.Series(["a"] * 5 + ["b"] * 5 + ["c"] * 5)
+
+    assert (
+        resolve_metric(TuningConfig(metric="pr_auc"), binary, "classification")
+        == "average_precision"
+    )
+    assert (
+        resolve_metric(TuningConfig(metric="pr_auc"), multi, "classification") == "pr_auc_weighted"
+    )
+
+
+@pytest.mark.parametrize("metric", ["pr_auc", "pr_auc_weighted", "g_score"])
+def test_pr_auc_family_and_g_score_complete_under_every_strategy(metric):
+    """Grid, halving and Optuna must all finish a search on these metrics (OC-67).
+
+    Before the fix they failed differently on the same input: grid reported the
+    misleading "All trials failed" after swallowing the scorer error per fold,
+    while halving and Optuna raised the raw ``get_scorer`` error before the search
+    ever started.
+    """
+    pytest.importorskip("optuna")
+    X = pd.DataFrame({"x": np.arange(40, dtype=float) % 7})
+    y = pd.Series(np.arange(40) % 2)
+    tuner = TuningCalculator(LogisticRegressionCalculator())
+    scores: dict[str, float] = {}
+
+    for strategy in ("grid", "halving_grid", "optuna"):
+        _model, result = tuner.fit(
+            X,
+            y,
+            config=TuningConfig(
+                strategy=typing.cast(Any, strategy),
+                metric=metric,
+                search_space={"C": [1.0]},
+                cv_folds=2,
+                n_trials=1,
+                random_state=42,
+            ).__dict__,
+        )
+        scores[strategy] = float(result.best_score)
+
+    assert all(np.isfinite(score) for score in scores.values()), scores
+    assert scores["halving_grid"] == pytest.approx(scores["grid"])
+    assert scores["optuna"] == pytest.approx(scores["grid"])
 
 
 def test_optuna_tuning_completes_on_string_binary_target_with_f1():

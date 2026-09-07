@@ -3,11 +3,16 @@
 These nodes are row-order dependent. To stay deterministic across engines we
 optionally sort by a user-supplied ``sort_by`` column before computing lags or
 rolling windows, and (when ``group_by`` is given) compute within each group.
+
+Because sorting reorders rows, the sort helpers return the row positions they
+used: a paired ``y`` must be permuted through the *same* positions or it keeps
+its original order while ``X`` takes the new one.
 """
 
 from typing import Any
 
 import pandas as pd
+import polars as pl
 
 # Supported calendar parts extracted by DateFeatures. Keys are the public
 # feature names; values are the pandas ``.dt`` accessor used to compute them.
@@ -59,8 +64,39 @@ def coerce_aggregations(aggs: Any) -> list[str]:
     return [a for a in (aggs or []) if a in ROLLING_AGGREGATIONS]
 
 
+def sort_with_positions_pandas(df: pd.DataFrame, sort_by: str | None) -> tuple[pd.DataFrame, Any]:
+    """Stable-sort ``df`` by ``sort_by``, returning it plus the row positions used.
+
+    The positions are indices into the *unsorted* frame, so handing the same
+    value to ``select_rows_by_position`` permutes a paired ``y`` identically
+    . They come from a RangeIndex'd copy of the sort key run through
+    pandas' own ``sort_values``, so the order is identical to ``sort_pandas`` by
+    construction rather than by a second sort implementation that could drift —
+    including its ``na_position="last"`` default and stable tie-breaking.
+
+    ``None`` positions mean the frame was not reordered, i.e. ``y`` needs no
+    change either.
+    """
+    if not sort_by or sort_by not in df.columns:
+        return df, None
+    positions = df[sort_by].reset_index(drop=True).sort_values(kind="mergesort").index.to_numpy()
+    return df.iloc[positions], positions
+
+
 def sort_pandas(df: pd.DataFrame, sort_by: str | None) -> pd.DataFrame:
     """Stable-sort a pandas frame by ``sort_by`` when present."""
-    if sort_by and sort_by in df.columns:
-        return df.sort_values(sort_by, kind="mergesort")
-    return df
+    return sort_with_positions_pandas(df, sort_by)[0]
+
+
+def sort_with_positions_polars(X: Any, sort_by: str | None) -> tuple[Any, Any]:
+    """Polars counterpart of ``sort_with_positions_pandas``.
+
+    ``pl.arg_sort_by`` is the expression form of ``DataFrame.sort`` and accepts
+    the same ``nulls_last`` / ``maintain_order`` flags, so ``X.gather(order)``
+    equals the ``X.sort(...)`` this replaces; verified on ties, nulls, dates and
+    single-row frames.
+    """
+    if not sort_by or sort_by not in X.columns:
+        return X, None
+    order = X.select(pl.arg_sort_by(sort_by, nulls_last=True, maintain_order=True)).to_series()
+    return X.gather(order), order

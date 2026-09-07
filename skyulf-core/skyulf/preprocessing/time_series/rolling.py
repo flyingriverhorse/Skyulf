@@ -9,10 +9,16 @@ from ...core.meta.decorators import node_meta
 from ...engines import SkyulfDataFrame
 from ...registry import NodeRegistry
 from .._artifacts import RollingAggregateArtifact
+from .._helpers import select_rows_by_position
 from .._schema import SkyulfSchema
 from ..base import BaseApplier, BaseCalculator, apply_method
 from ..dispatcher import apply_dual_engine
-from ._common import coerce_aggregations, filter_existing_columns, sort_pandas
+from ._common import (
+    coerce_aggregations,
+    filter_existing_columns,
+    sort_with_positions_pandas,
+    sort_with_positions_polars,
+)
 
 
 def _roll_name(col: str, agg: str, window: int) -> str:
@@ -55,15 +61,11 @@ def _polars_rolling_exprs(
 def _apply_polars(X: Any, _y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
     columns: list[str] = params.get("columns", [])
     aggs: list[str] = params.get("aggregations", [])
-    sort_by: str | None = params.get("sort_by")
     if not columns or not aggs:
         return X, _y
 
-    X_out = (
-        X.sort(sort_by, nulls_last=True, maintain_order=True)
-        if sort_by and sort_by in X.columns
-        else X
-    )
+    X_out, sort_positions = sort_with_positions_polars(X, params.get("sort_by"))
+    _y = select_rows_by_position(_y, sort_positions)
     exprs = _polars_rolling_exprs(
         columns,
         list(X_out.columns),
@@ -116,7 +118,8 @@ def _apply_pandas(X: Any, _y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
     window = int(params.get("window", 3))
     min_periods = int(params.get("min_periods", 1))
     group_by: list[str] | None = params.get("group_by") or None
-    df = sort_pandas(X.copy(), params.get("sort_by"))
+    df, sort_positions = sort_with_positions_pandas(X.copy(), params.get("sort_by"))
+    _y = select_rows_by_position(_y, sort_positions)
     for col in columns:
         if col in df.columns:
             _pandas_roll_column(df, col, aggs, window, min_periods, group_by)

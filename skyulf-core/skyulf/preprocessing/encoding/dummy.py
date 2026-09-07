@@ -35,20 +35,23 @@ def _drop_first_if_needed(cats: list[Any], drop_first: bool) -> list[Any]:
     return cats
 
 
-def _pandas_col_to_str(series: Any) -> Any:
-    """Render a pandas Series as strings, matching the Polars fit path's output.
+# A trailing ".0" is stripped from float columns so an integral value renders
+# identically on both engines and in every batch. Pandas upcasts an integer
+# column to float64 the moment it holds a null (no NaN-capable numpy int dtype),
+# and polars renders Float64 1.0 as "1.0" where it renders Int64 1 as "1".
+_INTEGRAL_FLOAT_SUFFIX = r"\.0$"
 
-    Pandas silently upcasts an integer column to ``float64`` whenever it
-    contains a null (there's no native NaN-capable integer dtype for plain
-    numpy-backed columns), so ``1`` renders as ``"1.0"`` instead of ``"1"``
-    once a null is present in the batch — even though the Polars fit/apply
-    paths (``cast(pl.Utf8)``) always render ``"1"`` regardless of nulls. Left
-    unhandled, this causes every value to miss the category lookup whenever
-    a batch's null presence differs from what a sibling batch/engine saw at
-    fit time, silently producing all-zero dummy columns for every row. If the
-    non-null values are all integer-valued (e.g. a nullable-float column that
-    only ever held whole numbers), normalize to a nullable ``Int64`` dtype
-    first so the string form matches the Polars convention.
+
+def _pandas_col_to_str(series: Any) -> Any:
+    """Render a pandas Series as strings, matching the Polars path's output.
+
+    The rendering is per value, never per batch: ``1.0`` must yield the same
+    category string whether or not a fractional sibling such as ``2.5`` sits
+    beside it. Stripping ``_INTEGRAL_FLOAT_SUFFIX`` from float columns only is
+    what keeps an integer column upcast to ``float64`` by a null rendering as
+    ``"1"`` — the string the Polars ``Int64`` path produces — without letting
+    the rest of the batch decide. Non-float columns stringify untouched, so a
+    string column holding the literal ``"1.0"`` keeps it.
 
     Nulls are preserved as actual NaN in the returned (object-dtype) series
     rather than the literal ``"<NA>"``/``"nan"`` string that ``Int64``/
@@ -57,11 +60,24 @@ def _pandas_col_to_str(series: Any) -> Any:
     the Polars fit path's ``if c is not None`` filter.
     """
     null_mask = series.isna()
+    rendered = series.astype(str)
     if pd.api.types.is_float_dtype(series):
-        non_null = series.dropna()
-        if not non_null.empty and (non_null % 1 == 0).all():
-            series = series.astype("Int64")
-    return series.astype(str).mask(null_mask)
+        rendered = rendered.str.replace(_INTEGRAL_FLOAT_SUFFIX, "", regex=True)
+    return rendered.mask(null_mask)
+
+
+def _polars_col_to_str_expr(X: Any, col: str) -> Any:
+    """Build the Polars expression rendering ``col`` to strings, matching pandas.
+
+    Same rule as :func:`_pandas_col_to_str`: a trailing ``.0`` comes off float
+    columns so ``1.0`` and ``1`` are one category on either engine, and nulls
+    stay null rather than becoming a ``"null"`` string the fit path would then
+    have to filter out of the category list.
+    """
+    expr = pl.col(col).cast(pl.Utf8)
+    if X.schema[col].is_float():
+        expr = expr.str.replace(_INTEGRAL_FLOAT_SUFFIX, "")
+    return expr
 
 
 def _dummy_apply_polars(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
@@ -74,9 +90,9 @@ def _dummy_apply_polars(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, An
     X_out = X
     for col in valid_cols:
         cats = _drop_first_if_needed(categories.get(col, []), drop_first)
+        rendered = _polars_col_to_str_expr(X, col)
         exprs = [
-            (pl.col(col).cast(pl.Utf8) == str(cat)).cast(pl.Int8).fill_null(0).alias(f"{col}_{cat}")
-            for cat in cats
+            (rendered == str(cat)).cast(pl.Int8).fill_null(0).alias(f"{col}_{cat}") for cat in cats
         ]
         X_out = X_out.with_columns(exprs)
     return X_out.drop(valid_cols), y
@@ -104,10 +120,10 @@ class DummyEncoderApplier(BaseApplier):
 
     The originals are always dropped. Parity depends on both engines rendering
     a value to the *same* string before comparing it with the learned
-    categories — see ``_pandas_col_to_str``, which undoes pandas' null-induced
-    ``float64`` upcast so ``1`` does not become ``"1.0"`` and silently miss
-    every category. A value unseen at fit time yields an all-zero row rather
-    than raising.
+    categories — one rule, implemented per engine by ``_pandas_col_to_str``
+    and ``_polars_col_to_str_expr``, which is a function of the value alone so
+    a category cannot stop matching because of what else shares its batch. A
+    value unseen at fit time yields an all-zero row rather than raising.
     """
 
     @apply_method
@@ -144,8 +160,8 @@ def _dummy_fit_polars(X: Any, y: Any, config: dict[str, Any]) -> Mapping[str, An
 
     categories: dict[str, list[str]] = {}
     for col in cols:
-        cats = X.select(pl.col(col).cast(pl.Utf8).unique().sort()).to_series().to_list()
-        categories[col] = [str(c) for c in cats if c is not None]
+        rendered = X.select(_polars_col_to_str_expr(X, col).unique().sort()).to_series().to_list()
+        categories[col] = [str(c) for c in rendered if c is not None]
     return _build_dummy_artifact(cols, categories, config)
 
 

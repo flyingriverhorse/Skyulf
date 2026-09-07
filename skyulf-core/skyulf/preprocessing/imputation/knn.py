@@ -8,7 +8,11 @@ from ...core.meta.decorators import node_meta
 from ...registry import NodeRegistry
 from ...utils import detect_numeric_columns, user_picked_no_columns
 from .._artifacts import KNNImputerArtifact
-from .._helpers import resolve_columns_then_to_numpy, resolve_valid_columns
+from .._helpers import (
+    promote_configured_columns_to_float64,
+    resolve_columns_then_to_numpy,
+    resolve_valid_columns,
+)
 from .._schema import SkyulfSchema
 from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
 from ..dispatcher import apply_dual_engine
@@ -57,9 +61,8 @@ class KNNImputerCalculator(BaseCalculator):
     def infer_output_schema(
         self, input_schema: SkyulfSchema, config: dict[str, Any]
     ) -> SkyulfSchema:
-        """Return the input schema unchanged: imputation fills cells, not columns."""
-        # KNN imputation fills NaNs in place; column set is preserved.
-        return input_schema
+        """Return a schema with selected columns promoted to ``float64``."""
+        return promote_configured_columns_to_float64(input_schema, config)
 
     @fit_method
     def fit(self, X: Any, _y: Any, config: dict[str, Any]) -> KNNImputerArtifact:  # pylint: disable=arguments-differ

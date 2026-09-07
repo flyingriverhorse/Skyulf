@@ -30,12 +30,17 @@ const writePerfOverlayPreference = (enabled: boolean): void => {
 interface ViewState {
   activeView: ViewType;
   setView: (view: ViewType) => void;
-  isSidebarOpen: boolean;
+  /** Null follows viewport size; an explicit open/close choice lasts for the session. */
+  sidebarOpenOverride: boolean | null;
   setSidebarOpen: (isOpen: boolean) => void;
   isPropertiesPanelExpanded: boolean;
   setPropertiesPanelExpanded: (isExpanded: boolean) => void;
+  propertiesPanelWidth: number;
+  setPropertiesPanelWidth: (width: number) => void;
   isResultsPanelExpanded: boolean;
   setResultsPanelExpanded: (isExpanded: boolean) => void;
+  resultsPanelHeight: number;
+  setResultsPanelHeight: (height: number) => void;
   /** Preview Results panel maximize toggle. Lives in the store (not panel-
    * local state) so the canvas can hide its zoom controls when the panel
    * covers the whole canvas. */
@@ -59,12 +64,24 @@ interface ViewState {
 export const useViewStore = create<ViewState>((set) => ({
   activeView: 'canvas',
   setView: (view) => set({ activeView: view }),
-  isSidebarOpen: true,
-  setSidebarOpen: (isOpen) => set({ isSidebarOpen: isOpen }),
+  sidebarOpenOverride: null,
+  setSidebarOpen: (isOpen) => set({ sidebarOpenOverride: isOpen }),
   isPropertiesPanelExpanded: false,
   setPropertiesPanelExpanded: (isExpanded) => set({ isPropertiesPanelExpanded: isExpanded }),
+  propertiesPanelWidth: 320,
+  setPropertiesPanelWidth: (width) => {
+    if (Number.isFinite(width)) {
+      set({ propertiesPanelWidth: Math.max(320, Math.min(720, Math.round(width))) });
+    }
+  },
   isResultsPanelExpanded: true,
   setResultsPanelExpanded: (isExpanded) => set({ isResultsPanelExpanded: isExpanded }),
+  resultsPanelHeight: 384,
+  setResultsPanelHeight: (height) => {
+    if (Number.isFinite(height)) {
+      set({ resultsPanelHeight: Math.max(200, Math.min(720, Math.round(height))) });
+    }
+  },
   isResultsPanelMaximized: false,
   setResultsPanelMaximized: (isMaximized) => set({ isResultsPanelMaximized: isMaximized }),
   isResultsPanelDismissed: false,

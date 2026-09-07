@@ -122,7 +122,7 @@ export const JobsHistoryModal: React.FC<JobsHistoryModalProps> = ({ isOpen, onCl
                 onSelect(selectedJob);
                 handleClose();
               }}
-              className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors shadow-sm"
+              className="flex items-center px-4 py-2 action-primary rounded-md transition-colors shadow-sm"
             >
               <Play className="w-4 h-4 mr-2" />
               Load this Report

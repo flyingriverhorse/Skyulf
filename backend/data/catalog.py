@@ -511,14 +511,15 @@ class S3Catalog(DataCatalog):
         """Ask S3 whether ``dataset_id`` is present.
 
         Builds a throwaway ``S3FileSystem`` for the call instead of reusing
-        ``self.fs``, and hands it the instance ``storage_options`` raw — without the
-        ``_prepare_s3fs_options`` name mapping that ``load`` and ``save`` apply, so
-        AWS-style option names are not translated to their s3fs equivalents here.
+        ``self.fs``, but from the same ``_prepare_s3fs_options``-mapped options that
+        ``load`` and ``save`` use. Going through the mapping is what keeps ``exists``
+        and ``load`` from authenticating differently and disagreeing about an object
+        that is there.
         """
         # This is a bit expensive, but accurate
         import s3fs  # ty: ignore[unresolved-import]
 
-        fs = s3fs.S3FileSystem(**self.storage_options)
+        fs = s3fs.S3FileSystem(**self._prepare_s3fs_options(self.storage_options))
         path = self._get_s3_path(dataset_id)
         return fs.exists(path)
 

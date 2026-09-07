@@ -1187,8 +1187,7 @@ export function EnsembleSettings({ config, onChange, nodeId }: {
           type="button"
           onClick={() => { void runJob(isAdvanced ? 'tuning' : 'training', 'ensemble'); }}
           disabled={!config.target_column || tooFewModels}
-          className="w-full max-w-xs flex items-center justify-center gap-2 px-6 py-2.5 text-white rounded-lg shadow-lg transition-all hover:shadow-xl hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0"
-          style={{ background: 'var(--main-gradient)' }}
+          className="w-full max-w-xs flex items-center justify-center gap-2 px-6 py-2.5 action-primary rounded-lg shadow-lg transition-all hover:shadow-xl hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 focus-ring"
         >
           {isAdvanced ? <Sparkles className="w-4 h-4" /> : <Play className="w-4 h-4 fill-current" />}
           <span className="text-sm font-semibold">

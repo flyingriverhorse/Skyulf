@@ -1,5 +1,6 @@
 """Tests for SkyulfPipeline.get_fitted_split() (convenience split-extraction API)."""
 
+import numpy as np
 import pandas as pd
 import pytest
 
@@ -78,3 +79,43 @@ def test_get_fitted_split_raises_without_a_configured_splitter(sample_classifica
     pipeline = SkyulfPipeline({"preprocessing": [], "modeling": {"type": "logistic_regression"}})
     with pytest.raises(ValueError, match="train/test split"):
         pipeline.get_fitted_split(data, target_column="target")
+
+
+def test_get_fitted_split_leaves_a_fitted_pipeline_untouched():
+    """Extracting a split must not refit the pipeline's own preprocessing (OC-164).
+
+    It used to run the live ``feature_engineer.fit_transform``, replacing a
+    trained scaler's statistics while keeping the model fitted against the old
+    ones — so the same input's prediction silently changed from 50 to -950 and
+    every later ``predict()`` was wrong with no error raised.
+    """
+    x = np.arange(20, dtype=float)
+    data = pd.DataFrame({"x": x, "target": 10 * x})
+    config = {
+        "preprocessing": [
+            {"name": "scale", "transformer": "StandardScaler", "params": {"columns": ["x"]}},
+            {
+                "name": "split",
+                "transformer": "TrainTestSplitter",
+                "params": {"test_size": 0.25, "random_state": 42},
+            },
+        ],
+        "modeling": {"type": "linear_regression"},
+    }
+    pipeline = SkyulfPipeline(config)
+    pipeline.fit(data, target_column="target")
+
+    probe = pd.DataFrame({"x": [5.0]})
+    before = float(pipeline.predict(probe).iloc[0])
+
+    shifted = pd.DataFrame({"x": x + 100.0, "target": 10 * (x + 100.0)})
+    X_train, y_train, X_test, y_test = pipeline.get_fitted_split(shifted, target_column="target")
+
+    assert float(pipeline.predict(probe).iloc[0]) == before
+    # ...and the throwaway chain really did fit the data it was handed. X comes
+    # back standardized, so provenance is read off the unscaled target.
+    assert len(X_train) == len(y_train)
+    assert len(X_test) == len(y_test)
+    assert len(X_train) + len(X_test) == len(shifted)
+    assert y_train.min() >= 1000.0
+    assert y_test.min() >= 1000.0

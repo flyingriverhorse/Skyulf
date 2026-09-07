@@ -11,7 +11,7 @@ from ...engines.sklearn_bridge import SklearnBridge
 from ...registry import NodeRegistry
 from ...utils import user_picked_no_columns
 from .._artifacts import RobustScalerArtifact
-from .._helpers import resolve_valid_columns, safe_scale
+from .._helpers import promote_configured_columns_to_float64, resolve_valid_columns, safe_scale
 from .._schema import SkyulfSchema
 from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
 from ..dispatcher import apply_dual_engine, fit_dual_engine
@@ -97,8 +97,10 @@ class RobustScalerCalculator(BaseCalculator):
     def infer_output_schema(
         self, input_schema: SkyulfSchema, config: dict[str, Any]
     ) -> SkyulfSchema:
-        """Return the input schema unchanged: scaling rewrites values, not columns."""
-        return input_schema
+        """Return a schema with transformed columns promoted to ``float64``."""
+        if not (config.get("with_centering", True) or config.get("with_scaling", True)):
+            return input_schema
+        return promote_configured_columns_to_float64(input_schema, config)
 
     @fit_method
     def fit(self, X: Any, _y: Any, config: dict[str, Any]) -> RobustScalerArtifact:  # pylint: disable=arguments-differ

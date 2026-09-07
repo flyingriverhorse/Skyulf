@@ -364,13 +364,13 @@ class TargetEncoderCalculator(BaseCalculator):
         input_schema: SkyulfSchema,
         config: dict[str, Any],
     ) -> SkyulfSchema | None:
-        """Predict the schema only when ``target_type`` is explicitly binary or regression.
+        """Predict the schema only when ``target_type`` is explicitly binary or continuous.
 
         Anything else — ``"auto"`` included — can resolve to multiclass at fit
         time, which changes the column set in a data-dependent way, so ``None``
         is returned and callers fall back to runtime introspection.
         """
-        # For binary/regression targets, the encoder replaces values in
+        # For binary/continuous targets, the encoder replaces values in
         # source columns in place — same column names, dtype becomes float
         # (per-column dtype is best-effort so we don't bother rewriting it).
         #
@@ -381,9 +381,15 @@ class TargetEncoderCalculator(BaseCalculator):
         # confidently predict the output columns. The default/"auto"
         # target_type is resolved to multiclass at fit time whenever y has
         # more than two classes, so we must also treat "auto" as unknown
-        # rather than assuming binary/regression. Only the explicit
-        # "binary"/"regression" config values are confidently in-place.
-        if config.get("target_type", "auto") not in ("binary", "regression"):
+        # rather than assuming binary/continuous. Only the explicit
+        # "binary"/"continuous" config values are confidently in-place.
+        #
+        # "continuous" is sklearn's name for a regression target. The value is
+        # forwarded to ``TargetEncoder(target_type=...)`` verbatim and its
+        # accepted set is {auto, binary, multiclass, continuous}, so the more
+        # natural-sounding "regression" raises InvalidParameterError at fit and
+        # could never reach this check through a working config.
+        if config.get("target_type", "auto") not in ("binary", "continuous"):
             return None
         return input_schema
 

@@ -12,7 +12,7 @@ from ...core.meta.decorators import node_meta
 from ...registry import NodeRegistry
 from ...utils import detect_numeric_columns, user_picked_no_columns
 from .._artifacts import PowerTransformerArtifact
-from .._helpers import resolve_columns_then_to_pandas
+from .._helpers import promote_configured_columns_to_float64, resolve_columns_then_to_pandas
 from .._schema import SkyulfSchema
 from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
 from ..dispatcher import apply_dual_engine
@@ -49,6 +49,26 @@ def _filter_power_columns(X_pd: pd.DataFrame, cols: list[str], method: str) -> l
     return cols
 
 
+def _fitted_columns_present(X: Any, cols: list[str]) -> list[str]:
+    """Return the fitted columns that ``X`` actually has, warning about the rest.
+
+    A lambda only means something for the column it was fitted on. When the
+    apply-time frame lacks one, that column passes through untransformed while
+    the node still reports success — train/serve skew, not a no-op — so it is
+    named in the log rather than filtered out quietly. Shared by both engine
+    paths so they cannot drift apart.
+    """
+    present = [c for c in cols if c in X.columns]
+    missing = [c for c in cols if c not in X.columns]
+    if missing:
+        logger.warning(
+            "PowerTransformer was fitted on column(s) %r that this frame does not have; "
+            "they pass through untransformed",
+            missing,
+        )
+    return present
+
+
 def _extract_scaler_params(transformer: PowerTransformer, standardize: bool) -> dict[str, Any]:
     """Pull mean/scale arrays out of a fitted PowerTransformer's internal scaler."""
     if not standardize:
@@ -69,7 +89,12 @@ class PowerTransformerApplier(BaseApplier):
     def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
         """Rebuild the transformer from stored lambdas and transform ``X``; ``y`` untouched.
 
-        A failed transform is logged and leaves the data unchanged (fail open).
+        Fails open, like every applier in ``preprocessing/transformations/``: a
+        failed transform is logged at ERROR with its traceback and leaves the data
+        unchanged, so a degraded frame beats a hard failure at inference time.
+        Every path that leaves data untransformed logs — including the one that
+        used not to, a frame missing columns the transformer was fitted on, which
+        is train/serve skew rather than a no-op and is warned about by name.
         """
         return apply_dual_engine(
             X, params, {"polars": self._apply_polars, "pandas": self._apply_pandas}
@@ -80,7 +105,7 @@ class PowerTransformerApplier(BaseApplier):
         cols = params.get("columns", [])
         if params.get("lambdas") is None:
             return X, _y
-        valid_cols = [c for c in cols if c in X.columns]
+        valid_cols = _fitted_columns_present(X, cols)
         if not valid_cols:
             return X, _y
 
@@ -89,7 +114,7 @@ class PowerTransformerApplier(BaseApplier):
             X_trans = _power_transform_array(X_vals, params, cols, valid_cols)
             series = [pl.Series(name, X_trans[:, i]) for i, name in enumerate(valid_cols)]
             return X.with_columns(series), _y
-        except Exception:
+        except Exception:  # noqa: BLE001 - transform failure is logged; frame left unchanged
             logger.exception("PowerTransformer (Polars) application failed")
             return X, _y
 
@@ -98,17 +123,27 @@ class PowerTransformerApplier(BaseApplier):
         cols = params.get("columns", [])
         if params.get("lambdas") is None:
             return X, _y
-        valid_cols = [c for c in cols if c in X.columns]
+        valid_cols = _fitted_columns_present(X, cols)
         if not valid_cols:
             return X, _y
 
-        df_out = X.copy()
         try:
-            X_vals = df_out[valid_cols].to_numpy()
-            X_trans = _power_transform_array(X_vals, params, cols, valid_cols)
-            df_out.loc[:, valid_cols] = np.asarray(X_trans)
-        except Exception:
+            # Computed before the copy so a failure hands back the caller's frame
+            # rather than one whose columns were already cast to float64, matching
+            # what the polars path returns.
+            X_vals = X[valid_cols].to_numpy()
+            X_trans = np.asarray(_power_transform_array(X_vals, params, cols, valid_cols))
+            df_out = X.copy()
+            # The transform result is float; writing it into an integer column is
+            # the pandas "incompatible dtype" FutureWarning, slated to become an
+            # error — which the bare except below would swallow into a silent
+            # no-op that returns untransformed data. Cast first.
+            for col in valid_cols:
+                df_out[col] = df_out[col].astype("float64")
+            df_out.loc[:, valid_cols] = X_trans
+        except Exception:  # noqa: BLE001 - transform failure is logged; frame left unchanged
             logger.exception("PowerTransformer (Pandas) application failed")
+            return X, _y
         return df_out, _y
 
 
@@ -127,9 +162,8 @@ class PowerTransformerCalculator(BaseCalculator):
     def infer_output_schema(
         self, input_schema: SkyulfSchema, config: dict[str, Any]
     ) -> SkyulfSchema:
-        """Return the input schema unchanged: the transform rewrites columns in place."""
-        # Power transforms are applied in place on the same columns.
-        return input_schema
+        """Return a schema with transformed columns promoted to ``float64``."""
+        return promote_configured_columns_to_float64(input_schema, config)
 
     @fit_method
     def fit(self, X: Any, _y: Any, config: dict[str, Any]) -> PowerTransformerArtifact:  # pylint: disable=arguments-differ

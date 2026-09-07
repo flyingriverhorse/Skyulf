@@ -2,6 +2,7 @@
 
 import pandas as pd
 import pytest
+from sklearn.preprocessing import TargetEncoder
 
 from skyulf.preprocessing import SkyulfSchema
 from skyulf.preprocessing.base import BaseCalculator
@@ -54,11 +55,13 @@ from skyulf.preprocessing.split import (
     FeatureTargetSplitCalculator,
     SplitCalculator,
 )
+from skyulf.preprocessing.time_series import LagFeaturesCalculator
 from skyulf.preprocessing.transformations import (
     GeneralTransformationCalculator,
     PowerTransformerCalculator,
     SimpleTransformationCalculator,
 )
+from skyulf.registry import NodeRegistry
 
 # ---------- SkyulfSchema dataclass ----------
 
@@ -129,6 +132,110 @@ def test_scalers_passthrough_schema(cls) -> None:
     assert cls().infer_output_schema(s, {"columns": ["a"]}) == s
 
 
+# ---------- OC-03: dtype-evolution nodes ----------
+
+
+@pytest.mark.parametrize(
+    "node_id, calc_cls, df, cfg",
+    [
+        (
+            "StandardScaler",
+            StandardScalerCalculator,
+            pd.DataFrame({"x": [1, 2, 3], "y": [4, 5, 6]}),
+            {"columns": ["x"]},
+        ),
+        (
+            "MinMaxScaler",
+            MinMaxScalerCalculator,
+            pd.DataFrame({"x": [1, 2, 3], "y": [4, 5, 6]}),
+            {"columns": ["x"]},
+        ),
+        (
+            "RobustScaler",
+            RobustScalerCalculator,
+            pd.DataFrame({"x": [1, 2, 3], "y": [4, 5, 6]}),
+            {"columns": ["x"]},
+        ),
+        (
+            "MaxAbsScaler",
+            MaxAbsScalerCalculator,
+            pd.DataFrame({"x": [1, 2, 3], "y": [4, 5, 6]}),
+            {"columns": ["x"]},
+        ),
+        (
+            "SimpleImputer",
+            SimpleImputerCalculator,
+            pd.DataFrame({"x": [1.0, None, 3.0], "y": [1.0, 2.0, 3.0], "text": ["a", "b", "c"]}),
+            {"strategy": "mean"},
+        ),
+        (
+            "KNNImputer",
+            KNNImputerCalculator,
+            pd.DataFrame(
+                {"x": [1.0, 2.0, 3.0, 4.0, 5.0, 6.0], "y": [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]}
+            ),
+            {"columns": ["x"]},
+        ),
+        (
+            "IterativeImputer",
+            IterativeImputerCalculator,
+            pd.DataFrame(
+                {"x": [1.0, 2.0, 3.0, 4.0, 5.0, 6.0], "y": [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]}
+            ),
+            {"columns": ["x"]},
+        ),
+        (
+            "SimpleTransformation",
+            SimpleTransformationCalculator,
+            pd.DataFrame({"x": [1, 2, 3], "y": [4, 5, 6]}),
+            {"transformations": [{"column": "x", "method": "log"}]},
+        ),
+        (
+            "GeneralTransformation",
+            GeneralTransformationCalculator,
+            pd.DataFrame({"x": [1, 2, 3], "y": [4, 5, 6]}),
+            {"transformations": [{"column": "x", "method": "log"}]},
+        ),
+        (
+            "PowerTransformer",
+            PowerTransformerCalculator,
+            pd.DataFrame({"x": [1.0, 2.0, 3.0], "y": [4.0, 5.0, 6.0]}),
+            {"method": "yeo-johnson", "columns": ["x"]},
+        ),
+        (
+            "Winsorize",
+            WinsorizeCalculator,
+            pd.DataFrame({"x": list(range(1, 7)), "y": [0, 0, 0, 0, 0, 0]}),
+            {"columns": ["x"], "lower_percentile": 10, "upper_percentile": 90},
+        ),
+        (
+            "LagFeatures",
+            LagFeaturesCalculator,
+            pd.DataFrame({"x": [1, 2, 3], "y": [4, 5, 6]}),
+            {"columns": ["x"], "lags": [1]},
+        ),
+    ],
+)
+def test_oc03_infer_output_schema_matches_runtime_dtype_changes(
+    node_id: str,
+    calc_cls: type[BaseCalculator],
+    df: pd.DataFrame,
+    cfg: dict[str, object],
+) -> None:
+    """OC-03: infer_output_schema should match real output dtypes for int->float transforms."""
+    calc = calc_cls()
+    schema_in = SkyulfSchema.from_dataframe(df)
+    inferred = calc.infer_output_schema(schema_in, cfg)
+    assert inferred is not None
+    artifact = calc.fit(df, cfg)
+    if not artifact:
+        pytest.skip("No-op config in schema-inference parity probe")
+
+    applier = NodeRegistry.get_applier(node_id)
+    out = applier().apply(df, artifact)
+    assert inferred == SkyulfSchema.from_dataframe(out)
+
+
 # ---------- DropMissingColumns ----------
 
 
@@ -166,17 +273,10 @@ def test_unimplemented_calculator_returns_none() -> None:
 
 
 PASSTHROUGH_CALCULATORS = [
-    SimpleImputerCalculator,
-    KNNImputerCalculator,
-    IterativeImputerCalculator,
     IQRCalculator,
     ZScoreCalculator,
-    WinsorizeCalculator,
     ManualBoundsCalculator,
     EllipticEnvelopeCalculator,
-    PowerTransformerCalculator,
-    SimpleTransformationCalculator,
-    GeneralTransformationCalculator,
     TextCleaningCalculator,
     InvalidValueReplacementCalculator,
     ValueReplacementCalculator,
@@ -200,13 +300,37 @@ def test_phase_a_passthrough(calc_cls: type) -> None:
     assert calc_cls().infer_output_schema(s, {}) == s
 
 
-def test_target_encoder_binary_regression_is_passthrough() -> None:
-    # Unlike the multiclass/"auto" case (covered in test_encoding_target.py),
-    # explicit binary/regression target_type is confidently in-place.
+def test_target_encoder_binary_continuous_is_passthrough() -> None:
+    """Explicit binary/continuous ``target_type`` encodes in place, so its schema is predictable.
+
+    Breaks if the encoder ever starts fanning out columns for these two target
+    types, or if the in-place prediction is lost for the regression case —
+    ``"continuous"`` is sklearn's spelling, not ``"regression"``.
+    """
     s = SkyulfSchema.from_columns(["a", "b", "c"], {"a": "float64"})
-    for target_type in ("binary", "regression"):
+    for target_type in ("binary", "continuous"):
         out = TargetEncoderCalculator().infer_output_schema(s, {"target_type": target_type})
         assert out == s
+
+
+def test_target_encoder_regression_spelling_is_rejected_and_opaque() -> None:
+    """``"regression"`` is not a sklearn ``target_type``, so the schema must stay opaque for it.
+
+    Pins OC-22: this file used to assert passthrough for ``"regression"``, which
+    promised an output shape no working pipeline could ever produce — the value
+    is forwarded to ``TargetEncoder(target_type=...)`` verbatim and raises at
+    fit. Breaks if sklearn starts accepting the alias, or if the prediction
+    starts answering for a config that cannot fit.
+    """
+    X = pd.DataFrame({"cat": ["a", "b", "a", "b"]})
+    y = pd.Series([0, 1, 0, 1])
+    # sklearn raises InvalidParameterError, which subclasses ValueError; the class
+    # itself lives in the private sklearn.utils._param_validation, so match the base.
+    with pytest.raises(ValueError, match="target_type"):
+        TargetEncoder(target_type="regression").fit(X, y)
+
+    s = SkyulfSchema.from_columns(["cat"], {"cat": "object"})
+    assert TargetEncoderCalculator().infer_output_schema(s, {"target_type": "regression"}) is None
 
 
 # ---------- Phase A: config-driven Calculators ----------
@@ -300,7 +424,7 @@ DATA_DEPENDENT_CALCULATORS = [
     DummyEncoderCalculator,
     HashEncoderCalculator,  # passthrough actually — kept here pending review
     TargetEncoderCalculator,  # returns None for the default "auto"/multiclass
-    # target_type (data-dependent column fan-out); binary/regression stays
+    # target_type (data-dependent column fan-out); binary/continuous stays
     # passthrough, covered separately in test_encoding_target.py.
     # Bucketing — output column set depends on fitted bin edges.
     GeneralBinningCalculator,

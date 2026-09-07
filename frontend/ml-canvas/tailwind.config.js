@@ -1,3 +1,9 @@
+// Existing neutral utilities follow each theme without changing their roles.
+const neutral = Object.fromEntries(
+  [50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950].map(shade =>
+    [shade, `hsl(var(--neutral-${shade}) / <alpha-value>)`]),
+);
+
 /** @type {import('tailwindcss').Config} */
 export default {
   darkMode: ["class"],
@@ -18,6 +24,13 @@ export default {
     },
     extend: {
       colors: {
+        slate: neutral,
+        gray: neutral,
+        'brand-action': {
+          DEFAULT: 'hsl(var(--brand-action))',
+          foreground: 'hsl(var(--brand-action-foreground))',
+        },
+        link: 'hsl(var(--link))',
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",

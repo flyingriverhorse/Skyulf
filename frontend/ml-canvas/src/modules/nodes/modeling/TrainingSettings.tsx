@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useId, useState, useRef } from 'react';
 import {
     Play, Download, Loader2, Activity, Settings2,
     BarChart3, X, ChevronRight, ChevronDown, AlertCircle, AlertTriangle
@@ -172,6 +172,7 @@ export const TrainingSettings: React.FC<{
   // Advanced-mode search-space defs/editor state.
   const [searchSpaceDefs, setSearchSpaceDefs] = useState<HyperparameterDef[]>([]);
   const [isLoadingSearchSpaceDefs, setIsLoadingSearchSpaceDefs] = useState(false);
+  const fieldId = useId();
   const [showStrategyModal, setShowStrategyModal] = useState(false);
 
   const [showParamsModal, setShowParamsModal] = useState(false);
@@ -357,9 +358,10 @@ export const TrainingSettings: React.FC<{
                 <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Model Configuration</span>
                 <div className="grid gap-3">
                     <div>
-                        <span className="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Model Type</span>
+                        <label htmlFor={`${fieldId}-model`} className="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Model Type</label>
                         <div className="relative">
                             <select
+                                id={`${fieldId}-model`}
                                 value={config.model_type}
                                 onChange={(e) => {
                                     if (isAdvanced) {
@@ -404,7 +406,7 @@ export const TrainingSettings: React.FC<{
                     </div>
 
                     <div>
-                        <span className="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Target Column</span>
+                        <label htmlFor={`${fieldId}-target`} className="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Target Column</label>
                         {availableColumns.length === 0 && (
                             <div className="mb-2 p-2 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded text-xs text-yellow-700 dark:text-yellow-400 flex items-center gap-2">
                                 <AlertTriangle className="w-3 h-3" />
@@ -414,6 +416,7 @@ export const TrainingSettings: React.FC<{
                         <div className="relative">
                             {availableColumns.length > 0 ? (
                                 <select
+                                    id={`${fieldId}-target`}
                                     value={config.target_column}
                                     onChange={(e) => onChange({ ...config, target_column: e.target.value })}
                                     className="w-full appearance-none border border-gray-300 dark:border-gray-600 rounded-lg p-2.5 text-sm bg-white dark:bg-gray-800 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
@@ -425,6 +428,7 @@ export const TrainingSettings: React.FC<{
                                 </select>
                             ) : (
                                 <input
+                                    id={`${fieldId}-target`}
                                     type="text"
                                     value={config.target_column}
                                     onChange={(e) => onChange({ ...config, target_column: e.target.value })}
@@ -448,9 +452,9 @@ export const TrainingSettings: React.FC<{
                             <div className="col-span-2">
                               <div className="flex items-center justify-between mb-1">
                                     <div className="flex items-center gap-1.5">
-                                        <span className="block text-xs font-medium text-gray-700 dark:text-gray-300">
+                                        <label htmlFor={`${fieldId}-search-method`} className="block text-xs font-medium text-gray-700 dark:text-gray-300">
                                             Search Method
-                                        </span>
+                                        </label>
                                         <HelpTooltip placement="bottom-left" text={
                                             config.search_strategy === 'optuna' ? 'Optuna uses Bayesian optimization (TPE) to efficiently find optimal hyperparameters with early pruning.' :
                                             config.search_strategy === 'halving_grid' ? 'Successive Halving (Grid) tests all combinations but quickly drops poorly performing candidates to save time.' :
@@ -471,6 +475,7 @@ export const TrainingSettings: React.FC<{
                                   )}
                               </div>
                               <select
+                                  id={`${fieldId}-search-method`}
                                   value={config.search_strategy ?? 'random'}
                                   onChange={(e) => {
                                       const newStrategy = e.target.value;
@@ -502,8 +507,9 @@ export const TrainingSettings: React.FC<{
                             </div>
 
                             <div>
-                                <span className="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Metric</span>
+                                <label htmlFor={`${fieldId}-metric`} className="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Metric</label>
                                 <select
+                                    id={`${fieldId}-metric`}
                                     value={config.metric}
                                     onChange={(e) => onChange({ ...config, metric: e.target.value })}
                                     className="w-full border border-gray-300 dark:border-gray-600 rounded-lg p-2 text-sm bg-white dark:bg-gray-800 dark:text-gray-100"
@@ -519,8 +525,9 @@ export const TrainingSettings: React.FC<{
                             </div>
 
                             <div>
-                                <span className="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Trials</span>
+                                <label htmlFor={`${fieldId}-trials`} className="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Trials</label>
                                 <input
+                                    id={`${fieldId}-trials`}
                                     type="number"
                                     value={config.n_trials}
                                     onChange={(e) => onChange({ ...config, n_trials: Number(e.target.value) })}
@@ -532,10 +539,11 @@ export const TrainingSettings: React.FC<{
 
                             <div>
                                 <div className="flex items-center gap-1.5 mb-1">
-                                    <span className="block text-xs font-medium text-gray-700 dark:text-gray-300">Random State</span>
+                                    <label htmlFor={`${fieldId}-random-state`} className="block text-xs font-medium text-gray-700 dark:text-gray-300">Random State</label>
                                     <HelpTooltip text="Seed for the search and the final refit — same seed + same data = identical tuning outcome. Applies to every candidate, not just the winner." />
                                 </div>
                                 <input
+                                    id={`${fieldId}-random-state`}
                                     type="number"
                                     value={config.random_state ?? 42}
                                     onChange={(e) => onChange({ ...config, random_state: Number(e.target.value) })}
@@ -601,8 +609,9 @@ export const TrainingSettings: React.FC<{
                             <div className="space-y-3 pl-6 border-l-2 border-gray-100 dark:border-gray-800">
                                 <div className="grid grid-cols-2 gap-3">
                                     <div>
-                                        <span className="block text-xs text-gray-500 mb-1">Folds</span>
+                                        <label htmlFor={`${fieldId}-cv-folds`} className="block text-xs text-gray-500 mb-1">Folds</label>
                                         <input
+                                            id={`${fieldId}-cv-folds`}
                                             type="number"
                                             value={config.cv_folds ?? 5}
                                             onChange={(e) => onChange({ ...config, cv_folds: Number(e.target.value) })}
@@ -611,8 +620,9 @@ export const TrainingSettings: React.FC<{
                                         />
                                     </div>
                                     <div>
-                                        <span className="block text-xs text-gray-500 mb-1">Method</span>
+                                        <label htmlFor={`${fieldId}-cv-method`} className="block text-xs text-gray-500 mb-1">Method</label>
                                         <select
+                                            id={`${fieldId}-cv-method`}
                                             value={config.cv_type ?? 'k_fold'}
                                             onChange={(e) => onChange({ ...config, cv_type: e.target.value })}
                                             className="w-full border border-gray-300 dark:border-gray-600 rounded p-1.5 text-sm bg-white dark:bg-gray-800 dark:text-gray-100"
@@ -632,8 +642,9 @@ export const TrainingSettings: React.FC<{
                                             <span>Data must be sorted by time. Select a date column below or ensure your data is pre-sorted.</span>
                                         </div>
                                         <div>
-                                            <span className="block text-xs text-gray-500 mb-1">Time Column (optional)</span>
+                                            <label htmlFor={`${fieldId}-cv-time-column`} className="block text-xs text-gray-500 mb-1">Time Column (optional)</label>
                                             <select
+                                                id={`${fieldId}-cv-time-column`}
                                                 value={config.cv_time_column ?? ''}
                                                 onChange={(e) => onChange({ ...config, cv_time_column: e.target.value })}
                                                 className="w-full border border-gray-300 dark:border-gray-600 rounded p-1.5 text-sm bg-white dark:bg-gray-800 dark:text-gray-100"
@@ -674,10 +685,11 @@ export const TrainingSettings: React.FC<{
                                 {config.cv_shuffle !== false && config.cv_type !== 'time_series_split' && (
                                     <div>
                                         <div className="flex items-center gap-1.5 mb-1">
-                                            <span className="block text-xs text-gray-500">Fold Split Seed</span>
+                                            <label htmlFor={`${fieldId}-cv-seed`} className="block text-xs text-gray-500">Fold Split Seed</label>
                                             <HelpTooltip text="Seed controlling how rows are dealt to folds — same seed = identical fold splits, so CV scores stay comparable across runs." />
                                         </div>
                                         <input
+                                            id={`${fieldId}-cv-seed`}
                                             type="number"
                                             value={config.cv_random_state ?? 42}
                                             onChange={(e) => onChange({ ...config, cv_random_state: Number(e.target.value) })}
@@ -961,16 +973,26 @@ export const TrainingSettings: React.FC<{
 
       {/* Footer */}
       <div className="pt-4 mt-auto border-t border-gray-100 dark:border-gray-700 flex flex-col gap-3 items-center">
+        <p className="text-xs text-center text-gray-600 dark:text-gray-400 break-words">
+          Selected model: {selectedModelItem?.name || config.model_type.replace(/_/g, ' ')}
+        </p>
         <button
+          type="button"
           onClick={() => { void handleSubmit(); }}
           disabled={!datasetId}
-          title={!datasetId ? 'Connect a dataset node upstream to enable training' : undefined}
-          className="w-full max-w-xs flex items-center justify-center gap-2 px-6 py-2.5 text-white rounded-lg shadow-lg transition-all hover:shadow-xl hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-lg disabled:hover:translate-y-0"
-          style={{ background: 'var(--main-gradient)' }}
+          aria-describedby={`${fieldId}-run-help`}
+          className="w-full max-w-xs flex items-center justify-center gap-2 px-6 py-2.5 action-primary rounded-lg shadow-lg transition-all hover:shadow-xl hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-lg disabled:hover:translate-y-0 focus-ring"
         >
           <Play className="w-4 h-4 fill-current" />
-          <span className="text-sm font-semibold">{isAdvanced ? 'Start Advanced Training' : 'Start Training'}</span>
+          <span className="text-sm font-semibold">{isAdvanced ? 'Tune model' : 'Train model'}</span>
         </button>
+        <p id={`${fieldId}-run-help`} className="text-xs text-center text-gray-600 dark:text-gray-400">
+          {!datasetId
+            ? 'Connect a dataset node upstream and select a dataset to enable this action.'
+            : isAdvanced
+              ? 'Searches hyperparameters and trains the selected model in the background.'
+              : 'Trains the selected model with fixed parameters in the background.'}
+        </p>
 
         {isAdvanced && (
             <button

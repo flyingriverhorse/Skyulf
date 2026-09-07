@@ -166,7 +166,7 @@ export const BestParamsModal: React.FC<BestParamsModalProps> = ({
                                                 onSelect({ params: job.result!.best_params, modelType: currentModelType });
                                                 onClose();
                                             }}
-                                            className="text-xs bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-md transition-colors flex items-center gap-1 shadow-sm shadow-blue-500/20"
+                                            className="text-xs action-primary px-3 py-1.5 rounded-md transition-colors flex items-center gap-1 shadow-sm"
                                         >
                                             <Check className="w-3 h-3" />
                                             Apply

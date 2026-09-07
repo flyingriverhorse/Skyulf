@@ -126,7 +126,7 @@ export const RestoreSessionBanner: React.FC = () => {
       </span>
       <button
         onClick={handleRestore}
-        className="px-2.5 py-1 rounded bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90 focus-ring"
+        className="px-2.5 py-1 rounded action-primary text-xs font-medium focus-ring"
       >
         Restore
       </button>

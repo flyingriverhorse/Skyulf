@@ -6,16 +6,29 @@ This is the async equivalent of the Flask db/data_sources/sqlite_queries.py
 import logging
 from typing import Any
 
-from sqlalchemy import column, delete, func, literal_column, select, table, update
+from sqlalchemy import column, func, literal_column, select, table
 from sqlalchemy import text as sa_text
 
 from backend.config import Settings
 
 from ..adapter import async_session_or_connection
 
+# Engine-agnostic: both writers are implemented once in ``_common`` and re-exported
+# here so ``_DB_PEERS`` dispatch and the ``sqlite_*`` names in ``__init__`` resolve.
+from ._common import delete_data_source, update_data_source
+
 logger = logging.getLogger(__name__)
 
 TABLE = "data_sources"
+
+__all__ = [
+    "count_data_sources",
+    "delete_data_source",
+    "insert_data_source",
+    "select_data_source_by_file_hash",
+    "select_data_sources",
+    "update_data_source",
+]
 
 
 async def insert_data_source(settings: Settings, row: dict[str, Any]) -> dict[str, Any]:
@@ -96,56 +109,6 @@ async def select_data_sources(
 
         except Exception as e:
             logger.exception(f"Failed to select data sources: {e}")
-            raise
-
-
-async def update_data_source(
-    settings: Settings, filter_dict: dict[str, Any], update_data: dict[str, Any]
-):
-    """Update data source records."""
-    async with async_session_or_connection(settings) as session:
-        try:
-            # Use SQLAlchemy Core for UPDATE
-            tbl = table(
-                TABLE,
-                *[column(c) for c in update_data] + [column(c) for c in filter_dict],
-            )
-
-            stmt = update(tbl).values(**update_data)
-
-            for k, v in filter_dict.items():
-                stmt = stmt.where(column(k) == v)
-
-            result = await session.execute(stmt)
-            await session.commit()
-
-            return {"affected_rows": result.rowcount}
-
-        except Exception as e:
-            logger.exception(f"Failed to update data source: {e}")
-            await session.rollback()
-            raise
-
-
-async def delete_data_source(settings: Settings, filter_dict: dict[str, Any]):
-    """Delete data source records."""
-    async with async_session_or_connection(settings) as session:
-        try:
-            # Use SQLAlchemy Core for DELETE
-            tbl = table(TABLE, *[column(c) for c in filter_dict])
-            stmt = delete(tbl)
-
-            for k, v in filter_dict.items():
-                stmt = stmt.where(column(k) == v)
-
-            result = await session.execute(stmt)
-            await session.commit()
-
-            return {"affected_rows": result.rowcount}
-
-        except Exception as e:
-            logger.exception(f"Failed to delete data source: {e}")
-            await session.rollback()
             raise
 
 

@@ -132,6 +132,7 @@ def _grid_search_binary(
     candidates = np.linspace(0.0, 1.0, grid_points + 2)[1:-1]  # exclude 0 and 1
     best_threshold = 0.5
     best_score = -np.inf
+    worst_score = np.inf
     for t in candidates:
         pred = np.where(y_proba[:, 1] >= t, classes[1], classes[0])
         score = metric(y_true, pred)
@@ -143,6 +144,21 @@ def _grid_search_binary(
         if score > best_score or (score == best_score and abs(t - 0.5) < abs(best_threshold - 0.5)):
             best_score = score
             best_threshold = float(t)
+        if score < worst_score:
+            worst_score = score
+
+    # Every candidate scoring alike is the same "nothing to tune against"
+    # verdict as the single-class case above — saturated probabilities, a metric
+    # that ignores its predictions — but the cutoff it yields is indistinguishable
+    # from a genuine optimum at 0.5, so say so. An all-NaN sweep never reaches
+    # here: both sentinels keep their infinities.
+    if best_score == worst_score:
+        logger.warning(
+            "Binary threshold tuning is degenerate: every candidate cutoff scores "
+            "%.4f on the validation split, so there is nothing to tune against. "
+            "Keeping the default 0.5 threshold.",
+            best_score,
+        )
     return {classes[0]: 1.0 - best_threshold, classes[1]: best_threshold}
 
 

@@ -212,7 +212,7 @@ class InvalidValueReplacementApplier(BaseApplier):
     name="Replace Invalid Values",
     category="Cleaning",
     description="Replace specified values with nan.",
-    params={"columns": [], "invalid_values": []},
+    params={"columns": []},
     learns_from_data=False,
 )
 class InvalidValueReplacementCalculator(BaseCalculator):
