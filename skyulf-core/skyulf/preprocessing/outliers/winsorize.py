@@ -87,6 +87,8 @@ class WinsorizeCalculator(BaseCalculator):
         self, input_schema: SkyulfSchema, config: dict[str, Any]
     ) -> SkyulfSchema:
         """Return a schema with selected columns promoted to ``float64``."""
+        if not isinstance(input_schema, SkyulfSchema):
+            return input_schema
         return promote_configured_columns_to_float64(input_schema, config)
 
     @fit_method

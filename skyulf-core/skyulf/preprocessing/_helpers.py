@@ -62,7 +62,7 @@ def promote_configured_columns_to_float64(
 
     out = input_schema
     for col in selected:
-        if col in input_schema.columns:
+        if col in input_schema.columns and input_schema.dtypes.get(col) != "float64":
             out = out.with_dtype(col, "float64")
     return out
 
