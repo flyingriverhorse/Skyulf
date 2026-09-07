@@ -420,5 +420,5 @@ class TestRealShapedDataset:
 
         out = MissingIndicatorApplier().apply(df, params)
         for col in params["columns"]:
-            expected = df[col].isna().astype(int)
+            expected = df[col].isna().astype("int64")
             pd.testing.assert_series_equal(out[f"{col}_missing"], expected, check_names=False)

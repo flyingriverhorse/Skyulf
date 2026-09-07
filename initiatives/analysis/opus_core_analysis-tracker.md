@@ -135,6 +135,7 @@ uses, so a fixed finding stays where it was filed.
 | OC-79 | 🟡 | `joblib` imported at module scope but not in `install_requires` — packaging-integrity cluster | 1 line | ✅ fixed 2026-09-06 — `joblib>=1.3.0` declared in core `install_requires`, and in root `pyproject.toml`/`requirements.txt` for the backend's identical undeclared-import gap. See the log entry |
 | OC-81 | ⚪ | No `License ::` classifier / SPDX field — packaging-integrity cluster | 1 line | ✅ fixed 2026-09-06 — owner decided `skyulf-core` = Apache-2.0 with backend + frontend staying AGPLv3, declared **statically** in `skyulf-core/pyproject.toml` so it emits PEP 639 `License-Expression:` rather than the deprecated free-text field, and the three files that contradicted the decision reconciled to it. See the OC-81 log entry |
 | OC-09 | 🟡 | Narrow `ruff select` hides ~500 missing docstrings + 84 unused args — **last**, widening first would bury the signal | done — `ARG` declined by decision (121 in-scope sites measured) | ✅ fixed 2026-09-06 — `F401`/`F841`/the `D` family now enforced on `skyulf-core/skyulf/` + `backend/`, 904 docstrings hand-written (82 of them invisible to ruff because `D1xx` is privacy-gated on the whole dotted module path), and `ARG` declined by decision; closed by the owner as “fixed as much as we did, no need to continue”. See the 2026-09-05 and 2026-09-06 OC-09 log entries |
+| OC-76 | 🟠 | Cross-engine parity tests originally covered 9 of 100 nodes and never compared applied output | ~3 days | ✅ fixed 2026-09-07 — registry-wide checks now compare applied pandas/Polars outputs and dtypes for 51 comparable registered nodes; structured splitter outputs remain outside the frame comparator |
 
 ### Remaining — evaluation & explainability
 
@@ -291,6 +292,18 @@ batch's context are in [the live queue](opus_core_analysis-open_queue.md).
 ---
 
 ## Log
+
+### 2026-09-07 — OC-76 fixed: applied pandas/Polars output parity is now enforced
+
+Added registry-wide applied-output parity coverage for 51 comparable non-modeling
+nodes, including output values, columns, row alignment, target passthrough, and
+dtypes. The new checks exposed and fixed the `DummyEncoder` indicator dtype
+divergence (`int8`) and `MissingIndicator` flag dtype divergence (`int64`).
+Structured splitter results are intentionally excluded from the frame comparator
+because they return `SplitDataset` objects; their existing artifact and wrapper
+parity checks remain active. The registry contract suite passed 229 tests, with
+Ruff and Ty checks also passing. The remaining bucketing dtype issue stays open
+as OC-04.
 
 ### 2026-09-07 — OC-207 fixed: the threshold-tuning contract was right and the three docs describing it were wrong — plus the silent degenerate search the follow-up measurement exposed
 

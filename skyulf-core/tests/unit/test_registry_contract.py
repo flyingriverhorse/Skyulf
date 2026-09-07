@@ -204,6 +204,11 @@ _NEEDS_SPECIAL_INPUT: set[str] = {
     "DatasetProfile",
 }
 
+# Splitters return a structured SplitDataset, not one comparable frame. Keep
+# them in the existing fit/artifact checks; only applied-output comparison is
+# inapplicable until that structured result gets its own comparator.
+_NON_FRAME_OUTPUT_NODES = {"Split", "TrainTestSplitter", "feature_target_split"}
+
 # Nodes whose fit is expected to return an empty dict (legitimate no-op).
 _FIT_MAY_BE_EMPTY: set[str] = set()
 
@@ -296,6 +301,51 @@ def _fit_and_apply(
             return X_out, y_out, f"y length {y_len} != X length {x_len} after row drop"
 
     return X_out, y_out, ""
+
+
+def _to_pandas(value: Any) -> pd.DataFrame | pd.Series | None:
+    """Convert a supported engine value to pandas for parity assertions."""
+    if isinstance(value, (pd.DataFrame, pd.Series)):
+        return value
+    if isinstance(value, (pl.DataFrame, pl.Series)):
+        return value.to_pandas()
+    if isinstance(value, SkyulfPolarsWrapper):
+        return value.to_pandas()
+    return None
+
+
+def _assert_applied_outputs_equal(pd_x: Any, pl_x: Any, pd_y: Any, pl_y: Any, node_id: str) -> None:
+    """Compare applied pandas/Polars outputs, including frame and target shape."""
+    pd_frame = _to_pandas(pd_x)
+    pl_frame = _to_pandas(pl_x)
+    assert pd_frame is not None and pl_frame is not None, (
+        f"{node_id}: applied output is not a comparable pandas/Polars frame"
+    )
+    if isinstance(pd_frame, pd.DataFrame) and isinstance(pl_frame, pd.DataFrame):
+        pd.testing.assert_frame_equal(
+            pd_frame.reset_index(drop=True), pl_frame.reset_index(drop=True), check_dtype=True
+        )
+    else:
+        assert isinstance(pd_frame, pd.Series) and isinstance(pl_frame, pd.Series)
+        pd.testing.assert_series_equal(
+            pd_frame.reset_index(drop=True), pl_frame.reset_index(drop=True), check_dtype=True
+        )
+
+    if pd_y is None or pl_y is None:
+        assert pd_y is pl_y, f"{node_id}: target passthrough differs between engines"
+        return
+    pd_target = _to_pandas(pd_y)
+    pl_target = _to_pandas(pl_y)
+    assert pd_target is not None and pl_target is not None
+    if isinstance(pd_target, pd.DataFrame) and isinstance(pl_target, pd.DataFrame):
+        pd.testing.assert_frame_equal(
+            pd_target.reset_index(drop=True), pl_target.reset_index(drop=True), check_dtype=True
+        )
+    else:
+        assert isinstance(pd_target, pd.Series) and isinstance(pl_target, pd.Series)
+        pd.testing.assert_series_equal(
+            pd_target.reset_index(drop=True), pl_target.reset_index(drop=True), check_dtype=True
+        )
 
 
 def _assert_artifacts_equal(pd_params: Any, pl_params: Any, node_id: str) -> None:
@@ -473,6 +523,36 @@ def test_nan_parity_pandas_vs_polars(node_id: str) -> None:
 
     if pd_params and pl_params:
         _assert_artifacts_equal(pd_params, pl_params, node_id)
+
+
+@pytest.mark.parametrize(
+    "node_id",
+    sorted(
+        nid
+        for nid, meta in NodeRegistry.get_all_metadata().items()
+        if (
+            meta.get("category") != "Modeling"
+            and nid not in _NEEDS_SPECIAL_INPUT
+            and nid not in _NON_FRAME_OUTPUT_NODES
+        )
+    ),
+)
+def test_applied_output_parity_pandas_vs_polars(node_id: str) -> None:
+    """Every supported registered node must apply equivalent pandas/Polars artifacts."""
+    meta = NodeRegistry.get_all_metadata()[node_id]
+    config = _build_config(node_id, meta)
+    df_pd = _make_nan_frame()
+    X_pd = df_pd.drop(columns=["y"])
+    y_pd = df_pd["y"]
+    df_pl = pl.from_pandas(df_pd)
+    X_pl = df_pl.drop("y")
+    y_pl = df_pl["y"]
+
+    pd_x, pd_y, pd_error = _fit_and_apply(node_id, X_pd, y_pd, config)
+    pl_x, pl_y, pl_error = _fit_and_apply(node_id, X_pl, y_pl, config)
+    assert not pd_error, f"{node_id}: pandas {pd_error}"
+    assert not pl_error, f"{node_id}: polars {pl_error}"
+    _assert_applied_outputs_equal(pd_x, pl_x, pd_y, pl_y, node_id)
 
 
 @pytest.mark.parametrize(

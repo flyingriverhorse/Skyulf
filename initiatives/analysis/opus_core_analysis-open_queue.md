@@ -49,7 +49,6 @@ closed that on 2026-09-07.
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
-| OC-76 | 🟠 | Cross-engine parity tests cover 9 of 100 nodes and never compare applied output — directly caused OC-04/23/24/58 to go unnoticed | ~3 days | ⬜ open |
 | OC-03 | 🟠 | Systemic `infer_output_schema` int→float misprediction across 22 nodes — one sweep + parametrized test (predicted schema == actual schema for every node) | ~1 day | ✅ done — runtime dtype parity covered by parametrized tests |
 
 ### Remaining — evaluation & explainability
@@ -106,7 +105,7 @@ closed that on 2026-09-07.
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
-| OC-04 | 🟡 | Cross-engine dtype divergence in 3 nodes (int64 vs int8/uint32) (`encoding/dummy.py`, `bucketing.py`) | small | ⬜ open |
+| OC-04 | 🟡 | Remaining cross-engine dtype divergence in bucketing (`bucketing.py`); DummyEncoder and MissingIndicator parity is fixed by OC-76 coverage | small | ⬜ open |
 | OC-06 | 🟡 | 6 registered nodes unreachable from the UI (incl. all of `geo/`) — `registry.py` vs `frontend/` | small | ⬜ open — R1 step 3 catches this class |
 | OC-07 | 🟡 | Node-id naming split 55 PascalCase / 45 snake_case + redundant aliases (`registry.py`) | half day | ⬜ open |
 | OC-08 | 🟡 | Public-API name collision: `DatasetProfile` means two things (`skyulf/__init__.py:32-46`) | small | ⬜ open |

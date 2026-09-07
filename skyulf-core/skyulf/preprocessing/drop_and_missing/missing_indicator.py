@@ -41,7 +41,9 @@ def _missing_indicator_apply_pandas(X: Any, y: Any, params: dict[str, Any]) -> t
     X_out = X.copy()
     for col in cols:
         if col in X.columns:
-            X_out[f"{col}{suffix}"] = X[col].isna().astype(int)
+            # Keep the pandas result aligned with the explicit Polars Int64 cast
+            # and the inferred output schema.
+            X_out[f"{col}{suffix}"] = X[col].isna().astype("int64")
     return X_out, y
 
 
