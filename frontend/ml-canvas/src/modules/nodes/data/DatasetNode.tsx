@@ -1,4 +1,5 @@
 import React, { useEffect, useId, useState } from 'react';
+import { ValidationField, useValidationReveal } from '../../../components/shared/ValidationField';
 import { NodeDefinition } from '../../../core/types/nodes';
 import { Database, TableProperties, Plus } from 'lucide-react';
 import { DatasetService } from '../../../core/api/datasets';
@@ -18,6 +19,9 @@ const DatasetSettings: React.FC<{ config: DatasetNodeConfig; onChange: (c: Datas
 }) => {
   const datasetSelectId = useId();
   const [showUpload, setShowUpload] = useState(false);
+  useValidationReveal((field) => {
+    if (field === 'datasetId') setShowUpload(false);
+  });
   const { data: schema, isLoading: isSchemaLoading } = useDatasetSchema(config.datasetId);
 
   // Shared cache: every Dataset node on the canvas reads from the same
@@ -66,23 +70,25 @@ const DatasetSettings: React.FC<{ config: DatasetNodeConfig; onChange: (c: Datas
           </button>
         </div>
 
-        {loading ? (
-          <div className="text-xs text-muted-foreground">Loading datasets...</div>
-        ) : (
-          <select
-            id={datasetSelectId}
-            className="w-full p-2 border rounded bg-background focus:ring-1 focus:ring-primary outline-none"
-            value={config.datasetId || ''}
-            onChange={handleChange}
-          >
-            <option value="">-- Select --</option>
-            {datasets.map((d) => (
-              <option key={d.id} value={d.id}>
-                {d.name}
-              </option>
-            ))}
-          </select>
-        )}
+        <ValidationField field="datasetId">
+          {loading ? (
+            <div className="text-xs text-muted-foreground">Loading datasets...</div>
+          ) : (
+            <select
+              id={datasetSelectId}
+              className="w-full p-2 border rounded bg-background focus:ring-1 focus:ring-primary outline-none"
+              value={config.datasetId || ''}
+              onChange={handleChange}
+            >
+              <option value="">-- Select --</option>
+              {datasets.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.name}
+                </option>
+              ))}
+            </select>
+          )}
+        </ValidationField>
       </div>
 
       {/* Schema Preview */}
@@ -180,6 +186,7 @@ export const DatasetNode: NodeDefinition<DatasetNodeConfig> = {
     return {
       isValid: !!config.datasetId,
       message: !config.datasetId ? 'Dataset is required' : undefined,
+      field: !config.datasetId ? 'datasetId' : undefined,
     };
   },
   getDefaultConfig: () => ({

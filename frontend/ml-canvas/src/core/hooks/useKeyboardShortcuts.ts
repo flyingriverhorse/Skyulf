@@ -56,6 +56,8 @@ export const FOCUS_NODE_EVENT = 'skyulf:focus-node';
 
 export interface FocusNodeDetail {
   id: string;
+  /** Keep a source node visible alongside a newly connected step. */
+  relatedNodeIds?: string[];
   /**
    * Moves DOM focus onto the canvas wrapper after fitting the node into
    * view. Off by default since the Sidebar's palette-click origin already

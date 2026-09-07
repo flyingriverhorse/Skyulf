@@ -61,6 +61,20 @@ const Harness: React.FC = () => {
 };
 
 describe('CommandPalette', () => {
+  it('finds a node by its task and exposes its complete description', async () => {
+    // People should not need to know the catalog name to find a normalization step.
+    getAllSpy?.mockReturnValue([
+      { ...stubNode('scale_numeric_features', 'Scaling'), description: 'Scale numeric features to a standard range.' },
+      stubNode('beta-node', 'Beta node'),
+    ]);
+    render(<Harness />);
+    fireEvent.click(screen.getByRole('button', { name: 'Open palette' }));
+    fireEvent.change(await screen.findByRole('textbox', { name: 'Search nodes' }), { target: { value: 'normalize' } });
+    expect(screen.getAllByRole('option')).toHaveLength(1);
+    expect(screen.getByRole('option')).toHaveTextContent('Scaling');
+    expect(screen.getByRole('option')).toHaveTextContent('Scale numeric features to a standard range.');
+  });
+
   it('keeps the search input focused, preserves arrow navigation, and returns focus on close', async () => {
     render(<Harness />);
 

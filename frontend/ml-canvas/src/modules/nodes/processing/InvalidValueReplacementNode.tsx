@@ -1,3 +1,4 @@
+import { ValidationField } from '../../../components/shared/ValidationField';
 import React, { useState } from 'react';
 import { NodeDefinition } from '../../../core/types/nodes';
 import { AlertTriangle, Info, ChevronDown, ChevronUp } from 'lucide-react';
@@ -48,12 +49,14 @@ const InvalidValueSettings: React.FC<{ config: InvalidValueReplacementConfig; on
             <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 block">
               Target Columns ({config.columns.length})
             </label>
-            <ColumnMultiSelect
-              variant="compact"
-              columns={numericColumns}
-              selected={config.columns}
-              onChange={(cols) => onChange({ ...config, columns: cols })}
-            />
+            <ValidationField field="columns">
+              <ColumnMultiSelect
+                variant="compact"
+                columns={numericColumns}
+                selected={config.columns}
+                onChange={(cols) => onChange({ ...config, columns: cols })}
+              />
+            </ValidationField>
             <p className="text-xs text-gray-500 mt-1">Only numeric columns are shown.</p>
           </div>
         </div>
@@ -111,13 +114,15 @@ const InvalidValueSettings: React.FC<{ config: InvalidValueReplacementConfig; on
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <span className="text-[10px] text-gray-500 uppercase font-semibold">Min Value</span>
-                <input
-                  type="number"
-                  className="w-full text-xs rounded border border-gray-300 dark:border-gray-600 px-2 py-1.5"
-                  placeholder={config.mode === 'percentage_bounds' ? '0' : 'Min'}
-                  value={config.min_value ?? ''}
-                  onChange={(e) => onChange({ ...config, min_value: e.target.value ? Number.parseFloat(e.target.value) : undefined })}
-                />
+                <ValidationField field="min_value">
+                  <input
+                    type="number"
+                    className="w-full text-xs rounded border border-gray-300 dark:border-gray-600 px-2 py-1.5"
+                    placeholder={config.mode === 'percentage_bounds' ? '0' : 'Min'}
+                    value={config.min_value ?? ''}
+                    onChange={(e) => onChange({ ...config, min_value: e.target.value ? Number.parseFloat(e.target.value) : undefined })}
+                  />
+                </ValidationField>
               </div>
               <div>
                 <span className="text-[10px] text-gray-500 uppercase font-semibold">Max Value</span>
@@ -157,9 +162,9 @@ export const InvalidValueReplacementNode: NodeDefinition<InvalidValueReplacement
     return `${mode} · ${cols} ${cols === 1 ? 'col' : 'cols'}`;
   },
   validate: (config) => {
-    if (config.columns.length === 0) return { isValid: false, message: 'Select at least one column.' };
+    if (config.columns.length === 0) return { isValid: false, field: 'columns', message: 'Select at least one column.' };
     if (config.mode === 'custom_range' && config.min_value === undefined && config.max_value === undefined) {
-      return { isValid: false, message: 'Specify at least a min or max value for custom range.' };
+      return { isValid: false, field: 'min_value', message: 'Specify at least a min or max value for custom range.' };
     }
     return { isValid: true };
   },

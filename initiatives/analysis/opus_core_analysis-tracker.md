@@ -135,11 +135,18 @@ uses, so a fixed finding stays where it was filed.
 | OC-79 | 🟡 | `joblib` imported at module scope but not in `install_requires` — packaging-integrity cluster | 1 line | ✅ fixed 2026-09-06 — `joblib>=1.3.0` declared in core `install_requires`, and in root `pyproject.toml`/`requirements.txt` for the backend's identical undeclared-import gap. See the log entry |
 | OC-81 | ⚪ | No `License ::` classifier / SPDX field — packaging-integrity cluster | 1 line | ✅ fixed 2026-09-06 — owner decided `skyulf-core` = Apache-2.0 with backend + frontend staying AGPLv3, declared **statically** in `skyulf-core/pyproject.toml` so it emits PEP 639 `License-Expression:` rather than the deprecated free-text field, and the three files that contradicted the decision reconciled to it. See the OC-81 log entry |
 | OC-09 | 🟡 | Narrow `ruff select` hides ~500 missing docstrings + 84 unused args — **last**, widening first would bury the signal | done — `ARG` declined by decision (121 in-scope sites measured) | ✅ fixed 2026-09-06 — `F401`/`F841`/the `D` family now enforced on `skyulf-core/skyulf/` + `backend/`, 904 docstrings hand-written (82 of them invisible to ruff because `D1xx` is privacy-gated on the whole dotted module path), and `ARG` declined by decision; closed by the owner as “fixed as much as we did, no need to continue”. See the 2026-09-05 and 2026-09-06 OC-09 log entries |
+| OC-76 | 🟠 | Cross-engine parity tests originally covered 9 of 100 nodes and never compared applied output | ~3 days | ✅ fixed 2026-09-07 — registry-wide checks now compare applied pandas/Polars outputs and dtypes for 51 comparable registered nodes; structured splitter outputs remain outside the frame comparator |
+| OC-04 | 🟡 | Cross-engine dtype divergence in binning outputs (`encoding/dummy.py`, `bucketing.py`) | small | ✅ fixed 2026-09-07 — ordinal/bin-index bucketing now emits signed `int64` on both pandas and Polars; DummyEncoder and MissingIndicator were aligned in the OC-76 pass |
+| OC-149 | 🟠 | Clustering evaluation crashes on Polars when a numeric feature is all-null within one cluster | small | ✅ fixed 2026-09-07 — cluster-local Polars means now preserve pandas-compatible `NaN` values |
+| OC-196 | 🟡 | GaussianMixture probability prediction omitted the feature/reference filtering used for fit and ordinary prediction | small | ✅ fixed 2026-09-07 — shared clustering prediction preparation now filters both labels and probabilities identically |
+| OC-195 | 🟡 | Clustering numeric-feature selection skipped `SkyulfPandasWrapper` | small | ✅ fixed 2026-09-07 — wrapped pandas frames now use native pandas numeric selection and preserve the wrapper contract |
+| OC-197 | 🟡 | Polars clustering reference crosstabs crashed when reference columns were named `count` or `__skyulf_cluster__` | small | ✅ fixed 2026-09-07 — crosstab internals now use dedicated collision-proof helper names |
 
 ### Remaining — evaluation & explainability
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
+| OC-38 | ⚪ | Clustering metrics treat DBSCAN `-1` noise as a real cluster (`metrics.py:432-459`) | small | ✅ fixed 2026-09-07 — DBSCAN noise rows are excluded from cluster counts and quality scores; regression coverage added |
 | OC-146 | 🔴 | Binary `pr_auc` scored against wrong class on `{1,n}` labels — reports 0.32 vs true 0.97, no warning (`metrics.py:324-326`) | small | ✅ fixed 2026-09-05 |
 | OC-37 | 🟡 | Binary PR-AUC dropped for string-labeled classifiers (`metrics.py:324-327`) | small | ✅ fixed 2026-09-05 — same one-arg fix as OC-146 |
 | OC-147 | ⚪ | `optimize_thresholds` returns a dict shape that bypasses its own documented binary rule, flipping `>=` to `>` on exact ties (`thresholds.py:66-88`) | small | ✅ fixed 2026-09-05 — with OC-36 |
@@ -148,6 +155,7 @@ uses, so a fixed finding stays where it was filed.
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
+| OC-68 | 🟠 | Model alias map task-unaware — direct API caller silently trains the wrong estimator family (`_execution/engine/_node_runners.py:1157-1183`) | small | ✅ fixed 2026-09-07 — ambiguous aliases are task-aware and mismatched model/task combinations fail clearly |
 | OC-130 | 🟠 | Typo in `FASTAPI_ENV` silently disables the entire production security posture (wildcard CORS w/ credentials, DEBUG=True, no SECRET_KEY check) (`config/factory.py:27-32`) — **worse than filed**: a second, unfiled channel — `FASTAPI_ENV` is not a `Settings` field and pydantic-settings never exports dotenv values into `os.environ`, so the bare `os.getenv` could not see a `.env`-only `production` either; both now fail closed through `resolve_environment()` | small | ✅ fixed 2026-09-05 |
 | OC-150 | 🟠 | S3 error "sanitiser" matches credential key names case-sensitively — S3 403 bodies + replayable presigned URLs logged verbatim; duplicated in two files (`connectors/s3.py:31-37`, `artifacts/s3.py:67-73`) — **worse than filed**: executed against real shapes the old helper was a *no-op* on all three leaks and exposed the **secret access key** (the audit only ever demonstrated key IDs and signatures), while separately destroying benign text (`key=reports/2026/q3.csv` → `redacted sensitive S3 error`); both copies deleted in favour of one shape-based `redact_credentials()` | small | ✅ fixed 2026-09-05 |
 | OC-153 | 🟠 | Multi-input merge silently switches column-wise→row-wise when a branch changes row count — 5-row set + filtered branch yields 8 rows, 3 duplicates, zero UI warnings (`_merge.py:338-348`) — repro came out **9 rows / 4 duplicates**; fixed by warning, not raising, so appending datasets still works | small | ✅ fixed 2026-09-05 |
@@ -165,6 +173,7 @@ uses, so a fixed finding stays where it was filed.
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
 | OC-112 | ⚪ | Comment and code disagree in the categorical profiler — the comment promises a rendered missing-value marker, the code `continue`s and discards the null category (`profiling/_analyzer/categorical.py:22-30`). *Filed as "disagree about the applied threshold"; the real subject is the null-category marker* | 1 line | ✅ fixed 2026-09-06 — comment-only, no behaviour change; the reasoning for why dropping the null category is correct now lives in the code comment it rewrote. See the log entry |
+| OC-148 | 🟡 | PII detector flags ordinary 7+ digit numeric ID columns as "Email/Phone" (`profiling/_analyzer/text.py:107-128`) | small | ✅ fixed 2026-09-07 — phone detection now requires positive format evidence and repeated sample evidence; plain IDs, ZIP+4, and isolated phone-shaped IDs are excluded |
 
 ### Remaining — file-coverage closure
 
@@ -291,6 +300,89 @@ batch's context are in [the live queue](opus_core_analysis-open_queue.md).
 ---
 
 ## Log
+
+### 2026-09-07 — OC-68 fixed: ambiguous model aliases now respect the task
+
+The backend model factory no longer maps the ambiguous `random_forest` alias to
+the classifier unconditionally. Callers can provide `task_type` (also accepted
+as the legacy `task` or `problem_type` parameter), which selects the classifier
+or regressor registry entry; omitting it now fails closed. The factory also
+checks explicit model IDs against the requested task, preventing a successful
+but nonsensical classifier-on-regression run. Regression coverage pins all
+three cases.
+
+### 2026-09-07 — OC-38 fixed: DBSCAN noise is excluded from clustering metrics
+
+`calculate_clustering_metrics()` now removes rows labelled `-1` before counting
+clusters or calculating silhouette, Calinski–Harabasz, and Davies–Bouldin
+scores. This matches DBSCAN's contract that `-1` means noise, not a learned
+cluster. A regression test verifies both the reported cluster count and the
+feature/label arrays passed to the quality metrics; the no-noise path remains
+allocation-free for the existing large-label memory guard.
+
+### 2026-09-07 — OC-148 fixed: phone PII detection no longer flags ordinary identifiers
+
+The previous phone heuristic treated any 7–20 character numeric/separator
+string with at least seven digits as a phone number, so customer IDs, order
+references, and ZIP+4 values produced false `PII` alerts. It also flagged a
+whole column from one matching sample. The detector now requires a `+` prefix
+or phone-style separators plus 10–11 digits, and requires two matching phone
+samples when the sample contains at least two values. Email detection remains
+unchanged. Regression coverage includes long numeric IDs, ZIP+4 values, an
+isolated phone-shaped ID, real phone formats, email, and plain text; all 7 PII
+tests pass, with Ruff and Ty clean.
+
+### 2026-09-07 — OC-76 fixed: applied pandas/Polars output parity is now enforced
+
+Added registry-wide applied-output parity coverage for 51 comparable non-modeling
+nodes, including output values, columns, row alignment, target passthrough, and
+dtypes. The new checks exposed and fixed the `DummyEncoder` indicator dtype
+divergence (`int8`) and `MissingIndicator` flag dtype divergence (`int64`).
+Structured splitter results are intentionally excluded from the frame comparator
+because they return `SplitDataset` objects; their existing artifact and wrapper
+parity checks remain active. The registry contract suite passed 229 tests, with
+Ruff and Ty checks also passing. The remaining bucketing dtype issue stays open
+as OC-04.
+
+### 2026-09-07 — OC-04 fixed: ordinal bucketing dtype is aligned
+
+The applied Polars bucketing path cast ordinal and bin-index categories to
+`UInt32`, while pandas emitted `int64` for complete inputs. The cast now uses
+signed `Int64`, matching pandas and preserving the existing nullable behaviour
+when missing values are present. A no-null cross-engine dtype regression test was
+added; the bucketing suite, registry contract suite, Ruff, and Ty all pass.
+
+### 2026-09-07 — OC-149 fixed: cluster-local all-null means match pandas
+
+Polars returns `None` for the mean of a feature that is entirely null within
+one cluster, while pandas returns `NaN`. The Polars centroid path now converts
+that `None` to `float("nan")`, preventing `float(None)` from aborting the whole
+clustering report and preserving the pandas-compatible centroid/profile input.
+The clustering evaluation and integration suites, Ruff, and Ty all pass.
+
+### 2026-09-07 — OC-196 fixed: GaussianMixture probabilities use fitted features
+
+`predict_proba()` inherited the generic sklearn applier and bypassed the
+clustering-specific reference-column and numeric-only filtering used by
+`predict()`. A shared preparation helper now feeds both methods, so a fitted
+`reference_column` or extra text column cannot change the feature count passed
+to GaussianMixture. Clustering integration/modeling tests, Ruff, and Ty all pass.
+
+### 2026-09-07 — OC-195 fixed: wrapped pandas clustering keeps numeric features
+
+`SkyulfPandasWrapper` delegated `.columns` and `.dtypes`, so the explicit
+Polars branch misclassified it and dropped every feature. `_select_numeric_features`
+now recognizes the wrapper, selects numeric columns from its native pandas frame,
+and returns a wrapped pandas subset. The clustering/modeling suites, Ruff, and
+Ty all pass.
+
+### 2026-09-07 — OC-197 fixed: Polars crosstab helper names are collision-proof
+
+The Polars reference crosstab used `__skyulf_cluster__` for its temporary
+cluster key and `count` for its aggregation output. Either name could already
+be the user-selected reference column, causing a `DuplicateError`. The path now
+uses dedicated internal cluster, reference, and count names independent of user
+columns. Clustering evaluation/integration tests, Ruff, and Ty all pass.
 
 ### 2026-09-07 — OC-207 fixed: the threshold-tuning contract was right and the three docs describing it were wrong — plus the silent degenerate search the follow-up measurement exposed
 

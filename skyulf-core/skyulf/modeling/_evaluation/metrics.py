@@ -459,6 +459,14 @@ def calculate_clustering_metrics(
     if X_np.shape[0] != len(labels_np):
         raise ValueError("X and labels must have the same number of rows")
 
+    # DBSCAN reserves -1 for samples that do not belong to any cluster. Noise
+    # must not inflate the cluster count or influence quality scores. Keep the
+    # common no-noise path allocation-free for large label arrays.
+    if np.any(labels_np == -1):
+        non_noise = labels_np != -1
+        X_np = X_np[non_noise]
+        labels_np = labels_np[non_noise]
+
     n_samples = len(labels_np)
     representative_by_label = _collect_silhouette_representatives(
         labels_np,

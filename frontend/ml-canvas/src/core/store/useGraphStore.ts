@@ -25,10 +25,15 @@ import {
 } from '../types/executionMode';
 import { toast } from '../toast';
 import { convertGraphToPipelineConfig } from '../utils/pipelineConverter';
+import { getReadOnlyMode } from '../hooks/useReadOnlyMode';
+import { connectionIssue, MODEL_NODE_TYPES } from '../utils/connectionValidation';
+import { bundleConnection, normalizeSplitEdges } from '../utils/splitConnections';
+export { wouldCreateCycle, isModelEndpointViolation, MODEL_NODE_TYPES, CYCLE_CONNECTION_MESSAGE, MODEL_ENDPOINT_CONNECTION_MESSAGE } from '../utils/connectionValidation';
 import { findCycleIssues } from '../utils/pipelineCycleValidation';
 import { findPreprocessingBeforeSplitIssues } from '../utils/pipelineLeakageValidation';
 
 export interface GraphValidationIssue {
+  field?: string | undefined;
   nodeId: string;
   nodeLabel: string;
   category: 'configuration' | 'connection' | 'leakage' | 'cycle';
@@ -46,6 +51,8 @@ interface GraphState {
 
   // Custom Actions
   addNode: (type: string, position: { x: number, y: number }, initialData?: unknown) => string;
+  /** Add a downstream node and its selected-port connection as one undo step. */
+  addConnectedNode: (source: string, sourceHandle: string, type: string, targetHandle: string, position: { x: number; y: number }) => string;
   updateNodeData: (id: string, data: unknown) => void;
   /**
    * Read the effective `execution_mode` for a node, defaulting to the
@@ -167,52 +174,6 @@ const getNodeLabel = (node: Node): string => {
   );
 };
 
-/**
- * True if adding the edge source→target would create a cycle: either a
- * self-loop, or target can already reach source through existing edges.
- * Cyclic graphs cannot execute in order and die late with a cryptic
- * "Artifact not found" error, so they are rejected at connect time.
- */
-export function wouldCreateCycle(edges: Edge[], source: string, target: string): boolean {
-  if (source === target) return true;
-  const stack = [target];
-  const seen = new Set<string>();
-  while (stack.length > 0) {
-    const current = stack.pop()!;
-    if (current === source) return true;
-    if (seen.has(current)) continue;
-    seen.add(current);
-    for (const edge of edges) {
-      if (edge.source === current) stack.push(edge.target);
-    }
-  }
-  return false;
-}
-
-/** Node types whose output is a trained model (spec), not a DataFrame. */
-export const MODEL_NODE_TYPES = [
-  'classification',
-  'regression',
-  'text_classification',
-  'SegmentationNode',
-  'EnsembleNode',
-];
-
-/**
- * Training/model nodes are pipeline endpoints: the only node that may consume
- * a model output is EnsembleNode. Any other target is a wiring mistake,
- * regardless of which branch the target sits on.
- */
-export function isModelEndpointViolation(sourceType: string, targetType: string): boolean {
-  return MODEL_NODE_TYPES.includes(sourceType) && targetType !== 'EnsembleNode';
-}
-
-/** Toast wording for the two connect-time rejections (shared with FlowCanvas). */
-export const CYCLE_CONNECTION_MESSAGE =
-  'This connection would create a loop. Pipelines must flow in one direction — remove the backwards wire instead.';
-export const MODEL_ENDPOINT_CONNECTION_MESSAGE =
-  'Training nodes are the end of a pipeline: their output is a trained model, not data. Only an Ensemble can consume a model output — wire preprocessing or training from the dataset branch instead.';
-
 /** Collects the blocking validation issues for a canvas graph. */
 export function collectGraphValidationIssues(nodes: Node[], edges: Edge[]): GraphValidationIssue[] {
   const previewNodeIds = new Set(
@@ -244,6 +205,7 @@ export function collectGraphValidationIssues(nodes: Node[], edges: Edge[]): Grap
         nodeLabel: label,
         category: 'configuration',
         message: `Fix the ${label} settings before running preview${validation.message ? `: ${validation.message}` : '.'}`,
+        ...(validation.field ? { field: validation.field } : {}),
       });
     }
 
@@ -307,6 +269,165 @@ export function collectGraphValidationIssues(nodes: Node[], edges: Edge[]): Grap
   return issues;
 }
 
+/** Preserve preflight confirmations for manual wiring and atomic next-step insertion. */
+function confirmConnection(connection: Connection, nodes: Node[], edges: Edge[]): boolean {
+  const issue = connectionIssue(nodes, edges, connection);
+  if (issue) {
+    toast.error('Invalid connection', issue);
+    return false;
+  }
+  const sourceNode = nodes.find((n) => n.id === connection.source);
+  const targetNode = nodes.find((n) => n.id === connection.target);
+
+  if (sourceNode && targetNode) {
+    const sourceType = sourceNode.data.definitionType as string;
+    const targetType = targetNode.data.definitionType as string;
+
+    // Warn: a model node from a DIFFERENT dataset lineage is wired into an
+    // ensemble. Base learners are spec-only (the ensemble refits them on its
+    // own data), so mixing models trained on unrelated datasets is almost
+    // always a wiring mistake — surface it before the edge is committed.
+    const modelSourceTypes = ['classification', 'regression', 'text_classification', 'SegmentationNode'];
+    if (targetType === 'EnsembleNode' && modelSourceTypes.includes(sourceType)) {
+      // Trace a node back to the dataset_node root(s) it derives from.
+      const rootsOf = (startId: string): Set<string> => {
+        const roots = new Set<string>();
+        const seen = new Set<string>();
+        const stack = [startId];
+        while (stack.length > 0) {
+          const cur = stack.pop()!;
+          if (seen.has(cur)) continue;
+          seen.add(cur);
+          const n = nodes.find((x) => x.id === cur);
+          if (n?.data.definitionType === 'dataset_node') {
+            roots.add(cur);
+            continue;
+          }
+          for (const e of edges.filter((ed) => ed.target === cur)) stack.push(e.source);
+        }
+        return roots;
+      };
+      const sourceRoots = rootsOf(connection.source!);
+      // Existing lineage of the ensemble = roots of everything already wired in.
+      const ensembleRoots = new Set<string>();
+      for (const e of edges.filter((ed) => ed.target === connection.target)) {
+        for (const r of rootsOf(e.source)) ensembleRoots.add(r);
+      }
+      const disjoint =
+        ensembleRoots.size > 0 &&
+        sourceRoots.size > 0 &&
+        ![...sourceRoots].some((r) => ensembleRoots.has(r));
+      if (disjoint) {
+        // window.confirm: see note above on sync onConnect contract.
+        const proceed = window.confirm(
+          'Warning: this model comes from a different dataset than the ensemble\'s ' +
+          'other inputs.\n\n' +
+          'The ensemble re-fits every base learner on a single dataset, so mixing ' +
+          'models trained on unrelated data is usually a wiring mistake.\n\n' +
+          'Click OK to connect anyway, or Cancel to abort.'
+        );
+        if (!proceed) return false;
+      }
+    }
+
+    // Warn: X/Y Split without prior Train-Test Split
+    if (sourceType === 'feature_target_split') {
+      let hasTrainTestSplit = targetNode.data.definitionType === 'TrainTestSplitter';
+
+      if (!hasTrainTestSplit) {
+        const queue = [sourceNode.id];
+        const visited = new Set<string>();
+
+        while (queue.length > 0) {
+          const currentId = queue.shift()!;
+          if (visited.has(currentId)) continue;
+          visited.add(currentId);
+
+          const currentNode = nodes.find((n) => n.id === currentId);
+          if (currentNode?.data.definitionType === 'TrainTestSplitter') {
+            hasTrainTestSplit = true;
+            break;
+          }
+
+          const parentEdges = edges.filter((e) => e.target === currentId);
+          for (const edge of parentEdges) {
+            queue.push(edge.source);
+          }
+        }
+      }
+
+      if (!hasTrainTestSplit) {
+        // window.confirm is intentional here: onConnect is a synchronous
+        // React Flow callback that must return before the edge is
+        // committed, so we can't await the async <ConfirmDialog>.
+        const proceed = window.confirm(
+          'Warning: X/Y Split without a prior Train-Test Split.\n\n' +
+          'This means 100% of data will be used (possible data leakage).\n\n' +
+          'Click OK to connect anyway, or Cancel to abort.'
+        );
+        if (!proceed) return false;
+      }
+    }
+
+    // Warn: multi-input on a training/tuning node — explain merge vs parallel.
+    // Count UNIQUE source nodes, not edges: multi-output splitters
+    // (train_test_split, feature_target_split) legitimately produce
+    // several edges from the same source (train/test/X/y handles)
+    // into one downstream node, and that's not fan-in — pipelineConverter
+    // dedupes by source id so the backend sees one logical input,
+    // and useBranchColors groups them into one branch color.
+    const existingInputs = edges.filter(e => e.target === connection.target);
+    const existingSources = new Set(existingInputs.map(e => e.source));
+    const isNewSource = connection.source != null && !existingSources.has(connection.source);
+    const uniqueSourceCount = existingSources.size + (isNewSource ? 1 : 0);
+    // Auto-parallel terminals (data_preview) split each input into its own
+    // tab instead of merging — no warning needed, no merge contract to
+    // confirm. Mirrors AUTO_PARALLEL_STEP_TYPES in backend graph_utils.py.
+    const autoParallelTypes = ['data_preview'];
+    if (autoParallelTypes.includes(targetType)) {
+      // Skip both confirms below; each input becomes its own preview tab.
+    } else if (targetType === 'EnsembleNode') {
+      // Ensemble nodes auto-detect their inputs (Phase 2): one dataset edge +
+      // N model-spec edges. The converter separates them by source type, so a
+      // fan-in here is NOT a column merge — suppress the merge confirm.
+    } else if (isNewSource && uniqueSourceCount >= 2 && MODEL_NODE_TYPES.includes(targetType)) {
+      // window.confirm: see note above on sync onConnect contract.
+      const proceed = window.confirm(
+        `This training node will receive ${uniqueSourceCount} inputs.\n\n` +
+        'You have two options:\n' +
+        '  • MERGE (default): Inputs are auto-merged into one dataset before training.\n' +
+        '  • PARALLEL: Each input runs as a separate experiment.\n' +
+        '    → To use parallel mode, connect each path to its OWN training node.\n\n' +
+        'Click OK to connect (merge mode), or Cancel to abort.'
+      );
+      if (!proceed) return false;
+    } else if (isNewSource && uniqueSourceCount >= 2 && !MODEL_NODE_TYPES.includes(targetType)) {
+      // Pre-flight lint for non-training nodes (audit issue #7).
+      // Non-training nodes auto-merge fan-in per column: each column is
+      // supplied by whichever branch actually changed it (see the engine's
+      // `_column_modifiers`). Only a column two branches BOTH rewrote to
+      // different values needs the merge strategy to break the tie, and
+      // that can only be known after a run — so this confirm states the
+      // union contract and defers the conflict report to the Results panel.
+      // window.confirm: see note above on sync onConnect contract.
+      const proceed = window.confirm(
+        `This node will receive ${uniqueSourceCount} inputs.\n\n` +
+        'Inputs are merged into one dataset. Each column keeps the value of ' +
+        'whichever branch changed it, so branches editing different columns ' +
+        'are combined without loss.\n\n' +
+        'If two branches change the SAME column to different values, one of ' +
+        'them is discarded. The run Results panel reports any such conflict ' +
+        'and lets you choose which branch wins.\n\n' +
+        'For strictly sequential transformations, chain the nodes linearly instead.\n\n' +
+        'Click OK to connect (merge), or Cancel to abort.'
+      );
+      if (!proceed) return false;
+    }
+  }
+
+  return true;
+}
+
 export const useGraphStore = create<GraphState>()(
   temporal(
     (set, get) => ({
@@ -335,7 +456,7 @@ export const useGraphStore = create<GraphState>()(
 
   brokenSchemaRefs: {},
   setBrokenSchemaRefs: (refs) => set({ brokenSchemaRefs: refs }),
-  setGraph: (nodes, edges) => set({ nodes, edges }),
+  setGraph: (nodes, edges) => set({ nodes, edges: normalizeSplitEdges(nodes, edges) }),
 
   onNodesChange: (changes: NodeChange[]) => {
     set({
@@ -350,178 +471,9 @@ export const useGraphStore = create<GraphState>()(
   },
 
   onConnect: (connection: Connection) => {
-    const nodes = get().nodes;
-    const edges = get().edges;
-    const sourceNode = nodes.find((n) => n.id === connection.source);
-    const targetNode = nodes.find((n) => n.id === connection.target);
-
-    if (sourceNode && targetNode) {
-      const sourceType = sourceNode.data.definitionType as string;
-      const targetType = targetNode.data.definitionType as string;
-
-      // Block: connections that close a loop. A cyclic graph has no valid
-      // execution order and fails late with a cryptic "Artifact not found"
-      // error — reject at connect time with an actionable message instead.
-      if (wouldCreateCycle(edges, connection.source!, connection.target!)) {
-        toast.error('Invalid connection', CYCLE_CONNECTION_MESSAGE);
-        return;
-      }
-
-      // Block: training nodes are pipeline endpoints. Their output is a
-      // trained model (spec), not a DataFrame — the only node that consumes
-      // model specs is the Ensemble. Anything downstream of a dataset must be
-      // wired from the dataset branch, never from a model output, no matter
-      // which branch the target sits on.
-      if (isModelEndpointViolation(sourceType, targetType)) {
-        toast.error('Invalid connection', MODEL_ENDPOINT_CONNECTION_MESSAGE);
-        return;
-      }
-
-      // Warn: a model node from a DIFFERENT dataset lineage is wired into an
-      // ensemble. Base learners are spec-only (the ensemble refits them on its
-      // own data), so mixing models trained on unrelated datasets is almost
-      // always a wiring mistake — surface it before the edge is committed.
-      const modelSourceTypes = ['classification', 'regression', 'text_classification', 'SegmentationNode'];
-      if (targetType === 'EnsembleNode' && modelSourceTypes.includes(sourceType)) {
-        // Trace a node back to the dataset_node root(s) it derives from.
-        const rootsOf = (startId: string): Set<string> => {
-          const roots = new Set<string>();
-          const seen = new Set<string>();
-          const stack = [startId];
-          while (stack.length > 0) {
-            const cur = stack.pop()!;
-            if (seen.has(cur)) continue;
-            seen.add(cur);
-            const n = nodes.find((x) => x.id === cur);
-            if (n?.data.definitionType === 'dataset_node') {
-              roots.add(cur);
-              continue;
-            }
-            for (const e of edges.filter((ed) => ed.target === cur)) stack.push(e.source);
-          }
-          return roots;
-        };
-        const sourceRoots = rootsOf(connection.source!);
-        // Existing lineage of the ensemble = roots of everything already wired in.
-        const ensembleRoots = new Set<string>();
-        for (const e of edges.filter((ed) => ed.target === connection.target)) {
-          for (const r of rootsOf(e.source)) ensembleRoots.add(r);
-        }
-        const disjoint =
-          ensembleRoots.size > 0 &&
-          sourceRoots.size > 0 &&
-          ![...sourceRoots].some((r) => ensembleRoots.has(r));
-        if (disjoint) {
-          // window.confirm: see note above on sync onConnect contract.
-          const proceed = window.confirm(
-            'Warning: this model comes from a different dataset than the ensemble\'s ' +
-            'other inputs.\n\n' +
-            'The ensemble re-fits every base learner on a single dataset, so mixing ' +
-            'models trained on unrelated data is usually a wiring mistake.\n\n' +
-            'Click OK to connect anyway, or Cancel to abort.'
-          );
-          if (!proceed) return;
-        }
-      }
-
-      // Warn: X/Y Split without prior Train-Test Split
-      if (sourceType === 'feature_target_split') {
-        let hasTrainTestSplit = targetNode.data.definitionType === 'TrainTestSplitter';
-
-        if (!hasTrainTestSplit) {
-          const queue = [sourceNode.id];
-          const visited = new Set<string>();
-
-          while (queue.length > 0) {
-            const currentId = queue.shift()!;
-            if (visited.has(currentId)) continue;
-            visited.add(currentId);
-
-            const currentNode = nodes.find((n) => n.id === currentId);
-            if (currentNode?.data.definitionType === 'TrainTestSplitter') {
-              hasTrainTestSplit = true;
-              break;
-            }
-
-            const parentEdges = edges.filter((e) => e.target === currentId);
-            for (const edge of parentEdges) {
-              queue.push(edge.source);
-            }
-          }
-        }
-
-        if (!hasTrainTestSplit) {
-          // window.confirm is intentional here: onConnect is a synchronous
-          // React Flow callback that must return before the edge is
-          // committed, so we can't await the async <ConfirmDialog>.
-          const proceed = window.confirm(
-            'Warning: X/Y Split without a prior Train-Test Split.\n\n' +
-            'This means 100% of data will be used (possible data leakage).\n\n' +
-            'Click OK to connect anyway, or Cancel to abort.'
-          );
-          if (!proceed) return;
-        }
-      }
-
-      // Warn: multi-input on a training/tuning node — explain merge vs parallel.
-      // Count UNIQUE source nodes, not edges: multi-output splitters
-      // (train_test_split, feature_target_split) legitimately produce
-      // several edges from the same source (train/test/X/y handles)
-      // into one downstream node, and that's not fan-in — pipelineConverter
-      // dedupes by source id so the backend sees one logical input,
-      // and useBranchColors groups them into one branch color.
-      const existingInputs = edges.filter(e => e.target === connection.target);
-      const existingSources = new Set(existingInputs.map(e => e.source));
-      const isNewSource = connection.source != null && !existingSources.has(connection.source);
-      const uniqueSourceCount = existingSources.size + (isNewSource ? 1 : 0);
-      // Auto-parallel terminals (data_preview) split each input into its own
-      // tab instead of merging — no warning needed, no merge contract to
-      // confirm. Mirrors AUTO_PARALLEL_STEP_TYPES in backend graph_utils.py.
-      const autoParallelTypes = ['data_preview'];
-      if (autoParallelTypes.includes(targetType)) {
-        // Skip both confirms below; each input becomes its own preview tab.
-      } else if (targetType === 'EnsembleNode') {
-        // Ensemble nodes auto-detect their inputs (Phase 2): one dataset edge +
-        // N model-spec edges. The converter separates them by source type, so a
-        // fan-in here is NOT a column merge — suppress the merge confirm.
-      } else if (isNewSource && uniqueSourceCount >= 2 && MODEL_NODE_TYPES.includes(targetType)) {
-        // window.confirm: see note above on sync onConnect contract.
-        const proceed = window.confirm(
-          `This training node will receive ${uniqueSourceCount} inputs.\n\n` +
-          'You have two options:\n' +
-          '  • MERGE (default): Inputs are auto-merged into one dataset before training.\n' +
-          '  • PARALLEL: Each input runs as a separate experiment.\n' +
-          '    → To use parallel mode, connect each path to its OWN training node.\n\n' +
-          'Click OK to connect (merge mode), or Cancel to abort.'
-        );
-        if (!proceed) return;
-      } else if (isNewSource && uniqueSourceCount >= 2 && !MODEL_NODE_TYPES.includes(targetType)) {
-        // Pre-flight lint for non-training nodes (audit issue #7).
-        // Non-training nodes auto-merge fan-in per column: each column is
-        // supplied by whichever branch actually changed it (see the engine's
-        // `_column_modifiers`). Only a column two branches BOTH rewrote to
-        // different values needs the merge strategy to break the tie, and
-        // that can only be known after a run — so this confirm states the
-        // union contract and defers the conflict report to the Results panel.
-        // window.confirm: see note above on sync onConnect contract.
-        const proceed = window.confirm(
-          `This node will receive ${uniqueSourceCount} inputs.\n\n` +
-          'Inputs are merged into one dataset. Each column keeps the value of ' +
-          'whichever branch changed it, so branches editing different columns ' +
-          'are combined without loss.\n\n' +
-          'If two branches change the SAME column to different values, one of ' +
-          'them is discarded. The run Results panel reports any such conflict ' +
-          'and lets you choose which branch wins.\n\n' +
-          'For strictly sequential transformations, chain the nodes linearly instead.\n\n' +
-          'Click OK to connect (merge), or Cancel to abort.'
-        );
-        if (!proceed) return;
-      }
-    }
-
-    set({
-      edges: addEdge(connection, get().edges),
-    });
+    if (getReadOnlyMode()) return;
+    if (!confirmConnection(connection, get().nodes, get().edges)) return;
+    set({ edges: addEdge({ ...bundleConnection(get().nodes, connection), type: 'custom' }, get().edges) });
   },
 
   addNode: (type: string, position: { x: number, y: number }, initialData: unknown = {}) => {
@@ -557,6 +509,25 @@ export const useGraphStore = create<GraphState>()(
         ...get().nodes.map((n) => (n.selected ? { ...n, selected: false } : n)),
         newNode,
       ],
+    });
+    return id;
+  },
+
+  addConnectedNode: (source, sourceHandle, type, targetHandle, position) => {
+    if (getReadOnlyMode()) return '';
+    const definition = registry.get(type);
+    if (!definition || definition.hidden) return '';
+    const id = `${type}-${uuidv4()}`;
+    const node: Node = {
+      id, type: 'custom', position, selected: true,
+      data: { definitionType: type, catalogType: type, ...(definition.getDefaultConfig() as object) },
+    };
+    const connection: Connection = { source, sourceHandle, target: id, targetHandle };
+    const nodes = [...get().nodes, node];
+    if (!confirmConnection(connection, nodes, get().edges)) return '';
+    set({
+      nodes: nodes.map(n => n.id !== id && n.selected ? { ...n, selected: false } : n),
+      edges: addEdge({ ...bundleConnection(nodes, connection), type: 'custom' }, get().edges),
     });
     return id;
   },

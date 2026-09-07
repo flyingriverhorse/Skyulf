@@ -151,6 +151,22 @@ class TestCheckPii:
     email and phone detection, so _check_pii must actually check both.
     """
 
+    @pytest.mark.parametrize("values", [[], [None, None]])
+    def test_check_pii_does_not_flag_missing_values(self, values: list[str | None]) -> None:
+        """Columns without any non-null values must not produce PII alerts."""
+        df = pl.DataFrame({"contact": pl.Series(values, dtype=pl.String)})
+        analyzer = EDAAnalyzer(df)
+
+        assert analyzer._check_pii("contact") is False
+
+    @pytest.mark.parametrize("values", [["+15551234567"], [None, "+15551234567", None]])
+    def test_check_pii_detects_single_non_null_phone(self, values: list[str | None]) -> None:
+        """A single available phone value must not require a second non-null match."""
+        df = pl.DataFrame({"contact": values})
+        analyzer = EDAAnalyzer(df)
+
+        assert analyzer._check_pii("contact") is True
+
     def test_check_pii_detects_email(self) -> None:
         df = pl.DataFrame(
             {"contact": ["alice@example.com", "bob@example.com", "carol@example.com"]}
@@ -175,3 +191,21 @@ class TestCheckPii:
         df = pl.DataFrame({"id": ["123", "456", "789"]})
         analyzer = EDAAnalyzer(df)
         assert analyzer._check_pii("id") is False
+
+    def test_check_pii_does_not_flag_long_numeric_ids(self) -> None:
+        """Long customer IDs must not be mistaken for phone numbers."""
+        df = pl.DataFrame({"customer_id": ["10000001", "10000002", "10000003"]})
+        analyzer = EDAAnalyzer(df)
+        assert analyzer._check_pii("customer_id") is False
+
+    def test_check_pii_does_not_flag_zip_plus_four_values(self) -> None:
+        """ZIP+4 values must not be mistaken for phone numbers."""
+        df = pl.DataFrame({"postal_code": ["90210-1234", "10001-1234", "30301-1234"]})
+        analyzer = EDAAnalyzer(df)
+        assert analyzer._check_pii("postal_code") is False
+
+    def test_check_pii_does_not_flag_one_phone_shaped_id_value(self) -> None:
+        """One phone-shaped ID value must not flag an otherwise numeric ID column."""
+        df = pl.DataFrame({"order_id": ["10000001", "555-123-4567", "10000003", "10000004"]})
+        analyzer = EDAAnalyzer(df)
+        assert analyzer._check_pii("order_id") is False

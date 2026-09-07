@@ -1,5 +1,6 @@
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
-import { Handle, Position, NodeProps, useReactFlow } from '@xyflow/react';
+import { NodeProps, useReactFlow } from '@xyflow/react';
+import { ConnectionPort } from './ConnectionPort';
 import { registry } from '../../core/registry/NodeRegistry';
 import { AlertCircle, AlertTriangle, X, CheckCircle2, XCircle, Merge, GitFork } from 'lucide-react';
 import { useGraphStore } from '../../core/store/useGraphStore';
@@ -13,7 +14,7 @@ import {
   getExecutionMode,
 } from '../../core/types/executionMode';
 
-function CustomNodeWrapperImpl({ id, data, selected }: NodeProps) {
+function CustomNodeWrapperImpl({ id, data, selected, isConnectable }: NodeProps) {
   const definitionType = data.definitionType as string;
   const definition = registry.get(definitionType);
   const { deleteElements, getEdges } = useReactFlow();
@@ -222,8 +223,20 @@ function CustomNodeWrapperImpl({ id, data, selected }: NodeProps) {
     );
   }
 
-  // Determine handle positions based on port definitions
-  // This is a simplified version. In a real app, we might want more control over handle placement.
+  const hasMultipleOutputs = definition.outputs.length > 1;
+  // Reserve room for both "Features (X)" and "Validation" with wider platform fallback fonts.
+  const splitBodyPadding = 'pl-3 pr-28';
+  const bodyTextClass = `${hasMultipleOutputs ? splitBodyPadding : 'px-10'} py-2 min-h-[2.75rem] flex items-center justify-center`;
+  const outputPorts = definition.outputs.map((output, index) => (
+    <ConnectionPort
+      key={`output-${output.id}`}
+      nodeId={id} direction="source" port={output}
+      canConnect={isConnectable !== false && !readOnly}
+      disabled={definitionType === 'TrainTestSplitter' && output.id === 'validation' && !(Number(data.validation_size ?? 0) > 0)}
+      compact={hasMultipleOutputs}
+      top={hasMultipleOutputs ? `calc(50% + ${(index - (definition.outputs.length - 1) / 2) * 16 - 12}px)` : '50%'}
+    />
+  ));
 
   return (
     <div
@@ -264,8 +277,7 @@ function CustomNodeWrapperImpl({ id, data, selected }: NodeProps) {
       {/* Floating status/validation chips at the top-left corner. Kept
           out of the header text row so they can't be squeezed by long
           titles and out of the right edge so they can't collide with
-          output-handle labels (which absolute-position at 25/50/75%
-          of the card height for multi-output nodes like splitters). */}
+          output-handle labels in the body of split nodes. */}
       {(nodeResult || validationMessage || hasBrokenRefs) && (
         <div className="absolute -top-2 -left-2 z-10 flex items-center gap-1">
           {nodeResult && (
@@ -367,11 +379,9 @@ function CustomNodeWrapperImpl({ id, data, selected }: NodeProps) {
           3. Frontend pre-run preview (`definition.bodyPreview(data)`).
           4. Static italic description.
           5. Nothing — collapse padding so card visually shrinks.
-          Side padding is bumped on text bodies (px-10) so the body
-          text never collides with the absolutely-positioned port
-          labels ("Data" / "X" / "y" / "Train" / "Test") that float at
-          left-4 / right-4. min-h gives the floating port labels
-          vertical separation from the centered body line. */}
+          Split outputs share the existing body height, with the summary
+          on the left and compact port labels on the right. */}
+      <div className={hasMultipleOutputs ? 'relative' : undefined}>
       {(() => {
         if (definition.component) {
           return (
@@ -397,7 +407,7 @@ function CustomNodeWrapperImpl({ id, data, selected }: NodeProps) {
           if (inlineSummary || jobEntries.length === 1) {
             const text = inlineSummary || jobEntries[0]!.summary;
             return (
-              <div className="px-10 py-2 min-h-[2.75rem] flex items-center justify-center">
+              <div className={bodyTextClass}>
                 <div
                   className="text-[11px] text-foreground/80 font-mono tabular-nums truncate text-center w-full"
                   title={`${tooltipPrefix}${text}`}
@@ -443,7 +453,7 @@ function CustomNodeWrapperImpl({ id, data, selected }: NodeProps) {
             .join('\n');
           return (
             <div
-              className="px-3 py-2 flex flex-col gap-0.5"
+              className={`${hasMultipleOutputs ? splitBodyPadding : 'px-3'} py-2 flex flex-col gap-0.5`}
               title={`${tooltipPrefix}${tooltipBody}`}
             >
               {rows.map((r) => (
@@ -471,7 +481,7 @@ function CustomNodeWrapperImpl({ id, data, selected }: NodeProps) {
         }
         if (preview && preview.trim()) {
           return (
-            <div className="px-10 py-2 min-h-[2.75rem] flex items-center justify-center">
+            <div className={bodyTextClass}>
               <div
                 className="text-[11px] text-muted-foreground truncate text-center w-full"
                 title={preview}
@@ -483,7 +493,7 @@ function CustomNodeWrapperImpl({ id, data, selected }: NodeProps) {
         }
         if (definition.description) {
           return (
-            <div className="px-10 py-2 min-h-[2.75rem] flex items-center justify-center">
+            <div className={bodyTextClass}>
               <div
                 className="text-[11px] text-muted-foreground italic line-clamp-2 text-center w-full"
                 title={definition.description}
@@ -495,6 +505,8 @@ function CustomNodeWrapperImpl({ id, data, selected }: NodeProps) {
         }
         return <div className="min-h-[1.5rem]" />;
       })()}
+      {hasMultipleOutputs && outputPorts}
+      </div>
 
       {perfOverlayEnabled && perfTelemetry && (
         <div className="flex flex-row items-center justify-between gap-3 px-3 py-1.5 border-t border-border bg-muted/30 text-[9px] text-muted-foreground font-mono rounded-b-lg">
@@ -508,35 +520,16 @@ function CustomNodeWrapperImpl({ id, data, selected }: NodeProps) {
 
       {/* Input Handles */}
       {definition.inputs.map((input, index) => (
-        <Handle
+        <ConnectionPort
           key={`input-${input.id}`}
-          type="target"
-          position={Position.Left}
-          id={input.id}
-          className="!w-3 !h-3 !bg-muted-foreground hover:!bg-primary transition-colors"
-          style={{ top: `${((index + 1) * 100) / (definition.inputs.length + 1)}%` }}
-        >
-          <div className="absolute left-4 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground pointer-events-none whitespace-nowrap px-1 rounded bg-card/80">
-            {input.label}
-          </div>
-        </Handle>
+          nodeId={id} direction="target" port={input}
+          canConnect={isConnectable !== false && !readOnly}
+          top={`${((index + 1) * 100) / (definition.inputs.length + 1)}%`}
+        />
       ))}
 
       {/* Output Handles */}
-      {definition.outputs.map((output, index) => (
-        <Handle
-          key={`output-${output.id}`}
-          type="source"
-          position={Position.Right}
-          id={output.id}
-          className="!w-3 !h-3 !bg-muted-foreground hover:!bg-primary transition-colors"
-          style={{ top: `${((index + 1) * 100) / (definition.outputs.length + 1)}%` }}
-        >
-          <div className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground pointer-events-none whitespace-nowrap px-1 rounded bg-card/80">
-            {output.label}
-          </div>
-        </Handle>
-      ))}
+      {!hasMultipleOutputs && outputPorts}
     </div>
   );
 }

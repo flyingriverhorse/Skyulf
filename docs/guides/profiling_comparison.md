@@ -1,16 +1,21 @@
 # Skyulf Profiling vs. YData Profiling vs. Sweetviz
 
-Choosing the right EDA (Exploratory Data Analysis) tool matters. This guide offers a practical, honest comparison between Skyulf's profiling engine and two popular alternatives: YData Profiling (formerly pandas-profiling) and Sweetviz.
+Choosing the right EDA (Exploratory Data Analysis) tool matters. This guide
+offers a practical comparison between Skyulf's profiling engine and two
+popular alternatives: YData Profiling (formerly pandas-profiling) and
+Sweetviz. The external-tool claims were checked against their official
+documentation on 2026-09-07; availability and performance can change by
+version, configuration, and dataset.
 
 ## TL;DR
 
 | Feature | Skyulf | YData Profiling | Sweetviz |
 |---------|--------|-----------------|----------|
-| **Backend** | Polars (Rust) | Pandas (optional Spark support) | Pandas |
-| **Outputs** | JSON profile object; optional terminal/plots | HTML report; JSON export; notebook widgets | HTML report; notebook embedding |
-| **Scales to larger data** | Often better (Polars-based) | Can scale via Spark; Pandas mode can be heavy | Can be heavy (Pandas-based) |
+| **Backend** | Polars (Rust) | Pandas; limited Spark profiling mode | Pandas |
+| **Outputs** | Structured profile object; optional terminal/plots | HTML report; JSON export; notebook widgets/iframe | Self-contained HTML report; notebook output |
+| **Large-data options** | Polars supports parallel and streaming workflows | Minimal mode; limited Spark feature set | Pandas-based; no distributed mode documented |
 | **Target-Aware Analysis** | Yes | Yes | Yes |
-| **Dataset comparison report** | No | Yes | Yes |
+| **Dataset comparison report** | No | Yes (not currently for Spark) | Yes |
 | **Time series analysis** | Yes | Yes | Not advertised |
 | **Causal discovery (PC algorithm)** | Yes | Not advertised | Not advertised |
 | **Rule extraction (surrogate decision tree)** | Yes | Not advertised | Not advertised |
@@ -18,15 +23,33 @@ Choosing the right EDA (Exploratory Data Analysis) tool matters. This guide offe
 | **PCA projection** | Yes | Not advertised | Not advertised |
 | **Geospatial analysis (lat/lon detection)** | Yes | Not advertised | Not advertised |
 | **Subset profiling via filters** | Yes | No | No |
-| **Normality / stationarity tests** | Yes | No | No |
+| **Normality / stationarity diagnostics** | Yes | Yes (including time-series stationarity) | Not advertised |
 | **ANOVA p-values (target interactions)** | Yes (optional SciPy) | Not advertised | Not advertised |
 | **Feature importance (from surrogate tree)** | Yes (scikit-learn) | Not advertised | Not advertised |
 | **Recommendations (drop/impute/encode hints)** | Yes | Not advertised | Not advertised |
-| **PII heuristics (email/phone)** | Yes | Not advertised | Not advertised |
+| **PII heuristics (email/phone)** | Yes (advisory) | Not advertised | Not advertised |
 | **Leakage warnings (high corr to target)** | Yes | Not advertised | Not advertised |
 | **Correlation Matrix** | Yes | Yes | Yes |
 | **Missing Value Analysis** | Yes | Yes | Yes |
 | **Duplicate Detection** | Yes | Yes | Yes |
+
+---
+
+## PII alerts
+
+Skyulf includes a narrow, advisory PII heuristic in its profiler. It checks
+Text and Categorical columns for values that look like email addresses or
+phone numbers and adds a `PII` alert to the profile when it finds a possible
+match. It does not modify, mask, delete, block, or classify the data.
+
+This is not a complete sensitive-data scanner: it does not identify every
+kind of personal data, such as names, addresses, national identifiers,
+payment-card numbers, or health information. Unusual formatted values can
+still produce false positives, so findings should be reviewed before taking
+action.
+
+For the direct profile accessors, example output, and current limitations, see
+the [PII Detection guide](../user_guide/pii_detection.md).
 
 ---
 
@@ -36,21 +59,40 @@ Choosing the right EDA (Exploratory Data Analysis) tool matters. This guide offe
 
 **1. Performance on Large Datasets**
 
-Skyulf is built on Polars, a DataFrame library written in Rust. This makes a real difference when you're working with datasets over 100K rows. YData Profiling and Sweetviz both rely on Pandas, which can become painfully slow and memory-hungry on larger datasets.
+Skyulf is built on Polars, whose core is written in Rust and supports
+parallel and streaming workflows. That can make Skyulf a good fit for larger
+Polars-native workloads, but this page does not claim a universal speed or
+memory win: actual performance depends on the operation, data shape, hardware,
+and profiling options. YData also offers a limited Spark profiling mode and a
+minimal configuration for larger datasets, while Sweetviz remains
+Pandas-based.
 
-If you regularly work with datasets that push RAM limits, Polars-based workflows tend to be more resilient than Pandas-based ones. (Exact timing depends heavily on data types, cardinality, and what options you enable.)
+See the [Polars user guide](https://docs.pola.rs/) and YData's
+[big-data documentation](https://docs.profiling.ydata.ai/latest/features/big_data/)
+for the implementation details behind those statements.
 
 **2. ML-Focused Analysis**
 
-Skyulf was designed with machine learning workflows in mind, not just descriptive statistics. This means:
+Skyulf was designed with machine learning workflows in mind, not just
+descriptive statistics. Its profile can include:
 
-- **Causal Discovery:** Using the PC algorithm from `causal-learn`, Skyulf can infer potential causal relationships between variables. This helps you understand not just correlations, but which features might actually drive your target. Neither YData nor Sweetviz offers this.
+- **Causal Discovery:** Using the PC algorithm from `causal-learn`, Skyulf can
+  infer potential causal relationships between variables. These are hypotheses,
+  not proof of causation. Causal discovery is not listed among the official
+  feature descriptions for YData Profiling or Sweetviz that this comparison
+  checked.
 
-- **Rule Extraction:** Skyulf trains a surrogate Decision Tree on your data and extracts human-readable rules like "If Age > 50 AND Income < 30k → High Risk". This is invaluable for fraud detection, churn analysis, or any use case where you need to explain segments to stakeholders.
+- **Rule Extraction:** Skyulf trains a surrogate Decision Tree on your data
+  and extracts human-readable rules such as "If Age > 50 AND Income < 30k →
+  High Risk". This is useful for exploratory explanation, but it is not a
+  substitute for a model-specific explanation or causal analysis.
 
 - **Feature Importance (from the surrogate tree):** Alongside rules, Skyulf exposes feature importances from the surrogate Decision Tree. This is not a replacement for model explainability, but it's a fast way to see which columns dominate the tree's decisions.
 
-- **Outlier Detection:** Built-in Isolation Forest identifies anomalous rows and explains *why* they're outliers (which features deviate most from the median). YData shows distribution plots but doesn't flag specific outlier rows.
+- **Outlier Detection:** Built-in Isolation Forest identifies anomalous rows
+  and reports which features deviate most from the median. This row-level
+  model-based output is distinct from the distribution summaries in the
+  compared tools.
 
 - **PCA Projection:** Skyulf computes 2D/3D PCA projections colored by target class, helping you visually assess class separability before training a model.
 
@@ -62,15 +104,18 @@ Skyulf was designed with machine learning workflows in mind, not just descriptiv
 
 - **Time Series:** Skyulf detects datetime columns and analyzes trends, seasonality (day-of-week, month-of-year patterns), and stationarity. This context is critical before building forecasting models.
 
-**4. API-First Design**
+**4. Structured, API-first output**
 
-Skyulf returns structured JSON (Pydantic models) rather than HTML. This makes it easy to:
+Skyulf returns a structured profile object (serializable to JSON) and keeps
+visualization optional. This makes it easy to:
 - Integrate profiling into automated pipelines
 - Build custom dashboards
 - Store profiles in databases for tracking data drift over time
 - Apply dynamic filters and re-analyze subsets
 
-If you want an HTML artifact you can email around, Skyulf is not trying to replace YData/Sweetviz today. Skyulf focuses on programmatic profiling that you can embed into products.
+If you want a polished, self-contained HTML artifact, YData Profiling or
+Sweetviz is a better fit today. Skyulf focuses on programmatic profiling that
+can be embedded into an ML workflow.
 
 ---
 
@@ -78,14 +123,15 @@ If you want an HTML artifact you can email around, Skyulf is not trying to repla
 
 | Scenario | Recommended Tool |
 |----------|------------------|
-| Large dataset (500K+ rows) | **Skyulf** |
+| Larger Polars-native workload | **Skyulf**, subject to benchmarking |
+| Larger dataset with distributed Spark profiling | **YData Profiling** |
 | Need causal inference or rule extraction | **Skyulf** |
-| Building ML pipelines (need JSON output) | **Skyulf** |
+| Building a Skyulf ML pipeline with structured profile output | **Skyulf** |
 | Geospatial or time series data | **Skyulf** |
 | Sharing HTML reports with business users | **YData Profiling** |
 | Quick one-off HTML EDA on small datasets | **Sweetviz** or **YData Profiling** |
-| Comparing train/test splits visually | **Sweetviz** |
-| Spark/distributed environment | **YData Profiling** |
+| Comparing train/test splits visually | **Sweetviz** or **YData Profiling** |
+| Spark environment (within YData's supported feature set) | **YData Profiling** |
 
 ---
 
@@ -127,5 +173,8 @@ There's no universally "best" profiling tool. Choose based on your needs:
 ## Related Resources
 
 - [Skyulf EDA Documentation](../user_guide/eda_profiling.md)
-- [YData Profiling Documentation](https://docs.profiling.ydata.ai/)
-- [Sweetviz GitHub](https://github.com/fbdesignpro/sweetviz)
+- [PII Detection](../user_guide/pii_detection.md)
+- [Polars User Guide](https://docs.pola.rs/)
+- [YData Profiling documentation](https://docs.profiling.ydata.ai/latest/)
+- [YData big-data support](https://docs.profiling.ydata.ai/latest/features/big_data/)
+- [Sweetviz official documentation](https://github.com/fbdesignpro/sweetviz)

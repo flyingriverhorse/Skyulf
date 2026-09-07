@@ -79,9 +79,16 @@ jobs:
           echo "## 🏗️ Frontend build" >> "$GITHUB_STEP_SUMMARY"
         working-directory: frontend/ml-canvas
 
-      - name: Test
-        run: bash ../../.github/scripts/run_check.sh "Unit tests (vitest)" npm test
+      - name: Test with coverage
+        run: bash ../../.github/scripts/run_check.sh "Unit tests (vitest coverage)" npm run test:coverage
         working-directory: frontend/ml-canvas
+
+      - name: Upload frontend coverage
+        uses: actions/upload-artifact@v7
+        with:
+          name: frontend-unit-coverage
+          path: frontend/ml-canvas/coverage
+          if-no-files-found: error
 
       - name: Build
         # Notice: building here compiles the code anyway, but doing it inside

@@ -50,10 +50,11 @@ export const EnsembleNode = createModelingNode({
     return `${strategy} \u00b7 ${n} ${n === 1 ? 'model' : 'models'}`;
   },
   validate: (config: EnsembleConfig) => {
-    if (!config.target_column) return { isValid: false, message: 'Target column is required.' };
+    if (!config.target_column) return { isValid: false, message: 'Target column is required.', field: 'target_column' };
     if ((config.base_estimators?.length ?? 0) < 2)
-      return { isValid: false, message: 'Select at least two base models.' };
+      return { isValid: false, message: 'Select at least two base models.', field: 'base_estimators' };
     return { isValid: true };
   },
+  inputs: [{ id: 'in', label: 'Data / Models', type: 'any' }],
   outputs: [{ id: 'model', label: 'Ensemble Model', type: 'model' }],
 });

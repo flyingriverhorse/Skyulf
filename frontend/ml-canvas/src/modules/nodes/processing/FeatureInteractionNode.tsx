@@ -1,3 +1,5 @@
+import { useState } from 'react';
+import { ValidationField, useValidationReveal } from '../../../components/shared/ValidationField';
 import { NodeDefinition } from '../../../core/types/nodes';
 import { Shuffle, ChevronDown, ChevronRight, Info } from 'lucide-react';
 import { useUpstreamData } from '../../../core/hooks/useUpstreamData';
@@ -55,8 +57,14 @@ export const FeatureInteractionNode: NodeDefinition = {
       onChange({ ...config, ...updates });
     };
 
+    const [validationExpanded, setValidationExpanded] = useState(false);
+    const isConfigurationExpanded = config.isExpanded || validationExpanded;
+    useValidationReveal((field) => {
+      if (field === 'columns' || field === 'degree') setValidationExpanded(true);
+    });
     const toggleExpand = () => {
-      updateConfig({ isExpanded: !config.isExpanded });
+      updateConfig({ isExpanded: !isConfigurationExpanded });
+      setValidationExpanded(false);
     };
 
     // Responsive layout: switch to a 2-column layout once the panel is wider than 450px.
@@ -73,20 +81,22 @@ export const FeatureInteractionNode: NodeDefinition = {
               <Shuffle size={14} className="text-primary" />
               <span className="text-sm font-medium">Configuration</span>
             </div>
-            {config.isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+            {isConfigurationExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
           </div>
 
-          {config.isExpanded && (
+          {isConfigurationExpanded && (
             <div className={`p-3 border-t gap-4 ${isWide ? 'grid grid-cols-2 items-start' : 'space-y-4'}`}>
 
-              <ColumnMultiSelect
-                label="Input Columns (Numeric)"
-                columns={numericColumns}
-                selected={config.columns || []}
-                onChange={(cols) => updateConfig({ columns: cols })}
-                variant="compact"
-                showFooterCount={true}
-              />
+              <ValidationField field="columns">
+                <ColumnMultiSelect
+                  label="Input Columns (Numeric)"
+                  columns={numericColumns}
+                  selected={config.columns || []}
+                  onChange={(cols) => updateConfig({ columns: cols })}
+                  variant="compact"
+                  showFooterCount={true}
+                />
+              </ValidationField>
 
               <div className="space-y-3">
                 <div className="space-y-1.5">
@@ -99,19 +109,21 @@ export const FeatureInteractionNode: NodeDefinition = {
                       </div>
                     </div>
                   </span>
-                  <select
-                    className="w-full px-2 py-1.5 text-xs border rounded bg-background"
-                    value={config.degree || 2}
-                    onChange={(e) => {
-                      const parsed = Number.parseInt(e.target.value);
-                      const degree: 2 | 3 | 4 = parsed === 4 ? 4 : parsed === 3 ? 3 : 2;
-                      updateConfig({ degree });
-                    }}
-                  >
-                    <option value={2}>2 (pairwise)</option>
-                    <option value={3}>3 (three-way)</option>
-                    <option value={4}>4 (four-way)</option>
-                  </select>
+                  <ValidationField field="degree">
+                    <select
+                      className="w-full px-2 py-1.5 text-xs border rounded bg-background"
+                      value={config.degree || 2}
+                      onChange={(e) => {
+                        const parsed = Number.parseInt(e.target.value);
+                        const degree: 2 | 3 | 4 = parsed === 4 ? 4 : parsed === 3 ? 3 : 2;
+                        updateConfig({ degree });
+                      }}
+                    >
+                      <option value={2}>2 (pairwise)</option>
+                      <option value={3}>3 (three-way)</option>
+                      <option value={4}>4 (four-way)</option>
+                    </select>
+                  </ValidationField>
                 </div>
 
                 <div className="space-y-2 pt-1">
@@ -151,13 +163,13 @@ export const FeatureInteractionNode: NodeDefinition = {
 
   validate: (data) => {
     if (!data.columns || data.columns.length === 0) {
-      return { isValid: false, message: 'Select at least one input column.' };
+      return { isValid: false, field: 'columns', message: 'Select at least one input column.' };
     }
     if (data.columns.length < (data.degree || 2)) {
-      return { isValid: false, message: `Select at least ${data.degree || 2} columns for degree ${data.degree || 2} interactions.` };
+      return { isValid: false, field: 'columns', message: `Select at least ${data.degree || 2} columns for degree ${data.degree || 2} interactions.` };
     }
     if (![2, 3, 4].includes(data.degree)) {
-      return { isValid: false, message: 'Degree must be 2, 3, or 4.' };
+      return { isValid: false, field: 'degree', message: 'Degree must be 2, 3, or 4.' };
     }
     return { isValid: true };
   }

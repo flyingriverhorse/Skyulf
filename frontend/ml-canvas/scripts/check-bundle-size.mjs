@@ -41,8 +41,9 @@ const BUDGETS = [
   // Waterfall/Force/Interaction) + Segmentation (4 clustering algorithms, auto-profile
   // labeling, reference-column UI/crosstab) shipped in v0.7.0,
   // then 260→275 KB for slow-nodes observability instrumentation + concurrent
-  // execution rendering (v0.7.x).
-  { prefix: 'index',         maxGzipBytes: 300 * 1024,  label: 'index (main)',  kind: 'vendor' },
+  // execution rendering (v0.7.x). Raised 300→325 KB for canvas connection guidance,
+  // grouped split outputs, and component discovery improvements (v0.8.16).
+  { prefix: 'index',         maxGzipBytes: 325 * 1024,  label: 'index (main)',  kind: 'vendor' },
   // Lazy route chunks — keep tight so an EDA-only regression surfaces
   // here rather than getting absorbed by the global index ceiling.
   { prefix: 'EDAPage',       maxGzipBytes: 140 * 1024,  label: 'route:EDA',         kind: 'route' },

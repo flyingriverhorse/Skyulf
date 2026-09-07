@@ -1,3 +1,4 @@
+import { ValidationField } from '../../../components/shared/ValidationField';
 import React, { useState } from 'react';
 import { NodeDefinition, NodeSettingsProps } from '../../../core/types/nodes';
 import { Hash, FileText, Binary, Info } from 'lucide-react';
@@ -154,12 +155,14 @@ const VectorizerSettings: React.FC<NodeSettingsProps<AnyVectorizerConfig> & { va
             <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 block">
               Text Columns ({config.columns.length})
             </label>
-            <ColumnMultiSelect
-              columns={textColumns}
-              selected={config.columns}
-              onChange={(cols) => patch({ columns: cols })}
-              variant="compact"
-            />
+            <ValidationField field="columns">
+              <ColumnMultiSelect
+                columns={textColumns}
+                selected={config.columns}
+                onChange={(cols) => patch({ columns: cols })}
+                variant="compact"
+              />
+            </ValidationField>
             <p className="text-xs text-gray-500 mt-1">
               Only text/categorical columns are shown. Multiple columns are joined with a space.
             </p>
@@ -334,7 +337,7 @@ const bagPreview = (config: CountVectorizerConfig): string | null => {
 
 const baseValidate = (config: { columns: string[] }) =>
   config.columns.length === 0
-    ? { isValid: false, message: 'Select at least one text column.' }
+    ? { isValid: false, field: 'columns', message: 'Select at least one text column.' }
     : { isValid: true };
 
 // ── Node definitions ──────────────────────────────────────────────────────────

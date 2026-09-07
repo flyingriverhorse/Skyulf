@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
+import { ValidationField, useValidationReveal } from '../../../components/shared/ValidationField';
 import { Play, Loader2, Settings2, AlertCircle, ChevronDown, X } from 'lucide-react';
 import { jobsApi } from '../../../core/api/jobs';
 import { RegistryItem, registryApi } from '../../../core/api/registry';
@@ -100,6 +101,9 @@ export const SegmentationSettings: React.FC<{
 
   const [containerRef, isWide] = useIsWideContainer();
   const [activeTab, setActiveTab] = useState<'model' | 'params'>('model');
+  useValidationReveal((field) => {
+    if (field === 'model_type') setActiveTab('model');
+  });
   const [availableModels, setAvailableModels] = useState<RegistryItem[]>([]);
   const [isLoadingModels, setIsLoadingModels] = useState(false);
   const [showScalingAlert, setShowScalingAlert] = useState(true);
@@ -195,7 +199,7 @@ export const SegmentationSettings: React.FC<{
         <div className="space-y-1.5">
           <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Model Configuration</span>
           <div className="grid gap-3">
-            <div>
+            <ValidationField field="model_type">
               <span className="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Clustering Algorithm</span>
               <div className="relative">
                 <select
@@ -235,7 +239,7 @@ export const SegmentationSettings: React.FC<{
                   )}
                 </div>
               )}
-            </div>
+            </ValidationField>
 
             <div>
               <div className="flex items-center gap-1.5 mb-1">

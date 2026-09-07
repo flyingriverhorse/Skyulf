@@ -1,3 +1,4 @@
+import { ValidationField } from '../../../components/shared/ValidationField';
 import React, { useState } from 'react';
 import { NodeDefinition } from '../../../core/types/nodes';
 import { ArrowLeftRight, Plus, Trash2, Info, ChevronDown, ChevronUp } from 'lucide-react';
@@ -126,12 +127,14 @@ const AliasReplacementSettings: React.FC<{ config: AliasReplacementConfig; onCha
             <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 block">
               Target Columns ({config.columns.length})
             </label>
-            <ColumnMultiSelect
-              variant="compact"
-              columns={textColumns}
-              selected={config.columns}
-              onChange={(cols) => onChange({ ...config, columns: cols })}
-            />
+            <ValidationField field="columns">
+              <ColumnMultiSelect
+                variant="compact"
+                columns={textColumns}
+                selected={config.columns}
+                onChange={(cols) => onChange({ ...config, columns: cols })}
+              />
+            </ValidationField>
             <p className="text-xs text-gray-500 mt-1">Only text/categorical columns are shown.</p>
           </div>
         </div>
@@ -188,10 +191,12 @@ const AliasReplacementSettings: React.FC<{ config: AliasReplacementConfig; onCha
               <span className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 block">
                 Custom Aliases
               </span>
-              <CustomPairEditor
-                pairs={config.custom_pairs}
-                onChange={(pairs) => onChange({ ...config, custom_pairs: pairs })}
-              />
+              <ValidationField field="custom_pairs">
+                <CustomPairEditor
+                  pairs={config.custom_pairs}
+                  onChange={(pairs) => onChange({ ...config, custom_pairs: pairs })}
+                />
+              </ValidationField>
             </div>
           )}
         </div>
@@ -217,9 +222,9 @@ export const AliasReplacementNode: NodeDefinition<AliasReplacementConfig> = {
     return `${mode} · ${cols} ${cols === 1 ? 'col' : 'cols'}`;
   },
   validate: (config) => {
-    if (config.columns.length === 0) return { isValid: false, message: 'Select at least one column.' };
+    if (config.columns.length === 0) return { isValid: false, field: 'columns', message: 'Select at least one column.' };
     if (config.mode === 'custom' && Object.keys(config.custom_pairs).length === 0) {
-      return { isValid: false, message: 'Add at least one alias pair for custom mode.' };
+      return { isValid: false, field: 'custom_pairs', message: 'Add at least one alias pair for custom mode.' };
     }
     return { isValid: true };
   },

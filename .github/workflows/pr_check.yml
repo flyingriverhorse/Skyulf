@@ -5,8 +5,8 @@
 # intentionally do NOT run the test suites — those live in their own dedicated
 # workflows (backend-tests.yml, skyulf-core-tests.yml, frontend-tests.yml) so
 # each concern can be triaged, re-run, and required independently in branch
-# protection. Also carries the SonarCloud (SonarQube Cloud) pipeline: two
-# token-gated coverage jobs produce Cobertura XML in parallel and hand it to
+# protection. Also carries the SonarCloud (SonarQube Cloud) pipeline: three
+# token-gated coverage jobs produce Python XML and frontend LCOV and hand them to
 # the scanner as artifacts, so the scan itself never re-runs the suites. The
 # whole SonarCloud section skips silently when the SONAR_TOKEN secret is absent.
 
@@ -69,16 +69,16 @@ jobs:
       - name: Type check (Ty)
         run: bash .github/scripts/run_check.sh "Ty type check" ty check backend skyulf-core/skyulf skyulf-core/tests run_skyulf.py celery_worker.py
 
-  # SonarCloud does not measure coverage itself — the Cobertura XML must exist
-  # before the scanner runs (Python test coverage docs). These two token-gated
-  # jobs generate it and hand it to the scanner as artifacts, so the scan job
+  # SonarCloud does not measure coverage itself — Python XML and frontend LCOV
+  # must exist before the scanner runs. These three token-gated jobs generate
+  # them and hand them to the scanner as artifacts, so the scan job
   # never re-runs the test suites inline.
   #
   # Job-level `if:` can only see the github/inputs/needs/vars contexts —
   # referencing `secrets` there fails workflow validation for the whole file
   # (no jobs run at all). So this tiny gate job converts "is SONAR_TOKEN set"
   # into an output the Sonar jobs can gate on with a valid expression; when
-  # the token is absent, all three jobs report *skipped*, not failed.
+  # the token is absent, all coverage and scan jobs report *skipped*, not failed.
   sonar-gate:
     name: Sonar token gate
     runs-on: ubuntu-latest
@@ -198,10 +198,42 @@ jobs:
           name: coverage-core
           path: coverage-core.xml
 
+  frontend-coverage:
+    name: Frontend coverage (LCOV)
+    runs-on: ubuntu-latest
+    needs: [sonar-gate]
+    if: ${{ needs.sonar-gate.outputs.enabled == 'true' }}
+    defaults:
+      run:
+        working-directory: frontend/ml-canvas
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+          cache: "npm"
+          cache-dependency-path: frontend/ml-canvas/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci --silent --no-audit --no-fund
+
+      - name: Generate frontend coverage (LCOV)
+        run: npm run test:coverage
+
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage-frontend
+          path: frontend/ml-canvas/coverage/lcov.info
+          if-no-files-found: error
+
   sonarcloud-scan:
     name: SonarCloud Scan
     runs-on: ubuntu-latest
-    needs: [sonar-gate, backend-coverage, skyulf-core-coverage]
+    needs: [sonar-gate, backend-coverage, skyulf-core-coverage, frontend-coverage]
     if: ${{ needs.sonar-gate.outputs.enabled == 'true' }}
     env:
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
@@ -224,13 +256,19 @@ jobs:
           name: coverage-core
           path: .
 
+      - name: Download frontend coverage
+        uses: actions/download-artifact@v8
+        with:
+          name: coverage-frontend
+          path: frontend/ml-canvas/coverage
+
       # Tolerate either extraction layout (repo root vs. per-artifact subdir).
       - name: Ensure coverage reports are at repo root
         run: |
           for f in coverage-backend/coverage-backend.xml coverage-core/coverage-core.xml; do
             if [ -f "$f" ]; then mv "$f" .; fi
           done
-          ls -l coverage-backend.xml coverage-core.xml
+          ls -l coverage-backend.xml coverage-core.xml frontend/ml-canvas/coverage/lcov.info
 
       - name: SonarQube Scan
         uses: SonarSource/sonarqube-scan-action@22918119ff8e1ca75a623e15c8296b6ea4fbe28f # v8.2.1

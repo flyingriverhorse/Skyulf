@@ -1,3 +1,5 @@
+import { useState } from 'react';
+import { ValidationField, useValidationReveal } from '../../../components/shared/ValidationField';
 import { NodeDefinition } from '../../../core/types/nodes';
 import { Zap, ChevronDown, ChevronRight, Info } from 'lucide-react';
 import { useUpstreamData } from '../../../core/hooks/useUpstreamData';
@@ -59,8 +61,14 @@ export const PolynomialFeaturesNode: NodeDefinition = {
       onChange({ ...config, ...updates });
     };
 
+    const [validationExpanded, setValidationExpanded] = useState(false);
+    const isConfigurationExpanded = config.isExpanded || validationExpanded;
+    useValidationReveal((field) => {
+      if (field === 'columns' || field === 'degree') setValidationExpanded(true);
+    });
     const toggleExpand = () => {
-      updateConfig({ isExpanded: !config.isExpanded });
+      updateConfig({ isExpanded: !isConfigurationExpanded });
+      setValidationExpanded(false);
     };
 
     // Responsive layout: switch to a 2-column layout once the panel is wider than 450px.
@@ -77,20 +85,22 @@ export const PolynomialFeaturesNode: NodeDefinition = {
               <Zap size={14} className="text-primary" />
               <span className="text-sm font-medium">Configuration</span>
             </div>
-            {config.isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+            {isConfigurationExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
           </div>
 
-          {config.isExpanded && (
+          {isConfigurationExpanded && (
             <div className={`p-3 border-t gap-4 ${isWide ? 'grid grid-cols-2 items-start' : 'space-y-4'}`}>
 
-              <ColumnMultiSelect
-                label="Input Columns (Numeric)"
-                columns={numericColumns}
-                selected={config.columns || []}
-                onChange={(cols) => updateConfig({ columns: cols })}
-                variant="compact"
-                showFooterCount={true}
-              />
+              <ValidationField field="columns">
+                <ColumnMultiSelect
+                  label="Input Columns (Numeric)"
+                  columns={numericColumns}
+                  selected={config.columns || []}
+                  onChange={(cols) => updateConfig({ columns: cols })}
+                  variant="compact"
+                  showFooterCount={true}
+                />
+              </ValidationField>
 
               <div className="space-y-3">
                 <div className="space-y-1.5">
@@ -103,14 +113,16 @@ export const PolynomialFeaturesNode: NodeDefinition = {
                       </div>
                     </div>
                   </span>
-                  <input
-                    type="number"
-                    min={2}
-                    max={5}
-                    className="w-full px-2 py-1.5 text-xs border rounded bg-background"
-                    value={config.degree || 2}
-                    onChange={(e) => updateConfig({ degree: Number.parseInt(e.target.value) || 2 })}
-                  />
+                  <ValidationField field="degree">
+                    <input
+                      type="number"
+                      min={2}
+                      max={5}
+                      className="w-full px-2 py-1.5 text-xs border rounded bg-background"
+                      value={config.degree || 2}
+                      onChange={(e) => updateConfig({ degree: Number.parseInt(e.target.value) || 2 })}
+                    />
+                  </ValidationField>
                 </div>
 
                 <div className="space-y-1.5">
@@ -167,10 +179,10 @@ export const PolynomialFeaturesNode: NodeDefinition = {
 
   validate: (data) => {
     if (!data.columns || data.columns.length === 0) {
-      return { isValid: false, message: 'Select at least one input column.' };
+      return { isValid: false, field: 'columns', message: 'Select at least one input column.' };
     }
     if (data.degree < 2) {
-      return { isValid: false, message: 'Degree must be at least 2.' };
+      return { isValid: false, field: 'degree', message: 'Degree must be at least 2.' };
     }
     return { isValid: true };
   }

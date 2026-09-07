@@ -687,7 +687,15 @@ class NodeRunnersMixin:
         algorithm = node.params.get("algorithm") or node.params.get("model_type")
         if not algorithm:
             raise ValueError("Missing 'algorithm' or 'model_type' in node parameters")
-        calculator, applier = self._get_model_components(algorithm)
+        task_type = (
+            node.params.get("task_type")
+            or node.params.get("problem_type")
+            or node.params.get("task")
+        )
+        calculator, applier = self._get_model_components(
+            algorithm,
+            task_type=task_type if isinstance(task_type, str) else None,
+        )
         is_clustering = getattr(calculator, "problem_type", "") == "clustering"
 
         if is_clustering:
@@ -1158,8 +1166,8 @@ class NodeRunnersMixin:
 
         return node.node_id, metrics
 
-    def _get_model_components(self, algorithm: str):
-        """Factory for model components."""
+    def _get_model_components(self, algorithm: str, *, task_type: str | None = None):
+        """Factory for model components, resolving ambiguous aliases by task."""
         # Normalize algorithm name to match registry IDs
         algo = algorithm.lower().replace(" ", "_").replace("-", "_")
 
@@ -1167,23 +1175,41 @@ class NodeRunnersMixin:
         alias_map = {
             "logisticregression": "logistic_regression",
             "randomforestclassifier": "random_forest_classifier",
-            "random_forest": "random_forest_classifier",
             "ridgeregression": "ridge_regression",
             "ridge": "ridge_regression",
             "randomforestregressor": "random_forest_regressor",
         }
+        task_alias_map = {
+            "classification": "random_forest_classifier",
+            "regression": "random_forest_regressor",
+        }
 
-        registry_id = alias_map.get(algo, algo)
+        if algo == "random_forest":
+            if task_type not in task_alias_map:
+                raise ValueError(
+                    "Ambiguous algorithm alias 'random_forest'; provide "
+                    "task_type='classification' or task_type='regression'"
+                )
+            registry_id = task_alias_map[task_type]
+        else:
+            registry_id = alias_map.get(algo, algo)
 
         try:
             calculator_cls = NodeRegistry.get_calculator(registry_id)
             applier_cls = NodeRegistry.get_applier(registry_id)
-            return calculator_cls(), applier_cls()
         except ValueError:
             # Fallback: Raise original error if not found in registry
             raise ValueError(
                 f"Unknown algorithm: {algorithm} (Registry ID: {registry_id})"
             ) from None
+
+        calculator = calculator_cls()
+        if task_type and getattr(calculator, "problem_type", None) != task_type:
+            raise ValueError(
+                f"Algorithm '{algorithm}' resolves to a {calculator.problem_type} "
+                f"model, incompatible with task_type='{task_type}'"
+            )
+        return calculator, applier_cls()
 
     def _data_preview_df_info(self, df: Any, name: str) -> dict[str, Any]:
         """Build the preview payload (shape/columns/sample) for a single DataFrame."""

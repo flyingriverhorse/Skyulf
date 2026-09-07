@@ -15,6 +15,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from skyulf.engines.pandas_engine import SkyulfPandasWrapper
 from skyulf.modeling.clustering import (
     BirchApplier,
     BirchCalculator,
@@ -184,6 +185,18 @@ class TestReferenceColumn:
         labels = KMeansApplier().predict(probe, model)
         assert len(labels) == 1
 
+    def test_gaussian_mixture_predict_proba_drops_reference_column_again(self) -> None:
+        """Probability prediction must use the same filtered features as fit and predict."""
+        df, _ = _three_blobs(n_per_blob=20)
+        df = df.assign(ref=[f"ref-{i}" for i in range(len(df))])
+        model = GaussianMixtureCalculator().fit(df, None, {"reference_column": "ref"})
+
+        proba = GaussianMixtureApplier().predict_proba(df, model)
+
+        assert isinstance(proba, pd.DataFrame)
+        assert proba.shape == (len(df), 3)
+        assert np.allclose(proba.sum(axis=1).to_numpy(), np.ones(len(df)), atol=1e-6)
+
     def test_no_reference_column_means_no_attribute(self) -> None:
         """Without reference_column in config, no reference_column_ is set."""
         df, _ = _three_blobs()
@@ -221,6 +234,18 @@ class TestNonNumericAutoDrop:
         model = BirchCalculator().fit(df, None, {})
         assert model.n_features_in_ == 2
         labels = BirchApplier().predict(df, model)
+        assert labels.nunique() == 3
+
+    def test_wrapped_pandas_mixed_frame_still_clusters_numeric(self) -> None:
+        """A pandas wrapper must retain numeric features while dropping text columns."""
+        df, _ = _three_blobs(n_per_blob=20)
+        df["note"] = "text"
+
+        model = KMeansCalculator().fit(SkyulfPandasWrapper(df), None, {})
+        labels = KMeansApplier().predict(SkyulfPandasWrapper(df), model)
+
+        assert model.n_features_in_ == 2
+        assert len(labels) == len(df)
         assert labels.nunique() == 3
 
 

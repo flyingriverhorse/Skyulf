@@ -1,7 +1,7 @@
 # Canvas UX improvement backlog
 
 Date: 2026-09-06
-Status: CUX-01 complete; CUX-03, CUX-04, and CUX-08 in progress. Completed portions are recorded below.
+Status: CUX-01, CUX-02, CUX-04, CUX-05, and CUX-06 complete; CUX-03 and CUX-08 in progress. Completed portions are recorded below.
 
 ## Purpose and review scope
 
@@ -27,13 +27,14 @@ before implementation because other work may have changed these components.
 | ID | Priority | Improvement | Status |
 |---|---|---|---|
 | CUX-01 | High | Preserve canvas space with resizable panels | Complete at checked desktop/laptop sizes |
-| CUX-02 | High | Guide node connections and adding the next step | Open |
+| CUX-02 | High | Guide node connections and adding the next step | Complete; drag guidance and keyboard next-step picker verified |
 | CUX-03 | High | Clearly distinguish previewing data from training | In progress; visible action labels and training guidance complete |
-| CUX-04 | Medium | Improve component discovery | In progress; description search and collapsible categories complete |
-| CUX-05 | Medium | Navigate from validation issues to the exact setting | Open |
-| CUX-06 | Medium | Reduce connection and settings visual noise | Open |
+| CUX-04 | Medium | Improve component discovery | Complete; shared task search, readable results, and collapsible preprocessing groups verified |
+| CUX-05 | Medium | Navigate from validation issues to the exact setting | Complete; field navigation and general-issue fallback verified |
+| CUX-06 | Medium | Reduce connection and settings visual noise | Complete; contextual connection controls and node details verified |
 | CUX-07 | Medium | Inspect a selected node's input and output | Open |
 | CUX-08 | High, alongside related work | Fix keyboard and accessible-name gaps | In progress; panel labels, sidebar keyboard access, and primary field labels complete |
+| CUX-09 | Medium | Make possible PII findings easy to review without exposing raw values | Open; core accessors are planned, frontend UX is not implemented |
 
 ### CUX-01 — Preserve canvas space
 
@@ -103,14 +104,38 @@ still needs to know which step or input is appropriate before connecting it.
 show the reason for incompatibility near the attempted destination, and offer
 an output-handle “Add next step” action with compatible suggestions.
 
+**Progress (2026-09-07):** Output labels now include a small plus and open a
+searchable Next step popover. Add new node lists compatible registered steps;
+Existing node lists named input ports and explains unavailable connections.
+The picker reuses task search, focuses search on opening, supports native
+keyboard controls, and restores focus on dismissal. New node insertion
+initializes defaults and adds its edge in a single graph update, places it near
+the source, and reveals both nodes. It can be undone/redone as one action. Existing leakage and
+multi-input confirmations remain; cancelling leaves no orphan node or history
+entry. Shared validation covers cycles, model endpoints, missing ports, port
+kinds, and duplicate connections. During dragging, compatible ports receive a
+ring and incompatible destinations show an actionable floating message above
+nodes, bounded by the viewport. Both drag directions use the same source/target
+orientation. Connecting any Train/Test output groups both, plus Validation when
+enabled, into one junction and downstream connection. X/y behaves the same way.
+This applies to manual wiring and both picker paths. Groups use one canonical
+edge for deletion, undo/redo, and copy/paste; loading legacy graphs folds duplicate
+split edges. Validation changes update the visible group immediately. Split ports
+share the compact body area with the summary, without extra rows enlarging the
+card. Ensemble's shared input is labeled Data /
+Models to reflect its existing contract.
+Read-only mode disables handles, hides the picker, and blocks mutations; returning to edit mode
+does not reopen an old menu. Implementation notes:
+`canvas_connections_2026-09-07.md`.
+
 **Acceptance criteria:**
 
-- [ ] Compatibility guidance agrees with the existing graph validation rules.
-- [ ] Invalid connections explain the cause and the next action.
-- [ ] An output can open a relevant node picker and connect the chosen node.
-- [ ] Adding and connecting a node can be undone cleanly.
-- [ ] Keyboard users have an equivalent way to choose endpoints.
-- [ ] Train/validation/test ports and ensemble model inputs remain distinguishable.
+- [x] Compatibility guidance agrees with the existing graph validation rules.
+- [x] Invalid connections explain the cause and the next action.
+- [x] An output can open a relevant node picker and connect the chosen node.
+- [x] Adding and connecting a node can be undone cleanly.
+- [x] Keyboard users have an equivalent way to choose endpoints.
+- [x] Train/validation/test ports and ensemble model inputs remain distinguishable.
 
 **Starting points:** `src/components/canvas/FlowCanvas.tsx`,
 `CustomNodeWrapper.tsx`, `src/core/store/useGraphStore.ts`,
@@ -168,17 +193,35 @@ chevrons and node counts; mouse, Enter, and Space toggle their node lists.
 Search keeps matching categories expanded and temporarily disables their
 toggles. Clearing search restores the previous collapsed choices, which also
 survive closing/reopening the sidebar while it remains mounted. Categories
-start expanded. Preprocessing subgroups, synonyms, and fuller result
-descriptions remain open.
+start expanded. Sidebar and Ctrl+K now share ranked task-term search: for
+example, "normalize" finds Scaling, "fill blanks" finds Imputation, and
+"predict" finds the three prediction node types. All query words must match,
+so "predict numbers" narrows to Regression. Name matches rank ahead of task
+aliases; category, description, and technical-type queries still work, and
+hidden legacy definitions stay excluded. Case, extra whitespace, hyphens,
+and underscores are normalized. Sidebar search results wrap full names and
+descriptions, with descriptions associated with their add buttons. Browsing
+keeps compact cards; the palette always shows full descriptions. Existing
+click, drag, Enter/Space, and Ctrl+K insertion paths are preserved.
+The 28 preprocessing nodes now appear in five collapsible task groups: Data
+cleaning (9), Numeric & categorical (5), Feature engineering (5), Text processing
+(6), and Splitting & sampling (3). Subgroups start collapsed so Modeling is
+visible without scrolling through preprocessing cards. Enter/Space and mouse
+activation toggle each group. Search presents flat ranked results under the
+existing categories, bypassing subgroup collapse; clearing it restores subgroup
+choices, which also survive sidebar close/reopen while mounted. Future types
+without an explicit assignment remain reachable in Other preprocessing.
 
 **Acceptance criteria:**
 
 - [x] Sidebar search matches node descriptions, names, and categories; blank queries restore the library.
 - [x] Modeling and evaluation are reachable by collapsing the preceding categories.
-- [ ] Common task terms return relevant nodes without flooding results.
-- [ ] Search results expose the reason a node is useful and enough description to choose it.
+- [x] Common task terms return relevant nodes without flooding results.
+- [x] Search results expose the reason a node is useful and enough description to choose it.
 - [x] Collapsed categories do not hide matches during a search.
-- [ ] Existing click-to-add, drag, and command-palette flows remain available.
+- [x] Existing click-to-add, drag, and command-palette flows remain available.
+- [x] Preprocessing task groups keep every visible node reachable exactly once.
+- [x] Subgroups support keyboard toggling and retain browsing choices across search and sidebar visibility changes.
 
 **Starting points:** `src/components/layout/Sidebar.tsx`,
 `CommandPalette.tsx`, and `src/core/registry/NodeRegistry.ts`.
@@ -193,13 +236,26 @@ problems are represented by small badges with tooltip explanations.
 the node, open the relevant settings section, and focus the invalid field.
 Keep the explanation beside the setting while it remains invalid.
 
+**Progress (2026-09-07):** Validation results now carry explicit settings-field
+targets, including indexed operations and transformations. Activating an issue
+selects and reveals its node, restores maximized panels, opens hidden settings,
+and focuses the relevant control. The explanation is associated with the
+control for assistive technology and remains beside it until corrected.
+Connection, cycle, and other general issues focus an explanatory summary.
+Delayed controls are handled without stealing focus after the user moves on.
+Closing settings clears the navigation request; reveal state is scoped to the
+selected node. Read-only activation reveals the node and focuses the canvas
+without enabling editing. Existing validation conditions are preserved;
+Encoding and TimeSeries now expose their existing messages through the correct
+validation-result property.
+
 **Acceptance criteria:**
 
-- [ ] Issue activation selects and reveals the correct node.
-- [ ] Hidden settings sections open when needed.
-- [ ] Field-specific problems focus the field; general problems focus an appropriate summary.
-- [ ] Keyboard focus is visible and not covered by results or settings panels.
-- [ ] Fixed issues disappear without unexpectedly moving focus.
+- [x] Issue activation selects and reveals the correct node.
+- [x] Hidden settings sections open when needed.
+- [x] Field-specific problems focus the field; general problems focus an appropriate summary.
+- [x] Keyboard focus is visible and not covered by results or settings panels.
+- [x] Fixed issues disappear without unexpectedly moving focus.
 
 **Starting points:** `src/components/layout/ResultsPanel.tsx`,
 `PropertiesPanel.tsx`, `src/components/canvas/CustomNodeWrapper.tsx`,
@@ -215,13 +271,25 @@ a long UUID, which consumes space without helping most settings decisions.
 Use readable node names in tooltips and accessible labels. Move technical IDs
 into a details area with a copy action.
 
+**Progress (2026-09-07):** Connection delete buttons now appear on hover,
+selection, edge focus, or button focus. A wider invisible hit area keeps edges
+easy to select. Tooltips and accessible labels use node names, with ordinals
+for repeated names. Branch labels and merge-winner indicators remain visible;
+the compact endpoint tooltip floats above nodes on hover or focus, wrapping
+long names within the viewport. Read-only connections keep their inspection
+behavior while hiding deletion. A keyboard-accessible info button in the
+settings header opens the node ID and copy action with success/failure
+feedback. Switching nodes clears the previous information popover, and no
+technical details block takes up space in the settings form. Canvas focus handling
+stays outside graph objects so connected nodes remain copyable and pasteable.
+
 **Acceptance criteria:**
 
-- [ ] Unselected connections remain readable without permanent delete controls.
-- [ ] Connection deletion remains discoverable and keyboard accessible.
-- [ ] Tooltips identify nodes using meaningful names, with disambiguation when needed.
-- [ ] Technical IDs remain available for troubleshooting without dominating settings.
-- [ ] Branch labels, merge-winner indicators, and undo behavior remain intact.
+- [x] Unselected connections remain readable without permanent delete controls.
+- [x] Connection deletion remains discoverable and keyboard accessible.
+- [x] Tooltips identify nodes using meaningful names, with disambiguation when needed.
+- [x] Technical IDs remain available for troubleshooting without dominating settings.
+- [x] Branch labels, merge-winner indicators, and undo behavior remain intact.
 
 **Starting points:** `src/components/canvas/CustomEdge.tsx`,
 `CustomNodeWrapper.tsx`, and `src/components/layout/PropertiesPanel.tsx`.
@@ -301,12 +369,47 @@ Use semantic controls, associated labels, and visible keyboard focus.
 Reference used in the review:
 [Web Interface Guidelines](https://raw.githubusercontent.com/vercel-labs/web-interface-guidelines/main/command.md).
 
+### CUX-09 — Review possible PII findings without exposing raw values
+
+**Observed:** Profiling can emit `PII` alerts for columns that may contain
+email addresses or phone numbers, but the current consumer must inspect the
+generic alert list manually. There is no focused review surface, and the core
+API requires callers to filter `profile.alerts` themselves.
+
+**Proposal:** Add a PII review view within the selected dataset's profiling
+experience rather than a global page. Show the flagged column, detected
+category, severity, and advisory explanation; never render raw email, phone,
+or sample values. Include a clear note that detection is heuristic and does
+not mask, delete, block, or classify data as legally sensitive.
+
+The core profile API should provide direct accessors for this view:
+`profile.has_pii`, `profile.pii_columns`, and `profile.pii_alerts`. The
+frontend should consume structured profile data and preserve the generic
+alerts view for other data-quality findings.
+
+**Acceptance criteria:**
+
+- [ ] A selected dataset has a dedicated PII tab or panel in its profiling view.
+- [ ] The view lists flagged column names, detector category, severity, and explanation.
+- [ ] Raw values and profiling samples are not rendered in the PII view.
+- [ ] Empty and loading states explain whether the dataset has no findings or
+      has not been profiled yet.
+- [ ] The view explains that findings are advisory heuristics, not compliance
+      classifications or automatic remediation.
+- [ ] Email/phone alerts remain available in the generic alerts view.
+- [ ] The view is keyboard accessible and works in light and dark themes.
+
+**Starting points:** the dataset profile API/client types, the EDA/profile
+results view, and the existing generic alert rendering. Recheck the current
+backend response shape before implementing the frontend panel.
+
 ## Suggested implementation order
 
 1. **Workspace and actions:** CUX-01 and CUX-03, with relevant CUX-08 fixes.
 2. **Connecting and correcting:** CUX-02 and CUX-05, followed by CUX-06.
 3. **Discovery:** CUX-04, with keyboard support from CUX-08.
-4. **Understanding results:** CUX-07 after checking available backend payloads.
+4. **Understanding results:** CUX-07 and CUX-09 after checking available
+   backend payloads.
 
 For each item, review the current behavior, settle the interaction details,
 implement a bounded change, and record verification here. Only the progress
@@ -493,3 +596,104 @@ explicitly recorded above is complete; remaining interaction details need review
   run missed a pre-existing 20ms mocked deployment loading state, which also
   passed in isolation. Final lint, TypeScript, and production build passed,
   and served assets were rebuilt. Existing build chunk warnings remain.
+- 2026-09-07: Completed CUX-05 with explicit validator field targets, shared
+  settings navigation, inline accessible explanations, and local section
+  reveals. Added 24 unit tests for field metadata, indexed and hidden settings,
+  deferred controls, and focus retention/cancellation. Five new browser tests
+  cover distant-node reveal, maximized results, model tabs, dataset upload,
+  correction, general errors, read-only mode, StrictMode mounting/dismissal,
+  and node-specific reveal state on a compact dark canvas. Review findings
+  around stale requests, summary descriptions, disabled/hidden controls, and
+  state leaking between same-type nodes were addressed. All 897 frontend unit
+  tests and 17 distinct focused browser checks passed. Final lint, TypeScript,
+  and production build passed; served frontend assets were rebuilt. Browser
+  checks use mocked APIs. Existing mocked connection logs and circular/empty
+  chunk build warnings remain.
+- 2026-09-07: Completed CUX-06. CustomEdge uses contextual delete controls,
+  readable endpoint tooltips, and read-only guards. FlowCanvas supplies
+  disambiguated endpoint names and handles edge focus outside graph objects.
+  PropertiesPanel moves technical identifiers into NodeDetails with native
+  keyboard disclosure and copy feedback. Six new browser tests cover hover,
+  focus-only discovery, Tab/Enter/Space deletion, undo, clipboard denial,
+  connected-node copy/paste, read-only inspection, and retained branch labels
+  and merge winners in light/dark compact layouts. Tests caught and verified
+  fixes for React Flow intercepting disclosure Space and non-cloneable edge
+  focus callbacks. Two unit tests cover readable-name fallback and duplicate
+  labels. Independent review found no remaining blockers. All 899 frontend
+  unit tests and 23 focused browser checks passed, along with final lint,
+  TypeScript, and production build. Served assets were rebuilt and short
+  CUX-05/CUX-06 entries were added under v0.8.16. Browser checks use mocked
+  APIs; existing mocked connection logs and build chunk warnings remain.
+- 2026-09-07: Refined CUX-06 after canvas feedback. Endpoint labels now use a
+  content-sized `source → target` tooltip, capped at 280px, with no From/To
+  headings. A portal keeps long labels above nearby nodes and within the
+  viewport; hover/focus controls visibility and Escape dismisses the tooltip.
+  Node information moved from an inline Details block to the header info
+  button. A regression test reproduced duplicate React sibling keys causing
+  details to accumulate when switching nodes; separate parents and distinct
+  keys now clear the old editor and popover. All 900 unit tests and 24 focused
+  browser checks passed, including compact labels, hover transfer, Escape and
+  re-hover, repeated node selection, and clipboard feedback. Lint, TypeScript,
+  and production build passed; served assets were rebuilt. Existing chunk
+  warnings remain.
+- 2026-09-07: Completed the CUX-04 task-search and readable-results portion.
+  Shared `nodeSearch` ranks catalog names and curated task vocabulary for the
+  sidebar and command palette. Search descriptions wrap fully, sidebar add
+  buttons expose associated descriptions, and palette search changes keep the
+  active result in view. A failing palette regression first demonstrated that
+  "normalize" returned no options. Eight catalog-search tests and a palette
+  regression now cover synonyms, narrowing, ranking, catalog fields, and hidden
+  nodes. Three new browser tests verify full description bounds, light/dark
+  layouts, sidebar/palette consistency, keyboard insertion, click, and drag.
+  All 909 unit tests and 11 focused browser checks passed, along with lint,
+  TypeScript, and the production build. Independent review found no blockers.
+  Served assets were rebuilt and v0.8.16 notes updated. Preprocessing subgroups
+  remain open. Browser checks use mocked APIs; existing build warnings remain.
+- 2026-09-07: Completed CUX-02 guided connections. Pure connection validation is
+  shared by drag guidance, React Flow acceptance, picker suggestions, and graph
+  mutations. Existing confirmation logic now serves both manual wiring and
+  atomic connected-node insertion. Five new unit tests cover split-port
+  preservation, cancellation, stale/read-only rejection, duplicate/cycle/model
+  validation, and single-step undo/redo. Five new browser tests cover keyboard
+  insertion and canvas focus, existing-node selection and Escape, drag guidance
+  in both directions, model-to-Ensemble acceptance, viewport bounds, and
+  read-only menu lifecycle. All 914 frontend unit tests and 35 focused browser
+  checks passed, along with lint, TypeScript, and production build. Independent
+  review found no blockers. Served assets were rebuilt and v0.8.16 notes updated.
+  Browser checks use mocked APIs; existing circular/empty chunk warnings remain.
+- 2026-09-07: Refined CUX-02 following split-output and placement feedback.
+  Train/Test with enabled Validation, and X/y, now converge into one connection
+  for manual wiring and picker actions. Legacy duplicate edges normalize on load;
+  validation toggles, whole-group deletion, undo/redo, and copy/paste are covered.
+  New nodes use nearby free positions and reveal both endpoints. Split labels
+  have dedicated rows, and read-only handles no longer accept drag initiation.
+  All 919 frontend unit tests and 29 browser checks passed. The seven guided
+  connection checks passed again after the final port-layout adjustment, with
+  screenshot inspection. Lint and the production build passed; served assets and
+  v0.8.16 notes were updated. Browser APIs are mocked; existing circular/empty
+  chunk warnings remain.
+- 2026-09-07: Restored compact split cards after size feedback. Removed the
+  added spacer rows and fixed header height; output labels now share the body
+  with the summary. Both default cards fit within 110px, with non-overlapping
+  labels inside their bounds. Seven guided-connection browser checks, lint, and
+  the production build passed; screenshots were inspected and assets rebuilt.
+- 2026-09-07: Completed CUX-04 with five collapsible preprocessing task groups.
+  All 28 current visible types are assigned exactly once; future unclassified
+  types use a visible fallback. Groups start collapsed, preserve choices across
+  search/sidebar visibility changes, and support native keyboard activation.
+  Search keeps its flat ranked results shared with Ctrl+K and the next-step
+  picker. Ten focused unit tests and nine browser checks passed, covering light
+  desktop and dark laptop layouts, insertion, drag, search, category state, and
+  responsive focus. Screenshots were inspected. Lint and production build passed;
+  served assets and v0.8.16 notes were updated. Browser APIs are mocked and the
+  existing circular/empty chunk build warnings remain.
+- 2026-09-07: Investigated the Linux CI split-label clearance failure. Wider
+  fonts reproduced a negative horizontal gap locally; feature/target split
+  summaries now reserve 112px for output labels instead of 96px, preserving
+  compact height and existing port positions. Browser checks exercise default,
+  Verdana/sans-serif, and monospace fonts and report individual gap measurements.
+  The Escape check now waits for picker search focus before sending the key.
+  All seven guided-connection checks passed twice locally (14 runs); lint, build,
+  and size-check passed. At the user's request the main gzip budget increased
+  from 300 to 325 KB; the rebuilt entry measured 303.6 KB. Independent review
+  found no blockers. The hosted Linux CI run has not been rerun here.

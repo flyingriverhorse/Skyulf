@@ -10,6 +10,7 @@ from sklearn.mixture import GaussianMixture
 
 from ..core.meta.decorators import node_meta
 from ..engines import SkyulfDataFrame
+from ..engines.pandas_engine import SkyulfPandasWrapper
 from ..engines.polars_engine import POLARS_NUMERIC_BOOL_DTYPES, SkyulfPolarsWrapper
 from ..registry import NodeRegistry
 from .sklearn_wrapper import SklearnApplier, SklearnCalculator
@@ -26,8 +27,9 @@ def _select_numeric_features(X: Any) -> tuple[Any, list[str]]:
     fail (or, worse, silently corrupt distances) once converted to a numpy
     array. Returns ``(numeric_only_X, dropped_column_names)``.
 
-    Handles both pandas ``DataFrame``s and Polars ``DataFrame``/``SkyulfPolarsWrapper``
-    objects: ``extract_xy`` (``modeling/base.py``) hands back a raw, unwrapped
+    Handles pandas ``DataFrame``/``SkyulfPandasWrapper`` and Polars
+    ``DataFrame``/``SkyulfPolarsWrapper`` objects: ``extract_xy``
+    (``modeling/base.py``) hands back a raw, unwrapped
     ``pl.DataFrame`` when the pipeline has no target column configured (the
     "no target" sentinel used throughout clustering), so this must not assume
     pandas is the only non-trivial branch.
@@ -44,6 +46,11 @@ def _select_numeric_features(X: Any) -> tuple[Any, list[str]]:
         numeric = X.select_dtypes(include=["number", "bool"])
         dropped = [c for c in X.columns if c not in numeric.columns]
         return numeric, dropped
+    if isinstance(X, SkyulfPandasWrapper):
+        native = X.to_pandas()
+        numeric = native.select_dtypes(include=["number", "bool"])
+        dropped = [c for c in native.columns if c not in numeric.columns]
+        return SkyulfPandasWrapper(numeric), dropped
     if isinstance(X, pl.DataFrame | SkyulfPolarsWrapper):
         numeric_cols = [
             col
@@ -80,13 +87,26 @@ class _NumericOnlyClusteringApplier(SklearnApplier):
     at fit time (see ``_NumericOnlyClusteringCalculatorMixin``).
     """
 
-    def predict(self, df: pd.DataFrame | SkyulfDataFrame, model_artifact: Any) -> Any:
+    def _prepare_prediction_frame(
+        self, df: pd.DataFrame | SkyulfDataFrame, model_artifact: Any
+    ) -> pd.DataFrame | SkyulfDataFrame:
+        """Apply the same reference-column and numeric filtering used during fit."""
         reference_column = getattr(model_artifact, "reference_column_", "")
         working_df = _drop_reference_column(df, reference_column)
         numeric_df, dropped = _select_numeric_features(working_df)
         if dropped:
             logger.info(f"Dropping non-numeric column(s) before predicting: {dropped}")
-        return super().predict(numeric_df, model_artifact)
+        return numeric_df
+
+    def predict(self, df: pd.DataFrame | SkyulfDataFrame, model_artifact: Any) -> Any:
+        """Predict labels after applying the fitted feature-column contract."""
+        return super().predict(self._prepare_prediction_frame(df, model_artifact), model_artifact)
+
+    def predict_proba(self, df: pd.DataFrame | SkyulfDataFrame, model_artifact: Any) -> Any | None:
+        """Predict probabilities after applying the fitted feature-column contract."""
+        return super().predict_proba(
+            self._prepare_prediction_frame(df, model_artifact), model_artifact
+        )
 
 
 class _NumericOnlyClusteringCalculatorMixin:

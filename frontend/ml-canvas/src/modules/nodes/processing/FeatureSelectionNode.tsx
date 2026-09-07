@@ -1,4 +1,5 @@
-import React, { useEffect } from 'react';
+import { ValidationField, useValidationReveal } from '../../../components/shared/ValidationField';
+import React, { useEffect, useState } from 'react';
 import { NodeDefinition } from '../../../core/types/nodes';
 import { Filter } from 'lucide-react';
 import { useUpstreamData } from '../../../core/hooks/useUpstreamData';
@@ -108,6 +109,10 @@ const FeatureSelectionSettings: React.FC<{ config: FeatureSelectionConfig; onCha
   const droppedUpstream = useUpstreamDroppedColumns(nodeId);
   const columns = schema ? Object.values(schema.columns).map(c => c.name).filter(n => !droppedUpstream.has(n)) : [];
 
+  const [showInvalidTarget, setShowInvalidTarget] = useState(false);
+  useValidationReveal((field) => {
+    if (field === 'target_column') setShowInvalidTarget(true);
+  });
   // Responsive layout: switch to a 2-column layout once the panel is wider than 450px.
   const [containerRef, isWide] = useIsWideContainer();
 
@@ -294,7 +299,7 @@ const FeatureSelectionSettings: React.FC<{ config: FeatureSelectionConfig; onCha
             </select>
           </div>
 
-          {config.method !== 'variance_threshold' && config.method !== 'correlation_threshold' && (
+          {((config.method !== 'variance_threshold' && config.method !== 'correlation_threshold') || showInvalidTarget) && (
             <div className="space-y-2">
               <span className="text-sm font-medium">Target Column</span>
               {upstreamTargetColumn ? (
@@ -302,16 +307,18 @@ const FeatureSelectionSettings: React.FC<{ config: FeatureSelectionConfig; onCha
                   {upstreamTargetColumn} <span className="text-xs italic">(Auto-detected)</span>
                 </div>
               ) : (
-                <select
-                  className="w-full p-2 border rounded bg-background text-sm"
-                  value={config.target_column ?? ''}
-                  onChange={(e) => onChange({ ...config, target_column: e.target.value })}
-                >
-                  <option value="">Select Target...</option>
-                  {columns.map(col => (
-                    <option key={col} value={col}>{col}</option>
-                  ))}
-                </select>
+                <ValidationField field="target_column">
+                  <select
+                    className="w-full p-2 border rounded bg-background text-sm"
+                    value={config.target_column ?? ''}
+                    onChange={(e) => onChange({ ...config, target_column: e.target.value })}
+                  >
+                    <option value="">Select Target...</option>
+                    {columns.map(col => (
+                      <option key={col} value={col}>{col}</option>
+                    ))}
+                  </select>
+                </ValidationField>
               )}
               <p className="text-xs text-muted-foreground">Required for supervised selection methods.</p>
             </div>
@@ -573,7 +580,7 @@ export const FeatureSelectionNode: NodeDefinition<FeatureSelectionConfig> = {
   },
   validate: (config) => {
     if (config.method !== 'variance_threshold' && !config.target_column) {
-      return { isValid: false, message: 'Target column is required for this method.' };
+      return { isValid: false, field: 'target_column', message: 'Target column is required for this method.' };
     }
     return { isValid: true };
   },

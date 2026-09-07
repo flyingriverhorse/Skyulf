@@ -1,3 +1,4 @@
+import { ValidationField } from '../../../components/shared/ValidationField';
 import React from 'react';
 import { NodeDefinition } from '../../../core/types/nodes';
 import { Hash, Activity, Info } from 'lucide-react';
@@ -239,19 +240,21 @@ const EncodingSettings: React.FC<{ config: EncodingConfig; onChange: (c: Encodin
           {config.method === 'target' && (
             <div className="space-y-2 p-3 bg-muted/20 rounded border h-full">
               <span className="block text-sm font-medium">Target Column</span>
-              <select
-                className="w-full p-2 border rounded bg-background text-sm"
-                value={config.target_column || ''}
-                onChange={(e) => onChange({ ...config, target_column: e.target.value })}
-              >
-                <option value="">Select a target column...</option>
-                {categoricalColumns.map(name => {
-                  const col = schema?.columns[name];
-                  return (
-                    <option key={name} value={name}>{name}{col ? ` (${col.dtype})` : ''}</option>
-                  );
-                })}
-              </select>
+              <ValidationField field="target_column">
+                <select
+                  className="w-full p-2 border rounded bg-background text-sm"
+                  value={config.target_column || ''}
+                  onChange={(e) => onChange({ ...config, target_column: e.target.value })}
+                >
+                  <option value="">Select a target column...</option>
+                  {categoricalColumns.map(name => {
+                    const col = schema?.columns[name];
+                    return (
+                      <option key={name} value={name}>{name}{col ? ` (${col.dtype})` : ''}</option>
+                    );
+                  })}
+                </select>
+              </ValidationField>
               <div className="space-y-1">
                 <span className="block text-xs font-medium">Smoothing</span>
                 <input
@@ -286,19 +289,21 @@ const EncodingSettings: React.FC<{ config: EncodingConfig; onChange: (c: Encodin
           {config.method === 'woe' && (
             <div className="space-y-2 p-3 bg-muted/20 rounded border h-full">
               <span className="block text-sm font-medium">Target Column</span>
-              <select
-                className="w-full p-2 border rounded bg-background text-sm"
-                value={config.target_column || ''}
-                onChange={(e) => onChange({ ...config, target_column: e.target.value })}
-              >
-                <option value="">Select a binary target column...</option>
-                {Object.keys(schema?.columns ?? {}).map(name => {
-                  const col = schema?.columns[name];
-                  return (
-                    <option key={name} value={name}>{name}{col ? ` (${col.dtype})` : ''}</option>
-                  );
-                })}
-              </select>
+              <ValidationField field="target_column">
+                <select
+                  className="w-full p-2 border rounded bg-background text-sm"
+                  value={config.target_column || ''}
+                  onChange={(e) => onChange({ ...config, target_column: e.target.value })}
+                >
+                  <option value="">Select a binary target column...</option>
+                  {Object.keys(schema?.columns ?? {}).map(name => {
+                    const col = schema?.columns[name];
+                    return (
+                      <option key={name} value={name}>{name}{col ? ` (${col.dtype})` : ''}</option>
+                    );
+                  })}
+                </select>
+              </ValidationField>
               <p className="text-[10px] text-muted-foreground">Target must have exactly 2 classes.</p>
               <div className="space-y-1">
                 <span className="block text-xs font-medium">Regularization</span>
@@ -397,16 +402,18 @@ const EncodingSettings: React.FC<{ config: EncodingConfig; onChange: (c: Encodin
       </div>
 
       {/* Column Selection */}
-      <ColumnMultiSelect
-        columns={categoricalColumns}
-        selected={config.columns}
-        onChange={(newCols) => { onChange({ ...config, columns: newCols }); }}
-        label="Columns to Encode"
-        variant="panel"
-        isLoading={isLoading}
-        emptyMessage="No columns found — connect an upstream dataset node."
-        fillHeight={false}
-      />
+      <ValidationField field="columns">
+        <ColumnMultiSelect
+          columns={categoricalColumns}
+          selected={config.columns}
+          onChange={(newCols) => { onChange({ ...config, columns: newCols }); }}
+          label="Columns to Encode"
+          variant="panel"
+          isLoading={isLoading}
+          emptyMessage="No columns found — connect an upstream dataset node."
+          fillHeight={false}
+        />
+      </ValidationField>
 
       {/* Recommendations Section */}
       {filteredRecommendations.length > 0 && (
@@ -486,9 +493,9 @@ export const EncodingNode: NodeDefinition<EncodingConfig> = {
   validate: (config) => {
     // Label and Ordinal intentionally operate on y when no columns selected
     if (config.columns.length === 0 && config.method !== 'label' && config.method !== 'ordinal')
-      return { isValid: false, error: 'Select at least one column' };
+      return { isValid: false, field: 'columns', message: 'Select at least one column' };
     if (config.method === 'woe' && !config.target_column)
-      return { isValid: false, error: 'WOE encoding requires a binary target column' };
+      return { isValid: false, field: 'target_column', message: 'WOE encoding requires a binary target column' };
     return { isValid: true };
   },
   getDefaultConfig: () => ({

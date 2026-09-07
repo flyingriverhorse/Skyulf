@@ -1,3 +1,4 @@
+import { ValidationField } from '../../../components/shared/ValidationField';
 import React, { useMemo } from 'react';
 import { NodeDefinition } from '../../../core/types/nodes';
 import { Trash2, Activity } from 'lucide-react';
@@ -142,15 +143,17 @@ const DropColumnsSettings: React.FC<{ config: DropColumnsConfig; onChange: (c: D
 
         {/* Right Column (Column List) */}
         <div className={`flex flex-col overflow-hidden ${isWide ? 'min-h-0 flex-1' : 'shrink-0'}`}>
-          <ColumnMultiSelect
-            columns={availableColumns}
-            selected={config.columns}
-            onChange={(newCols) => { onChange({ ...config, columns: newCols }); }}
-            label="Explicitly Drop Columns"
-            variant="panel"
-            isLoading={isLoading}
-            fillHeight={isWide}
-          />
+          <ValidationField field="columns" className={isWide ? "flex min-h-0 flex-1 flex-col" : ""}>
+            <ColumnMultiSelect
+              columns={availableColumns}
+              selected={config.columns}
+              onChange={(newCols) => { onChange({ ...config, columns: newCols }); }}
+              label="Explicitly Drop Columns"
+              variant="panel"
+              isLoading={isLoading}
+              fillHeight={isWide}
+            />
+          </ValidationField>
         </div>
       </div>
     </div>
@@ -175,6 +178,7 @@ export const DropColumnsNode: NodeDefinition<DropColumnsConfig> = {
     return null;
   },
   validate: (config) => ({
+    field: 'columns',
     isValid: (config.columns?.length ?? 0) > 0 || ((config.missing_threshold ?? 0) > 0),
     message: ((config.columns?.length ?? 0) === 0 && (!config.missing_threshold || config.missing_threshold === 0))
       ? 'Select columns or set a threshold'

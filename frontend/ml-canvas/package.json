@@ -1,7 +1,7 @@
 {
   "name": "ml-canvas",
   "private": true,
-  "version": "0.8.15",
+  "version": "0.8.16",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -11,6 +11,7 @@
     "sync-version": "node scripts/sync-version.mjs",
     "check-version": "node scripts/sync-version.mjs --check",
     "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
     "test:watch": "vitest",
     "test:ui": "vitest --ui",
     "test:e2e": "playwright test",
@@ -81,6 +82,7 @@
     "@typescript-eslint/eslint-plugin": "^7.2.0",
     "@typescript-eslint/parser": "^7.2.0",
     "@vitejs/plugin-react": "^4.2.1",
+    "@vitest/coverage-v8": "4.1.9",
     "@vitest/ui": "^4.1.0",
     "autoprefixer": "^10.4.19",
     "eslint": "^8.57.0",

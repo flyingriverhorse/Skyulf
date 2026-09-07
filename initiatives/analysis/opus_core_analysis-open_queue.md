@@ -49,25 +49,17 @@ closed that on 2026-09-07.
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
-| OC-76 | 🟠 | Cross-engine parity tests cover 9 of 100 nodes and never compare applied output — directly caused OC-04/23/24/58 to go unnoticed | ~3 days | ⬜ open |
 | OC-03 | 🟠 | Systemic `infer_output_schema` int→float misprediction across 22 nodes — one sweep + parametrized test (predicted schema == actual schema for every node) | ~1 day | ✅ done — runtime dtype parity covered by parametrized tests |
 
 ### Remaining — evaluation & explainability
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
-| OC-149 | 🟠 | Clustering evaluation crashes on polars when a numeric feature is all-null within one cluster (`clustering.py:83-88`) | small | ⬜ open |
-| OC-195 | 🟡 | Clustering numeric-feature selection skips `SkyulfPandasWrapper`, so wrapping a working pandas frame with text columns makes fitting fail (`modeling/clustering.py:40-53`) | small | ⬜ open |
-| OC-196 | 🟡 | GaussianMixture probability prediction omits the feature/reference filtering used for fit and ordinary prediction, causing a feature-count mismatch on the same input (`modeling/clustering.py:83-89`, `modeling/sklearn_wrapper.py:266-279`) | small | ⬜ open |
-| OC-197 | 🟡 | Polars clustering reference crosstabs crash for reference columns named `count` or `__skyulf_cluster__` (`modeling/_evaluation/clustering.py:137-146`) | small | ⬜ open |
-| OC-148 | 🟡 | PII detector flags ordinary 7+ digit numeric ID columns as "Email/Phone" (`profiling/_analyzer/text.py:107-128`) | small | ⬜ open |
-| OC-38 | ⚪ | Clustering metrics treat DBSCAN `-1` noise as a real cluster (`metrics.py:432-459`) | small | ⬜ open |
 
 ### Remaining — backend infrastructure
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
-| OC-68 | 🟠 | Model alias map task-unaware — direct API caller silently trains the wrong estimator family (`_execution/engine/_node_runners.py:1157-1183`) | small | ⬜ open |
 | OC-70 | 🟡 | Leakage validator checks for *a* splitter globally, not that *this* branch is protected (`_execution/_leakage_validation.py:189-267`) | small | ⬜ open |
 | OC-145 | 🟡 | Crashed cross-validation returns the same `{}` sentinel as a disabled one — job reports success with missing `cv_*` metrics (`_node_runners.py:871-907`) | small | ⬜ open |
 | OC-151 | 🟡 | Trial-buffer `clear_*` hooks documented but never called — 110.9 MB retained for process lifetime (`realtime/trial_buffer.py:56-59,103-106`) | small | ⬜ open |
@@ -106,7 +98,6 @@ closed that on 2026-09-07.
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
-| OC-04 | 🟡 | Cross-engine dtype divergence in 3 nodes (int64 vs int8/uint32) (`encoding/dummy.py`, `bucketing.py`) | small | ⬜ open |
 | OC-06 | 🟡 | 6 registered nodes unreachable from the UI (incl. all of `geo/`) — `registry.py` vs `frontend/` | small | ⬜ open — R1 step 3 catches this class |
 | OC-07 | 🟡 | Node-id naming split 55 PascalCase / 45 snake_case + redundant aliases (`registry.py`) | half day | ⬜ open |
 | OC-08 | 🟡 | Public-API name collision: `DatasetProfile` means two things (`skyulf/__init__.py:32-46`) | small | ⬜ open |

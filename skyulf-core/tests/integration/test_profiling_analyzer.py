@@ -116,6 +116,15 @@ def test_analyze_regression_target_builds_full_profile(mixed_df: pl.DataFrame) -
     assert profile.rule_tree.accuracy is not None
 
 
+def test_profile_exposes_pii_alerts_without_manual_filtering(mixed_df: pl.DataFrame) -> None:
+    """The profile should provide direct PII accessors so callers need not filter all alerts."""
+    profile = EDAAnalyzer(mixed_df).analyze(target_col="target_reg", task_type="Regression")
+
+    assert profile.has_pii is True
+    assert profile.pii_columns == ["contact_email"]
+    assert profile.pii_alerts == [alert for alert in profile.alerts if alert.type == "PII"]
+
+
 def test_analyze_classification_target_uses_categorical_path(mixed_df: pl.DataFrame) -> None:
     """A categorical target should use eta-association + ANOVA box-plot interactions."""
     analyzer = EDAAnalyzer(mixed_df)

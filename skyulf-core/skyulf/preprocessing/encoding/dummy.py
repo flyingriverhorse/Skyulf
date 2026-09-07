@@ -110,7 +110,8 @@ def _dummy_apply_pandas(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, An
         known_cats = categories.get(col, [])
         X_out[col] = pd.Categorical(_pandas_col_to_str(X_out[col]), categories=known_cats)
 
-    dummies = pd.get_dummies(X_out[valid_cols], drop_first=drop_first, dtype=int)
+    # Match the Polars engine's compact binary indicator dtype.
+    dummies = pd.get_dummies(X_out[valid_cols], drop_first=drop_first, dtype="int8")
     X_out = X_out.drop(columns=valid_cols)
     return pd.concat([X_out, dummies], axis=1), y
 

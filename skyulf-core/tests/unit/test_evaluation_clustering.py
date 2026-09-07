@@ -79,6 +79,36 @@ def test_calculate_clustering_metrics_single_cluster_omits_quality_scores():
     assert "silhouette_score" not in metrics
 
 
+def test_calculate_clustering_metrics_excludes_dbscan_noise(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """DBSCAN noise must not count or participate in clustering-quality scores."""
+    captured: list[tuple[np.ndarray, np.ndarray]] = []
+
+    def fake_silhouette(X: np.ndarray, labels: np.ndarray, **_: object) -> float:
+        captured.append((X.copy(), labels.copy()))
+        return 0.5
+
+    monkeypatch.setattr("sklearn.metrics.silhouette_score", fake_silhouette)
+    monkeypatch.setattr("sklearn.metrics.calinski_harabasz_score", lambda X, labels: 1.0)
+    monkeypatch.setattr("sklearn.metrics.davies_bouldin_score", lambda X, labels: 2.0)
+    X = pd.DataFrame(
+        {
+            "a": [0.0, 0.5, 10.0, 10.5, 100.0, 101.0],
+            "b": [0.0, 0.5, 10.0, 10.5, 100.0, 101.0],
+        }
+    )
+    labels = np.array([0, 0, 1, 1, -1, -1])
+
+    metrics = calculate_clustering_metrics(X, labels)
+
+    scored_X, scored_labels = captured[0]
+    assert metrics["n_clusters"] == 2
+    assert scored_X.shape == (4, 2)
+    assert np.array_equal(scored_labels, np.array([0, 0, 1, 1]))
+    assert "silhouette_score" in metrics
+
+
 def test_calculate_clustering_metrics_caps_silhouette_sample(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

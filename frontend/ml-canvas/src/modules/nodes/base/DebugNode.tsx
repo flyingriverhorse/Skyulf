@@ -1,3 +1,4 @@
+import { ValidationField } from '../../../components/shared/ValidationField';
 import React from 'react';
 import { NodeDefinition } from '../../../core/types/nodes';
 import { Bug } from 'lucide-react';
@@ -13,12 +14,14 @@ const DebugSettings: React.FC<{ config: DebugConfig; onChange: (c: DebugConfig) 
   return (
     <div className="p-4 space-y-2">
       <span className="block text-sm font-medium">Debug Message</span>
-      <input
-        type="text"
-        className="w-full p-2 border rounded"
-        value={config.message}
-        onChange={(e) => onChange({ ...config, message: e.target.value })}
-      />
+      <ValidationField field="message">
+        <input
+          type="text"
+          className="w-full p-2 border rounded"
+          value={config.message}
+          onChange={(e) => onChange({ ...config, message: e.target.value })}
+        />
+      </ValidationField>
     </div>
   );
 };
@@ -39,6 +42,7 @@ export const DebugNode: NodeDefinition<DebugConfig> = {
   settings: DebugSettings,
   validate: (config) => {
     return {
+      field: 'message',
       isValid: config.message.length > 0,
       message: config.message.length === 0 ? 'Message is required' : undefined,
     };

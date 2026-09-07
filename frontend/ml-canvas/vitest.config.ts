@@ -21,7 +21,8 @@ export default defineConfig({
     // Co-located tests are encouraged but `src/test/` may also hold shared fixtures.
     coverage: {
       provider: 'v8',
-      reporter: ['text', 'html'],
+      reporter: ['text-summary', 'html', ['lcovonly', { projectRoot: path.resolve(__dirname, '../..') }]],
+      reportsDirectory: './coverage',
       include: ['src/**/*.{ts,tsx}'],
       exclude: ['src/**/*.{test,spec}.{ts,tsx}', 'src/test/**', 'src/**/*.d.ts'],
     },
