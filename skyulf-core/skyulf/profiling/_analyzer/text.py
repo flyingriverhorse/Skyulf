@@ -112,15 +112,25 @@ class TextMixin(_AnalyzerState):
         # was implemented, making the alert message misleading for
         # phone-number-only columns).
         sample = self.df[col].drop_nulls().head(20).to_list()  # type: ignore[attr-defined]
-        email_pattern = r"[^@]+@[^@]+\.[^@]+"
-        # Loose heuristic for common phone formats, e.g. "+1 (555) 123-4567",
-        # "555-123-4567", "5551234567". Requires at least 7 digits so plain
-        # numeric IDs/years don't false-positive.
+        if not sample:
+            return False
+
+        email_pattern = r"[^@\s]+@[^@\s]+\.[^@\s]+"
+        # Require positive phone evidence: a plus prefix or visual separators,
+        # plus the 10-11 digits used by the common formats we support. This
+        # avoids treating plain IDs and ZIP+4 values as phone numbers.
         phone_pattern = r"^\+?[\d\s().-]{7,20}$"
 
         def _looks_like_phone(value: str) -> bool:
-            return bool(re.match(phone_pattern, value)) and sum(c.isdigit() for c in value) >= 7
+            if not re.fullmatch(phone_pattern, value):
+                return False
+            digits = sum(c.isdigit() for c in value)
+            has_phone_marker = value.startswith("+") or any(char in value for char in " ()-")
+            return has_phone_marker and 10 <= digits <= 11
 
-        return any(
-            re.match(email_pattern, str(val)) or _looks_like_phone(str(val)) for val in sample
-        )
+        if any(re.fullmatch(email_pattern, str(val)) for val in sample):
+            return True
+
+        phone_matches = sum(_looks_like_phone(str(val)) for val in sample)
+        required_matches = max(1, min(2, len(sample)))
+        return phone_matches >= required_matches

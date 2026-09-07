@@ -171,6 +171,7 @@ uses, so a fixed finding stays where it was filed.
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
 | OC-112 | ⚪ | Comment and code disagree in the categorical profiler — the comment promises a rendered missing-value marker, the code `continue`s and discards the null category (`profiling/_analyzer/categorical.py:22-30`). *Filed as "disagree about the applied threshold"; the real subject is the null-category marker* | 1 line | ✅ fixed 2026-09-06 — comment-only, no behaviour change; the reasoning for why dropping the null category is correct now lives in the code comment it rewrote. See the log entry |
+| OC-148 | 🟡 | PII detector flags ordinary 7+ digit numeric ID columns as "Email/Phone" (`profiling/_analyzer/text.py:107-128`) | small | ✅ fixed 2026-09-07 — phone detection now requires positive format evidence and repeated sample evidence; plain IDs, ZIP+4, and isolated phone-shaped IDs are excluded |
 
 ### Remaining — file-coverage closure
 
@@ -297,6 +298,18 @@ batch's context are in [the live queue](opus_core_analysis-open_queue.md).
 ---
 
 ## Log
+
+### 2026-09-07 — OC-148 fixed: phone PII detection no longer flags ordinary identifiers
+
+The previous phone heuristic treated any 7–20 character numeric/separator
+string with at least seven digits as a phone number, so customer IDs, order
+references, and ZIP+4 values produced false `PII` alerts. It also flagged a
+whole column from one matching sample. The detector now requires a `+` prefix
+or phone-style separators plus 10–11 digits, and requires two matching phone
+samples when the sample contains at least two values. Email detection remains
+unchanged. Regression coverage includes long numeric IDs, ZIP+4 values, an
+isolated phone-shaped ID, real phone formats, email, and plain text; all 7 PII
+tests pass, with Ruff and Ty clean.
 
 ### 2026-09-07 — OC-76 fixed: applied pandas/Polars output parity is now enforced
 

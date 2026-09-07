@@ -380,6 +380,22 @@ class DatasetProfile(BaseModel):
     recommendations: list[Recommendation] = Field(default_factory=list)
     sample_data: list[dict[str, Any]] | None = None
 
+    @property
+    def pii_alerts(self) -> list[Alert]:
+        """Return only alerts indicating that a column may contain PII."""
+        return [alert for alert in self.alerts if alert.type == "PII"]
+
+    @property
+    def pii_columns(self) -> list[str]:
+        """Return PII-flagged column names in their profile alert order."""
+        columns = (alert.column for alert in self.pii_alerts if alert.column is not None)
+        return list(dict.fromkeys(columns))
+
+    @property
+    def has_pii(self) -> bool:
+        """Return whether profiling found at least one possible PII column."""
+        return bool(self.pii_alerts)
+
     # Target Analysis
     target_col: str | None = None
     task_type: str | None = None  # "Classification" or "Regression"
