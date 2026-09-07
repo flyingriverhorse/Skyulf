@@ -79,7 +79,9 @@ test('existing-node picker connects through the named input and Escape preserves
   await expect(trigger).toBeFocused();
   await trigger.press('Space');
   await expect(picker).toBeVisible();
-  await page.keyboard.press('Escape');
+  const search = picker.getByRole('textbox', { name: 'Search next steps', exact: true });
+  await expect(search).toBeFocused();
+  await search.press('Escape');
   await expect(picker).toHaveCount(0);
   await expect(trigger).toBeFocused();
   await expect(page.locator('.react-flow__edge')).toHaveCount(1);
@@ -161,15 +163,32 @@ for (const split of [
       state.updateNodeData('node-0', { validation_size: value });
     }, value);
     if (split.type === 'TrainTestSplitter') await updateValidation(0.1);
-    // Split labels must fit a normal-height card without covering its title or summary.
-    expect(await page.locator('[data-id="node-0"] [data-node-definition-type]').evaluate(element => (element as HTMLElement).offsetHeight)).toBeLessThanOrEqual(110);
-    expect(await page.locator('[data-id="node-0"] [data-node-definition-type]').evaluate(element => {
-      const card = element.getBoundingClientRect();
-      const labels = Array.from(element.querySelectorAll('.react-flow__handle.source button')).map(button => button.getBoundingClientRect());
-      const summary = element.querySelector('.text-\\[11px\\]')!.getBoundingClientRect();
-      return labels.every((label, index) => label.bottom <= card.bottom && label.left >= summary.right &&
-        (index === 0 || label.top >= labels[index - 1]!.bottom));
-    })).toBe(true);
+    // Platform fallback fonts have different widths; long output labels must still clear the summary.
+    const splitCard = page.locator('[data-id="node-0"] [data-node-definition-type]');
+    for (const font of ['', 'Verdana, sans-serif', 'monospace']) {
+      await splitCard.evaluate((element, font) => { (element as HTMLElement).style.fontFamily = font; }, font);
+      expect(await splitCard.evaluate(element => (element as HTMLElement).offsetHeight)).toBeLessThanOrEqual(110);
+      const measurements = await splitCard.evaluate(element => {
+        const card = element.getBoundingClientRect();
+        const summary = element.querySelector('.text-\\[11px\\]')!.getBoundingClientRect();
+        const labels = Array.from(element.querySelectorAll('.react-flow__handle.source button')).map(button => ({
+          text: button.textContent, bounds: button.getBoundingClientRect(),
+        }));
+        return labels.map((label, index) => ({
+          text: label.text,
+          summaryGap: label.bounds.left - summary.right,
+          bottomGap: card.bottom - label.bounds.bottom,
+          previousLabelGap: index === 0 ? 0 : label.bounds.top - labels[index - 1]!.bounds.bottom,
+        }));
+      });
+      for (const label of measurements) {
+        const context = `${split.type}, ${font || 'default font'}, ${label.text}`;
+        expect(label.summaryGap, `${context}: summary clearance`).toBeGreaterThanOrEqual(0);
+        expect(label.bottomGap, `${context}: card clearance`).toBeGreaterThanOrEqual(0);
+        expect(label.previousLabelGap, `${context}: preceding label clearance`).toBeGreaterThanOrEqual(0);
+      }
+    }
+    await splitCard.evaluate(element => { (element as HTMLElement).style.fontFamily = ''; });
     const source = page.locator(`[data-id="node-0"] .react-flow__handle.source[data-handleid="${split.start}"]`);
     const target = page.locator('[data-id="node-1"] .react-flow__handle.target');
     await moveTo(page, source);

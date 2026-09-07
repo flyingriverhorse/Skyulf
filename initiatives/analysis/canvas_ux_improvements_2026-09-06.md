@@ -687,3 +687,13 @@ explicitly recorded above is complete; remaining interaction details need review
   responsive focus. Screenshots were inspected. Lint and production build passed;
   served assets and v0.8.16 notes were updated. Browser APIs are mocked and the
   existing circular/empty chunk build warnings remain.
+- 2026-09-07: Investigated the Linux CI split-label clearance failure. Wider
+  fonts reproduced a negative horizontal gap locally; feature/target split
+  summaries now reserve 112px for output labels instead of 96px, preserving
+  compact height and existing port positions. Browser checks exercise default,
+  Verdana/sans-serif, and monospace fonts and report individual gap measurements.
+  The Escape check now waits for picker search focus before sending the key.
+  All seven guided-connection checks passed twice locally (14 runs); lint, build,
+  and size-check passed. At the user's request the main gzip budget increased
+  from 300 to 325 KB; the rebuilt entry measured 303.6 KB. Independent review
+  found no blockers. The hosted Linux CI run has not been rerun here.
