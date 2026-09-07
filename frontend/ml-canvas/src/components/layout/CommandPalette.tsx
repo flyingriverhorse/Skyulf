@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Search, X } from 'lucide-react';
 import { registry } from '../../core/registry/NodeRegistry';
+import { searchNodes } from '../../core/utils/nodeSearch';
 import type { NodeDefinition } from '../../core/types/nodes';
 import {
   ADD_NODE_AT_CENTER_EVENT,
@@ -10,8 +11,8 @@ import {
 import { useModalFocus } from '../shared/useModalFocus';
 
 /**
- * Quick command palette (Ctrl/Cmd+K). Fuzzy filter the registry by
- * label/description/category/type and drop the chosen node at the
+ * Quick command palette (Ctrl/Cmd+K). Search catalog names and task terms,
+ * then drop the chosen node at the
  * canvas viewport center. Listens on the global SHOW_PALETTE_EVENT
  * dispatched by `useKeyboardShortcuts` so it can be opened from the
  * keyboard or from any UI affordance without prop-drilling.
@@ -40,29 +41,7 @@ export const CommandPalette: React.FC = () => {
     return () => window.removeEventListener(SHOW_PALETTE_EVENT, onOpen);
   }, []);
 
-  const matches = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return allNodes;
-    // Cheap fuzzy: substring match against label/description/category/type
-    // with a tiny score so exact label-prefix matches surface first.
-    const scored = allNodes
-      .map((n) => {
-        const label = n.label.toLowerCase();
-        const desc = n.description.toLowerCase();
-        const cat = n.category.toLowerCase();
-        const type = n.type.toLowerCase();
-        let score = 0;
-        if (label.startsWith(q)) score += 100;
-        if (label.includes(q)) score += 50;
-        if (cat.includes(q)) score += 20;
-        if (type.includes(q)) score += 10;
-        if (desc.includes(q)) score += 5;
-        return { node: n, score };
-      })
-      .filter((x) => x.score > 0)
-      .sort((a, b) => b.score - a.score);
-    return scored.map((x) => x.node);
-  }, [allNodes, query]);
+  const matches = useMemo(() => searchNodes(allNodes, query), [allNodes, query]);
 
   // Clamp activeIndex when the result set shrinks under the cursor.
   useEffect(() => {
@@ -125,7 +104,7 @@ export const CommandPalette: React.FC = () => {
       `[data-palette-index="${activeIndex}"]`,
     );
     el?.scrollIntoView({ block: 'nearest' });
-  }, [activeIndex, open]);
+  }, [activeIndex, open, matches]);
 
   if (!open) return null;
 
@@ -155,8 +134,8 @@ export const CommandPalette: React.FC = () => {
               setQuery(e.target.value);
               setActiveIndex(0);
             }}
-            placeholder="Search nodes by name, category, or description…"
-            className="flex-1 bg-transparent outline-none text-sm placeholder:text-muted-foreground"
+            placeholder="Search nodes or tasks, e.g. normalize…"
+            className="min-w-0 flex-1 bg-transparent outline-none text-sm placeholder:text-muted-foreground"
             aria-label="Search nodes"
           />
           <button
@@ -203,13 +182,13 @@ export const CommandPalette: React.FC = () => {
                     <span className="w-4 h-4 mt-0.5 shrink-0" />
                   )}
                   <span className="flex-1 min-w-0">
-                    <span className="flex items-center gap-2">
-                      <span className="font-medium truncate">{n.label}</span>
+                    <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                      <span className="font-medium break-words min-w-0">{n.label}</span>
                       <span className="text-[10px] uppercase tracking-wider text-muted-foreground shrink-0">
                         {n.category}
                       </span>
                     </span>
-                    <span className="block text-xs text-muted-foreground line-clamp-1">
+                    <span className="block text-xs text-muted-foreground break-words">
                       {n.description}
                     </span>
                   </span>

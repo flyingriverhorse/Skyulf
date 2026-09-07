@@ -1,5 +1,6 @@
 import React, { useCallback, useId, useLayoutEffect, useRef, useState } from 'react';
 import { registry } from '../../core/registry/NodeRegistry';
+import { searchNodes } from '../../core/utils/nodeSearch';
 import { useGraphStore } from '../../core/store/useGraphStore';
 import { useViewStore } from '../../core/store/useViewStore';
 import { useSidebarOpen } from '../../core/hooks/useSidebarOpen';
@@ -81,11 +82,7 @@ export const Sidebar: React.FC = () => {
   }
 
   const searchQuery = searchTerm.trim().toLowerCase();
-  const filteredNodes = nodes.filter(n =>
-    n.label.toLowerCase().includes(searchQuery) ||
-    n.category.toLowerCase().includes(searchQuery) ||
-    n.description.toLowerCase().includes(searchQuery)
-  );
+  const filteredNodes = searchNodes(nodes, searchQuery);
 
   const categories = ['Data Source', 'Preprocessing', 'Modeling', 'Evaluation', 'Utility'];
 
@@ -123,7 +120,7 @@ export const Sidebar: React.FC = () => {
         {filteredNodes.length === 0 && (
           <div className="text-center py-8 px-2">
             <p className="text-sm font-medium text-muted-foreground">No components found</p>
-            <p className="text-xs text-muted-foreground mt-1">Try a different search term.</p>
+            <p className="text-xs text-muted-foreground mt-1">Try a task such as “normalize” or “missing values”.</p>
           </div>
         )}
         {categories.map((category, index) => {
@@ -160,17 +157,19 @@ export const Sidebar: React.FC = () => {
                     key={node.type}
                     data-testid={`sidebar-node-${node.type}`}
                     aria-label={`Add ${node.label} node`}
-                    className="group flex w-full items-center p-3 border rounded-lg bg-card text-left hover:border-primary/50 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background cursor-grab active:cursor-grabbing transition-all"
+                    aria-describedby={`${categoryListId}-${node.type}-description`}
+                    title={node.description}
+                    className="group flex w-full items-start p-3 border rounded-lg bg-card text-left hover:border-primary/50 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background cursor-grab active:cursor-grabbing transition-all"
                     draggable
                     onDragStart={(e) => { handleDragStart(e, node.type); }}
                     onClick={() => { handleAddNodeClick(node.type); }}
                   >
-                    <span className="p-2 bg-primary/5 group-hover:bg-primary/10 rounded-md mr-3 transition-colors">
+                    <span className="shrink-0 p-2 bg-primary/5 group-hover:bg-primary/10 rounded-md mr-3 transition-colors">
                       {node.icon && <node.icon className="w-4 h-4 text-primary" />}
                     </span>
                     <span className="flex-1 min-w-0">
-                      <span className="block text-sm font-medium truncate">{node.label}</span>
-                      <span className="block text-xs text-muted-foreground truncate">
+                      <span className={`block text-sm font-medium ${isSearching ? 'break-words' : 'truncate'}`}>{node.label}</span>
+                      <span id={`${categoryListId}-${node.type}-description`} className={`block text-xs text-muted-foreground ${isSearching ? 'break-words' : 'truncate'}`}>
                         {node.description}
                       </span>
                     </span>

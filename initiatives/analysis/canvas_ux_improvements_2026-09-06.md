@@ -29,7 +29,7 @@ before implementation because other work may have changed these components.
 | CUX-01 | High | Preserve canvas space with resizable panels | Complete at checked desktop/laptop sizes |
 | CUX-02 | High | Guide node connections and adding the next step | Open |
 | CUX-03 | High | Clearly distinguish previewing data from training | In progress; visible action labels and training guidance complete |
-| CUX-04 | Medium | Improve component discovery | In progress; description search and collapsible categories complete |
+| CUX-04 | Medium | Improve component discovery | In progress; task search, readable results, and collapsible categories complete; preprocessing subgroups remain |
 | CUX-05 | Medium | Navigate from validation issues to the exact setting | Complete; field navigation and general-issue fallback verified |
 | CUX-06 | Medium | Reduce connection and settings visual noise | Complete; contextual connection controls and node details verified |
 | CUX-07 | Medium | Inspect a selected node's input and output | Open |
@@ -168,17 +168,26 @@ chevrons and node counts; mouse, Enter, and Space toggle their node lists.
 Search keeps matching categories expanded and temporarily disables their
 toggles. Clearing search restores the previous collapsed choices, which also
 survive closing/reopening the sidebar while it remains mounted. Categories
-start expanded. Preprocessing subgroups, synonyms, and fuller result
-descriptions remain open.
+start expanded. Sidebar and Ctrl+K now share ranked task-term search: for
+example, "normalize" finds Scaling, "fill blanks" finds Imputation, and
+"predict" finds the three prediction node types. All query words must match,
+so "predict numbers" narrows to Regression. Name matches rank ahead of task
+aliases; category, description, and technical-type queries still work, and
+hidden legacy definitions stay excluded. Case, extra whitespace, hyphens,
+and underscores are normalized. Sidebar search results wrap full names and
+descriptions, with descriptions associated with their add buttons. Browsing
+keeps compact cards; the palette always shows full descriptions. Existing
+click, drag, Enter/Space, and Ctrl+K insertion paths are preserved.
+Preprocessing subgroups remain open.
 
 **Acceptance criteria:**
 
 - [x] Sidebar search matches node descriptions, names, and categories; blank queries restore the library.
 - [x] Modeling and evaluation are reachable by collapsing the preceding categories.
-- [ ] Common task terms return relevant nodes without flooding results.
-- [ ] Search results expose the reason a node is useful and enough description to choose it.
+- [x] Common task terms return relevant nodes without flooding results.
+- [x] Search results expose the reason a node is useful and enough description to choose it.
 - [x] Collapsed categories do not hide matches during a search.
-- [ ] Existing click-to-add, drag, and command-palette flows remain available.
+- [x] Existing click-to-add, drag, and command-palette flows remain available.
 
 **Starting points:** `src/components/layout/Sidebar.tsx`,
 `CommandPalette.tsx`, and `src/core/registry/NodeRegistry.ts`.
@@ -558,3 +567,16 @@ explicitly recorded above is complete; remaining interaction details need review
   re-hover, repeated node selection, and clipboard feedback. Lint, TypeScript,
   and production build passed; served assets were rebuilt. Existing chunk
   warnings remain.
+- 2026-09-07: Completed the CUX-04 task-search and readable-results portion.
+  Shared `nodeSearch` ranks catalog names and curated task vocabulary for the
+  sidebar and command palette. Search descriptions wrap fully, sidebar add
+  buttons expose associated descriptions, and palette search changes keep the
+  active result in view. A failing palette regression first demonstrated that
+  "normalize" returned no options. Eight catalog-search tests and a palette
+  regression now cover synonyms, narrowing, ranking, catalog fields, and hidden
+  nodes. Three new browser tests verify full description bounds, light/dark
+  layouts, sidebar/palette consistency, keyboard insertion, click, and drag.
+  All 909 unit tests and 11 focused browser checks passed, along with lint,
+  TypeScript, and the production build. Independent review found no blockers.
+  Served assets were rebuilt and v0.8.16 notes updated. Preprocessing subgroups
+  remain open. Browser checks use mocked APIs; existing build warnings remain.
