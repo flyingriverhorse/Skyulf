@@ -114,3 +114,39 @@ it('clears the pending guard after rejection and identifies a later tuning submi
   expect(result.current.runFeedback?.jobIds).toEqual(['job-a']);
   expect(jobsApi.runPipeline).toHaveBeenCalledTimes(2);
 });
+
+/** Missing editor context must not accidentally submit every model in the graph. */
+it.each([undefined, 'deleted-model'])('does not submit when node %s is unavailable', async (nodeId) => {
+  const { result } = renderHook(() => useTrainingNodeContext(nodeId));
+  await act(async () => { await result.current.runJob('training', 'classification'); });
+  expect(result.current.datasetId).toBeUndefined();
+  expect(result.current.isSubmitting).toBe(false);
+  expect(result.current.runFeedback).toBeNull();
+  expect(useJobStore.getState().nodeSubmissions).toEqual({});
+  expect(jobsApi.runPipeline).not.toHaveBeenCalled();
+});
+
+/** A disconnected model needs persistent instructions even when there is no toast. */
+it.each([
+  { data: { label: 'Custom_classifier' }, modelName: 'Custom classifier' },
+  { data: {}, modelName: 'selected model' },
+])('identifies a disconnected $modelName in blocked feedback', async ({ data, modelName }) => {
+  useGraphStore.setState({ nodes: [{ id: 'model-a', position: { x: 0, y: 0 }, data }], edges: [] });
+  const { result } = renderHook(() => useTrainingNodeContext('model-a'));
+  await act(async () => { await result.current.runJob('tuning', 'classification'); });
+  expect(result.current.submissionMessage).toContain(modelName);
+  expect(result.current.submissionMessage).toContain('Connect a dataset upstream and select a dataset');
+  expect(result.current.isSubmitting).toBe(false);
+  expect(result.current.runFeedback).toBeNull();
+  expect(jobsApi.runPipeline).not.toHaveBeenCalled();
+});
+
+/** Legacy responses without a nonempty batch list must still be monitored. */
+it('falls back to job_id when the response has no batch jobs', async () => {
+  vi.mocked(jobsApi.runPipeline).mockResolvedValue({ ...response, job_ids: [] });
+  const { result } = renderHook(() => useTrainingNodeContext('model-a'));
+  await act(async () => { await result.current.runJob('training', 'classification'); });
+  expect(result.current.runFeedback?.jobIds).toEqual(['job-a']);
+  expect(useJobStore.getState().startPolling).toHaveBeenCalledOnce();
+  expect(useJobStore.getState().setActiveParallelRun).not.toHaveBeenCalled();
+});

@@ -17,21 +17,25 @@ interface DriftHistoryChartProps {
 }
 
 /**
- * Time-series chart of how many columns drifted in each historical check.
+ * Time-series chart of how many measured features drifted in each historical check.
  * Plots both the raw count (red) and the percentage (amber, dashed).
  * Hidden when there's only zero or one history entry.
  */
 export const DriftHistoryChart: React.FC<DriftHistoryChartProps> = ({ history }) => {
     if (history.length <= 1) return null;
 
-    const data = [...history].reverse().map(h => ({
-        date: h.created_at?.split('T')[0] ?? '',
-        drifted: h.drifted_columns_count ?? 0,
-        total: h.total_columns ?? 0,
-        pct: h.total_columns
-            ? Math.round(((h.drifted_columns_count ?? 0) / h.total_columns) * 100)
-            : 0,
-    }));
+    const data = [...history].reverse().map(h => {
+        // Persisted counts also include schema changes, including legacy target
+        // artifacts. Use the recorded feature evidence for both numerator and
+        // denominator; an unevaluated check has no distribution verdict.
+        const columns = h.summary ? Object.values(h.summary) : null;
+        const drifted = columns ? columns.filter(c => c.drifted).length : null;
+        return {
+            date: h.created_at?.split('T')[0] ?? '',
+            drifted,
+            pct: columns?.length ? Math.round(((drifted ?? 0) / columns.length) * 100) : null,
+        };
+    });
 
     return (
         <div className="bg-white dark:bg-slate-800 p-6 rounded-lg shadow border dark:border-slate-700 mt-6">
@@ -68,7 +72,7 @@ export const DriftHistoryChart: React.FC<DriftHistoryChartProps> = ({ history })
                             itemStyle={{ color: 'hsl(var(--popover-foreground))' }}
                             labelStyle={{ color: 'hsl(var(--muted-foreground))' }}
                             formatter={(value: number, name: string) => {
-                                if (name === 'Drifted Columns') return [value, name];
+                                if (name === 'Drifted Features') return [value, name];
                                 if (name === 'Drift %') return [`${value}%`, name];
                                 return [value, name];
                             }}
@@ -77,7 +81,7 @@ export const DriftHistoryChart: React.FC<DriftHistoryChartProps> = ({ history })
                         <Line
                             type="monotone"
                             dataKey="drifted"
-                            name="Drifted Columns"
+                            name="Drifted Features"
                             stroke="#ef4444"
                             strokeWidth={2}
                             dot={{ r: 3, fill: '#ef4444' }}

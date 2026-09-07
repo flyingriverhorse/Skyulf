@@ -523,6 +523,9 @@ async def calculate_drift(
     unparseable). ``dataset_name`` is optional and only used to prefer an exact
     reference-file match over a scan of the job's artifacts.
 
+    The job's target column is excluded from feature and schema drift on both
+    sides, including unnamed target columns in legacy splitter references.
+
     The response carries per-column drift metrics — PSI, KS, Wasserstein and KL —
     the columns missing from or new to the upload, and, when the job recorded them,
     its training feature importances, so a drifted column can be weighed against
@@ -563,6 +566,17 @@ async def calculate_drift(
 
     # 3. Load Current Data
     curr_df = await _load_current_dataframe(file)
+
+    # Compare model inputs only. Older splitter snapshots stored the target
+    # under an empty name, falsely reporting it as missing and the named upload
+    # target as new. Normalize in memory so existing jobs need no retraining.
+    db_jobs = await _fetch_drift_job_rows(db, [job_id])
+    db_job = db_jobs.get(job_id)
+    target_col = _extract_drift_target_column(db_job) if db_job is not None else None
+    if target_col:
+        ref_df = ref_df.drop([col for col in ("", target_col) if col in ref_df.columns])
+        if target_col in curr_df.columns:
+            curr_df = curr_df.drop(target_col)
 
     # 4. Calculate Drift
     custom_thresholds = _build_drift_thresholds(

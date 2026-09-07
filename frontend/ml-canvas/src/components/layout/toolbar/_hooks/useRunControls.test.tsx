@@ -1,10 +1,28 @@
-import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, renderHook } from '@testing-library/react';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { act, cleanup, renderHook } from '@testing-library/react';
 import { useRunControls } from './useRunControls';
 import { useGraphStore } from '../../../../core/store/useGraphStore';
 import { initializeRegistry } from '../../../../core/registry/init';
 import { useJobStore } from '../../../../core/store/useJobStore';
 import { useNotificationsStore } from '../../../../core/store/useNotificationsStore';
+import { useViewStore } from '../../../../core/store/useViewStore';
+import { runPipelinePreview } from '../../../../core/api/client';
+import { jobsApi } from '../../../../core/api/jobs';
+import { RUN_PREVIEW_EVENT } from '../../../../core/hooks/useKeyboardShortcuts';
+import type { Node, Edge } from '@xyflow/react';
+
+const originalStartPolling = useJobStore.getState().startPolling;
+
+/** A valid preprocessing graph keeps submission tests on the real validation path. */
+function previewGraph(): { nodes: Node[]; edges: Edge[] } {
+  return {
+    nodes: [
+      { id: 'dataset', position: { x: 0, y: 0 }, data: { definitionType: 'dataset_node', datasetId: 'ds-1' } },
+      { id: 'drop', position: { x: 200, y: 0 }, data: { definitionType: 'drop_missing_columns', columns: ['id'], missing_threshold: 0 } },
+    ],
+    edges: [{ id: 'edge', source: 'dataset', sourceHandle: 'data', target: 'drop', targetHandle: 'in' }],
+  };
+}
 
 vi.mock('../../../../core/api/client', () => ({
   runPipelinePreview: vi.fn(),
@@ -13,6 +31,8 @@ vi.mock('../../../../core/api/client', () => ({
 vi.mock('../../../../core/api/jobs', () => ({
   jobsApi: {
     runPipeline: vi.fn(),
+    getJobs: vi.fn().mockResolvedValue([]),
+    getJob: vi.fn().mockRejectedValue(new Error('Job snapshot is not available yet')),
   },
 }));
 
@@ -21,7 +41,10 @@ describe('useRunControls', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(runPipelinePreview).mockReset();
+    vi.mocked(jobsApi.runPipeline).mockReset();
     useNotificationsStore.getState().clear();
+    useViewStore.setState({ readOnlyOverride: 'off', isResultsPanelExpanded: false });
     useGraphStore.setState({
       nodes: [],
       edges: [],
@@ -31,7 +54,17 @@ describe('useRunControls', () => {
     useJobStore.setState({
       jobs: [],
       activeParallelRun: null,
+      inspectedRun: null,
+      isDrawerOpen: false,
+      // Polling opens network/WebSocket subscriptions; submission state remains real.
+      startPolling: vi.fn(),
     });
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.restoreAllMocks();
+    useJobStore.setState({ startPolling: originalStartPolling });
   });
 
   it('explains a blocked keyboard preview using the same validation flow as clicking', async () => {
@@ -46,6 +79,7 @@ describe('useRunControls', () => {
   });
 
   it('blocks preview submission when graph validation finds issues', async () => {
+    // Invalid node configuration must never reach the preview API.
     useGraphStore.getState().setGraph(
       [
         {
@@ -76,6 +110,7 @@ describe('useRunControls', () => {
   });
 
   it('blocks experiment submission when graph validation finds issues', async () => {
+    // Invalid graphs must not create background jobs.
     useGraphStore.getState().setGraph(
       [
         {
@@ -134,5 +169,201 @@ describe('useRunControls', () => {
     await act(async () => { await result.current.handleRun(); });
     expect(useNotificationsStore.getState().items).toHaveLength(0);
     expect(useGraphStore.getState().executionResult?.status).toBe('success');
+  });
+
+  it('explains that an empty canvas needs a dataset for both run actions', async () => {
+    // Empty graphs have no node validation issues, so the dataset guard must explain the block.
+    const { result } = renderHook(() => useRunControls());
+    expect(result.current.canRunPreview).toBe(false);
+    expect(result.current.experimentBlockReason).toContain('Connect a model');
+    await act(async () => {
+      await result.current.handleRun();
+      await result.current.handleRunAll();
+    });
+    expect(useNotificationsStore.getState().items).toEqual(expect.arrayContaining([
+      expect.objectContaining({ message: 'Preview blocked. Add a dataset node and select a dataset.' }),
+      expect.objectContaining({ message: 'Experiments blocked. Add a dataset node and select a dataset.' }),
+    ]));
+    expect(runPipelinePreview).not.toHaveBeenCalled();
+    expect(jobsApi.runPipeline).not.toHaveBeenCalled();
+  });
+
+  it('requires a selected, connected dataset before declaring preview available', () => {
+    // Preview readiness must follow graph edits instead of remaining stale after selection or wiring.
+    const { result } = renderHook(() => useRunControls());
+    act(() => useGraphStore.setState({ nodes: [{ id: 'dataset', position: { x: 0, y: 0 }, data: { definitionType: 'dataset_node' } }] }));
+    expect(result.current.canRunPreview).toBe(false);
+    const graph = previewGraph();
+    act(() => useGraphStore.setState({ nodes: graph.nodes.slice(0, 1), edges: [] }));
+    expect(result.current.canRunPreview).toBe(false);
+    act(() => useGraphStore.setState(graph));
+    expect(result.current.canRunPreview).toBe(true);
+    expect(result.current.experimentBlockReason).toContain('Connect a model');
+  });
+
+  it.each([1, 2])('counts %i validation issues and directs blocked runs to results', async count => {
+    // The review summary and execution feedback must identify how many fixes are required.
+    useGraphStore.setState({
+      nodes: Array.from({ length: count }, (_, index) => ({
+        id: `unknown-${index}`, position: { x: index * 100, y: 0 },
+        data: { definitionType: 'unknown_node', label: `Unknown ${index}` },
+      })),
+    });
+    const { result } = renderHook(() => useRunControls());
+    expect(result.current.experimentBlockReason).toContain(`Fix ${count} validation issue${count === 1 ? '' : 's'} first.`);
+    await act(async () => { await result.current.handleRun(); });
+    expect(useViewStore.getState().isResultsPanelExpanded).toBe(true);
+    expect(useGraphStore.getState().executionResult).toBeNull();
+    expect(useNotificationsStore.getState().items[0]?.message)
+      .toBe(`Preview blocked. Review ${count} validation issue${count === 1 ? '' : 's'}.`);
+    await act(async () => { await result.current.handleRunAll(); });
+    expect(useNotificationsStore.getState().items.some(item => item.message.startsWith('Experiments blocked.'))).toBe(true);
+    expect(jobsApi.runPipeline).not.toHaveBeenCalled();
+  });
+
+  it.each([true, false])('lists connected models and detects branches sharing a parent: %s', sharedParent => {
+    // Disconnected models stay out of the review while training and tuning retain their own labels.
+    const graph = previewGraph();
+    graph.nodes.push(
+      { id: 'first', position: { x: 400, y: 0 }, data: { definitionType: 'classification', label: 'Classifier', model_type: 'random_forest_classifier' } },
+      { id: 'second', position: { x: 400, y: 200 }, data: { definitionType: 'classification', label: 'Classifier', run_mode: 'advanced' } },
+      { id: 'unconnected', position: { x: 400, y: 400 }, data: { definitionType: 'classification', label: 'Unused classifier' } },
+    );
+    graph.edges.push(
+      { id: 'first-input', source: 'drop', target: 'first' },
+      { id: 'second-input', source: sharedParent ? 'drop' : 'dataset', target: 'second' },
+    );
+    useGraphStore.setState(graph);
+    const { result } = renderHook(() => useRunControls());
+    expect(result.current.hasMultipleBranches).toBe(true);
+    expect(result.current.experimentModels).toEqual([
+      { id: 'first', name: 'Classifier (1)', model: 'random forest classifier', action: 'Train' },
+      { id: 'second', name: 'Classifier (2)', model: 'Select a model', action: 'Tune' },
+    ]);
+  });
+
+  it('filters data-preview sinks and their edges from the submitted preprocessing graph', async () => {
+    // Inspection-only nodes must not become executable steps or dangling input references.
+    const graph = previewGraph();
+    graph.nodes.push({ id: 'inspect', position: { x: 300, y: 200 }, data: { definitionType: 'data_preview' } });
+    graph.edges.push(
+      { id: 'inspect-input', source: 'drop', target: 'inspect' },
+      { id: 'inspect-output', source: 'inspect', target: 'drop' },
+    );
+    useGraphStore.setState(graph);
+    vi.mocked(runPipelinePreview).mockResolvedValueOnce({ pipeline_id: 'p', status: 'success', node_results: {}, preview_data: null, recommendations: [] });
+    const { result } = renderHook(() => useRunControls());
+    await act(async () => { await result.current.handleRun(); });
+    expect(runPipelinePreview).toHaveBeenCalledOnce();
+    const submitted = vi.mocked(runPipelinePreview).mock.calls[0]![0];
+    expect(submitted.nodes.map(node => node.node_id)).toEqual(['dataset', 'drop']);
+    expect(JSON.stringify(submitted)).not.toContain('inspect');
+    expect(useGraphStore.getState().executionResult?.status).toBe('success');
+  });
+
+  it.each([new Error('Backend unavailable'), 'Connection interrupted'])('keeps rejected preview details visible and allows retry: %s', async failure => {
+    // Errors must release the pending guard and preserve the actual failure for diagnostics.
+    useGraphStore.setState(previewGraph());
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.mocked(runPipelinePreview).mockRejectedValueOnce(failure);
+    const { result } = renderHook(() => useRunControls());
+    await act(async () => { await result.current.handleRun(); });
+    expect(result.current.isRunning).toBe(false);
+    expect(useGraphStore.getState().lastRunError).toBe(failure instanceof Error ? failure.message : failure);
+    expect(useViewStore.getState().isResultsPanelExpanded).toBe(true);
+    expect(useNotificationsStore.getState().items[0]?.message).toContain('Preview failed');
+    vi.mocked(runPipelinePreview).mockResolvedValueOnce({ pipeline_id: 'retry', status: 'success', node_results: {}, preview_data: null, recommendations: [] });
+    await act(async () => { await result.current.handleRun(); });
+    expect(useGraphStore.getState().lastRunError).toBeNull();
+    expect(useGraphStore.getState().executionResult?.pipeline_id).toBe('retry');
+  });
+
+  it('blocks direct and shortcut submissions in read-only mode', async () => {
+    // Imperative callbacks must honor the same read-only protection as hidden toolbar buttons.
+    useGraphStore.setState(previewGraph());
+    useViewStore.setState({ readOnlyOverride: 'on' });
+    const { result } = renderHook(() => useRunControls());
+    await act(async () => {
+      await result.current.handleRun();
+      await result.current.handleRunAll();
+      window.dispatchEvent(new CustomEvent(RUN_PREVIEW_EVENT));
+    });
+    expect(runPipelinePreview).not.toHaveBeenCalled();
+    expect(jobsApi.runPipeline).not.toHaveBeenCalled();
+    expect(useNotificationsStore.getState().items).toHaveLength(0);
+  });
+
+  it('ignores experiment submission and repeated keyboard shortcuts during a pending preview', async () => {
+    // A pending preview must not race background submission or another keyboard activation.
+    useGraphStore.setState(previewGraph());
+    let resolve!: (value: Awaited<ReturnType<typeof runPipelinePreview>>) => void;
+    vi.mocked(runPipelinePreview).mockReturnValueOnce(new Promise(done => { resolve = done; }));
+    const { result, unmount } = renderHook(() => useRunControls());
+    act(() => window.dispatchEvent(new CustomEvent(RUN_PREVIEW_EVENT)));
+    await act(async () => {
+      window.dispatchEvent(new CustomEvent(RUN_PREVIEW_EVENT));
+      await result.current.handleRunAll();
+    });
+    expect(runPipelinePreview).toHaveBeenCalledOnce();
+    expect(jobsApi.runPipeline).not.toHaveBeenCalled();
+    await act(async () => {
+      resolve({ pipeline_id: 'p', status: 'success', node_results: {}, preview_data: null, recommendations: [] });
+    });
+    unmount();
+    act(() => window.dispatchEvent(new CustomEvent(RUN_PREVIEW_EVENT)));
+    expect(runPipelinePreview).toHaveBeenCalledOnce();
+  });
+
+  it.each([
+    { jobIds: [], expectedIds: ['job-1'], message: '1 experiment submitted' },
+    { jobIds: ['job-1'], expectedIds: ['job-1'], message: '1 experiment submitted' },
+    { jobIds: ['job-1', 'job-2'], expectedIds: ['job-1', 'job-2'], message: '2 experiments submitted' },
+  ])('selects submitted job scope for job ids $jobIds', async ({ jobIds, expectedIds, message }) => {
+    // Both legacy single-job and parallel responses must open the exact submitted run in Jobs.
+    useGraphStore.setState(previewGraph());
+    vi.mocked(jobsApi.runPipeline).mockResolvedValueOnce({
+      message: 'Submitted', pipeline_id: 'pipeline', job_id: 'job-1', job_ids: jobIds,
+    });
+    const { result } = renderHook(() => useRunControls());
+    await act(async () => { await result.current.handleRunAll(); });
+    expect(jobsApi.runPipeline).toHaveBeenCalledWith(expect.objectContaining({ job_type: 'training' }));
+    expect(useJobStore.getState().inspectedRun).toEqual({ label: 'Experiments', jobIds: expectedIds });
+    expect(useJobStore.getState().isDrawerOpen).toBe(true);
+    expect(useJobStore.getState().startPolling).toHaveBeenCalledOnce();
+    expect(useNotificationsStore.getState().items[0]).toMatchObject({
+      message,
+      action: { type: 'jobs', run: { label: 'Experiments', jobIds: expectedIds } },
+    });
+    if (jobIds.length > 1) {
+      expect(useJobStore.getState().activeParallelRun).toMatchObject({ jobIds: ['job-1', 'job-2'], startedAt: expect.any(String) });
+    } else {
+      expect(useJobStore.getState().activeParallelRun).toBeNull();
+    }
+    expect(runPipelinePreview).not.toHaveBeenCalled();
+    expect(result.current.isRunningAll).toBe(false);
+  });
+
+  it('rejects duplicate experiment submission and releases the guard after failure', async () => {
+    // Connection failures must be recoverable without opening Jobs for work that was never queued.
+    useGraphStore.setState(previewGraph());
+    let reject!: (reason: Error) => void;
+    vi.mocked(jobsApi.runPipeline).mockReturnValueOnce(new Promise((_, fail) => { reject = fail; }));
+    const { result } = renderHook(() => useRunControls());
+    let pending!: Promise<void>;
+    act(() => {
+      pending = result.current.handleRunAll();
+      void result.current.handleRunAll();
+    });
+    expect(result.current.isRunningAll).toBe(true);
+    expect(jobsApi.runPipeline).toHaveBeenCalledOnce();
+    await act(async () => { reject(new Error('Offline')); await pending; });
+    expect(result.current.isRunningAll).toBe(false);
+    expect(useJobStore.getState().isDrawerOpen).toBe(false);
+    expect(useJobStore.getState().inspectedRun).toBeNull();
+    expect(useNotificationsStore.getState().items[0]?.message).toContain('Experiment submission failed');
+    vi.mocked(jobsApi.runPipeline).mockResolvedValueOnce({ message: 'Submitted', pipeline_id: 'p', job_id: 'retry-job', job_ids: [] });
+    await act(async () => { await result.current.handleRunAll(); });
+    expect(useJobStore.getState().inspectedRun?.jobIds).toEqual(['retry-job']);
+    expect(useNotificationsStore.getState().items.some(item => item.message.includes('submission failed'))).toBe(false);
   });
 });

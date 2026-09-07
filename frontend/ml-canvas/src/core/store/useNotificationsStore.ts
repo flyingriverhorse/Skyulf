@@ -43,14 +43,19 @@ interface NotificationsState {
 
 const MAX_ITEMS = 100;
 
+/** Generate a notification ID from 128 bits of cryptographic randomness. */
+function createNotificationId(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  return Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('');
+}
+
 export const useNotificationsStore = create<NotificationsState>()(
   persist(
     (set) => ({
   items: [],
   addAppMessage: (level, message) => set(state => {
     const previous = state.items.find(item => item.logger === 'app' && item.level === level && item.message === message);
-    // nosemgrep: insecure-random-generator -- non-cryptographic local UI identity.
-    const id = previous?.id ?? `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const id = previous?.id ?? createNotificationId();
     const item: StoredNotification = {
       id, level, message, node_id: null, node_type: null, logger: 'app', ts: Date.now(), read: false,
     };
@@ -85,9 +90,7 @@ export const useNotificationsStore = create<NotificationsState>()(
         existingKeys.add(key);
         fresh.push({
           ...w,
-          // nosemgrep: insecure-random-generator -- non-cryptographic local UI id
-          // suffix, not used for security tokens/secrets.
-          id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+          id: createNotificationId(),
           ts: Date.now(),
           read: false,
         });

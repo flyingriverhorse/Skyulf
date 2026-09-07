@@ -21,10 +21,15 @@ describe('notification center announcements', () => {
     expect(screen.getByTestId('notification-announcement')).toHaveTextContent('Export failed');
   });
 
-  it.each(['success', 'error', 'info', 'warning'] as const)('stores and announces %s messages without opening a popup', (level) => {
+  it.each([
+    ['success', () => toast.success('Dataset saved', 'Ready to use.')],
+    ['error', () => toast.error('Dataset saved', 'Ready to use.')],
+    ['info', () => toast.info('Dataset saved', 'Ready to use.')],
+    ['warning', () => toast.warning('Dataset saved', 'Ready to use.')],
+  ] as const)('stores and announces %s messages without opening a popup', (level, announce) => {
     // Removing toast popups must preserve messages, descriptions, and screen-reader feedback.
     render(<MemoryRouter><NotificationCenter /></MemoryRouter>);
-    act(() => toast[level]('Dataset saved', 'Ready to use.'));
+    act(announce);
     expect(useNotificationsStore.getState().items).toHaveLength(1);
     expect(useNotificationsStore.getState().items[0]).toMatchObject({ level, message: 'Dataset saved\nReady to use.' });
     expect(screen.getByTestId('notification-announcement')).toHaveTextContent('Dataset saved Ready to use.');
