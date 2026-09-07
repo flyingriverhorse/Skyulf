@@ -2,6 +2,7 @@ import React from 'react';
 import { useGraphStore } from '../../core/store/useGraphStore';
 import { useViewStore } from '../../core/store/useViewStore';
 import { useSidebarOpen } from '../../core/hooks/useSidebarOpen';
+import { FOCUS_NODE_EVENT } from '../../core/hooks/useKeyboardShortcuts';
 import { registry } from '../../core/registry/NodeRegistry';
 import {
   ExecutionMode,
@@ -11,7 +12,7 @@ import {
 } from '../../core/types/executionMode';
 import { getMergeStrategy, type MergeStrategy } from '../../core/types/nodeData';
 import { predictMergeConflict } from '../../core/utils/predictMergeConflict';
-import { X, Maximize2, Minimize2, Settings2, Merge } from 'lucide-react';
+import { X, Maximize2, Minimize2, Settings2, Merge, LocateFixed } from 'lucide-react';
 import { Node } from '@xyflow/react';
 
 export const PropertiesPanel: React.FC = () => {
@@ -165,17 +166,26 @@ const PropertiesContent: React.FC<{
 
   return (
     <div className="h-full flex flex-col">
-      <div className="p-4 border-b flex items-center justify-between bg-muted/30">
-        <div className="flex items-center gap-2">
+      <div className="p-4 border-b flex items-center justify-between gap-2 bg-muted/30">
+        <div className="flex items-center gap-2 min-w-0">
           <div className="p-1.5 bg-primary/10 rounded-md">
             <Settings2 className="w-4 h-4 text-primary" />
           </div>
-          <div>
+          <div className="min-w-0">
             <h2 className="font-semibold text-sm">{String(selectedNode.data.label || definition.label)}</h2>
-            <div className="text-xs text-muted-foreground font-mono">ID: {selectedNode.id}</div>
+            <div className="text-xs text-muted-foreground font-mono break-all">ID: {selectedNode.id}</div>
           </div>
         </div>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 shrink-0">
+          <button
+            type="button"
+            onClick={() => window.dispatchEvent(new CustomEvent(FOCUS_NODE_EVENT, { detail: { id: selectedNode.id } }))}
+            aria-label="Show node on canvas"
+            title="Show node on canvas"
+            className="p-1.5 hover:bg-accent rounded-md text-muted-foreground hover:text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          >
+            <LocateFixed className="w-4 h-4" />
+          </button>
           <button
             type="button"
             onClick={toggleExpand}

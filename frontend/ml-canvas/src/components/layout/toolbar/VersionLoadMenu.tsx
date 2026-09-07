@@ -34,8 +34,9 @@ export const VersionLoadMenu: React.FC<VersionLoadMenuProps> = ({
     />
     <div
       role="menu"
+      tabIndex={-1}
       aria-label="Load pipeline version"
-      className="absolute top-full right-0 mt-1 w-72 bg-background border rounded-md shadow-lg overflow-hidden z-20"
+      className="absolute top-full right-0 mt-1 w-72 max-w-[calc(100vw-2rem)] max-h-[calc(100dvh-11rem)] overflow-y-auto overscroll-contain bg-background border rounded-md shadow-lg z-20"
     >
       {loadVersionsLoading ? (
         <div className="px-3 py-4 flex items-center justify-center text-muted-foreground">

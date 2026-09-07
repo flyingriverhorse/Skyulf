@@ -1,7 +1,7 @@
 # Canvas UX improvement backlog
 
 Date: 2026-09-06
-Status: CUX-01, CUX-03, CUX-04, and CUX-08 in progress; completed portions are recorded below.
+Status: CUX-01 complete; CUX-03, CUX-04, and CUX-08 in progress. Completed portions are recorded below.
 
 ## Purpose and review scope
 
@@ -26,7 +26,7 @@ before implementation because other work may have changed these components.
 
 | ID | Priority | Improvement | Status |
 |---|---|---|---|
-| CUX-01 | High | Preserve canvas space with resizable panels | In progress; panel resizing and automatic sidebar collapse complete |
+| CUX-01 | High | Preserve canvas space with resizable panels | Complete at checked desktop/laptop sizes |
 | CUX-02 | High | Guide node connections and adding the next step | Open |
 | CUX-03 | High | Clearly distinguish previewing data from training | In progress; visible action labels and training guidance complete |
 | CUX-04 | Medium | Improve component discovery | In progress; description search and collapsible categories complete |
@@ -70,7 +70,13 @@ button disappears. Settings fields keep focus when the sidebar changes.
 Sidebar visibility, toolbar placement, and settings sizing share one resolver.
 The existing read-only transition below 1024px still unmounts the sidebar:
 search/category state resets on returning, but explicit open/close choices
-persist. Revealing selected nodes remains open.
+persist. Settings now has a "Show node on canvas" button with a tooltip and
+visible keyboard focus. It restores expanded settings and maximized results,
+then fits the node clear of toolbar controls and the visible results panel.
+Sidebar additions and existing deep-link reveals use the same placement.
+The action preserves settings and preview data, honors reduced motion, and
+keeps focus at its origin unless a deep link explicitly requests canvas focus.
+Ordinary resizing and manual panning do not continually recenter the node.
 
 **Acceptance criteria:**
 
@@ -78,7 +84,7 @@ persist. Revealing selected nodes remains open.
 - [x] Docked settings width adapts to available space at checked 1440px and 1100px widths.
 - [x] Users can adjust panel sizes without losing their selected node or form state.
 - [x] Panel limits preserve usable canvas space at checked desktop and laptop sizes.
-- [ ] A selected node can be brought into the unobscured canvas area.
+- [x] A selected node can be brought into the unobscured canvas area.
 - [x] Resizing has a keyboard-accessible alternative.
 - [x] Existing expand, collapse, results maximize, and read-only behaviors remain coherent.
 - [x] The component library collapses automatically when space becomes constrained, preserving explicit choices.
@@ -418,3 +424,39 @@ explicitly recorded above is complete; remaining interaction details need review
   circular-chunk/empty-chunk build warnings remain. Read-only still unmounts
   local sidebar browsing state, as recorded above. CUX-01 remains in progress
   for selected-node visibility.
+- 2026-09-07: Committed responsive sidebar defaults as `f6d58255`; all 873
+  frontend unit tests and the applicable pre-commit hooks passed.
+- 2026-09-07: Completed selected-node reveal for CUX-01. PropertiesPanel adds
+  "Show node on canvas"; FlowCanvas handles the shared reveal event after
+  panel resizing settles and uses React Flow's asymmetric padding to exclude
+  toolbar/zoom controls and the rendered results height. Expanded settings
+  and maximized results restore before fitting. Added
+  `e2e/reveal-node.spec.ts`; the first two tests failed before implementation
+  and all three pass afterward. Coverage includes a distant selected node,
+  keyboard activation, retained configuration/preview rows, desktop/laptop
+  bounds, sidebar additions with enlarged results, reduced motion, read-only
+  canvas focus, and manual pan retention after a later viewport resize.
+  All 12 focused browser checks and 24 focused unit tests passed, as did
+  `npm run lint` and `npm run build`; generated assets were refreshed. Existing
+  mocked backend connection logs and circular-chunk/empty-chunk build warnings
+  remain. CUX-01 is complete for its recorded acceptance criteria. Exact-field
+  navigation from validation issues remains separate CUX-05 work.
+- 2026-09-07: Audited responsive canvas controls after reports of overlapping
+  buttons. Toolbar groups now share a flex layout and move secondary actions
+  into More based on the actual canvas width. Preview retains its visible
+  label; overflow actions reuse the existing execution handlers. Navigation
+  uses grid columns and truncates long dataset context. Results titles can
+  shrink without crowding controls. Legend, load/recent, overflow, and
+  notification menus have viewport bounds and scrolling; open toolbar menus
+  render above results. Node reveal measures the rendered toolbar height.
+  Added four tests in `e2e/canvas-layout.spec.ts`, which reproduced control
+  collisions, a menu hidden behind results, and phone legend overflow before
+  the fixes. Coverage spans 320px to 1920px, pinned desktop side panels,
+  long dataset names, parallel actions, keyboard menu access, and dark phone
+  popovers. All 17 focused browser tests and all 873 frontend unit tests
+  passed, along with `npm run lint` and `npm run build`; served assets were
+  rebuilt. Existing mocked connection logs and build chunk warnings remain.
+  Review also identified lost keyboard focus when More opened a replacement
+  menu. New assertions reproduced it; focus now moves into that content and
+  returns to More on dismissal. All four layout tests passed again, including
+  keyboard opening and dismissal of the load menu and legend.

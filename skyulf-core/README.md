@@ -202,8 +202,13 @@ for binary) is rarely optimal for imbalanced classes or a metric you actually
 care about (F1, MCC, balanced accuracy, ...). `pipeline.optimize_thresholds(
 X_val, y_val, metric=...)` searches per-class thresholds against a metric you
 supply — evaluated on validation data you pass in explicitly (never the
-pipeline's internal split; get a clean holdout via `get_fitted_split()` above)
-— and `predict(use_tuned_thresholds=True)` then applies them. The same search
+pipeline's internal split) — and `predict(use_tuned_thresholds=True)` then
+applies them. `X_val` must be **raw**: the method runs the pipeline's fitted
+preprocessing on it itself, exactly once, so that the cutoffs are fitted
+against the same probabilities `predict()` later reproduces. `get_fitted_split()`
+above is therefore *not* a source for it — those frames are already
+preprocessed, and passing them here transforms the holdout a second time.
+Carve the holdout off the raw data before `fit()` instead. The same search
 is available as standalone array-level functions,
 `from skyulf.modeling import optimize_thresholds, apply_thresholds`, for use
 outside a pipeline. See the

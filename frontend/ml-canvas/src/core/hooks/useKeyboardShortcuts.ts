@@ -47,12 +47,10 @@ export interface AddNodeAtCenterDetail {
 }
 
 /**
- * Custom event fired after a node is added from outside the canvas
- * (currently: Sidebar palette clicks). `FlowCanvas` listens and pans/
- * zooms the new node into view — needed because the Sidebar isn't
- * inside `<ReactFlowProvider>` and so has no `useReactFlow()` access
- * of its own (CAN-001: a click-added node must be visible, not just
- * selected, without a second action).
+ * Requests a node reveal from settings, sidebar additions, or deep links.
+ * `FlowCanvas` restores maximized panels and fits the node into the canvas
+ * area clear of results and toolbar controls. Callers outside the canvas
+ * use this event because they do not have access to `useReactFlow()`.
  */
 export const FOCUS_NODE_EVENT = 'skyulf:focus-node';
 

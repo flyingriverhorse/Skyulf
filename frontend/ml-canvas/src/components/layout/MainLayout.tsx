@@ -104,7 +104,7 @@ export const MainLayout: React.FC = () => {
       <div style={{ display: activeView === 'canvas' ? 'contents' : 'none' }}>
         <div className="flex flex-1 overflow-hidden relative">
           {!readOnly && <Sidebar />}
-          <main className="flex-1 h-full relative flex flex-col transition-all duration-300 ease-in-out">
+          <main className="flex-1 min-w-0 h-full relative flex flex-col transition-all duration-300 ease-in-out">
             {!isPropertiesPanelExpanded && <Toolbar />}
             <div
               ref={canvasAreaRef}

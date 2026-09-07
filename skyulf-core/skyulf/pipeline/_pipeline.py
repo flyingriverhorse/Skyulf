@@ -231,6 +231,11 @@ class SkyulfPipeline:
 
         Returns:
             ``(X_train, y_train, X_test, y_test)`` as pandas DataFrame/Series.
+            The frames are **already preprocessed** — hand them to a raw
+            sklearn-style estimator, not back into this pipeline's
+            ``optimize_thresholds()`` or ``predict()``, which run the fitted
+            preprocessing on their own input and would transform these a
+            second time.
 
         Raises:
             ValueError: If the configured preprocessing steps don't produce a
@@ -284,9 +289,17 @@ class SkyulfPipeline:
         Runs on caller-supplied validation data and stores the result for later
         use by ``predict(use_tuned_thresholds=True)``. Always uses the
         *explicit* ``(X_val, y_val)`` the caller passes in — never the
-        pipeline's internal train/test split. Get a clean, independent holdout
-        via ``get_fitted_split()`` (or your own split) before calling this, the
-        same way you would for any other out-of-sample evaluation.
+        pipeline's internal train/test split. Carve an independent holdout out
+        of the **raw** data before ``fit()`` and pass its rows here, the same
+        way you would for any other out-of-sample evaluation.
+
+        ``X_val`` must be raw. This method runs the pipeline's fitted
+        preprocessing on it exactly once, which is what makes the probabilities
+        it tunes against the ones ``predict()`` later reproduces.
+        ``get_fitted_split()`` is therefore *not* a source for it: that helper
+        returns already-preprocessed frames, so passing them here transforms
+        the holdout a second time and fits the cutoffs against a distribution
+        inference never sees.
 
         Args:
             X_val: Validation features, *not* yet transformed (this method

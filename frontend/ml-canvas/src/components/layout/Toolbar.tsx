@@ -165,12 +165,14 @@ export const Toolbar: React.FC = () => {
   // visible and rendered on top of the left cluster (Undo/Clear).
   // Measuring the real container closes that gap at every panel
   // combination instead of only at the one viewport width devs tested.
-  const rightClusterRef = useRef<HTMLDivElement | null>(null);
-  const [containerWidth, setContainerWidth] = useState<number>(Infinity);
-  const COMPACT_WIDTH = 1040;
+  const toolbarRef = useRef<HTMLDivElement | null>(null);
+  const [containerWidth, setContainerWidth] = useState(0);
+  const COMPACT_WIDTH = 1280;
   const isCompact = containerWidth < COMPACT_WIDTH;
+  const isNarrow = containerWidth < 720;
+  const hideUndoRedo = containerWidth < 380;
   useEffect(() => {
-    const container = rightClusterRef.current?.parentElement;
+    const container = toolbarRef.current?.parentElement;
     if (!container) return;
     const observer = new ResizeObserver((entries) => {
       const entry = entries[0];
@@ -191,6 +193,24 @@ export const Toolbar: React.FC = () => {
   useDismissable(showExportMenu, () => setShowExportMenu(false), exportMenuRef);
   useDismissable(showRecentMenu, () => setShowRecentMenu(false), recentMenuRef);
   useDismissable(showLoadMenu, () => setShowLoadMenu(false), loadMenuRef);
+
+  // Overflow items disappear when opening another menu. Keep keyboard focus
+  // in the replacement content and return it to More when that content closes.
+  useEffect(() => {
+    if (!isNarrow) return;
+    const popover = showLegend ? legendPopoverRef.current
+      : showLoadMenu ? loadMenuRef.current
+      : showRecentMenu ? recentMenuRef.current : null;
+    if (!popover) return;
+    const trigger = moreMenuRef.current?.querySelector('button');
+    const target = popover.querySelector<HTMLElement>('[role="menu"], button:not(:disabled)');
+    target?.focus({ preventScroll: true });
+    return () => {
+      if (document.activeElement === document.body || popover.contains(document.activeElement)) {
+        trigger?.focus({ preventScroll: true });
+      }
+    };
+  }, [isNarrow, showLegend, showLoadMenu, showRecentMenu]);
 
   const handleExport = async (kind: 'png' | 'svg'): Promise<void> => {
     setShowExportMenu(false);
@@ -221,19 +241,18 @@ export const Toolbar: React.FC = () => {
 
   return (
     <>
-      {/* Left cluster: legend, keyboard help, command palette, undo/redo.
-          Shifts right when the sidebar is collapsed so it doesn't overlap
-          the floating "Expand" button (z-10, left-4/top-4). The cluster
-          stays at z-10 — above canvas nodes, but below modals and the
-          expanded Preview Results panel (z-20). The legend popover renders
-          as a sibling at z-40 so it escapes this stacking context and
-          floats above the results panel. */}
+      {/* Shared layout prevents the action groups from occupying the same space.
+          Reserve the floating sidebar toggle's slot when the library is closed. */}
+      <div
+        ref={toolbarRef}
+        data-canvas-toolbar
+        className={`absolute top-4 right-4 flex items-start gap-2 ${showMoreMenu || showLoadMenu || showRecentMenu || showExportMenu ? 'z-40' : 'z-10'} ${isSidebarOpen || readOnly ? 'left-4' : 'left-16'}`}
+      >
       <div
         ref={legendRef}
-        className={`absolute top-4 z-10 flex gap-2 transition-[left] duration-300 ${
-          isSidebarOpen ? 'left-4' : 'left-16'
-        }`}
+        className="flex shrink-0 gap-2"
       >
+        {!isNarrow && <>
         <div className="relative">
           <ToolbarIconButton
             icon={<Tag className="w-4 h-4" />}
@@ -241,7 +260,6 @@ export const Toolbar: React.FC = () => {
             title="Show node badge legend"
             ariaLabel="Show node badge legend"
             ariaExpanded={showLegend}
-            focusRing={false}
           />
         </div>
         <ToolbarIconButton
@@ -258,7 +276,8 @@ export const Toolbar: React.FC = () => {
             ariaLabel="Open command palette"
           />
         )}
-        {!readOnly && (
+        </>}
+        {!readOnly && !hideUndoRedo && (
           <ToolbarIconButton
             icon={<Redo2 className="w-4 h-4" />}
             onClick={() => redo()}
@@ -268,7 +287,7 @@ export const Toolbar: React.FC = () => {
             testId="toolbar-redo"
           />
         )}
-        {!readOnly && (
+        {!readOnly && !hideUndoRedo && (
           <ToolbarIconButton
             icon={<Undo2 className="w-4 h-4" />}
             onClick={() => undo()}
@@ -278,7 +297,7 @@ export const Toolbar: React.FC = () => {
             testId="toolbar-undo"
           />
         )}
-        {!readOnly && (
+        {!readOnly && !isNarrow && (
           <ToolbarIconButton
             icon={<Trash2 className="w-4 h-4" />}
             onClick={() => { void handleClearCanvas(); }}
@@ -290,25 +309,7 @@ export const Toolbar: React.FC = () => {
           />
         )}
       </div>
-      {/* Legend popover: rendered outside the z-10 cluster so its z-40 can
-          float above the Preview Results panel (z-20) without also lifting
-          the toolbar buttons above modals or the maximized panel. */}
-      {showLegend && (
-        <div
-          ref={legendPopoverRef}
-          className={`absolute top-4 z-40 transition-[left] duration-300 ${
-            isSidebarOpen ? 'left-4' : 'left-16'
-          }`}
-        >
-          <CanvasLegend onClose={() => setShowLegend(false)} />
-        </div>
-      )}
-
-      {/* Right cluster: history / load / save / tidy / export / run.
-          max-width keeps the cluster from sliding under the left cluster.
-          z-10 like the left cluster: above canvas nodes, below modals and
-          the expanded Preview Results panel. */}
-      <div ref={rightClusterRef} className="absolute top-4 right-4 z-10 flex flex-nowrap justify-end gap-2 max-w-[calc(100%-13rem)]">
+      <div className="flex flex-1 min-w-0 flex-wrap justify-end gap-2 [&>button]:shrink-0">
         {/* Compact overflow menu — collapses secondary actions so the
             cluster never overlaps the left cluster once the live Flow-pane
             width (not the viewport) drops below COMPACT_WIDTH. */}
@@ -329,8 +330,46 @@ export const Toolbar: React.FC = () => {
             <div
               role="menu"
               aria-label="More canvas tools"
-              className="absolute top-full right-0 mt-1 w-52 bg-background border rounded-md shadow-lg overflow-hidden z-20"
+              className="absolute top-full right-0 mt-1 w-52 max-w-[calc(100vw-2rem)] max-h-[calc(100dvh-11rem)] overflow-y-auto overscroll-contain bg-background border rounded-md shadow-lg z-20"
             >
+              {isNarrow && (
+                <>
+                  <button role="menuitem" onClick={() => { setShowMoreMenu(false); setShowLegend(true); }} className="w-full flex items-center gap-2 text-left px-3 py-2 text-sm hover:bg-accent">
+                    <Tag className="w-4 h-4" /> Node badge legend
+                  </button>
+                  <button role="menuitem" onClick={() => { setShowMoreMenu(false); window.dispatchEvent(new CustomEvent(SHOW_SHORTCUTS_EVENT)); }} className="w-full flex items-center gap-2 text-left px-3 py-2 text-sm hover:bg-accent">
+                    <Keyboard className="w-4 h-4" /> Keyboard shortcuts
+                  </button>
+                  {!readOnly && <>
+                    <button role="menuitem" onClick={() => { setShowMoreMenu(false); window.dispatchEvent(new CustomEvent(SHOW_PALETTE_EVENT)); }} className="w-full flex items-center gap-2 text-left px-3 py-2 text-sm hover:bg-accent">
+                      <Command className="w-4 h-4" /> Command palette
+                    </button>
+                    {hideUndoRedo && <>
+                      <button role="menuitem" disabled={!canUndo} onClick={() => { setShowMoreMenu(false); undo(); }} className="w-full text-left px-3 py-2 text-sm hover:bg-accent disabled:opacity-50">Undo</button>
+                      <button role="menuitem" disabled={!canRedo} onClick={() => { setShowMoreMenu(false); redo(); }} className="w-full text-left px-3 py-2 text-sm hover:bg-accent disabled:opacity-50">Redo</button>
+                    </>}
+                    <button role="menuitem" disabled={!canClear} onClick={() => { setShowMoreMenu(false); void handleClearCanvas(); }} className="w-full flex items-center gap-2 text-left px-3 py-2 text-sm hover:bg-accent disabled:opacity-50">
+                      <Trash2 className="w-4 h-4" /> Clear canvas
+                    </button>
+                    {!hasServerVersions && recentPipelines.length > 0 && (
+                      <button role="menuitem" onClick={() => { setShowMoreMenu(false); openRecentMenu(); }} className="w-full flex items-center gap-2 text-left px-3 py-2 text-sm hover:bg-accent">
+                        <Clock className="w-4 h-4" /> Recent pipelines
+                      </button>
+                    )}
+                    <button role="menuitem" disabled={isRunning} onClick={() => { setShowMoreMenu(false); void openLoadMenu(); }} className="w-full flex items-center gap-2 text-left px-3 py-2 text-sm hover:bg-accent disabled:opacity-50">
+                      <FolderOpen className="w-4 h-4" /> Load pipeline
+                    </button>
+                    <button role="menuitem" disabled={isSaving || isRunning} onClick={() => { setShowMoreMenu(false); void handleSave(); }} className="w-full flex items-center gap-2 text-left px-3 py-2 text-sm hover:bg-accent disabled:opacity-50">
+                      <Save className="w-4 h-4" /> {isSaving ? 'Saving...' : 'Save pipeline'}
+                    </button>
+                    {hasMultipleBranches && (
+                      <button role="menuitem" disabled={isRunningAll || isRunning} onClick={() => { setShowMoreMenu(false); void handleRunAll(); }} className="w-full flex items-center gap-2 text-left px-3 py-2 text-sm hover:bg-accent disabled:opacity-50">
+                        <Rocket className="w-4 h-4" /> {isRunningAll ? 'Queuing experiments...' : 'Run all experiments'}
+                      </button>
+                    )}
+                  </>}
+                </>
+              )}
               <button
                 role="menuitem"
                 onClick={() => { setShowMoreMenu(false); toggleDrawer(); }}
@@ -447,8 +486,9 @@ export const Toolbar: React.FC = () => {
         )}
         {/* Recent pipelines (localStorage fallback) — only shown when no
             server-side versions exist for the current dataset. */}
-        {!readOnly && !hasServerVersions && recentPipelines.length > 0 && (
-          <div className="relative" ref={recentMenuRef}>
+        {!readOnly && !hasServerVersions && recentPipelines.length > 0 && (!isNarrow || showRecentMenu) && (
+          <div className={isNarrow ? 'absolute top-full right-0' : 'relative'} ref={recentMenuRef}>
+            {!isNarrow && (
             <button
               onClick={openRecentMenu}
               title="Per-browser fallback (localStorage). Server-side versions live in DataSources."
@@ -462,6 +502,7 @@ export const Toolbar: React.FC = () => {
               {!isCompact && <span className="text-sm font-medium">Recent</span>}
               <ChevronDown className="w-3 h-3" />
             </button>
+            )}
             {showRecentMenu && (
               <RecentPipelinesMenu
                 recentPipelines={recentPipelines}
@@ -480,8 +521,9 @@ export const Toolbar: React.FC = () => {
             )}
           </div>
         )}
-        {!readOnly && (
-          <div className="relative" ref={loadMenuRef}>
+        {!readOnly && (!isNarrow || showLoadMenu) && (
+          <div className={isNarrow ? 'absolute top-full right-0' : 'relative'} ref={loadMenuRef}>
+            {!isNarrow && (
             <button
               onClick={() => { void openLoadMenu(); }}
               disabled={isRunning}
@@ -496,6 +538,7 @@ export const Toolbar: React.FC = () => {
               {!isCompact && <span className="text-sm font-medium">Load</span>}
               <ChevronDown className="w-3 h-3" />
             </button>
+            )}
             {showLoadMenu && (
               <VersionLoadMenu
                 onClose={() => setShowLoadMenu(false)}
@@ -508,7 +551,7 @@ export const Toolbar: React.FC = () => {
             )}
           </div>
         )}
-        {!readOnly && (
+        {!readOnly && !isNarrow && (
           <button
             onClick={() => { void handleSave(); }}
             disabled={isSaving || isRunning}
@@ -592,7 +635,7 @@ export const Toolbar: React.FC = () => {
           )}
         </div>
         )}
-        {!readOnly && hasMultipleBranches && (
+        {!readOnly && !isNarrow && hasMultipleBranches && (
           <button
             onClick={() => { void handleRunAll(); }}
             disabled={isRunningAll || isRunning}
@@ -631,6 +674,12 @@ export const Toolbar: React.FC = () => {
           </button>
         )}
       </div>
+      </div>
+      {showLegend && (
+        <div ref={legendPopoverRef} className={`absolute top-4 right-4 z-40 ${isSidebarOpen || readOnly ? 'left-4' : 'left-16'}`}>
+          <CanvasLegend onClose={() => setShowLegend(false)} />
+        </div>
+      )}
       <TemplatesGalleryModal
         isOpen={showTemplates}
         onClose={() => setShowTemplates(false)}

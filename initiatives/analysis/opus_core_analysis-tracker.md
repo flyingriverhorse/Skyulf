@@ -53,9 +53,8 @@ by this review.
 **Fix-pass by-product (2026-09-06):** OC-207 (1 🟠) was filed out of the OC-164
 fix the way OC-169 came out of OC-150 — reading `get_fitted_split()`'s callers
 to pick a fix strategy showed three doc sites prescribing an input
-`optimize_thresholds` transforms a second time. Open, in the live queue's
-**Next** tier, with executed reproduction evidence; historical baseline counts
-unchanged.
+`optimize_thresholds` transforms a second time. Closed 2026-09-07 by a contract
+decision — see the Log; historical baseline counts unchanged.
 
 Both files follow the master report's suggested fix order (4 tiers), then the
 remaining findings grouped by domain. R1 (the systemic core↔frontend contract
@@ -99,6 +98,7 @@ uses, so a fixed finding stays where it was filed.
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
+| OC-207 | 🟠 | `optimize_thresholds()` transforms its `X_val` internally (`pipeline/_pipeline.py:325`), but `docs/user_guide/threshold_tuning.md:32`, `skyulf-core/README.md:205` and the method's own docstring (`:280`) all tell callers to feed it `get_fitted_split()` output — which is **already** preprocessed. The documented workflow therefore tunes thresholds on double-transformed probabilities, and `predict(use_tuned_thresholds=True)` then applies them to singly-transformed ones (`:365`), so the cutoffs are fitted against a distribution inference never reproduces. Needs a contract decision (fix the three docs, or accept pre-transformed input) before code | decision + small | ✅ fixed 2026-09-07 — the contract decision was "keep the code, fix the prose": `optimize_thresholds` and `predict` already both took raw input and transformed exactly once, so the three narrative sites that pointed callers at `get_fitted_split()` were the defect. See the log entry |
 | OC-177 | 🟠 | Pandas `DummyEncoder` changes a known category's encoding with batch composition: after fitting `[1.0,2.0]`, `1.0` encodes as known alone but all-zero when accompanied by `2.5` (`preprocessing/encoding/dummy.py:60-64`) | small | ✅ fixed 2026-09-06 — **broader than filed**: the two engines also learned different category *strings* from the same float data (`["1","2"]` vs `["1.0","2.0"]`), so they emitted differently named indicator columns; both symptoms were one batch-dependent renderer, replaced by a per-value rule shared by the engines. See the log entry |
 | OC-164 | 🟠 | `get_fitted_split()` on new data replaces a trained pipeline's preprocessing while retaining its old model — the same input's prediction changed from 50 to −950 (`pipeline/_pipeline.py:234`) | small | ✅ fixed 2026-09-06 — isolation, not invalidation: a throwaway `FeatureEngineer` over the same steps leaves the pipeline's fitted state alone, so predictions are identical before and after. See the log entry |
 | OC-163 | 🟠 | `LagFeatures` / `RollingAggregate` sort X without reordering tuple y on both engines — `[3,1,2]` times become `[1,2,3]` while targets remain `[300,100,200]`, silently training on wrong labels (`preprocessing/time_series/lag.py:45,81`, `rolling.py:63,119`) | small | ✅ fixed 2026-09-06 — both engines now derive one positional permutation and hand it to X and y alike, which retired OC-165 and OC-166 in the same pass. See the log entry |
@@ -291,6 +291,131 @@ batch's context are in [the live queue](opus_core_analysis-open_queue.md).
 ---
 
 ## Log
+
+### 2026-09-07 — OC-207 fixed: the threshold-tuning contract was right and the three docs describing it were wrong — plus the silent degenerate search the follow-up measurement exposed
+
+Reproduced against `HEAD` before any edit, on the auditor's own 200-row setup
+(`x ~ N(0,1)`, `target = (x + N(0,0.4) > 0)`, `StandardScaler` +
+`TrainTestSplitter(test_size=0.25, random_state=42)` + `logistic_regression`).
+`get_fitted_split()` returns an `X_val` with mean `0.0766` / std `0.9774` —
+already standardized — and feeding it to `optimize_thresholds()` standardizes it
+again at `pipeline/_pipeline.py:325`. On identical rows and one fitted pipeline,
+the only difference being whether `transform()` runs a second time, `p(class=1)`
+for the first six rows moved from
+`[0.9526, 0.0888, 0.0404, 0.0241, 0.1377, 0.0826]` to
+`[0.9560, 0.0783, 0.0343, 0.0200, 0.1244, 0.0725]` (largest shift `0.0161`), one
+of 50 rows flipped class, and measured accuracy on the fold went `0.8800` →
+`0.9000`. That last number is why the defect stays invisible: the double
+transform is not merely different, it scored *better* on the tuning fold, so
+nothing looks wrong from the metric alone.
+
+**The harm is the mismatch, not the flip.** `predict(use_tuned_thresholds=True)`
+transforms its caller's raw input exactly once (`:373`) before
+`apply_thresholds`, so cutoffs fitted on twice-transformed probabilities get
+applied to singly-transformed ones — systematically, and with no error.
+
+**Decision (contract): keep the code, fix the prose.** The code was already
+self-consistent — `optimize_thresholds` and `predict` both take raw input and
+transform exactly once, the `Args:` entry at `:292` already said "*not* yet
+transformed", and `FeatureEngineer.transform` skips splitters
+(`preprocessing/pipeline.py:77-84`), so a raw holdout flows through correctly.
+Three *narrative* sites contradicted that one signature. The auditor's other
+option — dropping the internal `transform()` so `get_fitted_split()` output
+becomes valid input — was rejected: it makes tuning asymmetric with inference
+and contradicts every existing test. A second reason to reject it surfaced while
+reading `get_fitted_split()`: it fits a **throwaway** chain over the configured
+steps, so its frames are not guaranteed to be the pipeline's *own* fitted
+transform at all. A raw holdout passed through the pipeline's own chain is the
+only input that reproduces what `predict()` sees.
+
+**Correction, measured after the fix landed — the first pass at this entry got
+the severity backwards.** It called the threshold *dict* "a poor observable",
+because on the reproduction above tuning on the raw holdout and on the
+preprocessed one returned the same `{0: 0.3627, 1: 0.6373}` (`accuracy_score` is
+piecewise constant in the cutoff and both landed on the same plateau). That was
+one lucky dataset out of many: sweeping **32** configurations (8 seeds × four
+size/feature-offset combinations), the raw and pre-transformed dicts **diverge
+in 27 of them**. The filed reproduction was among the 5 coincidences, so it
+understated the defect rather than characterising it. With feature *magnitude*
+in the mix the pre-transformed path is far worse than the filed numbers suggest
+— at `x ~ N(20,1)` the double transform saturates the probabilities (largest
+shift **0.9994**), flips **32 of 50** hard predictions, and collapses the
+returned dict to the untuned default `{0: 0.5, 1: 0.5}`. The dict is therefore a
+*sensitive* observable; the probability distribution the regression test pins is
+simply sensitive in 32/32 configurations rather than 27/32, which is why the
+test pins that and not the dict.
+
+**Unfiled, found while measuring that: the search gave up in silence.** The
+collapse to `{0: 0.5, 1: 0.5}` is the grid's tie-break doing exactly what OC-36
+designed — but it emitted nothing. `_grid_search_binary`
+(`modeling/_evaluation/thresholds.py:132-146`) warned on the *single-class*
+degenerate case and stayed mute when both classes were present yet every
+candidate cutoff scored identically (saturated probabilities, or a metric that
+ignores its predictions). Verified in isolation: `y_true` covering both classes,
+all 101 cutoffs scoring `1.0`, `{0: 0.5, 1: 0.5}` returned, **zero** log
+records. A caller could not distinguish "tuning gave up" from "0.5 really is
+optimal" — and that silence is precisely what let OC-207's worst symptom pass
+for a successful tune. **Fixed:** the loop now tracks the worst score beside the
+best and warns when they coincide, mirroring the single-class message. An
+all-NaN sweep still falls through silently, because both sentinels keep their
+infinities and never compare equal — the existing
+`test_optimize_thresholds_nan_scores_fall_back_to_default` behaviour is
+untouched. End-to-end on the `x ~ N(20,1)` case: the raw holdout tunes to
+`{0: 0.4902, 1: 0.5098}` with no warning, the pre-transformed one returns
+`{0: 0.5, 1: 0.5}` **and** logs "every candidate cutoff scores 0.6000 on the
+validation split". Two tests pin it —
+`test_optimize_thresholds_all_tied_candidates_warn`, plus a guard-the-guard
+`test_optimize_thresholds_stays_quiet_when_the_grid_discriminates` that first
+asserts its own premise (more than one distinct score across the grid) so it
+cannot pass vacuously and prove only that the warning is noisy. No new OC number
+was minted: this is a by-product of the OC-207 measurement, logged here the way
+the OC-177 entry logs its own unfiled engine-divergence find.
+
+**Changes.** `docs/user_guide/threshold_tuning.md` — the Pipeline-usage example
+now carves a raw holdout with `train_test_split` before `fit()`, explains that
+the single internal transform is what makes tuning and inference agree, carries
+an explicit "do not tune on `get_fitted_split()` output" paragraph, and states
+the nested-split consequence when the config already holds a
+`TrainTestSplitter`. Its `get_fitted_split()` link was repointed from
+`validation_vs_sklearn.md` — which never mentions the helper — to
+`reference/api/pipeline.md`, which renders its docstring.
+`skyulf-core/README.md` — the Threshold-tuning paragraph drops the
+`get_fitted_split()` recommendation and names it as not a valid source.
+`_pipeline.py` — the `optimize_thresholds` narrative now agrees with its own
+`Args:`, and `get_fitted_split()`'s `Returns:` warns that its frames come back
+preprocessed and belong to a raw sklearn-style estimator, not back into this
+pipeline.
+
+**Deliberately kept.** No behaviour change anywhere; `_pipeline.py` is
+docstring-only. `get_fitted_split()` itself is unchanged and still correct for
+its documented purpose.
+
+**Tests.** Three tests in
+`skyulf-core/tests/unit/test_pipeline_threshold_tuning.py` sourced `X_val` from
+`get_fitted_split()` and so encoded the broken workflow; they now use a shared
+`_raw_holdout()` carve, with their assertions unchanged in intent. Added
+`test_optimize_thresholds_sees_the_same_probabilities_as_predict`, which spies on
+the per-pipeline applier's `predict_proba` (instantiated fresh at
+`_pipeline.py:89-90`, so patching the instance stays contained) and asserts
+tuning and `predict(use_tuned_thresholds=True)` each make exactly one call with
+identical probability arrays for the same raw rows. It carries a teeth check:
+the same rows handed over pre-transformed must produce a *different*
+distribution. That check needed a `StandardScaler` config (`_scaling_config`),
+because the existing mean-imputer chain is idempotent — imputing an
+already-imputed frame changes nothing, so a double transform is unobservable
+through it.
+
+**Mutation-checked:** replacing `transform(X_val)` with `X_val` at `:325` fails
+all four tuning tests, so the suite detects a contract break in both directions.
+
+**Gates.** Re-run after the `thresholds.py` change: `skyulf-core/tests` **3813
+passed, 56 skipped** (140s — 3811 before the two new tests); root `tests/unit`
+plus the threshold-router, threshold-tuning-service and pipeline-config-snapshot
+suites **957 passed**, 7 snapshots passed; `ruff check .` and
+`ruff format --check .` clean (673 files); `ty check` clean after narrowing
+`model_estimator` (typed `StatefulEstimator | None`) behind an explicit
+precondition assert. Changelog bullets added to the still-open `v0.8.15` section
+— no `v0.8.15` tag exists yet.
 
 ### 2026-09-06 — OC-177 + OC-164 fixed: the Next tier's last two rows, and both were one root cause rather than the filed symptom
 

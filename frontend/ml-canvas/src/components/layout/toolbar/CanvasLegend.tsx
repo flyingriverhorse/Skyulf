@@ -14,7 +14,7 @@ interface CanvasLegendProps {
 }
 
 export const CanvasLegend: React.FC<CanvasLegendProps> = ({ onClose }) => (
-  <div className="absolute top-12 left-0 mt-2 w-80 p-3 bg-background border rounded-md shadow-lg text-sm max-h-[80vh] overflow-y-auto z-20">
+  <div className="absolute top-10 left-0 mt-1 w-80 max-w-full p-3 bg-background border rounded-md shadow-lg text-sm max-h-[calc(100dvh-11rem)] overflow-y-auto overscroll-contain z-20">
     <div className="flex items-center justify-between mb-3">
       <h3 className="font-semibold">Canvas Legend</h3>
       <button

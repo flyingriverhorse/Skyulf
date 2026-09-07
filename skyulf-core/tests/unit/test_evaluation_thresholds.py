@@ -149,6 +149,56 @@ def test_optimize_thresholds_single_class_validation_keeps_default(caplog):
     )
 
 
+def test_optimize_thresholds_all_tied_candidates_warn(caplog):
+    """Both classes present but every candidate cutoff scoring alike must warn.
+
+    Saturated probabilities make the grid hand back the same default 0.5 cutoffs
+    as the single-class case above, and it used to return them silently — so a
+    caller could not tell "tuning gave up" from "0.5 really is optimal". Found
+    while closing OC-207: a doubly-transformed holdout saturates the
+    probabilities and collapses the search to the default with no diagnostic.
+    """
+    import logging
+
+    y_true = np.array([0, 1] * 25)
+    p = np.where(y_true == 1, 0.999, 0.001)  # no candidate cutoff straddles a boundary
+    y_proba = np.column_stack([1 - p, p])
+
+    with caplog.at_level(logging.WARNING):
+        thresholds = optimize_thresholds(y_true, y_proba, metric=f1_score, classes=[0, 1])
+
+    assert thresholds == {0: 0.5, 1: 0.5}
+    assert any("degenerate" in message for message in caplog.messages)
+
+
+def test_optimize_thresholds_stays_quiet_when_the_grid_discriminates(caplog):
+    """The degenerate warning must not fire on an ordinary tuning run.
+
+    Guarding the guard: were it to warn whenever the winning plateau is wide,
+    every real search would log noise and the diagnostic would stop meaning
+    anything.
+    """
+    import logging
+
+    rng = np.random.default_rng(0)
+    y_true = np.array([0] * 300 + [1] * 100)
+    proba_pos = np.concatenate([rng.normal(0.3, 0.05, 300), rng.normal(0.7, 0.05, 100)]).clip(
+        0.01, 0.99
+    )
+    y_proba = np.column_stack([1 - proba_pos, proba_pos])
+
+    candidates = np.linspace(0.0, 1.0, 103)[1:-1]
+    distinct = {
+        round(float(f1_score(y_true, np.where(y_proba[:, 1] >= t, 1, 0))), 12) for t in candidates
+    }
+    assert len(distinct) > 1, "precondition: this grid must actually discriminate"
+
+    with caplog.at_level(logging.WARNING):
+        optimize_thresholds(y_true, y_proba, metric=f1_score, classes=[0, 1])
+
+    assert not any("degenerate" in message for message in caplog.messages)
+
+
 def test_optimize_thresholds_ties_break_toward_the_default_cut():
     """Regression test (OC-36): F1 and friends are piecewise constant in the
     threshold, so exactly-tied plateaus are the common case. The tie must break

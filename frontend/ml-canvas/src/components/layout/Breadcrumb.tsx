@@ -41,7 +41,7 @@ export const Breadcrumb: React.FC = () => {
   return (
     <nav
       aria-label="Breadcrumb"
-      className="hidden md:flex items-center gap-1.5 text-xs text-muted-foreground absolute left-4 top-1/2 -translate-y-1/2 max-w-[40%]"
+      className="hidden md:flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground"
     >
       <button
         onClick={() => setView('canvas')}
@@ -52,9 +52,9 @@ export const Breadcrumb: React.FC = () => {
         <Database className="w-3 h-3 flex-shrink-0" />
         <span className="truncate font-medium">{datasetName}</span>
       </button>
-      <ChevronRight className="w-3 h-3 flex-shrink-0" aria-hidden="true" />
+      <ChevronRight className="hidden xl:block w-3 h-3 flex-shrink-0" aria-hidden="true" />
       <span
-        className="flex items-center gap-1 px-1.5 py-0.5 text-foreground"
+        className="hidden xl:flex shrink-0 items-center gap-1 px-1.5 py-0.5 text-foreground"
         aria-current="page"
         data-testid="breadcrumb-view"
       >

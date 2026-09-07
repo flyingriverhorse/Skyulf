@@ -27,8 +27,8 @@ export const Navbar: React.FC = () => {
   };
 
   return (
-    <div className="h-14 border-b bg-card px-4 flex items-center justify-center shrink-0 relative z-30">
-      <Breadcrumb />
+    <div className="min-h-14 border-b bg-card px-2 py-1 grid grid-cols-[auto_minmax(0,1fr)] md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-1 shrink-0 relative z-30">
+      <div className="hidden md:block min-w-0 overflow-hidden"><Breadcrumb /></div>
       {/* Navigation */}
       <div
         className="flex items-center gap-1 bg-secondary/50 p-1 rounded-lg"
@@ -49,7 +49,7 @@ export const Navbar: React.FC = () => {
           }`}
         >
           <GitBranch className="w-4 h-4" />
-          <span className="hidden sm:inline">Canvas</span>
+          <span className="hidden md:inline">Canvas</span>
         </button>
         <button
           onClick={() => setView('experiments')}
@@ -64,7 +64,7 @@ export const Navbar: React.FC = () => {
           }`}
         >
           <BarChart2 className="w-4 h-4" />
-          <span className="hidden sm:inline">Experiments</span>
+          <span className="hidden md:inline">Experiments</span>
         </button>
         <button
           onClick={() => setView('inference')}
@@ -79,11 +79,11 @@ export const Navbar: React.FC = () => {
           }`}
         >
           <Rocket className="w-4 h-4" />
-          <span className="hidden sm:inline">Inference</span>
+          <span className="hidden md:inline">Inference</span>
         </button>
       </div>
 
-      <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2">
+      <div className="flex items-center justify-self-end gap-1 md:gap-2">
         {showReadOnlyChip && (
           <button
             onClick={toggleReadOnly}
@@ -92,7 +92,8 @@ export const Navbar: React.FC = () => {
                 ? 'Read-only canvas (tablet view). Click to enable editing.'
                 : 'Editing enabled. Click to switch to read-only.'
             }
-            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-colors border ${
+            aria-label={readOnly ? 'Read-only' : 'Editing'}
+            className={`flex shrink-0 items-center gap-1.5 px-1.5 md:px-2.5 py-1 rounded-md text-xs font-medium transition-colors border ${
               readOnly
                 ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30 hover:bg-amber-500/20'
                 : 'bg-secondary/50 text-muted-foreground border-transparent hover:bg-secondary'
@@ -100,7 +101,7 @@ export const Navbar: React.FC = () => {
             aria-pressed={readOnly}
           >
             {readOnly ? <Eye className="w-3.5 h-3.5" /> : <Pencil className="w-3.5 h-3.5" />}
-            <span className="hidden sm:inline">{readOnly ? 'Read-only' : 'Editing'}</span>
+            <span className="hidden md:inline">{readOnly ? 'Read-only' : 'Editing'}</span>
           </button>
         )}
 
@@ -109,7 +110,7 @@ export const Navbar: React.FC = () => {
           title="How pipelines work — branches, merges, and scoring"
           aria-label="Pipeline guide"
           data-testid="navbar-help"
-          className="flex items-center justify-center w-8 h-8 rounded-full bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/30 hover:bg-indigo-500/20 transition-colors focus-ring"
+          className="flex shrink-0 items-center justify-center w-7 h-7 md:w-8 md:h-8 rounded-full bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/30 hover:bg-indigo-500/20 transition-colors focus-ring"
         >
           <BookOpen className="w-4 h-4" />
         </button>

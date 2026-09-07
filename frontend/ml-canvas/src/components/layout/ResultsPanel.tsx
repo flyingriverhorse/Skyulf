@@ -360,7 +360,7 @@ export const ResultsPanel: React.FC<{ maxHeight?: number }> = ({ maxHeight = 720
           className="flex flex-1 items-center gap-2 min-w-0 text-left text-foreground rounded hover:bg-muted/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
         >
           <Table className="w-4 h-4 text-primary shrink-0" />
-          <span className="font-semibold text-sm shrink-0">Preview Results</span>
+          <span className="font-semibold text-sm truncate">Preview Results</span>
           {executionResult && (
             <span className="text-xs text-muted-foreground truncate">
               {currentRows.length === currentTotal
@@ -373,7 +373,7 @@ export const ResultsPanel: React.FC<{ maxHeight?: number }> = ({ maxHeight = 720
             <span className="text-xs text-red-600 font-bold shrink-0">(Failed)</span>
           )}
           {issueCount > 0 && (
-            <span className="shrink-0 text-[11px] font-medium px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300">
+            <span className="shrink-0 text-[11px] font-medium px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300 whitespace-nowrap">
               {issueCount} {issueCount === 1 ? 'issue' : 'issues'}
             </span>
           )}

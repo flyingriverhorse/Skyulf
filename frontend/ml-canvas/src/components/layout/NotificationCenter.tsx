@@ -225,7 +225,7 @@ export const NotificationCenter: React.FC = () => {
         </button>
 
         {open && (
-          <div className="absolute right-0 top-full mt-2 w-96 max-h-[28rem] bg-card border rounded-lg shadow-xl z-[9999] flex flex-col">
+          <div className="absolute right-0 top-full mt-2 w-96 max-w-[calc(100vw-2rem)] max-h-[min(28rem,calc(100dvh-9rem))] bg-card border rounded-lg shadow-xl z-[9999] flex flex-col">
             <div className="flex items-center justify-between px-3 py-2 border-b">
               <span className="text-sm font-medium">Notifications</span>
               <div className="flex items-center gap-2">

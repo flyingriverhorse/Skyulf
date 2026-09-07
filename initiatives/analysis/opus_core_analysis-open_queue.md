@@ -32,15 +32,10 @@ reaching users), **Next** (wrong results in realistic configs), **Then** (decide
 deployment model), **Ongoing** (remove the hiding conditions). Remaining findings
 follow, grouped by domain.
 
-The **Now** tier has no open findings left — those rows are in the archive.
-**Next** closed its last two filed rows (OC-177, OC-164) on 2026-09-06 and
-immediately re-opened with one filed *while* fixing OC-164.
-
-### Next — wrong results in realistic configs
-
-| ID | Sev | Item | Effort | Status |
-|---|---|---|---|---|
-| OC-207 | 🟠 | `optimize_thresholds()` transforms its `X_val` internally (`pipeline/_pipeline.py:325`), but `docs/user_guide/threshold_tuning.md:32`, `skyulf-core/README.md:205` and the method's own docstring (`:280`) all tell callers to feed it `get_fitted_split()` output — which is **already** preprocessed. The documented workflow therefore tunes thresholds on double-transformed probabilities, and `predict(use_tuned_thresholds=True)` then applies them to singly-transformed ones (`:365`), so the cutoffs are fitted against a distribution inference never reproduces. Needs a contract decision (fix the three docs, or accept pre-transformed input) before code | decision + small | ⬜ open — filed while fixing OC-164 |
+The **Now** and **Next** tiers have no open findings left — those rows are in
+the archive. **Next** closed its last two filed rows (OC-177, OC-164) on
+2026-09-06, immediately re-opened with OC-207 filed *while* fixing OC-164, and
+closed that on 2026-09-07.
 
 ### Then — decide deployment model first
 
@@ -245,49 +240,6 @@ source read when the finding was filed, so they may have moved.
 
 Findings filed before 2026-09-05 — OC-169 and OC-178–182 among them — keep
 their reproduction detail in the archive's `## Log` entries instead.
-
-### 2026-09-06 — OC-207 filed while fixing OC-164
-
-Found by reading `get_fitted_split()`'s callers to decide between isolation and
-invalidation. **OC-207 — the documented threshold-tuning workflow tunes against
-a distribution inference never produces (🟠).** Build 200 rows,
-`x ~ N(0,1)`, `target = (x + N(0,0.4) > 0)`, config
-`[StandardScaler(columns=["x"]), TrainTestSplitter(test_size=0.25,
-random_state=42)]` + `logistic_regression`. Take
-`X_val, y_val = pipeline.get_fitted_split(data, "target")` (so `X_val` is
-already standardized: mean `0.0766`, std `0.9774`), then `pipeline.fit(data)`,
-then `pipeline.optimize_thresholds(X_val, y_val, metric=accuracy_score)`
-exactly as `docs/user_guide/threshold_tuning.md:32` shows. It returns
-**`{0: 0.3627, 1: 0.6373}`**.
-
-`optimize_thresholds` calls `self.feature_engineer.transform(X_val)` at
-`pipeline/_pipeline.py:325`, so those already-preprocessed features are
-standardized a second time. Isolating that on **identical rows and one fitted
-pipeline** — the only difference being whether `transform()` runs again —
-`p(class=1)` for the first six rows moves from
-`[0.9526, 0.0888, 0.0404, 0.0241, 0.1377, 0.0826]` to
-`[0.9560, 0.0783, 0.0343, 0.0200, 0.1244, 0.0725]`, one of 50 rows flips
-class, and measured accuracy on the fold goes `0.8800` → `0.9000` (the double
-transform is not merely different, it is *better* on this fold, which is why
-nothing looks wrong from the metric alone). The grid search then compensates
-for the distorted probabilities by picking asymmetric cutoffs.
-
-**Why that is the harm, not the row flip:** `predict(use_tuned_thresholds=True)`
-transforms the caller's *raw* input exactly once (`:365`) before
-`apply_thresholds`, so thresholds fitted on twice-transformed probabilities are
-applied to once-transformed ones. The mismatch is systematic and invisible —
-`optimize_thresholds` returns a plausible dict, and its own docstring at `:280`
-("Get a clean, independent holdout via `get_fitted_split()`") plus
-`skyulf-core/README.md:205` both prescribe the broken ordering, while the
-`Args:` entry at `:284` correctly says `X_val` is "*not* yet transformed". Three
-doc sites contradict one signature.
-**Fix/verification target:** decide the contract first — either the docs pass a
-raw holdout (and `get_fitted_split()` is not the way to get one, since it
-returns preprocessed frames), or `optimize_thresholds` accepts pre-transformed
-input and says so. Then pin that tuning and `predict(use_tuned_thresholds=True)`
-see the same probability distribution for the same rows. Distinct from OC-168
-(stale thresholds surviving a refit) and OC-36/OC-147 (degenerate search, tie
-comparison), which are about the search itself rather than its input.
 
 ### 2026-09-06 — remaining-source continuation (findings added as verified)
 
