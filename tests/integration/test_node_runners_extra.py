@@ -286,9 +286,30 @@ def test_get_model_components_unknown_algorithm_raises():
 def test_get_model_components_known_alias():
     """Legacy alias names resolve via the alias map to a real registry id."""
     harness = _Harness()
-    calculator, applier = harness._get_model_components("random_forest")
+    calculator, applier = harness._get_model_components("random_forest", task_type="classification")
     assert calculator is not None
     assert applier is not None
+
+
+def test_get_model_components_ambiguous_alias_uses_regression_task():
+    """The ambiguous random-forest alias must resolve to a regressor for regression tasks."""
+    harness = _Harness()
+    calculator, _ = harness._get_model_components("random_forest", task_type="regression")
+    assert calculator.problem_type == "regression"
+
+
+def test_get_model_components_ambiguous_alias_requires_task():
+    """An ambiguous alias must fail closed when no task is supplied."""
+    harness = _Harness()
+    with pytest.raises(ValueError, match="Ambiguous algorithm alias"):
+        harness._get_model_components("random_forest")
+
+
+def test_get_model_components_rejects_task_mismatch():
+    """An explicit model family must agree with the requested task."""
+    harness = _Harness()
+    with pytest.raises(ValueError, match="incompatible with task_type='regression'"):
+        harness._get_model_components("random_forest_classifier", task_type="regression")
 
 
 # --- _preview_slot_info / _build_split_dataset_data_summary ----------------
