@@ -140,6 +140,7 @@ uses, so a fixed finding stays where it was filed.
 | OC-149 | 🟠 | Clustering evaluation crashes on Polars when a numeric feature is all-null within one cluster | small | ✅ fixed 2026-09-07 — cluster-local Polars means now preserve pandas-compatible `NaN` values |
 | OC-196 | 🟡 | GaussianMixture probability prediction omitted the feature/reference filtering used for fit and ordinary prediction | small | ✅ fixed 2026-09-07 — shared clustering prediction preparation now filters both labels and probabilities identically |
 | OC-195 | 🟡 | Clustering numeric-feature selection skipped `SkyulfPandasWrapper` | small | ✅ fixed 2026-09-07 — wrapped pandas frames now use native pandas numeric selection and preserve the wrapper contract |
+| OC-197 | 🟡 | Polars clustering reference crosstabs crashed when reference columns were named `count` or `__skyulf_cluster__` | small | ✅ fixed 2026-09-07 — crosstab internals now use dedicated collision-proof helper names |
 
 ### Remaining — evaluation & explainability
 
@@ -340,6 +341,14 @@ Polars branch misclassified it and dropped every feature. `_select_numeric_featu
 now recognizes the wrapper, selects numeric columns from its native pandas frame,
 and returns a wrapped pandas subset. The clustering/modeling suites, Ruff, and
 Ty all pass.
+
+### 2026-09-07 — OC-197 fixed: Polars crosstab helper names are collision-proof
+
+The Polars reference crosstab used `__skyulf_cluster__` for its temporary
+cluster key and `count` for its aggregation output. Either name could already
+be the user-selected reference column, causing a `DuplicateError`. The path now
+uses dedicated internal cluster, reference, and count names independent of user
+columns. Clustering evaluation/integration tests, Ruff, and Ty all pass.
 
 ### 2026-09-07 — OC-207 fixed: the threshold-tuning contract was right and the three docs describing it were wrong — plus the silent degenerate search the follow-up measurement exposed
 

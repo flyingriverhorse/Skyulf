@@ -18,6 +18,7 @@ import pytest
 from skyulf.engines.polars_engine import SkyulfPolarsWrapper
 from skyulf.modeling._evaluation.clustering import (
     _compute_centroids_polars,
+    _compute_reference_crosstab_polars,
     evaluate_clustering_model,
 )
 
@@ -156,6 +157,16 @@ def test_compute_centroids_polars_preserves_nan_for_cluster_local_nulls() -> Non
     assert centroids[0].center == {"a": 1.5, "b": 15.0}
     assert centroids[1].center["a"] == 5.5
     assert math.isnan(centroids[1].center["b"])
+
+
+@pytest.mark.parametrize("reference_name", ["count", "__skyulf_cluster__"])
+def test_reference_crosstab_polars_avoids_helper_column_collisions(reference_name: str) -> None:
+    """Reserved reference names must not collide with crosstab helper columns."""
+    reference_values = pl.Series(reference_name, ["a", "a", "b", "b"])
+
+    result = _compute_reference_crosstab_polars(np.array([0, 0, 1, 1]), reference_values)
+
+    assert result == {"0": {"a": 2}, "1": {"b": 2}}
 
 
 def test_evaluate_clustering_model_reference_crosstab_null_value_matches_pandas() -> None:

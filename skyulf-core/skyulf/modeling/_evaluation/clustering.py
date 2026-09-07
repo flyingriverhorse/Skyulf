@@ -133,21 +133,23 @@ def _compute_reference_crosstab_polars(
     in Polars NaN is a valid value, not a null, so ``is_not_null()`` alone
     would invent a ``"nan"`` segment — float columns also filter ``is_nan()``.
     """
-    ref_name = reference_values.name or "reference"
+    cluster_key = "__skyulf_crosstab_cluster__"
+    reference_key = "__skyulf_crosstab_reference__"
+    count_key = "__skyulf_crosstab_count__"
     frame = (
-        pl.DataFrame({"__skyulf_cluster__": labels})
-        .with_columns(reference_values.alias(ref_name))
-        .filter(pl.col(ref_name).is_not_null())
+        pl.DataFrame({cluster_key: labels})
+        .with_columns(reference_values.alias(reference_key))
+        .filter(pl.col(reference_key).is_not_null())
     )
-    if frame.schema[ref_name] in (pl.Float32, pl.Float64):
-        frame = frame.filter(pl.col(ref_name).is_not_nan())
-    counts = frame.group_by(["__skyulf_cluster__", ref_name]).agg(pl.len().alias("count"))
+    if frame.schema[reference_key] in (pl.Float32, pl.Float64):
+        frame = frame.filter(pl.col(reference_key).is_not_nan())
+    counts = frame.group_by([cluster_key, reference_key]).agg(pl.len().alias(count_key))
 
     result: dict[str, dict[str, int]] = {}
-    for cluster_id, ref_value, count in counts.iter_rows():
-        if not isinstance(cluster_id, int | np.integer) or not count:
+    for cluster_id, ref_value, row_count in counts.iter_rows():
+        if not isinstance(cluster_id, int | np.integer) or not row_count:
             continue
-        result.setdefault(str(int(cluster_id)), {})[str(ref_value)] = int(count)
+        result.setdefault(str(int(cluster_id)), {})[str(ref_value)] = int(row_count)
     return result
 
 
