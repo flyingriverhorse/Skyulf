@@ -3197,15 +3197,17 @@ you supply, evaluated on held-out validation data.</p>
 </ul>
 <h2 id="pipeline-usage">Pipeline usage</h2>
 <p>Tune against explicit, out-of-sample validation data — <strong>never</strong> the
-pipeline's internal train/test split. Get a clean holdout via
-<a href="validation_vs_sklearn.html"><code>get_fitted_split()</code></a> (or your own split) first:</p>
+pipeline's internal train/test split. Carve the holdout out of the <strong>raw</strong>
+data before fitting, and pass those raw rows in:</p>
 <pre><code class="language-python">from sklearn.metrics import f1_score
+from sklearn.model_selection import train_test_split
 
-# Clean, independent holdout for tuning (uses the pipeline's configured preprocessing).
-X_train, y_train, X_val, y_val = pipeline.get_fitted_split(
-    customers, target_column=&quot;purchased&quot;
-)
-pipeline.fit(customers, target_column=&quot;purchased&quot;)
+# Raw holdout, carved before fit(): optimize_thresholds() preprocesses it itself.
+train_raw, val_raw = train_test_split(customers, test_size=0.2, random_state=42)
+X_val = val_raw.drop(columns=[&quot;purchased&quot;])
+y_val = val_raw[&quot;purchased&quot;]
+
+pipeline.fit(train_raw, target_column=&quot;purchased&quot;)
 
 thresholds = pipeline.optimize_thresholds(
     X_val,
@@ -3219,11 +3221,26 @@ thresholds = pipeline.optimize_thresholds(
 tuned_predictions = pipeline.predict(new_customers, use_tuned_thresholds=True)
 </code></pre>
 <p><code>optimize_thresholds()</code> runs the pipeline's already-fitted preprocessing on
-<code>X_val</code> internally, calls the model's <code>predict_proba</code>, searches thresholds,
-and stores the result on the pipeline. <code>predict(use_tuned_thresholds=True)</code>
-then applies those stored thresholds; it raises a <code>ValueError</code> if
-<code>optimize_thresholds()</code> was never called, and requires a model that supports
-<code>predict_proba</code>.</p>
+<code>X_val</code> internally — exactly once, the same single pass <code>predict()</code> makes —
+then calls the model's <code>predict_proba</code>, searches thresholds, and stores the
+result on the pipeline. That one pass is why <code>X_val</code> has to be raw: it is what
+makes the probabilities the cutoffs are fitted against the same probabilities
+<code>predict(use_tuned_thresholds=True)</code> later reproduces.
+<code>predict(use_tuned_thresholds=True)</code> then applies those stored thresholds; it
+raises a <code>ValueError</code> if <code>optimize_thresholds()</code> was never called, and requires
+a model that supports <code>predict_proba</code>.</p>
+<p><strong>Do not tune on <a href="../reference/api/pipeline.html"><code>get_fitted_split()</code></a> output.</strong>
+That helper returns frames the preprocessing chain has <strong>already transformed</strong>;
+it exists so you can compare raw sklearn/XGBoost/CatBoost estimators against
+the exact split the pipeline would use. Handing its <code>X_test</code> to
+<code>optimize_thresholds()</code> preprocesses the holdout a <em>second</em> time, so the search
+fits cutoffs against a distribution inference never reproduces. Nothing errors
+— the returned dict looks plausible, and the metric can even score <em>better</em> on
+the doubly-transformed fold, which is why the mismatch stays invisible.</p>
+<p>If your config already contains a <code>TrainTestSplitter</code>, fitting on <code>train_raw</code>
+splits it a second time internally. That is fine, and it is what keeps the
+model off your tuning data: the model trains on the splitter's train part, and
+<code>val_raw</code> is untouched by both.</p>
 <h3 id="skyulfpipelineoptimize_thresholds-signature"><code>SkyulfPipeline.optimize_thresholds</code> signature</h3>
 <pre><code class="language-python">pipeline.optimize_thresholds(
     X_val,                 # validation features, NOT yet transformed
@@ -3344,7 +3361,12 @@ tuning run.</p>
   exclusive of the endpoints). Metrics like F1 are piecewise constant in the
   cutoff, so exactly-tied plateaus are common; ties break toward the default
   <code>0.5</code> cut. Applying the returned per-class thresholds reproduces the same
-  <code>&gt;=</code> rule the search scored with, an exact tie included.</li>
+  <code>&gt;=</code> rule the search scored with, an exact tie included. When <em>every</em>
+  candidate ties — a validation split holding one class, probabilities so
+  saturated that no cutoff straddles a boundary, or a metric that ignores its
+  predictions — there is no signal to tune against: the search keeps the default
+  <code>0.5</code> cut and logs a warning saying so, rather than silently returning cutoffs
+  indistinguishable from a genuine optimum.</li>
 <li><strong>Multiclass</strong> uses Nelder–Mead optimization over a scaled-argmax rule.
   Equal thresholds across all classes reduce to plain <code>argmax</code>, so the tuned
   result can only match or beat the default rule on the tuning metric.</li>

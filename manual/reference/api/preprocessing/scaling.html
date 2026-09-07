@@ -3655,8 +3655,8 @@ continue to work unchanged.</p>
     <span class="k">def</span><span class="w"> </span><span class="nf">infer_output_schema</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span> <span class="n">input_schema</span><span class="p">:</span> <span class="n">SkyulfSchema</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">SkyulfSchema</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">"""Return the input schema unchanged: scaling rewrites values, not columns."""</span>
-        <span class="k">return</span> <span class="n">input_schema</span>
+<span class="w">        </span><span class="sd">"""Return a schema with transformed columns promoted to ``float64``."""</span>
+        <span class="k">return</span> <span class="n">promote_configured_columns_to_float64</span><span class="p">(</span><span class="n">input_schema</span><span class="p">,</span> <span class="n">config</span><span class="p">)</span>
 
     <span class="nd">@fit_method</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">fit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">_y</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">MaxAbsScalerArtifact</span><span class="p">:</span>  <span class="c1"># pylint: disable=arguments-differ</span>
@@ -3747,7 +3747,7 @@ continue to work unchanged.</p>
 
     <div class="doc doc-contents ">
 
-        <p>Return the input schema unchanged: scaling rewrites values, not columns.</p>
+        <p>Return a schema with transformed columns promoted to <code>float64</code>.</p>
 
 
             <details class="mkdocstrings-source">
@@ -3759,8 +3759,8 @@ continue to work unchanged.</p>
 <span class="normal">77</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">infer_output_schema</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span> <span class="n">input_schema</span><span class="p">:</span> <span class="n">SkyulfSchema</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">SkyulfSchema</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">"""Return the input schema unchanged: scaling rewrites values, not columns."""</span>
-    <span class="k">return</span> <span class="n">input_schema</span>
+<span class="w">    </span><span class="sd">"""Return a schema with transformed columns promoted to ``float64``."""</span>
+    <span class="k">return</span> <span class="n">promote_configured_columns_to_float64</span><span class="p">(</span><span class="n">input_schema</span><span class="p">,</span> <span class="n">config</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -4020,8 +4020,8 @@ continue to work unchanged.</p>
     <span class="k">def</span><span class="w"> </span><span class="nf">infer_output_schema</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span> <span class="n">input_schema</span><span class="p">:</span> <span class="n">SkyulfSchema</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">SkyulfSchema</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">"""Return the input schema unchanged: scaling rewrites values, not columns."""</span>
-        <span class="k">return</span> <span class="n">input_schema</span>
+<span class="w">        </span><span class="sd">"""Return a schema with transformed columns promoted to ``float64``."""</span>
+        <span class="k">return</span> <span class="n">promote_configured_columns_to_float64</span><span class="p">(</span><span class="n">input_schema</span><span class="p">,</span> <span class="n">config</span><span class="p">)</span>
 
     <span class="nd">@fit_method</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">fit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">_y</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">MinMaxScalerArtifact</span><span class="p">:</span>  <span class="c1"># pylint: disable=arguments-differ</span>
@@ -4112,7 +4112,7 @@ continue to work unchanged.</p>
 
     <div class="doc doc-contents ">
 
-        <p>Return the input schema unchanged: scaling rewrites values, not columns.</p>
+        <p>Return a schema with transformed columns promoted to <code>float64</code>.</p>
 
 
             <details class="mkdocstrings-source">
@@ -4124,8 +4124,8 @@ continue to work unchanged.</p>
 <span class="normal">78</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">infer_output_schema</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span> <span class="n">input_schema</span><span class="p">:</span> <span class="n">SkyulfSchema</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">SkyulfSchema</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">"""Return the input schema unchanged: scaling rewrites values, not columns."""</span>
-    <span class="k">return</span> <span class="n">input_schema</span>
+<span class="w">    </span><span class="sd">"""Return a schema with transformed columns promoted to ``float64``."""</span>
+    <span class="k">return</span> <span class="n">promote_configured_columns_to_float64</span><span class="p">(</span><span class="n">input_schema</span><span class="p">,</span> <span class="n">config</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -4412,7 +4412,9 @@ continue to work unchanged.</p>
 <span class="normal">122</span>
 <span class="normal">123</span>
 <span class="normal">124</span>
-<span class="normal">125</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">"RobustScaler"</span><span class="p">,</span> <span class="n">RobustScalerApplier</span><span class="p">)</span>
+<span class="normal">125</span>
+<span class="normal">126</span>
+<span class="normal">127</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">"RobustScaler"</span><span class="p">,</span> <span class="n">RobustScalerApplier</span><span class="p">)</span>
 <span class="nd">@node_meta</span><span class="p">(</span>
     <span class="nb">id</span><span class="o">=</span><span class="s2">"RobustScaler"</span><span class="p">,</span>
     <span class="n">name</span><span class="o">=</span><span class="s2">"Robust Scaler"</span><span class="p">,</span>
@@ -4432,8 +4434,10 @@ continue to work unchanged.</p>
     <span class="k">def</span><span class="w"> </span><span class="nf">infer_output_schema</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span> <span class="n">input_schema</span><span class="p">:</span> <span class="n">SkyulfSchema</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">SkyulfSchema</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">"""Return the input schema unchanged: scaling rewrites values, not columns."""</span>
-        <span class="k">return</span> <span class="n">input_schema</span>
+<span class="w">        </span><span class="sd">"""Return a schema with transformed columns promoted to ``float64``."""</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"with_centering"</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span> <span class="ow">or</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"with_scaling"</span><span class="p">,</span> <span class="kc">True</span><span class="p">)):</span>
+            <span class="k">return</span> <span class="n">input_schema</span>
+        <span class="k">return</span> <span class="n">promote_configured_columns_to_float64</span><span class="p">(</span><span class="n">input_schema</span><span class="p">,</span> <span class="n">config</span><span class="p">)</span>
 
     <span class="nd">@fit_method</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">fit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">_y</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">RobustScalerArtifact</span><span class="p">:</span>  <span class="c1"># pylint: disable=arguments-differ</span>
@@ -4490,15 +4494,15 @@ continue to work unchanged.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>skyulf-core/skyulf/preprocessing/scaling/robust.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">103</span>
-<span class="normal">104</span>
-<span class="normal">105</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">105</span>
 <span class="normal">106</span>
 <span class="normal">107</span>
 <span class="normal">108</span>
 <span class="normal">109</span>
 <span class="normal">110</span>
-<span class="normal">111</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@fit_method</span>
+<span class="normal">111</span>
+<span class="normal">112</span>
+<span class="normal">113</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@fit_method</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">fit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">_y</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">RobustScalerArtifact</span><span class="p">:</span>  <span class="c1"># pylint: disable=arguments-differ</span>
 <span class="w">    </span><span class="sd">"""Dispatch the fit to the active engine and return the robust-statistics artifact."""</span>
     <span class="k">if</span> <span class="n">user_picked_no_columns</span><span class="p">(</span><span class="n">config</span><span class="p">):</span>
@@ -4524,7 +4528,7 @@ continue to work unchanged.</p>
 
     <div class="doc doc-contents ">
 
-        <p>Return the input schema unchanged: scaling rewrites values, not columns.</p>
+        <p>Return a schema with transformed columns promoted to <code>float64</code>.</p>
 
 
             <details class="mkdocstrings-source">
@@ -4533,11 +4537,15 @@ continue to work unchanged.</p>
 <span class="normal"> 98</span>
 <span class="normal"> 99</span>
 <span class="normal">100</span>
-<span class="normal">101</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">infer_output_schema</span><span class="p">(</span>
+<span class="normal">101</span>
+<span class="normal">102</span>
+<span class="normal">103</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">infer_output_schema</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span> <span class="n">input_schema</span><span class="p">:</span> <span class="n">SkyulfSchema</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">SkyulfSchema</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">"""Return the input schema unchanged: scaling rewrites values, not columns."""</span>
-    <span class="k">return</span> <span class="n">input_schema</span>
+<span class="w">    </span><span class="sd">"""Return a schema with transformed columns promoted to ``float64``."""</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"with_centering"</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span> <span class="ow">or</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"with_scaling"</span><span class="p">,</span> <span class="kc">True</span><span class="p">)):</span>
+        <span class="k">return</span> <span class="n">input_schema</span>
+    <span class="k">return</span> <span class="n">promote_configured_columns_to_float64</span><span class="p">(</span><span class="n">input_schema</span><span class="p">,</span> <span class="n">config</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -4831,7 +4839,8 @@ enabled flags have no fitted statistics, and <code>y</code> is never modified.</
 <span class="normal">144</span>
 <span class="normal">145</span>
 <span class="normal">146</span>
-<span class="normal">147</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">"StandardScaler"</span><span class="p">,</span> <span class="n">StandardScalerApplier</span><span class="p">)</span>
+<span class="normal">147</span>
+<span class="normal">148</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">"StandardScaler"</span><span class="p">,</span> <span class="n">StandardScalerApplier</span><span class="p">)</span>
 <span class="nd">@node_meta</span><span class="p">(</span>
     <span class="nb">id</span><span class="o">=</span><span class="s2">"StandardScaler"</span><span class="p">,</span>
     <span class="n">name</span><span class="o">=</span><span class="s2">"Standard Scaler"</span><span class="p">,</span>
@@ -4846,9 +4855,10 @@ enabled flags have no fitted statistics, and <code>y</code> is never modified.</
     <span class="k">def</span><span class="w"> </span><span class="nf">infer_output_schema</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span> <span class="n">input_schema</span><span class="p">:</span> <span class="n">SkyulfSchema</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">SkyulfSchema</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">"""Return the input schema unchanged: scaling rewrites values, not columns."""</span>
-        <span class="c1"># Scalers preserve column set; values change but names/order do not.</span>
-        <span class="k">return</span> <span class="n">input_schema</span>
+<span class="w">        </span><span class="sd">"""Return a schema with touched numeric columns promoted to ``float64``."""</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"with_mean"</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span> <span class="ow">or</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"with_std"</span><span class="p">,</span> <span class="kc">True</span><span class="p">)):</span>
+            <span class="k">return</span> <span class="n">input_schema</span>
+        <span class="k">return</span> <span class="n">promote_configured_columns_to_float64</span><span class="p">(</span><span class="n">input_schema</span><span class="p">,</span> <span class="n">config</span><span class="p">)</span>
 
     <span class="nd">@fit_method</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">fit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">_y</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">StandardScalerArtifact</span><span class="p">:</span>  <span class="c1"># pylint: disable=arguments-differ</span>
@@ -4905,15 +4915,15 @@ enabled flags have no fitted statistics, and <code>y</code> is never modified.</
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>skyulf-core/skyulf/preprocessing/scaling/standard.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">125</span>
-<span class="normal">126</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">126</span>
 <span class="normal">127</span>
 <span class="normal">128</span>
 <span class="normal">129</span>
 <span class="normal">130</span>
 <span class="normal">131</span>
 <span class="normal">132</span>
-<span class="normal">133</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@fit_method</span>
+<span class="normal">133</span>
+<span class="normal">134</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@fit_method</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">fit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">_y</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">StandardScalerArtifact</span><span class="p">:</span>  <span class="c1"># pylint: disable=arguments-differ</span>
 <span class="w">    </span><span class="sd">"""Dispatch the fit to the active engine and return the scaler-statistics artifact."""</span>
     <span class="k">if</span> <span class="n">user_picked_no_columns</span><span class="p">(</span><span class="n">config</span><span class="p">):</span>
@@ -4939,7 +4949,7 @@ enabled flags have no fitted statistics, and <code>y</code> is never modified.</
 
     <div class="doc doc-contents ">
 
-        <p>Return the input schema unchanged: scaling rewrites values, not columns.</p>
+        <p>Return a schema with touched numeric columns promoted to <code>float64</code>.</p>
 
 
             <details class="mkdocstrings-source">
@@ -4949,12 +4959,14 @@ enabled flags have no fitted statistics, and <code>y</code> is never modified.</
 <span class="normal">120</span>
 <span class="normal">121</span>
 <span class="normal">122</span>
-<span class="normal">123</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">infer_output_schema</span><span class="p">(</span>
+<span class="normal">123</span>
+<span class="normal">124</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">infer_output_schema</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span> <span class="n">input_schema</span><span class="p">:</span> <span class="n">SkyulfSchema</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">SkyulfSchema</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">"""Return the input schema unchanged: scaling rewrites values, not columns."""</span>
-    <span class="c1"># Scalers preserve column set; values change but names/order do not.</span>
-    <span class="k">return</span> <span class="n">input_schema</span>
+<span class="w">    </span><span class="sd">"""Return a schema with touched numeric columns promoted to ``float64``."""</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"with_mean"</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span> <span class="ow">or</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"with_std"</span><span class="p">,</span> <span class="kc">True</span><span class="p">)):</span>
+        <span class="k">return</span> <span class="n">input_schema</span>
+    <span class="k">return</span> <span class="n">promote_configured_columns_to_float64</span><span class="p">(</span><span class="n">input_schema</span><span class="p">,</span> <span class="n">config</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>

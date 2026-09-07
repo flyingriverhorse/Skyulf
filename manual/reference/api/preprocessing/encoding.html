@@ -3647,10 +3647,10 @@ continue to work unchanged.</p>
         <p>Replace each categorical column with one <code>&lt;col&gt;_&lt;category&gt;</code> indicator column.</p>
 <p>The originals are always dropped. Parity depends on both engines rendering
 a value to the <em>same</em> string before comparing it with the learned
-categories — see <code>_pandas_col_to_str</code>, which undoes pandas' null-induced
-<code>float64</code> upcast so <code>1</code> does not become <code>"1.0"</code> and silently miss
-every category. A value unseen at fit time yields an all-zero row rather
-than raising.</p>
+categories — one rule, implemented per engine by <code>_pandas_col_to_str</code>
+and <code>_polars_col_to_str_expr</code>, which is a function of the value alone so
+a category cannot stop matching because of what else shares its batch. A
+value unseen at fit time yields an all-zero row rather than raising.</p>
 
 
 
@@ -3661,33 +3661,33 @@ than raising.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>skyulf-core/skyulf/preprocessing/encoding/dummy.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">102</span>
-<span class="normal">103</span>
-<span class="normal">104</span>
-<span class="normal">105</span>
-<span class="normal">106</span>
-<span class="normal">107</span>
-<span class="normal">108</span>
-<span class="normal">109</span>
-<span class="normal">110</span>
-<span class="normal">111</span>
-<span class="normal">112</span>
-<span class="normal">113</span>
-<span class="normal">114</span>
-<span class="normal">115</span>
-<span class="normal">116</span>
-<span class="normal">117</span>
-<span class="normal">118</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">118</span>
 <span class="normal">119</span>
-<span class="normal">120</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">DummyEncoderApplier</span><span class="p">(</span><span class="n">BaseApplier</span><span class="p">):</span>
+<span class="normal">120</span>
+<span class="normal">121</span>
+<span class="normal">122</span>
+<span class="normal">123</span>
+<span class="normal">124</span>
+<span class="normal">125</span>
+<span class="normal">126</span>
+<span class="normal">127</span>
+<span class="normal">128</span>
+<span class="normal">129</span>
+<span class="normal">130</span>
+<span class="normal">131</span>
+<span class="normal">132</span>
+<span class="normal">133</span>
+<span class="normal">134</span>
+<span class="normal">135</span>
+<span class="normal">136</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">DummyEncoderApplier</span><span class="p">(</span><span class="n">BaseApplier</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""Replace each categorical column with one ``&lt;col&gt;_&lt;category&gt;`` indicator column.</span>
 
 <span class="sd">    The originals are always dropped. Parity depends on both engines rendering</span>
 <span class="sd">    a value to the *same* string before comparing it with the learned</span>
-<span class="sd">    categories — see ``_pandas_col_to_str``, which undoes pandas' null-induced</span>
-<span class="sd">    ``float64`` upcast so ``1`` does not become ``"1.0"`` and silently miss</span>
-<span class="sd">    every category. A value unseen at fit time yields an all-zero row rather</span>
-<span class="sd">    than raising.</span>
+<span class="sd">    categories — one rule, implemented per engine by ``_pandas_col_to_str``</span>
+<span class="sd">    and ``_polars_col_to_str_expr``, which is a function of the value alone so</span>
+<span class="sd">    a category cannot stop matching because of what else shares its batch. A</span>
+<span class="sd">    value unseen at fit time yields an all-zero row rather than raising.</span>
 <span class="sd">    """</span>
 
     <span class="nd">@apply_method</span>
@@ -3730,14 +3730,14 @@ than raising.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>skyulf-core/skyulf/preprocessing/encoding/dummy.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">113</span>
-<span class="normal">114</span>
-<span class="normal">115</span>
-<span class="normal">116</span>
-<span class="normal">117</span>
-<span class="normal">118</span>
-<span class="normal">119</span>
-<span class="normal">120</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@apply_method</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">129</span>
+<span class="normal">130</span>
+<span class="normal">131</span>
+<span class="normal">132</span>
+<span class="normal">133</span>
+<span class="normal">134</span>
+<span class="normal">135</span>
+<span class="normal">136</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@apply_method</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">apply</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">y</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">params</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>  <span class="c1"># pylint: disable=arguments-differ</span>
 <span class="w">    </span><span class="sd">"""Dispatch to the engine-specific dummy encoding, forwarding ``(X, y)`` when present."""</span>
     <span class="k">return</span> <span class="n">apply_dual_engine</span><span class="p">(</span>
@@ -3792,23 +3792,7 @@ artifact so the applier no-ops.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>skyulf-core/skyulf/preprocessing/encoding/dummy.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">162</span>
-<span class="normal">163</span>
-<span class="normal">164</span>
-<span class="normal">165</span>
-<span class="normal">166</span>
-<span class="normal">167</span>
-<span class="normal">168</span>
-<span class="normal">169</span>
-<span class="normal">170</span>
-<span class="normal">171</span>
-<span class="normal">172</span>
-<span class="normal">173</span>
-<span class="normal">174</span>
-<span class="normal">175</span>
-<span class="normal">176</span>
-<span class="normal">177</span>
-<span class="normal">178</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">178</span>
 <span class="normal">179</span>
 <span class="normal">180</span>
 <span class="normal">181</span>
@@ -3823,7 +3807,23 @@ artifact so the applier no-ops.</p>
 <span class="normal">190</span>
 <span class="normal">191</span>
 <span class="normal">192</span>
-<span class="normal">193</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">"DummyEncoder"</span><span class="p">,</span> <span class="n">DummyEncoderApplier</span><span class="p">)</span>
+<span class="normal">193</span>
+<span class="normal">194</span>
+<span class="normal">195</span>
+<span class="normal">196</span>
+<span class="normal">197</span>
+<span class="normal">198</span>
+<span class="normal">199</span>
+<span class="normal">200</span>
+<span class="normal">201</span>
+<span class="normal">202</span>
+<span class="normal">203</span>
+<span class="normal">204</span>
+<span class="normal">205</span>
+<span class="normal">206</span>
+<span class="normal">207</span>
+<span class="normal">208</span>
+<span class="normal">209</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">"DummyEncoder"</span><span class="p">,</span> <span class="n">DummyEncoderApplier</span><span class="p">)</span>
 <span class="nd">@node_meta</span><span class="p">(</span>
     <span class="nb">id</span><span class="o">=</span><span class="s2">"DummyEncoder"</span><span class="p">,</span>
     <span class="n">name</span><span class="o">=</span><span class="s2">"Dummy Encoder"</span><span class="p">,</span>
@@ -3887,19 +3887,19 @@ artifact so the applier no-ops.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>skyulf-core/skyulf/preprocessing/encoding/dummy.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">181</span>
-<span class="normal">182</span>
-<span class="normal">183</span>
-<span class="normal">184</span>
-<span class="normal">185</span>
-<span class="normal">186</span>
-<span class="normal">187</span>
-<span class="normal">188</span>
-<span class="normal">189</span>
-<span class="normal">190</span>
-<span class="normal">191</span>
-<span class="normal">192</span>
-<span class="normal">193</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@fit_method</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">197</span>
+<span class="normal">198</span>
+<span class="normal">199</span>
+<span class="normal">200</span>
+<span class="normal">201</span>
+<span class="normal">202</span>
+<span class="normal">203</span>
+<span class="normal">204</span>
+<span class="normal">205</span>
+<span class="normal">206</span>
+<span class="normal">207</span>
+<span class="normal">208</span>
+<span class="normal">209</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@fit_method</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">fit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">y</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">DummyEncoderArtifact</span><span class="p">:</span>  <span class="c1"># pylint: disable=arguments-differ</span>
 <span class="w">    </span><span class="sd">"""Short-circuit an explicit empty column selection, else learn the categories."""</span>
     <span class="k">if</span> <span class="n">user_picked_no_columns</span><span class="p">(</span><span class="n">config</span><span class="p">):</span>
@@ -5564,7 +5564,13 @@ held-out splits go through the plain applier.</p>
 <span class="normal">385</span>
 <span class="normal">386</span>
 <span class="normal">387</span>
-<span class="normal">388</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">"TargetEncoder"</span><span class="p">,</span> <span class="n">TargetEncoderApplier</span><span class="p">)</span>
+<span class="normal">388</span>
+<span class="normal">389</span>
+<span class="normal">390</span>
+<span class="normal">391</span>
+<span class="normal">392</span>
+<span class="normal">393</span>
+<span class="normal">394</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">"TargetEncoder"</span><span class="p">,</span> <span class="n">TargetEncoderApplier</span><span class="p">)</span>
 <span class="nd">@node_meta</span><span class="p">(</span>
     <span class="nb">id</span><span class="o">=</span><span class="s2">"TargetEncoder"</span><span class="p">,</span>
     <span class="n">name</span><span class="o">=</span><span class="s2">"Target Encoder"</span><span class="p">,</span>
@@ -5624,13 +5630,13 @@ held-out splits go through the plain applier.</p>
         <span class="n">input_schema</span><span class="p">:</span> <span class="n">SkyulfSchema</span><span class="p">,</span>
         <span class="n">config</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">SkyulfSchema</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">"""Predict the schema only when ``target_type`` is explicitly binary or regression.</span>
+<span class="w">        </span><span class="sd">"""Predict the schema only when ``target_type`` is explicitly binary or continuous.</span>
 
 <span class="sd">        Anything else — ``"auto"`` included — can resolve to multiclass at fit</span>
 <span class="sd">        time, which changes the column set in a data-dependent way, so ``None``</span>
 <span class="sd">        is returned and callers fall back to runtime introspection.</span>
 <span class="sd">        """</span>
-        <span class="c1"># For binary/regression targets, the encoder replaces values in</span>
+        <span class="c1"># For binary/continuous targets, the encoder replaces values in</span>
         <span class="c1"># source columns in place — same column names, dtype becomes float</span>
         <span class="c1"># (per-column dtype is best-effort so we don't bother rewriting it).</span>
         <span class="c1">#</span>
@@ -5641,9 +5647,15 @@ held-out splits go through the plain applier.</p>
         <span class="c1"># confidently predict the output columns. The default/"auto"</span>
         <span class="c1"># target_type is resolved to multiclass at fit time whenever y has</span>
         <span class="c1"># more than two classes, so we must also treat "auto" as unknown</span>
-        <span class="c1"># rather than assuming binary/regression. Only the explicit</span>
-        <span class="c1"># "binary"/"regression" config values are confidently in-place.</span>
-        <span class="k">if</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"target_type"</span><span class="p">,</span> <span class="s2">"auto"</span><span class="p">)</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"binary"</span><span class="p">,</span> <span class="s2">"regression"</span><span class="p">):</span>
+        <span class="c1"># rather than assuming binary/continuous. Only the explicit</span>
+        <span class="c1"># "binary"/"continuous" config values are confidently in-place.</span>
+        <span class="c1">#</span>
+        <span class="c1"># "continuous" is sklearn's name for a regression target. The value is</span>
+        <span class="c1"># forwarded to ``TargetEncoder(target_type=...)`` verbatim and its</span>
+        <span class="c1"># accepted set is {auto, binary, multiclass, continuous}, so the more</span>
+        <span class="c1"># natural-sounding "regression" raises InvalidParameterError at fit and</span>
+        <span class="c1"># could never reach this check through a working config.</span>
+        <span class="k">if</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"target_type"</span><span class="p">,</span> <span class="s2">"auto"</span><span class="p">)</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"binary"</span><span class="p">,</span> <span class="s2">"continuous"</span><span class="p">):</span>
             <span class="k">return</span> <span class="kc">None</span>
         <span class="k">return</span> <span class="n">input_schema</span>
 </code></pre></div></td></tr></table></div>
@@ -5779,7 +5791,7 @@ held-out splits go through the plain applier.</p>
 
     <div class="doc doc-contents ">
 
-        <p>Predict the schema only when <code>target_type</code> is explicitly binary or regression.</p>
+        <p>Predict the schema only when <code>target_type</code> is explicitly binary or continuous.</p>
 <p>Anything else — <code>"auto"</code> included — can resolve to multiclass at fit
 time, which changes the column set in a data-dependent way, so <code>None</code>
 is returned and callers fall back to runtime introspection.</p>
@@ -5813,18 +5825,24 @@ is returned and callers fall back to runtime introspection.</p>
 <span class="normal">385</span>
 <span class="normal">386</span>
 <span class="normal">387</span>
-<span class="normal">388</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">infer_output_schema</span><span class="p">(</span>
+<span class="normal">388</span>
+<span class="normal">389</span>
+<span class="normal">390</span>
+<span class="normal">391</span>
+<span class="normal">392</span>
+<span class="normal">393</span>
+<span class="normal">394</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">infer_output_schema</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">input_schema</span><span class="p">:</span> <span class="n">SkyulfSchema</span><span class="p">,</span>
     <span class="n">config</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">SkyulfSchema</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">"""Predict the schema only when ``target_type`` is explicitly binary or regression.</span>
+<span class="w">    </span><span class="sd">"""Predict the schema only when ``target_type`` is explicitly binary or continuous.</span>
 
 <span class="sd">    Anything else — ``"auto"`` included — can resolve to multiclass at fit</span>
 <span class="sd">    time, which changes the column set in a data-dependent way, so ``None``</span>
 <span class="sd">    is returned and callers fall back to runtime introspection.</span>
 <span class="sd">    """</span>
-    <span class="c1"># For binary/regression targets, the encoder replaces values in</span>
+    <span class="c1"># For binary/continuous targets, the encoder replaces values in</span>
     <span class="c1"># source columns in place — same column names, dtype becomes float</span>
     <span class="c1"># (per-column dtype is best-effort so we don't bother rewriting it).</span>
     <span class="c1">#</span>
@@ -5835,9 +5853,15 @@ is returned and callers fall back to runtime introspection.</p>
     <span class="c1"># confidently predict the output columns. The default/"auto"</span>
     <span class="c1"># target_type is resolved to multiclass at fit time whenever y has</span>
     <span class="c1"># more than two classes, so we must also treat "auto" as unknown</span>
-    <span class="c1"># rather than assuming binary/regression. Only the explicit</span>
-    <span class="c1"># "binary"/"regression" config values are confidently in-place.</span>
-    <span class="k">if</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"target_type"</span><span class="p">,</span> <span class="s2">"auto"</span><span class="p">)</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"binary"</span><span class="p">,</span> <span class="s2">"regression"</span><span class="p">):</span>
+    <span class="c1"># rather than assuming binary/continuous. Only the explicit</span>
+    <span class="c1"># "binary"/"continuous" config values are confidently in-place.</span>
+    <span class="c1">#</span>
+    <span class="c1"># "continuous" is sklearn's name for a regression target. The value is</span>
+    <span class="c1"># forwarded to ``TargetEncoder(target_type=...)`` verbatim and its</span>
+    <span class="c1"># accepted set is {auto, binary, multiclass, continuous}, so the more</span>
+    <span class="c1"># natural-sounding "regression" raises InvalidParameterError at fit and</span>
+    <span class="c1"># could never reach this check through a working config.</span>
+    <span class="k">if</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"target_type"</span><span class="p">,</span> <span class="s2">"auto"</span><span class="p">)</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"binary"</span><span class="p">,</span> <span class="s2">"continuous"</span><span class="p">):</span>
         <span class="k">return</span> <span class="kc">None</span>
     <span class="k">return</span> <span class="n">input_schema</span>
 </code></pre></div></td></tr></table></div>
