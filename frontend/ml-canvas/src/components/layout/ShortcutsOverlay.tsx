@@ -23,7 +23,7 @@ const SHORTCUTS: Shortcut[] = [
   { keys: ['Delete'], description: 'Delete selected nodes / edges' },
   { keys: ['F'], description: 'Fit view to canvas' },
   { keys: ['Ctrl', '0'], description: 'Fit view to canvas (alt)' },
-  { keys: ['Ctrl', 'Enter'], description: 'Run preview' },
+  { keys: ['Ctrl', 'Enter'], description: 'Preview data' },
   { keys: ['?'], description: 'Toggle this cheatsheet' },
   { keys: ['Esc'], description: 'Close overlays / collapse panels' },
 ];

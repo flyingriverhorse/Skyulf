@@ -1,9 +1,9 @@
-import React, { useRef, useState } from 'react';
+import React, { useId, useRef, useState } from 'react';
 import { registry } from '../../core/registry/NodeRegistry';
 import { useGraphStore } from '../../core/store/useGraphStore';
 import { useViewStore } from '../../core/store/useViewStore';
 import { FOCUS_NODE_EVENT } from '../../core/hooks/useKeyboardShortcuts';
-import { Search, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import { Search, PanelLeftClose, PanelLeftOpen, ChevronDown, ChevronRight } from 'lucide-react';
 
 export const Sidebar: React.FC = () => {
   // Legacy node types (e.g. the old Basic Training / Advanced Tuning nodes,
@@ -13,6 +13,8 @@ export const Sidebar: React.FC = () => {
   const addNode = useGraphStore((state) => state.addNode);
   const { isSidebarOpen, setSidebarOpen } = useViewStore();
   const [searchTerm, setSearchTerm] = useState('');
+  const [collapsedCategories, setCollapsedCategories] = useState<Record<string, boolean>>({});
+  const categoryListId = useId();
   // Cascades click-to-add nodes so repeated clicks don't stack them on top of each other.
   const placementCounterRef = useRef(0);
 
@@ -60,9 +62,11 @@ export const Sidebar: React.FC = () => {
     );
   }
 
+  const searchQuery = searchTerm.trim().toLowerCase();
   const filteredNodes = nodes.filter(n =>
-    n.label.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    n.category.toLowerCase().includes(searchTerm.toLowerCase())
+    n.label.toLowerCase().includes(searchQuery) ||
+    n.category.toLowerCase().includes(searchQuery) ||
+    n.description.toLowerCase().includes(searchQuery)
   );
 
   const categories = ['Data Source', 'Preprocessing', 'Modeling', 'Evaluation', 'Utility'];
@@ -103,16 +107,34 @@ export const Sidebar: React.FC = () => {
             <p className="text-xs text-muted-foreground mt-1">Try a different search term.</p>
           </div>
         )}
-        {categories.map((category) => {
+        {categories.map((category, index) => {
           const categoryNodes = filteredNodes.filter(n => n.category === category);
           if (categoryNodes.length === 0) return null;
+          // Search reveals every matching group without changing the browsing layout.
+          const isSearching = searchQuery.length > 0;
+          const isExpanded = isSearching || !collapsedCategories[category];
+          const contentId = `${categoryListId}-${index}`;
 
           return (
             <div key={category}>
-              <h3 className="text-[10px] font-bold text-muted-foreground mb-2 uppercase tracking-wider px-1">
-                {category}
+              <h3 className="mb-2">
+                <button
+                  type="button"
+                  aria-expanded={isExpanded}
+                  aria-controls={contentId}
+                  disabled={isSearching}
+                  title={isSearching ? 'Clear search to collapse categories' : undefined}
+                  onClick={() => setCollapsedCategories(current => ({ ...current, [category]: !current[category] }))}
+                  className="flex w-full items-center gap-1.5 rounded px-1 py-1 text-left text-[10px] font-bold uppercase tracking-wider text-muted-foreground enabled:hover:bg-accent enabled:hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                >
+                  {isExpanded
+                    ? <ChevronDown aria-hidden="true" className="h-3.5 w-3.5 shrink-0" />
+                    : <ChevronRight aria-hidden="true" className="h-3.5 w-3.5 shrink-0" />}
+                  <span className="flex-1">{category}</span>
+                  <span aria-hidden="true" className="rounded bg-muted px-1.5 py-0.5 tabular-nums">{categoryNodes.length}</span>
+                </button>
               </h3>
-              <div className="space-y-2">
+              <div id={contentId} hidden={!isExpanded} className="space-y-2">
                 {categoryNodes.map((node) => (
                   <button
                     type="button"

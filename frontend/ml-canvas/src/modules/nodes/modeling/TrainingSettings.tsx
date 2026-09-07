@@ -973,16 +973,27 @@ export const TrainingSettings: React.FC<{
 
       {/* Footer */}
       <div className="pt-4 mt-auto border-t border-gray-100 dark:border-gray-700 flex flex-col gap-3 items-center">
+        <p className="text-xs text-center text-gray-600 dark:text-gray-400 break-words">
+          Selected model: {selectedModelItem?.name || config.model_type.replace(/_/g, ' ')}
+        </p>
         <button
+          type="button"
           onClick={() => { void handleSubmit(); }}
           disabled={!datasetId}
-          title={!datasetId ? 'Connect a dataset node upstream to enable training' : undefined}
+          aria-describedby={`${fieldId}-run-help`}
           className="w-full max-w-xs flex items-center justify-center gap-2 px-6 py-2.5 text-white rounded-lg shadow-lg transition-all hover:shadow-xl hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-lg disabled:hover:translate-y-0"
           style={{ background: 'var(--main-gradient)' }}
         >
           <Play className="w-4 h-4 fill-current" />
-          <span className="text-sm font-semibold">{isAdvanced ? 'Start Advanced Training' : 'Start Training'}</span>
+          <span className="text-sm font-semibold">{isAdvanced ? 'Tune model' : 'Train model'}</span>
         </button>
+        <p id={`${fieldId}-run-help`} className="text-xs text-center text-gray-600 dark:text-gray-400">
+          {!datasetId
+            ? 'Connect a dataset node upstream and select a dataset to enable this action.'
+            : isAdvanced
+              ? 'Searches hyperparameters and trains the selected model in the background.'
+              : 'Trains the selected model with fixed parameters in the background.'}
+        </p>
 
         {isAdvanced && (
             <button

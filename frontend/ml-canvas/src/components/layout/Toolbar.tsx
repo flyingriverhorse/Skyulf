@@ -614,10 +614,9 @@ export const Toolbar: React.FC = () => {
           <button
             onClick={() => { void handleRun(); }}
             disabled={isRunning}
-            title="Run Preview (Ctrl+Enter). Blocked? Click to see what's missing."
-            aria-label="Run Preview"
+            title="Preview data (Ctrl+Enter). Click to review any blocking issues."
             data-testid="toolbar-run-preview"
-            className="flex items-center gap-2 px-3 py-2 text-white rounded-md shadow-sm transition-all disabled:opacity-50"
+            className="flex shrink-0 items-center gap-2 px-3 py-2 text-white rounded-md shadow-sm transition-all disabled:opacity-50"
             style={{ background: 'var(--main-gradient)' }}
           >
             {isRunning ? (
@@ -625,8 +624,8 @@ export const Toolbar: React.FC = () => {
             ) : (
               <Play className="w-4 h-4" />
             )}
-            <span className="text-sm font-medium hidden 2xl:inline">
-              {isRunning ? 'Running...' : 'Run Preview'}
+            <span className="text-sm font-medium whitespace-nowrap">
+              {isRunning ? 'Previewing data...' : 'Preview data'}
             </span>
           </button>
         )}

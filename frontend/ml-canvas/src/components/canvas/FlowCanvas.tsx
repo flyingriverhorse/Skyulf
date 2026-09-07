@@ -146,7 +146,7 @@ const FlowCanvasContent: React.FC = () => {
 
   // Whether the Preview Results panel is showing (mirrors ResultsPanel's
   // visibility rule) and how tall it is, so the zoom controls lift above
-  // it: 40px for the collapsed bar, 384px (h-96) when expanded. Uses the
+  // it: 40px for the collapsed bar, the layout's clamped height when expanded. Uses the
   // branch-stable nodes so drags don't re-validate every frame.
   const validationIssueCount = useMemo(
     () => collectGraphValidationIssues(branchStableNodes, edges).length,
@@ -401,16 +401,15 @@ const FlowCanvasContent: React.FC = () => {
           style={{
             // Maximizing the panel covers the whole canvas, so the controls
             // have nowhere to lift to — hide them instead of burying them.
-            ...(isResultsPanelMaximized && resultsPanelVisible
+            ...(isResultsPanelExpanded && isResultsPanelMaximized && resultsPanelVisible
               ? { display: 'none' }
               : {
                   marginBottom: resultsPanelVisible
                     ? isResultsPanelExpanded
-                      ? '384px'
+                      ? 'var(--results-panel-height, 384px)'
                       : '40px'
                     : '0px',
                 }),
-            transition: 'margin-bottom 0.3s ease-in-out',
           }}
         />
       </ReactFlow>

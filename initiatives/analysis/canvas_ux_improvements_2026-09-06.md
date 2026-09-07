@@ -1,7 +1,7 @@
 # Canvas UX improvement backlog
 
 Date: 2026-09-06
-Status: CUX-08 in progress; panel labels, sidebar keyboard access, and primary field labels complete.
+Status: CUX-01, CUX-03, CUX-04, and CUX-08 in progress; completed portions are recorded below.
 
 ## Purpose and review scope
 
@@ -26,10 +26,10 @@ before implementation because other work may have changed these components.
 
 | ID | Priority | Improvement | Status |
 |---|---|---|---|
-| CUX-01 | High | Preserve canvas space with resizable panels | Open |
+| CUX-01 | High | Preserve canvas space with resizable panels | In progress; settings and results resizing complete |
 | CUX-02 | High | Guide node connections and adding the next step | Open |
-| CUX-03 | High | Clearly distinguish previewing data from training | Open |
-| CUX-04 | Medium | Improve component discovery | Open |
+| CUX-03 | High | Clearly distinguish previewing data from training | In progress; visible action labels and training guidance complete |
+| CUX-04 | Medium | Improve component discovery | In progress; description search and collapsible categories complete |
 | CUX-05 | Medium | Navigate from validation issues to the exact setting | Open |
 | CUX-06 | Medium | Reduce connection and settings visual noise | Open |
 | CUX-07 | Medium | Inspect a selected node's input and output | Open |
@@ -37,7 +37,7 @@ before implementation because other work may have changed these components.
 
 ### CUX-01 — Preserve canvas space
 
-**Observed:** The properties panel switches between 320px and almost the full
+**Observed during review:** The properties panel switched between 320px and almost the full
 available width. At 1100px, the 64px navigation, 256px component library, and
 320px properties panel leave approximately 460px for the canvas. Expanded
 results occupy another 384px vertically. Users can lose sight of the pipeline
@@ -47,13 +47,32 @@ while editing it.
 the component library when space becomes constrained, with a clear way to
 reopen it. Preserve explicit user layout choices where practical.
 
+**Progress (2026-09-07):** The docked settings panel has a draggable left edge
+and a focusable resize handle. Left/Right arrows widen/narrow it in 20px steps;
+Home resets to 320px and End uses the available maximum. Width is capped at
+720px and reduced to reserve 400px of canvas when space permits, with a 320px
+minimum for settings. The preferred width survives selection changes,
+close/reopen, and expand/collapse within the current app session; it returns
+when the window grows or the component library closes. Refresh resets it.
+Results now have a draggable top edge and a focusable resize handle. Up/Down
+arrows grow/shrink the panel in 20px steps; Home resets the preferred height
+to 384px and End uses the docked maximum. Height ranges from 200px to 720px,
+with the maximum reduced to reserve 240px above results when space permits.
+The preferred height survives collapse, maximize/restore, close/new results,
+and viewport changes within the session; refresh resets it. Canvas zoom
+controls follow the visible height and return when maximized results collapse.
+Automatic sidebar collapse and revealing selected nodes remain open.
+
 **Acceptance criteria:**
 
-- [ ] Users can adjust panel sizes without losing their selected node or form state.
-- [ ] Panel limits preserve usable canvas space at desktop and laptop widths.
+- [x] Settings-panel resizing preserves configuration and selection, with mouse and keyboard controls.
+- [x] Docked settings width adapts to available space at checked 1440px and 1100px widths.
+- [x] Users can adjust panel sizes without losing their selected node or form state.
+- [x] Panel limits preserve usable canvas space at checked desktop and laptop sizes.
 - [ ] A selected node can be brought into the unobscured canvas area.
-- [ ] Resizing has a keyboard-accessible alternative.
-- [ ] Existing expand, collapse, results maximize, and read-only behaviors remain coherent.
+- [x] Resizing has a keyboard-accessible alternative.
+- [x] Existing expand, collapse, results maximize, and read-only behaviors remain coherent.
+- [ ] The component library collapses automatically when space becomes constrained, preserving explicit choices.
 
 **Starting points:** `src/components/layout/PropertiesPanel.tsx`,
 `MainLayout.tsx`, `ResultsPanel.tsx`, `Sidebar.tsx`,
@@ -93,12 +112,20 @@ interpret it as “train this pipeline.”
 in a consistent, clearly labeled location. Explain whether an action previews
 data, trains the selected model, or queues multiple experiments.
 
+**Progress (2026-09-07):** The toolbar keeps "Preview data" visible, including
+at 1100px with settings open, and displays "Previewing data..." while running.
+Training settings use "Train model" / "Tune model," show the selected model,
+and explain the action below the button. Missing upstream dataset selection
+has a visible explanation associated with the disabled button. The help guide
+and shortcut overlay use the same preview label.
+
 **Acceptance criteria:**
 
-- [ ] Preview and training have distinct visible labels at supported editing widths.
+- [x] Preview and training have distinct visible labels at checked desktop/laptop widths (1440px and 1100px).
+- [x] Selected-model training identifies its model and explains how to enable the action when no dataset is connected.
 - [ ] Training identifies the model or set of experiments it will run.
 - [ ] Blocked actions expose actionable reasons without requiring a tooltip.
-- [ ] Keyboard shortcuts use the same action names and behavior.
+- [x] Keyboard shortcuts use the same action names and behavior.
 - [ ] Loading, queued, running, and completed states identify the relevant action.
 - [ ] Existing run handlers remain the source of execution behavior.
 
@@ -109,8 +136,8 @@ data, trains the selected model, or queues multiple experiments.
 
 ### CUX-04 — Improve component discovery
 
-**Observed:** A long preprocessing list pushes modeling and evaluation far down
-the library. Search currently matches node labels and categories. Descriptions
+**Observed during review:** A long preprocessing list pushes modeling and evaluation far down
+the library. Search matched node labels and categories. Descriptions
 are truncated, and the instruction mentions dragging although clicking also
 adds a node.
 
@@ -118,12 +145,24 @@ adds a node.
 search descriptions or curated synonyms. Include task-oriented terms such as
 “missing values,” “normalize,” and “predict.” Explain both click and drag.
 
+**Progress (2026-09-07):** Sidebar search now matches descriptions as well as
+labels and categories, ignoring case and surrounding whitespace. For example,
+"missing values" finds Imputation and Missing Indicator. The sidebar helper
+text already explains click and drag. Category headings are now buttons with
+chevrons and node counts; mouse, Enter, and Space toggle their node lists.
+Search keeps matching categories expanded and temporarily disables their
+toggles. Clearing search restores the previous collapsed choices, which also
+survive closing/reopening the sidebar while it remains mounted. Categories
+start expanded. Preprocessing subgroups, synonyms, and fuller result
+descriptions remain open.
+
 **Acceptance criteria:**
 
-- [ ] Modeling and evaluation are easy to reach without scrolling past every preprocessing node.
+- [x] Sidebar search matches node descriptions, names, and categories; blank queries restore the library.
+- [x] Modeling and evaluation are reachable by collapsing the preceding categories.
 - [ ] Common task terms return relevant nodes without flooding results.
 - [ ] Search results expose the reason a node is useful and enough description to choose it.
-- [ ] Grouping does not hide matches during a search.
+- [x] Collapsed categories do not hide matches during a search.
 - [ ] Existing click-to-add, drag, and command-palette flows remain available.
 
 **Starting points:** `src/components/layout/Sidebar.tsx`,
@@ -220,6 +259,11 @@ with instance-specific IDs. Target Column keeps its label when switching
 between a text input and a dropdown populated from the connected dataset.
 The eight tuning/CV fields also have associated labels: Search Method, Metric,
 Trials, Random State, Folds, Method, Time Column, and Fold Split Seed.
+Results-panel resizing has a named keyboard-focusable separator. Its header
+now uses separate native buttons, so keyboard activation of maximize/restore
+does not also toggle collapse. These controls have visible focus rings; the
+title button uses the theme foreground color. A targeted axe scan of the
+dark results panel with an error and reduced motion passes.
 
 **Proposal:** Address these gaps alongside the affected interaction changes.
 Use semantic controls, associated labels, and visible keyboard focus.
@@ -296,3 +340,54 @@ explicitly recorded above is complete; remaining interaction details need review
   conditional time-series controls, and disabled trial counts for grid search.
   `npm run lint` and `npm run build` passed. Dynamic hyperparameter controls and
   other remaining form-label gaps still need review; CUX-08 remains in progress.
+- 2026-09-07: Implemented the action-label and selected-model guidance portion
+  of CUX-03 in Toolbar, TrainingSettings, HelpGuideModal, and ShortcutsOverlay.
+  Updated the existing preview browser test to use the new accessible name.
+  Browser checks at 1440px and 1100px confirmed visible preview text with
+  settings open, Train/Tune labels, selected-model text, and accessible visible
+  guidance for the disabled training action. The existing preview E2E test
+  passed request submission and displayed results; the 3 run-control/shortcut
+  unit tests passed, with the shortcut test rerun after its wording update.
+  `npm run lint` and `npm run build` passed.
+  Broader experiment guidance and queued/completed-state work remain open.
+- 2026-09-07: Added settings-panel resizing in PropertiesPanel and session width
+  state in useViewStore. Added `e2e/settings-panel-resize.spec.ts`; it first
+  failed because the resize handle was absent, then passed with the feature.
+  It covers dragging, arrow/Home/End keys, form-value retention, close/reopen,
+  expand/collapse, sidebar changes, and the laptop canvas-space limit.
+  All 6 existing PropertiesPanel tests, `npm run lint`, and `npm run build`
+  passed. The focusable separator uses the
+  [ARIA window-splitter semantics](https://www.w3.org/WAI/ARIA/apg/patterns/windowsplitter/);
+  a targeted lint exception allows this interactive separator. CUX-01 remains
+  in progress for results resizing and the other unchecked criteria.
+- 2026-09-07: Extended Sidebar search to descriptions and normalized the query
+  once by trimming surrounding whitespace and lowercasing. Browser checks
+  passed description-only matches, case/space handling, existing name/category
+  matching, keyboard addition from filtered results, the no-results state, and
+  clearing the query. `npm run lint` and `npm run build` passed. CUX-04 remains
+  in progress for grouping and the other discovery improvements.
+- 2026-09-07: Added collapsible category headings and node counts in Sidebar.
+  Added `e2e/sidebar-categories.spec.ts`, which failed before the category
+  toggles existed and passed after implementation. It covers Enter/Space
+  toggling, reaching Modeling at 1100px, searching collapsed groups, keyboard
+  node addition, restoring collapsed choices after search, and sidebar
+  close/reopen. The new test and 2 existing canvas smoke tests passed;
+  `npm run lint` and `npm run build` passed. CUX-04 remains in progress for
+  the unchecked discovery criteria and finer preprocessing groups.
+- 2026-09-07: Added results-panel resizing in ResultsPanel, preferred height in
+  useViewStore, and viewport limits in MainLayout. FlowCanvas uses the same
+  rendered height to keep zoom controls above results. Replaced the nested
+  interactive results header with separate native buttons and explicit title
+  color. Added `e2e/results-panel-resize.spec.ts`; it failed first because the
+  handle was missing, then caught and verified a compact-viewport Home-reset
+  fix. Its two tests cover pointer/keyboard resizing, retained settings and
+  rows, viewport preference restoration, minimum height, collapse while
+  maximized, maximize/restore, close/new results, and dark read-only error
+  content with reduced motion. Desktop/laptop checks used 1440x900,
+  1100x700, and 1100x600; read-only used 900x800. A scoped axe scan passes.
+  All 6 focused browser tests (new resizing checks, settings resizing,
+  preview submission, and canvas smoke) and all 12 ResultsPanel/PropertiesPanel
+  unit tests passed. `npm run lint` and `npm run build` passed; generated
+  frontend assets were refreshed. Mocked checks still emit backend connection
+  logs; the build retains circular-chunk and empty-chunk warnings. CUX-01
+  remains in progress for sidebar auto-collapse and selected-node visibility.

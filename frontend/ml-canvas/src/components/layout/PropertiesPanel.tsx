@@ -15,7 +15,36 @@ import { Node } from '@xyflow/react';
 
 export const PropertiesPanel: React.FC = () => {
   const nodes = useGraphStore((state) => state.nodes);
-  const { isSidebarOpen, isPropertiesPanelExpanded, setPropertiesPanelExpanded } = useViewStore();
+  const {
+    isSidebarOpen, isPropertiesPanelExpanded, setPropertiesPanelExpanded,
+    propertiesPanelWidth, setPropertiesPanelWidth,
+  } = useViewStore();
+  const panelRef = React.useRef<HTMLElement>(null);
+  const panelId = React.useId();
+  const dragStart = React.useRef<{ x: number; width: number } | null>(null);
+  const [isResizing, setIsResizing] = React.useState(false);
+  const [workspaceWidth, setWorkspaceWidth] = React.useState(0);
+
+  React.useEffect(() => {
+    const workspace = panelRef.current?.parentElement;
+    if (!workspace) return;
+    const observer = new ResizeObserver(([entry]) => {
+      if (entry && entry.contentRect.width > 0) setWorkspaceWidth(entry.contentRect.width);
+    });
+    observer.observe(workspace);
+    return () => observer.disconnect();
+  }, []);
+
+  // Reserve canvas space when docked; keep the preferred width so it returns
+  // when the window grows or the component library closes.
+  const maxWidth = Math.max(320, Math.min(720, workspaceWidth - (isSidebarOpen ? 256 : 0) - 400));
+  const panelWidth = Math.min(propertiesPanelWidth, maxWidth);
+  const resizeTo = (width: number) => setPropertiesPanelWidth(Math.max(320, Math.min(maxWidth, width)));
+
+  const stopResizing = () => {
+    dragStart.current = null;
+    setIsResizing(false);
+  };
 
   // Find the currently selected node
   const selectedNode = nodes.find((n) => n.selected);
@@ -43,10 +72,56 @@ export const PropertiesPanel: React.FC = () => {
 
   return (
     <aside
-      className={`border-l bg-background shrink-0 transition-all duration-300 ease-in-out overflow-hidden ${
-        selectedNode ? (isPropertiesPanelExpanded ? `${expandedWidth} opacity-100` : 'w-80 opacity-100') : 'w-0 opacity-0'
+      ref={panelRef}
+      id={panelId}
+      aria-label="Node settings"
+      style={selectedNode && !isPropertiesPanelExpanded ? { width: panelWidth } : undefined}
+      className={`relative border-l bg-background shrink-0 overflow-hidden ${isResizing ? '' : 'transition-[width,opacity] duration-300 motion-reduce:transition-none'} ${
+        selectedNode ? (isPropertiesPanelExpanded ? `${expandedWidth} opacity-100` : 'opacity-100') : 'w-0 opacity-0'
       }`}
     >
+      {selectedNode && !isPropertiesPanelExpanded && (
+        // eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions, jsx-a11y/no-noninteractive-tabindex -- A focusable ARIA separator is an interactive pane-resize widget.
+        <div role="separator" tabIndex={0}
+          aria-label="Resize settings panel"
+          aria-orientation="vertical"
+          aria-controls={panelId}
+          aria-valuemin={320}
+          aria-valuemax={maxWidth}
+          aria-valuenow={panelWidth}
+          aria-valuetext={`${panelWidth} pixels wide`}
+          title="Drag to resize. Left arrow widens; Right arrow narrows. Home resets; End maximizes."
+          className="absolute inset-y-0 left-0 z-20 w-2 cursor-col-resize touch-none hover:bg-primary/20 focus-visible:bg-primary/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary"
+          onPointerDown={(event) => {
+            if (event.button !== 0) return;
+            event.preventDefault();
+            event.currentTarget.focus();
+            event.currentTarget.setPointerCapture(event.pointerId);
+            dragStart.current = { x: event.clientX, width: panelWidth };
+            setIsResizing(true);
+          }}
+          onPointerMove={(event) => {
+            if (dragStart.current) resizeTo(dragStart.current.width + dragStart.current.x - event.clientX);
+          }}
+          onPointerUp={stopResizing}
+          onPointerCancel={stopResizing}
+          onLostPointerCapture={stopResizing}
+          onKeyDown={(event) => {
+            const widths: Record<string, number> = {
+              ArrowLeft: panelWidth + 20,
+              ArrowRight: panelWidth - 20,
+              Home: 320,
+              End: maxWidth,
+            };
+            const width = widths[event.key];
+            if (width === undefined) return;
+            event.preventDefault();
+            resizeTo(width);
+          }}
+        >
+          <span aria-hidden="true" className="absolute left-1/2 top-1/2 h-8 w-1 -translate-x-1/2 -translate-y-1/2 rounded-full bg-muted-foreground/40" />
+        </div>
+      )}
       {selectedNode && (
         <PropertiesContent
           selectedNode={selectedNode}
