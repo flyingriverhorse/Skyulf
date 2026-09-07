@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo } from 'react';
+import { ValidationField } from '../../../components/shared/ValidationField';
 import {
   Play, Boxes, ChevronRight, BarChart3, AlertTriangle, Info, X, Sparkles,
 } from 'lucide-react';
@@ -578,7 +579,7 @@ function TargetSelector({ config, update, columns }: {
   columns: ColumnProfile[];
 }) {
   return (
-    <div>
+    <ValidationField field="target_column">
       <span className="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Target Column</span>
       {columns.length === 0 ? (
         <input
@@ -600,7 +601,7 @@ function TargetSelector({ config, update, columns }: {
           ))}
         </select>
       )}
-    </div>
+    </ValidationField>
   );
 }
 
@@ -1131,28 +1132,30 @@ export function EnsembleSettings({ config, onChange, nodeId }: {
           />
         </div>
 
-        <div className="space-y-1.5">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Base Models</span>
-            <span className="text-[10px] text-gray-400">{config.base_estimators?.length ?? 0} selected</span>
-          </div>
-          <p className="text-[11px] text-gray-500 dark:text-gray-400">Click to add or remove each model in the ensemble.</p>
-          <MultiSelectChips
-            options={currentOptions}
-            selected={config.base_estimators ?? []}
-            onChange={(vals) => { update({ base_estimators: vals as string[] }); }}
-          />
-          <p className="text-[10px] text-gray-500 dark:text-gray-400">
-            Tip: wire model nodes into this ensemble&apos;s input to use them as base
-            learners automatically — connected models override the selection above.
-          </p>
-          {tooFewModels && (
-            <div className="flex items-start gap-1.5 text-[11px] text-amber-600 dark:text-amber-400">
-              <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
-              <span>Pick at least two base models for a meaningful ensemble.</span>
+        <ValidationField field="base_estimators">
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Base Models</span>
+              <span className="text-[10px] text-gray-400">{config.base_estimators?.length ?? 0} selected</span>
             </div>
-          )}
-        </div>
+            <p className="text-[11px] text-gray-500 dark:text-gray-400">Click to add or remove each model in the ensemble.</p>
+            <MultiSelectChips
+              options={currentOptions}
+              selected={config.base_estimators ?? []}
+              onChange={(vals) => { update({ base_estimators: vals as string[] }); }}
+            />
+            <p className="text-[10px] text-gray-500 dark:text-gray-400">
+              Tip: wire model nodes into this ensemble&apos;s input to use them as base
+              learners automatically — connected models override the selection above.
+            </p>
+            {tooFewModels && (
+              <div className="flex items-start gap-1.5 text-[11px] text-amber-600 dark:text-amber-400">
+                <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                <span>Pick at least two base models for a meaningful ensemble.</span>
+              </div>
+            )}
+          </div>
+        </ValidationField>
 
         <TargetSelector config={config} update={update} columns={availableColumns} />
           </div>

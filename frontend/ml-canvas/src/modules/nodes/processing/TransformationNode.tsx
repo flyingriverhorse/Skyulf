@@ -1,3 +1,4 @@
+import { ValidationField, useValidationReveal } from '../../../components/shared/ValidationField';
 import React, { useMemo, useState } from 'react';
 import { NodeDefinition } from '../../../core/types/nodes';
 import { FunctionSquare, Plus, Trash2, ChevronDown, ChevronRight } from 'lucide-react';
@@ -59,6 +60,12 @@ const TransformationSettings: React.FC<{ config: TransformationConfig; onChange:
   const transformations = useMemo(() => Array.isArray(config.transformations) ? config.transformations : [], [config.transformations]);
 
   const [expandedRules, setExpandedRules] = useState<number[]>([]);
+  useValidationReveal((field) => {
+    const match = /^transformations\.(\d+)\.columns$/.exec(field);
+    if (!match) return;
+    const index = Number(match[1]);
+    setExpandedRules(previous => previous.includes(index) ? previous : [...previous, index]);
+  });
 
   // Responsive layout: switch to a 2-column layout once the panel is wider than 450px.
   const [containerRef, isWide] = useIsWideContainer();
@@ -120,12 +127,14 @@ const TransformationSettings: React.FC<{ config: TransformationConfig; onChange:
     <div ref={containerRef} className="p-4 space-y-6 h-full overflow-y-auto">
       <div className="flex justify-between items-center">
         <span className="text-sm font-medium">Transformation Rules</span>
-        <button
-          onClick={addRule}
-          className="flex items-center gap-1 text-xs action-primary px-2 py-1 rounded"
-        >
-          <Plus size={12} /> Add Rule
-        </button>
+        <ValidationField field="transformations">
+          <button
+            onClick={addRule}
+            className="flex items-center gap-1 text-xs action-primary px-2 py-1 rounded"
+          >
+            <Plus size={12} /> Add Rule
+          </button>
+        </ValidationField>
       </div>
 
       <div className="space-y-4">
@@ -220,13 +229,15 @@ const TransformationSettings: React.FC<{ config: TransformationConfig; onChange:
                   {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events,jsx-a11y/no-static-element-interactions -- stopPropagation wrapper, child controls handle their own keyboard input */}
                   <div className="space-y-1 min-w-0" onClick={(e) => { e.stopPropagation(); }}>
                     <span className="text-xs font-medium text-muted-foreground">Target Columns</span>
-                    <ColumnMultiSelect
-                      columns={columns}
-                      selected={rule.columns}
-                      onChange={(newCols) => { updateRule(idx, { columns: newCols }); }}
-                      variant="panel"
-                      fillHeight={false}
-                    />
+                    <ValidationField field={`transformations.${idx}.columns`}>
+                      <ColumnMultiSelect
+                        columns={columns}
+                        selected={rule.columns}
+                        onChange={(newCols) => { updateRule(idx, { columns: newCols }); }}
+                        variant="panel"
+                        fillHeight={false}
+                      />
+                    </ValidationField>
                   </div>
                 </div>
               )}
@@ -275,11 +286,11 @@ export const TransformationNode: NodeDefinition<TransformationConfig> = {
   outputs: [{ id: 'out', type: 'dataset', label: 'Transformed' }],
   validate: (config: TransformationConfig) => {
     if (config.transformations.length === 0) {
-      return { isValid: false, message: 'Add at least one transformation rule.' };
+      return { isValid: false, field: 'transformations', message: 'Add at least one transformation rule.' };
     }
-    for (const rule of config.transformations) {
+    for (const [index, rule] of config.transformations.entries()) {
         if (rule.columns.length === 0) {
-            return { isValid: false, message: 'Each rule must have at least one column selected.' };
+            return { isValid: false, field: `transformations.${index}.columns`, message: 'Each rule must have at least one column selected.' };
         }
     }
     return { isValid: true };

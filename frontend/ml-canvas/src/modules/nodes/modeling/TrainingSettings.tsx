@@ -1,4 +1,5 @@
 import React, { useEffect, useId, useState, useRef } from 'react';
+import { ValidationField, useValidationReveal } from '../../../components/shared/ValidationField';
 import {
     Play, Download, Loader2, Activity, Settings2,
     BarChart3, X, ChevronRight, ChevronDown, AlertCircle, AlertTriangle
@@ -183,6 +184,9 @@ export const TrainingSettings: React.FC<{
   // Responsive layout: switch to a 2-column layout once the panel is wider than 450px.
   const [containerRef, isWide] = useIsWideContainer();
   const [activeTab, setActiveTab] = useState<'model' | 'params'>('model');
+  useValidationReveal((field) => {
+    if (field === 'model_type' || field === 'target_column') setActiveTab('model');
+  });
   const [showCV, setShowCV] = useState(false);
   const [availableModels, setAvailableModels] = useState<RegistryItem[]>([]);
   const [isLoadingModels, setIsLoadingModels] = useState(false);
@@ -357,7 +361,7 @@ export const TrainingSettings: React.FC<{
             <div className="space-y-1.5">
                 <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Model Configuration</span>
                 <div className="grid gap-3">
-                    <div>
+                    <ValidationField field="model_type">
                         <label htmlFor={`${fieldId}-model`} className="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Model Type</label>
                         <div className="relative">
                             <select
@@ -403,9 +407,9 @@ export const TrainingSettings: React.FC<{
                                )}
                            </div>
                         )}
-                    </div>
+                    </ValidationField>
 
-                    <div>
+                    <ValidationField field="target_column">
                         <label htmlFor={`${fieldId}-target`} className="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Target Column</label>
                         {availableColumns.length === 0 && (
                             <div className="mb-2 p-2 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded text-xs text-yellow-700 dark:text-yellow-400 flex items-center gap-2">
@@ -438,7 +442,7 @@ export const TrainingSettings: React.FC<{
                             )}
                             {availableColumns.length > 0 && <ChevronDown className="absolute right-3 top-3 w-4 h-4 text-gray-400 pointer-events-none" />}
                         </div>
-                    </div>
+                    </ValidationField>
                 </div>
             </div>
 

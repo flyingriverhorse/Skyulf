@@ -1,4 +1,5 @@
 import React from 'react';
+import { ValidationField } from '../../../components/shared/ValidationField';
 import { NodeDefinition } from '../../../core/types/nodes';
 import { Split } from 'lucide-react';
 import { useUpstreamData } from '../../../core/hooks/useUpstreamData';
@@ -83,45 +84,49 @@ const TrainTestSplitSettings: React.FC<{ config: TrainTestSplitConfig; onChange:
 
         {/* Left Column: Split Ratios & Random State */}
         <div className={`space-y-4 ${isWide ? 'overflow-y-auto pr-2' : 'shrink-0'}`}>
-          <div className="space-y-2">
-            <span className="text-sm font-medium">Test Size (0.0 - 1.0)</span>
-            <input
-              type="number"
-              step="0.05"
-              min="0.05"
-              max="0.95"
-              className="w-full p-2 border rounded bg-background text-sm"
-              value={config.test_size}
-              onChange={(e) => onChange({ ...config, test_size: Number.parseFloat(e.target.value) })}
-            />
-          </div>
+          <ValidationField field="test_size">
+            <div className="space-y-2">
+              <span className="text-sm font-medium">Test Size (0.0 - 1.0)</span>
+              <input
+                type="number"
+                step="0.05"
+                min="0.05"
+                max="0.95"
+                className="w-full p-2 border rounded bg-background text-sm"
+                value={config.test_size}
+                onChange={(e) => onChange({ ...config, test_size: Number.parseFloat(e.target.value) })}
+              />
+            </div>
+          </ValidationField>
 
-          <div className="space-y-2">
-            <span className="text-sm font-medium">Validation Size (0.0 - 1.0)</span>
-            <input
-              type="number"
-              step="0.05"
-              min="0.00"
-              max="0.95"
-              className="w-full p-2 border rounded bg-background text-sm"
-              value={valSize}
-              onChange={(e) => onChange({ ...config, validation_size: Number.parseFloat(e.target.value) })}
-            />
-            <p className="text-xs text-muted-foreground">
-              {Math.round(trainSize * 100)}% Training, {Math.round(valSize * 100)}% Validation, {Math.round(config.test_size * 100)}% Testing
-            </p>
-            <p className="text-xs text-muted-foreground">
-              The validation split grades hyperparameter candidates during tuning
-              (instead of CV folds) and is used for threshold tuning. If left at 0,
-              tuning scores candidates with CV folds inside the training split and
-              threshold tuning falls back to the test split.
-            </p>
-            {trainSize <= 0 && (
-              <p className="text-xs text-red-500 font-medium">
-                Error: Total split size exceeds 100%
+          <ValidationField field="validation_size">
+            <div className="space-y-2">
+              <span className="text-sm font-medium">Validation Size (0.0 - 1.0)</span>
+              <input
+                type="number"
+                step="0.05"
+                min="0.00"
+                max="0.95"
+                className="w-full p-2 border rounded bg-background text-sm"
+                value={valSize}
+                onChange={(e) => onChange({ ...config, validation_size: Number.parseFloat(e.target.value) })}
+              />
+              <p className="text-xs text-muted-foreground">
+                {Math.round(trainSize * 100)}% Training, {Math.round(valSize * 100)}% Validation, {Math.round(config.test_size * 100)}% Testing
               </p>
-            )}
-          </div>
+              <p className="text-xs text-muted-foreground">
+                The validation split grades hyperparameter candidates during tuning
+                (instead of CV folds) and is used for threshold tuning. If left at 0,
+                tuning scores candidates with CV folds inside the training split and
+                threshold tuning falls back to the test split.
+              </p>
+              {trainSize <= 0 && (
+                <p className="text-xs text-red-500 font-medium">
+                  Error: Total split size exceeds 100%
+                </p>
+              )}
+            </div>
+          </ValidationField>
 
           <div className="space-y-2">
             <span className="text-sm font-medium">Random State</span>
@@ -206,14 +211,14 @@ export const TrainTestSplitNode: NodeDefinition<TrainTestSplitConfig> = {
   },
   validate: (config) => {
     if (config.test_size <= 0 || config.test_size >= 1) {
-      return { isValid: false, message: 'Test size must be between 0 and 1.' };
+      return { isValid: false, message: 'Test size must be between 0 and 1.', field: 'test_size' };
     }
     const valSize = config.validation_size || 0;
     if (valSize < 0 || valSize >= 1) {
-      return { isValid: false, message: 'Validation size must be between 0 and 1.' };
+      return { isValid: false, message: 'Validation size must be between 0 and 1.', field: 'validation_size' };
     }
     if (config.test_size + valSize >= 1) {
-      return { isValid: false, message: 'Sum of Test and Validation sizes must be less than 1.' };
+      return { isValid: false, message: 'Sum of Test and Validation sizes must be less than 1.', field: 'validation_size' };
     }
     return { isValid: true };
   },

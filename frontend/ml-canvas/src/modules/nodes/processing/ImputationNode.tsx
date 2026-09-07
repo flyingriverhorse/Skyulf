@@ -1,3 +1,4 @@
+import { ValidationField } from '../../../components/shared/ValidationField';
 import React, { useMemo } from 'react';
 import { NodeDefinition } from '../../../core/types/nodes';
 import { PaintBucket } from 'lucide-react';
@@ -192,13 +193,15 @@ const ImputationSettings: React.FC<{ config: ImputationConfig; onChange: (c: Imp
               {config.strategy === 'constant' && (
                 <div>
                   <span className="block text-sm font-medium mb-1">Fill Value</span>
-                  <input
-                    type="text"
-                    className="w-full p-2 border rounded bg-background text-sm"
-                    value={config.fill_value || ''}
-                    onChange={(e) => onChange({ ...config, fill_value: e.target.value })}
-                    placeholder="Enter value..."
-                  />
+                  <ValidationField field="fill_value">
+                    <input
+                      type="text"
+                      className="w-full p-2 border rounded bg-background text-sm"
+                      value={config.fill_value || ''}
+                      onChange={(e) => onChange({ ...config, fill_value: e.target.value })}
+                      placeholder="Enter value..."
+                    />
+                  </ValidationField>
                 </div>
               )}
             </>
@@ -282,25 +285,27 @@ const ImputationSettings: React.FC<{ config: ImputationConfig; onChange: (c: Imp
 
         {/* Right Column (Column Selection) */}
         <div className={`flex flex-col overflow-hidden ${isWide ? 'min-h-0 flex-1' : 'shrink-0'}`}>
-          <ColumnMultiSelect
-            columns={availableColumns}
-            selected={config.columns}
-            onChange={(newCols) => { onChange({ ...config, columns: newCols }); }}
-            label="Target Columns"
-            variant="panel"
-            isLoading={isLoading}
-            fillHeight={isWide}
-            renderItemBadge={(col) =>
-              missingCounts && missingCounts[col] !== undefined ? (
-                <span
-                  className="text-[10px] text-muted-foreground font-mono shrink-0 bg-muted px-1.5 py-0.5 rounded"
-                  title={`${String(missingCounts[col])} missing values filled`}
-                >
-                  {String(missingCounts[col])}
-                </span>
-              ) : null
-            }
-          />
+          <ValidationField field="columns" className={isWide ? "flex min-h-0 flex-1 flex-col" : ""}>
+            <ColumnMultiSelect
+              columns={availableColumns}
+              selected={config.columns}
+              onChange={(newCols) => { onChange({ ...config, columns: newCols }); }}
+              label="Target Columns"
+              variant="panel"
+              isLoading={isLoading}
+              fillHeight={isWide}
+              renderItemBadge={(col) =>
+                missingCounts && missingCounts[col] !== undefined ? (
+                  <span
+                    className="text-[10px] text-muted-foreground font-mono shrink-0 bg-muted px-1.5 py-0.5 rounded"
+                    title={`${String(missingCounts[col])} missing values filled`}
+                  >
+                    {String(missingCounts[col])}
+                  </span>
+                ) : null
+              }
+            />
+          </ValidationField>
         </div>
 
         {/* Feedback Section - Show here if NOT wide (mobile/narrow) */}
@@ -326,9 +331,9 @@ export const ImputationNode: NodeDefinition<ImputationConfig> = {
     return `${strat} · ${cols} ${cols === 1 ? 'col' : 'cols'}`;
   },
   validate: (config) => {
-    if (config.columns.length === 0) return { isValid: false, message: 'Select at least one column' };
+    if (config.columns.length === 0) return { isValid: false, field: 'columns', message: 'Select at least one column' };
     if (config.method === 'simple' && config.strategy === 'constant' && (config.fill_value === undefined || config.fill_value === '')) {
-      return { isValid: false, message: 'Fill value is required for Constant strategy' };
+      return { isValid: false, field: 'fill_value', message: 'Fill value is required for Constant strategy' };
     }
     return { isValid: true };
   },

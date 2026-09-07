@@ -1,7 +1,7 @@
 # Canvas UX improvement backlog
 
 Date: 2026-09-06
-Status: CUX-01 complete; CUX-03, CUX-04, and CUX-08 in progress. Completed portions are recorded below.
+Status: CUX-01 and CUX-05 complete; CUX-03, CUX-04, and CUX-08 in progress. Completed portions are recorded below.
 
 ## Purpose and review scope
 
@@ -30,7 +30,7 @@ before implementation because other work may have changed these components.
 | CUX-02 | High | Guide node connections and adding the next step | Open |
 | CUX-03 | High | Clearly distinguish previewing data from training | In progress; visible action labels and training guidance complete |
 | CUX-04 | Medium | Improve component discovery | In progress; description search and collapsible categories complete |
-| CUX-05 | Medium | Navigate from validation issues to the exact setting | Open |
+| CUX-05 | Medium | Navigate from validation issues to the exact setting | Complete; field navigation and general-issue fallback verified |
 | CUX-06 | Medium | Reduce connection and settings visual noise | Open |
 | CUX-07 | Medium | Inspect a selected node's input and output | Open |
 | CUX-08 | High, alongside related work | Fix keyboard and accessible-name gaps | In progress; panel labels, sidebar keyboard access, and primary field labels complete |
@@ -193,13 +193,26 @@ problems are represented by small badges with tooltip explanations.
 the node, open the relevant settings section, and focus the invalid field.
 Keep the explanation beside the setting while it remains invalid.
 
+**Progress (2026-09-07):** Validation results now carry explicit settings-field
+targets, including indexed operations and transformations. Activating an issue
+selects and reveals its node, restores maximized panels, opens hidden settings,
+and focuses the relevant control. The explanation is associated with the
+control for assistive technology and remains beside it until corrected.
+Connection, cycle, and other general issues focus an explanatory summary.
+Delayed controls are handled without stealing focus after the user moves on.
+Closing settings clears the navigation request; reveal state is scoped to the
+selected node. Read-only activation reveals the node and focuses the canvas
+without enabling editing. Existing validation conditions are preserved;
+Encoding and TimeSeries now expose their existing messages through the correct
+validation-result property.
+
 **Acceptance criteria:**
 
-- [ ] Issue activation selects and reveals the correct node.
-- [ ] Hidden settings sections open when needed.
-- [ ] Field-specific problems focus the field; general problems focus an appropriate summary.
-- [ ] Keyboard focus is visible and not covered by results or settings panels.
-- [ ] Fixed issues disappear without unexpectedly moving focus.
+- [x] Issue activation selects and reveals the correct node.
+- [x] Hidden settings sections open when needed.
+- [x] Field-specific problems focus the field; general problems focus an appropriate summary.
+- [x] Keyboard focus is visible and not covered by results or settings panels.
+- [x] Fixed issues disappear without unexpectedly moving focus.
 
 **Starting points:** `src/components/layout/ResultsPanel.tsx`,
 `PropertiesPanel.tsx`, `src/components/canvas/CustomNodeWrapper.tsx`,
@@ -493,3 +506,16 @@ explicitly recorded above is complete; remaining interaction details need review
   run missed a pre-existing 20ms mocked deployment loading state, which also
   passed in isolation. Final lint, TypeScript, and production build passed,
   and served assets were rebuilt. Existing build chunk warnings remain.
+- 2026-09-07: Completed CUX-05 with explicit validator field targets, shared
+  settings navigation, inline accessible explanations, and local section
+  reveals. Added 24 unit tests for field metadata, indexed and hidden settings,
+  deferred controls, and focus retention/cancellation. Five new browser tests
+  cover distant-node reveal, maximized results, model tabs, dataset upload,
+  correction, general errors, read-only mode, StrictMode mounting/dismissal,
+  and node-specific reveal state on a compact dark canvas. Review findings
+  around stale requests, summary descriptions, disabled/hidden controls, and
+  state leaking between same-type nodes were addressed. All 897 frontend unit
+  tests and 17 distinct focused browser checks passed. Final lint, TypeScript,
+  and production build passed; served frontend assets were rebuilt. Browser
+  checks use mocked APIs. Existing mocked connection logs and circular/empty
+  chunk build warnings remain.

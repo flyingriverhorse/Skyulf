@@ -1,3 +1,4 @@
+import { ValidationField, useValidationReveal } from '../../../components/shared/ValidationField';
 import React, { useState } from 'react';
 import { NodeDefinition } from '../../../core/types/nodes';
 import { Calculator, Trash2, Calendar, Percent, GitCompare, ChevronDown, ChevronRight, FunctionSquare, Info, Lightbulb, Activity } from 'lucide-react';
@@ -81,6 +82,13 @@ const FeatureGenerationSettings: React.FC<{ config: FeatureGenerationConfig; onC
       : [];
 
   const [showRecommendations, setShowRecommendations] = useState(false);
+  const [revealedOperations, setRevealedOperations] = useState<number[]>([]);
+  useValidationReveal((field) => {
+    const match = /^operations\.(\d+)\./.exec(field);
+    if (!match) return;
+    const index = Number(match[1]);
+    setRevealedOperations(previous => previous.includes(index) ? previous : [...previous, index]);
+  });
   // Responsive layout: switch to a 2-column layout once the panel is wider than 380px.
   const [containerRef, isWide] = useIsWideContainer(380);
 
@@ -139,6 +147,7 @@ const FeatureGenerationSettings: React.FC<{ config: FeatureGenerationConfig; onC
     e.stopPropagation();
     const newOps = [...(config.operations || [])];
     newOps.splice(index, 1);
+    setRevealedOperations(previous => previous.filter(i => i !== index).map(i => i > index ? i - 1 : i));
     onChange({ operations: newOps });
   };
 
@@ -146,7 +155,8 @@ const FeatureGenerationSettings: React.FC<{ config: FeatureGenerationConfig; onC
     const newOps = [...(config.operations || [])];
     const existing = newOps[index];
     if (!existing) return;
-    newOps[index] = { ...existing, isExpanded: !existing.isExpanded };
+    newOps[index] = { ...existing, isExpanded: !(existing.isExpanded || revealedOperations.includes(index)) };
+    setRevealedOperations(previous => previous.filter(i => i !== index));
     onChange({ operations: newOps });
   };
 
@@ -158,7 +168,7 @@ const FeatureGenerationSettings: React.FC<{ config: FeatureGenerationConfig; onC
     <div ref={containerRef} className={isWide ? 'flex min-h-[300px]' : 'flex flex-col min-h-[300px]'}>
       {/* Add Operations — vertical sidebar when wide, horizontal strip when narrow */}
       {isWide ? (
-        <div className="w-20 border-r bg-muted/10 flex flex-col items-center py-4 gap-2 overflow-y-auto shrink-0">
+        <ValidationField field="operations" className="w-20 border-r bg-muted/10 flex flex-col items-center py-4 gap-2 overflow-y-auto shrink-0">
           <span className="text-[10px] font-bold text-muted-foreground mb-2 uppercase tracking-wider">Add</span>
           {OPERATION_TYPES.map(t => (
             <button
@@ -173,9 +183,9 @@ const FeatureGenerationSettings: React.FC<{ config: FeatureGenerationConfig; onC
               </span>
             </button>
           ))}
-        </div>
+        </ValidationField>
       ) : (
-        <div className="flex items-center gap-1.5 border-b bg-muted/10 px-2 py-2 overflow-x-auto shrink-0">
+        <ValidationField field="operations" className="flex items-center gap-1.5 border-b bg-muted/10 px-2 py-2 overflow-x-auto shrink-0">
           <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider shrink-0 mr-1">Add:</span>
           {OPERATION_TYPES.map(t => (
             <button
@@ -188,7 +198,7 @@ const FeatureGenerationSettings: React.FC<{ config: FeatureGenerationConfig; onC
               <span className="text-[10px] font-medium text-muted-foreground group-hover:text-foreground whitespace-nowrap">{t.label}</span>
             </button>
           ))}
-        </div>
+        </ValidationField>
       )}
 
       {/* Right Main: Content */}
@@ -230,7 +240,7 @@ const FeatureGenerationSettings: React.FC<{ config: FeatureGenerationConfig; onC
               {...clickableProps(() => { toggleExpand(idx); })}
             >
               <div className="flex items-center gap-2">
-                {op.isExpanded ? <ChevronDown size={14} className="text-muted-foreground" /> : <ChevronRight size={14} className="text-muted-foreground" />}
+                {(op.isExpanded || revealedOperations.includes(idx)) ? <ChevronDown size={14} className="text-muted-foreground" /> : <ChevronRight size={14} className="text-muted-foreground" />}
                 <span className="text-[10px] font-bold uppercase tracking-wider text-primary bg-primary/10 px-1.5 py-0.5 rounded">
                   {op.operation_type === 'datetime_extract' ? 'Date' : op.operation_type.replace('_', ' ')}
                 </span>
@@ -259,7 +269,7 @@ const FeatureGenerationSettings: React.FC<{ config: FeatureGenerationConfig; onC
             </div>
 
             {/* Body */}
-            {op.isExpanded && (
+            {(op.isExpanded || revealedOperations.includes(idx)) && (
             <div className="p-3 space-y-4">
 
 
@@ -272,14 +282,16 @@ const FeatureGenerationSettings: React.FC<{ config: FeatureGenerationConfig; onC
                       ? 'Performs row-by-row division (Col A / Col B) for each record.'
                       : 'Performs row-by-row arithmetic between two columns.'}
                   </div>
-                  <ColumnMultiSelect
-                    variant="compact"
-                    label="Column A (Left Operand)"
-                    columns={numericColumns}
-                    selected={op.input_columns.slice(0, 1)}
-                    onChange={(cols) => { updateOperation(idx, { input_columns: cols }); }}
-                    single
-                  />
+                  <ValidationField field={`operations.${idx}.input_columns`}>
+                    <ColumnMultiSelect
+                      variant="compact"
+                      label="Column A (Left Operand)"
+                      columns={numericColumns}
+                      selected={op.input_columns.slice(0, 1)}
+                      onChange={(cols) => { updateOperation(idx, { input_columns: cols }); }}
+                      single
+                    />
+                  </ValidationField>
 
                   <div className="flex items-center gap-2">
                      <div className="h-px bg-border flex-1"></div>
@@ -289,14 +301,16 @@ const FeatureGenerationSettings: React.FC<{ config: FeatureGenerationConfig; onC
                      <div className="h-px bg-border flex-1"></div>
                   </div>
 
-                  <ColumnMultiSelect
-                    variant="compact"
-                    label="Column B (Right Operand)"
-                    columns={numericColumns}
-                    selected={op.secondary_columns?.slice(0, 1) || []}
-                    onChange={(cols) => { updateOperation(idx, { secondary_columns: cols }); }}
-                    single
-                  />
+                  <ValidationField field={`operations.${idx}.secondary_columns`}>
+                    <ColumnMultiSelect
+                      variant="compact"
+                      label="Column B (Right Operand)"
+                      columns={numericColumns}
+                      selected={op.secondary_columns?.slice(0, 1) || []}
+                      onChange={(cols) => { updateOperation(idx, { secondary_columns: cols }); }}
+                      single
+                    />
+                  </ValidationField>
                 </div>
               )}
 
@@ -306,26 +320,30 @@ const FeatureGenerationSettings: React.FC<{ config: FeatureGenerationConfig; onC
                   <div className="text-[10px] text-muted-foreground bg-muted/20 p-1.5 rounded border border-muted/20">
                     Calculates aggregate ratio: <strong>Sum(Numerator) / Sum(Denominator)</strong>.
                   </div>
-                  <ColumnMultiSelect
-                    variant="compact"
-                    label="Numerator (Sum)"
-                    columns={numericColumns}
-                    selected={op.input_columns}
-                    onChange={(cols) => { updateOperation(idx, { input_columns: cols }); }}
-                  />
+                  <ValidationField field={`operations.${idx}.input_columns`}>
+                    <ColumnMultiSelect
+                      variant="compact"
+                      label="Numerator (Sum)"
+                      columns={numericColumns}
+                      selected={op.input_columns}
+                      onChange={(cols) => { updateOperation(idx, { input_columns: cols }); }}
+                    />
+                  </ValidationField>
 
                   <div className="relative flex items-center justify-center">
                     <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-dashed"></div></div>
                     <span className="relative bg-card px-2 text-xs text-muted-foreground font-medium">Divided By</span>
                   </div>
 
-                  <ColumnMultiSelect
-                    variant="compact"
-                    label="Denominator (Sum)"
-                    columns={numericColumns}
-                    selected={op.secondary_columns || []}
-                    onChange={(cols) => { updateOperation(idx, { secondary_columns: cols }); }}
-                  />
+                  <ValidationField field={`operations.${idx}.secondary_columns`}>
+                    <ColumnMultiSelect
+                      variant="compact"
+                      label="Denominator (Sum)"
+                      columns={numericColumns}
+                      selected={op.secondary_columns || []}
+                      onChange={(cols) => { updateOperation(idx, { secondary_columns: cols }); }}
+                    />
+                  </ValidationField>
                 </div>
               )}
 
@@ -340,14 +358,16 @@ const FeatureGenerationSettings: React.FC<{ config: FeatureGenerationConfig; onC
                       <li><strong>Token Set:</strong> Compares intersection of words. Handles duplicates/subsets well.</li>
                     </ul>
                   </div>
-                  <ColumnMultiSelect
-                    variant="compact"
-                    label="String A"
-                    columns={stringColumns}
-                    selected={op.input_columns.slice(0, 1)}
-                    onChange={(cols) => updateOperation(idx, { input_columns: cols })}
-                    single
-                  />
+                  <ValidationField field={`operations.${idx}.input_columns`}>
+                    <ColumnMultiSelect
+                      variant="compact"
+                      label="String A"
+                      columns={stringColumns}
+                      selected={op.input_columns.slice(0, 1)}
+                      onChange={(cols) => updateOperation(idx, { input_columns: cols })}
+                      single
+                    />
+                  </ValidationField>
 
                   <div className="flex items-center gap-2">
                      <div className="h-px bg-border flex-1"></div>
@@ -355,14 +375,16 @@ const FeatureGenerationSettings: React.FC<{ config: FeatureGenerationConfig; onC
                      <div className="h-px bg-border flex-1"></div>
                   </div>
 
-                  <ColumnMultiSelect
-                    variant="compact"
-                    label="String B"
-                    columns={stringColumns}
-                    selected={op.secondary_columns?.slice(0, 1) || []}
-                    onChange={(cols) => updateOperation(idx, { secondary_columns: cols })}
-                    single
-                  />
+                  <ValidationField field={`operations.${idx}.secondary_columns`}>
+                    <ColumnMultiSelect
+                      variant="compact"
+                      label="String B"
+                      columns={stringColumns}
+                      selected={op.secondary_columns?.slice(0, 1) || []}
+                      onChange={(cols) => updateOperation(idx, { secondary_columns: cols })}
+                      single
+                    />
+                  </ValidationField>
                 </div>
               )}
 
@@ -372,42 +394,48 @@ const FeatureGenerationSettings: React.FC<{ config: FeatureGenerationConfig; onC
                   <div className="text-[10px] text-muted-foreground bg-muted/20 p-1.5 rounded border border-muted/20">
                     Calculates aggregate statistics (e.g., Mean Salary) grouped by a categorical column (e.g., Department) and assigns it back to each row.
                   </div>
-                  <ColumnMultiSelect
-                    variant="compact"
-                    label="Group By (Categorical)"
-                    columns={stringColumns.length > 0 ? stringColumns : allColumns}
-                    selected={op.input_columns.slice(0, 1)}
-                    onChange={(cols) => updateOperation(idx, { input_columns: cols })}
-                    single
-                  />
+                  <ValidationField field={`operations.${idx}.input_columns`}>
+                    <ColumnMultiSelect
+                      variant="compact"
+                      label="Group By (Categorical)"
+                      columns={stringColumns.length > 0 ? stringColumns : allColumns}
+                      selected={op.input_columns.slice(0, 1)}
+                      onChange={(cols) => updateOperation(idx, { input_columns: cols })}
+                      single
+                    />
+                  </ValidationField>
 
                   <div className="relative flex items-center justify-center">
                     <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-dashed"></div></div>
                     <span className="relative bg-card px-2 text-xs text-muted-foreground font-medium">Target Column</span>
                   </div>
 
-                  <ColumnMultiSelect
-                    variant="compact"
-                    label="Target (Numeric)"
-                    columns={numericColumns}
-                    selected={op.secondary_columns?.slice(0, 1) || []}
-                    onChange={(cols) => updateOperation(idx, { secondary_columns: cols })}
-                    single
-                  />
+                  <ValidationField field={`operations.${idx}.secondary_columns`}>
+                    <ColumnMultiSelect
+                      variant="compact"
+                      label="Target (Numeric)"
+                      columns={numericColumns}
+                      selected={op.secondary_columns?.slice(0, 1) || []}
+                      onChange={(cols) => updateOperation(idx, { secondary_columns: cols })}
+                      single
+                    />
+                  </ValidationField>
                 </div>
               )}
 
               {/* DATE EXTRACT */}
               {op.operation_type === 'datetime_extract' && (
                 <div className="space-y-3">
-                  <ColumnMultiSelect
-                    variant="compact"
-                    label="Date Column"
-                    columns={dateColumns.length > 0 ? dateColumns : allColumns}
-                    selected={op.input_columns.slice(0, 1)}
-                    onChange={(cols) => updateOperation(idx, { input_columns: cols })}
-                    single
-                  />
+                  <ValidationField field={`operations.${idx}.input_columns`}>
+                    <ColumnMultiSelect
+                      variant="compact"
+                      label="Date Column"
+                      columns={dateColumns.length > 0 ? dateColumns : allColumns}
+                      selected={op.input_columns.slice(0, 1)}
+                      onChange={(cols) => updateOperation(idx, { input_columns: cols })}
+                      single
+                    />
+                  </ValidationField>
 
                   <div className="space-y-1.5">
                     <span className="text-xs font-medium text-muted-foreground">Features to Extract</span>
@@ -531,18 +559,18 @@ export const FeatureGenerationNode: NodeDefinition = {
   outputs: [{ id: 'out', type: 'dataset', label: 'Enhanced' }],
   validate: (config: FeatureGenerationConfig) => {
     if (!config.operations?.length) {
-      return { isValid: false, message: 'Add at least one operation.' };
+      return { isValid: false, field: 'operations', message: 'Add at least one operation.' };
     }
-    for (const op of config.operations) {
+    for (const [index, op] of config.operations.entries()) {
 
       if (op.operation_type === 'arithmetic' && (op.input_columns.length === 0 || (!op.secondary_columns?.length && !op.constants?.length))) {
-        return { isValid: false, message: 'Arithmetic requires two operands.' };
+        return { isValid: false, field: `operations.${index}.${op.input_columns.length === 0 ? "input_columns" : "secondary_columns"}`, message: 'Arithmetic requires two operands.' };
       }
       if (op.operation_type === 'datetime_extract' && op.input_columns.length === 0) {
-        return { isValid: false, message: 'Select a date column.' };
+        return { isValid: false, field: `operations.${index}.input_columns`, message: 'Select a date column.' };
       }
       if (op.operation_type === 'group_agg' && (op.input_columns.length === 0 || !op.secondary_columns?.length)) {
-        return { isValid: false, message: 'Select both Group By and Target columns.' };
+        return { isValid: false, field: `operations.${index}.${op.input_columns.length === 0 ? "input_columns" : "secondary_columns"}`, message: 'Select both Group By and Target columns.' };
       }
     }
     return { isValid: true };

@@ -1,3 +1,4 @@
+import { ValidationField } from '../../../components/shared/ValidationField';
 import React, { useState, useEffect } from 'react';
 import { NodeDefinition, ValidationResult } from '../../../core/types/nodes';
 import { Activity, ChevronDown, ChevronUp } from 'lucide-react';
@@ -232,14 +233,16 @@ const ResamplingSettings: React.FC<{ config: ResamplingConfig; onChange: (c: Res
             <div className="space-y-2">
                 <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Target Column</span>
                 <div className="relative">
-                    <input
-                        type="text"
-                        className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 p-2 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                        placeholder="e.g., target"
-                        value={config.target_column}
-                        onChange={(e) => { handleChange('target_column', e.target.value); }}
-                        list="target-column-suggestions"
-                    />
+                    <ValidationField field="target_column">
+                      <input
+                          type="text"
+                          className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 p-2 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                          placeholder="e.g., target"
+                          value={config.target_column}
+                          onChange={(e) => { handleChange('target_column', e.target.value); }}
+                          list="target-column-suggestions"
+                      />
+                    </ValidationField>
                     {schema?.columns && (
                         <datalist id="target-column-suggestions">
                             {Object.values(schema.columns).filter((col: ColumnProfile) => !droppedUpstream.has(col.name)).map((col: ColumnProfile) => (
@@ -290,12 +293,14 @@ const ResamplingSettings: React.FC<{ config: ResamplingConfig; onChange: (c: Res
                     {['smote', 'adasyn', 'borderline_smote', 'svm_smote', 'kmeans_smote'].includes(config.method) && (
                         <div className="space-y-2">
                             <span className="text-sm font-medium text-gray-700 dark:text-gray-300">k Neighbors</span>
-                            <input
-                                type="number"
-                                className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 p-2 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                                value={config.k_neighbors ?? 5}
-                                onChange={(e) => { handleChange('k_neighbors', parseIntSafe(e.target.value, config.k_neighbors)); }}
-                            />
+                            <ValidationField field="k_neighbors">
+                              <input
+                                  type="number"
+                                  className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 p-2 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                                  value={config.k_neighbors ?? 5}
+                                  onChange={(e) => { handleChange('k_neighbors', parseIntSafe(e.target.value, config.k_neighbors)); }}
+                              />
+                            </ValidationField>
                         </div>
                     )}
 
@@ -453,13 +458,13 @@ const ResamplingSettings: React.FC<{ config: ResamplingConfig; onChange: (c: Res
 
 const validate = (data: ResamplingConfig): ValidationResult => {
   if (!data.target_column) {
-    return { isValid: false, message: 'Target column is required for resampling.' };
+    return { isValid: false, field: 'target_column', message: 'Target column is required for resampling.' };
   }
 
   if (data.type === 'oversampling') {
     if (['smote', 'adasyn', 'borderline_smote', 'svm_smote', 'kmeans_smote'].includes(data.method)) {
        if ((data.k_neighbors ?? 5) < 1) {
-           return { isValid: false, message: 'k_neighbors must be at least 1.' };
+           return { isValid: false, field: 'k_neighbors', message: 'k_neighbors must be at least 1.' };
        }
     }
   }

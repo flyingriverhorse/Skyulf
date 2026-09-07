@@ -1,3 +1,4 @@
+import { ValidationField } from '../../../components/shared/ValidationField';
 import React, { useState } from 'react';
 import { NodeDefinition, NodeSettingsProps } from '../../../core/types/nodes';
 import { Scissors, Brain, Info, AlertTriangle } from 'lucide-react';
@@ -118,13 +119,15 @@ const TokenizerSettings: React.FC<NodeSettingsProps<TokenizerConfig>> = ({
           isExpanded ? 'md:grid-cols-2' : ''
         }`}
       >
-        <ColumnsPanel
-          columns={textColumns}
-          selected={config.columns}
-          dropOriginal={config.drop_original}
-          onColumns={(cols) => patch({ columns: cols })}
-          onDrop={(v) => patch({ drop_original: v })}
-        />
+        <ValidationField field="columns">
+          <ColumnsPanel
+            columns={textColumns}
+            selected={config.columns}
+            dropOriginal={config.drop_original}
+            onColumns={(cols) => patch({ columns: cols })}
+            onDrop={(v) => patch({ drop_original: v })}
+          />
+        </ValidationField>
 
         <div
           className={`space-y-3 ${
@@ -224,13 +227,15 @@ const SentenceEmbedderSettings: React.FC<NodeSettingsProps<SentenceEmbedderConfi
           isExpanded ? 'md:grid-cols-2' : ''
         }`}
       >
-        <ColumnsPanel
-          columns={textColumns}
-          selected={config.columns}
-          dropOriginal={config.drop_original}
-          onColumns={(cols) => patch({ columns: cols })}
-          onDrop={(v) => patch({ drop_original: v })}
-        />
+        <ValidationField field="columns">
+          <ColumnsPanel
+            columns={textColumns}
+            selected={config.columns}
+            dropOriginal={config.drop_original}
+            onColumns={(cols) => patch({ columns: cols })}
+            onDrop={(v) => patch({ drop_original: v })}
+          />
+        </ValidationField>
 
         <div
           className={`space-y-3 ${
@@ -292,7 +297,7 @@ export const TokenizerNode: NodeDefinition<TokenizerConfig> = {
   },
   validate: (config) =>
     config.columns.length === 0
-      ? { isValid: false, message: 'Select at least one text column.' }
+      ? { isValid: false, field: 'columns', message: 'Select at least one text column.' }
       : { isValid: true },
   getDefaultConfig: () => ({
     columns: [],
@@ -321,7 +326,7 @@ export const SentenceEmbedderNode: NodeDefinition<SentenceEmbedderConfig> = {
   },
   validate: (config) =>
     config.columns.length === 0
-      ? { isValid: false, message: 'Select at least one text column.' }
+      ? { isValid: false, field: 'columns', message: 'Select at least one text column.' }
       : { isValid: true },
   getDefaultConfig: () => ({
     columns: [],

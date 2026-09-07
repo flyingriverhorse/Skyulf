@@ -29,6 +29,7 @@ import { findCycleIssues } from '../utils/pipelineCycleValidation';
 import { findPreprocessingBeforeSplitIssues } from '../utils/pipelineLeakageValidation';
 
 export interface GraphValidationIssue {
+  field?: string | undefined;
   nodeId: string;
   nodeLabel: string;
   category: 'configuration' | 'connection' | 'leakage' | 'cycle';
@@ -244,6 +245,7 @@ export function collectGraphValidationIssues(nodes: Node[], edges: Edge[]): Grap
         nodeLabel: label,
         category: 'configuration',
         message: `Fix the ${label} settings before running preview${validation.message ? `: ${validation.message}` : '.'}`,
+        ...(validation.field ? { field: validation.field } : {}),
       });
     }
 

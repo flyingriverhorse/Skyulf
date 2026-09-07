@@ -1,3 +1,4 @@
+import { ValidationField, useValidationReveal } from '../../../components/shared/ValidationField';
 import React, { useState, useRef, useEffect } from 'react';
 import { NodeDefinition } from '../../../core/types/nodes';
 import { BarChart3 } from 'lucide-react';
@@ -60,6 +61,10 @@ const BinningSettings: React.FC<{ config: BinningConfig; onChange: (c: BinningCo
   const { data: schema, isLoading } = useDatasetSchema(datasetId);
   const droppedUpstream = useUpstreamDroppedColumns(nodeId);
 
+  const [showInvalidBinCount, setShowInvalidBinCount] = useState(false);
+  useValidationReveal((field) => {
+    if (field === 'n_bins') setShowInvalidBinCount(true);
+  });
   // Responsive layout: switch to a 2-column layout once the panel is wider than 450px.
   const [containerRef, isWide] = useIsWideContainer();
 
@@ -102,17 +107,19 @@ const BinningSettings: React.FC<{ config: BinningConfig; onChange: (c: BinningCo
             </p>
           </div>
 
-          {config.strategy !== 'custom' && (
+          {(config.strategy !== 'custom' || showInvalidBinCount) && (
             <div className="space-y-2">
               <span className="block text-sm font-medium">Number of Bins</span>
-              <input
-                type="number"
-                min={2}
-                max={100}
-                className="w-full p-2 border rounded bg-background focus:ring-1 focus:ring-primary outline-none"
-                value={config.n_bins}
-                onChange={(e) => onChange({ ...config, n_bins: Number.parseInt(e.target.value) || 5 })}
-              />
+              <ValidationField field="n_bins">
+                <input
+                  type="number"
+                  min={2}
+                  max={100}
+                  className="w-full p-2 border rounded bg-background focus:ring-1 focus:ring-primary outline-none"
+                  value={config.n_bins}
+                  onChange={(e) => onChange({ ...config, n_bins: Number.parseInt(e.target.value) || 5 })}
+                />
+              </ValidationField>
             </div>
           )}
 
@@ -198,16 +205,18 @@ const BinningSettings: React.FC<{ config: BinningConfig; onChange: (c: BinningCo
         </div>
 
         {/* Right Column: Column Selection */}
-        <ColumnMultiSelect
-          columns={numericColumns}
-          selected={config.columns}
-          onChange={(newCols) => { onChange({ ...config, columns: newCols }); }}
-          label="Target Columns"
-          variant="panel"
-          isLoading={isLoading}
-          emptyMessage="No numeric columns found."
-          fillHeight={false}
-        />
+        <ValidationField field="columns">
+          <ColumnMultiSelect
+            columns={numericColumns}
+            selected={config.columns}
+            onChange={(newCols) => { onChange({ ...config, columns: newCols }); }}
+            label="Target Columns"
+            variant="panel"
+            isLoading={isLoading}
+            emptyMessage="No numeric columns found."
+            fillHeight={false}
+          />
+        </ValidationField>
       </div>
     </div>
   );
@@ -223,10 +232,10 @@ export const BinningNode: NodeDefinition = {
   outputs: [{ id: 'out', type: 'dataset', label: 'Binned' }],
   validate: (config: BinningConfig) => {
     if (config.columns.length === 0) {
-      return { isValid: false, message: 'Select at least one column to bin.' };
+      return { isValid: false, field: 'columns', message: 'Select at least one column to bin.' };
     }
     if (config.n_bins < 2) {
-      return { isValid: false, message: 'Number of bins must be at least 2.' };
+      return { isValid: false, field: 'n_bins', message: 'Number of bins must be at least 2.' };
     }
     return { isValid: true };
   },

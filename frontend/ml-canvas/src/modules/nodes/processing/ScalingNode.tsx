@@ -1,3 +1,4 @@
+import { ValidationField } from '../../../components/shared/ValidationField';
 import React from 'react';
 import { NodeDefinition } from '../../../core/types/nodes';
 import { Scaling } from 'lucide-react';
@@ -243,16 +244,18 @@ const ScalingSettings: React.FC<{ config: ScalingConfig; onChange: (c: ScalingCo
 
         {/* Right Column: Columns */}
         <div className={`flex flex-col overflow-hidden ${isWide ? 'min-h-0 flex-1' : 'shrink-0'}`}>
-          <ColumnMultiSelect
-            columns={numericColumns}
-            selected={config.columns}
-            onChange={(newCols) => { onChange({ ...config, columns: newCols }); }}
-            label="Numeric Columns"
-            variant="panel"
-            isLoading={isLoading}
-            emptyMessage="No numeric columns found"
-            fillHeight={isWide}
-          />
+          <ValidationField field="columns" className={isWide ? "flex min-h-0 flex-1 flex-col" : ""}>
+            <ColumnMultiSelect
+              columns={numericColumns}
+              selected={config.columns}
+              onChange={(newCols) => { onChange({ ...config, columns: newCols }); }}
+              label="Numeric Columns"
+              variant="panel"
+              isLoading={isLoading}
+              emptyMessage="No numeric columns found"
+              fillHeight={isWide}
+            />
+          </ValidationField>
         </div>
 
         {/* Feedback Section (Narrow) */}
@@ -279,6 +282,7 @@ export const ScalingNode: NodeDefinition<ScalingConfig> = {
     return `${method} · ${cols} ${cols === 1 ? 'col' : 'cols'}`;
   },
   validate: (config) => ({
+    field: 'columns',
     isValid: config.columns.length > 0,
     message: config.columns.length === 0 ? 'Select at least one column' : undefined
   }),

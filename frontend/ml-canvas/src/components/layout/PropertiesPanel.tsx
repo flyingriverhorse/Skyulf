@@ -4,6 +4,7 @@ import { useViewStore } from '../../core/store/useViewStore';
 import { useSidebarOpen } from '../../core/hooks/useSidebarOpen';
 import { FOCUS_NODE_EVENT } from '../../core/hooks/useKeyboardShortcuts';
 import { registry } from '../../core/registry/NodeRegistry';
+import { ValidationNavigation } from '../shared/ValidationField';
 import {
   ExecutionMode,
   getExecutionMode,
@@ -126,11 +127,13 @@ export const PropertiesPanel: React.FC = () => {
         </div>
       )}
       {selectedNode && (
+        <ValidationNavigation nodeId={selectedNode.id}>
         <PropertiesContent
           selectedNode={selectedNode}
           isExpanded={isPropertiesPanelExpanded}
           toggleExpand={() => setPropertiesPanelExpanded(!isPropertiesPanelExpanded)}
         />
+        </ValidationNavigation>
       )}
     </aside>
   );
@@ -165,7 +168,7 @@ const PropertiesContent: React.FC<{
   const SettingsComponent = definition.settings;
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="flex-1 min-h-0 flex flex-col">
       <div className="p-4 border-b flex items-center justify-between gap-2 bg-muted/30">
         <div className="flex items-center gap-2 min-w-0">
           <div className="p-1.5 bg-primary/10 rounded-md">
@@ -210,6 +213,7 @@ const PropertiesContent: React.FC<{
       <div className="flex-1 overflow-y-auto p-4">
         <div className="space-y-6">
           <SettingsComponent
+            key={selectedNode.id}
             config={selectedNode.data}
             onChange={(data: unknown) => updateNodeData(selectedNode.id, data)}
             nodeId={selectedNode.id}

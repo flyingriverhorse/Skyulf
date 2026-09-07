@@ -26,7 +26,7 @@ export const SegmentationNode = createModelingNode<SegmentationConfig>({
   },
   bodyPreview: (config) => (config.model_type ? `${config.model_type}` : null),
   validate: (config) => {
-    if (!config.model_type) return { isValid: false, message: 'Select a clustering algorithm.' };
+    if (!config.model_type) return { isValid: false, message: 'Select a clustering algorithm.', field: 'model_type' };
     return { isValid: true };
   },
   outputs: [{ id: 'model', label: 'Trained Model', type: 'model' }]

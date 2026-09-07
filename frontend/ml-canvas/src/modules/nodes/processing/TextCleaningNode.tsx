@@ -1,3 +1,4 @@
+import { ValidationField } from '../../../components/shared/ValidationField';
 import React, { useState } from 'react';
 import { NodeDefinition } from '../../../core/types/nodes';
 import { Eraser, Plus, Trash2, Wand2, Info, ChevronDown, ChevronUp } from 'lucide-react';
@@ -208,12 +209,14 @@ const TextCleaningSettings: React.FC<{ config: TextCleaningConfig; onChange: (c:
             <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 block">
               Target Columns ({config.columns.length})
             </label>
-            <ColumnMultiSelect
-              variant="compact"
-              columns={textColumns}
-              selected={config.columns}
-              onChange={(cols) => onChange({ ...config, columns: cols })}
-            />
+            <ValidationField field="columns">
+              <ColumnMultiSelect
+                variant="compact"
+                columns={textColumns}
+                selected={config.columns}
+                onChange={(cols) => onChange({ ...config, columns: cols })}
+              />
+            </ValidationField>
             <p className="text-xs text-gray-500 mt-1">Only text/categorical columns are shown.</p>
           </div>
         </div>
@@ -247,13 +250,15 @@ const TextCleaningSettings: React.FC<{ config: TextCleaningConfig; onChange: (c:
             <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
               Cleaning Operations
             </span>
-            <button
-              onClick={addOperation}
-              className="flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
-            >
-              <Plus size={14} />
-              Add Step
-            </button>
+            <ValidationField field="operations">
+              <button
+                onClick={addOperation}
+                className="flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+              >
+                <Plus size={14} />
+                Add Step
+              </button>
+            </ValidationField>
           </div>
 
           <div className="space-y-3">
@@ -266,6 +271,7 @@ const TextCleaningSettings: React.FC<{ config: TextCleaningConfig; onChange: (c:
                 >
                   Add your first cleaning step
                 </button>
+
               </div>
             ) : (
               config.operations.map((op, idx) => (
@@ -301,8 +307,8 @@ export const TextCleaningNode: NodeDefinition<TextCleaningConfig> = {
     return `${ops} op${ops === 1 ? '' : 's'} · ${cols} ${cols === 1 ? 'col' : 'cols'}`;
   },
   validate: (config) => {
-    if (config.columns.length === 0) return { isValid: false, message: 'Select at least one column.' };
-    if (config.operations.length === 0) return { isValid: false, message: 'Add at least one operation.' };
+    if (config.columns.length === 0) return { isValid: false, field: 'columns', message: 'Select at least one column.' };
+    if (config.operations.length === 0) return { isValid: false, field: 'operations', message: 'Add at least one operation.' };
     return { isValid: true };
   },
   getDefaultConfig: () => ({

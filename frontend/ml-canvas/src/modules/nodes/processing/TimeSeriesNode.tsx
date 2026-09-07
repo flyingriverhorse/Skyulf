@@ -1,3 +1,4 @@
+import { ValidationField } from '../../../components/shared/ValidationField';
 import { NodeDefinition } from '../../../core/types/nodes';
 import { Clock, Info } from 'lucide-react';
 import { useUpstreamData } from '../../../core/hooks/useUpstreamData';
@@ -106,19 +107,21 @@ function LagSettings({ config, update }: { config: TimeSeriesConfig; update: Upd
   <div className="space-y-2 p-3 bg-muted/20 rounded border">
     <div className="space-y-1">
       <span className="block text-xs font-medium">Lags (comma-separated)</span>
-      <input
-        type="text"
-        className="w-full p-1.5 border rounded text-sm"
-        value={(config.lags ?? [1]).join(', ')}
-        onChange={e => {
-          const parsed = e.target.value
-            .split(',')
-            .map(s => Number.parseInt(s.trim(), 10))
-            .filter(n => Number.isFinite(n));
-          update({ lags: parsed });
-        }}
-        placeholder="1, 2, 3"
-      />
+      <ValidationField field="lags">
+        <input
+          type="text"
+          className="w-full p-1.5 border rounded text-sm"
+          value={(config.lags ?? [1]).join(', ')}
+          onChange={e => {
+            const parsed = e.target.value
+              .split(',')
+              .map(s => Number.parseInt(s.trim(), 10))
+              .filter(n => Number.isFinite(n));
+            update({ lags: parsed });
+          }}
+          placeholder="1, 2, 3"
+        />
+      </ValidationField>
       <p className="text-[10px] text-muted-foreground">Each value creates a <code>col_lag_N</code> column.</p>
     </div>
     <label className="flex items-center gap-2 text-xs">
@@ -160,11 +163,13 @@ function RollingSettings({ config, update }: { config: TimeSeriesConfig; update:
     </div>
     <div className="space-y-1">
       <span className="block text-xs font-medium">Aggregations</span>
-      <ChipMultiSelect
-        options={ROLLING_AGGS}
-        selected={config.aggregations ?? ['mean']}
-        onChange={aggs => { update({ aggregations: aggs }); }}
-      />
+      <ValidationField field="aggregations">
+        <ChipMultiSelect
+          options={ROLLING_AGGS}
+          selected={config.aggregations ?? ['mean']}
+          onChange={aggs => { update({ aggregations: aggs }); }}
+        />
+      </ValidationField>
     </div>
   </div>
   );
@@ -175,11 +180,13 @@ function DateSettings({ config, update }: { config: TimeSeriesConfig; update: Up
   <div className="space-y-2 p-3 bg-muted/20 rounded border">
     <div className="space-y-1">
       <span className="block text-xs font-medium">Calendar Features</span>
-      <ChipMultiSelect
-        options={DATE_FEATURES}
-        selected={config.features ?? ['year', 'month', 'day', 'dayofweek']}
-        onChange={feats => { update({ features: feats }); }}
-      />
+      <ValidationField field="features">
+        <ChipMultiSelect
+          options={DATE_FEATURES}
+          selected={config.features ?? ['year', 'month', 'day', 'dayofweek']}
+          onChange={feats => { update({ features: feats }); }}
+        />
+      </ValidationField>
     </div>
     <label className="flex items-center gap-2 text-xs">
       <input
@@ -231,14 +238,16 @@ function TimeSeriesSettings({ config, onChange, nodeId }: {
           <p className="text-xs text-muted-foreground">{METHOD_DESCRIPTIONS[config.method]}</p>
         </div>
 
-        <ColumnMultiSelect
-          variant="compact"
-          showFooterCount
-          columns={allColumns}
-          selected={config.columns ?? []}
-          onChange={cols => { update({ columns: cols }); }}
-          label={config.method === 'date' ? 'Datetime Columns' : 'Numeric Columns'}
-        />
+        <ValidationField field="columns">
+          <ColumnMultiSelect
+            variant="compact"
+            showFooterCount
+            columns={allColumns}
+            selected={config.columns ?? []}
+            onChange={cols => { update({ columns: cols }); }}
+            label={config.method === 'date' ? 'Datetime Columns' : 'Numeric Columns'}
+          />
+        </ValidationField>
       </div>
 
       <div className="space-y-3">
@@ -265,15 +274,15 @@ function timeSeriesPreview(config: TimeSeriesConfig): string {
   return `${method} \u00b7 ${cols} ${cols === 1 ? 'col' : 'cols'}`;
 }
 
-function validateTimeSeries(config: TimeSeriesConfig): { isValid: boolean; error?: string } {
+function validateTimeSeries(config: TimeSeriesConfig): { isValid: boolean; message?: string; field?: string } {
   if ((config.columns?.length ?? 0) === 0)
-    return { isValid: false, error: 'Select at least one column' };
+    return { isValid: false, field: 'columns', message: 'Select at least one column' };
   if (config.method === 'lag' && (config.lags?.length ?? 0) === 0)
-    return { isValid: false, error: 'Provide at least one lag value' };
+    return { isValid: false, field: 'lags', message: 'Provide at least one lag value' };
   if (config.method === 'rolling' && (config.aggregations?.length ?? 0) === 0)
-    return { isValid: false, error: 'Select at least one aggregation' };
+    return { isValid: false, field: 'aggregations', message: 'Select at least one aggregation' };
   if (config.method === 'date' && (config.features?.length ?? 0) === 0)
-    return { isValid: false, error: 'Select at least one calendar feature' };
+    return { isValid: false, field: 'features', message: 'Select at least one calendar feature' };
   return { isValid: true };
 }
 

@@ -1,5 +1,5 @@
 import { LucideIcon } from 'lucide-react';
-import { NodeDefinition } from '../types/nodes';
+import { NodeDefinition, ValidationResult } from '../types/nodes';
 
 // Heterogeneous factory for modeling nodes. `NodeDefinition<TConfig>` is
 // already generic; this factory used to erase to `any` internally even
@@ -14,7 +14,7 @@ interface CreateNodeConfig<TConfig> {
   icon: LucideIcon;
   settings: React.ComponentType<{ config: TConfig; onChange: (next: TConfig) => void; nodeId?: string }>;
   defaultConfig?: Partial<TConfig>;
-  validate?: (config: TConfig) => { isValid: boolean; message?: string };
+  validate?: (config: TConfig) => ValidationResult;
   bodyPreview?: (config: TConfig) => string | null;
   category?: 'Data Source' | 'Preprocessing' | 'Modeling' | 'Evaluation' | 'Utility';
   inputs?: NodeDefinition['inputs'];
@@ -62,7 +62,7 @@ export const createModelingNode = <TConfig extends BaseModelingConfig>({
       return null;
     }),
     validate: validate || ((config: TConfig) => {
-      if (!config.target_column) return { isValid: false, message: 'Target column is required.' };
+      if (!config.target_column) return { isValid: false, message: 'Target column is required.', field: 'target_column' };
       return { isValid: true };
     }),
     getDefaultConfig: () => ({

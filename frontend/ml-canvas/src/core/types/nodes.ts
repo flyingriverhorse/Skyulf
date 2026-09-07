@@ -15,6 +15,8 @@ export interface PortDefinition {
 
 export interface ValidationResult {
   isValid: boolean;
+  /** Settings field or collection to reveal when this issue is activated. */
+  field?: string | undefined;
   message?: string | undefined;
 }
 

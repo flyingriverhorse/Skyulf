@@ -1,3 +1,4 @@
+import { ValidationField } from '../../../components/shared/ValidationField';
 import React from 'react';
 import { NodeDefinition } from '../../../core/types/nodes';
 import { Scissors } from 'lucide-react';
@@ -404,16 +405,18 @@ const OutlierSettings: React.FC<{ config: OutlierConfig; onChange: (c: OutlierCo
 
         {/* Right Column: Columns */}
         <div className={`flex flex-col overflow-hidden ${isWide ? 'min-h-0 flex-1' : 'shrink-0'}`}>
-          <ColumnMultiSelect
-            columns={numericColumns}
-            selected={config.columns}
-            onChange={(newCols) => { onChange({ ...config, columns: newCols }); }}
-            label="Numeric Columns"
-            variant="panel"
-            isLoading={isLoading}
-            emptyMessage="No numeric columns found"
-            fillHeight={isWide}
-          />
+          <ValidationField field="columns" className={isWide ? "flex min-h-0 flex-1 flex-col" : ""}>
+            <ColumnMultiSelect
+              columns={numericColumns}
+              selected={config.columns}
+              onChange={(newCols) => { onChange({ ...config, columns: newCols }); }}
+              label="Numeric Columns"
+              variant="panel"
+              isLoading={isLoading}
+              emptyMessage="No numeric columns found"
+              fillHeight={isWide}
+            />
+          </ValidationField>
         </div>
 
         {/* Feedback Section (Narrow) */}
@@ -446,7 +449,7 @@ export const OutlierNode: NodeDefinition = {
   },
   validate: (config: OutlierConfig) => {
     if (config.columns.length === 0) {
-      return { isValid: false, message: 'Select at least one column.' };
+      return { isValid: false, field: 'columns', message: 'Select at least one column.' };
     }
     return { isValid: true };
   },

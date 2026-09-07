@@ -1,5 +1,7 @@
 import React, { useState, useMemo } from 'react';
-import { collectGraphValidationIssues, useGraphStore } from '../../core/store/useGraphStore';
+import { collectGraphValidationIssues, useGraphStore, type GraphValidationIssue } from '../../core/store/useGraphStore';
+import { FOCUS_NODE_EVENT } from '../../core/hooks/useKeyboardShortcuts';
+import { getReadOnlyMode } from '../../core/hooks/useReadOnlyMode';
 import { useViewStore } from '../../core/store/useViewStore';
 import { AlertTriangle, ChevronUp, ChevronDown, Maximize2, Minimize2, Table, X, XCircle } from 'lucide-react';
 import type { PreviewDataRows, PreviewData } from '../../core/api/client';
@@ -29,7 +31,7 @@ export const ResultsPanel: React.FC<{ maxHeight?: number }> = ({ maxHeight = 720
   const canvasNodes = useGraphStore((state) => state.nodes);
   const canvasEdges = useGraphStore((state) => state.edges);
   const lastRunError = useGraphStore((state) => state.lastRunError);
-  const onNodesChange = useGraphStore((state) => state.onNodesChange);
+  const selectNode = useGraphStore((state) => state.selectNode);
   const chainSiblings = useGraphStore((state) => state.chainSiblings);
   const confirm = useConfirm();
   const {
@@ -194,14 +196,11 @@ export const ResultsPanel: React.FC<{ maxHeight?: number }> = ({ maxHeight = 720
     return counts;
   }, [rawMergeWarnings, branchNodeIdsMemo, branchLabels]);
 
-  const selectNode = (nodeId: string): void => {
-    onNodesChange(
-      canvasNodes.map((node) => ({
-        id: node.id,
-        type: 'select',
-        selected: node.id === nodeId,
-      })),
-    );
+  const openIssue = (issue: GraphValidationIssue): void => {
+    if (!selectNode(issue.nodeId)) return;
+    const readOnly = getReadOnlyMode();
+    if (!readOnly) useViewStore.getState().requestValidationFocus(issue);
+    window.dispatchEvent(new CustomEvent(FOCUS_NODE_EVENT, { detail: { id: issue.nodeId, focusWrapper: readOnly } }));
   };
 
   const showSummary = validationIssues.length > 0 || lastRunError !== null;
@@ -249,7 +248,7 @@ export const ResultsPanel: React.FC<{ maxHeight?: number }> = ({ maxHeight = 720
               <li key={`${issue.nodeId}-${issue.category}-${issue.message}`}>
                 <button
                   type="button"
-                  onClick={() => selectNode(issue.nodeId)}
+                  onClick={() => openIssue(issue)}
                   className="w-full rounded-md border border-red-200 bg-white/80 px-3 py-2 text-left transition-colors hover:bg-red-100 dark:border-red-900/40 dark:bg-slate-950/30 dark:hover:bg-red-950/40"
                 >
                   <div className="flex flex-wrap items-center gap-2 text-[11px] uppercase tracking-wide text-red-700 dark:text-red-300">

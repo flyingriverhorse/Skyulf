@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import type { GraphValidationIssue } from './useGraphStore';
 
 type ViewType = 'canvas' | 'experiments' | 'inference';
 
@@ -28,6 +29,8 @@ const writePerfOverlayPreference = (enabled: boolean): void => {
 };
 
 interface ViewState {
+  validationFocusRequest: (GraphValidationIssue & { requestId: number }) | null;
+  requestValidationFocus: (issue: GraphValidationIssue) => void;
   activeView: ViewType;
   setView: (view: ViewType) => void;
   /** Null follows viewport size; an explicit open/close choice lasts for the session. */
@@ -62,6 +65,10 @@ interface ViewState {
 }
 
 export const useViewStore = create<ViewState>((set) => ({
+  validationFocusRequest: null,
+  requestValidationFocus: (issue) => set((state) => ({
+    validationFocusRequest: { ...issue, requestId: (state.validationFocusRequest?.requestId ?? 0) + 1 },
+  })),
   activeView: 'canvas',
   setView: (view) => set({ activeView: view }),
   sidebarOpenOverride: null,
