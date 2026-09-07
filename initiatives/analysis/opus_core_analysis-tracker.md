@@ -139,6 +139,7 @@ uses, so a fixed finding stays where it was filed.
 | OC-04 | 🟡 | Cross-engine dtype divergence in binning outputs (`encoding/dummy.py`, `bucketing.py`) | small | ✅ fixed 2026-09-07 — ordinal/bin-index bucketing now emits signed `int64` on both pandas and Polars; DummyEncoder and MissingIndicator were aligned in the OC-76 pass |
 | OC-149 | 🟠 | Clustering evaluation crashes on Polars when a numeric feature is all-null within one cluster | small | ✅ fixed 2026-09-07 — cluster-local Polars means now preserve pandas-compatible `NaN` values |
 | OC-196 | 🟡 | GaussianMixture probability prediction omitted the feature/reference filtering used for fit and ordinary prediction | small | ✅ fixed 2026-09-07 — shared clustering prediction preparation now filters both labels and probabilities identically |
+| OC-195 | 🟡 | Clustering numeric-feature selection skipped `SkyulfPandasWrapper` | small | ✅ fixed 2026-09-07 — wrapped pandas frames now use native pandas numeric selection and preserve the wrapper contract |
 
 ### Remaining — evaluation & explainability
 
@@ -331,6 +332,14 @@ clustering-specific reference-column and numeric-only filtering used by
 `predict()`. A shared preparation helper now feeds both methods, so a fitted
 `reference_column` or extra text column cannot change the feature count passed
 to GaussianMixture. Clustering integration/modeling tests, Ruff, and Ty all pass.
+
+### 2026-09-07 — OC-195 fixed: wrapped pandas clustering keeps numeric features
+
+`SkyulfPandasWrapper` delegated `.columns` and `.dtypes`, so the explicit
+Polars branch misclassified it and dropped every feature. `_select_numeric_features`
+now recognizes the wrapper, selects numeric columns from its native pandas frame,
+and returns a wrapped pandas subset. The clustering/modeling suites, Ruff, and
+Ty all pass.
 
 ### 2026-09-07 — OC-207 fixed: the threshold-tuning contract was right and the three docs describing it were wrong — plus the silent degenerate search the follow-up measurement exposed
 

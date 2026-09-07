@@ -10,6 +10,7 @@ from sklearn.mixture import GaussianMixture
 
 from ..core.meta.decorators import node_meta
 from ..engines import SkyulfDataFrame
+from ..engines.pandas_engine import SkyulfPandasWrapper
 from ..engines.polars_engine import POLARS_NUMERIC_BOOL_DTYPES, SkyulfPolarsWrapper
 from ..registry import NodeRegistry
 from .sklearn_wrapper import SklearnApplier, SklearnCalculator
@@ -26,8 +27,9 @@ def _select_numeric_features(X: Any) -> tuple[Any, list[str]]:
     fail (or, worse, silently corrupt distances) once converted to a numpy
     array. Returns ``(numeric_only_X, dropped_column_names)``.
 
-    Handles both pandas ``DataFrame``s and Polars ``DataFrame``/``SkyulfPolarsWrapper``
-    objects: ``extract_xy`` (``modeling/base.py``) hands back a raw, unwrapped
+    Handles pandas ``DataFrame``/``SkyulfPandasWrapper`` and Polars
+    ``DataFrame``/``SkyulfPolarsWrapper`` objects: ``extract_xy``
+    (``modeling/base.py``) hands back a raw, unwrapped
     ``pl.DataFrame`` when the pipeline has no target column configured (the
     "no target" sentinel used throughout clustering), so this must not assume
     pandas is the only non-trivial branch.
@@ -44,6 +46,11 @@ def _select_numeric_features(X: Any) -> tuple[Any, list[str]]:
         numeric = X.select_dtypes(include=["number", "bool"])
         dropped = [c for c in X.columns if c not in numeric.columns]
         return numeric, dropped
+    if isinstance(X, SkyulfPandasWrapper):
+        native = X.to_pandas()
+        numeric = native.select_dtypes(include=["number", "bool"])
+        dropped = [c for c in native.columns if c not in numeric.columns]
+        return SkyulfPandasWrapper(numeric), dropped
     if isinstance(X, pl.DataFrame | SkyulfPolarsWrapper):
         numeric_cols = [
             col

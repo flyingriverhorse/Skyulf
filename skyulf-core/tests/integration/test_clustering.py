@@ -15,6 +15,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from skyulf.engines.pandas_engine import SkyulfPandasWrapper
 from skyulf.modeling.clustering import (
     BirchApplier,
     BirchCalculator,
@@ -233,6 +234,18 @@ class TestNonNumericAutoDrop:
         model = BirchCalculator().fit(df, None, {})
         assert model.n_features_in_ == 2
         labels = BirchApplier().predict(df, model)
+        assert labels.nunique() == 3
+
+    def test_wrapped_pandas_mixed_frame_still_clusters_numeric(self) -> None:
+        """A pandas wrapper must retain numeric features while dropping text columns."""
+        df, _ = _three_blobs(n_per_blob=20)
+        df["note"] = "text"
+
+        model = KMeansCalculator().fit(SkyulfPandasWrapper(df), None, {})
+        labels = KMeansApplier().predict(SkyulfPandasWrapper(df), model)
+
+        assert model.n_features_in_ == 2
+        assert len(labels) == len(df)
         assert labels.nunique() == 3
 
 
