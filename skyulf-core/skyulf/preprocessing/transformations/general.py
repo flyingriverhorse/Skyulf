@@ -21,6 +21,16 @@ from ._power_common import build_pretrained_power_transformer
 logger = logging.getLogger(__name__)
 
 _POWER_METHODS = {"box-cox", "yeo-johnson"}
+_FLOAT_METHODS = {
+    "log",
+    "sqrt",
+    "square_root",
+    "cube_root",
+    "reciprocal",
+    "exp",
+    "exponential",
+    *_POWER_METHODS,
+}
 
 
 def _apply_power_to_polars_col(X_out: Any, item: dict[str, Any]) -> Any:
@@ -167,10 +177,22 @@ class GeneralTransformationCalculator(BaseCalculator):
     def infer_output_schema(
         self, input_schema: SkyulfSchema, config: dict[str, Any]
     ) -> SkyulfSchema:
-        """Return the input schema unchanged: each transformation replaces its column in place."""
-        # Transformations are keyed by source column and replace it in place;
-        # column set is preserved.
-        return input_schema
+        """Return updated dtypes for transformed numeric columns."""
+        schema = input_schema
+        touched: set[str] = set()
+        for item in config.get("transformations", []):
+            col = item.get("column")
+            method = item.get("method")
+            if col not in schema.columns or method is None:
+                continue
+            if method == "square":
+                continue
+            if method in _FLOAT_METHODS:
+                touched.add(col)
+
+        for col in touched:
+            schema = schema.with_dtype(col, "float64")
+        return schema
 
     @fit_method
     def fit(self, X: Any, _y: Any, config: dict[str, Any]) -> GeneralTransformationArtifact:  # pylint: disable=arguments-differ

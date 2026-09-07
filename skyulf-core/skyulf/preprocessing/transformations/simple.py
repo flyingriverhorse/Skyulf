@@ -73,12 +73,35 @@ class SimpleTransformationApplier(BaseApplier):
 class SimpleTransformationCalculator(BaseCalculator):
     """Package the configured transformations into an artifact without reading the data."""
 
+    _FLOAT_METHODS = {
+        "log",
+        "sqrt",
+        "square_root",
+        "cube_root",
+        "reciprocal",
+        "exp",
+        "exponential",
+    }
+
     def infer_output_schema(
         self, input_schema: SkyulfSchema, config: dict[str, Any]
     ) -> SkyulfSchema:
-        """Return the input schema unchanged: transformations replace values in place."""
-        # Simple transformations replace values in place; column set is preserved.
-        return input_schema
+        """Return updated dtypes for transformed numeric columns."""
+        schema = input_schema
+        touched: set[str] = set()
+        for item in config.get("transformations", []):
+            col = item.get("column")
+            method = item.get("method")
+            if col not in schema.columns or method is None:
+                continue
+            if method == "square":
+                continue
+            if method in self._FLOAT_METHODS:
+                touched.add(col)
+
+        for col in touched:
+            schema = schema.with_dtype(col, "float64")
+        return schema
 
     def fit(
         self,

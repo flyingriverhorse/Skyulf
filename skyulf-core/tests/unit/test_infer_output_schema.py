@@ -55,11 +55,13 @@ from skyulf.preprocessing.split import (
     FeatureTargetSplitCalculator,
     SplitCalculator,
 )
+from skyulf.preprocessing.time_series import LagFeaturesCalculator
 from skyulf.preprocessing.transformations import (
     GeneralTransformationCalculator,
     PowerTransformerCalculator,
     SimpleTransformationCalculator,
 )
+from skyulf.registry import NodeRegistry
 
 # ---------- SkyulfSchema dataclass ----------
 
@@ -130,6 +132,95 @@ def test_scalers_passthrough_schema(cls) -> None:
     assert cls().infer_output_schema(s, {"columns": ["a"]}) == s
 
 
+# ---------- OC-03: dtype-evolution nodes ----------
+
+
+@pytest.mark.parametrize(
+    "calc_cls, df, cfg",
+    [
+        (
+            StandardScalerCalculator,
+            pd.DataFrame({"x": [1, 2, 3], "y": [4, 5, 6]}),
+            {"columns": ["x"]},
+        ),
+        (
+            MinMaxScalerCalculator,
+            pd.DataFrame({"x": [1, 2, 3], "y": [4, 5, 6]}),
+            {"columns": ["x"]},
+        ),
+        (
+            RobustScalerCalculator,
+            pd.DataFrame({"x": [1, 2, 3], "y": [4, 5, 6]}),
+            {"columns": ["x"]},
+        ),
+        (
+            MaxAbsScalerCalculator,
+            pd.DataFrame({"x": [1, 2, 3], "y": [4, 5, 6]}),
+            {"columns": ["x"]},
+        ),
+        (
+            SimpleImputerCalculator,
+            pd.DataFrame({"x": [1.0, None, 3.0], "y": [1.0, 2.0, 3.0]}),
+            {"strategy": "mean", "columns": ["x"]},
+        ),
+        (
+            KNNImputerCalculator,
+            pd.DataFrame(
+                {"x": [1.0, 2.0, 3.0, 4.0, 5.0, 6.0], "y": [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]}
+            ),
+            {"columns": ["x"]},
+        ),
+        (
+            IterativeImputerCalculator,
+            pd.DataFrame(
+                {"x": [1.0, 2.0, 3.0, 4.0, 5.0, 6.0], "y": [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]}
+            ),
+            {"columns": ["x"]},
+        ),
+        (
+            SimpleTransformationCalculator,
+            pd.DataFrame({"x": [1, 2, 3], "y": [4, 5, 6]}),
+            {"transformations": [{"column": "x", "method": "log"}]},
+        ),
+        (
+            GeneralTransformationCalculator,
+            pd.DataFrame({"x": [1, 2, 3], "y": [4, 5, 6]}),
+            {"transformations": [{"column": "x", "method": "log"}]},
+        ),
+        (
+            PowerTransformerCalculator,
+            pd.DataFrame({"x": [1.0, 2.0, 3.0], "y": [4.0, 5.0, 6.0]}),
+            {"method": "yeo-johnson", "columns": ["x"]},
+        ),
+        (
+            WinsorizeCalculator,
+            pd.DataFrame({"x": list(range(1, 7)), "y": [0, 0, 0, 0, 0, 0]}),
+            {"columns": ["x"], "lower_percentile": 10, "upper_percentile": 90},
+        ),
+        (
+            LagFeaturesCalculator,
+            pd.DataFrame({"x": [1, 2, 3], "y": [4, 5, 6]}),
+            {"columns": ["x"], "lags": [1]},
+        ),
+    ],
+)
+def test_oc03_infer_output_schema_matches_runtime_dtype_changes(
+    calc_cls: type[BaseCalculator], df: pd.DataFrame, cfg: dict[str, object]
+) -> None:
+    """OC-03: infer_output_schema should match real output dtypes for int->float transforms."""
+    calc = calc_cls()
+    schema_in = SkyulfSchema.from_dataframe(df)
+    inferred = calc.infer_output_schema(schema_in, cfg)
+    assert inferred is not None
+    artifact = calc.fit(df, cfg)
+    if not artifact:
+        pytest.skip("No-op config in schema-inference parity probe")
+
+    applier = NodeRegistry.get_applier(calc.__node_meta__.id)
+    out = applier().apply(df, artifact)
+    assert inferred == SkyulfSchema.from_dataframe(out)
+
+
 # ---------- DropMissingColumns ----------
 
 
@@ -167,17 +258,10 @@ def test_unimplemented_calculator_returns_none() -> None:
 
 
 PASSTHROUGH_CALCULATORS = [
-    SimpleImputerCalculator,
-    KNNImputerCalculator,
-    IterativeImputerCalculator,
     IQRCalculator,
     ZScoreCalculator,
-    WinsorizeCalculator,
     ManualBoundsCalculator,
     EllipticEnvelopeCalculator,
-    PowerTransformerCalculator,
-    SimpleTransformationCalculator,
-    GeneralTransformationCalculator,
     TextCleaningCalculator,
     InvalidValueReplacementCalculator,
     ValueReplacementCalculator,

@@ -30,6 +30,7 @@ from ..engines import (
     get_engine,
 )
 from ..utils import resolve_columns
+from ._schema import SkyulfSchema
 
 
 def resolve_valid_columns(X: Any, requested: Iterable[str]) -> list[str]:
@@ -42,6 +43,21 @@ def resolve_valid_columns(X: Any, requested: Iterable[str]) -> list[str]:
     # Order-preserving dedupe: polars `.select` raises DuplicateError on
     # repeated output names where pandas silently duplicated them.
     return [c for c in dict.fromkeys(requested) if c in cols_set]
+
+
+def promote_configured_columns_to_float64(
+    input_schema: SkyulfSchema, config: dict[str, Any]
+) -> SkyulfSchema:
+    """Promote configured, existing columns to ``float64`` in a schema."""
+    selected = config.get("columns", input_schema.column_list())
+    if not selected:
+        return input_schema
+
+    out = input_schema
+    for col in selected:
+        if col in input_schema.columns:
+            out = out.with_dtype(col, "float64")
+    return out
 
 
 def safe_scale(scale_arr: np.ndarray) -> np.ndarray:

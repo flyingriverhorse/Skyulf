@@ -138,14 +138,13 @@ class LagFeaturesCalculator(BaseCalculator):
     def infer_output_schema(
         self, input_schema: SkyulfSchema, config: dict[str, Any]
     ) -> SkyulfSchema | None:
-        """Add one ``{col}_lag_{n}`` column per lag, mirroring the source dtype."""
-        # Lag columns mirror the dtype of their source column, so the output
-        # schema is derivable from config alone (shape is data-independent).
+        """Add one ``{col}_lag_{n}`` column per lag, as ``float64``."""
+        # Shifted lag columns are nullable by construction; pandas/polars keep
+        # them as ``float64`` because of the inserted missing row.
         cols = filter_existing_columns(config.get("columns", []), input_schema.column_list())
         lags = coerce_lags(config.get("lags", [1]))
         schema = input_schema
         for col in cols:
-            dtype = input_schema.dtypes.get(col, "unknown")
             for lag in lags:
-                schema = schema.add(_lag_name(col, lag), dtype)
+                schema = schema.add(_lag_name(col, lag), "float64")
         return schema

@@ -162,9 +162,16 @@ class PowerTransformerCalculator(BaseCalculator):
     def infer_output_schema(
         self, input_schema: SkyulfSchema, config: dict[str, Any]
     ) -> SkyulfSchema:
-        """Return the input schema unchanged: the transform rewrites columns in place."""
-        # Power transforms are applied in place on the same columns.
-        return input_schema
+        """Return a schema with transformed columns promoted to ``float64``."""
+        selected = config.get("columns", input_schema.column_list())
+        if not selected:
+            return input_schema
+
+        out = input_schema
+        for col in selected:
+            if col in input_schema.columns:
+                out = out.with_dtype(col, "float64")
+        return out
 
     @fit_method
     def fit(self, X: Any, _y: Any, config: dict[str, Any]) -> PowerTransformerArtifact:  # pylint: disable=arguments-differ

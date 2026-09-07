@@ -119,9 +119,22 @@ class SimpleImputerCalculator(BaseCalculator):
     def infer_output_schema(
         self, input_schema: SkyulfSchema, config: dict[str, Any]
     ) -> SkyulfSchema:
-        """Return the input schema unchanged: imputation rewrites cells, not columns."""
-        # Imputers fill NaNs in place; column set and order are preserved.
-        return input_schema
+        """Return ``input_schema`` and promote float-only imputation targets to ``float64``."""
+        selected = config.get("columns", input_schema.column_list())
+        if not selected:
+            return input_schema
+
+        strategy = config.get("strategy", "mean")
+        if strategy == "mode":
+            strategy = "most_frequent"
+        if strategy not in {"mean", "median"}:
+            return input_schema
+
+        out = input_schema
+        for col in selected:
+            if col in input_schema.columns:
+                out = out.with_dtype(col, "float64")
+        return out
 
     @fit_method
     def fit(self, X: Any, _y: Any, config: dict[str, Any]) -> SimpleImputerArtifact:  # pylint: disable=arguments-differ
