@@ -28,14 +28,15 @@ test.describe('Canvas smoke', () => {
     await page.goto('/canvas');
     await expect(page.locator('.react-flow')).toBeVisible({ timeout: 10_000 });
 
-    // Sidebar items are draggable divs but ALSO have an onClick that
+    // Sidebar items are draggable buttons but ALSO have an onClick that
     // calls addNode — we exploit that to avoid HTML5 drag synthesis,
     // which is unreliable in Playwright + React Flow.
-    const datasetItem = page.locator('aside [draggable="true"]').filter({ hasText: 'Dataset' }).first();
+    const datasetItem = page.getByRole('button', { name: 'Add Dataset node', exact: true });
     await expect(datasetItem).toBeVisible();
     await datasetItem.click();
 
-    const dropColsItem = page.locator('aside [draggable="true"]').filter({ hasText: 'Drop Columns' }).first();
+    await page.getByRole('button', { name: 'Data cleaning', exact: true }).click();
+    const dropColsItem = page.getByRole('button', { name: 'Add Drop Columns node', exact: true });
     await expect(dropColsItem).toBeVisible();
     await dropColsItem.click();
 

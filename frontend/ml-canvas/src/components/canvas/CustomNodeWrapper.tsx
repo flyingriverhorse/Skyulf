@@ -224,8 +224,8 @@ function CustomNodeWrapperImpl({ id, data, selected, isConnectable }: NodeProps)
   }
 
   const hasMultipleOutputs = definition.outputs.length > 1;
-  // "Features (X)" needs more clearance than Train/Test with wider platform fallback fonts.
-  const splitBodyPadding = definitionType === 'feature_target_split' ? 'pl-3 pr-28' : 'pl-3 pr-24';
+  // Reserve room for both "Features (X)" and "Validation" with wider platform fallback fonts.
+  const splitBodyPadding = 'pl-3 pr-28';
   const bodyTextClass = `${hasMultipleOutputs ? splitBodyPadding : 'px-10'} py-2 min-h-[2.75rem] flex items-center justify-center`;
   const outputPorts = definition.outputs.map((output, index) => (
     <ConnectionPort

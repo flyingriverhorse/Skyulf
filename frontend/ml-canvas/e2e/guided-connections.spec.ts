@@ -166,7 +166,13 @@ for (const split of [
     // Platform fallback fonts have different widths; long output labels must still clear the summary.
     const splitCard = page.locator('[data-id="node-0"] [data-node-definition-type]');
     for (const font of ['', 'Verdana, sans-serif', 'monospace']) {
-      await splitCard.evaluate((element, font) => { (element as HTMLElement).style.fontFamily = font; }, font);
+      await splitCard.evaluate((element, font) => {
+        (element as HTMLElement).style.fontFamily = font;
+        // Exercise wider glyph spacing locally as well as Linux's monospace fallback.
+        element.querySelectorAll<HTMLElement>('.react-flow__handle.source button').forEach(button => {
+          button.style.letterSpacing = font === 'monospace' ? '0.5px' : '';
+        });
+      }, font);
       expect(await splitCard.evaluate(element => (element as HTMLElement).offsetHeight)).toBeLessThanOrEqual(110);
       const measurements = await splitCard.evaluate(element => {
         const card = element.getBoundingClientRect();
@@ -188,7 +194,12 @@ for (const split of [
         expect(label.previousLabelGap, `${context}: preceding label clearance`).toBeGreaterThanOrEqual(0);
       }
     }
-    await splitCard.evaluate(element => { (element as HTMLElement).style.fontFamily = ''; });
+    await splitCard.evaluate(element => {
+      (element as HTMLElement).style.fontFamily = '';
+      element.querySelectorAll<HTMLElement>('.react-flow__handle.source button').forEach(button => {
+        button.style.letterSpacing = '';
+      });
+    });
     const source = page.locator(`[data-id="node-0"] .react-flow__handle.source[data-handleid="${split.start}"]`);
     const target = page.locator('[data-id="node-1"] .react-flow__handle.target');
     await moveTo(page, source);

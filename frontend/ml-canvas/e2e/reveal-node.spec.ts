@@ -65,6 +65,7 @@ test('sidebar additions use the visible canvas above results in dark reduced-mot
   await page.addInitScript(() => localStorage.setItem('skyulf-theme', 'dark'));
   await page.setViewportSize({ width: 1440, height: 800 });
   await page.goto('/canvas');
+  await page.getByRole('button', { name: 'Data cleaning', exact: true }).press('Enter');
   const add = page.getByRole('button', { name: 'Add Missing Indicator node', exact: true });
   await add.press('Enter');
   const results = page.getByRole('separator', { name: 'Resize results panel' });
@@ -82,6 +83,7 @@ test('read-only reveal moves canvas focus and later resizing preserves a manual 
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto('/canvas');
+  await page.getByRole('button', { name: 'Data cleaning', exact: true }).click();
   await page.getByRole('button', { name: 'Add Missing Indicator node', exact: true }).click();
   await page.setViewportSize({ width: 900, height: 800 });
   await expect(page.getByRole('button', { name: 'Read-only', exact: true })).toHaveAttribute('aria-pressed', 'true');

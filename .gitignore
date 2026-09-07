@@ -75,6 +75,7 @@ mlops_database.db
 .coverage
 .coverage.*
 htmlcov/
+frontend/ml-canvas/coverage/
 
 # === Jupyter Notebooks ===
 .ipynb_checkpoints
