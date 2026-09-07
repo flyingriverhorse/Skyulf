@@ -5,6 +5,7 @@ import { useSidebarOpen } from '../../core/hooks/useSidebarOpen';
 import { FOCUS_NODE_EVENT } from '../../core/hooks/useKeyboardShortcuts';
 import { registry } from '../../core/registry/NodeRegistry';
 import { ValidationNavigation } from '../shared/ValidationField';
+import { NodeDetails } from './NodeDetails';
 import {
   ExecutionMode,
   getExecutionMode,
@@ -161,6 +162,7 @@ const PropertiesContent: React.FC<{
           <X className="w-4 h-4" />
           Error: Node definition &apos;{definitionType}&apos; not found.
         </div>
+        <NodeDetails key={`info-${selectedNode.id}`} nodeId={selectedNode.id} />
       </div>
     );
   }
@@ -171,12 +173,9 @@ const PropertiesContent: React.FC<{
     <div className="flex-1 min-h-0 flex flex-col">
       <div className="p-4 border-b flex items-center justify-between gap-2 bg-muted/30">
         <div className="flex items-center gap-2 min-w-0">
-          <div className="p-1.5 bg-primary/10 rounded-md">
-            <Settings2 className="w-4 h-4 text-primary" />
-          </div>
+          <NodeDetails key={`info-${selectedNode.id}`} nodeId={selectedNode.id} />
           <div className="min-w-0">
-            <h2 className="font-semibold text-sm">{String(selectedNode.data.label || definition.label)}</h2>
-            <div className="text-xs text-muted-foreground font-mono break-all">ID: {selectedNode.id}</div>
+            <h2 className="font-semibold text-sm truncate" title={String(selectedNode.data.label || definition.label)}>{String(selectedNode.data.label || definition.label)}</h2>
           </div>
         </div>
         <div className="flex items-center gap-1 shrink-0">
@@ -213,7 +212,7 @@ const PropertiesContent: React.FC<{
       <div className="flex-1 overflow-y-auto p-4">
         <div className="space-y-6">
           <SettingsComponent
-            key={selectedNode.id}
+            key={`settings-${selectedNode.id}`}
             config={selectedNode.data}
             onChange={(data: unknown) => updateNodeData(selectedNode.id, data)}
             nodeId={selectedNode.id}

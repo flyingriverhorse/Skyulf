@@ -1,5 +1,5 @@
 import { describe, expect, it, beforeEach, beforeAll } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { PropertiesPanel } from './PropertiesPanel';
 import { useGraphStore } from '../../core/store/useGraphStore';
@@ -41,6 +41,18 @@ describe('PropertiesPanel merge strategy', () => {
 
   beforeEach(() => {
     useGraphStore.setState({ executionResult: null } as never);
+  });
+
+  it('keeps a single editor when switching between nodes repeatedly', () => {
+    // Duplicate sibling keys must not leave old technical-details blocks in the next editor.
+    useGraphStore.setState({ nodes: [MERGE_NODE, { ...MERGE_NODE, id: 'second-node', selected: false }], edges: [] });
+    const { container } = renderPanel();
+    for (const nodeId of ['second-node', 'merge-node', 'second-node', 'merge-node']) {
+      act(() => { useGraphStore.getState().selectNode(nodeId); });
+      expect(container.querySelectorAll('details').length).toBeLessThanOrEqual(1);
+      expect(screen.getAllByRole('button', { name: 'Node information' })).toHaveLength(1);
+    }
+    expect(screen.getAllByRole('heading', { name: 'MissingIndicator' })).toHaveLength(1);
   });
 
   it('hides the strategy control when no branch contested a column', () => {

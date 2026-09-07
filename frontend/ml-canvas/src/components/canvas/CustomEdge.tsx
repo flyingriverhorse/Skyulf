@@ -1,4 +1,4 @@
-import React, { memo, useState } from 'react';
+import React, { memo, useEffect, useId, useRef, useState } from 'react';
 import {
   BaseEdge,
   EdgeLabelRenderer,
@@ -9,6 +9,8 @@ import {
   useReactFlow,
 } from '@xyflow/react';
 import { X } from 'lucide-react';
+import { getReadOnlyMode } from '../../core/hooks/useReadOnlyMode';
+import { ConnectionHoverCard } from './ConnectionHoverCard';
 
 export const CustomEdge: React.FC<EdgeProps> = memo(({
   id,
@@ -20,12 +22,23 @@ export const CustomEdge: React.FC<EdgeProps> = memo(({
   targetPosition,
   style = {},
   markerEnd,
-  source,
-  target,
   data,
+  selected,
+  deletable,
 }) => {
   const { deleteElements } = useReactFlow();
   const [hovered, setHovered] = useState(false);
+  const [buttonFocused, setButtonFocused] = useState(false);
+  const tooltipId = useId();
+  const hoverTimer = useRef<ReturnType<typeof setTimeout>>();
+  const enter = () => { clearTimeout(hoverTimer.current); setHovered(true); };
+  const leave = () => { hoverTimer.current = setTimeout(() => setHovered(false), 150); };
+  useEffect(() => () => clearTimeout(hoverTimer.current), []);
+  const sourceLabel = typeof data?.sourceLabel === 'string' ? data.sourceLabel : 'Source node';
+  const targetLabel = typeof data?.targetLabel === 'string' ? data.targetLabel : 'Target node';
+  const showControls = hovered || buttonFocused || selected || data?.isFocused === true;
+  const showTooltip = hovered || buttonFocused || data?.isFocused === true;
+  const canDelete = deletable && data?.readOnly !== true;
 
   // When source and target handles are almost collinear along the handle
   // axis (e.g. Right -> Left with nearly identical Y), `getSmoothStepPath`
@@ -80,51 +93,31 @@ export const CustomEdge: React.FC<EdgeProps> = memo(({
 
   const onEdgeClick = (evt: React.MouseEvent) => {
     evt.stopPropagation();
-    deleteElements({ edges: [{ id }] });
+    if (!canDelete || getReadOnlyMode()) return;
+    // Keep keyboard navigation in the canvas after its delete button disappears.
+    evt.currentTarget.closest('.react-flow')?.parentElement?.focus({ preventScroll: true });
+    void deleteElements({ edges: [{ id }] });
   };
 
   return (
     <>
-      {/* Invisible wider path for hit-testing + hover glow */}
-      <BaseEdge
-        path={edgePath}
-        style={{ strokeWidth: 20, stroke: 'transparent', cursor: 'pointer' }}
-        interactionWidth={20}
-        onMouseEnter={() => setHovered(true)}
-        onMouseLeave={() => setHovered(false)}
-      />
-      {/* Visible path */}
-      <BaseEdge
-        path={edgePath}
-        {...(markerEnd ? { markerEnd } : {})}
-        style={{
-          ...edgeStyle,
-          filter: hovered
-            ? `drop-shadow(0 0 4px ${branchColor || 'hsl(var(--primary))'})`
-            : edgeStyle.filter,
-        }}
-        className="react-flow__edge-path"
-      />
+      <g onMouseEnter={enter} onMouseLeave={leave}>
+        <BaseEdge
+          path={edgePath}
+          {...(markerEnd ? { markerEnd } : {})}
+          style={{
+            ...edgeStyle,
+            filter: showControls
+              ? `drop-shadow(0 0 4px ${branchColor || 'hsl(var(--primary))'})`
+              : edgeStyle.filter,
+          }}
+          className="react-flow__edge-path"
+          interactionWidth={24}
+        />
+      </g>
       <EdgeLabelRenderer>
-        {hovered && (
-          <div
-            style={{
-              position: 'absolute',
-              transform: `translate(-50%, -150%) translate(${labelX}px,${labelY}px)`,
-              fontSize: 10,
-              color: 'hsl(var(--foreground))',
-              backgroundColor: 'hsl(var(--background) / 0.95)',
-              border: '1px solid hsl(var(--border))',
-              borderRadius: 4,
-              padding: '2px 6px',
-              pointerEvents: 'none',
-              whiteSpace: 'nowrap',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-            }}
-          >
-            {source} → {target}
-          </div>
-        )}
+        {showTooltip && <ConnectionHoverCard id={tooltipId} x={labelX} y={labelY}
+          sourceLabel={sourceLabel} targetLabel={targetLabel} onEnter={enter} onLeave={leave} />}
         {isMergeWinner && (
           <div
             style={{
@@ -170,24 +163,31 @@ export const CustomEdge: React.FC<EdgeProps> = memo(({
             {branchLabel}
           </div>
         )}
-        <div
+        {canDelete && <div
           style={{
             position: 'absolute',
             transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`,
             fontSize: 12,
-            pointerEvents: 'all',
+            pointerEvents: showControls ? 'all' : 'none',
           }}
           className="nodrag nopan"
+          onMouseEnter={enter}
+          onMouseLeave={leave}
         >
           <button
-            className="w-5 h-5 bg-background border border-border text-muted-foreground rounded-full flex items-center justify-center hover:bg-destructive hover:text-destructive-foreground transition-colors shadow-sm focus-ring"
+            type="button"
+            className="w-6 h-6 bg-background border border-border text-muted-foreground rounded-full flex items-center justify-center hover:bg-destructive hover:text-destructive-foreground transition-colors shadow-sm focus-ring"
+            style={{ opacity: showControls ? 1 : 0 }}
+            onFocus={() => setButtonFocused(true)}
+            onBlur={() => setButtonFocused(false)}
             onClick={onEdgeClick}
             title="Remove Connection"
-            aria-label={`Remove connection from ${source} to ${target}`}
+            aria-label={`Remove connection from ${sourceLabel} to ${targetLabel}`}
+            aria-describedby={showTooltip ? tooltipId : undefined}
           >
             <X size={10} />
           </button>
-        </div>
+        </div>}
       </EdgeLabelRenderer>
     </>
   );

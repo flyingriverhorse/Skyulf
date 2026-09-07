@@ -1,7 +1,7 @@
 # Canvas UX improvement backlog
 
 Date: 2026-09-06
-Status: CUX-01 and CUX-05 complete; CUX-03, CUX-04, and CUX-08 in progress. Completed portions are recorded below.
+Status: CUX-01, CUX-05, and CUX-06 complete; CUX-03, CUX-04, and CUX-08 in progress. Completed portions are recorded below.
 
 ## Purpose and review scope
 
@@ -31,7 +31,7 @@ before implementation because other work may have changed these components.
 | CUX-03 | High | Clearly distinguish previewing data from training | In progress; visible action labels and training guidance complete |
 | CUX-04 | Medium | Improve component discovery | In progress; description search and collapsible categories complete |
 | CUX-05 | Medium | Navigate from validation issues to the exact setting | Complete; field navigation and general-issue fallback verified |
-| CUX-06 | Medium | Reduce connection and settings visual noise | Open |
+| CUX-06 | Medium | Reduce connection and settings visual noise | Complete; contextual connection controls and node details verified |
 | CUX-07 | Medium | Inspect a selected node's input and output | Open |
 | CUX-08 | High, alongside related work | Fix keyboard and accessible-name gaps | In progress; panel labels, sidebar keyboard access, and primary field labels complete |
 
@@ -228,13 +228,25 @@ a long UUID, which consumes space without helping most settings decisions.
 Use readable node names in tooltips and accessible labels. Move technical IDs
 into a details area with a copy action.
 
+**Progress (2026-09-07):** Connection delete buttons now appear on hover,
+selection, edge focus, or button focus. A wider invisible hit area keeps edges
+easy to select. Tooltips and accessible labels use node names, with ordinals
+for repeated names. Branch labels and merge-winner indicators remain visible;
+the compact endpoint tooltip floats above nodes on hover or focus, wrapping
+long names within the viewport. Read-only connections keep their inspection
+behavior while hiding deletion. A keyboard-accessible info button in the
+settings header opens the node ID and copy action with success/failure
+feedback. Switching nodes clears the previous information popover, and no
+technical details block takes up space in the settings form. Canvas focus handling
+stays outside graph objects so connected nodes remain copyable and pasteable.
+
 **Acceptance criteria:**
 
-- [ ] Unselected connections remain readable without permanent delete controls.
-- [ ] Connection deletion remains discoverable and keyboard accessible.
-- [ ] Tooltips identify nodes using meaningful names, with disambiguation when needed.
-- [ ] Technical IDs remain available for troubleshooting without dominating settings.
-- [ ] Branch labels, merge-winner indicators, and undo behavior remain intact.
+- [x] Unselected connections remain readable without permanent delete controls.
+- [x] Connection deletion remains discoverable and keyboard accessible.
+- [x] Tooltips identify nodes using meaningful names, with disambiguation when needed.
+- [x] Technical IDs remain available for troubleshooting without dominating settings.
+- [x] Branch labels, merge-winner indicators, and undo behavior remain intact.
 
 **Starting points:** `src/components/canvas/CustomEdge.tsx`,
 `CustomNodeWrapper.tsx`, and `src/components/layout/PropertiesPanel.tsx`.
@@ -519,3 +531,30 @@ explicitly recorded above is complete; remaining interaction details need review
   and production build passed; served frontend assets were rebuilt. Browser
   checks use mocked APIs. Existing mocked connection logs and circular/empty
   chunk build warnings remain.
+- 2026-09-07: Completed CUX-06. CustomEdge uses contextual delete controls,
+  readable endpoint tooltips, and read-only guards. FlowCanvas supplies
+  disambiguated endpoint names and handles edge focus outside graph objects.
+  PropertiesPanel moves technical identifiers into NodeDetails with native
+  keyboard disclosure and copy feedback. Six new browser tests cover hover,
+  focus-only discovery, Tab/Enter/Space deletion, undo, clipboard denial,
+  connected-node copy/paste, read-only inspection, and retained branch labels
+  and merge winners in light/dark compact layouts. Tests caught and verified
+  fixes for React Flow intercepting disclosure Space and non-cloneable edge
+  focus callbacks. Two unit tests cover readable-name fallback and duplicate
+  labels. Independent review found no remaining blockers. All 899 frontend
+  unit tests and 23 focused browser checks passed, along with final lint,
+  TypeScript, and production build. Served assets were rebuilt and short
+  CUX-05/CUX-06 entries were added under v0.8.16. Browser checks use mocked
+  APIs; existing mocked connection logs and build chunk warnings remain.
+- 2026-09-07: Refined CUX-06 after canvas feedback. Endpoint labels now use a
+  content-sized `source → target` tooltip, capped at 280px, with no From/To
+  headings. A portal keeps long labels above nearby nodes and within the
+  viewport; hover/focus controls visibility and Escape dismisses the tooltip.
+  Node information moved from an inline Details block to the header info
+  button. A regression test reproduced duplicate React sibling keys causing
+  details to accumulate when switching nodes; separate parents and distinct
+  keys now clear the old editor and popover. All 900 unit tests and 24 focused
+  browser checks passed, including compact labels, hover transfer, Escape and
+  re-hover, repeated node selection, and clipboard feedback. Lint, TypeScript,
+  and production build passed; served assets were rebuilt. Existing chunk
+  warnings remain.

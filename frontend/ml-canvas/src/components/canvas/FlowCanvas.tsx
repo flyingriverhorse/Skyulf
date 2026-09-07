@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ReactFlow,
   Background,
@@ -36,6 +36,7 @@ import {
   type FocusNodeDetail,
 } from '../../core/hooks/useKeyboardShortcuts';
 import { PerfOverlayLegend } from './PerfOverlayLegend';
+import { nodeDisplayNames } from '../../core/utils/nodeDisplayNames';
 
 const nodeTypes = {
   custom: CustomNodeWrapper
@@ -143,6 +144,8 @@ const FlowCanvasContent: React.FC = () => {
 
   const branchStableNodes = useBranchStableNodes(nodes);
   const branchColorMap = useBranchColors(branchStableNodes, edges);
+  const displayNames = useMemo(() => nodeDisplayNames(branchStableNodes), [branchStableNodes]);
+  const [focusedEdgeId, setFocusedEdgeId] = useState<string | null>(null);
 
   // Whether the Preview Results panel is showing (mirrors ResultsPanel's
   // visibility rule) and how tall it is, so the zoom controls lift above
@@ -211,11 +214,17 @@ const FlowCanvasContent: React.FC = () => {
     return edges.map(edge => {
       const info = branchColorMap.get(edge.id);
       const isMergeWinner = winnerEdgeIds.has(edge.id);
-      if (info === undefined && !isMergeWinner) return edge;
+      const sourceLabel = displayNames.get(edge.source) ?? 'Missing node';
+      const targetLabel = displayNames.get(edge.target) ?? 'Missing node';
       return {
         ...edge,
+        ariaLabel: `Connection from ${sourceLabel} to ${targetLabel}`,
         data: {
           ...edge.data,
+          readOnly,
+          sourceLabel,
+          targetLabel,
+          isFocused: focusedEdgeId === edge.id,
           branchColor: info?.color,
           branchLabel: info?.label,
           branchShared: info?.shared,
@@ -223,7 +232,7 @@ const FlowCanvasContent: React.FC = () => {
         },
       };
     });
-  }, [edges, branchColorMap, winnerEdgeIds]);
+  }, [edges, branchColorMap, winnerEdgeIds, displayNames, focusedEdgeId, readOnly]);
 
   const onDragOver = useCallback((event: React.DragEvent) => {
     event.preventDefault();
@@ -362,6 +371,12 @@ const FlowCanvasContent: React.FC = () => {
     <div
       className="w-full h-full outline-none relative focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary"
       ref={reactFlowWrapper}
+      // Keep event handlers outside edge objects: clipboard copies clone rendered edges.
+      onFocusCapture={(event) => {
+        const element = event.target as Element;
+        setFocusedEdgeId(element.closest('.react-flow__edge')?.getAttribute('data-id') ?? null);
+      }}
+      onBlurCapture={() => setFocusedEdgeId(null)}
       // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- canvas wrapper must be focusable to capture keyboard shortcuts
       tabIndex={0}
     >
