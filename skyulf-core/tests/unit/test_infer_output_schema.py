@@ -136,34 +136,40 @@ def test_scalers_passthrough_schema(cls) -> None:
 
 
 @pytest.mark.parametrize(
-    "calc_cls, df, cfg",
+    "node_id, calc_cls, df, cfg",
     [
         (
+            "StandardScaler",
             StandardScalerCalculator,
             pd.DataFrame({"x": [1, 2, 3], "y": [4, 5, 6]}),
             {"columns": ["x"]},
         ),
         (
+            "MinMaxScaler",
             MinMaxScalerCalculator,
             pd.DataFrame({"x": [1, 2, 3], "y": [4, 5, 6]}),
             {"columns": ["x"]},
         ),
         (
+            "RobustScaler",
             RobustScalerCalculator,
             pd.DataFrame({"x": [1, 2, 3], "y": [4, 5, 6]}),
             {"columns": ["x"]},
         ),
         (
+            "MaxAbsScaler",
             MaxAbsScalerCalculator,
             pd.DataFrame({"x": [1, 2, 3], "y": [4, 5, 6]}),
             {"columns": ["x"]},
         ),
         (
+            "SimpleImputer",
             SimpleImputerCalculator,
             pd.DataFrame({"x": [1.0, None, 3.0], "y": [1.0, 2.0, 3.0]}),
             {"strategy": "mean", "columns": ["x"]},
         ),
         (
+            "KNNImputer",
             KNNImputerCalculator,
             pd.DataFrame(
                 {"x": [1.0, 2.0, 3.0, 4.0, 5.0, 6.0], "y": [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]}
@@ -171,6 +177,7 @@ def test_scalers_passthrough_schema(cls) -> None:
             {"columns": ["x"]},
         ),
         (
+            "IterativeImputer",
             IterativeImputerCalculator,
             pd.DataFrame(
                 {"x": [1.0, 2.0, 3.0, 4.0, 5.0, 6.0], "y": [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]}
@@ -178,26 +185,31 @@ def test_scalers_passthrough_schema(cls) -> None:
             {"columns": ["x"]},
         ),
         (
+            "SimpleTransformation",
             SimpleTransformationCalculator,
             pd.DataFrame({"x": [1, 2, 3], "y": [4, 5, 6]}),
             {"transformations": [{"column": "x", "method": "log"}]},
         ),
         (
+            "GeneralTransformation",
             GeneralTransformationCalculator,
             pd.DataFrame({"x": [1, 2, 3], "y": [4, 5, 6]}),
             {"transformations": [{"column": "x", "method": "log"}]},
         ),
         (
+            "PowerTransformer",
             PowerTransformerCalculator,
             pd.DataFrame({"x": [1.0, 2.0, 3.0], "y": [4.0, 5.0, 6.0]}),
             {"method": "yeo-johnson", "columns": ["x"]},
         ),
         (
+            "Winsorize",
             WinsorizeCalculator,
             pd.DataFrame({"x": list(range(1, 7)), "y": [0, 0, 0, 0, 0, 0]}),
             {"columns": ["x"], "lower_percentile": 10, "upper_percentile": 90},
         ),
         (
+            "LagFeatures",
             LagFeaturesCalculator,
             pd.DataFrame({"x": [1, 2, 3], "y": [4, 5, 6]}),
             {"columns": ["x"], "lags": [1]},
@@ -205,7 +217,10 @@ def test_scalers_passthrough_schema(cls) -> None:
     ],
 )
 def test_oc03_infer_output_schema_matches_runtime_dtype_changes(
-    calc_cls: type[BaseCalculator], df: pd.DataFrame, cfg: dict[str, object]
+    node_id: str,
+    calc_cls: type[BaseCalculator],
+    df: pd.DataFrame,
+    cfg: dict[str, object],
 ) -> None:
     """OC-03: infer_output_schema should match real output dtypes for int->float transforms."""
     calc = calc_cls()
@@ -216,7 +231,7 @@ def test_oc03_infer_output_schema_matches_runtime_dtype_changes(
     if not artifact:
         pytest.skip("No-op config in schema-inference parity probe")
 
-    applier = NodeRegistry.get_applier(calc.__node_meta__.id)
+    applier = NodeRegistry.get_applier(node_id)
     out = applier().apply(df, artifact)
     assert inferred == SkyulfSchema.from_dataframe(out)
 
