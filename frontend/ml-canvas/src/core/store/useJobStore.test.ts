@@ -25,12 +25,42 @@ const makeJob = (id: string, overrides: Partial<JobInfo> = {}): JobInfo => ({
 
 describe('useJobStore retry/cancel (double-submit guarding)', () => {
   beforeEach(() => {
-    useJobStore.setState({ jobs: [], pendingJobActions: {}, skip: 0, hasMore: true, isLoading: false });
+    useJobStore.setState({ jobs: [], pendingJobActions: {}, nodeSubmissions: {}, inspectedRun: null, runJobs: {}, skip: 0, hasMore: true, isLoading: false });
     vi.restoreAllMocks();
   });
 
   afterEach(() => {
     useJobStore.getState().stopPolling();
+  });
+
+  it('loads a submitted job outside the first page without corrupting history pagination', async () => {
+    // An older run's View jobs link must still resolve its exact jobs after newer runs fill the page.
+    const recent = Array.from({ length: 50 }, (_, i) => makeJob(`recent-${i}`));
+    vi.spyOn(jobsApi, 'getJobs').mockResolvedValue(recent);
+    vi.spyOn(jobsApi, 'getJob').mockResolvedValue(makeJob('older', { status: 'completed' }));
+    useJobStore.getState().setInspectedRun({ label: 'Training', jobIds: ['older'] });
+    await useJobStore.getState().fetchJobs();
+    expect(jobsApi.getJob).toHaveBeenCalledWith('older');
+    expect(useJobStore.getState().runJobs.older?.status).toBe('completed');
+    expect(useJobStore.getState().jobs).toHaveLength(50);
+    expect(useJobStore.getState().skip).toBe(0);
+  });
+
+  it('retains a retried job in the inspected run when returning from details', async () => {
+    // Retrying from scoped history must not hide the replacement job behind the original receipt.
+    vi.spyOn(jobsApi, 'retryJob').mockResolvedValue({ job_id: 'new', message: 'ok' });
+    vi.spyOn(jobsApi, 'getJobs').mockResolvedValue([makeJob('old'), makeJob('new', { status: 'queued' })]);
+    useJobStore.getState().setInspectedRun({ label: 'Training', jobIds: ['old'] });
+    await useJobStore.getState().retryJob('old');
+    expect(useJobStore.getState().inspectedRun?.jobIds).toEqual(['old', 'new']);
+  });
+
+  it('refreshes an active snapshot after its original receipt is replaced', async () => {
+    // Old active jobs must reach a terminal state instead of keeping polling alive indefinitely.
+    useJobStore.setState({ runJobs: { old: makeJob('old', { status: 'running' }) }, inspectedRun: null });
+    vi.spyOn(jobsApi, 'getJobs').mockResolvedValue([makeJob('old', { status: 'completed' })]);
+    await useJobStore.getState().fetchJobs();
+    expect(useJobStore.getState().runJobs.old?.status).toBe('completed');
   });
 
   it('retryJob calls the API, refreshes the job list, and clears the pending flag', async () => {

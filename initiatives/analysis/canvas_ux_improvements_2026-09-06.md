@@ -1,7 +1,7 @@
 # Canvas UX improvement backlog
 
 Date: 2026-09-06
-Status: CUX-01, CUX-02, CUX-04, CUX-05, and CUX-06 complete; CUX-03 and CUX-08 in progress. Completed portions are recorded below.
+Status: CUX-01 through CUX-06 complete; CUX-08 in progress. Completed portions are recorded below.
 
 ## Purpose and review scope
 
@@ -28,7 +28,7 @@ before implementation because other work may have changed these components.
 |---|---|---|---|
 | CUX-01 | High | Preserve canvas space with resizable panels | Complete at checked desktop/laptop sizes |
 | CUX-02 | High | Guide node connections and adding the next step | Complete; drag guidance and keyboard next-step picker verified |
-| CUX-03 | High | Clearly distinguish previewing data from training | In progress; visible action labels and training guidance complete |
+| CUX-03 | High | Clearly distinguish previewing data from training | Complete; experiment review, visible blockers, and scoped run feedback verified |
 | CUX-04 | Medium | Improve component discovery | Complete; shared task search, readable results, and collapsible preprocessing groups verified |
 | CUX-05 | Medium | Navigate from validation issues to the exact setting | Complete; field navigation and general-issue fallback verified |
 | CUX-06 | Medium | Reduce connection and settings visual noise | Complete; contextual connection controls and node details verified |
@@ -159,15 +159,33 @@ and explain the action below the button. Missing upstream dataset selection
 has a visible explanation associated with the disabled button. The help guide
 and shortcut overlay use the same preview label.
 
+**Further progress (2026-09-07):** Run all opens a model list showing each
+node's name, configured algorithm, and Train/Tune mode. The review explains
+parallel experiment creation, provides visible validation reasons, supports
+cancel/focus restoration, and closes in read-only mode. Preview loading stays
+on its button; blocked/failed feedback and experiment status appear in the
+navbar notification center with direct results/history actions. Successful
+preview completion adds no persistent banner.
+Training, tuning, ensemble, and segmentation retain submission feedback by
+node ID across settings remounts and prevent duplicate pending requests.
+Their compact action footers stay visible inside the settings scroll area;
+explanations expand at its end, respecting reduced motion and keyboard focus.
+Submitted job IDs drive queued/running/completed/failed/cancelled summaries;
+missing statuses remain explicit. Run all groups submitted jobs across task
+and search filters, resolves jobs outside the first history page, and retains
+retry jobs. Individual node actions keep the normal model-specific history
+tab. API payload conversion and existing submission handlers remain
+the execution path; both single and parallel submissions start monitoring.
+
 **Acceptance criteria:**
 
 - [x] Preview and training have distinct visible labels at checked desktop/laptop widths (1440px and 1100px).
 - [x] Selected-model training identifies its model and explains how to enable the action when no dataset is connected.
-- [ ] Training identifies the model or set of experiments it will run.
-- [ ] Blocked actions expose actionable reasons without requiring a tooltip.
+- [x] Training identifies the model or set of experiments it will run.
+- [x] Blocked actions expose actionable reasons without requiring a tooltip.
 - [x] Keyboard shortcuts use the same action names and behavior.
-- [ ] Loading, queued, running, and completed states identify the relevant action.
-- [ ] Existing run handlers remain the source of execution behavior.
+- [x] Loading, queued, running, and completed states identify the relevant action.
+- [x] Existing run handlers remain the source of execution behavior.
 
 **Starting points:** `src/components/layout/Toolbar.tsx`,
 `src/components/layout/toolbar/_hooks/useRunControls.ts`,
@@ -697,3 +715,47 @@ explicitly recorded above is complete; remaining interaction details need review
   and size-check passed. At the user's request the main gzip budget increased
   from 300 to 325 KB; the rebuilt entry measured 303.6 KB. Independent review
   found no blockers. The hosted Linux CI run has not been rerun here.
+- 2026-09-07: Completed CUX-03 with experiment review, action-specific preview
+  and model-run feedback, visible blocking reasons, and sticky training action
+  footers. Submission receipts and pending guards survive keyed settings
+  remounts. Scoped job history bypasses old filters, resolves submitted IDs
+  outside the first page, includes retry jobs, and refreshes active snapshots
+  after their original receipt is replaced. Review findings in those lifecycle
+  paths were reproduced with regression tests and corrected. Added 12 unit
+  tests and eight browser scenarios; all 949 frontend unit tests and all 71
+  browser tests passed on the final implementation. Checks cover light/dark,
+  laptop/reduced motion, cancellation/focus restoration, read-only transitions,
+  blocked preview shortcuts, model/ensemble/segmentation submissions, and
+  mixed background outcomes. Lint, TypeScript/build, and size-check passed;
+  the main gzip bundle is 306.9 KB against a 325 KB budget. Served assets and
+  v0.8.16 notes were updated. Browser APIs are mocked; no live training or
+  hosted CI run was triggered. Existing circular/empty chunk warnings remain.
+- 2026-09-07: Refined CUX-03 after hands-on feedback. Individual Train/Tune
+  actions keep the normal model-specific Job History tab; grouped inspection
+  is reserved for Run all. Removed toolbar status strips and the successful
+  preview banner. Preview issues and live experiment summaries now appear in
+  the navbar notification center, with actions that return from Experiments or
+  Inference to Canvas. Training controls follow settings as a compact button,
+  expanding explanations/history at the end with reduced-motion support and
+  preserved keyboard focus. Split-node label clearance now uses measured,
+  unscaled label widths instead of a fixed font-dependent padding value.
+  The full 959-test unit suite passed; final targeted verification passed 15
+  tests including four added view-switch regressions. The browser sweep passed
+  72 checks; after correcting the preview fixture expectation, all ten execution
+  scenarios passed, including notification navigation and both footer themes.
+  All seven guided-connection checks passed with font stress and compact-height
+  assertions retained. Lint, TypeScript/build, size-check, and diff checks passed.
+  Main gzip size is 307.7 KB against 325 KB. Served assets and v0.8.16 notes
+  were updated. Browser APIs are mocked; hosted Linux CI has not been rerun.
+- 2026-09-07: Removed pop-up toasts in favor of the notification center. The
+  shared app-message API now retains messages and descriptions in the bell;
+  preview and Run all no longer add duplicate notices. Repeated app failures
+  refresh the existing entry as unread, and a hidden live region preserves
+  screen-reader announcements. The same bell is available outside Canvas in
+  the desktop header and existing mobile navigation bar. Full unit verification
+  passed 965 tests before the final retry regression; all 20 targeted tests then
+  passed. Browser checks passed for execution feedback, responsive layouts,
+  accessibility, and a failed dataset export on desktop/mobile (23 scenarios;
+  the export fixture was corrected before its passing rerun). Lint, production
+  build, size-check, and diff checks passed. Main gzip size dropped to 298.6 KB;
+  served assets and v0.8.16 notes were updated. No commit was created.

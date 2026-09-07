@@ -1,5 +1,7 @@
 import React, { useEffect, useId, useState, useRef } from 'react';
 import { ValidationField, useValidationReveal } from '../../../components/shared/ValidationField';
+import { RunFeedback } from '../../../components/shared/RunFeedback';
+import { TrainingActionFooter } from '../../../components/shared/TrainingActionFooter';
 import {
     Play, Download, Loader2, Activity, Settings2,
     BarChart3, X, ChevronRight, ChevronDown, AlertCircle, AlertTriangle
@@ -179,7 +181,7 @@ export const TrainingSettings: React.FC<{
   const [showParamsModal, setShowParamsModal] = useState(false);
   const [showInfo, setShowInfo] = useState(() => !sessionStorage.getItem('hide_info_training_node'));
 
-  const { availableColumns, upstreamTarget, datasetId, runJob } = useTrainingNodeContext(nodeId);
+  const { availableColumns, upstreamTarget, datasetId, runJob, isSubmitting, submissionMessage, runFeedback } = useTrainingNodeContext(nodeId);
 
   // Responsive layout: switch to a 2-column layout once the panel is wider than 450px.
   const [containerRef, isWide] = useIsWideContainer();
@@ -334,6 +336,8 @@ export const TrainingSettings: React.FC<{
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [upstreamTarget, config.target_column, isAdvanced]);
 
+  const resolvedTask = task ?? getTaskForModelType(config.model_type, availableModels);
+  const historyTask = resolvedTask === 'other' ? 'classification' : resolvedTask;
   const handleSubmit = async () => {
     // Task-scoped nodes already know their task; the generic (hidden)
     // TrainingNode resolves it from the selected model's registry tags —
@@ -341,8 +345,7 @@ export const TrainingSettings: React.FC<{
     // Falls back to 'classification' (like jobMeta.ts's own default) if
     // unresolvable — this only affects which drawer tab opens, never
     // whether the job itself is submitted.
-    const resolvedTask = task ?? getTaskForModelType(config.model_type, availableModels);
-    await runJob(isAdvanced ? 'tuning' : 'training', resolvedTask === 'other' ? 'classification' : resolvedTask);
+    await runJob(isAdvanced ? 'tuning' : 'training', historyTask);
   };
 
   const ModelConfigSection = (
@@ -976,23 +979,15 @@ export const TrainingSettings: React.FC<{
       </div>
 
       {/* Footer */}
-      <div className="pt-4 mt-auto border-t border-gray-100 dark:border-gray-700 flex flex-col gap-3 items-center">
+      <TrainingActionFooter details={<>
         <p className="text-xs text-center text-gray-600 dark:text-gray-400 break-words">
           Selected model: {selectedModelItem?.name || config.model_type.replace(/_/g, ' ')}
         </p>
-        <button
-          type="button"
-          onClick={() => { void handleSubmit(); }}
-          disabled={!datasetId}
-          aria-describedby={`${fieldId}-run-help`}
-          className="w-full max-w-xs flex items-center justify-center gap-2 px-6 py-2.5 action-primary rounded-lg shadow-lg transition-all hover:shadow-xl hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-lg disabled:hover:translate-y-0 focus-ring"
-        >
-          <Play className="w-4 h-4 fill-current" />
-          <span className="text-sm font-semibold">{isAdvanced ? 'Tune model' : 'Train model'}</span>
-        </button>
         <p id={`${fieldId}-run-help`} className="text-xs text-center text-gray-600 dark:text-gray-400">
           {!datasetId
             ? 'Connect a dataset node upstream and select a dataset to enable this action.'
+            : !config.target_column?.trim() ? 'Choose a target column to enable this action.'
+            : !config.model_type ? 'Choose a model to enable this action.'
             : isAdvanced
               ? 'Searches hyperparameters and trains the selected model in the background.'
               : 'Trains the selected model with fixed parameters in the background.'}
@@ -1007,7 +1002,20 @@ export const TrainingSettings: React.FC<{
                 View Best Parameters History
             </button>
         )}
-      </div>
+      </>}>
+        <button
+          type="button"
+          onClick={() => { void handleSubmit(); }}
+          disabled={!datasetId || isSubmitting || !config.target_column?.trim() || !config.model_type}
+          aria-describedby={`${fieldId}-run-help`}
+          className="w-full max-w-xs flex items-center justify-center gap-2 px-6 py-2.5 action-primary rounded-lg shadow-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus-ring"
+        >
+          {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4 fill-current" />}
+          <span className="text-sm font-semibold">{isSubmitting ? 'Submitting job...' : isAdvanced ? 'Tune model' : 'Train model'}</span>
+        </button>
+        {submissionMessage && <p role="status" aria-atomic="true" className="text-xs text-center text-muted-foreground break-words">{submissionMessage}</p>}
+        {runFeedback && <RunFeedback run={runFeedback} task={historyTask} />}
+      </TrainingActionFooter>
     </div>
   );
 };

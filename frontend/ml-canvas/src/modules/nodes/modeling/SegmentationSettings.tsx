@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useId } from 'react';
 import { ValidationField, useValidationReveal } from '../../../components/shared/ValidationField';
 import { Play, Loader2, Settings2, AlertCircle, ChevronDown, X } from 'lucide-react';
 import { jobsApi } from '../../../core/api/jobs';
@@ -15,6 +15,9 @@ import { HyperparameterInput } from './components/HyperparameterInput';
 import type { HyperparameterDef } from './components/types';
 import type { ExecutionMode } from '../../../core/types/executionMode';
 import { toast } from '../../../core/toast';
+import { RunFeedback } from '../../../components/shared/RunFeedback';
+import { TrainingActionFooter } from '../../../components/shared/TrainingActionFooter';
+import type { NodeSubmission } from '../../../core/types/runFeedback';
 
 /** Config for the dedicated Segmentation (clustering) node.
  *
@@ -50,6 +53,11 @@ export const SegmentationSettings: React.FC<{
 }> = ({ config, onChange, nodeId }) => {
   const [hyperparameters, setHyperparameters] = useState<HyperparameterDef[]>([]);
   const [isLoadingDefs, setIsLoadingDefs] = useState(false);
+  const feedback = useJobStore(state => nodeId ? state.nodeSubmissions[nodeId] : undefined);
+  const isSubmitting = feedback?.pending ?? false;
+  const submissionMessage = feedback?.message ?? '';
+  const runFeedback = feedback?.run;
+  const runHelpId = useId();
   const [showInfo, setShowInfo] = useState(() => !sessionStorage.getItem('hide_info_segmentation'));
 
   const { toggleDrawer: toggleJobDrawer, setTab, setActiveParallelRun, startPolling } = useJobStore();
@@ -164,31 +172,41 @@ export const SegmentationSettings: React.FC<{
   }, [config.model_type]);
 
   const handleTrain = async () => {
-    if (!nodeId) return;
+    if (!nodeId || useJobStore.getState().nodeSubmissions[nodeId]?.pending) return;
     if (!datasetId) {
       toast.error('No dataset connected', 'Connect a dataset node upstream before starting training.');
       return;
     }
+    const update = (value: NodeSubmission) => useJobStore.getState().setNodeSubmission(nodeId, value);
+    const label = `Segmentation — ${config.model_type.replace(/_/g, ' ')}`;
+    update({ pending: true, run: null, message: `${label}: Submitting...` });
     try {
       const pipelineConfig = convertGraphToPipelineConfig(nodes, edges);
-      if (warnAndBlockOnLeakage(pipelineConfig)) return;
+      if (warnAndBlockOnLeakage(pipelineConfig)) {
+        update({ pending: false, run: null, message: `${label} blocked. Move data-learning preprocessing after the train/test split.` });
+        return;
+      }
       const response = await jobsApi.runPipeline({
         ...pipelineConfig,
         target_node_id: nodeId,
         job_type: 'training'
       });
       const jobCount = response.job_ids?.length || 1;
+      const run = { label, jobIds: response.job_ids?.length ? response.job_ids : [response.job_id] };
+      update({ pending: false, run, message: '' });
+      startPolling();
       if (jobCount > 1) {
         setActiveParallelRun({ jobIds: response.job_ids, startedAt: new Date().toISOString() });
-        startPolling();
         toast.success('Parallel execution started', `${jobCount} branches submitted.`);
       } else {
         toast.success('Segmentation job submitted');
       }
       setTab('segmentation');
+      useJobStore.getState().setInspectedRun(null);
       toggleJobDrawer(true);
     } catch (error) {
       console.error('Failed to submit segmentation job:', error);
+      update({ pending: false, run: null, message: `${label}: Submission failed. Check your connection and settings, then try again.` });
       toast.error('Failed to submit segmentation job', 'Check console for details.');
     }
   };
@@ -384,17 +402,26 @@ export const SegmentationSettings: React.FC<{
         )}
       </div>
 
-      <div className="pt-4 mt-auto border-t border-gray-100 dark:border-gray-700 flex flex-col gap-3 items-center">
+      <TrainingActionFooter details={
+        <p id={runHelpId} className="text-xs text-center text-muted-foreground">
+          {!datasetId ? 'Connect a dataset node upstream and select a dataset to enable this action.'
+            : !config.model_type ? 'Choose a clustering algorithm to enable this action.'
+            : `Trains ${selectedModelItem?.name || config.model_type.replace(/_/g, ' ')} in the background without a target column.`}
+        </p>
+      }>
         <button
+          type="button"
           onClick={() => { void handleTrain(); }}
-          disabled={!datasetId}
-          title={!datasetId ? 'Connect a dataset node upstream to enable training' : undefined}
+          disabled={!datasetId || !config.model_type || isSubmitting}
+          aria-describedby={runHelpId}
           className="w-full max-w-xs flex items-center justify-center gap-2 px-6 py-2.5 action-primary rounded-lg shadow-lg transition-all hover:shadow-xl hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-lg disabled:hover:translate-y-0 focus-ring"
         >
-          <Play className="w-4 h-4 fill-current" />
-          <span className="text-sm font-semibold">Start Segmentation</span>
+          {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4 fill-current" />}
+          <span className="text-sm font-semibold">{isSubmitting ? 'Submitting job...' : 'Train segmentation'}</span>
         </button>
-      </div>
+        {submissionMessage && <p role="status" aria-atomic="true" className="text-xs text-center text-muted-foreground break-words">{submissionMessage}</p>}
+        {runFeedback && <RunFeedback run={runFeedback} task="segmentation" />}
+      </TrainingActionFooter>
     </div>
   );
 };

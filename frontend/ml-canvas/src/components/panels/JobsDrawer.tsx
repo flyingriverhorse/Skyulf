@@ -46,7 +46,10 @@ export const JobsDrawer: React.FC = () => {
     fetchJobs,
     hasMore,
     loadMoreJobs,
-    activeParallelRun
+    activeParallelRun,
+    inspectedRun,
+    setInspectedRun,
+    runJobs,
   } = useJobStore();
 
   const [selectedJob, setSelectedJob] = useState<JobInfo | null>(null);
@@ -78,7 +81,7 @@ export const JobsDrawer: React.FC = () => {
   // Reset to list view whenever the drawer re-opens
   useEffect(() => {
     if (isDrawerOpen) setSelectedJob(null);
-  }, [isDrawerOpen]);
+  }, [isDrawerOpen, inspectedRun]);
 
   // Focus management: move focus into the panel when the drawer opens so
   // keyboard/screen-reader users land inside it, and restore focus to
@@ -128,18 +131,18 @@ export const JobsDrawer: React.FC = () => {
   }, [activeTab]);
 
   useEffect(() => {
-    if (!isDrawerOpen || isLoading || !hasMore) return;
+    if (!isDrawerOpen || isLoading || !hasMore || inspectedRun) return;
     if (autoLoadAttemptsRef.current >= MAX_AUTO_LOAD_ATTEMPTS) return;
     const tabCount = jobs.filter(j => getTaskForModelType(j.model_type, registryItems) === activeTab).length;
     if (tabCount < 5) {
       autoLoadAttemptsRef.current += 1;
       void loadMoreJobs();
     }
-  }, [isDrawerOpen, activeTab, jobs, hasMore, isLoading, loadMoreJobs, registryItems]);
+  }, [isDrawerOpen, activeTab, jobs, hasMore, isLoading, loadMoreJobs, registryItems, inspectedRun]);
 
   if (!isDrawerOpen) return null;
 
-  const tabJobs = jobs
+  const tabJobs = inspectedRun ? inspectedRun.jobIds.map(id => runJobs[id] ?? jobs.find(job => job.job_id === id)).filter((job): job is JobInfo => Boolean(job)) : jobs
     .filter(job => getTaskForModelType(job.model_type, registryItems) === activeTab)
     .filter(job => activeTab !== 'ensemble' || ensembleSubFilter === 'all' || getEnsembleSubTask(job.model_type) === ensembleSubFilter);
 
@@ -148,6 +151,7 @@ export const JobsDrawer: React.FC = () => {
   const statuses = [...new Set(tabJobs.map(j => j.status))];
 
   const filteredJobs = tabJobs.filter(job => {
+    if (inspectedRun) return true;
     if (statusFilter !== 'all' && job.status !== statusFilter) return false;
     if (modelFilter !== 'all' && job.model_type !== modelFilter) return false;
     if (searchQuery) {
@@ -196,6 +200,7 @@ export const JobsDrawer: React.FC = () => {
                     </button>
                     <button
                     onClick={() => toggleDrawer(false)}
+                    aria-label="Close job history"
                     className="p-1.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400"
                     >
                     <X className="w-4 h-4" />
@@ -204,11 +209,11 @@ export const JobsDrawer: React.FC = () => {
                 </div>
 
                 {/* Parallel Run Progress Banner */}
-                {activeParallelRun && (() => {
+                {activeParallelRun && (!inspectedRun || inspectedRun.jobIds.some(id => activeParallelRun.jobIds.includes(id))) && (() => {
                   const total = activeParallelRun.jobIds.length;
-                  const TERMINAL = new Set(['completed', 'failed', 'cancelled']);
+                  const TERMINAL = new Set(['completed', 'succeeded', 'failed', 'cancelled']);
                   const doneCount = activeParallelRun.jobIds.filter(id => {
-                    const j = jobs.find(job => job.job_id === id);
+                    const j = runJobs[id] ?? jobs.find(job => job.job_id === id);
                     return j && TERMINAL.has(j.status);
                   }).length;
                   const pct = Math.round((doneCount / total) * 100);
@@ -248,6 +253,10 @@ export const JobsDrawer: React.FC = () => {
                 })()}
 
                 {/* Tabs */}
+                {inspectedRun ? <div className="flex min-w-0 flex-wrap items-center justify-between gap-2 border-b p-4 text-sm">
+                  <span className="min-w-0 break-words">{inspectedRun.label} · {inspectedRun.jobIds.length} submitted jobs</span>
+                  <button type="button" onClick={() => setInspectedRun(null)} className="rounded text-primary underline underline-offset-2 focus-ring">Show all jobs</button>
+                </div> : <>
                 <div className="flex border-b border-gray-200 dark:border-gray-700">
                 {TASK_TABS.map(({ task, label }) => (
                     <button
@@ -353,6 +362,8 @@ export const JobsDrawer: React.FC = () => {
                   )}
                 </div>
 
+                </>}
+
                 {/* List Header */}
                 <div className="grid grid-cols-12 gap-4 px-6 py-2 bg-gray-50 dark:bg-gray-900/50 border-b border-gray-200 dark:border-gray-700 text-xs font-medium text-gray-500 dark:text-gray-400">
                     <div className="col-span-2">Status</div>
@@ -367,7 +378,7 @@ export const JobsDrawer: React.FC = () => {
                 <div className="flex-1 flex flex-col overflow-hidden bg-gray-50/30 dark:bg-gray-900/30">
                 {filteredJobs.length === 0 ? (
                     <div className="text-center py-10 text-gray-500 dark:text-gray-400 text-sm">
-                    {searchQuery || statusFilter !== 'all' || modelFilter !== 'all'
+                    {inspectedRun ? 'Waiting for the submitted jobs to appear. Use Refresh to check again.' : searchQuery || statusFilter !== 'all' || modelFilter !== 'all'
                       ? 'No jobs match the current filters.'
                       : `No ${TASK_LABELS[activeTab]} jobs found.`
                     }
@@ -386,7 +397,7 @@ export const JobsDrawer: React.FC = () => {
                             )}
                         />
 
-                        {hasMore && (
+                        {hasMore && !inspectedRun && (
                             <div className="flex-none flex justify-center pt-2 pb-4">
                                 <button
                                     onClick={() => loadMoreJobs()}

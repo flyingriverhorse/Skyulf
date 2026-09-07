@@ -1,10 +1,12 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useId } from 'react';
 import { ValidationField } from '../../../components/shared/ValidationField';
 import {
-  Play, Boxes, ChevronRight, BarChart3, AlertTriangle, Info, X, Sparkles,
+  Play, Boxes, ChevronRight, BarChart3, AlertTriangle, Info, X, Sparkles, Loader2,
 } from 'lucide-react';
 import { useIsWideContainer } from '../../../core/hooks/useIsWideContainer';
 import { useTrainingNodeContext } from '../../../core/hooks/useTrainingNodeContext';
+import { RunFeedback } from '../../../components/shared/RunFeedback';
+import { TrainingActionFooter } from '../../../components/shared/TrainingActionFooter';
 import { MultiSelectChips } from './components/MultiSelectChips';
 import { BaseModelParamsEditor } from './components/BaseModelParamsEditor';
 import { HelpTooltip } from './components/HelpTooltip';
@@ -789,7 +791,8 @@ export function EnsembleSettings({ config, onChange, nodeId }: {
   const [showCV, setShowCV] = useState(false);
   const [showBaseParams, setShowBaseParams] = useState(false);
   const [showInfo, setShowInfo] = useState(() => !sessionStorage.getItem('hide_info_ensemble'));
-  const { availableColumns, upstreamTarget, runJob } = useTrainingNodeContext(nodeId);
+  const { availableColumns, upstreamTarget, datasetId, runJob, isSubmitting, submissionMessage, runFeedback } = useTrainingNodeContext(nodeId);
+  const runHelpId = useId();
 
   const [availableModelIds, setAvailableModelIds] = useState<Set<string>>(new Set());
 
@@ -1185,19 +1188,29 @@ export function EnsembleSettings({ config, onChange, nodeId }: {
         </div>
       </div>
 
-      <div className="pt-4 mt-auto border-t border-gray-100 dark:border-gray-700 flex flex-col gap-3 items-center">
+      <TrainingActionFooter details={
+        <p id={runHelpId} className="text-xs text-center text-muted-foreground">
+          {!datasetId ? 'Connect a dataset node upstream and select a dataset to enable this action.'
+            : !config.target_column?.trim() ? 'Choose a target column to enable this action.'
+            : tooFewModels ? 'Choose at least two base models to enable this action.'
+            : `${isAdvanced ? 'Tunes' : 'Trains'} the ${config.strategy} ensemble with ${config.base_estimators.length} base models in the background.`}
+        </p>
+      }>
         <button
           type="button"
           onClick={() => { void runJob(isAdvanced ? 'tuning' : 'training', 'ensemble'); }}
-          disabled={!config.target_column || tooFewModels}
+          disabled={!datasetId || !config.target_column?.trim() || tooFewModels || isSubmitting}
+          aria-describedby={runHelpId}
           className="w-full max-w-xs flex items-center justify-center gap-2 px-6 py-2.5 action-primary rounded-lg shadow-lg transition-all hover:shadow-xl hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 focus-ring"
         >
-          {isAdvanced ? <Sparkles className="w-4 h-4" /> : <Play className="w-4 h-4 fill-current" />}
+          {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : isAdvanced ? <Sparkles className="w-4 h-4" /> : <Play className="w-4 h-4 fill-current" />}
           <span className="text-sm font-semibold">
-            {isAdvanced ? 'Start Ensemble Modeling' : 'Start Ensemble Training'}
+            {isSubmitting ? 'Submitting job...' : isAdvanced ? 'Tune ensemble' : 'Train ensemble'}
           </span>
         </button>
-      </div>
+        {submissionMessage && <p role="status" aria-atomic="true" className="text-xs text-center text-muted-foreground break-words">{submissionMessage}</p>}
+        {runFeedback && <RunFeedback run={runFeedback} task="ensemble" />}
+      </TrainingActionFooter>
     </div>
   );
 }

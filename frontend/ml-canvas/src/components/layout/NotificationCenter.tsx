@@ -1,19 +1,21 @@
 /**
  * Bell icon + dropdown panel for the navbar. Shows a count badge of unread
- * per-node pipeline warnings. Clicking a notification opens a detail modal.
+ * execution feedback and per-node warnings. Execution entries link to results;
+ * clicking a warning opens its detail modal.
  * Backed by `useNotificationsStore`.
  */
 
 import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { useNavigate } from 'react-router-dom';
-import { Bell, X, AlertTriangle, Info, AlertCircle, ExternalLink } from 'lucide-react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { Bell, X, AlertTriangle, Info, AlertCircle, ExternalLink, CheckCircle2 } from 'lucide-react';
 import {
   useNotificationsStore,
   type StoredNotification,
 } from '../../core/store/useNotificationsStore';
-import { toast } from '../../core/toast';
 import { useModalFocus } from '../shared/useModalFocus';
+import { RunFeedback } from '../shared/RunFeedback';
+import { useViewStore } from '../../core/store/useViewStore';
 
 const formatTime = (ts: number): string => {
   const d = new Date(ts);
@@ -30,6 +32,7 @@ const formatDateTime = (ts: number): string => {
 
 const LevelIcon: React.FC<{ level: string }> = ({ level }) => {
   const l = level.toLowerCase();
+  if (l === 'success') return <CheckCircle2 className="w-4 h-4 text-green-600 dark:text-green-400" />;
   if (l === 'error') return <AlertCircle className="w-4 h-4 text-red-500" />;
   if (l === 'warning' || l === 'warn') return <AlertTriangle className="w-4 h-4 text-amber-500" />;
   return <Info className="w-4 h-4 text-blue-500" />;
@@ -169,6 +172,7 @@ export const NotificationCenter: React.FC = () => {
   const clear = useNotificationsStore((s) => s.clear);
 
   const navigate = useNavigate();
+  const location = useLocation();
 
   const [open, setOpen] = useState(false);
   const [selected, setSelected] = useState<StoredNotification | null>(null);
@@ -202,9 +206,18 @@ export const NotificationCenter: React.FC = () => {
     setOpen((prev) => !prev);
   };
 
+  const openCanvas = (): void => {
+    setOpen(false);
+    useViewStore.getState().setView('canvas');
+    if (location.pathname !== '/canvas') navigate('/canvas');
+  };
+
   return (
     <>
       <div ref={ref} className="relative">
+        <span className="sr-only" aria-live="polite" aria-atomic="true" data-testid="notification-announcement">
+          {items.find(item => !item.read)?.message ?? ''}
+        </span>
         <button
           ref={bellRef}
           type="button"
@@ -232,7 +245,7 @@ export const NotificationCenter: React.FC = () => {
                 {items.length > 0 && (
                   <button
                     type="button"
-                    onClick={() => { clear(); toast.dismissAll(); }}
+                    onClick={clear}
                     className="text-xs text-muted-foreground hover:text-foreground"
                   >
                     Clear all
@@ -258,7 +271,22 @@ export const NotificationCenter: React.FC = () => {
                 {items.map((it) => (
                   <li key={it.id} className="group">
                     <div className="flex items-stretch gap-2 px-3 py-2 hover:bg-accent/40">
-                      <button
+                      {it.action || it.logger === 'app' ? <div className="min-w-0 flex-1 space-y-2 py-1">
+                        <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+                          <LevelIcon level={it.level} />
+                          <span>{formatTime(it.ts)}</span>
+                        </div>
+                        {it.action?.type === 'jobs' ? <RunFeedback run={it.action.run} onOpen={openCanvas} /> : <>
+                          <p className="text-xs break-words whitespace-pre-wrap [overflow-wrap:anywhere]">{it.message}</p>
+                          {it.action?.type === 'preview' && <button type="button" onClick={() => {
+                            openCanvas();
+                            useViewStore.getState().setResultsPanelExpanded(true);
+                            bellRef.current?.focus();
+                          }} className="rounded text-xs text-primary underline underline-offset-2 focus-ring">
+                            Review preview results
+                          </button>}
+                        </>}
+                      </div> : <button
                         type="button"
                         onClick={() => { setSelected(it); setOpen(false); }}
                         className="min-w-0 flex-1 text-left"
@@ -286,12 +314,12 @@ export const NotificationCenter: React.FC = () => {
                         <p className="mt-1 text-[10px] text-muted-foreground/60 italic">
                           Click to see full details
                         </p>
-                      </button>
+                      </button>}
                       <button
                         type="button"
                         onClick={() => dismiss(it.id)}
                         aria-label="Dismiss"
-                        className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-foreground shrink-0 mt-0.5"
+                        className="opacity-0 group-hover:opacity-100 focus:opacity-100 text-muted-foreground hover:text-foreground shrink-0 mt-0.5"
                       >
                         <X className="w-3.5 h-3.5" />
                       </button>

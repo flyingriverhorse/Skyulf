@@ -1,7 +1,6 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { Toaster } from 'sonner'
 import App from './App.tsx'
 import './index.css'
 import { initializeRegistry } from './core/registry/init'
@@ -48,7 +47,6 @@ if (rootElement) {
         <QueryClientProvider client={queryClient}>
           <ConfirmProvider>
             <App />
-            <Toaster richColors closeButton position="top-right" duration={5000} />
             {ReactQueryDevtools && (
               <React.Suspense fallback={null}>
                 <ReactQueryDevtools initialIsOpen={false} />

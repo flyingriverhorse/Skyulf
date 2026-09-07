@@ -1,9 +1,12 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, useLocation } from 'react-router-dom';
 import { NotificationCenter } from './NotificationCenter';
 import { useNotificationsStore } from '../../core/store/useNotificationsStore';
+import { useViewStore } from '../../core/store/useViewStore';
+import { useJobStore } from '../../core/store/useJobStore';
+import type { JobInfo } from '../../core/api/jobs';
 
 vi.mock('../../core/toast', () => ({
   toast: {
@@ -12,6 +15,7 @@ vi.mock('../../core/toast', () => ({
 }));
 
 let originalRect: typeof Element.prototype.getBoundingClientRect;
+const originalFetchJobs = useJobStore.getState().fetchJobs;
 
 beforeEach(() => {
   originalRect = Element.prototype.getBoundingClientRect;
@@ -32,9 +36,79 @@ beforeEach(() => {
   });
 });
 
+/** Expose the router destination so execution actions are tested through navigation. */
+function LocationProbe() {
+  return <span data-testid="location">{useLocation().pathname}</span>;
+}
+
+describe('NotificationCenter execution entries', () => {
+  it.each(['experiments', 'inference'] as const)('switches the internal %s view to canvas for preview feedback', (activeView) => {
+    // These tabs share /canvas, so router navigation alone cannot reveal preview results.
+    useNotificationsStore.getState().upsertExecution('canvas-preview', 'Preview failed', { type: 'preview' });
+    useViewStore.setState({ activeView, isResultsPanelExpanded: false });
+    render(<MemoryRouter initialEntries={['/canvas']}><NotificationCenter /></MemoryRouter>);
+    const bell = screen.getByRole('button', { name: /Notifications/ });
+    fireEvent.click(bell);
+    fireEvent.click(screen.getByRole('button', { name: 'Review preview results' }));
+    expect(useViewStore.getState().activeView).toBe('canvas');
+    expect(useViewStore.getState().isResultsPanelExpanded).toBe(true);
+    expect(bell).toHaveFocus();
+  });
+
+  it.each(['experiments', 'inference'] as const)('switches the internal %s view to canvas for submitted jobs', (activeView) => {
+    // Job history must open over the intended canvas even when another canvas tab is active.
+    const run = { label: 'Experiments', jobIds: ['job-a'] };
+    useNotificationsStore.getState().upsertExecution('experiments:job-a', 'Submitted', { type: 'jobs', run });
+    useViewStore.setState({ activeView });
+    useJobStore.setState({ jobs: [], runJobs: {}, fetchJobs: vi.fn(), inspectedRun: null, isDrawerOpen: false });
+    render(<MemoryRouter initialEntries={['/canvas']}><NotificationCenter /></MemoryRouter>);
+    fireEvent.click(screen.getByRole('button', { name: /Notifications/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'View jobs' }));
+    expect(useViewStore.getState().activeView).toBe('canvas');
+    expect(useJobStore.getState().isDrawerOpen).toBe(true);
+    expect(useJobStore.getState().inspectedRun).toEqual(run);
+  });
+
+  it('opens preview results from the bell without an error detail modal', () => {
+    // Preview failures must lead directly to the canvas result that explains the problem.
+    useNotificationsStore.getState().upsertExecution('canvas-preview', 'Preview blocked', { type: 'preview' }, 'warning');
+    useViewStore.setState({ isResultsPanelExpanded: false });
+    render(<MemoryRouter initialEntries={['/experiments']}><NotificationCenter /><LocationProbe /></MemoryRouter>);
+    expect(screen.queryByRole('button', { name: 'Review preview results' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: /Notifications/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Review preview results' }));
+    expect(screen.getByTestId('location')).toHaveTextContent('/canvas');
+    expect(useViewStore.getState().isResultsPanelExpanded).toBe(true);
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Clear all' })).toBeNull();
+  });
+
+  it('renders live job statuses and opens the submitted group from another page', () => {
+    // Completed runs must update inside the bell, and its action must preserve the exact job IDs.
+    const run = { label: 'Experiments', jobIds: ['job-a'] };
+    const makeJob = (status: JobInfo['status']): JobInfo => ({ job_id: 'job-a', pipeline_id: 'run', node_id: 'a', job_type: 'training', status,
+      created_at: '2026-09-07T12:00:00Z', start_time: null, end_time: null, error: null, result: null });
+    useNotificationsStore.getState().upsertExecution('experiments:job-a', 'Experiments submitted', { type: 'jobs', run });
+    useJobStore.setState({ jobs: [makeJob('running')], runJobs: {}, fetchJobs: vi.fn(), inspectedRun: null, isDrawerOpen: false });
+    const { container } = render(<MemoryRouter initialEntries={['/experiments']}><NotificationCenter /><LocationProbe /></MemoryRouter>);
+    fireEvent.click(screen.getByRole('button', { name: /Notifications/ }));
+    expect(screen.getByRole('status')).toHaveTextContent('Experiments: 1 running');
+    act(() => useJobStore.setState({ jobs: [makeJob('completed')] }));
+    expect(screen.getByRole('status')).toHaveTextContent('Experiments: 1 completed');
+    expect(container.querySelector('button button')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'View jobs' }));
+    expect(screen.getByTestId('location')).toHaveTextContent('/canvas');
+    expect(useJobStore.getState().isDrawerOpen).toBe(true);
+    expect(useJobStore.getState().inspectedRun).toEqual(run);
+    expect(screen.queryByRole('button', { name: 'Clear all' })).toBeNull();
+  });
+});
+
 afterEach(() => {
   act(() => {
     useNotificationsStore.getState().clear();
+    useJobStore.setState({ fetchJobs: originalFetchJobs, isDrawerOpen: false, inspectedRun: null });
+    useViewStore.setState({ activeView: 'canvas' });
   });
   Element.prototype.getBoundingClientRect = originalRect;
 });

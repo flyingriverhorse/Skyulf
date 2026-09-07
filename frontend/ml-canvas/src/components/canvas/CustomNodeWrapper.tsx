@@ -1,4 +1,4 @@
-import { memo, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { NodeProps, useReactFlow } from '@xyflow/react';
 import { ConnectionPort } from './ConnectionPort';
 import { registry } from '../../core/registry/NodeRegistry';
@@ -17,6 +17,22 @@ import {
 function CustomNodeWrapperImpl({ id, data, selected, isConnectable }: NodeProps) {
   const definitionType = data.definitionType as string;
   const definition = registry.get(definitionType);
+  const splitBodyRef = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const body = splitBodyRef.current;
+    if (!body || (definition?.outputs.length ?? 0) < 2) return;
+    const labels = Array.from(body.querySelectorAll<HTMLElement>('[data-output-label]'));
+    const reserveLabelSpace = () => {
+      // offsetWidth excludes canvas zoom and the selected-card transform.
+      // Include the labels' right-4 inset and 8px of clearance for the summary.
+      const width = Math.max(0, ...labels.map(label => label.offsetWidth)) + 24;
+      body.style.setProperty('--split-output-space', `${width}px`);
+    };
+    reserveLabelSpace();
+    const observer = new ResizeObserver(reserveLabelSpace);
+    labels.forEach(label => observer.observe(label));
+    return () => observer.disconnect();
+  }, [definition]);
   const { deleteElements, getEdges } = useReactFlow();
   // In read-only mode the per-node X is hidden along with the global
   // editor affordances (Backspace, sidebars, undo/redo, palette).
@@ -224,8 +240,7 @@ function CustomNodeWrapperImpl({ id, data, selected, isConnectable }: NodeProps)
   }
 
   const hasMultipleOutputs = definition.outputs.length > 1;
-  // Reserve room for both "Features (X)" and "Validation" with wider platform fallback fonts.
-  const splitBodyPadding = 'pl-3 pr-28';
+  const splitBodyPadding = 'pl-3 pr-[var(--split-output-space,0px)]';
   const bodyTextClass = `${hasMultipleOutputs ? splitBodyPadding : 'px-10'} py-2 min-h-[2.75rem] flex items-center justify-center`;
   const outputPorts = definition.outputs.map((output, index) => (
     <ConnectionPort
@@ -381,7 +396,7 @@ function CustomNodeWrapperImpl({ id, data, selected, isConnectable }: NodeProps)
           5. Nothing — collapse padding so card visually shrinks.
           Split outputs share the existing body height, with the summary
           on the left and compact port labels on the right. */}
-      <div className={hasMultipleOutputs ? 'relative' : undefined}>
+      <div ref={splitBodyRef} className={hasMultipleOutputs ? 'relative' : undefined}>
       {(() => {
         if (definition.component) {
           return (

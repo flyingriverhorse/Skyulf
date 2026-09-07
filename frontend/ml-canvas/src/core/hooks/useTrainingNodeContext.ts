@@ -9,6 +9,7 @@ import { warnAndBlockOnLeakage } from '../utils/pipelineLeakageValidation';
 import { jobsApi } from '../api/jobs';
 import { toast } from '../toast';
 import type { TaskType } from '../types/taskType';
+import type { NodeSubmission } from '../types/runFeedback';
 
 type JobType = 'training' | 'tuning';
 
@@ -60,6 +61,7 @@ export function useTrainingNodeContext(nodeId: string | undefined) {
   const edges = useGraphStore((s) => s.edges);
   const upstreamData = useUpstreamData(nodeId || '');
   const { toggleDrawer, setTab, setActiveParallelRun, startPolling } = useJobStore();
+  const feedback = useJobStore(state => nodeId ? state.nodeSubmissions[nodeId] : undefined);
 
   const datasetId = useMemo(
     () => findUpstreamDatasetId(nodeId, nodes, edges),
@@ -76,32 +78,53 @@ export function useTrainingNodeContext(nodeId: string | undefined) {
 
   const runJob = useCallback(
     async (jobType: JobType, task: TaskType) => {
-      if (!nodeId) return;
+      if (!nodeId || useJobStore.getState().nodeSubmissions[nodeId]?.pending) return;
+      const node = nodes.find(item => item.id === nodeId);
+      if (!node) return;
+      const modelName = String(node.data.model_type || node.data.label || 'selected model').replace(/_/g, ' ');
+      const label = `${jobType === 'tuning' ? 'Tuning' : 'Training'} — ${modelName}`;
+      const update = (value: NodeSubmission) => useJobStore.getState().setNodeSubmission(nodeId, value);
+      if (!datasetId) {
+        update({ pending: false, run: null, message: `${label} blocked. Connect a dataset upstream and select a dataset.` });
+        return;
+      }
+      update({ pending: true, run: null, message: `${label}: Submitting...` });
       try {
         const cfg = convertGraphToPipelineConfig(nodes, edges);
-        if (warnAndBlockOnLeakage(cfg)) return;
+        if (warnAndBlockOnLeakage(cfg)) {
+          update({ pending: false, run: null, message: `${label} blocked. Move data-learning preprocessing after the train/test split.` });
+          return;
+        }
         const res = await jobsApi.runPipeline({
           ...cfg,
           target_node_id: nodeId,
           job_type: jobType,
         });
-        const count = res.job_ids?.length ?? 1;
+        const jobIds = res.job_ids?.length ? res.job_ids : [res.job_id];
+        const count = jobIds.length;
+        update({ pending: false, message: '', run: { label, jobIds } });
+        startPolling();
         if (count > 1) {
           setActiveParallelRun({ jobIds: res.job_ids, startedAt: new Date().toISOString() });
-          startPolling();
           toast.success('Parallel execution started', `${count} branches submitted.`);
         } else {
-          toast.success('Training job submitted');
+          toast.success(`${jobType === 'tuning' ? 'Tuning' : 'Training'} job submitted`);
         }
         setTab(task);
+        useJobStore.getState().setInspectedRun(null);
         toggleDrawer(true);
       } catch (error) {
         console.error('Failed to submit job:', error);
+        update({ pending: false, run: null, message: `${label}: Submission failed. Check your connection and settings, then try again.` });
         toast.error('Failed to submit job');
       }
     },
-    [nodeId, nodes, edges, setActiveParallelRun, startPolling, setTab, toggleDrawer],
+    [nodeId, nodes, edges, datasetId, setActiveParallelRun, startPolling, setTab, toggleDrawer],
   );
 
-  return { availableColumns, upstreamTarget, datasetId, runJob };
+  return { availableColumns, upstreamTarget, datasetId, runJob,
+    isSubmitting: feedback?.pending ?? false,
+    submissionMessage: feedback?.message ?? '',
+    runFeedback: feedback?.run ?? null,
+  };
 }
