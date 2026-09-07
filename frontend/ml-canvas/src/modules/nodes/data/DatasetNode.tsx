@@ -59,7 +59,7 @@ const DatasetSettings: React.FC<{ config: DatasetNodeConfig; onChange: (c: Datas
           <label htmlFor={datasetSelectId} className="block text-sm font-medium">Select Dataset</label>
           <button
             onClick={() => { setShowUpload(true); }}
-            className="text-xs flex items-center gap-1 text-blue-600 hover:text-blue-700 font-medium"
+            className="text-xs flex items-center gap-1 text-link hover:underline font-medium focus-ring"
           >
             <Plus size={14} />
             New Upload

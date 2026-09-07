@@ -94,22 +94,22 @@ const DistributionChart: React.FC<{ distribution: NonNullable<ColumnDrift['distr
                 <XAxis
                     dataKey={(bin: { bin_start: number }) => `${bin.bin_start.toFixed(2)}`}
                     className="text-xs"
-                    tick={{ fill: '#64748b' }}
+                    tick={{ fill: 'hsl(var(--muted-foreground))' }}
                     tickLine={false}
                     axisLine={{ stroke: '#cbd5e1' }}
                 />
-                <YAxis className="text-xs" tick={{ fill: '#64748b' }} tickLine={false} axisLine={false} />
+                <YAxis className="text-xs" tick={{ fill: 'hsl(var(--muted-foreground))' }} tickLine={false} axisLine={false} />
                 <RechartsTooltip
                     cursor={{ fill: 'rgba(0,0,0,0.05)' }}
                     contentStyle={{
-                        backgroundColor: '#1e293b',
-                        borderColor: '#334155',
-                        color: '#f8fafc',
+                        backgroundColor: 'hsl(var(--popover))',
+                        borderColor: 'hsl(var(--border))',
+                        color: 'hsl(var(--popover-foreground))',
                         borderRadius: '6px',
                         boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
                     }}
-                    itemStyle={{ color: '#f8fafc' }}
-                    labelStyle={{ color: '#94a3b8', marginBottom: '0.5rem' }}
+                    itemStyle={{ color: 'hsl(var(--popover-foreground))' }}
+                    labelStyle={{ color: 'hsl(var(--muted-foreground))', marginBottom: '0.5rem' }}
                 />
                 <Legend verticalAlign="top" height={36} iconType="circle" />
                 <Bar

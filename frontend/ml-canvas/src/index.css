@@ -9,6 +9,14 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Suppress per-component color timing only while the theme is being applied. */
+html.theme-switching,
+html.theme-switching *,
+html.theme-switching *::before,
+html.theme-switching *::after {
+  transition: none !important;
+}
+
 @layer base {
   html, body, #root {
     height: 100%;
@@ -17,66 +25,83 @@
     overflow: hidden; /* Prevent body scroll */
   }
 
+  /* Soft dawn light theme and neutral charcoal dark theme. */
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
-
+    color-scheme: light;
+    --background: 231.429 53.846% 97.451%;
+    --foreground: 255.556 45.763% 11.569%;
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
-
+    --card-foreground: 255.556 45.763% 11.569%;
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
-
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
-
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
-
+    --popover-foreground: 255.556 45.763% 11.569%;
+    --primary: 40.714 87.5% 31.373%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 228 41.667% 95.294%;
+    --secondary-foreground: 255.556 16.364% 32.353%;
+    --muted: 228 41.667% 95.294%;
+    --muted-foreground: 252.727 14.163% 45.686%;
+    --accent: 245 33.333% 92.941%;
+    --accent-foreground: 255.556 45.763% 11.569%;
+    --destructive: 0 72.222% 50.588%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 253.333 14.754% 88.039%;
+    --input: 257.143 16.031% 74.314%;
+    --ring: 40.714 87.5% 31.373%;
+    --brand-action: 45.366 88.745% 54.706%;
+    --brand-action-foreground: 255.556 45.763% 11.569%;
+    --link: 232.993 53.725% 50%;
     --radius: 0.5rem;
+    --neutral-50: 231.429 53.846% 97.451%;
+    --neutral-100: 228 41.667% 95.294%;
+    --neutral-200: 253.333 14.754% 88.039%;
+    --neutral-300: 258.462 41.935% 81.765%;
+    --neutral-400: 256.098 22.404% 64.118%;
+    --neutral-500: 252.727 14.163% 45.686%;
+    --neutral-600: 255.556 16.364% 32.353%;
+    --neutral-700: 265 28.125% 25.098%;
+    --neutral-800: 262.286 52.239% 13.137%;
+    --neutral-900: 265.714 61.404% 11.176%;
+    --neutral-950: 266.087 58.974% 7.647%;
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
+    color-scheme: dark;
+    --background: 216 10.204% 9.608%;
+    --foreground: 220 14.286% 95.882%;
+    --card: 214.286 9.333% 14.706%;
+    --card-foreground: 220 14.286% 95.882%;
+    --popover: 214.286 9.333% 14.706%;
+    --popover-foreground: 220 14.286% 95.882%;
+    --primary: 208.594 86.486% 70.98%;
+    --primary-foreground: 212 30.612% 9.608%;
+    --secondary: 213.333 9.677% 18.235%;
+    --secondary-foreground: 216 11.111% 82.353%;
+    --muted: 213.333 9.677% 18.235%;
+    --muted-foreground: 220 7.692% 69.412%;
+    --accent: 215 10.345% 22.745%;
+    --accent-foreground: 220 14.286% 95.882%;
+    --destructive: 0 70% 35.294%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 215 9.231% 25.49%;
+    --input: 215.294 7.692% 43.333%;
+    --ring: 208.594 86.486% 70.98%;
+    --brand-action: 208.594 86.486% 70.98%;
+    --brand-action-foreground: 212 30.612% 9.608%;
+    --link: 209.375 90.566% 79.216%;
+    --neutral-50: 210 12.5% 96.863%;
+    --neutral-100: 220 11.111% 94.706%;
+    --neutral-200: 214.286 12.727% 89.216%;
+    --neutral-300: 216 11.111% 82.353%;
+    --neutral-400: 220 7.692% 69.412%;
+    --neutral-500: 217.5 6.4% 49.02%;
+    --neutral-600: 216 8.108% 36.275%;
+    --neutral-700: 215 9.231% 25.49%;
+    --neutral-800: 214.286 9.333% 14.706%;
+    --neutral-900: 214.286 11.111% 12.353%;
+    --neutral-950: 216 10.204% 9.608%;
+    --color-gradient-start: #75b8f5;
+    --color-gradient-middle: #75b8f5;
+    --color-gradient-end: #75b8f5;
   }
 }
 
@@ -106,10 +131,27 @@
 }
 
 @layer components {
+  /* Shared action colors; callers own spacing and sizing. */
+  .action-primary {
+    @apply bg-brand-action text-brand-action-foreground;
+  }
+
+  .action-primary:not(:disabled):hover {
+    @apply bg-brand-action/90;
+  }
+
+  .action-secondary {
+    @apply border border-border bg-card text-foreground;
+  }
+
+  .action-secondary:not(:disabled):hover {
+    @apply bg-accent;
+  }
+
   /* Unified focus ring. Apply to interactive elements that are not the
      shadcn Button/Input (those already include their own ring styles). */
   .focus-ring {
-    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-slate-900;
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background;
   }
 
   /* One-shot validation pulse: fires when a node first becomes invalid.

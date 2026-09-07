@@ -460,3 +460,36 @@ explicitly recorded above is complete; remaining interaction details need review
   menu. New assertions reproduced it; focus now moves into that content and
   returns to More on dismissal. All four layout tests passed again, including
   keyboard opening and dismissal of the load menu and legend.
+- 2026-09-07: Unified light/dark switching and applied the root site's galaxy
+  night / dawn palette to shared theme tokens, neutral utilities, canvas
+  controls, chart surfaces, and primary actions. Theme changes temporarily
+  suppress component transitions so surfaces update together; normal hover
+  and layout motion resumes after the paint. Replaced the navigation's S
+  placeholder and Vite favicon with the existing wolf logo, bundled by Vite.
+  First-paint HTML backgrounds match the app palette. Gold buttons use dark
+  text; a dataset upload link now uses periwinkle with adequate dark contrast.
+  Added three `e2e/theme.spec.ts` tests. They reproduced staggered color
+  transitions, the missing logo, and white-on-gold upload text before fixes.
+  Checks cover populated-canvas contrast in both modes, mobile/reduced motion,
+  loaded logo pixels, restored normal transitions, preference persistence,
+  and upload actions outside the canvas. All 20 focused browser tests and
+  873 frontend unit tests passed; 14 affected page tests passed again after
+  review corrections. Final lint, TypeScript, and production build passed.
+  Existing mocked connection logs and build chunk warnings remain.
+- 2026-09-07: Revised the app's dark palette after visual feedback: neutral
+  charcoal surfaces and soft blue actions replace plum and gold in dark mode.
+  Light mode retains the dawn palette and gold actions. Neutral gray/slate
+  utilities now resolve through theme-specific variables, including chart and
+  canvas surfaces. Shared primary/secondary action classes align preview,
+  training, prediction, upload, create, apply, confirm, and secondary tools;
+  shared Button variants use the same colors. The logo header now has the
+  same 56px height as the canvas navbar, fixing the 9px divider mismatch.
+  Four theme browser tests cover both palettes, text contrast, action colors
+  across pages, persistence, reduced motion, and divider alignment at 1440px,
+  1100px, and 768px. All 21 focused browser checks passed. Review found no
+  action-style regressions; remaining prediction/threshold action colors were
+  brought into the same styles and their focused unit tests passed.
+  All 873 frontend unit tests passed on the final run; the earlier parallel
+  run missed a pre-existing 20ms mocked deployment loading state, which also
+  passed in isolation. Final lint, TypeScript, and production build passed,
+  and served assets were rebuilt. Existing build chunk warnings remain.

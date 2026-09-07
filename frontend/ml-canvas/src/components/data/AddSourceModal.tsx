@@ -234,7 +234,7 @@ export const AddSourceModal: React.FC<AddSourceModalProps> = ({ isOpen, onClose,
               <button
                 type="submit"
                 disabled={loading}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md flex items-center gap-2 disabled:opacity-50"
+                className="px-4 py-2 action-primary rounded-md flex items-center gap-2 disabled:opacity-50"
               >
                 {loading ? 'Creating...' : <><Check size={16} /> Create Source</>}
               </button>

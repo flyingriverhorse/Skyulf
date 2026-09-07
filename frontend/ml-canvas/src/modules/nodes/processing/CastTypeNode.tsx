@@ -101,7 +101,7 @@ const CastTypeSettings: React.FC<{ config: CastTypeConfig; onChange: (c: CastTyp
           <button
             onClick={handleAdd}
             disabled={!datasetId || columns.length === 0}
-            className="p-1.5 bg-primary text-primary-foreground rounded hover:bg-primary/90 disabled:opacity-50 transition-colors"
+            className="p-1.5 action-primary rounded disabled:opacity-50 transition-colors"
             title="Add Casting Rule"
           >
             <Plus className="w-4 h-4" />

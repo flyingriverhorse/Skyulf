@@ -493,7 +493,7 @@ export const EvaluationView: React.FC<Props> = ({
                 <button
                   onClick={() => { void runThresholdMutation('preview', onPreviewThresholds); }}
                   disabled={isThresholdMutationPending}
-                  className="px-3 py-1.5 rounded-lg text-sm font-medium bg-blue-500 text-white hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-3 py-1.5 rounded-lg text-sm font-medium action-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Preview
                 </button>
@@ -522,7 +522,7 @@ export const EvaluationView: React.FC<Props> = ({
                     <button
                       onClick={() => { void runThresholdMutation('save', onSaveThresholds); }}
                       disabled={isThresholdMutationPending}
-                      className="px-3 py-1.5 rounded-lg text-sm font-medium bg-emerald-500 text-white hover:bg-emerald-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="px-3 py-1.5 rounded-lg text-sm font-medium action-secondary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       Save
                     </button>

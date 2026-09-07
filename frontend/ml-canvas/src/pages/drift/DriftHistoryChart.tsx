@@ -49,24 +49,24 @@ export const DriftHistoryChart: React.FC<DriftHistoryChartProps> = ({ history })
                         />
                         <XAxis
                             dataKey="date"
-                            tick={{ fill: '#64748b', fontSize: 11 }}
+                            tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }}
                             tickLine={false}
                             axisLine={{ stroke: '#cbd5e1' }}
                         />
                         <YAxis
-                            tick={{ fill: '#64748b', fontSize: 11 }}
+                            tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }}
                             tickLine={false}
                             axisLine={false}
                         />
                         <RechartsTooltip
                             contentStyle={{
-                                backgroundColor: '#1e293b',
-                                borderColor: '#334155',
-                                color: '#f8fafc',
+                                backgroundColor: 'hsl(var(--popover))',
+                                borderColor: 'hsl(var(--border))',
+                                color: 'hsl(var(--popover-foreground))',
                                 borderRadius: '6px',
                             }}
-                            itemStyle={{ color: '#f8fafc' }}
-                            labelStyle={{ color: '#94a3b8' }}
+                            itemStyle={{ color: 'hsl(var(--popover-foreground))' }}
+                            labelStyle={{ color: 'hsl(var(--muted-foreground))' }}
                             formatter={(value: number, name: string) => {
                                 if (name === 'Drifted Columns') return [value, name];
                                 if (name === 'Drift %') return [`${value}%`, name];

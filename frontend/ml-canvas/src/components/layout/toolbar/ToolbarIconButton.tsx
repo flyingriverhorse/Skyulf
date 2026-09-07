@@ -44,7 +44,7 @@ export const ToolbarIconButton: React.FC<ToolbarIconButtonProps> = ({
       aria-label={ariaLabel}
       aria-expanded={ariaExpanded}
       data-testid={testId}
-      className={`flex items-center justify-center w-10 h-10 bg-background border rounded-md shadow-sm transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${hoverClasses} ${focusRing ? 'focus-ring' : ''}`}
+      className={`flex items-center justify-center w-10 h-10 bg-card text-foreground border rounded-md shadow-sm transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${hoverClasses} ${focusRing ? 'focus-ring' : ''}`}
     >
       {icon}
     </button>

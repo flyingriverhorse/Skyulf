@@ -25,14 +25,14 @@
 }
 
 .btn-primary {
-  background: var(--main-gradient);
-  color: #fff;
+  background: hsl(var(--brand-action));
+  color: hsl(var(--brand-action-foreground));
   border: none;
-  box-shadow: 0 12px 32px rgba(59, 130, 246, 0.35);
+  box-shadow: 0 12px 32px hsl(var(--brand-action) / 0.15);
 }
 
 .btn-primary:hover:not(:disabled) {
-  box-shadow: 0 16px 42px rgba(139, 92, 246, 0.45);
+  box-shadow: 0 16px 42px hsl(var(--brand-action) / 0.2);
   filter: brightness(1.1);
 }
 

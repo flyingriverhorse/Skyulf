@@ -2,39 +2,39 @@
   --feature-canvas-nav-height: 72px;
 
   /* Main Gradient Colors */
-  --color-gradient-start: #38bdf8;
-  --color-gradient-middle: #6366f1;
-  --color-gradient-end: #a855f7;
+  --color-gradient-start: #f2c025;
+  --color-gradient-middle: #f7cc42;
+  --color-gradient-end: #ffd75e;
 
   /* Gradient Utility */
   --main-gradient: linear-gradient(90deg, var(--color-gradient-start), var(--color-gradient-middle), var(--color-gradient-end));
 
   /* Light Mode Palette */
-  --light-bg-page-start: #f8fafc;
-  --light-bg-page-end: #f1f5f9;
+  --light-bg-page-start: #f5f6fc;
+  --light-bg-page-end: #eef0f8;
   --light-bg-card-start: #ffffff;
-  --light-bg-card-end: #f8fafc;
-  --light-border: #e2e8f0;
-  --light-border-strong: #cbd5e1;
-  --light-text-primary: #1e293b;
-  --light-text-secondary: #475569;
+  --light-bg-card-end: #f5f6fc;
+  --light-border: #dedce5;
+  --light-border-strong: #b9b3c8;
+  --light-text-primary: #17102b;
+  --light-text-secondary: #4c4560;
   --light-navbar-bg: rgba(255, 255, 255, 0.8);
   --light-input-bg: #ffffff;
 
   /* Dark Mode Palette */
-  --dark-bg-page-start: #0d1117;
-  --dark-bg-page-end: #11161f;
-  --dark-bg-card-start: #2e384df2;
-  --dark-bg-card-end: #111827f0;
-  --dark-bg-flow-start: #1f262fb3;
-  --dark-bg-flow-end: #0d1117f2;
-  --dark-border: rgba(148, 163, 184, 0.25);
-  --dark-border-strong: rgba(71, 85, 105, 0.55);
-  --dark-text-primary: #e2e8f0;
-  --dark-text-secondary: #94a3b8;
-  --dark-navbar-bg-start: #181d24f2;
-  --dark-navbar-bg-end: #0d1117f5;
-  --dark-input-bg: #0f172ae0;
+  --dark-bg-page-start: #16181b;
+  --dark-bg-page-end: #1c1f23;
+  --dark-bg-card-start: #222529;
+  --dark-bg-card-end: #1c1f23;
+  --dark-bg-flow-start: #1c1f23;
+  --dark-bg-flow-end: #16181b;
+  --dark-border: #3b4047;
+  --dark-border-strong: #666d77;
+  --dark-text-primary: #f3f4f6;
+  --dark-text-secondary: #cdd1d7;
+  --dark-navbar-bg-start: #222529;
+  --dark-navbar-bg-end: #1c1f23;
+  --dark-input-bg: #1c1f23;
 
   /* Shadows */
   --shadow-subtle: 0 10px 30px rgba(0,0,0,0.05);

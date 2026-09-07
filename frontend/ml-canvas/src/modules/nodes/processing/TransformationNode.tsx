@@ -122,7 +122,7 @@ const TransformationSettings: React.FC<{ config: TransformationConfig; onChange:
         <span className="text-sm font-medium">Transformation Rules</span>
         <button
           onClick={addRule}
-          className="flex items-center gap-1 text-xs bg-primary text-primary-foreground px-2 py-1 rounded hover:bg-primary/90"
+          className="flex items-center gap-1 text-xs action-primary px-2 py-1 rounded"
         >
           <Plus size={12} /> Add Rule
         </button>

@@ -317,7 +317,7 @@ export const SlowNodesPage: React.FC = () => {
                                 />
                                 <XAxis
                                     dataKey="step_type"
-                                    tick={{ fill: '#64748b', fontSize: 10 }}
+                                    tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 10 }}
                                     angle={-25}
                                     textAnchor="end"
                                     interval={0}
@@ -327,20 +327,20 @@ export const SlowNodesPage: React.FC = () => {
                                     scale="log"
                                     domain={[chartFloor, 'auto']}
                                     allowDataOverflow
-                                    tick={{ fill: '#64748b', fontSize: 10 }}
+                                    tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 10 }}
                                     tickFormatter={(v: number) => formatSeconds(v)}
                                     width={64}
                                 />
                                 <RechartsTooltip
                                     contentStyle={{
-                                        backgroundColor: '#1e293b',
-                                        borderColor: '#334155',
-                                        color: '#f8fafc',
+                                        backgroundColor: 'hsl(var(--popover))',
+                                        borderColor: 'hsl(var(--border))',
+                                        color: 'hsl(var(--popover-foreground))',
                                         borderRadius: 6,
                                         fontSize: 12,
                                     }}
-                                    itemStyle={{ color: '#f8fafc' }}
-                                    labelStyle={{ color: '#94a3b8' }}
+                                    itemStyle={{ color: 'hsl(var(--popover-foreground))' }}
+                                    labelStyle={{ color: 'hsl(var(--muted-foreground))' }}
                                     formatter={(value: number, name: string, entry) => {
                                         if (name === 'runs') return [value, 'Runs'];
                                         if (name === 'total') {

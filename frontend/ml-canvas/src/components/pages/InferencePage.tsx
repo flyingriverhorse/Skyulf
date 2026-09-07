@@ -1818,7 +1818,7 @@ export const InferencePage: React.FC = () => {
                                 className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${
                                     !activeDeployment || Boolean(activeRun) || !inputStatus.valid || !canRunPrediction
                                         ? 'bg-gray-100 text-gray-400 cursor-not-allowed dark:bg-gray-800 dark:text-gray-600'
-                                        : 'bg-blue-600 text-white hover:bg-blue-700 shadow-sm'
+                                        : 'action-primary shadow-sm'
                                 }`}
                             >
                                 {activeRun ? (

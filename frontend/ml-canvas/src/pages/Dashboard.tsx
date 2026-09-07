@@ -124,7 +124,7 @@ export const Dashboard: React.FC = () => {
         <div className="flex gap-3">
           <Link
             to="/canvas"
-            className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-md shadow-sm transition-all"
+            className="flex items-center gap-2 action-primary px-4 py-2 rounded-md shadow-sm transition-all"
           >
             <Plus size={18} />
             New Experiment

@@ -117,7 +117,7 @@ const ConfirmDialog: React.FC<ConfirmDialogInternalProps> = ({
             className={
               isDanger
                 ? 'rounded-md bg-red-600 px-3 py-2 text-sm font-medium text-white hover:bg-red-700 focus-ring'
-                : 'rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 focus-ring'
+                : 'rounded-md action-primary px-3 py-2 text-sm font-medium focus-ring'
             }
           >
             {confirmLabel}

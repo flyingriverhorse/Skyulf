@@ -317,7 +317,7 @@ export const EDAPage: React.FC = () => {
                     <button
                         onClick={() => loadSpecificReport(existingReport.id)}
                         disabled={isLoadingReport}
-                        className="flex items-center px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="flex items-center px-4 py-2 action-secondary rounded-md disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                         {isLoadingReport ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-2" />}
                         Load Existing ({new Date(existingReport.created_at).toLocaleDateString()})
@@ -326,7 +326,7 @@ export const EDAPage: React.FC = () => {
                 <button
                     onClick={() => runAnalysis()}
                     disabled={analyzing}
-                    className={`flex items-center px-4 py-2 ${existingReport ? 'bg-gray-600 hover:bg-gray-700' : 'bg-blue-600 hover:bg-blue-700'} text-white rounded-md disabled:opacity-50`}
+                    className={`flex items-center px-4 py-2 action-primary rounded-md disabled:opacity-50`}
                 >
                     {analyzing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Play className="w-4 h-4 mr-2" />}
                     {existingReport ? 'Run New Analysis' : 'Run Analysis'}
@@ -589,7 +589,7 @@ export const EDAPage: React.FC = () => {
                 className={`ml-2 px-3 py-1.5 rounded text-sm font-medium transition-colors flex items-center shadow-sm ${
                     existingReport
                         ? 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 border border-gray-300 dark:border-gray-600 hover:bg-gray-50'
-                        : 'bg-blue-600 text-white hover:bg-blue-700 border border-transparent'
+                        : 'action-primary border border-transparent'
                 }`}
             >
                 {analyzing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Play className="w-4 h-4 mr-2" />}

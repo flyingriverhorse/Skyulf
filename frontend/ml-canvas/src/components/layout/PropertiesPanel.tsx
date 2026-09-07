@@ -265,7 +265,7 @@ const MultiInputModeSection: React.FC<{ selectedNode: Node }> = ({ selectedNode 
           onClick={() => setExecutionMode(selectedNode.id, 'merge')}
           className={`px-3 py-1.5 transition-colors ${
             current === 'merge'
-              ? 'bg-purple-500 text-white'
+              ? 'bg-primary/15 text-primary'
               : 'bg-white dark:bg-slate-700 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-600'
           }`}
         >
@@ -275,7 +275,7 @@ const MultiInputModeSection: React.FC<{ selectedNode: Node }> = ({ selectedNode 
           onClick={() => setExecutionMode(selectedNode.id, 'parallel')}
           className={`px-3 py-1.5 transition-colors ${
             current === 'parallel'
-              ? 'bg-blue-500 text-white'
+              ? 'bg-primary/15 text-primary'
               : 'bg-white dark:bg-slate-700 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-600'
           }`}
         >

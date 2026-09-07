@@ -250,7 +250,7 @@ export const DriftAlertModal: React.FC<DriftAlertModalProps> = ({
                                             type="button"
                                             disabled={actionPending}
                                             onClick={() => void handleAction(action)}
-                                            className="px-3 py-1.5 text-sm font-medium rounded-md bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                                            className="px-3 py-1.5 text-sm font-medium rounded-md action-primary disabled:opacity-50 disabled:cursor-not-allowed"
                                         >
                                             {ACTION_LABELS[action]}
                                         </button>

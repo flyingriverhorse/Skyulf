@@ -3,6 +3,8 @@ import { Link, Outlet, useLocation } from 'react-router-dom';
 import { LayoutDashboard, Database, Rocket, GitBranch, Moon, Sun, Archive, BarChart2, Activity, TrendingUp, Bug, Timer, ScrollText, Menu, X } from 'lucide-react';
 import { monitoringApi } from '../core/api/monitoring';
 import { useViewport } from '../core/hooks/useViewport';
+import { applyTheme } from '../core/theme/applyTheme';
+import logoUrl from '../../../../static/img/logo.png';
 
 export const Layout: React.FC = () => {
   const location = useLocation();
@@ -89,14 +91,7 @@ export const Layout: React.FC = () => {
   const toggleTheme = () => {
     const newMode = !isDarkMode;
     setIsDarkMode(newMode);
-    if (newMode) {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
-    try {
-      localStorage.setItem('skyulf-theme', newMode ? 'dark' : 'light');
-    } catch { /* ignore quota / privacy errors */ }
+    applyTheme(newMode);
   };
 
   const isActive = (path: string) => location.pathname === path;
@@ -106,7 +101,7 @@ export const Layout: React.FC = () => {
   const isCollapsed = !isMobile && (location.pathname === '/canvas' || location.pathname === '/eda');
 
   return (
-    <div className="flex h-screen bg-slate-50 dark:bg-slate-900 transition-colors duration-200">
+    <div className="flex h-screen bg-background text-foreground">
       {isMobile && isDrawerOpen && (
         <div
           className="fixed inset-0 bg-black/50 z-30"
@@ -125,13 +120,13 @@ export const Layout: React.FC = () => {
           isMobile
             ? `fixed inset-y-0 left-0 z-40 w-64 transform transition-transform duration-200 ${isDrawerOpen ? 'translate-x-0' : '-translate-x-full'}`
             : `${isCollapsed ? 'w-16' : 'w-64'} shrink-0 transition-all duration-200`
-        } bg-slate-900 dark:bg-slate-950 text-white flex flex-col`}
+        } bg-white dark:bg-slate-900 text-foreground border-r flex flex-col`}
       >
-        <div className={`${isCollapsed ? 'p-4' : 'p-6'} border-b border-slate-800 dark:border-slate-900 flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'} ${isMobile ? 'justify-between' : ''}`}>
+        <div className={`h-14 shrink-0 ${isCollapsed ? 'px-4' : 'px-6'} border-b flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'} ${isMobile ? 'justify-between' : ''}`}>
           <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'}`}>
-            <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center font-bold text-lg shrink-0 shadow-lg shadow-blue-900/20">S</div>
+            <img src={logoUrl} alt="Skyulf logo" width={32} height={32} className="w-8 h-8 object-contain shrink-0" />
             {!isCollapsed && (
-              <h1 className="text-xl font-bold tracking-tight whitespace-nowrap bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">
+              <h1 className="text-xl font-bold tracking-tight whitespace-nowrap text-foreground">
                 Skyulf ML
               </h1>
             )}
@@ -139,7 +134,7 @@ export const Layout: React.FC = () => {
           {isMobile && (
             <button
               onClick={() => setIsDrawerOpen(false)}
-              className="p-2.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-md transition-colors"
+              className="p-2.5 text-muted-foreground hover:text-foreground hover:bg-accent rounded-md transition-colors focus-ring"
               aria-label="Close navigation menu"
             >
               <X size={20} />
@@ -183,10 +178,10 @@ export const Layout: React.FC = () => {
           </NavLink>
         </nav>
 
-        <div className={`${isCollapsed ? 'p-2' : 'p-4'} border-t border-slate-800 space-y-4`}>
+        <div className={`${isCollapsed ? 'p-2' : 'p-4'} border-t space-y-4`}>
           <button
             onClick={toggleTheme}
-            className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'} w-full ${isCollapsed ? 'px-2' : 'px-4'} py-2 text-sm text-slate-400 hover:text-white hover:bg-slate-800 rounded-md transition-colors`}
+            className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'} w-full ${isCollapsed ? 'px-2' : 'px-4'} py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-accent rounded-md transition-colors focus-ring`}
             title={isDarkMode ? 'Light Mode' : 'Dark Mode'}
             aria-label={isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'}
           >
@@ -210,7 +205,8 @@ export const Layout: React.FC = () => {
             >
               <Menu size={20} />
             </button>
-            <span className="ml-2 font-semibold text-slate-900 dark:text-slate-100">Skyulf ML</span>
+            <img src={logoUrl} alt="" width={28} height={28} className="ml-2 h-7 w-7 object-contain" />
+            <span className="ml-2 font-semibold text-foreground">Skyulf ML</span>
           </div>
         )}
         {/* min-h-0 lets this flex item shrink below its content's natural
@@ -231,8 +227,8 @@ const NavLink = ({ to, children, active, icon, collapsed, badge }: { to: string,
     aria-current={active ? 'page' : undefined}
     className={`flex items-center ${collapsed ? 'justify-center' : 'gap-3'} ${collapsed ? 'px-2' : 'px-4'} py-3 rounded-md text-sm font-medium transition-colors ${
       active
-        ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-sm'
-        : 'text-slate-400 hover:text-white hover:bg-slate-800'
+        ? 'bg-brand-action text-brand-action-foreground shadow-sm'
+        : 'text-muted-foreground hover:text-foreground hover:bg-accent'
     }`}
     title={collapsed ? (children as string) : undefined}
     aria-label={collapsed ? (children as string) : undefined}

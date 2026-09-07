@@ -470,7 +470,7 @@ const FlowCanvasContent: React.FC = () => {
               type="button"
               onClick={() => window.dispatchEvent(new CustomEvent(SHOW_TEMPLATES_EVENT))}
               data-testid="empty-state-templates"
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium action-primary"
             >
               <Sparkles className="w-3.5 h-3.5" />
               Browse templates

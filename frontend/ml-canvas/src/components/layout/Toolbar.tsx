@@ -322,7 +322,7 @@ export const Toolbar: React.FC = () => {
             aria-haspopup="menu"
             aria-expanded={showMoreMenu}
             data-testid="toolbar-more"
-            className="flex items-center gap-1 px-3 py-2 bg-background border rounded-md shadow-sm hover:bg-accent transition-colors"
+            className="flex items-center gap-1 px-3 py-2 action-secondary rounded-md shadow-sm transition-colors"
           >
             <MoreHorizontal className="w-4 h-4" />
           </button>
@@ -445,7 +445,7 @@ export const Toolbar: React.FC = () => {
           title="Job runs history"
           aria-label="Job runs history"
           data-testid="toolbar-jobs"
-          className="flex items-center gap-2 px-3 py-2 bg-background border rounded-md shadow-sm hover:bg-accent transition-colors"
+          className="flex items-center gap-2 px-3 py-2 action-secondary rounded-md shadow-sm transition-colors"
         >
           <History className="w-4 h-4" />
           <span className="text-sm font-medium">Jobs</span>
@@ -457,7 +457,7 @@ export const Toolbar: React.FC = () => {
             title="Start from a template"
             aria-label="Start from a template"
             data-testid="toolbar-templates"
-            className="flex items-center gap-2 px-3 py-2 bg-background border rounded-md shadow-sm hover:bg-accent transition-colors"
+            className="flex items-center gap-2 px-3 py-2 action-secondary rounded-md shadow-sm transition-colors"
           >
             <Sparkles className="w-4 h-4" />
             <span className="text-sm font-medium">Templates</span>
@@ -496,7 +496,7 @@ export const Toolbar: React.FC = () => {
               aria-haspopup="menu"
               aria-expanded={showRecentMenu}
               data-testid="toolbar-recent"
-              className="flex items-center gap-2 px-3 py-2 bg-background border rounded-md shadow-sm hover:bg-accent transition-colors"
+              className="flex items-center gap-2 px-3 py-2 action-secondary rounded-md shadow-sm transition-colors"
             >
               <Clock className="w-4 h-4" />
               {!isCompact && <span className="text-sm font-medium">Recent</span>}
@@ -532,7 +532,7 @@ export const Toolbar: React.FC = () => {
               aria-haspopup="menu"
               aria-expanded={showLoadMenu}
               data-testid="toolbar-load"
-              className="flex items-center gap-2 px-3 py-2 bg-background border rounded-md shadow-sm hover:bg-accent transition-colors disabled:opacity-50"
+              className="flex items-center gap-2 px-3 py-2 action-secondary rounded-md shadow-sm transition-colors disabled:opacity-50"
             >
               <FolderOpen className="w-4 h-4" />
               {!isCompact && <span className="text-sm font-medium">Load</span>}
@@ -558,7 +558,7 @@ export const Toolbar: React.FC = () => {
             title="Save pipeline"
             aria-label="Save pipeline"
             data-testid="toolbar-save"
-            className="flex items-center gap-2 px-3 py-2 bg-background border rounded-md shadow-sm hover:bg-accent transition-colors disabled:opacity-50"
+            className="flex items-center gap-2 px-3 py-2 action-secondary rounded-md shadow-sm transition-colors disabled:opacity-50"
           >
             {isSaving ? (
               <Loader2 className="w-4 h-4 animate-spin" />
@@ -582,7 +582,7 @@ export const Toolbar: React.FC = () => {
             disabled={isRunning || nodes.length === 0}
             title="Auto-arrange nodes left-to-right by data flow"
             aria-label="Tidy: auto-arrange nodes"
-            className="flex items-center gap-2 px-3 py-2 bg-background border rounded-md shadow-sm hover:bg-accent transition-colors disabled:opacity-50"
+            className="flex items-center gap-2 px-3 py-2 action-secondary rounded-md shadow-sm transition-colors disabled:opacity-50"
           >
             <Wand2 className="w-4 h-4" />
             <span className="text-sm font-medium">Tidy</span>
@@ -597,7 +597,7 @@ export const Toolbar: React.FC = () => {
             aria-label="Export canvas as image"
             aria-haspopup="menu"
             aria-expanded={showExportMenu}
-            className="flex items-center gap-2 px-3 py-2 bg-background border rounded-md shadow-sm hover:bg-accent transition-colors disabled:opacity-50"
+            className="flex items-center gap-2 px-3 py-2 action-secondary rounded-md shadow-sm transition-colors disabled:opacity-50"
           >
             {isExporting ? (
               <Loader2 className="w-4 h-4 animate-spin" />
@@ -642,7 +642,7 @@ export const Toolbar: React.FC = () => {
             title="Run all branches as separate experiments"
             aria-label="Run all parallel branches as separate experiments"
             data-testid="toolbar-run-all"
-            className="flex items-center gap-2 px-3 py-2 text-white bg-amber-600 rounded-md shadow-sm hover:bg-amber-700 transition-colors disabled:opacity-50"
+            className="flex items-center gap-2 px-3 py-2 action-primary rounded-md shadow-sm transition-colors disabled:opacity-50"
           >
             {isRunningAll ? (
               <Loader2 className="w-4 h-4 animate-spin" />
@@ -660,8 +660,7 @@ export const Toolbar: React.FC = () => {
             disabled={isRunning}
             title="Preview data (Ctrl+Enter). Click to review any blocking issues."
             data-testid="toolbar-run-preview"
-            className="flex shrink-0 items-center gap-2 px-3 py-2 text-white rounded-md shadow-sm transition-all disabled:opacity-50"
-            style={{ background: 'var(--main-gradient)' }}
+            className="flex shrink-0 items-center gap-2 px-3 py-2 action-primary rounded-md shadow-sm transition-all disabled:opacity-50 focus-ring"
           >
             {isRunning ? (
               <Loader2 className="w-4 h-4 animate-spin" />
