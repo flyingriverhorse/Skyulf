@@ -10,6 +10,7 @@ test('category collapse keeps search matches reachable and restores the browsing
   const preprocessing = page.getByRole('button', { name: 'Preprocessing', exact: true });
   const indicator = page.getByRole('button', { name: 'Add Missing Indicator node', exact: true });
   const search = page.getByRole('textbox', { name: 'Search nodes' });
+  await page.getByRole('button', { name: 'Data cleaning', exact: true }).click();
   await expect(preprocessing).toHaveAttribute('aria-expanded', 'true');
   await preprocessing.focus();
   await page.keyboard.press('Enter');

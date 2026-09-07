@@ -1,7 +1,7 @@
 # Canvas UX improvement backlog
 
 Date: 2026-09-06
-Status: CUX-01, CUX-02, CUX-05, and CUX-06 complete; CUX-03, CUX-04, and CUX-08 in progress. Completed portions are recorded below.
+Status: CUX-01, CUX-02, CUX-04, CUX-05, and CUX-06 complete; CUX-03 and CUX-08 in progress. Completed portions are recorded below.
 
 ## Purpose and review scope
 
@@ -29,7 +29,7 @@ before implementation because other work may have changed these components.
 | CUX-01 | High | Preserve canvas space with resizable panels | Complete at checked desktop/laptop sizes |
 | CUX-02 | High | Guide node connections and adding the next step | Complete; drag guidance and keyboard next-step picker verified |
 | CUX-03 | High | Clearly distinguish previewing data from training | In progress; visible action labels and training guidance complete |
-| CUX-04 | Medium | Improve component discovery | In progress; task search, readable results, and collapsible categories complete; preprocessing subgroups remain |
+| CUX-04 | Medium | Improve component discovery | Complete; shared task search, readable results, and collapsible preprocessing groups verified |
 | CUX-05 | Medium | Navigate from validation issues to the exact setting | Complete; field navigation and general-issue fallback verified |
 | CUX-06 | Medium | Reduce connection and settings visual noise | Complete; contextual connection controls and node details verified |
 | CUX-07 | Medium | Inspect a selected node's input and output | Open |
@@ -203,7 +203,14 @@ and underscores are normalized. Sidebar search results wrap full names and
 descriptions, with descriptions associated with their add buttons. Browsing
 keeps compact cards; the palette always shows full descriptions. Existing
 click, drag, Enter/Space, and Ctrl+K insertion paths are preserved.
-Preprocessing subgroups remain open.
+The 28 preprocessing nodes now appear in five collapsible task groups: Data
+cleaning (9), Numeric & categorical (5), Feature engineering (5), Text processing
+(6), and Splitting & sampling (3). Subgroups start collapsed so Modeling is
+visible without scrolling through preprocessing cards. Enter/Space and mouse
+activation toggle each group. Search presents flat ranked results under the
+existing categories, bypassing subgroup collapse; clearing it restores subgroup
+choices, which also survive sidebar close/reopen while mounted. Future types
+without an explicit assignment remain reachable in Other preprocessing.
 
 **Acceptance criteria:**
 
@@ -213,6 +220,8 @@ Preprocessing subgroups remain open.
 - [x] Search results expose the reason a node is useful and enough description to choose it.
 - [x] Collapsed categories do not hide matches during a search.
 - [x] Existing click-to-add, drag, and command-palette flows remain available.
+- [x] Preprocessing task groups keep every visible node reachable exactly once.
+- [x] Subgroups support keyboard toggling and retain browsing choices across search and sidebar visibility changes.
 
 **Starting points:** `src/components/layout/Sidebar.tsx`,
 `CommandPalette.tsx`, and `src/core/registry/NodeRegistry.ts`.
@@ -668,3 +677,13 @@ explicitly recorded above is complete; remaining interaction details need review
   with the summary. Both default cards fit within 110px, with non-overlapping
   labels inside their bounds. Seven guided-connection browser checks, lint, and
   the production build passed; screenshots were inspected and assets rebuilt.
+- 2026-09-07: Completed CUX-04 with five collapsible preprocessing task groups.
+  All 28 current visible types are assigned exactly once; future unclassified
+  types use a visible fallback. Groups start collapsed, preserve choices across
+  search/sidebar visibility changes, and support native keyboard activation.
+  Search keeps its flat ranked results shared with Ctrl+K and the next-step
+  picker. Ten focused unit tests and nine browser checks passed, covering light
+  desktop and dark laptop layouts, insertion, drag, search, category state, and
+  responsive focus. Screenshots were inspected. Lint and production build passed;
+  served assets and v0.8.16 notes were updated. Browser APIs are mocked and the
+  existing circular/empty chunk build warnings remain.

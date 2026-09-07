@@ -1,6 +1,8 @@
 import React, { useCallback, useId, useLayoutEffect, useRef, useState } from 'react';
 import { registry } from '../../core/registry/NodeRegistry';
 import { searchNodes } from '../../core/utils/nodeSearch';
+import { groupPreprocessingNodes } from '../../core/utils/preprocessingGroups';
+import type { NodeDefinition } from '../../core/types/nodes';
 import { useGraphStore } from '../../core/store/useGraphStore';
 import { useViewStore } from '../../core/store/useViewStore';
 import { useSidebarOpen } from '../../core/hooks/useSidebarOpen';
@@ -32,6 +34,7 @@ export const Sidebar: React.FC = () => {
   }, [isSidebarOpen]);
   const [searchTerm, setSearchTerm] = useState('');
   const [collapsedCategories, setCollapsedCategories] = useState<Record<string, boolean>>({});
+  const [expandedPreprocessingGroups, setExpandedPreprocessingGroups] = useState<Record<string, boolean>>({});
   const categoryListId = useId();
   // Cascades click-to-add nodes so repeated clicks don't stack them on top of each other.
   const placementCounterRef = useRef(0);
@@ -85,6 +88,32 @@ export const Sidebar: React.FC = () => {
   const filteredNodes = searchNodes(nodes, searchQuery);
 
   const categories = ['Data Source', 'Preprocessing', 'Modeling', 'Evaluation', 'Utility'];
+  const isSearching = searchQuery.length > 0;
+
+  const renderNode = (node: NodeDefinition<unknown>) => (
+    <button
+      type="button"
+      key={node.type}
+      data-testid={`sidebar-node-${node.type}`}
+      aria-label={`Add ${node.label} node`}
+      aria-describedby={`${categoryListId}-${node.type}-description`}
+      title={node.description}
+      className="group flex w-full items-start p-3 border rounded-lg bg-card text-left hover:border-primary/50 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background cursor-grab active:cursor-grabbing transition-all"
+      draggable
+      onDragStart={(e) => { handleDragStart(e, node.type); }}
+      onClick={() => { handleAddNodeClick(node.type); }}
+    >
+      <span className="shrink-0 p-2 bg-primary/5 group-hover:bg-primary/10 rounded-md mr-3 transition-colors">
+        {node.icon && <node.icon className="w-4 h-4 text-primary" />}
+      </span>
+      <span className="flex-1 min-w-0">
+        <span className={`block text-sm font-medium ${isSearching ? 'break-words' : 'truncate'}`}>{node.label}</span>
+        <span id={`${categoryListId}-${node.type}-description`} className={`block text-xs text-muted-foreground ${isSearching ? 'break-words' : 'truncate'}`}>
+          {node.description}
+        </span>
+      </span>
+    </button>
+  );
 
   return (
     <aside ref={trackContent} aria-label="Components" className="w-64 shrink-0 border-r bg-background flex flex-col h-full shadow-sm z-10 transition-all duration-300">
@@ -127,7 +156,6 @@ export const Sidebar: React.FC = () => {
           const categoryNodes = filteredNodes.filter(n => n.category === category);
           if (categoryNodes.length === 0) return null;
           // Search reveals every matching group without changing the browsing layout.
-          const isSearching = searchQuery.length > 0;
           const isExpanded = isSearching || !collapsedCategories[category];
           const contentId = `${categoryListId}-${index}`;
 
@@ -151,30 +179,34 @@ export const Sidebar: React.FC = () => {
                 </button>
               </h3>
               <div id={contentId} hidden={!isExpanded} className="space-y-2">
-                {categoryNodes.map((node) => (
-                  <button
-                    type="button"
-                    key={node.type}
-                    data-testid={`sidebar-node-${node.type}`}
-                    aria-label={`Add ${node.label} node`}
-                    aria-describedby={`${categoryListId}-${node.type}-description`}
-                    title={node.description}
-                    className="group flex w-full items-start p-3 border rounded-lg bg-card text-left hover:border-primary/50 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background cursor-grab active:cursor-grabbing transition-all"
-                    draggable
-                    onDragStart={(e) => { handleDragStart(e, node.type); }}
-                    onClick={() => { handleAddNodeClick(node.type); }}
-                  >
-                    <span className="shrink-0 p-2 bg-primary/5 group-hover:bg-primary/10 rounded-md mr-3 transition-colors">
-                      {node.icon && <node.icon className="w-4 h-4 text-primary" />}
-                    </span>
-                    <span className="flex-1 min-w-0">
-                      <span className={`block text-sm font-medium ${isSearching ? 'break-words' : 'truncate'}`}>{node.label}</span>
-                      <span id={`${categoryListId}-${node.type}-description`} className={`block text-xs text-muted-foreground ${isSearching ? 'break-words' : 'truncate'}`}>
-                        {node.description}
-                      </span>
-                    </span>
-                  </button>
-                ))}
+                {category === 'Preprocessing' && !isSearching
+                  ? groupPreprocessingNodes(categoryNodes).map(group => {
+                    const groupExpanded = Boolean(expandedPreprocessingGroups[group.id]);
+                    const groupContentId = `${contentId}-${group.id}`;
+                    return (
+                      <div key={group.id}>
+                        <h4>
+                          <button
+                            type="button"
+                            aria-expanded={groupExpanded}
+                            aria-controls={groupContentId}
+                            onClick={() => setExpandedPreprocessingGroups(current => ({ ...current, [group.id]: !current[group.id] }))}
+                            className="flex w-full items-center gap-1.5 rounded px-1 py-2 text-left text-xs font-medium text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                          >
+                            {groupExpanded
+                              ? <ChevronDown aria-hidden="true" className="h-3.5 w-3.5 shrink-0" />
+                              : <ChevronRight aria-hidden="true" className="h-3.5 w-3.5 shrink-0" />}
+                            <span className="flex-1">{group.label}</span>
+                            <span aria-hidden="true" className="text-[10px] tabular-nums">{group.nodes.length}</span>
+                          </button>
+                        </h4>
+                        <div id={groupContentId} hidden={!groupExpanded} className="space-y-2 pt-1 pb-2">
+                          {group.nodes.map(renderNode)}
+                        </div>
+                      </div>
+                    );
+                  })
+                  : categoryNodes.map(renderNode)}
               </div>
             </div>
           );

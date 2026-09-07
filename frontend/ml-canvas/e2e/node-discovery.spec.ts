@@ -18,6 +18,41 @@ async function openCanvas(page: Page, width: number) {
 }
 
 for (const theme of ['light', 'dark'] as const) {
+  test(`preprocessing subgroups stay compact and preserve browsing choices on a ${theme} canvas`, async ({ page }) => {
+    // Grouping must shorten browsing while search and keyboard insertion still reach every node.
+    await page.addInitScript(value => localStorage.setItem('skyulf-theme', value), theme);
+    await openCanvas(page, theme === 'light' ? 1440 : 1100);
+    const sidebar = page.getByRole('complementary', { name: 'Components', exact: true });
+    const search = sidebar.getByRole('textbox', { name: 'Search nodes', exact: true });
+    const cleaning = sidebar.getByRole('button', { name: 'Data cleaning', exact: true });
+    const numeric = sidebar.getByRole('button', { name: 'Numeric & categorical', exact: true });
+    const scaling = sidebar.getByRole('button', { name: 'Add Scaling node', exact: true });
+    const imputation = sidebar.getByRole('button', { name: 'Add Imputation node', exact: true });
+    await expect(cleaning).toHaveAttribute('aria-expanded', 'false');
+    await expect(numeric).toHaveAttribute('aria-expanded', 'false');
+    await expect(sidebar.getByRole('button', { name: 'Modeling', exact: true })).toBeInViewport();
+    await page.screenshot({ path: `test-results/preprocessing-groups-${theme}.png` });
+    await cleaning.press('Enter');
+    await expect(imputation).toBeVisible();
+    await expect(scaling).toBeHidden();
+    await search.fill('normalize');
+    await expect(scaling).toBeVisible();
+    await expect(numeric).toHaveCount(0);
+    await search.fill('');
+    await expect(cleaning).toHaveAttribute('aria-expanded', 'true');
+    await expect(numeric).toHaveAttribute('aria-expanded', 'false');
+    await cleaning.press('Space');
+    await numeric.press('Enter');
+    await expect(numeric).toHaveAttribute('aria-expanded', 'true');
+    await expect(scaling).toBeVisible();
+    await scaling.press('Space');
+    await expect(page.getByTestId('canvas-node-scale_numeric_features')).toHaveCount(1);
+    await sidebar.getByRole('button', { name: 'Collapse sidebar', exact: true }).click();
+    await page.getByRole('button', { name: 'Expand components sidebar', exact: true }).click();
+    await expect(numeric).toHaveAttribute('aria-expanded', 'true');
+    await expect(cleaning).toHaveAttribute('aria-expanded', 'false');
+  });
+
   test(`task search keeps descriptions readable and keyboard insertion working on a ${theme} canvas`, async ({ page }) => {
     // Both entry points must expose the same relevant nodes at laptop and desktop widths.
     await page.addInitScript(value => localStorage.setItem('skyulf-theme', value), theme);
