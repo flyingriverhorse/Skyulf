@@ -8,6 +8,9 @@ test('resizing settings preserves edits, remembers width, and leaves room for th
   await page.route('**/api/pipeline/hyperparameters/*', route => route.fulfill({ json: [] }));
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto('/canvas');
+  // Pin the library open so this test exercises settings limits with both panels visible.
+  await page.getByRole('button', { name: 'Collapse sidebar', exact: true }).click();
+  await page.getByRole('button', { name: 'Expand components sidebar', exact: true }).click();
   await page.getByRole('button', { name: 'Add Classification node', exact: true }).click();
   const target = page.getByRole('textbox', { name: 'Target Column', exact: true });
   await target.fill('outcome');

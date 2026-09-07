@@ -24,6 +24,7 @@ import { useGraphStore, useTemporalStore } from '../../core/store/useGraphStore'
 import { useJobStore } from '../../core/store/useJobStore';
 import { useViewStore } from '../../core/store/useViewStore';
 import { getReadOnlyMode, useReadOnlyMode } from '../../core/hooks/useReadOnlyMode';
+import { useSidebarOpen } from '../../core/hooks/useSidebarOpen';
 import { autoLayoutGraph } from '../../core/utils/autoLayout';
 import {
   SHOW_SHORTCUTS_EVENT,
@@ -49,7 +50,7 @@ export const Toolbar: React.FC = () => {
   const setGraph = useGraphStore((state) => state.setGraph);
 
   const { toggleDrawer } = useJobStore();
-  const isSidebarOpen = useViewStore((s) => s.isSidebarOpen);
+  const isSidebarOpen = useSidebarOpen();
   const perfOverlayEnabled = useViewStore((s) => s.perfOverlayEnabled);
   const setPerfOverlayEnabled = useViewStore((s) => s.setPerfOverlayEnabled);
   // Hide editor-only buttons on tablet or when read-only is toggled on.

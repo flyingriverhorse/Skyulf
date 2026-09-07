@@ -1,7 +1,8 @@
-import React, { useId, useRef, useState } from 'react';
+import React, { useCallback, useId, useLayoutEffect, useRef, useState } from 'react';
 import { registry } from '../../core/registry/NodeRegistry';
 import { useGraphStore } from '../../core/store/useGraphStore';
 import { useViewStore } from '../../core/store/useViewStore';
+import { useSidebarOpen } from '../../core/hooks/useSidebarOpen';
 import { FOCUS_NODE_EVENT } from '../../core/hooks/useKeyboardShortcuts';
 import { Search, PanelLeftClose, PanelLeftOpen, ChevronDown, ChevronRight } from 'lucide-react';
 
@@ -11,7 +12,23 @@ export const Sidebar: React.FC = () => {
   // compatibility but are excluded from the drag-and-drop palette.
   const nodes = registry.getAll().filter((n) => !n.hidden);
   const addNode = useGraphStore((state) => state.addNode);
-  const { isSidebarOpen, setSidebarOpen } = useViewStore();
+  const setSidebarOpen = useViewStore((state) => state.setSidebarOpen);
+  const isSidebarOpen = useSidebarOpen();
+  const contentRef = useRef<HTMLElement | null>(null);
+  const restoreFocus = useRef(false);
+  // Ref detachment runs before the old sidebar DOM disappears, while its
+  // focused control can still be identified. Do not steal focus from settings.
+  const trackContent = useCallback((element: HTMLElement | null) => {
+    if (!element && contentRef.current?.contains(document.activeElement)) restoreFocus.current = true;
+    contentRef.current = element;
+  }, []);
+  useLayoutEffect(() => {
+    if (restoreFocus.current) {
+      const content = contentRef.current;
+      (content?.querySelector<HTMLInputElement>('input') ?? content?.querySelector<HTMLButtonElement>('button'))?.focus();
+      restoreFocus.current = false;
+    }
+  }, [isSidebarOpen]);
   const [searchTerm, setSearchTerm] = useState('');
   const [collapsedCategories, setCollapsedCategories] = useState<Record<string, boolean>>({});
   const categoryListId = useId();
@@ -49,10 +66,11 @@ export const Sidebar: React.FC = () => {
 
   if (!isSidebarOpen) {
     return (
-      <div className="absolute left-4 top-4 z-10">
+      <div ref={trackContent} className="absolute left-4 top-4 z-10">
         <button
+          type="button"
           onClick={() => setSidebarOpen(true)}
-          className="p-2 bg-background border shadow-md rounded-md text-muted-foreground hover:text-foreground transition-colors"
+          className="p-2 bg-background border shadow-md rounded-md text-muted-foreground hover:text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
           title="Expand Components"
           aria-label="Expand components sidebar"
         >
@@ -72,7 +90,7 @@ export const Sidebar: React.FC = () => {
   const categories = ['Data Source', 'Preprocessing', 'Modeling', 'Evaluation', 'Utility'];
 
   return (
-    <aside className="w-64 shrink-0 border-r bg-background flex flex-col h-full shadow-sm z-10 transition-all duration-300">
+    <aside ref={trackContent} aria-label="Components" className="w-64 shrink-0 border-r bg-background flex flex-col h-full shadow-sm z-10 transition-all duration-300">
       <div className="p-4 border-b space-y-3">
         <div className="flex items-center justify-between">
           <div>
@@ -80,8 +98,9 @@ export const Sidebar: React.FC = () => {
             <p className="text-xs text-muted-foreground">Click or drag to add a node</p>
           </div>
           <button
+            type="button"
             onClick={() => setSidebarOpen(false)}
-            className="p-1 hover:bg-accent rounded-md text-muted-foreground hover:text-foreground transition-colors"
+            className="p-1 hover:bg-accent rounded-md text-muted-foreground hover:text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
             title="Collapse Sidebar"
             aria-label="Collapse sidebar"
           >

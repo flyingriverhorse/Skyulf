@@ -30,7 +30,8 @@ const writePerfOverlayPreference = (enabled: boolean): void => {
 interface ViewState {
   activeView: ViewType;
   setView: (view: ViewType) => void;
-  isSidebarOpen: boolean;
+  /** Null follows viewport size; an explicit open/close choice lasts for the session. */
+  sidebarOpenOverride: boolean | null;
   setSidebarOpen: (isOpen: boolean) => void;
   isPropertiesPanelExpanded: boolean;
   setPropertiesPanelExpanded: (isExpanded: boolean) => void;
@@ -63,8 +64,8 @@ interface ViewState {
 export const useViewStore = create<ViewState>((set) => ({
   activeView: 'canvas',
   setView: (view) => set({ activeView: view }),
-  isSidebarOpen: true,
-  setSidebarOpen: (isOpen) => set({ isSidebarOpen: isOpen }),
+  sidebarOpenOverride: null,
+  setSidebarOpen: (isOpen) => set({ sidebarOpenOverride: isOpen }),
   isPropertiesPanelExpanded: false,
   setPropertiesPanelExpanded: (isExpanded) => set({ isPropertiesPanelExpanded: isExpanded }),
   propertiesPanelWidth: 320,

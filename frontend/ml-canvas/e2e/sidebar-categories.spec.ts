@@ -6,6 +6,7 @@ test('category collapse keeps search matches reachable and restores the browsing
   await mockBackend(page);
   await page.setViewportSize({ width: 1100, height: 900 });
   await page.goto('/canvas');
+  await page.getByRole('button', { name: 'Expand components sidebar', exact: true }).click();
   const preprocessing = page.getByRole('button', { name: 'Preprocessing', exact: true });
   const indicator = page.getByRole('button', { name: 'Add Missing Indicator node', exact: true });
   const search = page.getByRole('textbox', { name: 'Search nodes' });

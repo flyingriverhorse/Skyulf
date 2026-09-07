@@ -1,6 +1,7 @@
 import React from 'react';
 import { useGraphStore } from '../../core/store/useGraphStore';
 import { useViewStore } from '../../core/store/useViewStore';
+import { useSidebarOpen } from '../../core/hooks/useSidebarOpen';
 import { registry } from '../../core/registry/NodeRegistry';
 import {
   ExecutionMode,
@@ -16,9 +17,10 @@ import { Node } from '@xyflow/react';
 export const PropertiesPanel: React.FC = () => {
   const nodes = useGraphStore((state) => state.nodes);
   const {
-    isSidebarOpen, isPropertiesPanelExpanded, setPropertiesPanelExpanded,
+    isPropertiesPanelExpanded, setPropertiesPanelExpanded,
     propertiesPanelWidth, setPropertiesPanelWidth,
   } = useViewStore();
+  const isSidebarOpen = useSidebarOpen();
   const panelRef = React.useRef<HTMLElement>(null);
   const panelId = React.useId();
   const dragStart = React.useRef<{ x: number; width: number } | null>(null);

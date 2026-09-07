@@ -26,7 +26,7 @@ before implementation because other work may have changed these components.
 
 | ID | Priority | Improvement | Status |
 |---|---|---|---|
-| CUX-01 | High | Preserve canvas space with resizable panels | In progress; settings and results resizing complete |
+| CUX-01 | High | Preserve canvas space with resizable panels | In progress; panel resizing and automatic sidebar collapse complete |
 | CUX-02 | High | Guide node connections and adding the next step | Open |
 | CUX-03 | High | Clearly distinguish previewing data from training | In progress; visible action labels and training guidance complete |
 | CUX-04 | Medium | Improve component discovery | In progress; description search and collapsible categories complete |
@@ -61,7 +61,16 @@ with the maximum reduced to reserve 240px above results when space permits.
 The preferred height survives collapse, maximize/restore, close/new results,
 and viewport changes within the session; refresh resets it. Canvas zoom
 controls follow the visible height and return when maximized results collapse.
-Automatic sidebar collapse and revealing selected nodes remain open.
+The component library now defaults to collapsed below 1280px and reopens
+automatically at larger widths. Explicit open/close choices override this
+default for the app session. Search and category choices survive automatic
+collapse/reopen while editing. Focus moves to the reopen button only when a
+sidebar control was focused; it returns to search when the focused reopen
+button disappears. Settings fields keep focus when the sidebar changes.
+Sidebar visibility, toolbar placement, and settings sizing share one resolver.
+The existing read-only transition below 1024px still unmounts the sidebar:
+search/category state resets on returning, but explicit open/close choices
+persist. Revealing selected nodes remains open.
 
 **Acceptance criteria:**
 
@@ -72,7 +81,7 @@ Automatic sidebar collapse and revealing selected nodes remain open.
 - [ ] A selected node can be brought into the unobscured canvas area.
 - [x] Resizing has a keyboard-accessible alternative.
 - [x] Existing expand, collapse, results maximize, and read-only behaviors remain coherent.
-- [ ] The component library collapses automatically when space becomes constrained, preserving explicit choices.
+- [x] The component library collapses automatically when space becomes constrained, preserving explicit choices.
 
 **Starting points:** `src/components/layout/PropertiesPanel.tsx`,
 `MainLayout.tsx`, `ResultsPanel.tsx`, `Sidebar.tsx`,
@@ -391,3 +400,21 @@ explicitly recorded above is complete; remaining interaction details need review
   frontend assets were refreshed. Mocked checks still emit backend connection
   logs; the build retains circular-chunk and empty-chunk warnings. CUX-01
   remains in progress for sidebar auto-collapse and selected-node visibility.
+- 2026-09-07: Committed the accumulated resizing, action-label, and discovery
+  work as `42da3904`. Commit verification passed all 873 frontend unit tests,
+  7 focused browser tests, and the applicable pre-commit hooks.
+- 2026-09-07: Added responsive component-library defaults through
+  `useSidebarOpen`, with a session override in useViewStore. Sidebar,
+  PropertiesPanel, and Toolbar use the same effective visibility. Sidebar
+  replacement preserves keyboard focus and mounted search/category state.
+  Added `e2e/sidebar-responsive.spec.ts`; the initial tests failed before
+  implementation and all three pass afterward. Coverage includes initial
+  laptop layout, automatic collapse/reopen, manual overrides across viewport
+  changes, focused settings retention, toolbar clearance, panel-width limits,
+  and dark/reduced-motion/read-only transitions. The existing settings-resize
+  and category tests now explicitly open the library where needed.
+  All 10 focused browser tests and 24 focused unit tests passed, along with
+  `npm run lint` and `npm run build`; generated assets were refreshed. Existing
+  circular-chunk/empty-chunk build warnings remain. Read-only still unmounts
+  local sidebar browsing state, as recorded above. CUX-01 remains in progress
+  for selected-node visibility.
