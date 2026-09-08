@@ -620,17 +620,17 @@ def test_all_imputers_empty_dataframe_returns_empty_params(calculator: str) -> N
 
 
 def test_simple_imputer_all_nan_column_explicit_constant_strategy() -> None:
-    """Sklearn skips all-NaN columns for constant strategy (needs 1+ observed value).
-
-    ``SimpleImputer.statistics_`` reports NaN rather than fill_value in this
-    edge case (verified sklearn 1.8 behavior) -- documenting it here so a
-    future sklearn upgrade that changes this is caught by the test suite.
-    """
+    """Constant imputation fills entirely missing columns without learning values."""
     df = pd.DataFrame({"a": [np.nan, np.nan, np.nan], "b": [1.0, 2.0, 3.0]})
     params = SimpleImputerCalculator().fit(
         df, {"columns": ["a"], "strategy": "constant", "fill_value": 0.0}
     )
-    assert np.isnan(params["fill_values"]["a"])
+    assert params["fill_values"]["a"] == 0.0
+
+    out = SimpleImputerApplier().apply(df, params)
+    expected = pd.DataFrame({"a": [0.0, 0.0, 0.0], "b": [1.0, 2.0, 3.0]})
+    pd.testing.assert_frame_equal(out, expected)
+    assert df["a"].isna().all()
 
 
 def test_compute_polars_fill_values_all_null_column_mean_is_null() -> None:

@@ -189,11 +189,20 @@ class SimpleImputerCalculator(BaseCalculator):
             if not cols:
                 return {}
 
-        imputer = SimpleImputer(strategy=strategy, fill_value=fill_value)
+        imputer = SimpleImputer(
+            strategy=strategy,
+            fill_value=fill_value,
+            keep_empty_features=strategy == "constant",
+        )
         imputer.fit(X[cols])
 
-        statistics = imputer.statistics_.tolist()
-        fill_values = dict(zip(cols, statistics, strict=True))
+        if strategy == "constant" and fill_value is not None:
+            # Validation still runs, but heldout missingness must not choose a constant.
+            fill_values = dict.fromkeys(cols, fill_value)
+        else:
+            # Keeping empty constant columns preserves sklearn's dtype-based defaults.
+            statistics = imputer.statistics_.tolist()
+            fill_values = dict(zip(cols, statistics, strict=True))
         missing_counts = X[cols].isnull().sum().to_dict()
         total_missing = int(sum(missing_counts.values()))
 
