@@ -5,6 +5,7 @@ import json
 import logging
 import pickle  # nosec B403 - used only for internal pipeline serialization (see save/load below)
 from collections.abc import Callable
+from dataclasses import replace
 from typing import Any, cast
 
 import numpy as np
@@ -17,7 +18,10 @@ from ..engines import SkyulfDataFrame, get_engine
 from ..leakage import OnLeakage, validate_leakage_safety
 from ..modeling._evaluation.thresholds import apply_thresholds, optimize_thresholds
 from ..modeling._tuning.engine import TuningApplier, TuningCalculator
+from ..modeling._tuning.refit import tune_decision_thresholds
 from ..modeling.base import BaseModelApplier, BaseModelCalculator, StatefulEstimator, extract_xy
+from ..preprocessing.base import BaseApplier, apply_method
+from ..preprocessing.fold_adapter import FeatureEngineerFoldAdapter
 from ..preprocessing.pipeline import FeatureEngineer
 from ..registry import NodeRegistry
 from ..types import PipelineConfig
@@ -38,6 +42,58 @@ def _to_pandas(obj: Any) -> Any:
     if hasattr(obj, "to_pandas"):
         return obj.to_pandas()
     return obj
+
+
+class _PipelineTuningPreprocessor(FeatureEngineerFoldAdapter):
+    """Retain the final fold fit's engineer, training representation, and metrics."""
+
+    def __init__(self, steps_config: list[dict[str, Any]], target_column: str):
+        """Validate the fold chain and initialize the final-fit observations."""
+        super().__init__(steps_config, target_column)
+        self.training_payload: Any = None
+        self.metrics: dict[str, Any] = {}
+        self.input_columns: list[str] = []
+
+    def fit_transform(self, X: Any, y: Any) -> tuple[Any, Any]:
+        """Fit a fresh chain and retain its exact OOF or row-changing training output."""
+        self._validate_payload(X)
+        engineer = FeatureEngineer(self._steps_config)
+        transformed, metrics = engineer.fit_transform((X, y), target_column=self._target_column)
+        self._engineer = engineer
+        self.training_payload = transformed
+        self.metrics = metrics
+        self.input_columns = list(X.columns)
+        return transformed
+
+
+class _TuningColumnDropApplier(BaseApplier):
+    """Preserve the tuner's removal of its time-ordering column during serving."""
+
+    @apply_method
+    def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
+        """Drop only the recorded sorting columns, preserving row and target alignment."""
+        for column in params["columns"]:
+            if column in X.columns:
+                X = StatefulEstimator._drop_target_column(X, column)
+        return X, _y
+
+
+def _merge_preprocessing_metrics(
+    prefix: dict[str, Any], suffix: dict[str, Any], prefix_length: int
+) -> dict[str, Any]:
+    """Combine the split prefix and final training fit without replaying preprocessing."""
+    steps = dict(prefix["steps"])
+    for key, value in suffix["steps"].items():
+        index, _, name = key.partition(":")
+        steps[f"{prefix_length + int(index)}:{name}"] = value
+    before, after = prefix["summary"], suffix["summary"]
+    summary = {
+        "fit_time": before["fit_time"] + after["fit_time"],
+        "peak_memory_bytes": max(before["peak_memory_bytes"], after["peak_memory_bytes"]),
+        "rows_in": before["rows_in"] if prefix_length else after["rows_in"],
+        "rows_out": after["rows_out"] if suffix["steps"] else before["rows_out"],
+    }
+    return {"summary": summary, "steps": steps, **summary}
 
 
 class SkyulfPipeline:
@@ -133,35 +189,146 @@ class SkyulfPipeline:
             node_id=node_id, calculator=calculator, applier=applier
         )
 
+    def _fit_tuning_pipeline(
+        self, data: Any, target_column: str
+    ) -> tuple[SplitDataset, dict[str, Any]]:
+        """Tune from raw outer partitions and adopt the final training preprocessor."""
+        prefix_length = 0
+        if not isinstance(data, SplitDataset):
+            prefix_length = next(
+                (
+                    index + 1
+                    for index, step in enumerate(self.preprocessing_steps)
+                    if step["transformer"] in {"TrainTestSplitter", "Split"}
+                ),
+                0,
+            )
+        prefix = FeatureEngineer(self.preprocessing_steps[:prefix_length], _validated=True)
+        raw_data, prefix_metrics = prefix.fit_transform(data, target_column=target_column)
+        if isinstance(raw_data, SplitDataset):
+            raw_dataset = raw_data
+        else:
+            raw_frame = raw_data[0] if isinstance(raw_data, tuple) else raw_data
+            raw_dataset = SplitDataset(
+                train=raw_data, test=get_engine(raw_frame).create_dataframe({}), validation=None
+            )
+
+        raw_train = extract_xy(raw_dataset.train, target_column)
+        raw_validation = (
+            extract_xy(raw_dataset.validation, target_column)
+            if StatefulEstimator._is_non_empty_split(raw_dataset.validation)
+            else None
+        )
+        adapter = _PipelineTuningPreprocessor(
+            cast(list[dict[str, Any]], self.preprocessing_steps[prefix_length:]), target_column
+        )
+        estimator = self.model_estimator
+        if estimator is None or not isinstance(estimator.calculator, TuningCalculator):
+            raise RuntimeError("The tuning pipeline requires a tuning calculator.")
+        calculator = estimator.calculator
+        tuning_config = calculator._build_tuning_config(cast(dict[str, Any], self.modeling_config))
+        estimator.model = calculator.fit(
+            raw_train[0],
+            raw_train[1],
+            replace(tuning_config, tune_threshold=False),
+            preprocessing=adapter,
+            validation_data=raw_validation,
+            validation_frames=raw_validation,
+        )
+        if adapter._engineer is None or adapter.training_payload is None:
+            raise RuntimeError("The tuner did not produce fitted preprocessing.")
+
+        # Time-series tuning removes its explicit or auto-detected time column
+        # before fitting. Record that operation ahead of the fitted fold chain
+        # so evaluation and serving see the same feature space, without sorting
+        # new prediction requests or changing their row order.
+        removed_columns = [c for c in raw_train[0].columns if c not in adapter.input_columns]
+        if removed_columns:
+            adapter._engineer.fitted_steps.insert(
+                0,
+                {
+                    "name": "tuning_time_columns",
+                    "type": "TuningColumnDrop",
+                    "applier": _TuningColumnDropApplier(),
+                    "artifact": {"columns": removed_columns},
+                },
+            )
+        self.feature_engineer.fitted_steps = prefix.fitted_steps + adapter._engineer.fitted_steps
+        transformed = SplitDataset(
+            train=adapter.training_payload,
+            test=self._transform_tuning_split(adapter, raw_dataset.test, target_column),
+            validation=self._transform_tuning_split(adapter, raw_dataset.validation, target_column),
+        )
+        if tuning_config.tune_threshold:
+            model, tuning_result = estimator.model
+            tune_decision_thresholds(
+                calculator.model_calculator,
+                model,
+                tuning_result,
+                tuning_config,
+                extract_xy(transformed.validation, target_column)
+                if StatefulEstimator._is_non_empty_split(transformed.validation)
+                else None,
+                None,
+            )
+        return transformed, _merge_preprocessing_metrics(
+            prefix_metrics, adapter.metrics, prefix_length
+        )
+
+    @staticmethod
+    def _transform_tuning_split(
+        adapter: _PipelineTuningPreprocessor, payload: Any, target_column: str
+    ) -> Any:
+        """Transform one raw held-out partition with the final fitted fold chain."""
+        if not StatefulEstimator._is_non_empty_split(payload):
+            return None if payload is None else payload
+        X, y = extract_xy(payload, target_column)
+        return adapter.transform(X, y)
+
     def fit(
         self,
         data: pd.DataFrame | pl.DataFrame | SkyulfDataFrame | SplitDataset,
         target_column: str,
+        *,
+        on_leakage: OnLeakage = "raise",
     ) -> dict[str, Any]:
         """Fit the pipeline.
 
         Args:
             data: Input data (DataFrame or SplitDataset).
             target_column: Name of the target column.
+            on_leakage: Reject definite leakage by default. Use "warn" or
+                "ignore" only to explicitly allow unsafe preprocessing.
 
         Returns:
             Dictionary containing execution metrics.
+
+        Raises:
+            ValueError: If learned preprocessing precedes a train/test split
+                with ``on_leakage="raise"``, or the mode is invalid.
         """
         metrics = {}
 
-        # Leakage structure check (advisory): the backend execution gate
-        # hard-blocks data-dependent preprocessing before the split; in the
-        # SDK the same verdict is surfaced as warnings before any fit
-        # happens. Skipped when the caller supplies a SplitDataset — the
-        # train/test boundary is then provided externally and enforced by
-        # construction, and a flat config legitimately has no splitter node.
-        if not isinstance(data, SplitDataset):
-            for warning in validate_leakage_safety(self.config, on_leakage="warn"):
-                logger.warning(warning)
+        # Check before any transformer or estimator can learn from the data.
+        for warning in validate_leakage_safety(
+            self.config,
+            on_leakage=on_leakage,
+            target_column=target_column,
+            already_split=isinstance(data, SplitDataset),
+        ):
+            logger.warning(warning)
 
         # 1. Feature Engineering
         logger.info("Starting Feature Engineering...")
-        transformed_data, fe_metrics = self.feature_engineer.fit_transform(data)
+        is_tuning = self.model_estimator is not None and isinstance(
+            self.model_estimator.calculator, TuningCalculator
+        )
+        if is_tuning:
+            transformed_data, fe_metrics = self._fit_tuning_pipeline(data, target_column)
+        else:
+            transformed_data, fe_metrics = self.feature_engineer.fit_transform(
+                data, target_column=target_column
+            )
         metrics["preprocessing"] = fe_metrics
 
         # 2. Modeling
@@ -182,11 +349,12 @@ class SkyulfPipeline:
 
             # Fit the model
             # Note: fit_predict updates self.model_estimator.model in-memory
-            _ = self.model_estimator.fit_predict(
-                dataset=dataset,
-                target_column=target_column,
-                config=cast(dict[str, Any], self.modeling_config),
-            )
+            if not is_tuning:
+                _ = self.model_estimator.fit_predict(
+                    dataset=dataset,
+                    target_column=target_column,
+                    config=cast(dict[str, Any], self.modeling_config),
+                )
 
             # Evaluate
             # We can run evaluation if we have test/validation sets
@@ -207,6 +375,8 @@ class SkyulfPipeline:
         self,
         data: pd.DataFrame | pl.DataFrame | SkyulfDataFrame | SplitDataset,
         target_column: str,
+        *,
+        on_leakage: OnLeakage = "raise",
     ) -> tuple[pd.DataFrame, pd.Series, pd.DataFrame, pd.Series]:
         """Run this pipeline's configured preprocessing chain and return the split.
 
@@ -228,6 +398,8 @@ class SkyulfPipeline:
         Args:
             data: Input data (DataFrame or SplitDataset).
             target_column: Name of the target column.
+            on_leakage: Reject definite leakage by default, as in ``fit()``.
+                "warn" and "ignore" explicitly allow unsafe preprocessing.
 
         Returns:
             ``(X_train, y_train, X_test, y_test)`` as pandas DataFrame/Series.
@@ -239,11 +411,20 @@ class SkyulfPipeline:
 
         Raises:
             ValueError: If the configured preprocessing steps don't produce a
-                train/test split (e.g. no Splitter node configured).
+                train/test split, violate the selected leakage policy, or use
+                an invalid leakage mode.
         """
+        for warning in validate_leakage_safety(
+            self.config,
+            on_leakage=on_leakage,
+            target_column=target_column,
+            already_split=isinstance(data, SplitDataset),
+        ):
+            logger.warning(warning)
+
         transformed_data, _ = FeatureEngineer(
             self.preprocessing_steps, _validated=True
-        ).fit_transform(data)
+        ).fit_transform(data, target_column=target_column)
 
         if not isinstance(transformed_data, SplitDataset):
             raise ValueError(
@@ -327,7 +508,7 @@ class SkyulfPipeline:
                 "optimize_thresholds()."
             )
 
-        model = self.model_estimator.model
+        model = self.model_estimator._unwrap_tuned_model()
         model_classes = getattr(model, "classes_", None)
         if model_classes is None:
             raise ValueError(
@@ -401,7 +582,8 @@ class SkyulfPipeline:
             )
 
         proba_df = self._predict_proba_transformed(transformed_data)
-        classes = np.asarray(self.model_estimator.model.classes_)
+        model = self.model_estimator._unwrap_tuned_model()
+        classes = np.asarray(model.classes_)
         y_proba = np.asarray(proba_df)[:, : len(classes)]
         return apply_thresholds(y_proba, self._tuned_thresholds, classes=classes)
 
@@ -437,9 +619,13 @@ class SkyulfPipeline:
 
         return "\n".join(lines)
 
-    def validate_leakage_safety(self, on_leakage: OnLeakage = "raise") -> list[str]:
+    def validate_leakage_safety(
+        self, on_leakage: OnLeakage = "raise", *, target_column: str | None = None
+    ) -> list[str]:
         """Diagnose preprocessing steps ordered before the train/test split."""
-        return validate_leakage_safety(self.config, on_leakage=on_leakage)
+        return validate_leakage_safety(
+            self.config, on_leakage=on_leakage, target_column=target_column
+        )
 
     def to_mermaid(self) -> str:
         """Render the pipeline as a Mermaid ``flowchart`` string.

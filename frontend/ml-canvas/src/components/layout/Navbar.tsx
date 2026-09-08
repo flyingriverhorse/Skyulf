@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { BarChart2, BookOpen, GitBranch, Eye, Pencil, Rocket } from 'lucide-react';
 import { useViewStore } from '../../core/store/useViewStore';
 import { useReadOnlyMode } from '../../core/hooks/useReadOnlyMode';
@@ -8,11 +8,10 @@ import { HelpGuideModal } from './HelpGuideModal';
 import { NotificationCenter } from './NotificationCenter';
 
 export const Navbar: React.FC = () => {
-  const { activeView, setView } = useViewStore();
+  const { activeView, setView, helpGuideTab, openHelpGuide, closeHelpGuide } = useViewStore();
   const setReadOnlyOverride = useViewStore((s) => s.setReadOnlyOverride);
   const readOnly = useReadOnlyMode();
   const { isTablet } = useViewport();
-  const [showHelp, setShowHelp] = useState(false);
 
   // Show the read-only chip only on canvas view. Tablet users get an
   // info chip explaining why edit tools are hidden; desktop users only
@@ -106,7 +105,7 @@ export const Navbar: React.FC = () => {
         )}
 
         <button
-          onClick={() => setShowHelp(true)}
+          onClick={() => openHelpGuide('basics')}
           title="How pipelines work — branches, merges, and scoring"
           aria-label="Pipeline guide"
           data-testid="navbar-help"
@@ -118,7 +117,7 @@ export const Navbar: React.FC = () => {
         <NotificationCenter />
       </div>
 
-      <HelpGuideModal isOpen={showHelp} onClose={() => setShowHelp(false)} />
+      <HelpGuideModal isOpen={helpGuideTab !== null} initialTab={helpGuideTab ?? 'basics'} onClose={closeHelpGuide} />
     </div>
   );
 };

@@ -146,7 +146,7 @@ class HashingVectorizerCalculator(BaseCalculator):
         so a polars input is never converted to pandas just to fit. An empty or
         wholly-absent selection yields an empty artifact so the applier no-ops.
         """
-        valid_cols = resolve_fit_text_valid_columns(X, config)
+        valid_cols = resolve_fit_text_valid_columns(X, config, _y)
         if valid_cols is None:
             return {}
 

@@ -4,6 +4,7 @@ import { jobsApi, type RunPipelineResponse } from '../../../core/api/jobs';
 import { registryApi } from '../../../core/api/registry';
 import { useGraphStore } from '../../../core/store/useGraphStore';
 import { useJobStore } from '../../../core/store/useJobStore';
+import { useViewStore } from '../../../core/store/useViewStore';
 import { warnAndBlockOnLeakage } from '../../../core/utils/pipelineLeakageValidation';
 import { SegmentationSettings, type SegmentationConfig } from './SegmentationSettings';
 
@@ -28,6 +29,7 @@ async function renderSettings(patch: Partial<SegmentationConfig> = {}, nodeId: s
 
 beforeEach(() => {
   vi.clearAllMocks();
+  useViewStore.setState({ leakageNotice: null });
   vi.stubGlobal('IntersectionObserver', undefined);
   vi.mocked(registryApi.getAllNodes).mockResolvedValue([
     { id: 'kmeans', name: 'K-Means', category: 'Modeling', description: '', params: {}, tags: ['clustering'] },
@@ -159,6 +161,17 @@ it('recovers from a failed submission', async () => {
   expect(jobsApi.runPipeline).toHaveBeenCalledTimes(2);
   expect(screen.getByRole('status')).toHaveTextContent(/Awaiting status/);
   expect(screen.queryByText(/Submission failed/)).not.toBeInTheDocument();
+});
+
+/** Segmentation safety errors must retain backend corrections in both persistent feedback surfaces. */
+it('routes structured backend safety errors to the canvas notice', async () => {
+  const detail = 'Data leakage risk: learned preprocessing requires a safe split.';
+  vi.mocked(jobsApi.runPipeline).mockRejectedValueOnce({ response: { data: { detail } } });
+  await renderSettings();
+  await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Train segmentation' })));
+  expect(useViewStore.getState().leakageNotice?.message).toBe(detail);
+  expect(screen.getByRole('status')).toHaveTextContent(detail);
+  expect(screen.getByRole('button', { name: 'Train segmentation' })).toBeEnabled();
 });
 
 /** Delayed responses must remain attached to their original node after selection changes. */

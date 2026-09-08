@@ -13,6 +13,7 @@ import pytest
 from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
 
+from backend.config import get_settings
 from backend.ml_pipeline._execution.engine import PipelineEngine
 from backend.ml_pipeline._internal._routers import preview as preview_mod
 from skyulf.data.dataset import SplitDataset
@@ -202,14 +203,20 @@ def test_shared_node_executions_keep_distinct_branch_snapshots(preview_client, m
 
 
 @pytest.mark.parametrize("engine", ["pandas", "polars"])
-def test_samples_are_bounded_with_actual_shape(preview_client, engine):
+def test_samples_are_bounded_with_actual_shape(preview_client, engine, monkeypatch):
     """Wide or long data must retain true preview counts while bounding the receipt."""
+    # A real catalog honors the configured engine; this mock must do so too,
+    # independently of the outer CI engine matrix or a developer's .env.
+    monkeypatch.setattr(get_settings(), "SKYULF_ENGINE", engine)
     data = {f"column_{i}": ["x" * 1000] * 60 for i in range(105)}
     preview_client.catalog.load.return_value = (
         pd.DataFrame(data) if engine == "pandas" else pl.DataFrame(data)
     )
     response = _preview(preview_client, [_source()], selected="source")
-    table = response["node_inspections"][0]["output"]["tables"][0]
+    assert response["status"] == "success", response["node_results"]["source"]["error"]
+    side = response["node_inspections"][0]["output"]
+    assert side["status"] == "available", side["reason"]
+    table = side["tables"][0]
     assert (table["row_count"], table["column_count"]) == (60, 105)
     assert len(table["columns"]) == len(table["rows"][0]) == 100
     assert 0 < len(table["rows"]) <= 50

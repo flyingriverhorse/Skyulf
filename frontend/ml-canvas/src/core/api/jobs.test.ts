@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { jobsApi } from './jobs';
 import { apiClient } from './client';
-import axios from 'axios';
+import axios, { AxiosError } from 'axios';
 
 // We mock the underlying HTTP layer (apiClient = axios instance, plus
 // the bare `axios` import used by getIngestionJobs) and assert the
@@ -20,6 +20,26 @@ describe('jobsApi.runPipeline', () => {
     const result = await jobsApi.runPipeline({ nodes: [], edges: [] } as never);
     expect(post).toHaveBeenCalledWith('/pipeline/run', { nodes: [], edges: [] });
     expect(result.pipeline_id).toBe('p1');
+  });
+
+  /** Submission errors must retain the backend correction through the real Axios interceptor. */
+  it('preserves the leakage detail from an HTTP 400 response', async () => {
+    const detail = "Data leakage risk: node 'scale' (StandardScaler) fits on unsplit data. Move it after the train/test splitter.";
+    const originalAdapter = apiClient.defaults.adapter;
+    apiClient.defaults.adapter = async (config) => {
+      throw new AxiosError('Request failed with status code 400', 'ERR_BAD_REQUEST', config, undefined, {
+        data: { detail }, status: 400, statusText: 'Bad Request', headers: {}, config,
+      });
+    };
+    try {
+      await expect(jobsApi.runPipeline({ nodes: [], edges: [] } as never)).rejects.toMatchObject({
+        message: detail,
+        response: { status: 400, data: { detail } },
+      });
+    } finally {
+      if (originalAdapter === undefined) delete apiClient.defaults.adapter;
+      else apiClient.defaults.adapter = originalAdapter;
+    }
   });
 });
 

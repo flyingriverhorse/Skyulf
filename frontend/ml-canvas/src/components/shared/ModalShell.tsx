@@ -1,4 +1,5 @@
 import React, { useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import { useModalFocus } from './useModalFocus';
 
@@ -78,7 +79,9 @@ export const ModalShell: React.FC<ModalShellProps> = ({
 
   const titleId = ariaLabelledBy ?? (typeof title === 'string' ? `modal-title-${title.replace(/\s+/g, '-').toLowerCase()}` : undefined);
 
-  return (
+  // Escape ancestor stacking contexts (such as the navbar's z-30) so
+  // canvas notices cannot paint above the modal backdrop or its content.
+  return createPortal(
     // eslint-disable-next-line jsx-a11y/click-events-have-key-events,jsx-a11y/no-static-element-interactions -- backdrop dismiss zone (Escape handler covers keyboard)
     <div
       className={`fixed inset-0 ${zIndex} flex items-center justify-center bg-black/50 backdrop-blur-sm p-4`}
@@ -121,6 +124,7 @@ export const ModalShell: React.FC<ModalShellProps> = ({
           <div className="border-t border-slate-200 dark:border-slate-700 p-4">{footer}</div>
         )}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 };

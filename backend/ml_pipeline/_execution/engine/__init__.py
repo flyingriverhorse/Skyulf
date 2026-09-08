@@ -40,17 +40,18 @@ instead of silently no-op-ing downstream.
 import logging
 import time
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, cast
 
 import pandas as pd
 import polars as pl
 
 from skyulf.data.catalog import DataCatalog
+from skyulf.leakage import OnLeakage
 
 from ...artifacts.store import ArtifactStore
 from ...constants import StepType
 from .._cycle_validation import validate_no_cycles
-from .._leakage_validation import validate_no_preprocessing_before_split
+from .._leakage_validation import execution_target_column, validate_no_preprocessing_before_split
 from .._schema_graph import predict_schemas, schemas_to_dict
 from ..graph_utils import topological_order
 from ..schemas import (
@@ -88,6 +89,7 @@ class PipelineEngine(ArtifactsMixin, MergeMixin, FeatureEngMixin, NodeRunnersMix
         ] = []  # Track fitted transformers for inference pipeline
         self._results: dict[str, NodeExecutionResult] = {}
         self._node_configs: dict[str, NodeConfig] = {}
+        self._on_leakage: OnLeakage = "raise"
         # Engine-emitted advisories surfaced via PipelineExecutionResult.
         # Initialized here (not just in run()) so direct callers of
         # _merge_inputs / _merge_frames in tests don't hit AttributeError.
@@ -248,7 +250,8 @@ class PipelineEngine(ArtifactsMixin, MergeMixin, FeatureEngMixin, NodeRunnersMix
         # statistics on the whole dataset (train+test), leaking test data
         # into what should be train-only parameters. The returned verdict
         # is stamped onto the job metrics so Job Details can show it.
-        leakage_verdict = validate_no_preprocessing_before_split(config.nodes)
+        self._on_leakage = cast(OnLeakage, config.metadata.get("on_leakage", "raise"))
+        leakage_verdict = validate_no_preprocessing_before_split(config.nodes, self._on_leakage)
 
         _, pipeline_result = self._init_run_state(config, dataset_name)
         pipeline_result.leakage_verdict = leakage_verdict
@@ -481,6 +484,10 @@ class PipelineEngine(ArtifactsMixin, MergeMixin, FeatureEngMixin, NodeRunnersMix
                 ancestors.add(parent)
                 stack.append(parent)
         return ancestors
+
+    def _execution_target_column(self, node: NodeConfig) -> str | None:
+        """Find this branch's target without borrowing a sibling model's declaration."""
+        return execution_target_column(list(self._node_configs.values()), node.node_id)
 
     def _get_input(self, node: NodeConfig, target_col: str = "") -> Any:
         """Resolve a node's data input, merging when more than one edge exists.

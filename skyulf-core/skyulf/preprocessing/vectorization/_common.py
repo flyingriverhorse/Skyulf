@@ -12,6 +12,7 @@ Boundary with ``dispatcher.py``:
     * This module owns the *text-specific* dispatch pattern.
 """
 
+import logging
 from collections.abc import Callable
 from typing import Any
 
@@ -22,6 +23,8 @@ import polars as pl
 from ...engines.polars_engine import SkyulfPolarsWrapper
 from ...utils import pack_pipeline_output, unpack_pipeline_input
 from .._helpers import resolve_valid_columns
+
+logger = logging.getLogger(__name__)
 
 # Signature: (X_pandas, y, params) -> (X_out_pandas, y_out)
 TextApplyFn = Callable[[pd.DataFrame, Any, dict[str, Any]], tuple[pd.DataFrame, Any]]
@@ -91,13 +94,16 @@ def apply_text_dual_engine(
     return pack_pipeline_output(X_out, y_out, is_tuple)
 
 
-def resolve_fit_text_valid_columns(X: Any, config: dict[str, Any]) -> list[str] | None:
+def resolve_fit_text_valid_columns(
+    X: Any, config: dict[str, Any], y: Any = None
+) -> list[str] | None:
     """Resolve valid text columns for a vectorizer ``fit`` without converting *X*.
 
     Filters ``config["columns"]`` down to columns actually present on *X*
     (any engine — Polars/Pandas both expose ``.columns``). Returns ``None``
     when there are no configured or matching columns, signalling the caller
-    should return an empty artifact.
+    should return an empty artifact. The configured target and the name of
+    ``y`` are excluded so derived text features cannot reveal target values.
 
     Use this instead of :func:`resolve_fit_text_columns` when the caller only
     needs the resolved column names (no text data), e.g. hashing vectorizers
@@ -108,6 +114,18 @@ def resolve_fit_text_valid_columns(X: Any, config: dict[str, Any]) -> list[str] 
         return None
 
     valid_cols = resolve_valid_columns(X, cols)
+    target_columns = {
+        name
+        for name in (config.get("target_column"), getattr(y, "name", None))
+        if isinstance(name, str) and name
+    }
+    excluded = [col for col in valid_cols if col in target_columns]
+    if excluded:
+        logger.warning(
+            "Text feature nodes exclude target columns %s to prevent target-derived features.",
+            excluded,
+        )
+        valid_cols = [col for col in valid_cols if col not in target_columns]
     if not valid_cols:
         return None
 
@@ -115,7 +133,7 @@ def resolve_fit_text_valid_columns(X: Any, config: dict[str, Any]) -> list[str] 
 
 
 def resolve_fit_text_columns(
-    X: Any, config: dict[str, Any]
+    X: Any, config: dict[str, Any], y: Any = None
 ) -> tuple[pd.DataFrame, list[str]] | None:
     """Resolve the narrowed pandas frame and valid text columns for a fit.
 
@@ -129,12 +147,8 @@ def resolve_fit_text_columns(
     needed, use :func:`resolve_fit_text_valid_columns` instead to avoid a
     wasted full-frame Pandas conversion.
     """
-    cols: list[str] = config.get("columns", [])
-    if not cols:
-        return None
-
-    valid_cols = resolve_valid_columns(X, cols)
-    if not valid_cols:
+    valid_cols = resolve_fit_text_valid_columns(X, config, y)
+    if valid_cols is None:
         return None
 
     if hasattr(X, "to_pandas") and not isinstance(X, pd.DataFrame):

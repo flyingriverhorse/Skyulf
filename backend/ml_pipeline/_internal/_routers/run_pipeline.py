@@ -18,6 +18,9 @@ from backend.config import get_settings
 from backend.data_ingestion.service import DataIngestionService
 from backend.database.engine import get_async_session
 from backend.middleware.rate_limiter import limiter
+from backend.ml_pipeline._execution._leakage_validation import (
+    validate_no_preprocessing_before_split,
+)
 from backend.ml_pipeline._execution.jobs import JobManager
 from backend.ml_pipeline._execution.schemas import (
     JobInfo,
@@ -33,6 +36,7 @@ from backend.ml_pipeline.constants import StepType
 from backend.ml_pipeline.resolution import resolve_pipeline_nodes
 from backend.ml_pipeline.tasks import run_pipeline_batch_task, run_pipeline_task
 from backend.realtime.events import JobEvent, publish_job_event
+from skyulf.leakage import OnLeakage
 
 logger = logging.getLogger(__name__)
 
@@ -404,6 +408,17 @@ async def run_pipeline(
         nodes=internal_nodes,
         metadata=config.metadata,
     )
+
+    # Validate before partitioning removes sibling splitters from the graph.
+    # A selected target scopes the check to the nodes that will actually run.
+    try:
+        validate_no_preprocessing_before_split(
+            internal_nodes,
+            on_leakage=cast(OnLeakage, config.metadata.get("on_leakage", "raise")),
+            target_node_id=config.target_node_id,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     sub_pipelines = _build_sub_pipelines(config, internal_config)
     dataset_id = _detect_dataset_id(config.nodes)

@@ -7,8 +7,10 @@ import { useIsWideContainer } from '../../../core/hooks/useIsWideContainer';
 import { useDatasetSchema } from '../../../core/hooks/useDatasetSchema';
 import { useGraphStore } from '../../../core/store/useGraphStore';
 import { useJobStore } from '../../../core/store/useJobStore';
+import { useViewStore } from '../../../core/store/useViewStore';
 import { convertGraphToPipelineConfig } from '../../../core/utils/pipelineConverter';
 import { warnAndBlockOnLeakage } from '../../../core/utils/pipelineLeakageValidation';
+import { getLeakageErrorMessage, graphSemanticSignature } from '../../../core/utils/leakageFeedback';
 import { getIncomers } from '@xyflow/react';
 import { HelpTooltip } from './components/HelpTooltip';
 import { HyperparameterInput } from './components/HyperparameterInput';
@@ -180,6 +182,8 @@ export const SegmentationSettings: React.FC<{
     }
     const update = (value: NodeSubmission) => useJobStore.getState().setNodeSubmission(nodeId, value);
     const label = `Segmentation — ${config.model_type.replace(/_/g, ' ')}`;
+    useViewStore.getState().setLeakageNotice(null);
+    const graphSignature = graphSemanticSignature(nodes, edges);
     update({ pending: true, run: null, message: `${label}: Submitting...` });
     try {
       const pipelineConfig = convertGraphToPipelineConfig(nodes, edges);
@@ -207,8 +211,10 @@ export const SegmentationSettings: React.FC<{
       toggleJobDrawer(true);
     } catch (error) {
       console.error('Failed to submit segmentation job:', error);
-      update({ pending: false, run: null, message: `${label}: Submission failed. Check your connection and settings, then try again.` });
-      toast.error('Failed to submit segmentation job', 'Check console for details.');
+      const leakageMessage = getLeakageErrorMessage(error);
+      if (leakageMessage) useViewStore.getState().setLeakageNotice({ message: leakageMessage, graphSignature });
+      update({ pending: false, run: null, message: `${label}: Submission failed. ${leakageMessage ?? 'Check your connection and settings, then try again.'}` });
+      toast.error('Failed to submit segmentation job', leakageMessage ?? 'Check console for details.');
     }
   };
 

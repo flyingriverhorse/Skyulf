@@ -2,6 +2,8 @@ import { act, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { NodeProps } from '@xyflow/react';
 import type { NodeDefinition } from '../../core/types/nodes';
+import type { CanvasLeakageIssue } from '../../core/types/leakage';
+import { CanvasLeakageContext } from '../../core/contexts/CanvasLeakageContext';
 import { useViewStore } from '../../core/store/useViewStore';
 import { CustomNodeWrapper } from './CustomNodeWrapper';
 
@@ -150,4 +152,55 @@ it.each(['missing', 'empty', 'throws'] as const)('falls back to the description 
   render(<CustomNodeWrapper {...nodeProps} />);
 
   expect(screen.getByText('Split feature and target columns.')).toBeInTheDocument();
+});
+
+const leakageIssue: CanvasLeakageIssue = {
+  id: 'fit-before-split', nodeId: 'split', edgeIds: [], severity: 'error',
+  message: 'Scaling learns from held-out rows.',
+  suggestion: 'Split first, then fit scaling on the training output.',
+};
+
+/** Runtime feedback is supplied outside graph data so copied nodes remain serializable. */
+function LeakageNode({ issues, openGuide, ...props }: NodeProps & {
+  issues: CanvasLeakageIssue[]; openGuide?: () => void;
+}) {
+  return <CanvasLeakageContext.Provider value={{ nodeIssues: { split: issues }, edgeIssues: {}, openGuide: openGuide ?? (() => {}) }}>
+    <CustomNodeWrapper {...props} />
+  </CanvasLeakageContext.Provider>;
+}
+
+it.each([
+  { severity: 'error' as const, border: 'border-red-500', icon: 'text-red-600' },
+  { severity: 'warning' as const, border: 'border-amber-500', icon: 'text-amber-600' },
+])('keeps a visible $severity marker on a selected node without related edges', ({ severity, border, icon }) => {
+  /** A node must identify the risk even when no connecting edge can be marked. */
+  render(<LeakageNode {...nodeProps} selected issues={[{ ...leakageIssue, severity }]} />);
+
+  expect(screen.getByTestId('canvas-node-feature_target_split')).toHaveClass(border, 'scale-[1.02]');
+  expect(screen.getByRole('button', { name: `Data leakage ${severity}: X/Y Split` })).toHaveClass(icon);
+});
+
+it('keeps leakage advice available and dismissible in read-only mode', () => {
+  /** Inspecting leakage must remain possible when canvas mutation is disabled. */
+  useViewStore.setState({ readOnlyOverride: 'on' });
+  render(<LeakageNode {...nodeProps} issues={[leakageIssue]} />);
+  fireEvent.click(screen.getByRole('button', { name: 'Data leakage error: X/Y Split' }));
+
+  expect(screen.queryByRole('button', { name: 'Remove node' })).not.toBeInTheDocument();
+  expect(screen.getByRole('dialog', { name: 'Data leakage details' })).toHaveTextContent(leakageIssue.suggestion);
+  fireEvent.click(screen.getByRole('button', { name: 'Close data leakage details' }));
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+});
+
+it('removes an open leakage popover and restores selection styling when issues clear', () => {
+  /** Rewiring the graph must clear old warnings immediately without leaving a stale portal. */
+  const { rerender } = render(<LeakageNode {...nodeProps} selected issues={[leakageIssue]} />);
+  fireEvent.focus(screen.getByRole('button', { name: 'Data leakage error: X/Y Split' }));
+  expect(screen.getByRole('dialog')).toHaveTextContent(leakageIssue.message);
+  rerender(<LeakageNode {...nodeProps} selected issues={[]} />);
+
+  expect(screen.queryByRole('button', { name: /Data leakage/ })).not.toBeInTheDocument();
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  expect(screen.getByTestId('canvas-node-feature_target_split')).toHaveClass('border-primary');
+  expect(screen.getByTestId('canvas-node-feature_target_split')).not.toHaveClass('border-red-500');
 });

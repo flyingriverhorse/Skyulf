@@ -1,25 +1,29 @@
 """Tests for SkyulfPipeline.optimize_thresholds() and predict(use_tuned_thresholds=...)."""
 
+from typing import Any
+
 import numpy as np
 import pytest
 from sklearn.metrics import f1_score
 from sklearn.model_selection import train_test_split
 
+from skyulf.modeling._evaluation.thresholds import apply_thresholds
 from skyulf.pipeline import SkyulfPipeline
 
 
 def _binary_config(test_size=0.25, random_state=42):
+    """Fit imputation only on training rows before testing threshold behavior."""
     return {
         "preprocessing": [
-            {
-                "name": "imputer",
-                "transformer": "SimpleImputer",
-                "params": {"strategy": "mean"},
-            },
             {
                 "name": "split",
                 "transformer": "TrainTestSplitter",
                 "params": {"test_size": test_size, "random_state": random_state},
+            },
+            {
+                "name": "imputer",
+                "transformer": "SimpleImputer",
+                "params": {"strategy": "mean"},
             },
         ],
         "modeling": {"type": "logistic_regression"},
@@ -194,3 +198,55 @@ def test_predict_default_behavior_unchanged_when_flag_is_false(sample_classifica
     default_preds = pipeline.predict(X_test)
     explicit_false_preds = pipeline.predict(X_test, use_tuned_thresholds=False)
     np.testing.assert_array_equal(np.asarray(default_preds), np.asarray(explicit_false_preds))
+
+
+@pytest.mark.parametrize("labels", [[0, 1], ["no", "yes"], ["red", "green", "blue"]])
+def test_tuned_classifier_supports_post_training_thresholds(sample_classification_data, labels):
+    """Tuning artifacts must preserve class labels through threshold search and prediction."""
+    data = sample_classification_data.drop(columns=["category"])
+    data["target"] = np.asarray(labels)[np.arange(len(data)) % len(labels)]
+    config: dict[str, Any] = _scaling_config()
+    config["modeling"] = {
+        "type": "hyperparameter_tuner",
+        "base_model": {"type": "logistic_regression"},
+        "strategy": "grid",
+        "search_space": {"C": [0.1, 1.0]},
+        "metric": "f1_macro",
+        "cv_folds": 3,
+    }
+    pipeline = SkyulfPipeline(config)
+    train_raw, X_val, y_val = _raw_holdout(data)
+    pipeline.fit(train_raw, target_column="target")
+    default_predictions = pipeline.predict(X_val)
+
+    thresholds = pipeline.optimize_thresholds(X_val, y_val, metric=_macro_f1)
+    assert set(thresholds) == set(labels)
+
+    estimator = pipeline.model_estimator
+    assert estimator is not None and isinstance(estimator.model, tuple)
+    classifier, _ = estimator.model
+    transformed = pipeline.feature_engineer.transform(X_val)
+    probabilities = classifier.predict_proba(np.asarray(transformed))
+    expected = apply_thresholds(probabilities, thresholds, classes=classifier.classes_)
+    np.testing.assert_array_equal(pipeline.predict(X_val, use_tuned_thresholds=True), expected)
+    np.testing.assert_array_equal(pipeline.predict(X_val), default_predictions)
+
+
+def test_tuned_regressor_rejects_threshold_optimization(sample_regression_data):
+    """Unwrapping a tuning artifact must not admit models without class probabilities."""
+    data = sample_regression_data.drop(columns=["category"])
+    config: dict[str, Any] = _binary_config()
+    config["modeling"] = {
+        "type": "hyperparameter_tuner",
+        "base_model": {"type": "ridge_regression"},
+        "strategy": "grid",
+        "search_space": {"alpha": [1.0]},
+        "metric": "r2",
+        "cv_folds": 3,
+    }
+    pipeline = SkyulfPipeline(config)
+    train_raw, X_val, y_val = _raw_holdout(data)
+    pipeline.fit(train_raw, target_column="target")
+
+    with pytest.raises(ValueError, match="threshold tuning requires a classifier"):
+        pipeline.optimize_thresholds(X_val, y_val, metric=_macro_f1)

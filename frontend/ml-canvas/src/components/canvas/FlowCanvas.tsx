@@ -1,11 +1,12 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import {
   ReactFlow,
   Background,
   Controls,
   ReactFlowProvider,
   useReactFlow,
-  type Node
+  type Node,
+  type Edge
 } from '@xyflow/react';
 import { useShallow } from 'zustand/react/shallow';
 import '@xyflow/react/dist/style.css';
@@ -37,6 +38,12 @@ import {
 import { PerfOverlayLegend } from './PerfOverlayLegend';
 import { nodeDisplayNames } from '../../core/utils/nodeDisplayNames';
 import { splitOutputHandles } from '../../core/utils/splitConnections';
+import { convertGraphToPipelineConfig } from '../../core/utils/pipelineConverter';
+import { buildCanvasLeakageIssues } from '../../core/utils/canvasLeakageIssues';
+import { graphSemanticSignature } from '../../core/utils/leakageFeedback';
+import { getLeakageFlagsRevision, subscribeLeakageFlags } from '../../core/utils/pipelineLeakageValidation';
+import { CanvasLeakageContext, type CanvasLeakageFeedback } from '../../core/contexts/CanvasLeakageContext';
+import { CanvasLeakageNotice } from './CanvasLeakageNotice';
 
 const nodeTypes = {
   custom: CustomNodeWrapper
@@ -71,6 +78,16 @@ function useBranchStableNodes(nodes: Node[]): Node[] {
   return ref.current.nodes;
 }
 
+/** Recompute safety on configuration/topology changes, never on a drag frame. */
+function useSemanticStableGraph(nodes: Node[], edges: Edge[], flagsRevision: number) {
+  const signature = graphSemanticSignature(nodes, edges);
+  const ref = useRef({ signature, nodes, edges, flagsRevision });
+  if (ref.current.signature !== signature || ref.current.flagsRevision !== flagsRevision) {
+    ref.current = { signature, nodes, edges, flagsRevision };
+  }
+  return ref.current;
+}
+
 const FlowCanvasContent: React.FC = () => {
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const { screenToFlowPosition, fitView } = useReactFlow();
@@ -103,6 +120,9 @@ const FlowCanvasContent: React.FC = () => {
     isResultsPanelDismissed,
     perfOverlayEnabled,
     setPerfOverlayEnabled,
+    leakageNotice,
+    setLeakageNotice,
+    openHelpGuide,
   } = useViewStore();
   const readOnly = useReadOnlyMode();
 
@@ -146,14 +166,33 @@ const FlowCanvasContent: React.FC = () => {
   const branchColorMap = useBranchColors(branchStableNodes, edges);
   const displayNames = useMemo(() => nodeDisplayNames(branchStableNodes), [branchStableNodes]);
   const [focusedEdgeId, setFocusedEdgeId] = useState<string | null>(null);
+  const flagsRevision = useSyncExternalStore(subscribeLeakageFlags, getLeakageFlagsRevision, getLeakageFlagsRevision);
+  const semanticGraph = useSemanticStableGraph(nodes, edges, flagsRevision);
+  const openLeakageGuide = useCallback(() => openHelpGuide('leakage'), [openHelpGuide]);
+  const leakageFeedback = useMemo<CanvasLeakageFeedback>(() => {
+    const config = convertGraphToPipelineConfig(semanticGraph.nodes, semanticGraph.edges);
+    const issues = buildCanvasLeakageIssues(config.nodes, semanticGraph.edges, displayNames);
+    const nodeIssues: CanvasLeakageFeedback['nodeIssues'] = Object.create(null);
+    const edgeIssues: CanvasLeakageFeedback['edgeIssues'] = Object.create(null);
+    for (const issue of issues) {
+      (nodeIssues[issue.nodeId] ??= []).push(issue);
+      for (const edgeId of issue.edgeIds) (edgeIssues[edgeId] ??= []).push(issue);
+    }
+    return { nodeIssues, edgeIssues, openGuide: openLeakageGuide };
+  }, [semanticGraph, displayNames, openLeakageGuide]);
+  const activeLeakageNotice = leakageNotice?.graphSignature === semanticGraph.signature ? leakageNotice : null;
+  useEffect(() => {
+    if (leakageNotice && leakageNotice.graphSignature !== semanticGraph.signature) setLeakageNotice(null);
+  }, [leakageNotice, semanticGraph.signature, setLeakageNotice]);
 
   // Whether the Preview Results panel is showing (mirrors ResultsPanel's
   // visibility rule) and how tall it is, so the zoom controls lift above
   // it: 40px for the collapsed bar, the layout's clamped height when expanded. Uses the
   // branch-stable nodes so drags don't re-validate every frame.
   const validationIssueCount = useMemo(
-    () => collectGraphValidationIssues(branchStableNodes, edges).length,
-    [branchStableNodes, edges],
+    () => collectGraphValidationIssues(semanticGraph.nodes, semanticGraph.edges)
+      .filter(issue => issue.category !== 'leakage').length,
+    [semanticGraph],
   );
   const resultsPanelVisible =
     Boolean(executionResult || lastRunError || validationIssueCount > 0) &&
@@ -386,6 +425,7 @@ const FlowCanvasContent: React.FC = () => {
       // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- canvas wrapper must be focusable to capture keyboard shortcuts
       tabIndex={0}
     >
+      <CanvasLeakageContext.Provider value={leakageFeedback}>
       <ReactFlow
         nodes={nodes}
         edges={coloredEdges}
@@ -463,6 +503,12 @@ const FlowCanvasContent: React.FC = () => {
           }}
         />
       </ReactFlow>
+      </CanvasLeakageContext.Provider>
+      {activeLeakageNotice && <CanvasLeakageNotice
+        message={activeLeakageNotice.message}
+        onDismiss={() => setLeakageNotice(null)}
+        onOpenGuide={openLeakageGuide}
+      />}
       {perfOverlayEnabled && nodes.length > 0 && (
         // Floating mini-legend so the colored rings on each node are
         // self-explanatory without opening the Toolbar's legend popover.

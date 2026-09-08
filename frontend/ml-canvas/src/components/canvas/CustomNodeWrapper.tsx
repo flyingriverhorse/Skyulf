@@ -8,6 +8,8 @@ import { useJobStore } from '../../core/store/useJobStore';
 import { useViewStore } from '../../core/store/useViewStore';
 import { bucketDuration, getPerfFamily } from '../../core/perf/perfThresholds';
 import { useReadOnlyMode } from '../../core/hooks/useReadOnlyMode';
+import { useCanvasLeakageFeedback } from '../../core/contexts/CanvasLeakageContext';
+import { LeakageIssuePopover } from './LeakageIssuePopover';
 import {
   isAutoParallelType,
   supportsExecutionModeToggle,
@@ -17,6 +19,10 @@ import {
 function CustomNodeWrapperImpl({ id, data, selected, isConnectable }: NodeProps) {
   const definitionType = data.definitionType as string;
   const definition = registry.get(definitionType);
+  const { nodeIssues, openGuide } = useCanvasLeakageFeedback();
+  const leakageIssues = nodeIssues[id] ?? [];
+  const leakageSeverity = leakageIssues.some(issue => issue.severity === 'error')
+    ? 'error' : leakageIssues.length > 0 ? 'warning' : null;
   const splitBodyRef = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
     const body = splitBodyRef.current;
@@ -259,10 +265,15 @@ function CustomNodeWrapperImpl({ id, data, selected, isConnectable }: NodeProps)
       data-node-definition-type={definitionType}
       data-perf-bucket={perfBucket ?? undefined}
       data-perf-duration-ms={perfDurationMs ?? undefined}
+      data-leakage-severity={leakageSeverity ?? undefined}
       title={perfTooltip}
       className={`
       relative group min-w-[200px] bg-card border-2 rounded-lg shadow-sm transition-all duration-150
-      ${selected
+      ${leakageSeverity === 'error'
+        ? 'border-red-500 hover:border-red-500'
+        : leakageSeverity === 'warning'
+        ? 'border-amber-500 hover:border-amber-500'
+        : selected
         ? 'border-primary shadow-lg shadow-primary/30 scale-[1.02]'
         : nodeResult?.status === 'failed'
         ? 'border-red-500 shadow-sm shadow-red-500/20 hover:border-red-500'
@@ -271,7 +282,8 @@ function CustomNodeWrapperImpl({ id, data, selected, isConnectable }: NodeProps)
         : hasBrokenRefs
         ? 'border-amber-500/40 hover:border-amber-500/60'
         : 'border-border hover:border-primary/50'}
-      ${isPulsing ? 'animate-validation-pulse' : ''}
+      ${leakageSeverity && selected ? 'shadow-lg shadow-primary/30 scale-[1.02]' : ''}
+      ${isPulsing && !leakageSeverity ? 'animate-validation-pulse' : ''}
       ${perfRingClass}
     `}>
       {/* Floating delete chip — absolute on the card corner so it never
@@ -293,8 +305,9 @@ function CustomNodeWrapperImpl({ id, data, selected, isConnectable }: NodeProps)
           out of the header text row so they can't be squeezed by long
           titles and out of the right edge so they can't collide with
           output-handle labels in the body of split nodes. */}
-      {(nodeResult || validationMessage || hasBrokenRefs) && (
+      {(leakageSeverity || nodeResult || validationMessage || hasBrokenRefs) && (
         <div className="absolute -top-2 -left-2 z-10 flex items-center gap-1">
+          {leakageSeverity && <LeakageIssuePopover issues={leakageIssues} subject={definition.label} openGuide={openGuide} compact />}
           {nodeResult && (
             <span
               title={nodeResult.status === 'success'

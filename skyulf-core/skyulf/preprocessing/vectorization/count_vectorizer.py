@@ -156,7 +156,7 @@ class CountVectorizerCalculator(BaseCalculator):
         An empty or wholly-absent column selection yields an empty artifact so
         the applier no-ops.
         """
-        resolved = resolve_fit_text_columns(X, config)
+        resolved = resolve_fit_text_columns(X, config, _y)
         if resolved is None:
             return {}
         X, valid_cols = resolved

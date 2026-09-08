@@ -135,6 +135,8 @@ class NodeRunnersMixin:
     _extract_shap_explanation: Any
     _pipeline_has_training_node: Any
     _resolve_fold_preprocessing: Any
+    _execution_target_column: Any
+    _node_steps: Any
 
     def _record_split_dataset_shape_metrics(
         self, metrics: dict[str, Any], data: SplitDataset, target_col: str
@@ -968,9 +970,8 @@ class NodeRunnersMixin:
         # halving/optuna via a Pipeline wrapper around the searcher's internal
         # CV); holdout tuning with a validation split refits on the train rows
         # only and scores candidates against the untouched validation split.
-        # Unsupported graphs fall back inside the resolver with an explicit
-        # job-log warning instead of failing the run; the stable reason code
-        # is stamped into the node metrics below (demand telemetry).
+        # Unsupported learned graphs fail closed. Explicit warn/ignore mode
+        # permits fallback, recorded by the stable reason code in the metrics.
         fold_preprocessing, refit_fallback = self._resolve_fold_preprocessing(node, target_col)
 
         # Audit telemetry (findings 2026-08-26 §3/B): record the input row
@@ -1115,7 +1116,10 @@ class NodeRunnersMixin:
     ) -> tuple[str, dict[str, Any]]:
         """Runs a single transformer node as a 1-step feature engineering pipeline."""
         # Input: DataFrame or SplitDataset (merged when multiple branches feed in).
-        data = self._get_input(node)
+        target_column = self._execution_target_column(node)
+        data = self._get_input(node, target_column or "")
+        if len(dict.fromkeys(node.inputs)) > 1 and node.step_type in {"TrainTestSplitter", "Split"}:
+            self.artifact_store.save(f"exec_{node.node_id}_input", data)
 
         # Wrap the single node as a 1-step feature engineering pipeline
         step_config = {
@@ -1127,7 +1131,7 @@ class NodeRunnersMixin:
         engineer = FeatureEngineer([step_config])
 
         # SDK FeatureEngineer.fit_transform(data)
-        processed_data, run_metrics = engineer.fit_transform(data)
+        processed_data, run_metrics = engineer.fit_transform(data, target_column=target_column)
 
         # Manually save the engineer state if needed
         self.artifact_store.save(f"exec_{node.node_id}_pipeline", engineer)

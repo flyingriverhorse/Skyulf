@@ -1,0 +1,626 @@
+{
+  "schema_version": 1,
+  "target_column": "target",
+  "learned_transformers": {
+    "CorrelationThreshold": {},
+    "Deduplicate": {},
+    "DropMissingColumns": {
+      "missing_threshold": 50
+    },
+    "DummyEncoder": {},
+    "EllipticEnvelope": {},
+    "GeneralBinning": {},
+    "HashEncoder": {},
+    "IQR": {},
+    "IterativeImputer": {},
+    "KBinsDiscretizer": {},
+    "KNNImputer": {},
+    "LabelEncoder": {
+      "columns": [
+        "x"
+      ]
+    },
+    "MaxAbsScaler": {},
+    "MinMaxScaler": {},
+    "MissingIndicator": {},
+    "ModelBasedSelection": {},
+    "OneHotEncoder": {},
+    "OrdinalEncoder": {
+      "columns": [
+        "x"
+      ]
+    },
+    "Oversampling": {},
+    "PowerTransformer": {},
+    "RobustScaler": {},
+    "SimpleImputer": {},
+    "StandardScaler": {},
+    "TargetEncoder": {},
+    "Undersampling": {},
+    "UnivariateSelection": {},
+    "VarianceThreshold": {},
+    "WOEEncoder": {},
+    "Winsorize": {},
+    "ZScore": {},
+    "count_vectorizer": {
+      "columns": [
+        "text"
+      ]
+    },
+    "feature_selection": {},
+    "tfidf_vectorizer": {
+      "columns": [
+        "text"
+      ]
+    },
+    "Casting": {
+      "column_types": {
+        "category": "category"
+      }
+    },
+    "CustomBinning": {
+      "bins": [
+        0,
+        5,
+        10
+      ]
+    },
+    "GeneralTransformation": {
+      "transformations": [
+        {
+          "column": "x",
+          "method": "yeo-johnson"
+        }
+      ]
+    },
+    "FeatureGeneration": {
+      "operations": [
+        {
+          "operation_type": "group_agg",
+          "method": "mean",
+          "input_columns": [
+            "group"
+          ],
+          "secondary_columns": [
+            "x"
+          ],
+          "output_column": "group_x"
+        }
+      ]
+    },
+    "FeatureGenerationNode": {
+      "operations": [
+        {
+          "operation_type": "group_agg",
+          "method": "mean",
+          "input_columns": [
+            "group"
+          ],
+          "secondary_columns": [
+            "x"
+          ],
+          "output_column": "group_x"
+        }
+      ]
+    },
+    "FeatureMath": {
+      "operations": [
+        {
+          "operation_type": "group_agg",
+          "method": "mean",
+          "input_columns": [
+            "group"
+          ],
+          "secondary_columns": [
+            "x"
+          ],
+          "output_column": "group_x"
+        }
+      ]
+    }
+  },
+  "stateless_transformers": {
+    "AliasReplacement": {},
+    "DataSnapshot": {},
+    "DatasetProfile": {},
+    "DateFeatures": {},
+    "DropMissingRows": {},
+    "FeatureInteraction": {},
+    "GeoDistance": {},
+    "H3Index": {},
+    "InvalidValueReplacement": {},
+    "LagFeatures": {},
+    "ManualBounds": {},
+    "PolynomialFeatures": {},
+    "PolynomialFeaturesNode": {},
+    "RollingAggregate": {},
+    "SimpleTransformation": {},
+    "TextCleaning": {},
+    "ValueReplacement": {},
+    "feature_target_split": {},
+    "hashing_vectorizer": {},
+    "sentence_embedder": {},
+    "tokenizer": {}
+  },
+  "splitters": [
+    "TrainTestSplitter",
+    "Split"
+  ],
+  "models": [
+    "adaboost_classifier",
+    "adaboost_regressor",
+    "bernoulli_nb",
+    "birch",
+    "calibrated_classifier",
+    "decision_tree_classifier",
+    "decision_tree_regressor",
+    "elasticnet_regression",
+    "extra_trees_classifier",
+    "extra_trees_regressor",
+    "gaussian_mixture",
+    "gaussian_nb",
+    "gradient_boosting_classifier",
+    "gradient_boosting_regressor",
+    "hist_gradient_boosting_classifier",
+    "hist_gradient_boosting_regressor",
+    "k_neighbors_classifier",
+    "k_neighbors_regressor",
+    "kmeans",
+    "lasso_regression",
+    "lgbm_classifier",
+    "lgbm_regressor",
+    "linear_regression",
+    "logistic_regression",
+    "minibatch_kmeans",
+    "multinomial_nb",
+    "random_forest_classifier",
+    "random_forest_regressor",
+    "ridge_regression",
+    "sgd_classifier",
+    "stacking_classifier",
+    "stacking_regressor",
+    "svc",
+    "svr",
+    "voting_classifier",
+    "voting_regressor",
+    "xgboost_classifier",
+    "xgboost_regressor"
+  ],
+  "parameter_exemptions": [
+    {
+      "id": "constant_imputation",
+      "transformer": "SimpleImputer",
+      "params": {
+        "strategy": "constant",
+        "fill_value": 0
+      }
+    },
+    {
+      "id": "explicit_column_drop",
+      "transformer": "DropMissingColumns",
+      "params": {
+        "columns": [
+          "x"
+        ],
+        "missing_threshold": 0
+      }
+    },
+    {
+      "id": "default_column_drop",
+      "transformer": "DropMissingColumns",
+      "params": {}
+    },
+    {
+      "id": "explicit_missing_indicator",
+      "transformer": "MissingIndicator",
+      "params": {
+        "columns": [
+          "x"
+        ]
+      }
+    },
+    {
+      "id": "explicit_hash_columns",
+      "transformer": "HashEncoder",
+      "params": {
+        "columns": [
+          "x"
+        ]
+      }
+    },
+    {
+      "id": "empty_hash_columns",
+      "transformer": "HashEncoder",
+      "params": {
+        "columns": []
+      }
+    },
+    {
+      "id": "label_target_implicit",
+      "transformer": "LabelEncoder",
+      "params": {}
+    },
+    {
+      "id": "label_target_explicit",
+      "transformer": "LabelEncoder",
+      "params": {
+        "columns": [
+          "target"
+        ]
+      }
+    },
+    {
+      "id": "ordinal_empty_noop",
+      "transformer": "OrdinalEncoder",
+      "params": {
+        "columns": []
+      }
+    },
+    {
+      "id": "ordinal_target_explicit",
+      "transformer": "OrdinalEncoder",
+      "params": {
+        "columns": [
+          "target"
+        ]
+      }
+    },
+    {
+      "id": "general_log",
+      "transformer": "GeneralTransformation",
+      "params": {
+        "transformations": [
+          {
+            "column": "x",
+            "method": "log"
+          }
+        ]
+      }
+    },
+    {
+      "id": "general_sqrt",
+      "transformer": "GeneralTransformation",
+      "params": {
+        "transformations": [
+          {
+            "column": "x",
+            "method": "sqrt"
+          }
+        ]
+      }
+    },
+    {
+      "id": "general_square_root",
+      "transformer": "GeneralTransformation",
+      "params": {
+        "transformations": [
+          {
+            "column": "x",
+            "method": "square_root"
+          }
+        ]
+      }
+    },
+    {
+      "id": "general_cube_root",
+      "transformer": "GeneralTransformation",
+      "params": {
+        "transformations": [
+          {
+            "column": "x",
+            "method": "cube_root"
+          }
+        ]
+      }
+    },
+    {
+      "id": "general_reciprocal",
+      "transformer": "GeneralTransformation",
+      "params": {
+        "transformations": [
+          {
+            "column": "x",
+            "method": "reciprocal"
+          }
+        ]
+      }
+    },
+    {
+      "id": "general_square",
+      "transformer": "GeneralTransformation",
+      "params": {
+        "transformations": [
+          {
+            "column": "x",
+            "method": "square"
+          }
+        ]
+      }
+    },
+    {
+      "id": "general_exp",
+      "transformer": "GeneralTransformation",
+      "params": {
+        "transformations": [
+          {
+            "column": "x",
+            "method": "exp"
+          }
+        ]
+      }
+    },
+    {
+      "id": "general_exponential",
+      "transformer": "GeneralTransformation",
+      "params": {
+        "transformations": [
+          {
+            "column": "x",
+            "method": "exponential"
+          }
+        ]
+      }
+    },
+    {
+      "id": "general_empty",
+      "transformer": "GeneralTransformation",
+      "params": {
+        "transformations": []
+      }
+    },
+    {
+      "id": "general_omitted",
+      "transformer": "GeneralTransformation",
+      "params": {}
+    },
+    {
+      "id": "FeatureGeneration_arithmetic",
+      "transformer": "FeatureGeneration",
+      "params": {
+        "operations": [
+          {
+            "operation_type": "arithmetic",
+            "method": "multiply",
+            "input_columns": [
+              "x"
+            ],
+            "constants": [
+              2
+            ],
+            "output_column": "twice_x"
+          }
+        ]
+      }
+    },
+    {
+      "id": "FeatureGeneration_empty",
+      "transformer": "FeatureGeneration",
+      "params": {
+        "operations": []
+      }
+    },
+    {
+      "id": "FeatureGenerationNode_arithmetic",
+      "transformer": "FeatureGenerationNode",
+      "params": {
+        "operations": [
+          {
+            "operation_type": "arithmetic",
+            "method": "multiply",
+            "input_columns": [
+              "x"
+            ],
+            "constants": [
+              2
+            ],
+            "output_column": "twice_x"
+          }
+        ]
+      }
+    },
+    {
+      "id": "FeatureGenerationNode_empty",
+      "transformer": "FeatureGenerationNode",
+      "params": {
+        "operations": []
+      }
+    },
+    {
+      "id": "FeatureMath_arithmetic",
+      "transformer": "FeatureMath",
+      "params": {
+        "operations": [
+          {
+            "operation_type": "arithmetic",
+            "method": "multiply",
+            "input_columns": [
+              "x"
+            ],
+            "constants": [
+              2
+            ],
+            "output_column": "twice_x"
+          }
+        ]
+      }
+    },
+    {
+      "id": "FeatureMath_empty",
+      "transformer": "FeatureMath",
+      "params": {
+        "operations": []
+      }
+    },
+    {
+      "id": "custom_bins_explicit",
+      "transformer": "CustomBinning",
+      "params": {
+        "columns": [
+          "x"
+        ],
+        "bins": [
+          0,
+          5,
+          10,
+          100
+        ]
+      }
+    },
+    {
+      "id": "custom_bins_empty_columns",
+      "transformer": "CustomBinning",
+      "params": {
+        "columns": [],
+        "bins": [
+          0,
+          5,
+          10,
+          100
+        ]
+      }
+    },
+    {
+      "id": "casting_float",
+      "transformer": "Casting",
+      "params": {
+        "columns": [
+          "x"
+        ],
+        "target_type": "float"
+      }
+    },
+    {
+      "id": "casting_datetime",
+      "transformer": "Casting",
+      "params": {
+        "column_types": {
+          "date": "datetime"
+        }
+      }
+    },
+    {
+      "id": "casting_override_to_float",
+      "transformer": "Casting",
+      "params": {
+        "column_types": {
+          "x": "category"
+        },
+        "columns": [
+          "x"
+        ],
+        "target_type": "float"
+      }
+    },
+    {
+      "id": "casting_empty",
+      "transformer": "Casting",
+      "params": {}
+    }
+  ],
+  "data": {
+    "x": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      100,
+      200,
+      300,
+      400
+    ],
+    "target": [
+      0,
+      1,
+      0,
+      1,
+      0,
+      1,
+      0,
+      1,
+      0,
+      1,
+      0,
+      1
+    ]
+  },
+  "core_config": {
+    "preprocessing": [
+      {
+        "name": "candidate",
+        "transformer": "StandardScaler",
+        "params": {
+          "columns": [
+            "x"
+          ]
+        }
+      },
+      {
+        "name": "split",
+        "transformer": "TrainTestSplitter",
+        "params": {
+          "test_size": 0.25,
+          "random_state": 42,
+          "target_column": "target"
+        }
+      }
+    ],
+    "modeling": {}
+  },
+  "backend_graph": {
+    "pipeline_id": "leakage-submission",
+    "nodes": [
+      {
+        "node_id": "load",
+        "step_type": "data_loader",
+        "params": {},
+        "inputs": []
+      },
+      {
+        "node_id": "split",
+        "step_type": "TrainTestSplitter",
+        "params": {
+          "target_column": "target"
+        },
+        "inputs": [
+          "load"
+        ]
+      },
+      {
+        "node_id": "safe_training",
+        "step_type": "training",
+        "params": {
+          "target_column": "target"
+        },
+        "inputs": [
+          "split"
+        ]
+      },
+      {
+        "node_id": "scale",
+        "step_type": "StandardScaler",
+        "params": {
+          "columns": [
+            "x"
+          ]
+        },
+        "inputs": [
+          "load"
+        ]
+      },
+      {
+        "node_id": "unsafe_training",
+        "step_type": "training",
+        "params": {
+          "target_column": "target"
+        },
+        "inputs": [
+          "scale"
+        ]
+      }
+    ]
+  }
+}

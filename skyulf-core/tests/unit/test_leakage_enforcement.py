@@ -56,6 +56,12 @@ def test_every_registered_node_declares_learns_from_data():
         "Deduplicate",
         "Oversampling",
         "Undersampling",
+        "CustomBinning",
+        "Casting",
+        "GeneralTransformation",
+        "FeatureGeneration",
+        "FeatureGenerationNode",
+        "FeatureMath",
     ],
 )
 def test_previously_excluded_stateful_nodes_are_now_data_dependent(node_id):
@@ -65,7 +71,7 @@ def test_previously_excluded_stateful_nodes_are_now_data_dependent(node_id):
 
 @pytest.mark.parametrize(
     "node_id",
-    ["CustomBinning", "ManualBounds", "DropMissingRows", "DateFeatures", "GeoDistance"],
+    ["ManualBounds", "DropMissingRows", "DateFeatures", "GeoDistance"],
 )
 def test_rule_based_nodes_remain_safe(node_id):
     """Fixed-map / per-row rule nodes keep learns_from_data=False."""

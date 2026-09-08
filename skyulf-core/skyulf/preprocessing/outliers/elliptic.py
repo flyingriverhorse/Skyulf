@@ -29,14 +29,15 @@ def _elliptic_filter_pandas(X_pd: Any, models: dict[str, Any]) -> pd.Series:
         if col not in X_pd.columns:
             continue
         series = pd.to_numeric(X_pd[col], errors="coerce")
-        valid_idx = series.dropna().index
-        if valid_idx.empty:
+        valid_positions = np.flatnonzero(np.isfinite(series.to_numpy(dtype=float, na_value=np.nan)))
+        if not valid_positions.size:
             continue
         try:
-            preds = model.predict(series.loc[valid_idx].to_numpy().reshape(-1, 1))
-            col_mask = pd.Series(False, index=X_pd.index)
-            col_mask[series.isna()] = True  # keep NaNs; later steps decide
-            col_mask.loc[valid_idx] = preds == 1  # 1 == inlier
+            preds = model.predict(series.iloc[valid_positions].to_numpy().reshape(-1, 1))
+            # Preserve nonfinite rows without allowing them to disable
+            # prediction for every finite companion in the same batch.
+            col_mask = pd.Series(True, index=X_pd.index)
+            col_mask.iloc[valid_positions] = preds == 1  # 1 == inlier
             mask = mask & col_mask
         except Exception as e:  # noqa: BLE001 - per-column predict failure is logged; column contributes no filtering
             logger.warning(f"EllipticEnvelope predict failed for column {col}: {e}")
@@ -63,7 +64,7 @@ def _predict_inliers(model: Any, values: Any, col: str) -> Any:
 def _elliptic_mask_numpy(X: Any, models: dict[str, Any]) -> Any:
     """Build a row-keep boolean numpy mask by applying every fitted model.
 
-    Mirrors :func:`_elliptic_filter_pandas` semantics: missing values are kept
+    Mirrors :func:`_elliptic_filter_pandas` semantics: nonfinite values are kept
     (later steps decide), columns absent from *X* or without valid values are
     skipped, and a failing ``predict`` logs and fails open.
     """
@@ -75,7 +76,7 @@ def _elliptic_mask_numpy(X: Any, models: dict[str, Any]) -> Any:
         if series is None:
             continue
         arr = series.to_numpy()
-        valid = ~np.isnan(arr)
+        valid = np.isfinite(arr)
         if not valid.any():
             continue
         preds = _predict_inliers(model, arr[valid], col)

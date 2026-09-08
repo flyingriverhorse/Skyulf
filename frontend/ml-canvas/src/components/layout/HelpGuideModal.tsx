@@ -1,4 +1,5 @@
 import React from 'react';
+import * as Tabs from '@radix-ui/react-tabs';
 import {
   ArrowRight,
   GitFork,
@@ -12,10 +13,14 @@ import {
   Tag,
 } from 'lucide-react';
 import { ModalShell } from '../shared/ModalShell';
+import { PreprocessingPlacementGuide } from './PreprocessingPlacementGuide';
+import { SplitMergeGuide } from './SplitMergeGuide';
 
 interface HelpGuideModalProps {
   isOpen: boolean;
   onClose: () => void;
+  /** Initial section on each open; omitted callers retain the pipeline basics. */
+  initialTab?: 'basics' | 'leakage';
 }
 
 interface SectionProps {
@@ -41,9 +46,37 @@ const Section: React.FC<SectionProps> = ({ icon, title, children }) => (
  * the post-Split trap, Score Advisory) so new users learn the mental model
  * instead of discovering it from failed runs.
  */
-export const HelpGuideModal: React.FC<HelpGuideModalProps> = ({ isOpen, onClose }) => (
-  <ModalShell isOpen={isOpen} onClose={onClose} title="How pipelines work" size="2xl">
-    <div>
+export const HelpGuideModal: React.FC<HelpGuideModalProps> = ({ isOpen, onClose, initialTab = 'basics' }) => (
+  <ModalShell
+    isOpen={isOpen}
+    onClose={onClose}
+    title="How pipelines work"
+    size="5xl"
+    className="h-[calc(100dvh-2rem)] !max-h-[calc(100dvh-2rem)] sm:h-[calc(100dvh-4rem)] sm:!max-h-[calc(100dvh-4rem)]"
+  >
+    {isOpen && <Tabs.Root key={initialTab} defaultValue={initialTab} className="flex h-full min-h-0 flex-col">
+      <Tabs.List aria-label="Pipeline help sections" className="sticky top-0 z-20 grid shrink-0 grid-cols-3 gap-1 border-b border-slate-200 bg-white px-2 dark:border-slate-700 dark:bg-slate-900 sm:px-5">
+        <Tabs.Trigger
+          value="basics"
+          className="min-w-0 whitespace-normal break-words border-b-2 border-transparent px-2 py-3 text-xs font-medium text-slate-500 focus-ring data-[state=active]:border-indigo-500 data-[state=active]:text-indigo-600 dark:text-slate-400 dark:data-[state=active]:text-indigo-400 sm:px-3 sm:text-sm"
+        >
+          Pipeline Basics
+        </Tabs.Trigger>
+        <Tabs.Trigger
+          value="leakage"
+          className="min-w-0 whitespace-normal break-words border-b-2 border-transparent px-2 py-3 text-xs font-medium text-slate-500 focus-ring data-[state=active]:border-indigo-500 data-[state=active]:text-indigo-600 dark:text-slate-400 dark:data-[state=active]:text-indigo-400 sm:px-3 sm:text-sm"
+        >
+          Preprocessing &amp; Leakage
+        </Tabs.Trigger>
+        <Tabs.Trigger
+          value="split-merge"
+          className="min-w-0 whitespace-normal break-words border-b-2 border-transparent px-2 py-3 text-xs font-medium text-slate-500 focus-ring data-[state=active]:border-indigo-500 data-[state=active]:text-indigo-600 dark:text-slate-400 dark:data-[state=active]:text-indigo-400 sm:px-3 sm:text-sm"
+        >
+          Split &amp; Merge
+        </Tabs.Trigger>
+      </Tabs.List>
+      <div className="min-h-0 flex-1 overflow-y-auto">
+      <Tabs.Content value="basics" className="outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-500">
       <Section icon={<ArrowRight className="w-3.5 h-3.5" />} title="Linear chain — the basics">
         <p>
           Data flows left to right, one node at a time: a Loader reads a dataset, transform
@@ -73,22 +106,24 @@ export const HelpGuideModal: React.FC<HelpGuideModalProps> = ({ isOpen, onClose 
 
       <Section icon={<Merge className="w-3.5 h-3.5" />} title="Merging — which branch wins?">
         <p>
-          A node with two or more inputs joins branches column-wise. Columns only one branch
-          produced are all kept. When two branches produce a column with the{' '}
-          <span className="font-medium">same name</span>, the merge node&apos;s{' '}
-          <span className="font-medium">Merge Strategy</span> decides whose values survive:
-          &quot;last wins&quot; (the default — the last connected branch) or &quot;first
-          wins&quot;. After a run, the winning edge is highlighted with a WINS MERGE label.
+          Multiple wires into the same node join branches column-wise; no separate Merge node
+          is needed. Different-named columns are retained. If a shared ancestor identifies
+          exactly one branch that changed an overlapping column, that branch wins. Otherwise,
+          conflicting versions follow the node&apos;s{' '}
+          <span className="font-medium">Merge Strategy</span>: first wins or last wins
+          (the default). For sibling branches, first/last follows saved incoming-edge order,
+          not their position on the canvas. The Split &amp; Merge tab shows examples.
         </p>
       </Section>
 
       <Section icon={<Split className="w-3.5 h-3.5" />} title="After a Split node — order decides">
         <p>
-          After a Split node the platform can&apos;t track which branch owns which columns, so
-          the merge strategy no longer applies: overlapping columns resolve purely by merge
-          order — the <span className="font-medium">last connected branch wins every shared
-          column</span>. Keep branches after a Split disjoint (each emits different columns) or
-          fully numeric, otherwise an earlier branch&apos;s encoding can be silently discarded.
+          Train, validation and test partitions merge separately, and{' '}
+          <span className="font-medium">the configured merge strategy still applies</span>.
+          Column ownership generally lacks a shared-ancestor baseline after a row split, so a
+          branch passing through an original column can overwrite another branch&apos;s encoding
+          or scaling. Prefer distinct feature outputs and choose the strategy intentionally.
+          X/y merges retain the first branch&apos;s target; all branches need the same aligned y.
         </p>
       </Section>
 
@@ -135,22 +170,24 @@ export const HelpGuideModal: React.FC<HelpGuideModalProps> = ({ isOpen, onClose 
       <Section icon={<ShieldCheck className="w-3.5 h-3.5" />} title="Can you trust the scores?">
         <p>
           Job details carry two verification tiles. The{' '}
-          <span className="font-medium">Leakage Gate</span> confirms the held-out test rows
-          never touched the fitting process. The{' '}
-          <span className="font-medium">Fold Refit Audit</span> confirms preprocessing
-          statistics were refit inside every cross-validation fold &mdash; so nothing learned
-          from rows it shouldn&apos;t have seen. Green verdicts on both mean the numbers are
-          honest; anything else links to a detail view explaining what happened.
+          <span className="font-medium">Leakage Gate</span> checks detected preprocessing
+          placement violations. The{' '}
+          <span className="font-medium">Fold Refit Audit</span> records whether supported
+          preprocessing was refit inside cross-validation folds. Read both verdicts and their
+          details: green tiles do not prove feature provenance, temporal correctness or entity
+          independence. The Preprocessing &amp; Leakage tab explains the placement rules and limits.
         </p>
       </Section>
 
       <Section icon={<AlertTriangle className="w-3.5 h-3.5" />} title="Score Advisory — the amber tile in Jobs">
         <p>
           If a job&apos;s details show an amber{' '}
-          <span className="font-medium">Score Advisory</span> tile, the graph shape didn&apos;t
-          allow per-fold preprocessing refit, so scores were computed on pre-transformed data
-          and may be optimistically biased. The usual fix is the divide-and-merge shape above:
-          put encoders on branches between the split and the merge.
+          <span className="font-medium">Score Advisory</span> tile, inspect the fallback
+          diagnostic. Unsupported fold reconstruction involving learned preprocessing stops
+          execution under the default raise policy. Explicit warn/ignore policies can allow
+          scores on pre-transformed data, which may be optimistically biased. Prefer a
+          supported linear chain or row-aligned branches from a common split joining directly
+          into the model, with learned preprocessing after the split.
         </p>
       </Section>
 
@@ -162,6 +199,14 @@ export const HelpGuideModal: React.FC<HelpGuideModalProps> = ({ isOpen, onClose 
           <span className="font-medium">?</span> for the full keyboard-shortcut cheat sheet.
         </p>
       </Section>
-    </div>
+      </Tabs.Content>
+      <Tabs.Content value="leakage" className="outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-500">
+        <PreprocessingPlacementGuide />
+      </Tabs.Content>
+      <Tabs.Content value="split-merge" className="outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-500">
+        <SplitMergeGuide />
+      </Tabs.Content>
+      </div>
+    </Tabs.Root>}
   </ModalShell>
 );

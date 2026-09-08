@@ -77,6 +77,7 @@ class FeatureEngineer:
             # Skip splitters during inference/transform
             if transformer_type in [
                 "TrainTestSplitter",
+                "Split",
                 "feature_target_split",
                 *self._RESAMPLING_TYPES,
                 *self._ROW_DROPPING_TYPES,
@@ -88,7 +89,13 @@ class FeatureEngineer:
 
         return current_data
 
-    def fit_transform(self, data: pd.DataFrame | SkyulfDataFrame | Any, node_id_prefix="") -> Any:
+    def fit_transform(
+        self,
+        data: pd.DataFrame | SkyulfDataFrame | Any,
+        node_id_prefix="",
+        *,
+        target_column: str | None = None,
+    ) -> Any:
         """Runs the pipeline on data.
 
         Returns: (transformed_data, metrics_dict)
@@ -108,7 +115,11 @@ class FeatureEngineer:
         for i, step in enumerate(self.steps_config):
             name = step["name"]
             transformer_type = step["transformer"]
-            params = step.get("params", {})
+            params = dict(step.get("params", {}))
+            if target_column is not None:
+                # A raw-frame target must not become an auto-selected feature.
+                # Keep the caller's config untouched and use pipeline context.
+                params["target_column"] = target_column
             step_metrics: dict[str, Any] = {}
             step_key = f"{i}:{name}"
 
@@ -223,7 +234,7 @@ class FeatureEngineer:
         )
         fitted_params: dict[str, Any] = {}
 
-        if transformer_type == "TrainTestSplitter":
+        if transformer_type in {"TrainTestSplitter", "Split"}:
             logger.debug("Handling TrainTestSplitter")
             # A raw (unwrapped) polars DataFrame satisfies neither `pd.DataFrame`
             # nor the `SkyulfDataFrame` protocol (it has no `.copy()`, uses

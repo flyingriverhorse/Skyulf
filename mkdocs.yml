@@ -85,6 +85,9 @@ nav:
     - Cross-Validation: user_guide/cross_validation.md
     - Threshold Tuning: user_guide/threshold_tuning.md
     - SplitDataset & Leakage: user_guide/splitdataset_and_leakage.md
+    - Leakage Safety - Core & Backend: user_guide/leakage_core_backend.md
+    - Preprocessing Leakage Audit: user_guide/preprocessing_leakage_audit.md
+    - Preprocessing Placement: user_guide/preprocessing_placement.md
     - Drift Monitoring: user_guide/drift_monitoring.md
     - Serialization: user_guide/serialization.md
     - Extending Skyulf-Core: user_guide/extending_custom_nodes.md

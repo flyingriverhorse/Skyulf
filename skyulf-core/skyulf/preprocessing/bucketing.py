@@ -522,7 +522,7 @@ class CustomBinningApplier(GeneralBinningApplier):
     category="Preprocessing",
     description="Bin data using custom edges.",
     params={"bins": [], "columns": []},
-    learns_from_data=False,
+    learns_from_data=True,
 )
 class CustomBinningCalculator(BaseCalculator):
     """Apply user-supplied bin edges to selected columns."""
@@ -531,8 +531,9 @@ class CustomBinningCalculator(BaseCalculator):
     def fit(self, X: Any, _y: Any, config: dict[str, Any]) -> GeneralBinningArtifact:
         """Attach one shared, sorted edge list from ``config["bins"]`` to every selected column.
 
-        Nothing is learned from the data (``learns_from_data=False``) — *X* is
-        only consulted for column resolution. Unlike :class:`GeneralBinningCalculator`
+        Edges are fixed, but automatic column selection examines observed
+        values to exclude binary, constant, and all-missing columns.
+        Unlike :class:`GeneralBinningCalculator`
         the same edges go to every column, so a multi-column selection spanning
         different scales will push the out-of-scale columns' values outside the
         outer bins, where both engines null them. An empty or absent ``bins``

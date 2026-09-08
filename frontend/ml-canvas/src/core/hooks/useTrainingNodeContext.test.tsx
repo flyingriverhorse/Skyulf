@@ -3,12 +3,16 @@ import { beforeEach, expect, it, vi } from 'vitest';
 import { jobsApi, type RunPipelineResponse } from '../api/jobs';
 import { useGraphStore } from '../store/useGraphStore';
 import { useJobStore } from '../store/useJobStore';
+import { useViewStore } from '../store/useViewStore';
 import { warnAndBlockOnLeakage } from '../utils/pipelineLeakageValidation';
 import { useTrainingNodeContext } from './useTrainingNodeContext';
+import { toast } from '../toast';
+import { convertGraphToPipelineConfig } from '../utils/pipelineConverter';
+import type { PipelineConfigModel } from '../api/client';
 
 vi.mock('./useUpstreamData', () => ({ useUpstreamData: () => [] }));
 vi.mock('./useDatasetSchema', () => ({ useDatasetSchema: () => ({ data: undefined }) }));
-vi.mock('../utils/pipelineConverter', () => ({ convertGraphToPipelineConfig: () => ({ nodes: [] }) }));
+vi.mock('../utils/pipelineConverter', () => ({ convertGraphToPipelineConfig: vi.fn(() => ({ nodes: [] })) }));
 vi.mock('../utils/pipelineLeakageValidation', () => ({ warnAndBlockOnLeakage: vi.fn(() => false) }));
 vi.mock('../api/jobs', () => ({ jobsApi: { runPipeline: vi.fn() } }));
 vi.mock('../toast', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
@@ -17,7 +21,9 @@ const response = { job_id: 'job-a', job_ids: ['job-a'], pipeline_id: 'run', mess
 
 beforeEach(() => {
   vi.clearAllMocks();
+  useViewStore.setState({ leakageNotice: null, isResultsPanelExpanded: false });
   vi.mocked(warnAndBlockOnLeakage).mockReturnValue(false);
+  vi.mocked(convertGraphToPipelineConfig).mockReturnValue({ pipeline_id: 'pipeline', nodes: [] });
   useGraphStore.setState({
     nodes: ['dataset', 'model-a', 'model-b'].map((id, index) => ({
       id, position: { x: index * 200, y: 0 }, data: index === 0
@@ -100,6 +106,99 @@ it('exposes a visible actionable reason when leakage blocks submission', async (
   expect(result.current.submissionMessage).toContain('after the train/test split');
   expect(result.current.isSubmitting).toBe(false);
   expect(jobsApi.runPipeline).not.toHaveBeenCalled();
+});
+
+/** Selecting a safe branch must ignore sibling leakage while unsafe selected ancestors stay blocked. */
+it.each([
+  { targetNodeId: 'model-a', shouldSubmit: true },
+  { targetNodeId: 'model-b', shouldSubmit: false },
+])('scopes leakage preflight to selected target $targetNodeId', async ({ targetNodeId, shouldSubmit }) => {
+  const leakage = await vi.importActual<typeof import('../utils/pipelineLeakageValidation')>('../utils/pipelineLeakageValidation');
+  vi.mocked(warnAndBlockOnLeakage).mockImplementation(leakage.warnAndBlockOnLeakage);
+  const splitterParams = { target_column: 'target', test_size: 0.2, random_state: 42, shuffle: true };
+  const trainingParams = {
+    model_type: 'random_forest_classifier', task_type: 'classification', target_column: 'target',
+    hyperparameters: { n_estimators: 10, random_state: 42 }, cv_enabled: false,
+  };
+  const config: PipelineConfigModel = {
+    pipeline_id: 'mixed-leakage-branches',
+    nodes: [
+      { node_id: 'dataset', step_type: 'data_loader', params: { dataset_id: 'dataset-1' }, inputs: [] },
+      { node_id: 'split-safe', step_type: 'TrainTestSplitter', params: splitterParams, inputs: ['dataset'] },
+      { node_id: 'scale-safe', step_type: 'StandardScaler', params: { columns: ['feature'] }, inputs: ['split-safe'] },
+      { node_id: 'model-a', step_type: 'training', params: trainingParams, inputs: ['scale-safe'] },
+      { node_id: 'scale-unsafe', step_type: 'StandardScaler', params: { columns: ['feature'] }, inputs: ['dataset'] },
+      { node_id: 'split-unsafe', step_type: 'TrainTestSplitter', params: splitterParams, inputs: ['scale-unsafe'] },
+      { node_id: 'model-b', step_type: 'training', params: trainingParams, inputs: ['split-unsafe'] },
+    ],
+  };
+  vi.mocked(convertGraphToPipelineConfig).mockReturnValue(config);
+  vi.mocked(jobsApi.runPipeline).mockResolvedValue(response);
+  useGraphStore.setState({
+    nodes: config.nodes.map((node, index) => ({
+      id: node.node_id, position: { x: index * 200, y: 0 },
+      data: { ...node.params, definitionType: node.step_type === 'training' ? 'classification' : node.step_type },
+    })),
+    edges: config.nodes.flatMap(node => node.inputs.map(source => ({
+      id: `${source}-${node.node_id}`, source, target: node.node_id,
+    }))),
+  });
+  const { result } = renderHook(() => useTrainingNodeContext(targetNodeId));
+  await act(async () => { await result.current.runJob('training', 'classification'); });
+  expect(result.current.isSubmitting).toBe(false);
+  if (shouldSubmit) {
+    expect(result.current.runFeedback?.jobIds).toEqual(['job-a']);
+    expect(jobsApi.runPipeline).toHaveBeenCalledExactlyOnceWith({
+      ...config, target_node_id: targetNodeId, job_type: 'training',
+    });
+  } else {
+    expect(result.current.submissionMessage).toContain('after the train/test split');
+    expect(jobsApi.runPipeline).not.toHaveBeenCalled();
+    expect(toast.error).toHaveBeenCalledWith('Data leakage risk detected', expect.stringContaining("'scale-unsafe'"));
+  }
+});
+
+/** Server-side leakage failures must explain how to correct the graph in persistent feedback. */
+it.each(['training', 'tuning'] as const)('shows the HTTP 400 leakage detail for %s submissions', async (jobType) => {
+  const detail = "Data leakage risk: node 'scale' (StandardScaler) fits on unsplit data. Move it after the train/test splitter.";
+  vi.mocked(jobsApi.runPipeline).mockRejectedValueOnce(Object.assign(new Error(detail), {
+    response: { status: 400, data: { detail } },
+  }));
+  const { result } = renderHook(() => useTrainingNodeContext('model-a'));
+  await act(async () => { await result.current.runJob(jobType, 'classification'); });
+  expect(result.current.submissionMessage).toContain(detail);
+  expect(result.current.isSubmitting).toBe(false);
+  expect(result.current.runFeedback).toBeNull();
+  expect(useJobStore.getState().startPolling).not.toHaveBeenCalled();
+  expect(toast.error).toHaveBeenCalledWith('Failed to submit job', detail);
+  expect(useViewStore.getState().leakageNotice?.message).toBe(detail);
+  expect(useViewStore.getState().isResultsPanelExpanded).toBe(false);
+});
+
+/** Retrying a model must remove stale safety feedback even while its new request is pending. */
+it('clears safety notices on a fresh training request and preserves structured backend detail', async () => {
+  useViewStore.setState({ leakageNotice: { message: 'Earlier failure', graphSignature: 'old' } });
+  const detail = 'Per-fold preprocessing refit skipped: unsupported graph; CV/tuning scores may be optimistically biased.';
+  let reject!: (reason: unknown) => void;
+  vi.mocked(jobsApi.runPipeline).mockReturnValueOnce(new Promise((_, fail) => { reject = fail; }));
+  const { result } = renderHook(() => useTrainingNodeContext('model-a'));
+  let pending!: Promise<void>;
+  act(() => { pending = result.current.runJob('training', 'classification'); });
+  expect(useViewStore.getState().leakageNotice).toBeNull();
+  act(() => useGraphStore.setState({ nodes: [], edges: [] }));
+  await act(async () => { reject({ response: { data: { detail } } }); await pending; });
+  expect(useViewStore.getState().leakageNotice?.message).toBe(detail);
+  expect(useViewStore.getState().leakageNotice?.graphSignature).toContain('model-a');
+  expect(useJobStore.getState().nodeSubmissions['model-a']?.message).toContain(detail);
+});
+
+/** A rejection without an error message must still leave actionable feedback. */
+it('shows fallback feedback when a submission rejects without a message', async () => {
+  vi.mocked(jobsApi.runPipeline).mockRejectedValueOnce(new Error());
+  const { result } = renderHook(() => useTrainingNodeContext('model-a'));
+  await act(async () => { await result.current.runJob('training', 'classification'); });
+  expect(result.current.submissionMessage).toContain('Check your connection and settings, then try again.');
+  expect(result.current.isSubmitting).toBe(false);
 });
 
 it('clears the pending guard after rejection and identifies a later tuning submission', async () => {

@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useGraphStore } from '../../../core/store/useGraphStore';
+import { useViewStore } from '../../../core/store/useViewStore';
 import { Activity, CheckCircle, AlertCircle, Play, GitBranch } from 'lucide-react';
 import { jobsApi, JobInfo } from '../../../core/api/jobs';
 import { convertGraphToPipelineConfig } from '../../../core/utils/pipelineConverter';
 import { warnAndBlockOnLeakage } from '../../../core/utils/pipelineLeakageValidation';
+import { getLeakageErrorMessage, graphSemanticSignature } from '../../../core/utils/leakageFeedback';
 import { generateBranchColors } from '../../../core/hooks/useBranchColors';
 import { useJobPolling } from '../../../core/hooks/useJobPolling';
 import { toast } from '../../../core/toast';
@@ -122,6 +124,8 @@ export const DataPreviewSettings: React.FC<{ config: DataPreviewConfig; onChange
 
   const handleRunPreview = async () => {
     if (!nodeId) return;
+    useViewStore.getState().setLeakageNotice(null);
+    const graphSignature = graphSemanticSignature(nodes, edges);
     setIsRunning(true);
     try {
       const pipelineConfig = convertGraphToPipelineConfig(nodes, edges);
@@ -141,7 +145,9 @@ export const DataPreviewSettings: React.FC<{ config: DataPreviewConfig; onChange
       onChange({ ...config, lastRunJobId: ids[0], lastRunJobIds: ids });
     } catch (error) {
       console.error('Failed to run preview:', error);
-      toast.error('Failed to start preview job');
+      const leakageMessage = getLeakageErrorMessage(error);
+      if (leakageMessage) useViewStore.getState().setLeakageNotice({ message: leakageMessage, graphSignature });
+      toast.error('Failed to start preview job', leakageMessage ?? undefined);
     } finally {
       setIsRunning(false);
     }

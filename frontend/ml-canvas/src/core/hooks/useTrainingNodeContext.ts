@@ -2,10 +2,12 @@ import { useCallback, useMemo } from 'react';
 import { getIncomers, type Edge, type Node } from '@xyflow/react';
 import { useGraphStore } from '../store/useGraphStore';
 import { useJobStore } from '../store/useJobStore';
+import { useViewStore } from '../store/useViewStore';
 import { useUpstreamData } from './useUpstreamData';
 import { useDatasetSchema } from './useDatasetSchema';
 import { convertGraphToPipelineConfig } from '../utils/pipelineConverter';
 import { warnAndBlockOnLeakage } from '../utils/pipelineLeakageValidation';
+import { getLeakageErrorMessage, graphSemanticSignature } from '../utils/leakageFeedback';
 import { jobsApi } from '../api/jobs';
 import { toast } from '../toast';
 import type { TaskType } from '../types/taskType';
@@ -88,10 +90,23 @@ export function useTrainingNodeContext(nodeId: string | undefined) {
         update({ pending: false, run: null, message: `${label} blocked. Connect a dataset upstream and select a dataset.` });
         return;
       }
+      useViewStore.getState().setLeakageNotice(null);
+      const graphSignature = graphSemanticSignature(nodes, edges);
       update({ pending: true, run: null, message: `${label}: Submitting...` });
       try {
         const cfg = convertGraphToPipelineConfig(nodes, edges);
-        if (warnAndBlockOnLeakage(cfg)) {
+        // Match backend target scoping while retaining the full graph for submission.
+        const nodesById = new Map(cfg.nodes.map(configNode => [configNode.node_id, configNode]));
+        const selectedNodeIds = new Set<string>();
+        const pendingNodeIds = [nodeId];
+        while (pendingNodeIds.length > 0) {
+          const currentId = pendingNodeIds.pop()!;
+          if (selectedNodeIds.has(currentId)) continue;
+          selectedNodeIds.add(currentId);
+          pendingNodeIds.push(...(nodesById.get(currentId)?.inputs ?? []));
+        }
+        const selectedNodes = cfg.nodes.filter(configNode => selectedNodeIds.has(configNode.node_id));
+        if (warnAndBlockOnLeakage({ nodes: selectedNodes })) {
           update({ pending: false, run: null, message: `${label} blocked. Move data-learning preprocessing after the train/test split.` });
           return;
         }
@@ -115,8 +130,12 @@ export function useTrainingNodeContext(nodeId: string | undefined) {
         toggleDrawer(true);
       } catch (error) {
         console.error('Failed to submit job:', error);
-        update({ pending: false, run: null, message: `${label}: Submission failed. Check your connection and settings, then try again.` });
-        toast.error('Failed to submit job');
+        const leakageMessage = getLeakageErrorMessage(error);
+        if (leakageMessage) useViewStore.getState().setLeakageNotice({ message: leakageMessage, graphSignature });
+        const message = leakageMessage ?? (error instanceof Error && error.message
+          ? error.message : 'Check your connection and settings, then try again.');
+        update({ pending: false, run: null, message: `${label}: Submission failed. ${message}` });
+        toast.error('Failed to submit job', message);
       }
     },
     [nodeId, nodes, edges, datasetId, setActiveParallelRun, startPolling, setTab, toggleDrawer],

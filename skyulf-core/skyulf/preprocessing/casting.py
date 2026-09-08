@@ -1,6 +1,6 @@
 """Type-casting node — routes apply through the dual-engine dispatcher.
 
-The fit step is config-only (no per-engine math), so it stays single-path.
+The fit step resolves configuration and freezes categorical vocabularies.
 The pandas apply path was previously a single CCN-busting function; it is now
 split per dtype family (`float / int / bool / datetime / other`).
 """
@@ -14,6 +14,7 @@ import polars as pl
 from ..core.meta.decorators import node_meta
 from ..registry import NodeRegistry
 from ._artifacts import CastingArtifact
+from ._helpers import select_then_to_pandas
 from ._schema import SkyulfSchema
 from .base import BaseApplier, BaseCalculator, apply_method, fit_method
 from .dispatcher import apply_dual_engine
@@ -136,7 +137,10 @@ def _bool_expr_from_numeric_col_polars(col: str) -> Any:
 
 
 def _build_polars_cast_exprs(
-    X: Any, type_map: dict[str, Any], coerce_on_error: bool
+    X: Any,
+    type_map: dict[str, Any],
+    coerce_on_error: bool,
+    categories: dict[str, list[Any]] | None = None,
 ) -> tuple[list[Any], list[str]]:
     """Build the list of Polars cast expressions and track string->bool columns.
 
@@ -148,6 +152,17 @@ def _build_polars_cast_exprs(
         if col not in X.columns:
             continue
         pl_dtype = _resolve_polars_dtype(str(target_dtype).lower())
+        if pl_dtype == pl.Categorical and categories is not None and col in categories:
+            values = pl.col(col).cast(pl.String, strict=not coerce_on_error)
+            allowed = [str(value) for value in categories[col]]
+            exprs.append(
+                pl.when(values.is_in(allowed))
+                .then(values)
+                .otherwise(None)
+                .cast(pl.Categorical)
+                .alias(col)
+            )
+            continue
         if pl_dtype is None:
             # In strict mode (coerce_on_error=False), an unsupported dtype
             # string is a configuration error and must be surfaced loudly -
@@ -226,7 +241,9 @@ def _casting_apply_polars(X: Any, y: Any, params: dict[str, Any]) -> Any:
         return X, y
     coerce_on_error = params.get("coerce_on_error", True)
 
-    exprs, string_bool_cols = _build_polars_cast_exprs(X, type_map, coerce_on_error)
+    exprs, string_bool_cols = _build_polars_cast_exprs(
+        X, type_map, coerce_on_error, params.get("categories")
+    )
 
     if not exprs:
         return X, y
@@ -361,7 +378,7 @@ def _cast_bool(series: pd.Series, coerce_on_error: bool) -> pd.Series:
 
 
 def _cast_datetime(series: pd.Series, coerce_on_error: bool) -> pd.Series:
-    return pd.to_datetime(series, errors="coerce" if coerce_on_error else "raise")
+    return pd.to_datetime(series, format="mixed", errors="coerce" if coerce_on_error else "raise")
 
 
 def _cast_one_column(
@@ -385,12 +402,15 @@ def _casting_apply_pandas(X: Any, y: Any, params: dict[str, Any]) -> Any:
     if not type_map:
         return X, y
     coerce_on_error = params.get("coerce_on_error", True)
+    categories = params.get("categories", {})
 
     df_out = X.copy()
     for col, target_dtype in type_map.items():
         if col not in df_out.columns:
             continue
         try:
+            if col in categories:
+                target_dtype = pd.CategoricalDtype(categories=categories[col])
             df_out[col] = _cast_one_column(df_out[col], col, target_dtype, coerce_on_error)
         except Exception:
             if not coerce_on_error:
@@ -410,7 +430,9 @@ class CastingApplier(BaseApplier):
     pandas' ``astype`` clamps out-of-range integers where polars nulls or raises.
     Boolean targets additionally go through the shared alias table so
     "yes"/"no"-style strings coerce the same way on both engines in best-effort
-    mode. Columns missing from the frame are skipped.
+    mode. Columns missing from the frame are skipped. New categorical artifacts
+    freeze the training vocabulary; unseen values become missing. Older
+    artifacts without a vocabulary retain their original casting behavior.
     """
 
     @apply_method
@@ -428,14 +450,14 @@ class CastingApplier(BaseApplier):
     category="Data Operations",
     description="Cast columns to specific data types.",
     params={"type_map": {}, "coerce_on_error": True},
-    learns_from_data=False,
+    learns_from_data=True,
 )
 class CastingCalculator(BaseCalculator):
     """Normalise either accepted config shape into one canonical ``type_map``.
 
-    Purely config-driven (``learns_from_data=False``): nothing is read from the
-    data beyond column presence, and dtype aliases are resolved through
-    ``TYPE_ALIASES`` so the applier only ever sees canonical labels.
+    Ordinary casts resolve dtype aliases through ``TYPE_ALIASES``. Category
+    casts additionally learn the observed training vocabulary so applying a
+    held-out batch cannot change the accepted categories or pandas codes.
     """
 
     def infer_output_schema(
@@ -486,8 +508,18 @@ class CastingCalculator(BaseCalculator):
                 if col in X.columns:
                     final_map[col] = resolved_type
 
+        category_columns = [col for col, dtype in final_map.items() if dtype == "category"]
+        categories: dict[str, list[Any]] = {}
+        if category_columns:
+            category_frame = select_then_to_pandas(X, category_columns)
+            for col in category_columns:
+                # Rebuild from observed values, excluding unused categories
+                # that a sliced frame may have inherited from held-out rows.
+                categories[col] = pd.Categorical(category_frame[col].to_numpy()).categories.tolist()
+
         return {
             "type": "casting",
             "type_map": final_map,
             "coerce_on_error": config.get("coerce_on_error", True),
+            "categories": categories,
         }

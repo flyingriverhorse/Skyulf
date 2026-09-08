@@ -69,11 +69,15 @@ def _training(inputs: list[str], node_id: str = "node_training", **extra) -> Nod
     return NodeConfig(node_id=node_id, step_type=StepType.TRAINING, inputs=inputs, params=params)
 
 
-def _run(tmp_path, nodes, job_id):
+def _run(tmp_path, nodes, job_id, *, on_leakage="raise"):
+    """Run real training with fallback available only through an explicit safety opt-out."""
     logs: list[str] = []
     store = LocalArtifactStore(str(tmp_path / "artifacts"))
     engine = PipelineEngine(store, catalog=FileSystemCatalog(), log_callback=logs.append)
-    result = engine.run(PipelineConfig(pipeline_id=job_id, nodes=nodes), job_id=job_id)
+    result = engine.run(
+        PipelineConfig(pipeline_id=job_id, nodes=nodes, metadata={"on_leakage": on_leakage}),
+        job_id=job_id,
+    )
     return result, logs
 
 
@@ -194,6 +198,7 @@ def test_merged_branches_fall_back_with_warning(noise_target_csv, tmp_path):
             _training(["node_features"]),
         ],
         job_id="f15-merge-fallback",
+        on_leakage="warn",
     )
 
     assert result.status == "success"
@@ -278,6 +283,7 @@ def test_nested_merge_falls_back_with_warning(noise_target_csv, tmp_path):
             _training(["node_inner_merge", "woe_b"]),
         ],
         job_id="f15-nested-merge-fallback",
+        on_leakage="warn",
     )
 
     assert result.status == "success"
@@ -321,6 +327,7 @@ def test_row_count_changing_branch_falls_back_with_warning(noise_target_csv, tmp
             _training(["woe_a", "woe_b_drop"]),
         ],
         job_id="f15-row-count-fallback",
+        on_leakage="warn",
     )
 
     assert result.status == "success"
@@ -350,6 +357,7 @@ def test_learning_step_after_splitter_falls_back_with_warning(noise_target_csv, 
             _training(["woe_a", "woe_b"]),
         ],
         job_id="f15-mid-chain-splitter-fallback",
+        on_leakage="warn",
     )
 
     assert result.status == "success"
@@ -420,6 +428,7 @@ def test_learning_trunk_step_before_fork_splitter_falls_back(tmp_path):
             _training(["scale_a", "scale_b"]),
         ],
         job_id="f15-trunk-learner-fallback",
+        on_leakage="warn",
     )
 
     assert result.status == "success"
@@ -766,11 +775,12 @@ def test_learning_step_before_splitter_falls_back_with_warning(tmp_path):
             _training(["node_features"]),
         ],
         job_id="f15-pre-split-learner-fallback",
+        on_leakage="warn",
     )
 
     assert result.status == "success"
     assert any(
-        "Per-fold preprocessing refit skipped" in m and "before the last splitter" in m
+        "Per-fold preprocessing refit skipped" in m and "before the first row splitter" in m
         for m in logs
     ), f"expected the pre-splitter fallback warning, logs={logs}"
     assert not any("Per-fold preprocessing refit enabled" in m for m in logs)
@@ -931,6 +941,7 @@ def test_payload_reconstruction_failure_never_fails_the_run(
             _training(["node_features"]),
         ],
         job_id="f15-reconstruction-failure",
+        on_leakage="warn",
     )
 
     assert result.status == "success"

@@ -190,7 +190,18 @@ _PANDAS_AGG_METHODS = {"mean", "sum", "count", "min", "max", "std", "median"}
 
 
 def _pandas_group_agg(op: dict[str, Any], df_out: Any, _eps: float) -> pd.Series | None:
-    """Group-by aggregation broadcast back per row via ``groupby().transform()``."""
+    """Map fitted training aggregates, retaining the private unfitted batch helper."""
+    if "group_agg_mapping" in op:
+        fitted = op["group_agg_mapping"] or {}
+        group_col = fitted.get("group_column")
+        if group_col not in df_out.columns:
+            return None
+        mapping = dict(zip(fitted["keys"], fitted["values"], strict=True))
+        groups = df_out[group_col]
+        result = groups.map(mapping).astype("float64")
+        null_value = fitted.get("null_value")
+        return result.where(groups.notna(), np.nan if null_value is None else null_value)
+
     resolved = _resolve_group_agg_cols(op, list(df_out.columns))
     if resolved is None:
         return None
@@ -219,7 +230,7 @@ def _featgen_apply_pandas(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, 
     allow_overwrite = params.get("allow_overwrite", False)
 
     df_out = X.copy()
-    for i, op in enumerate(operations):
+    for i, op in enumerate(operations, start=params.get("_operation_offset", 0)):
         op_type = op.get("operation_type", "arithmetic")
         try:
             if op_type == "datetime_extract":

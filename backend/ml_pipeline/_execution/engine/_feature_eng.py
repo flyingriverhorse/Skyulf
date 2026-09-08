@@ -14,13 +14,7 @@ from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
 from skyulf.data.dataset import SplitDataset
-from skyulf.leakage import (
-    data_dependent_transformers,
-    is_constant_imputation,
-    is_explicit_column_drop,
-    is_explicit_hash_encoding,
-    is_explicit_missing_indicator,
-)
+from skyulf.leakage import step_learns_from_data, train_test_splitters
 from skyulf.modeling.base import extract_xy
 from skyulf.preprocessing.fold_adapter import (
     SPLITTER_STEP_TYPES,
@@ -29,7 +23,6 @@ from skyulf.preprocessing.fold_adapter import (
     MergedBranchFoldAdapter,
 )
 from skyulf.preprocessing.pipeline import FeatureEngineer
-from skyulf.registry import NodeRegistry
 
 from ...constants import StepType
 from ..schemas import NodeConfig
@@ -42,7 +35,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-def _step_learns_from_data(step: dict[str, Any]) -> bool:
+def _step_learns_from_data(step: dict[str, Any], target_column: str | None = None) -> bool:
     """Whether a step's ``fit`` reads statistics from the rows it is given.
 
     Mirrors the leakage gate's per-step verdict (``skyulf.validate_leakage_safety``):
@@ -50,19 +43,11 @@ def _step_learns_from_data(step: dict[str, Any]) -> bool:
     registry-derived learner list. Unknown transformers fail closed — they
     cannot be proven stateless, so they are treated as learners.
     """
-    transformer = str(step.get("transformer") or "")
-    params = step.get("params") or {}
-    if is_explicit_column_drop(transformer, params):
-        return False
-    if is_constant_imputation(transformer, params):
-        return False
-    if is_explicit_missing_indicator(transformer, params):
-        return False
-    if is_explicit_hash_encoding(transformer, params):
-        return False
-    if transformer in data_dependent_transformers():
-        return True
-    return transformer not in NodeRegistry.get_all_metadata()
+    return step_learns_from_data(
+        str(step.get("transformer") or ""),
+        step.get("params") or {},
+        target_column=target_column,
+    )
 
 
 class FeatureEngMixin:
@@ -78,6 +63,61 @@ class FeatureEngMixin:
     _merge_input_order: Any
     _get_merge_strategy: Any
     _upstream_dropped_columns: Any
+    _execution_target_column: Any
+
+    @staticmethod
+    def _node_steps(node: NodeConfig) -> list[dict[str, Any]]:
+        """Expose the operation configs executed by one backend node."""
+        if node.step_type == StepType.FEATURE_ENGINEERING:
+            return list((node.params or {}).get("steps", []))
+        return [{"name": "step", "transformer": node.step_type, "params": node.params or {}}]
+
+    def _safe_split_merge_anchor(self, node: NodeConfig, target_column: str | None) -> bool:
+        """Accept a merged raw frame only when its shared-loader branches learn nothing."""
+        steps = self._node_steps(node)
+        split_positions = [
+            i for i, step in enumerate(steps) if step.get("transformer") in train_test_splitters()
+        ]
+        if not split_positions or any(
+            _step_learns_from_data(step, target_column) for step in steps[: split_positions[0]]
+        ):
+            return False
+        loaders: set[str] = set()
+        for input_id in dict.fromkeys(node.inputs):
+            branch = self._branch_chain_up_to_loader(input_id)
+            if branch is None:
+                return False
+            loader_id, chain = branch
+            loaders.add(loader_id)
+            for _node_id, branch_steps in chain:
+                if any(
+                    step.get("transformer") in train_test_splitters()
+                    or _step_learns_from_data(step, target_column)
+                    for step in branch_steps
+                ):
+                    return False
+        return len(loaders) == 1
+
+    def _upstream_has_learners(self, node: NodeConfig, target_column: str | None) -> bool:
+        """Check every input branch before allowing an unsupported graph to skip refitting."""
+        pending = list(node.inputs)
+        visited: set[str] = set()
+        while pending:
+            node_id = pending.pop()
+            if node_id in visited:
+                continue
+            visited.add(node_id)
+            ancestor = self._node_configs.get(node_id)
+            if ancestor is None:
+                return True
+            if ancestor.step_type in {StepType.DATA_LOADER, "DataLoader"}:
+                continue
+            if any(
+                _step_learns_from_data(step, target_column) for step in self._node_steps(ancestor)
+            ):
+                return True
+            pending.extend(ancestor.inputs)
+        return False
 
     def _resolve_feature_engineer_artifact_key(self, node: NodeConfig) -> str | None:
         if not node.inputs:
@@ -336,7 +376,12 @@ class FeatureEngMixin:
             if cfg is None:
                 return None
             if len(dict.fromkeys(cfg.inputs or [])) > 1:
-                return None
+                if not self._safe_split_merge_anchor(
+                    cfg, training_node.params.get("target_column")
+                ):
+                    return None
+                chain.append((cfg.node_id, self._node_steps(cfg)))
+                return f"exec_{cfg.node_id}_input", list(reversed(chain))
             if cfg.step_type == StepType.DATA_LOADER:
                 return current_id, list(reversed(chain))
             if cfg.step_type == StepType.FEATURE_ENGINEERING:
@@ -429,9 +474,9 @@ class FeatureEngMixin:
         payload, validation_payload), None, None`` on a match
         (validation_payload is ``None`` when the fork split out no validation
         rows), else ``None`` plus the bail reason for the job log and a stable
-        reason code for the ``fold_refit_fallback`` metric. Anything else
-        keeps the skip-with-warning fallback: never fail a run, never leak
-        silently.
+        reason code for the ``fold_refit_fallback`` metric. The caller rejects
+        unsupported learned graphs unless the user explicitly opts out of
+        leakage enforcement.
         """
         inputs = list(dict.fromkeys(self._merge_input_order(training_node)))
         if len(inputs) < 2:
@@ -488,7 +533,7 @@ class FeatureEngMixin:
         trunk_steps = [
             step for _node_id, steps in chains[0][1][: prefix_len - 1] for step in steps
         ] + list(fork_steps[:-1])
-        trunk_learners = [step for step in trunk_steps if _step_learns_from_data(step)]
+        trunk_learners = [step for step in trunk_steps if _step_learns_from_data(step, target_col)]
         if trunk_learners:
             names = ", ".join(sorted({str(step.get("transformer")) for step in trunk_learners}))
             return (
@@ -553,15 +598,17 @@ class FeatureEngMixin:
         — or ``None`` to keep pre-transformed scoring. ``fallback_code`` is a
         stable reason code stamped into the training node's metrics
         (``fold_refit_fallback``) when the run falls back, else ``None``
-        (including the nothing-to-refit silent skip). Falls back with an
-        explicit job-log warning when the upstream graph is not a linear
-        chain or the payload cannot be reconstructed — never fails the run.
+        (including the nothing-to-refit silent skip). Unsupported learned
+        graphs and payload reconstruction failures block scoring by default.
+        Explicit ``on_leakage='warn'`` or ``'ignore'`` permits legacy fallback.
         """
         warning = None
         code: str | None = None
         try:
             resolved = self._upstream_fe_chain(training_node)
             if resolved is None:
+                if not self._upstream_has_learners(training_node, target_col):
+                    return None, None
                 if len(dict.fromkeys(training_node.inputs or [])) > 1:
                     merged, merged_reason, merged_code = self._try_fork_join_refit(
                         training_node, target_col
@@ -589,12 +636,14 @@ class FeatureEngMixin:
             splitter_positions = [
                 i
                 for i, (step, *_) in enumerate(flat)
-                if step.get("transformer") in SPLITTER_STEP_TYPES
+                if step.get("transformer") in train_test_splitters()
             ]
             if splitter_positions:
-                last_split = splitter_positions[-1]
+                first_split = splitter_positions[0]
                 pre_split_learners = [
-                    step for step, *_ in flat[:last_split] if _step_learns_from_data(step)
+                    step
+                    for step, *_ in flat[:first_split]
+                    if _step_learns_from_data(step, target_col)
                 ]
                 if pre_split_learners:
                     # Reconstructing the pre-transform payload would re-fit these
@@ -605,7 +654,7 @@ class FeatureEngMixin:
                         sorted({str(step.get("transformer")) for step in pre_split_learners})
                     )
                     warning = (
-                        f"data-dependent step(s) before the last splitter ({names}) "
+                        f"data-dependent step(s) before the first row splitter ({names}) "
                         "cannot be re-fit safely per fold"
                     )
                     code = "learner_before_split"
@@ -616,7 +665,7 @@ class FeatureEngMixin:
                 # step is applied exactly once.
                 learning_steps = [
                     step
-                    for step, *_ in flat[last_split + 1 :]
+                    for step, *_ in flat[first_split + 1 :]
                     if step.get("transformer") not in SPLITTER_STEP_TYPES
                 ]
             else:
@@ -635,9 +684,9 @@ class FeatureEngMixin:
                 payload = self._split_train_payload(loader_frame, target_col)
                 validation_payload = self._split_validation_payload(loader_frame, target_col)
             else:
-                _step, node_id, idx, total = flat[splitter_positions[-1]]
+                _step, node_id, idx, total = flat[splitter_positions[0]]
                 if idx == total - 1:
-                    # The last splitter ends at a node boundary, so its stored
+                    # The first row splitter ends at a node boundary, so its stored
                     # output artifact is the pre-transform SplitDataset itself.
                     split_artifact = self.artifact_store.load(node_id)
                     payload = self._split_train_payload(split_artifact, target_col)
@@ -646,9 +695,9 @@ class FeatureEngMixin:
                     # Splitter + learning steps share one FE node; re-run the
                     # splitter-only step prefix on the raw loader frame to
                     # reconstruct the pre-learning train rows.
-                    prefix_steps = [s for s, *_ in flat[: splitter_positions[-1] + 1]]
+                    prefix_steps = [s for s, *_ in flat[: splitter_positions[0] + 1]]
                     split_output, _metrics = FeatureEngineer(prefix_steps).fit_transform(
-                        self.artifact_store.load(loader_id)
+                        self.artifact_store.load(loader_id), target_column=target_col
                     )
                     payload = self._split_train_payload(split_output, target_col)
                     validation_payload = self._split_validation_payload(split_output, target_col)
@@ -666,20 +715,33 @@ class FeatureEngMixin:
             return None, code
         finally:
             if warning is not None:
-                self.log(
+                message = (
                     f"Per-fold preprocessing refit skipped: {warning}; "
                     "CV/tuning scores may be optimistically biased."
                 )
+                mode = getattr(self, "_on_leakage", "raise")
+                if mode == "raise" and self._upstream_has_learners(training_node, target_col):
+                    raise ValueError(
+                        message + " Use a supported graph, or explicitly set on_leakage='warn' "
+                        "or 'ignore' to accept pre-fitted preprocessing."
+                    )
+                if mode == "warn":
+                    self.log(message)
 
     def _run_feature_engineering(self, node: NodeConfig) -> tuple[str, dict[str, Any]]:
         # Input: DataFrame or SplitDataset (merged when multiple branches feed in).
-        df = self._get_input(node)
+        target_column = self._execution_target_column(node)
+        df = self._get_input(node, target_column or "")
+        if len(dict.fromkeys(node.inputs)) > 1 and any(
+            step.get("transformer") in train_test_splitters() for step in self._node_steps(node)
+        ):
+            self.artifact_store.save(f"exec_{node.node_id}_input", df)
 
         # params: {"steps": [...]}
         engineer = FeatureEngineer(node.params.get("steps", []))
 
         # SDK FeatureEngineer.fit_transform(data) -> (transformed_data, metrics)
-        processed_df, metrics = engineer.fit_transform(df)
+        processed_df, metrics = engineer.fit_transform(df, target_column=target_column)
 
         # Save the fitted FeatureEngineer itself (holds engineer.fitted_steps state)
         # as this node's artifact, so downstream inference can reload the pipeline.

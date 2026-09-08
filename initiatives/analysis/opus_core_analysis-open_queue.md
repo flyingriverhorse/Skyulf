@@ -15,7 +15,7 @@ file deliberately carries no history.
 per-area report files `00`–`18`).
 **Baseline:** commit `93d7719e` (master), audit run 2026-08-31 → 09-01 by 15
 parallel read-only agents (Claude Opus 5). 116 findings: 5 🔴 / 45 🟠 / 44 🟡 /
-22 ⚪, plus OC-160–206 filed by later reviews. OC-100 was retracted as a false
+22 ⚪, plus OC-160–212 filed by later reviews. OC-100 was retracted as a false
 positive and is not counted; the corrections pass stays in the archive.
 
 **Status key:** ⬜ open · 🟨 in progress · ✅ done · ⏭️ parked
@@ -60,7 +60,6 @@ closed that on 2026-09-07.
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
-| OC-70 | 🟡 | Leakage validator checks for *a* splitter globally, not that *this* branch is protected (`_execution/_leakage_validation.py:189-267`) | small | ⬜ open |
 | OC-151 | 🟡 | Trial-buffer `clear_*` hooks documented but never called — 110.9 MB retained for process lifetime (`realtime/trial_buffer.py:56-59,103-106`) | small | ⬜ open |
 | OC-156 | 🟡 | `roc_auc` threshold-tuning objective scores hard predictions — bit-identical to `balanced_accuracy` (`threshold_tuning_service.py:77-92`) | small | ⬜ open |
 | OC-158 | 🟡 | Sync/async JSON serializers disagree: sync nulls 8 of 15 legitimate strings (`"nan"`, `"NaT"`, `"<NA>"`, `"inf"`…), async nulls none; 603-line module production-dead but test-covered (`serialization.py:369,435-446`) | half day | ⬜ open |
@@ -122,6 +121,7 @@ closed that on 2026-09-07.
 | OC-27 | 🟠 | `GeneralTransformation` ignores the UI `standardize` toggle (`transformations/general.py:34-39,138-139`) | small | ⬜ open |
 | OC-29 | 🟡 | `FeatureGeneration` advertises `polynomial` but silently skips it (`feature_generation/_common.py:24-31`) | small | ⬜ open |
 | OC-30 | 🟡 | Datetime extraction ignores the UI output name, overwrites collisions (`_pandas_ops.py:173-184`) | small | ⬜ open |
+| OC-211 | 🟡 | Pandas datetime features depend on prediction-batch composition: prepending a different valid date format makes the original rows' year/month/day missing in both `FeatureGeneration.datetime_extract` and `DateFeatures` (`feature_generation/_pandas_ops.py:179`, `time_series/date_features.py:64`) | small | ⬜ open |
 | OC-31 | 🟡 | Frontend wrongly requires a target for unsupervised CorrelationThreshold (`FeatureSelectionNode.tsx:564-566`) | small | ⬜ open |
 | OC-32 | 🟡 | `VarianceThreshold` crashes when all candidates are constant (`feature_selection/variance.py:38-47`) | small | ⬜ open |
 | OC-33 | 🟡 | `FeatureInteraction` cannot generate single-column self-products (`feature_generation/interaction.py:173-178`) | small | ⬜ open |
@@ -159,6 +159,7 @@ closed that on 2026-09-07.
 | OC-161 | 🟡 | Polars clustering evaluation reserves `__skyulf_cluster__` without collision protection: a numeric feature with that name is overwritten by internal labels and then dropped, so centroid calculation crashes with `ColumnNotFoundError` (`modeling/_evaluation/clustering.py:92-101`) | small | ⬜ open |
 | OC-162 | 🟡 | Polars time-series CV reserves `__cv_y__` for an unnamed/list target: an input feature with that name is overwritten and dropped before fitting, silently changing the feature matrix (`modeling/cross_validation.py:317-322`) | small | ⬜ open |
 | OC-167 | 🟡 | Ambiguous string boundaries in artifact serialization give different fitted label encoders identical pipeline fingerprints, despite encoding the same input as 0 vs −1 (`pipeline/seal.py:52,64`) — distinct from OC-62's pointer instability | small | ⬜ open |
+| OC-208 | 🟡 | A failed `SkyulfPipeline.fit()` leaves new preprocessing attached to the previous model, so prediction remains enabled with inconsistent fitted state; executed prediction changes from 50 to −150 after the replacement model fails (`pipeline/_pipeline.py:329`, `modeling/base.py:427`) | half day | ⬜ open |
 
 ### Remaining — outliers / casting / binning / timeseries / geo
 
@@ -180,6 +181,7 @@ closed that on 2026-09-07.
 | OC-204 | 🟡 | `fit_predict` drops an embedded target during training but keeps it in held-out tuple features when explicit y is also supplied, causing prediction to fail (`modeling/base.py:317-324`) | small | ⬜ open |
 | OC-206 | ⚪ | Ensemble configuration resolution shallow-copies nested base-model parameters, so fitting mutates the caller's configuration (`modeling/ensemble.py:473,484`) | small | ⬜ open |
 | OC-168 | 🟡 | `SkyulfPipeline.fit()` retains the previous model's tuned thresholds — refitting with new class labels makes thresholded prediction crash; unchanged labels reuse stale cutoffs (`pipeline/_pipeline.py:135,380-389`) | small | ⬜ open |
+| OC-209 | 🟡 | Time-series tuning with an explicit validation partition fails on clean input: the time column is dropped only from training, and concatenating mismatched frames introduces NaNs (`modeling/_tuning/engine.py:353`, `_tuning/splitters.py:91`) | half day | ⬜ open |
 
 ### Remaining — frontend
 
@@ -225,6 +227,59 @@ source read when the finding was filed, so they may have moved.
 
 Findings filed before 2026-09-05 — OC-169 and OC-178–182 among them — keep
 their reproduction detail in the archive's `## Log` entries instead.
+
+### 2026-09-08 — OC-208/209/211: remaining reproduced core findings
+
+Source: [the supplemental review](skyulf_core_review-2026-09-08.md), against the
+working tree based on `28f12473`, including its staged and unstaged changes.
+All three remaining findings were executed and independently reproduced by the
+main reviewer. They are newly discovered defects, not necessarily regressions
+introduced by that working tree, and remain open.
+
+**OC-208 — failed refit mixes new preprocessing with the old model.** Fit a
+`SkyulfPipeline` containing `StandardScaler(columns=["x"])` and
+`linear_regression` on `x=0..23`, `target=2*x`. Prediction at `x=25` is **50**.
+Refit the same instance with `x += 100` and all-missing targets: fitting raises
+`ValueError: Input y contains NaN`. The subsequent prediction at `x=25` is
+**−150** because the scaler has already been replaced but the previous fitted
+model remains accessible. **Fix/verification target:** make failed fitting
+preserve the previous complete fitted state or invalidate prediction until a
+successful refit; pin predictions after an intentionally failed replacement
+fit. Locations: `pipeline/_pipeline.py:329`, `modeling/base.py:427`. Distinct
+from OC-168's stale thresholds and closed OC-164's `get_fitted_split()` mutation.
+
+**OC-209 — time-series tuning corrupts the train/validation feature schema.**
+Build a pandas frame with 30 rows: `x=arange(30, dtype=float)`, `time=arange(30)`,
+`target=2*x`. Supply a `SplitDataset` with train rows `[:18]`, validation
+`[18:24]`, and test `[24:]`. Run a `ridge_regression` hyperparameter tuner with
+`strategy="grid"`, `search_space={"alpha":[1.0]}`, `metric="r2"`, `cv_folds=3`,
+`cv_type="time_series_split"`, `cv_time_column="time"`. Public pipeline fitting
+raises `All trials failed ... First trial error: Input X contains NaN`, while
+the same setup with ordinary CV succeeds. Sorting removes `time` from training
+features but not validation features; frame concatenation restores it with
+missing training values. **Fix/verification target:** keep training and
+validation feature selection consistent before holdout concatenation; cover
+clean explicit partitions and retain chronological sorting and X/y alignment.
+Locations: `modeling/_tuning/engine.py:353`, `_tuning/splitters.py:91`. This
+requires neither OC-162's reserved name nor OC-194's missing timestamps.
+
+**OC-211 — date extraction changes with unrelated batch companions.** Fit and
+apply both `FeatureGeneration` with `operation_type="datetime_extract"`,
+`input_columns=["date"]`, `datetime_features=["year","month","day"]`, and
+`DateFeatures(columns=["date"])` to dates `["2024-01-02","2024-03-04"]`.
+Both return months **[1,3]**. Apply the same fitted artifact after prepending
+`"04/05/2024"` to that batch: the original two rows' year/month/day all become
+missing. Both pandas implementations infer one date format again from each
+apply batch. **Fix/verification target:** define a stable parsing policy and
+verify that unrelated rows and batch order do not change a given valid date's
+features in either node. Locations: `feature_generation/_pandas_ops.py:179`,
+`time_series/date_features.py:64`. Distinct from OC-30's output-name collision
+and OC-174's entirely invalid Polars dates.
+
+**Verification during the review:** the full core suite produced **5,494 passed,
+56 skipped, 281 warnings**; the remaining small reproductions expose behavior the
+passing suite does not assert. The linked report includes reproduction commands,
+the separate editor-diagnostics investigation, and existing-queue reconciliation.
 
 ### 2026-09-06 — remaining-source continuation (findings added as verified)
 

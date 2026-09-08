@@ -156,6 +156,7 @@ uses, so a fixed finding stays where it was filed.
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
 | OC-68 | 🟠 | Model alias map task-unaware — direct API caller silently trains the wrong estimator family (`_execution/engine/_node_runners.py:1157-1183`) | small | ✅ fixed 2026-09-07 — ambiguous aliases are task-aware and mismatched model/task combinations fail clearly |
+| OC-70 | 🟡 | Leakage validator checks for *a* splitter globally, not that *this* branch is protected (`_execution/_leakage_validation.py:189-267`) | small | ✅ fixed 2026-09-08 — every training branch now needs its own splitter or explicit CV; data-dependent ancestors on unprotected branches are reported |
 | OC-145 | 🟡 | Crashed cross-validation returns the same `{}` sentinel as a disabled one — job reports success with missing `cv_*` metrics (`_node_runners.py:871-907`) | small | ✅ fixed 2026-09-08 — post-tuning CV exceptions now fail the training node and pipeline; regression coverage added |
 | OC-130 | 🟠 | Typo in `FASTAPI_ENV` silently disables the entire production security posture (wildcard CORS w/ credentials, DEBUG=True, no SECRET_KEY check) (`config/factory.py:27-32`) — **worse than filed**: a second, unfiled channel — `FASTAPI_ENV` is not a `Settings` field and pydantic-settings never exports dotenv values into `os.environ`, so the bare `os.getenv` could not see a `.env`-only `production` either; both now fail closed through `resolve_environment()` | small | ✅ fixed 2026-09-05 |
 | OC-150 | 🟠 | S3 error "sanitiser" matches credential key names case-sensitively — S3 403 bodies + replayable presigned URLs logged verbatim; duplicated in two files (`connectors/s3.py:31-37`, `artifacts/s3.py:67-73`) — **worse than filed**: executed against real shapes the old helper was a *no-op* on all three leaks and exposed the **secret access key** (the audit only ever demonstrated key IDs and signatures), while separately destroying benign text (`key=reports/2026/q3.csv` → `redacted sensitive S3 error`); both copies deleted in favour of one shape-based `redact_credentials()` | small | ✅ fixed 2026-09-05 |
@@ -204,6 +205,7 @@ uses, so a fixed finding stays where it was filed.
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
+| OC-212 | 🟡 | Similarity generation silently omits its output column for duplicate pandas indexes: label-based `.at[i]` returns Series to a scalar helper and the operation exception is swallowed (`feature_generation/_common.py:137-139`) | small | ✅ fixed 2026-09-08 — similarity now reads and assigns by row position, preserving duplicate indexes and individual scores; see the Log entry. |
 | OC-25 | 🟠 | RFE "K" chosen in UI ignored by backend (`feature_selection/_common.py:236-240`) | small | ✅ fixed 2026-09-05 — closes OC-143 too |
 | OC-28 | 🟠 | Box-Cox transform failures silently return untransformed data (`transformations/power.py:97-104`) | small | ✅ fixed 2026-09-06 — the silent path was the `valid_cols` filter, not the `except` (which has logged since the node was created); both engines now share `_fitted_columns_present`, which names the fitted columns the frame lacks, and fail-open is kept by decision. See the log entry |
 
@@ -218,6 +220,7 @@ uses, so a fixed finding stays where it was filed.
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
+| OC-210 | 🟡 | Public `SkyulfPipeline.optimize_thresholds()` rejects hyperparameter-tuned classifiers because it reads `classes_` from the `(fitted_model, TuningResult)` tuple instead of the underlying classifier (`pipeline/_pipeline.py:511`) | small | ✅ fixed 2026-09-08 — threshold search and thresholded prediction resolve classes from the fitted model through the existing unwrap helper; see the Log entry. |
 | OC-200 | 🟠 | Halving search accepts an all-NaN score set as a successful best result and refits a model; grid search correctly fails on identical folds (`modeling/_tuning/strategies/runner.py:110-127`) | small | ✅ fixed 2026-09-06 — with OC-205: a search left with no fully-scored candidate now fails with grid's "All trials failed" instead of returning `nan` and refitting. See the log entry |
 | OC-205 | 🟠 | Grid/random tuning discards failed folds from each candidate's average, allowing a partially failed candidate to win with an apparently valid score and no failure count in the result (`modeling/_tuning/grid_random.py:91-92`) | small | ✅ fixed 2026-09-06 — with OC-200: a candidate is eligible only if every fold scored, and a partly-failed one is logged as disqualified. See the log entry |
 | OC-201 | 🟡 | Optuna skips search-space normalization: `max_depth=['none']` works in grid search but fails every Optuna trial (`modeling/_tuning/strategies/optuna.py:199`) | small | ✅ fixed 2026-09-06 — Optuna now runs `clean_search_space` like grid/random and halving already did. See the log entry |
@@ -306,6 +309,66 @@ batch's context are in [the live queue](opus_core_analysis-open_queue.md).
 ---
 
 ## Log
+
+### 2026-09-08 — OC-210 fixed: threshold optimization after hyperparameter tuning
+
+**Reproduction:** fit a logistic-regression grid tuner with
+`search_space={"C":[1.0]}`, `metric="accuracy"`, and `cv_folds=3` on
+`x=arange(30, dtype=float)`, `target=[0,1]*15`, using train rows `[:24]` and test
+rows `[24:]`. Fitting succeeded, but
+`pipeline.optimize_thresholds(raw_X, y, accuracy_score)` rejected the classifier
+because it read `classes_` from `(fitted_model, TuningResult)`. Thresholded
+prediction independently read `classes_` from the same tuple.
+
+Both sites now use `StatefulEstimator._unwrap_tuned_model()`, the existing
+model-resolution path used by evaluation. Probability prediction continues
+through the tuning applier with the complete artifact. No signatures or
+threshold-selection rules change.
+
+**TDD/verification:** the new end-to-end regression failed in all three class
+configurations before the fix: numeric binary, string binary, and string
+multiclass. All now optimize thresholds and reproduce predictions from the
+fitted classifier's probabilities while retaining default predictions. A
+tuned-regressor control still rejects threshold optimization. The complete
+pipeline threshold module passes **11 tests**. Joint verification with OC-212:
+**5,492 core tests passed, 70 skipped** (benchmarks explicitly skipped),
+**40 targeted backend tests passed**, `ruff check .` and the configured full
+`ty check` passed. The pre-existing two ty diagnostics in the repeated-split
+test were resolved by asserting the actual DataFrame/Series type before
+comparison; that updated test passed all **4 cases**. Changed Python files
+pass `ruff format --check`. Independent review found no actionable issues.
+
+This closes the standalone core post-training API issue, separate from automatic
+tuning thresholds, backend job threshold endpoints, and still-open OC-168.
+
+### 2026-09-08 — OC-212 fixed: similarity preserves repeated row labels
+
+**Reproduction:** configure `FeatureGeneration` with a `similarity` operation,
+`input_columns=["a"]`, `secondary_columns=["b"]`, `output_column="score"`.
+For `a=["apple","pear"]`, `b=["apple","pear"]`, the unique-index result was
+`score=[100.0,100.0]`. Changing only the index to `[7,7]` removed `score`
+entirely and logged `The truth value of a Series is ambiguous`. Label-based
+`.at[i]` returned Series to the scalar scorer, and the dispatcher skipped the
+failed operation.
+
+`_vectorised_similarity()` now selects pairs and stores scores by position.
+The original index, row order, null/empty handling, and input columns remain
+intact. The public fit/apply regression covers raw and wrapped pandas with
+repeated nonmonotonic labels, different scores sharing one label, missing values
+and empty strings. Both parametrizations failed at the missing output-column
+assertion before the fix and pass afterward. The four feature-generation
+integration suites pass **197 tests**. Independent checks also passed for
+MultiIndex, missing index labels, and the fallback scorer. Joint full-suite and
+lint/type results are recorded in the OC-210 entry above.
+
+### 2026-09-08 - OC-70 fixed
+
+The backend leakage gate now checks each leaf training/tuning branch
+independently. A data-dependent ancestor such as `StandardScaler` on a branch
+without its own splitter is reported, even when another branch has a valid
+splitter. Explicit CV on the training node remains an accepted protection.
+Regression coverage includes the unprotected branch and both fixed-mode and
+tuned-mode CV configuration.
 
 ### 2026-09-08 - OC-145 fixed
 

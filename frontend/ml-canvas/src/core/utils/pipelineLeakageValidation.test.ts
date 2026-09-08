@@ -113,7 +113,7 @@ describe('findPreprocessingBeforeSplitIssues', () => {
     (stepType) => {
       const nodes = [
         node('load', 'DataLoader'),
-        node('encode_target', stepType, ['load'], {}),
+        node('encode_target', stepType, ['load'], { columns: [] }),
         node('split', 'TrainTestSplitter', ['encode_target']),
         node('model', 'LogisticRegression', ['split']),
       ];

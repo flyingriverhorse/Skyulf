@@ -167,7 +167,7 @@ def _tiny_frame():
 
 
 def test_fit_warns_about_learned_step_before_splitter(caplog):
-    """fit() surfaces the leakage verdict as a warning before training."""
+    """An explicit warning policy permits fitting while surfacing leakage."""
     import logging
 
     config = {
@@ -183,7 +183,7 @@ def test_fit_warns_about_learned_step_before_splitter(caplog):
     }
 
     with caplog.at_level(logging.WARNING, logger="skyulf.pipeline"):
-        SkyulfPipeline(config).fit(_tiny_frame(), target_column="target")
+        SkyulfPipeline(config).fit(_tiny_frame(), target_column="target", on_leakage="warn")
 
     assert any("before the train/test split" in r.message for r in caplog.records)
 
