@@ -117,7 +117,8 @@ class FeatureGenerationCalculator(BaseCalculator):
         for index, op in enumerate(params["operations"]):
             if op.get("operation_type") == "group_agg":
                 op["group_agg_mapping"] = _fit_group_aggregation(working, op)
-            working = FeatureGenerationApplier().apply(
+            # apply_method exposes the public (data, params) call signature.
+            working = FeatureGenerationApplier().apply(  # pylint: disable=no-value-for-parameter
                 working, {**params, "operations": [op], "_operation_offset": index}
             )
         return params

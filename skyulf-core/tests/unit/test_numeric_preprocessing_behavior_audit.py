@@ -202,10 +202,10 @@ def test_ordinal_bins_use_fitted_edges_for_singleton_and_reordered_batches(
 @pytest.mark.parametrize(
     "method,companion", [("box-cox", -1.0), ("box-cox", np.inf), ("yeo-johnson", np.inf)]
 )
-def test_invalid_power_companion_cannot_disable_valid_row_transform(
-    engine, node_type, method, companion
+def test_invalid_power_batch_logs_fail_open_without_changing_replay(
+    engine, node_type, method, companion, caplog
 ):
-    """A logged batch failure must not silently feed untransformed valid values to a fitted model."""
+    """Invalid input follows the logged fail-open policy without changing later valid replay."""
     train = _frame({"x": [1.0, 2.0, 4.0, 10.0, 30.0]}, engine)
     config = (
         {"columns": ["x"], "method": method}
@@ -215,10 +215,17 @@ def test_invalid_power_companion_cannot_disable_valid_row_transform(
     artifact = NodeRegistry.get_calculator(node_type)().fit(train, config)
     applier = NodeRegistry.get_applier(node_type)()
     alone = applier.apply(_frame({"x": [3.0]}, engine), artifact)
+    caplog.clear()
     batch = applier.apply(_frame({"x": [3.0, companion]}, engine), artifact)
 
     assert alone["x"].to_list()[0] != 3.0
-    assert batch["x"].to_list()[0] == pytest.approx(alone["x"].to_list()[0])
+    _assert_frame_equal(batch, _frame({"x": [3.0, companion]}, engine), engine)
+    replay = applier.apply(_frame({"x": [3.0]}, engine), artifact)
+    _assert_frame_equal(replay, alone, engine)
+    expected_logger = "skyulf.preprocessing.transformations." + (
+        "power" if node_type == "PowerTransformer" else "general"
+    )
+    assert any(record.name == expected_logger and record.levelno >= 30 for record in caplog.records)
 
 
 @pytest.mark.parametrize("engine", ["pandas", "polars"])
@@ -231,16 +238,59 @@ def test_invalid_power_companion_cannot_disable_valid_row_transform(
         ("ManualBounds", {"bounds": {"x": {"lower": 0, "upper": 9}}}),
     ],
 )
-def test_outlier_inference_keeps_one_output_per_requested_row(engine, node_type, config):
-    """A serving transform must not silently remove inputs when prediction results have no row map."""
+def test_outlier_inference_preserves_filtering_policy_and_target_alignment(
+    engine, node_type, config
+):
+    """Outlier filtering retains in-range and missing rows with their correctly aligned targets."""
     train = _frame({"x": [0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0]}, engine)
     engineer = FeatureEngineer([{"name": "outlier", "transformer": node_type, "params": config}])
     engineer.fit_transform(train)
-    requested = _frame({"x": [3.0, 1000.0, None]}, engine)
+    requested = _frame({"x": [3.0, 1000.0, None], "row_id": [101, 202, 303]}, engine)
+    target = _labels([10, 20, 30], engine)
+    if engine == "pandas":
+        requested.index = pd.Index([8, 8, 3], name="sample")
+        target.index = requested.index
 
-    result = engineer.transform(requested)
+    result, result_target = engineer.transform((requested, target))
 
-    assert len(result) == len(requested)
+    assert requested["row_id"].to_list() == [101, 202, 303]
+    assert target.to_list() == [10, 20, 30]
+    assert result["row_id"].to_list() == [101, 303]
+    assert result["x"].to_list()[0] == 3.0
+    assert pd.isna(result["x"].to_list()[1])
+    if engine == "pandas":
+        assert result.index.to_list() == [8, 3]
+        assert result_target.index.to_list() == [8, 3]
+    assert result_target.to_list() == [10, 30]
+
+
+@pytest.mark.parametrize("engine", ["pandas", "polars"])
+@pytest.mark.parametrize("strategy", ["mean", "median"])
+def test_mean_median_automatic_selection_keeps_cardinality_and_target_exclusions(engine, strategy):
+    """Respecting explicit columns must not broaden automatic discovery or select the target."""
+    train = _frame(
+        {
+            "continuous": [1.0, 2.0, 4.0, 9.0],
+            "binary": [0.0, 1.0, 0.0, 1.0],
+            "constant": [7.0] * 4,
+            "all_missing": [np.nan] * 4,
+            "text": ["a", "b", "c", "d"],
+            "target": [0, 1, 2, 3],
+        },
+        engine,
+    )
+    artifact = NodeRegistry.get_calculator("SimpleImputer")().fit(
+        train, {"strategy": strategy, "target_column": "target"}
+    )
+    probe = _frame(
+        {"continuous": [None, 3.0], "binary": [None, 1.0], "constant": [None, 7.0]}, engine
+    )
+    output = NodeRegistry.get_applier("SimpleImputer")().apply(probe, artifact)
+
+    assert artifact["columns"] == ["continuous"]
+    assert output["continuous"].to_list() == [4.0 if strategy == "mean" else 3.0, 3.0]
+    assert pd.isna(output["binary"].to_list()[0])
+    assert pd.isna(output["constant"].to_list()[0])
 
 
 @pytest.mark.parametrize("engine", ["pandas", "polars"])

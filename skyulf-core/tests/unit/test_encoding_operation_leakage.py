@@ -375,14 +375,16 @@ def test_hash_new_artifacts_version_numeric_normalization(frame_type: Any) -> No
     integers = HashEncoderApplier().apply(integer_frame, artifact)
     floats = HashEncoderApplier().apply(floating_batch, artifact)
     strings = HashEncoderApplier().apply(frame_type({"category": ["1.0"]}), artifact)
-    assert integers["category"].to_list() == [64758]
-    assert floats["category"].to_list()[0] == 64758
+    integer_strings = HashEncoderApplier().apply(frame_type({"category": ["1"]}), artifact)
+    assert integers["category"].to_list() == [41218]
+    assert floats["category"].to_list()[0] == 41218
     assert strings["category"].to_list() == [51646]
-    assert artifact["numeric_normalization_version"] == 1
+    assert integer_strings["category"].to_list() == [64758]
+    assert artifact["numeric_normalization_version"] == 2
 
 
 @pytest.mark.parametrize("frame_type", [pd.DataFrame, pl.DataFrame])
-@pytest.mark.parametrize("version", [0, 2, None, "1", True])
+@pytest.mark.parametrize("version", [0, 3, None, "1", True])
 def test_hash_unknown_normalization_version_is_rejected(frame_type: Any, version: Any) -> None:
     """Unsupported or malformed artifact versions must not silently choose different model inputs."""
     artifact = {

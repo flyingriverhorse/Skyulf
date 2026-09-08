@@ -13,6 +13,12 @@ from ...engines.sklearn_bridge import SklearnBridge
 from ...registry import NodeRegistry
 from ...utils import resolve_columns, user_picked_no_columns
 from .._artifacts import OrdinalArtifact
+from .._category_keys import (
+    category_key_expr,
+    category_keys_pandas,
+    category_order_keys,
+    uses_category_keys,
+)
 from .._schema import SkyulfSchema
 from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
 from ..dispatcher import apply_dual_engine, fit_dual_engine
@@ -32,12 +38,17 @@ def _resolve_apply_inputs(X: Any, params: dict[str, Any]) -> tuple[list[str], An
     return valid_cols, encoder, target_encoders
 
 
-def _apply_features_polars(X: Any, valid_cols: list[str], encoder: Any) -> Any:
+def _apply_features_polars(
+    X: Any, valid_cols: list[str], encoder: Any, canonical_keys: bool = False
+) -> Any:
     # `fill_null("nan")` mirrors the pandas path's `.astype(str)` ("NaN" ->
     # "nan"), so polars nulls reuse the fitted "nan" class instead of drifting
     # into unknown_value (F-07).
     X_subset = X.select(valid_cols).select(
-        [pl.col(c).cast(pl.Utf8).fill_null("nan") for c in valid_cols]
+        [
+            category_key_expr(c) if canonical_keys else pl.col(c).cast(pl.Utf8).fill_null("nan")
+            for c in valid_cols
+        ]
     )
     X_np, _ = SklearnBridge.to_sklearn(X_subset)
     encoded = encoder.transform(X_np)
@@ -45,9 +56,11 @@ def _apply_features_polars(X: Any, valid_cols: list[str], encoder: Any) -> Any:
     return X.with_columns(new_cols_pl)
 
 
-def _apply_features_pandas(X: Any, valid_cols: list[str], encoder: Any) -> Any:
+def _apply_features_pandas(
+    X: Any, valid_cols: list[str], encoder: Any, canonical_keys: bool = False
+) -> Any:
     X_out = X.copy()
-    X_subset = _subset_to_str_pandas(X_out, valid_cols)
+    X_subset = _subset_to_str_pandas(X_out, valid_cols, canonical_keys)
     X_input = X_subset.to_numpy() if hasattr(X_subset, "to_numpy") else X_subset
     X_out[valid_cols] = encoder.transform(X_input)
     return X_out
@@ -110,7 +123,7 @@ def _ordinal_apply_polars(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, 
 
     X_out: Any = X
     if valid_cols and encoder:
-        X_out = _apply_features_polars(X, valid_cols, encoder)
+        X_out = _apply_features_polars(X, valid_cols, encoder, uses_category_keys(params))
 
     y_out = y
     if y is not None and "__target__" in target_encoders:
@@ -125,7 +138,7 @@ def _ordinal_apply_pandas(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, 
 
     X_out: Any = X
     if valid_cols and encoder:
-        X_out = _apply_features_pandas(X, valid_cols, encoder)
+        X_out = _apply_features_pandas(X, valid_cols, encoder, uses_category_keys(params))
 
     y_out = y
     if y is not None and "__target__" in target_encoders:
@@ -136,12 +149,10 @@ def _ordinal_apply_pandas(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, 
 class OrdinalEncoderApplier(BaseApplier):
     """Replace categorical values in place with fitted ordinal indices, target included.
 
-    Features go through the artifact's shared ``encoder_object`` and ``y``
-    through a separate ``__target__`` encoder. Parity rests on both engines
-    transforming through the same sklearn objects *and* stringifying values
-    identically: polars fills nulls with ``"nan"``, pandas collapses
-    ``astype(str)``'s ``"None"`` onto that same token (F-07). A value unseen at
-    fit time becomes ``unknown_value`` unless ``handle_unknown`` is ``"error"``.
+    Features use the shared ``encoder_object`` and versioned scalar keys; ``y``
+    uses a separate ``__target__`` encoder with its existing string-label rules.
+    Older feature artifacts retain their original string lookup. An unseen
+    value becomes ``unknown_value`` unless ``handle_unknown`` is ``"error"``.
     Encoded output is ``float32``, not integer.
     """
 
@@ -198,11 +209,14 @@ def _resolve_target_categories(raw_order: Any, n_features: int) -> str | list[li
     return "auto"
 
 
-def _build_subset_polars(X: Any, feature_cols: list[str]) -> Any:
+def _build_subset_polars(X: Any, feature_cols: list[str], canonical_keys: bool = False) -> Any:
     # Same fill_null("nan") normalisation as _apply_features_polars so fit
     # categories and apply-time strings agree for missing values (F-07).
     return X.select(feature_cols).select(
-        [pl.col(c).cast(pl.Utf8).fill_null("nan") for c in feature_cols]
+        [
+            category_key_expr(c) if canonical_keys else pl.col(c).cast(pl.Utf8).fill_null("nan")
+            for c in feature_cols
+        ]
     )
 
 
@@ -212,10 +226,12 @@ def _fit_feature_encoder(
     config: dict[str, Any],
 ) -> tuple[OrdinalEncoder, list[int]]:
     cats = _parse_categories_order(config.get("categories_order"), len(feature_cols))
+    X_np, _ = SklearnBridge.to_sklearn(X_subset)
+    if isinstance(cats, list):
+        cats = [category_order_keys(values, X_np[:, i]) for i, values in enumerate(cats)]
     enc = _make_ordinal_encoder(
         cats, _resolve_handle_unknown(config), config.get("unknown_value", -1)
     )
-    X_np, _ = SklearnBridge.to_sklearn(X_subset)
     enc.fit(X_np)
     counts = [len(c) for c in enc.categories_]
     return enc, counts
@@ -294,22 +310,29 @@ def _ordinal_fit_dispatch(
         "encoder_object": feature_encoder,
         "encoders": target_encoders,
         "categories_count": counts,
+        "category_key_version": 1,
     }
 
 
 def _ordinal_fit_polars(X: Any, y: Any, config: dict[str, Any]) -> Mapping[str, Any]:
-    return _ordinal_fit_dispatch(X, y, config, _build_subset_polars)
+    return _ordinal_fit_dispatch(
+        X, y, config, lambda frame, cols: _build_subset_polars(frame, cols, True)
+    )
 
 
-def _subset_to_str_pandas(X: Any, feature_cols: list[str]) -> Any:
+def _subset_to_str_pandas(X: Any, feature_cols: list[str], canonical_keys: bool = False) -> Any:
     # astype(str) renders float NaN as "nan" but object-None as "None";
     # collapse the latter so every missing representation shares one class
     # (F-07 parity with the polars fill_null("nan") path).
+    if canonical_keys:
+        return pd.DataFrame({col: category_keys_pandas(X[col]) for col in feature_cols})
     return X[feature_cols].astype(str).replace("None", "nan")
 
 
 def _ordinal_fit_pandas(X: Any, y: Any, config: dict[str, Any]) -> Mapping[str, Any]:
-    return _ordinal_fit_dispatch(X, y, config, _subset_to_str_pandas)
+    return _ordinal_fit_dispatch(
+        X, y, config, lambda frame, cols: _subset_to_str_pandas(frame, cols, True)
+    )
 
 
 @NodeRegistry.register("OrdinalEncoder", OrdinalEncoderApplier)

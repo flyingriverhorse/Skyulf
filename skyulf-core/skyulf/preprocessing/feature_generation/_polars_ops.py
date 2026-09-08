@@ -6,6 +6,7 @@ from typing import Any
 
 import polars as pl
 
+from ..time_series._common import parse_datetime_scalar
 from ._common import (
     DEFAULT_EPSILON,
     SEASON_BY_MONTH,
@@ -199,7 +200,11 @@ def _polars_datetime_apply(op: dict[str, Any], X_out: Any) -> Any:
         try:
             base_dt = pl.col(col)
             if X_out.schema[col] == pl.String:
-                base_dt = pl.col(col).str.to_datetime(strict=False)
+                base_dt = base_dt.map_elements(
+                    parse_datetime_scalar, return_dtype=pl.Datetime(time_zone="UTC")
+                )
+            elif X_out.schema[col] == pl.Null:
+                base_dt = base_dt.cast(pl.Datetime)
             col_exprs = _build_polars_dt_exprs(col, base_dt, features)
             if col_exprs:
                 X_out = X_out.with_columns(col_exprs)

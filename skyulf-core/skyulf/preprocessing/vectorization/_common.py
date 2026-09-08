@@ -159,11 +159,16 @@ def resolve_fit_text_columns(
     return X, valid_cols
 
 
+def _text_series(series: pd.Series) -> pd.Series:
+    """Render missing text as empty without inserting into a categorical vocabulary."""
+    return series.astype(object).where(series.notna(), "").astype(str)
+
+
 def _join_text_columns(X: pd.DataFrame, cols: list) -> pd.Series:
     """Concatenate one or more text columns into a single string series."""
-    series = X[cols[0]].fillna("").astype(str)
+    series = _text_series(X[cols[0]])
     for col in cols[1:]:
-        series = series + " " + X[col].fillna("").astype(str)
+        series = series + " " + _text_series(X[col])
     return series
 
 

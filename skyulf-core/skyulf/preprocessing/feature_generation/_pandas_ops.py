@@ -162,7 +162,7 @@ _PANDAS_DT_FEATURES: dict[str, Callable[[Any], Any]] = {
     "quarter": lambda d: d.dt.quarter,
     "weekday": lambda d: d.dt.dayofweek,
     "is_weekend": lambda d: (d.dt.dayofweek >= 5).astype(int),
-    "week": lambda d: d.dt.isocalendar().week.astype(int),
+    "week": lambda d: d.dt.isocalendar().week.astype("Int64"),
     "month_name": lambda d: d.dt.month_name(),
     "day_name": lambda d: d.dt.day_name(),
     "season": _pandas_season,
@@ -176,7 +176,7 @@ def _pandas_datetime_apply(op: dict[str, Any], df_out: Any) -> None:
     features = op.get("datetime_features", [])
     for col in valid:
         try:
-            dt = pd.to_datetime(df_out[col], errors="coerce", utc=True)
+            dt = pd.to_datetime(df_out[col], errors="coerce", utc=True, format="mixed")
             for feat in features:
                 builder = _PANDAS_DT_FEATURES.get(feat)
                 if builder is None:

@@ -9,10 +9,20 @@ used: a paired ``y`` must be permuted through the *same* positions or it keeps
 its original order while ``X`` takes the new one.
 """
 
+from datetime import datetime
 from typing import Any
 
 import pandas as pd
 import polars as pl
+
+
+def parse_datetime_scalar(value: str) -> datetime | None:
+    """Parse one date string independently, using UTC for native Polars expressions."""
+    parsed = pd.to_datetime(value, errors="coerce", utc=True)
+    if isinstance(parsed, pd.Timestamp):
+        return parsed.to_pydatetime()
+    return None
+
 
 # Supported calendar parts extracted by DateFeatures. Keys are the public
 # feature names; values are the pandas ``.dt`` accessor used to compute them.

@@ -19,7 +19,7 @@ from ...core.meta.decorators import node_meta
 from ...registry import NodeRegistry
 from .._artifacts import TokenizerArtifact
 from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
-from ._common import apply_text_dual_engine, resolve_fit_text_valid_columns
+from ._common import _text_series, apply_text_dual_engine, resolve_fit_text_valid_columns
 
 logger = logging.getLogger(__name__)
 
@@ -58,7 +58,7 @@ def _tokenizer_apply_pandas(
     X_out = X.copy()
 
     for col in valid_cols:
-        text = X_out[col].fillna("").astype(str)
+        text = _text_series(X_out[col])
         tokens = text.map(analyze)
         X_out[f"{col}__tokens"] = tokens.map(" ".join)  # ty: ignore[no-matching-overload]
         if add_token_count:

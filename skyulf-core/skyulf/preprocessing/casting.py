@@ -14,6 +14,7 @@ import polars as pl
 from ..core.meta.decorators import node_meta
 from ..registry import NodeRegistry
 from ._artifacts import CastingArtifact
+from ._category_keys import category_key, category_key_expr
 from ._helpers import select_then_to_pandas
 from ._schema import SkyulfSchema
 from .base import BaseApplier, BaseCalculator, apply_method, fit_method
@@ -153,12 +154,10 @@ def _build_polars_cast_exprs(
             continue
         pl_dtype = _resolve_polars_dtype(str(target_dtype).lower())
         if pl_dtype == pl.Categorical and categories is not None and col in categories:
-            values = pl.col(col).cast(pl.String, strict=not coerce_on_error)
-            allowed = [str(value) for value in categories[col]]
+            values = category_key_expr(col)
+            allowed = {category_key(value): str(value) for value in categories[col]}
             exprs.append(
-                pl.when(values.is_in(allowed))
-                .then(values)
-                .otherwise(None)
+                values.replace_strict(allowed, default=None, return_dtype=pl.String)
                 .cast(pl.Categorical)
                 .alias(col)
             )

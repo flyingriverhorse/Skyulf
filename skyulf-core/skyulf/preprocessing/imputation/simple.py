@@ -184,7 +184,9 @@ class SimpleImputerCalculator(BaseCalculator):
 
         # Mean/median: extra safety filter to numeric columns only.
         if strategy in ("mean", "median"):
-            numeric = set(detect_numeric_columns(X))
+            # Automatic selection already applied its cardinality heuristics.
+            # Do not discard explicitly selected binary or constant columns here.
+            numeric = set(detect_numeric_columns(X, exclude_binary=False, exclude_constant=False))
             cols = [c for c in cols if c in numeric]
             if not cols:
                 return {}

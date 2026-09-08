@@ -25,6 +25,7 @@ from ...engines import SkyulfDataFrame
 from ...registry import NodeRegistry
 from ...types import DEFAULT_RANDOM_STATE
 from ...utils import resolve_columns, user_picked_no_columns
+from .._category_keys import category_key_expr, category_keys_pandas, uses_category_keys
 from .._helpers import select_then_to_pandas
 from .._schema import SkyulfSchema
 from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
@@ -49,7 +50,7 @@ def _resolve_apply_inputs(X: Any, params: dict[str, Any]) -> tuple[list[str], di
     return valid_cols, mappings
 
 
-def _string_keys_with_nan(series: Any) -> Any:
+def _string_keys_with_nan(series: Any, canonical_keys: bool = False) -> Any:
     """Coerce a pandas column to string keys, rendering missing as ``"nan"``.
 
     Mirrors the Polars path's ``fill_null("nan")``: a bare ``astype(str)``
@@ -57,6 +58,8 @@ def _string_keys_with_nan(series: Any) -> Any:
     engines would learn different artifact keys for the same null category
     and cross-engine replay would silently fall back to the default (F-28).
     """
+    if canonical_keys:
+        return category_keys_pandas(series)
     return series.where(series.notna(), "nan").astype(str)
 
 
@@ -70,9 +73,11 @@ def _woe_apply_polars(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, Any]
     # so null rows hit the learned mapping on both engines instead of always
     # falling back to ``default``.
     exprs = [
-        pl.col(col)
-        .cast(pl.Utf8)
-        .fill_null("nan")
+        (
+            category_key_expr(col)
+            if uses_category_keys(params)
+            else pl.col(col).cast(pl.Utf8).fill_null("nan")
+        )
         .replace_strict(mappings[col], default=default, return_dtype=pl.Float64)
         .alias(col)
         for col in valid_cols
@@ -88,7 +93,7 @@ def _woe_apply_pandas(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, Any]
     default = float(params.get("default", 0.0))
     X_out = X.copy()
     for col in valid_cols:
-        mapped = _string_keys_with_nan(X_out[col]).map(mappings[col])
+        mapped = _string_keys_with_nan(X_out[col], uses_category_keys(params)).map(mappings[col])
         X_out[col] = mapped.fillna(default).astype(float)
     return X_out, y
 
@@ -97,10 +102,12 @@ class WOEEncoderApplier(BaseApplier):
     """Replace each category with the Weight-of-Evidence value learned for it.
 
     Both engines look the category up in the same fitted mapping, keyed by the
-    *string* form of the value, and fall back to ``default`` for categories
+    scalar key of the value, and fall back to ``default`` for categories
     never seen at fit time. Nulls are keyed as the literal ``"nan"`` on both
     sides, so a missing category gets its own learned WOE instead of always
-    taking the default (F-28). Encoded columns become float.
+    taking the default (F-28). New artifacts distinguish numeric values from
+    literal strings; older artifacts preserve their original string keys.
+    Encoded columns become float.
     """
 
     @apply_method
@@ -121,7 +128,9 @@ class WOEEncoderApplier(BaseApplier):
 def _binary_target(y: Any) -> np.ndarray | None:
     """Coerce ``y`` to a 0/1 numpy array, or ``None`` if not binary."""
     arr = y.to_numpy() if hasattr(y, "to_numpy") else np.asarray(y)
-    classes = np.unique(arr[~_is_null_mask(arr)])
+    if _is_null_mask(arr).any():
+        raise ValueError("WOEEncoder requires a complete binary target without missing values.")
+    classes = np.unique(arr)
     if len(classes) != 2:
         return None
     positive = classes[-1]
@@ -130,10 +139,7 @@ def _binary_target(y: Any) -> np.ndarray | None:
 
 def _is_null_mask(arr: np.ndarray) -> np.ndarray:
     """Boolean mask of NaN/None entries, dtype-safe for object arrays."""
-    try:
-        return np.isnan(arr.astype(float))
-    except (TypeError, ValueError):
-        return np.array([v is None for v in arr])
+    return np.asarray(pd.isna(arr), dtype=bool)
 
 
 def _column_woe(
@@ -163,7 +169,7 @@ def _build_woe_artifact(
     mappings: dict[str, dict[str, float]] = {}
     iv_scores: dict[str, float] = {}
     for col in cols:
-        values = _string_keys_with_nan(frame[col]).to_numpy()
+        values = _string_keys_with_nan(frame[col], True).to_numpy()
         mappings[col], iv_scores[col] = _column_woe(values, y_bin, reg)
     return {
         "type": "woe_encoder",
@@ -171,6 +177,7 @@ def _build_woe_artifact(
         "mappings": mappings,
         "information_value": iv_scores,
         "default": 0.0,
+        "category_key_version": 1,
     }
 
 
@@ -187,22 +194,11 @@ def _woe_fit_common(
 
 
 def _categorical_frame_for_fit(X: Any, cols: list[str]) -> Any:
-    """Return a pandas frame of ``cols`` with string keys matching the apply path.
-
-    For a Polars ``X``, casting to Utf8 and filling nulls with the literal
-    "nan" string natively (before the pandas conversion) mirrors
-    ``_woe_apply_polars``'s representation exactly (e.g. integer category ``1``
-    stays "1", not "1.0", and nulls become "nan" instead of the pandas-only
-    "None"/NaN-object quirks). Without this, an all-Polars column's fit-time
-    keys can silently diverge from its own apply-time keys -- e.g. any integer
-    categorical column containing nulls gets upcast to float by pandas'
-    ``.to_pandas()`` conversion, so ``.astype(str)`` on the fit side yields
-    "1.0" while the Polars apply path renders "1", and every known category
-    ends up falling back to ``default`` at apply time.
-    """
+    """Preserve raw scalar types before the shared fit builds canonical keys."""
     if hasattr(X, "fill_null"):  # polars DataFrame
-        exprs = [pl.col(col).cast(pl.Utf8).fill_null("nan") for col in cols]
-        return X.select(exprs).to_pandas()
+        return pd.DataFrame(
+            {col: pd.Series(X.get_column(col).to_list(), dtype=object) for col in cols}
+        )
     return select_then_to_pandas(X, cols)[cols]
 
 
@@ -257,7 +253,7 @@ def _cross_fit_woe_values(
             "mappings"
         ]
         for col in cols:
-            held_values = _string_keys_with_nan(frame[col].iloc[hold_idx]).to_numpy()
+            held_values = _string_keys_with_nan(frame[col].iloc[hold_idx], True).to_numpy()
             mapping = mappings[col]
             encoded[col][hold_idx] = np.array([mapping.get(v, 0.0) for v in held_values])
     return encoded

@@ -12,7 +12,7 @@ from .._artifacts import DateFeaturesArtifact
 from .._schema import SkyulfSchema
 from ..base import BaseApplier, BaseCalculator, apply_method
 from ..dispatcher import apply_dual_engine
-from ._common import DATE_FEATURE_ACCESSORS, filter_existing_columns
+from ._common import DATE_FEATURE_ACCESSORS, filter_existing_columns, parse_datetime_scalar
 
 # Default calendar parts when the user does not specify any.
 DEFAULT_FEATURES: list[str] = ["year", "month", "day", "dayofweek"]
@@ -61,7 +61,7 @@ def _apply_pandas(X: Any, _y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
     for col in columns:
         if col not in df.columns:
             continue
-        parsed = pd.to_datetime(df[col], errors="coerce")
+        parsed = pd.to_datetime(df[col], errors="coerce", format="mixed")
         is_null = parsed.isna()
         dt = parsed.dt
         for feature in features:
@@ -96,10 +96,12 @@ def _polars_base_expr(col: str, dtype: Any) -> Any:
     Plain ``cast(pl.Datetime, strict=False)`` only parses columns that are already
     temporal (or full ISO-8601 datetime strings); it silently returns null for
     ordinary date strings like "2021-01-01". String/Utf8 columns must instead go
-    through ``str.to_datetime`` so common date formats are parsed correctly.
+    be parsed independently so companion rows cannot determine their format.
     """
     if dtype in (pl.Utf8, pl.String):
-        return pl.col(col).str.to_datetime(strict=False)
+        return pl.col(col).map_elements(
+            parse_datetime_scalar, return_dtype=pl.Datetime(time_zone="UTC")
+        )
     return pl.col(col).cast(pl.Datetime, strict=False)
 
 

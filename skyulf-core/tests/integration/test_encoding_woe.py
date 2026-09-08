@@ -79,13 +79,12 @@ def test_unseen_category_at_apply_time_falls_back_to_default() -> None:
     assert out.loc[1, "city"] == params.get("default", 0.0)
 
 
-def test_mixed_string_target_with_none_uses_object_null_mask() -> None:
-    """A non-numeric target containing None exercises the object-array null-mask fallback."""
+def test_mixed_string_target_with_none_is_rejected() -> None:
+    """A missing string target must not be silently assigned to the negative class."""
     X = pd.DataFrame({"city": ["a", "a", "b", "b", "b"]})
     y = pd.Series(["yes", "no", "no", "yes", None], name="target")
-    params = WOEEncoderCalculator().fit((X, y), {"columns": ["city"]})
-    assert params != {}
-    assert set(params["mappings"]["city"].keys()) == {"a", "b"}
+    with pytest.raises(ValueError, match="missing"):
+        WOEEncoderCalculator().fit((X, y), {"columns": ["city"]})
 
 
 def test_fit_polars_resolves_target_column_from_within_x() -> None:
@@ -218,23 +217,29 @@ def test_polars_fit_integer_column_with_nulls_matches_apply_representation() -> 
     params = WOEEncoderCalculator().fit((X_fit, y_fit), {"columns": ["cat"]})
 
     mappings = params["mappings"]["cat"]
-    assert set(mappings.keys()) == {"1", "2", "nan"}
+    assert params["category_key_version"] == 1
+    assert len(mappings) == 3
+    assert "nan" in mappings
 
     X_apply = pl.DataFrame({"cat": [1, 2, 1, None]})
     y_apply = pl.Series("y", [1, 0, 1, 0])
     out, _ = WOEEncoderApplier().apply((X_apply, y_apply), dict(params))
 
-    expected = [mappings["1"], mappings["2"], mappings["1"], mappings["nan"]]
+    # Four positives/four negatives with regularization=0.5 give these odds.
+    expected = [np.log(1 / 9), np.log(7), np.log(1 / 9), np.log(3)]
     np.testing.assert_allclose(out["cat"].to_numpy(), expected, rtol=1e-9, atol=1e-9)
 
 
-def test_polars_fit_integer_column_without_nulls_uses_bare_string_keys() -> None:
-    """A Polars integer column with no nulls should key the WOE map as plain ints-as-strings."""
+def test_polars_fit_integer_column_without_nulls_preserves_numeric_identity() -> None:
+    """Typed keys must recognize integral floats and retain the unseen-category fallback."""
     X_fit = pl.DataFrame({"cat": [1, 2, 1, 2, 1, 2, 2, 1]})
     y_fit = pl.Series("y", [1, 0, 1, 0, 1, 0, 0, 1])
     params = WOEEncoderCalculator().fit((X_fit, y_fit), {"columns": ["cat"]})
 
-    assert set(params["mappings"]["cat"].keys()) == {"1", "2"}
+    assert params["category_key_version"] == 1
+    assert len(params["mappings"]["cat"]) == 2
+    result = WOEEncoderApplier().apply(pl.DataFrame({"cat": [1.0, 2.0, 2.5]}), dict(params))
+    np.testing.assert_allclose(result["cat"].to_numpy(), [-np.log(9), np.log(9), 0.0])
 
 
 def test_polars_apply_no_valid_columns_is_noop() -> None:
