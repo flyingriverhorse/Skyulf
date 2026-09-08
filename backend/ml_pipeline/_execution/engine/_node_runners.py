@@ -901,23 +901,19 @@ class NodeRunnersMixin:
             cv_data = SplitDataset(train=pre_train, test=data.test, validation=None)
 
         self.log("Running cross-validation on tuned model with best parameters...")
-        try:
-            cv_results = cv_estimator.cross_validate(
-                cv_data,
-                target_col,
-                {"params": best_params},
-                n_folds=tuning_params.get("cv_folds", 5),
-                cv_type=post_cv_type,
-                shuffle=tuning_params.get("cv_shuffle", True),
-                random_state=tuning_params.get("cv_random_state", DEFAULT_RANDOM_STATE),
-                time_column=tuning_params.get("cv_time_column") or None,
-                log_callback=self.log,
-                preprocessing=preprocessing,
-            )
-            return self._aggregate_cv_metrics(cv_results)
-        except Exception:
-            logger.exception("Cross-validation failed for tuned model")
-            return {}
+        cv_results = cv_estimator.cross_validate(
+            cv_data,
+            target_col,
+            {"params": best_params},
+            n_folds=tuning_params.get("cv_folds", 5),
+            cv_type=post_cv_type,
+            shuffle=tuning_params.get("cv_shuffle", True),
+            random_state=tuning_params.get("cv_random_state", DEFAULT_RANDOM_STATE),
+            time_column=tuning_params.get("cv_time_column") or None,
+            log_callback=self.log,
+            preprocessing=preprocessing,
+        )
+        return self._aggregate_cv_metrics(cv_results)
 
     def _run_training_tuned(
         self,
