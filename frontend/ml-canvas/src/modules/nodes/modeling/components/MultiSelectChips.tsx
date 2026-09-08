@@ -6,6 +6,7 @@ interface Option {
 }
 
 interface MultiSelectChipsProps {
+    ariaLabel?: string;
     options: Option[];
     /** Currently selected values (order preserved as the user toggles). */
     selected: unknown[];
@@ -17,7 +18,7 @@ interface MultiSelectChipsProps {
  * ensemble's base models). Toggling a chip adds/removes its value; selection
  * order is preserved so the rendered estimator order matches the user's intent.
  */
-export function MultiSelectChips({ options, selected, onChange }: MultiSelectChipsProps) {
+export function MultiSelectChips({ ariaLabel, options, selected, onChange }: MultiSelectChipsProps) {
     const toggle = (value: unknown) => {
         if (selected.includes(value)) {
             onChange(selected.filter((v) => v !== value));
@@ -27,13 +28,14 @@ export function MultiSelectChips({ options, selected, onChange }: MultiSelectChi
     };
 
     return (
-        <div className="flex flex-wrap gap-1.5">
+        <div role="group" aria-label={ariaLabel} className="flex flex-wrap gap-1.5">
             {options.map((opt) => {
                 const active = selected.includes(opt.value);
                 return (
                     <button
                         key={String(opt.value)}
                         type="button"
+                        aria-pressed={active}
                         onClick={() => { toggle(opt.value); }}
                         className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs border transition-colors ${
                             active

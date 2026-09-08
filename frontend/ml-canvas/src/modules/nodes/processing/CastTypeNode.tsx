@@ -99,6 +99,7 @@ const CastTypeSettings: React.FC<{ config: CastTypeConfig; onChange: (c: CastTyp
         <div className="flex items-center justify-between">
           <span className="text-sm font-medium">Casting Rules</span>
           <button
+            aria-label="Add Casting Rule"
             onClick={handleAdd}
             disabled={!datasetId || columns.length === 0}
             className="p-1.5 action-primary rounded disabled:opacity-50 transition-colors"
@@ -113,6 +114,7 @@ const CastTypeSettings: React.FC<{ config: CastTypeConfig; onChange: (c: CastTyp
             <div key={col} className="flex items-center gap-2 p-2 border rounded bg-muted/10 group">
               <div className="flex-1 space-y-2 min-w-0">
                 <select
+                  aria-label={`Column for casting rule ${col}`}
                   className="w-full p-1.5 text-sm border rounded bg-background focus:ring-1 focus:ring-primary outline-none"
                   value={col}
                   onChange={(e) => { handleUpdateColumn(col, e.target.value); }}
@@ -124,6 +126,7 @@ const CastTypeSettings: React.FC<{ config: CastTypeConfig; onChange: (c: CastTyp
                   ))}
                 </select>
                 <select
+                  aria-label={`Data type for ${col}`}
                   className="w-full p-1.5 text-sm border rounded bg-background focus:ring-1 focus:ring-primary outline-none"
                   value={type}
                   onChange={(e) => { handleUpdateType(col, e.target.value); }}
@@ -134,6 +137,7 @@ const CastTypeSettings: React.FC<{ config: CastTypeConfig; onChange: (c: CastTyp
                 </select>
               </div>
               <button
+                aria-label={`Remove casting rule for ${col}`}
                 onClick={() => { handleRemove(col); }}
                 className="p-1.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded transition-colors"
                 title="Remove Rule"

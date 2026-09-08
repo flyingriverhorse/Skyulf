@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useId } from 'react';
 import { ValidationField } from '../../../components/shared/ValidationField';
 import { NodeDefinition } from '../../../core/types/nodes';
 import { Split } from 'lucide-react';
@@ -22,6 +22,7 @@ const TrainTestSplitSettings: React.FC<{ config: TrainTestSplitConfig; onChange:
   onChange,
   nodeId,
 }) => {
+  const fieldId = useId();
   const upstreamData = useUpstreamData(nodeId || '');
 
   // Find datasetId from upstream data (injected by useUpstreamData hook)
@@ -86,13 +87,14 @@ const TrainTestSplitSettings: React.FC<{ config: TrainTestSplitConfig; onChange:
         <div className={`space-y-4 ${isWide ? 'overflow-y-auto pr-2' : 'shrink-0'}`}>
           <ValidationField field="test_size">
             <div className="space-y-2">
-              <span className="text-sm font-medium">Test Size (0.0 - 1.0)</span>
+              <label htmlFor={`${fieldId}-test_size`} className="text-sm font-medium">Test Size (0.0 - 1.0)</label>
               <input
                 type="number"
                 step="0.05"
                 min="0.05"
                 max="0.95"
                 className="w-full p-2 border rounded bg-background text-sm"
+                id={`${fieldId}-test_size`}
                 value={config.test_size}
                 onChange={(e) => onChange({ ...config, test_size: Number.parseFloat(e.target.value) })}
               />
@@ -101,13 +103,14 @@ const TrainTestSplitSettings: React.FC<{ config: TrainTestSplitConfig; onChange:
 
           <ValidationField field="validation_size">
             <div className="space-y-2">
-              <span className="text-sm font-medium">Validation Size (0.0 - 1.0)</span>
+              <label htmlFor={`${fieldId}-validation_size`} className="text-sm font-medium">Validation Size (0.0 - 1.0)</label>
               <input
                 type="number"
                 step="0.05"
                 min="0.00"
                 max="0.95"
                 className="w-full p-2 border rounded bg-background text-sm"
+                id={`${fieldId}-validation_size`}
                 value={valSize}
                 onChange={(e) => onChange({ ...config, validation_size: Number.parseFloat(e.target.value) })}
               />
@@ -129,10 +132,11 @@ const TrainTestSplitSettings: React.FC<{ config: TrainTestSplitConfig; onChange:
           </ValidationField>
 
           <div className="space-y-2">
-            <span className="text-sm font-medium">Random State</span>
+            <label htmlFor={`${fieldId}-random_state`} className="text-sm font-medium">Random State</label>
             <input
               type="number"
               className="w-full p-2 border rounded bg-background text-sm"
+              id={`${fieldId}-random_state`}
               value={config.random_state}
               onChange={(e) => onChange({ ...config, random_state: parseIntSafe(e.target.value, config.random_state) })}
             />
@@ -144,11 +148,11 @@ const TrainTestSplitSettings: React.FC<{ config: TrainTestSplitConfig; onChange:
           <div className="flex items-center gap-2">
             <input
               type="checkbox"
-              id="shuffle"
+              id={`${fieldId}-shuffle`}
               checked={config.shuffle}
               onChange={(e) => onChange({ ...config, shuffle: e.target.checked })}
             />
-            <label htmlFor="shuffle" className="text-sm font-medium">
+            <label htmlFor={`${fieldId}-shuffle`} className="text-sm font-medium">
               Shuffle Data
             </label>
           </div>
@@ -156,19 +160,20 @@ const TrainTestSplitSettings: React.FC<{ config: TrainTestSplitConfig; onChange:
           <div className="flex items-center gap-2">
             <input
               type="checkbox"
-              id="stratify"
+              id={`${fieldId}-stratify`}
               checked={config.stratify}
               onChange={(e) => onChange({ ...config, stratify: e.target.checked })}
             />
-            <label htmlFor="stratify" className="text-sm font-medium">
+            <label htmlFor={`${fieldId}-stratify`} className="text-sm font-medium">
               Stratify by Target
             </label>
           </div>
 
           <div className="space-y-2 pl-6 border-l-2 border-muted">
-            <span className="text-sm font-medium">Target Column</span>
+            <label htmlFor={`${fieldId}-target_column`} className="text-sm font-medium">Target Column</label>
             <select
               className="w-full p-2 border rounded bg-background text-sm"
+              id={`${fieldId}-target_column`}
               value={config.target_column ?? ''}
               onChange={(e) => onChange({ ...config, target_column: e.target.value })}
               disabled={!config.stratify}

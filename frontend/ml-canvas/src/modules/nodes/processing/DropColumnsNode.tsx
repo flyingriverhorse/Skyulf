@@ -99,6 +99,7 @@ const DropColumnsSettings: React.FC<{ config: DropColumnsConfig; onChange: (c: D
               </span>
             </div>
             <input
+              aria-label="Missing Value Threshold"
               type="range"
               min="0"
               max="100"

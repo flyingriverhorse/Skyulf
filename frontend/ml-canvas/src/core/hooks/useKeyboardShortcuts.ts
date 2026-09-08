@@ -54,6 +54,9 @@ export interface AddNodeAtCenterDetail {
  */
 export const FOCUS_NODE_EVENT = 'skyulf:focus-node';
 
+/** Return keyboard focus from dismissed panels without moving the viewport. */
+export const FOCUS_CANVAS_EVENT = 'skyulf:focus-canvas';
+
 export interface FocusNodeDetail {
   id: string;
   /** Keep a source node visible alongside a newly connected step. */

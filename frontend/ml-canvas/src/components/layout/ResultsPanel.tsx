@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { collectGraphValidationIssues, useGraphStore, type GraphValidationIssue } from '../../core/store/useGraphStore';
-import { FOCUS_NODE_EVENT } from '../../core/hooks/useKeyboardShortcuts';
+import { FOCUS_CANVAS_EVENT, FOCUS_NODE_EVENT } from '../../core/hooks/useKeyboardShortcuts';
 import { getReadOnlyMode } from '../../core/hooks/useReadOnlyMode';
 import { useViewStore } from '../../core/store/useViewStore';
 import { AlertTriangle, ChevronUp, ChevronDown, Maximize2, Minimize2, Table, X, XCircle } from 'lucide-react';
@@ -413,6 +413,7 @@ export const ResultsPanel: React.FC<{ maxHeight?: number }> = ({ maxHeight = 720
                 setIsMaximized(false);
                 setMergeWarningsOpen(false);
                 setDismissed(true);
+                window.dispatchEvent(new Event(FOCUS_CANVAS_EVENT));
               }}
             >
               <X className="w-4 h-4" />

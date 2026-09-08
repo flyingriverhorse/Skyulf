@@ -235,11 +235,28 @@ def test_polars_apply_path_matches_pandas_values() -> None:
         )
 
 
-def test_drop_first_not_applied_when_single_category() -> None:
-    """_drop_first_if_needed leaves a single-category list untouched even with drop_first=True."""
+def test_drop_first_applies_when_single_category() -> None:
+    """Single-category columns drop their only dummy when drop_first=True."""
     from skyulf.preprocessing.encoding.dummy import _drop_first_if_needed
 
-    assert _drop_first_if_needed(["only"], drop_first=True) == ["only"]
+    assert _drop_first_if_needed(["only"], drop_first=True) == []
+
+
+def test_single_category_column_drop_first_applies_consistently() -> None:
+    """Drop-first behavior for single-category columns matches on both engines."""
+    df_pd = pd.DataFrame({"color": ["red", "red"], "keep": [1, 2]})
+    df_pl = pl.from_pandas(df_pd)
+
+    pd_params = DummyEncoderCalculator().fit(df_pd, {"columns": ["color"], "drop_first": True})
+    out_pd = DummyEncoderApplier().apply(df_pd, dict(pd_params))
+    pl_params = DummyEncoderCalculator().fit(df_pl, {"columns": ["color"], "drop_first": True})
+    out_pl = DummyEncoderApplier().apply(df_pl, dict(pl_params))
+
+    assert list(out_pd.columns) == ["keep"]
+    assert list(out_pl.columns) == ["keep"]
+    assert out_pd["keep"].tolist() == [1, 2]
+    assert list(out_pl["keep"]) == [1, 2]
+    assert out_pd.shape == out_pl.shape == (2, 1)
 
 
 def test_polars_apply_drop_first_removes_first_category_column() -> None:

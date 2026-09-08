@@ -49,6 +49,19 @@ beforeEach(() => {
 
 afterEach(() => vi.unstubAllGlobals());
 
+/** Conditional hyperparameters need names even after changing settings sections. */
+it('labels basic hyperparameters and exposes the active training mode', async () => {
+  vi.mocked(jobsApi.getHyperparameters).mockResolvedValue([
+    { name: 'penalty', label: 'Penalty', type: 'select', default: 'elasticnet', options: [{ label: 'Elastic Net', value: 'elasticnet' }] },
+    { name: 'l1_ratio', label: 'L1 Ratio', type: 'number', default: 0.5, depends_on: { param: 'penalty', value: 'elasticnet' } },
+  ]);
+  await renderSettings({ hyperparameters: { penalty: 'elasticnet', l1_ratio: 0.5 } });
+  expect(screen.getByRole('button', { name: 'Basic', pressed: true })).toBeVisible();
+  fireEvent.click(screen.getByRole('button', { name: 'Hyperparameters' }));
+  expect(screen.getByRole('combobox', { name: 'Penalty' })).toBeVisible();
+  expect(screen.getByRole('textbox', { name: 'L1 Ratio' })).toHaveValue('0.5');
+});
+
 /** The footer must explain the first unmet prerequisite without submitting invalid work. */
 it.each([
   { name: 'missing dataset', datasetId: undefined, patch: {}, reason: /Connect a dataset node upstream/ },

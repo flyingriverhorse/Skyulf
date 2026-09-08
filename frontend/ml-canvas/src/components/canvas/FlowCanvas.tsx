@@ -30,6 +30,7 @@ import { Sparkles } from 'lucide-react';
 import {
   SHOW_TEMPLATES_EVENT,
   FOCUS_NODE_EVENT,
+  FOCUS_CANVAS_EVENT,
   FIT_VIEW_EVENT,
   type FocusNodeDetail,
 } from '../../core/hooks/useKeyboardShortcuts';
@@ -327,10 +328,13 @@ const FlowCanvasContent: React.FC = () => {
       scheduleFit();
     };
     window.addEventListener(FOCUS_NODE_EVENT, handler);
+    const focusCanvas = () => wrapper.focus({ preventScroll: true });
+    window.addEventListener(FOCUS_CANVAS_EVENT, focusCanvas);
     return () => {
       clearTimeout(timer);
       observer.disconnect();
       window.removeEventListener(FOCUS_NODE_EVENT, handler);
+      window.removeEventListener(FOCUS_CANVAS_EVENT, focusCanvas);
     };
   }, [fitView]);
 
@@ -371,6 +375,8 @@ const FlowCanvasContent: React.FC = () => {
     <div
       className="w-full h-full outline-none relative focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary"
       ref={reactFlowWrapper}
+      role="region"
+      aria-label="Pipeline canvas"
       // Keep event handlers outside edge objects: clipboard copies clone rendered edges.
       onFocusCapture={(event) => {
         const element = event.target as Element;

@@ -65,6 +65,7 @@ const MissingIndicatorSettings: React.FC<{ config: MissingIndicatorConfig; onCha
           <div>
             <span className="block text-sm font-medium mb-1">Indicator Suffix</span>
             <input
+              aria-label="Indicator Suffix"
               type="text"
               className="w-full p-2 border rounded bg-background focus:ring-1 focus:ring-primary outline-none"
               value={config.flag_suffix}

@@ -87,7 +87,7 @@ const ColumnsPanel: React.FC<{
       <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 block">
         Text Columns ({selected.length})
       </label>
-      <ColumnMultiSelect columns={columns} selected={selected} onChange={onColumns} variant="compact" />
+      <ColumnMultiSelect aria-label="Text Columns" columns={columns} selected={selected} onChange={onColumns} variant="compact" />
       <p className="text-xs text-gray-500 mt-1">
         Only text/categorical columns are shown. Multiple columns are joined with a space.
       </p>

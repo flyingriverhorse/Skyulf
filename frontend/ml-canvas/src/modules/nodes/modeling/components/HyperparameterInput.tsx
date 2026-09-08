@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 
 export interface HyperparameterInputProps {
+    id?: string;
     value: unknown;
     type: string;
     onChange: (value: unknown) => void;
@@ -15,7 +16,7 @@ export interface HyperparameterInputProps {
  * Commits on blur to avoid thrashing onChange while typing.
  */
 export const HyperparameterInput: React.FC<HyperparameterInputProps> = ({
-    value, type, onChange, step, min, max,
+    id, value, type, onChange, step, min, max,
 }) => {
     const [localValue, setLocalValue] = useState<string>('');
 
@@ -51,6 +52,7 @@ export const HyperparameterInput: React.FC<HyperparameterInputProps> = ({
 
     return (
         <input
+            id={id}
             type="text"
             value={localValue}
             onChange={(e) => { setLocalValue(e.target.value); }}

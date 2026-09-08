@@ -14,6 +14,8 @@ export interface ColumnMultiSelectProps {
    * sites want the label so the widget is self-describing).
    */
   label?: string;
+  /** Accessible picker name when its visible caption is rendered by the parent. */
+  'aria-label'?: string;
   /**
    * 'panel' (default): header + All/None buttons. Height behavior is
    * further controlled by `fillHeight` (see below).
@@ -80,6 +82,7 @@ export function ColumnMultiSelect({
   selected,
   onChange,
   label,
+  'aria-label': accessibleLabel,
   variant = 'panel',
   showFooterCount = false,
   isLoading = false,
@@ -90,6 +93,7 @@ export function ColumnMultiSelect({
   className = '',
 }: ColumnMultiSelectProps) {
   const [searchTerm, setSearchTerm] = useState('');
+  const accessibleName = accessibleLabel ?? label ?? 'Columns';
 
   const filtered = columns.filter((c) => c.toLowerCase().includes(searchTerm.toLowerCase()));
 
@@ -109,6 +113,8 @@ export function ColumnMultiSelect({
 
   return (
     <div
+      role="group"
+      aria-label={accessibleName}
       className={`flex flex-col border rounded-md bg-background overflow-hidden ${
         panelFillsHeight ? 'h-full min-h-[200px]' : isPanel ? 'min-h-[160px]' : ''
       } ${className}`}
@@ -126,6 +132,7 @@ export function ColumnMultiSelect({
                 <button
                   type="button"
                   onClick={selectAll}
+                  aria-label={`Select all matching ${accessibleName}`}
                   className="text-[10px] px-2 py-1 hover:bg-accent rounded text-muted-foreground hover:text-foreground transition-colors"
                 >
                   All
@@ -133,6 +140,7 @@ export function ColumnMultiSelect({
                 <button
                   type="button"
                   onClick={selectNone}
+                  aria-label={`Select none of the matching ${accessibleName}`}
                   className="text-[10px] px-2 py-1 hover:bg-accent rounded text-muted-foreground hover:text-foreground transition-colors"
                 >
                   None
@@ -144,6 +152,7 @@ export function ColumnMultiSelect({
         <div className="relative">
           <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground pointer-events-none" />
           <input
+            aria-label={`Search ${accessibleName}`}
             type="text"
             placeholder="Search columns..."
             value={searchTerm}

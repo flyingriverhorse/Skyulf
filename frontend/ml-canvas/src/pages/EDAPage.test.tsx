@@ -1,9 +1,10 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { Dataset } from '../core/types/api';
+import type { EDAReport } from '../core/api/eda';
 import { EDAService } from '../core/api/eda';
 import { DatasetService } from '../core/api/datasets';
 import { useEDAStore } from '../core/store/useEDAStore';
@@ -41,6 +42,90 @@ vi.mock('../core/api/datasets', async () => {
       getUsable: vi.fn(),
     },
   };
+});
+
+describe('EDAPage PII review', () => {
+  const profileReport: EDAReport = {
+    id: 10,
+    status: 'COMPLETED',
+    profile_data: {
+      row_count: 2,
+      column_count: 2,
+      columns: {
+        contact: {
+          name: 'contact', dtype: 'Categorical', missing_count: 0, missing_percentage: 0,
+          categorical_stats: {
+            unique_count: 2, rare_labels_count: 0,
+            top_k: [{ value: 'private@example.com', count: 1 }],
+          },
+        },
+        age: { name: 'age', dtype: 'Numeric', missing_count: 1, missing_percentage: 50 },
+      },
+      sample_data: [{ contact: 'private@example.com', phone: '+1-202-555-0123' }],
+      alerts: [
+        { type: 'PII', column: 'contact', severity: 'error', message: 'Found private@example.com' },
+        { type: 'PII', column: null, severity: '+1-202-555-0123', message: 'Untrusted private@example.com' },
+        { type: 'High Null', column: 'age', severity: 'warning', message: 'Missing values need review' },
+        { column: 'legacy', severity: 'info', message: 'PII Email/Phone mentioned in legacy message' },
+      ],
+    },
+  };
+
+  function renderProfilePage() {
+    vi.mocked(DatasetService.getUsable).mockResolvedValue(duplicateNamedDatasets);
+    vi.mocked(EDAService.getHistory).mockResolvedValue([]);
+    useEDAStore.getState().resetForDataset();
+    useEDAStore.setState({ selectedDataset: 101 });
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    return render(
+      <QueryClientProvider client={client}>
+        <MemoryRouter initialEntries={['/eda?dataset_id=101']}>
+          <EDAPage />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+  }
+
+  it('reviews structured PII alerts without exposing messages, samples, or filter values', async () => {
+    // Accidental rendering of alert text, raw statistics, or sidebar filters can disclose personal data.
+    vi.mocked(EDAService.getLatestReport).mockResolvedValue(profileReport);
+    renderProfilePage();
+    const reviewButton = await screen.findByRole('button', { name: 'PII Review' });
+    act(() => {
+      useEDAStore.getState().addFilterDraft({ column: 'contact', operator: '==', value: 'filter@example.com' });
+      useEDAStore.getState().toggleExclude('contact', true);
+    });
+    fireEvent.click(reviewButton);
+
+    const panel = await screen.findByRole('region', { name: 'PII review' });
+    const rows = within(panel).getAllByRole('row');
+    expect(rows).toHaveLength(3);
+    expect(within(panel).getByRole('rowheader', { name: 'contact' })).toBeInTheDocument();
+    expect(within(panel).getAllByText('Email / phone')).toHaveLength(2);
+    expect(within(panel).getByText('Error')).toBeInTheDocument();
+    expect(within(panel).getByText('Unspecified')).toBeInTheDocument();
+    expect(within(panel).queryByText('age')).not.toBeInTheDocument();
+    expect(within(panel).queryByText('legacy')).not.toBeInTheDocument();
+    expect(document.body.innerHTML).not.toMatch(/private@example.com|filter@example.com|\+1-202-555-0123/);
+    expect(profileReport.profile_data?.alerts).toHaveLength(4);
+  });
+
+  it('loads the selected dataset findings and clears them when switching to a clean profile', async () => {
+    // A dataset switch must not leave the previous dataset's PII findings visible.
+    vi.mocked(EDAService.getLatestReport).mockImplementation(async (datasetId) => (
+      datasetId === 101 ? profileReport : {
+        id: 20, status: 'COMPLETED',
+        profile_data: { row_count: 1, column_count: 0, columns: {}, alerts: [] },
+      }
+    ));
+    renderProfilePage();
+    fireEvent.click(await screen.findByRole('button', { name: 'PII Review' }));
+    expect(await screen.findByRole('rowheader', { name: 'contact' })).toBeInTheDocument();
+    fireEvent.change(screen.getByRole('combobox', { name: 'Dataset' }), { target: { value: '202' } });
+    fireEvent.click(await screen.findByRole('button', { name: 'PII Review' }));
+    expect(await screen.findByText('No PII findings recorded')).toBeInTheDocument();
+    expect(screen.queryByRole('rowheader', { name: 'contact' })).not.toBeInTheDocument();
+  });
 });
 
 vi.mock('../core/api/eda', async () => {

@@ -8,7 +8,6 @@ import { useUpstreamDroppedColumns } from '../../../core/hooks/useUpstreamDroppe
 import { useRecommendations } from '../../../core/hooks/useRecommendations';
 import { RecommendationsPanel } from '../../../components/panels/RecommendationsPanel';
 import { useGraphStore } from '../../../core/store/useGraphStore';
-import { clickableProps } from '../../../core/utils/a11y';
 import { getNodeMetricDetails } from '../../../core/utils/preprocessingMetrics';
 import { ColumnMultiSelect } from '../shared/ColumnMultiSelect';
 import { useIsWideContainer } from '../../../core/hooks/useIsWideContainer';
@@ -236,17 +235,25 @@ const FeatureGenerationSettings: React.FC<{ config: FeatureGenerationConfig; onC
           <div key={idx} className="border rounded-lg bg-card shadow-sm overflow-hidden">
             {/* Header */}
             <div
-              className="flex items-center justify-between px-3 py-2 bg-muted/30 border-b cursor-pointer hover:bg-muted/50 transition-colors"
-              {...clickableProps(() => { toggleExpand(idx); })}
+              className="flex items-center justify-between px-3 py-2 bg-muted/30 border-b"
             >
               <div className="flex items-center gap-2">
-                {(op.isExpanded || revealedOperations.includes(idx)) ? <ChevronDown size={14} className="text-muted-foreground" /> : <ChevronRight size={14} className="text-muted-foreground" />}
-                <span className="text-[10px] font-bold uppercase tracking-wider text-primary bg-primary/10 px-1.5 py-0.5 rounded">
-                  {op.operation_type === 'datetime_extract' ? 'Date' : op.operation_type.replace('_', ' ')}
-                </span>
+                <button
+                  type="button"
+                  aria-label={`${op.isExpanded || revealedOperations.includes(idx) ? 'Collapse' : 'Expand'} ${op.operation_type === 'datetime_extract' ? 'Date' : op.operation_type.replace('_', ' ')} operation ${idx + 1}`}
+                  aria-expanded={!!(op.isExpanded || revealedOperations.includes(idx))}
+                  onClick={() => { toggleExpand(idx); }}
+                  className="flex items-center gap-2 rounded hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                >
+                  {(op.isExpanded || revealedOperations.includes(idx)) ? <ChevronDown size={14} className="text-muted-foreground" /> : <ChevronRight size={14} className="text-muted-foreground" />}
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-primary bg-primary/10 px-1.5 py-0.5 rounded">
+                    {op.operation_type === 'datetime_extract' ? 'Date' : op.operation_type.replace('_', ' ')}
+                  </span>
+                </button>
                 {['arithmetic', 'similarity', 'group_agg'].includes(op.operation_type) && (
                   <select
-                    className="text-sm border-none bg-transparent font-semibold focus:ring-0 cursor-pointer hover:text-primary"
+                    aria-label={`Method for operation ${idx + 1}`}
+                    className="text-sm border-none bg-transparent font-semibold focus:ring-1 focus:ring-primary cursor-pointer hover:text-primary"
                     value={op.method}
                     onClick={(e) => { e.stopPropagation(); }}
                     onChange={(e) => { updateOperation(idx, { method: e.target.value }); }}
@@ -261,6 +268,7 @@ const FeatureGenerationSettings: React.FC<{ config: FeatureGenerationConfig; onC
                 )}
               </div>
               <button
+                aria-label={`Remove operation ${idx + 1}`}
                 onClick={(e) => { removeOperation(idx, e); }}
                 className="text-muted-foreground hover:text-destructive transition-colors p-1 rounded-full hover:bg-destructive/10"
               >
@@ -286,6 +294,7 @@ const FeatureGenerationSettings: React.FC<{ config: FeatureGenerationConfig; onC
                     <ColumnMultiSelect
                       variant="compact"
                       label="Column A (Left Operand)"
+                      aria-label={`Column A (Left Operand) for operation ${idx + 1}`}
                       columns={numericColumns}
                       selected={op.input_columns.slice(0, 1)}
                       onChange={(cols) => { updateOperation(idx, { input_columns: cols }); }}
@@ -305,6 +314,7 @@ const FeatureGenerationSettings: React.FC<{ config: FeatureGenerationConfig; onC
                     <ColumnMultiSelect
                       variant="compact"
                       label="Column B (Right Operand)"
+                      aria-label={`Column B (Right Operand) for operation ${idx + 1}`}
                       columns={numericColumns}
                       selected={op.secondary_columns?.slice(0, 1) || []}
                       onChange={(cols) => { updateOperation(idx, { secondary_columns: cols }); }}
@@ -324,6 +334,7 @@ const FeatureGenerationSettings: React.FC<{ config: FeatureGenerationConfig; onC
                     <ColumnMultiSelect
                       variant="compact"
                       label="Numerator (Sum)"
+                      aria-label={`Numerator (Sum) for operation ${idx + 1}`}
                       columns={numericColumns}
                       selected={op.input_columns}
                       onChange={(cols) => { updateOperation(idx, { input_columns: cols }); }}
@@ -339,6 +350,7 @@ const FeatureGenerationSettings: React.FC<{ config: FeatureGenerationConfig; onC
                     <ColumnMultiSelect
                       variant="compact"
                       label="Denominator (Sum)"
+                      aria-label={`Denominator (Sum) for operation ${idx + 1}`}
                       columns={numericColumns}
                       selected={op.secondary_columns || []}
                       onChange={(cols) => { updateOperation(idx, { secondary_columns: cols }); }}
@@ -362,6 +374,7 @@ const FeatureGenerationSettings: React.FC<{ config: FeatureGenerationConfig; onC
                     <ColumnMultiSelect
                       variant="compact"
                       label="String A"
+                      aria-label={`String A for operation ${idx + 1}`}
                       columns={stringColumns}
                       selected={op.input_columns.slice(0, 1)}
                       onChange={(cols) => updateOperation(idx, { input_columns: cols })}
@@ -379,6 +392,7 @@ const FeatureGenerationSettings: React.FC<{ config: FeatureGenerationConfig; onC
                     <ColumnMultiSelect
                       variant="compact"
                       label="String B"
+                      aria-label={`String B for operation ${idx + 1}`}
                       columns={stringColumns}
                       selected={op.secondary_columns?.slice(0, 1) || []}
                       onChange={(cols) => updateOperation(idx, { secondary_columns: cols })}
@@ -398,6 +412,7 @@ const FeatureGenerationSettings: React.FC<{ config: FeatureGenerationConfig; onC
                     <ColumnMultiSelect
                       variant="compact"
                       label="Group By (Categorical)"
+                      aria-label={`Group By (Categorical) for operation ${idx + 1}`}
                       columns={stringColumns.length > 0 ? stringColumns : allColumns}
                       selected={op.input_columns.slice(0, 1)}
                       onChange={(cols) => updateOperation(idx, { input_columns: cols })}
@@ -414,6 +429,7 @@ const FeatureGenerationSettings: React.FC<{ config: FeatureGenerationConfig; onC
                     <ColumnMultiSelect
                       variant="compact"
                       label="Target (Numeric)"
+                      aria-label={`Target (Numeric) for operation ${idx + 1}`}
                       columns={numericColumns}
                       selected={op.secondary_columns?.slice(0, 1) || []}
                       onChange={(cols) => updateOperation(idx, { secondary_columns: cols })}
@@ -430,6 +446,7 @@ const FeatureGenerationSettings: React.FC<{ config: FeatureGenerationConfig; onC
                     <ColumnMultiSelect
                       variant="compact"
                       label="Date Column"
+                      aria-label={`Date Column for operation ${idx + 1}`}
                       columns={dateColumns.length > 0 ? dateColumns : allColumns}
                       selected={op.input_columns.slice(0, 1)}
                       onChange={(cols) => updateOperation(idx, { input_columns: cols })}
@@ -451,7 +468,7 @@ const FeatureGenerationSettings: React.FC<{ config: FeatureGenerationConfig; onC
                           >
                             <input
                               type="checkbox"
-                              className="rounded border-muted-foreground/40 text-primary focus:ring-0"
+                              className="rounded border-muted-foreground/40 text-primary focus:ring-1 focus:ring-primary"
                               checked={(op.datetime_features || []).includes(method)}
                               onChange={(e) => {
                                 const current = op.datetime_features || [];
@@ -485,6 +502,7 @@ const FeatureGenerationSettings: React.FC<{ config: FeatureGenerationConfig; onC
               <div className="pt-2">
                 <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-1 block">Output Column Name</span>
                 <input
+                  aria-label={`Output Column Name for operation ${idx + 1}`}
                   type="text"
                   className="w-full text-xs border rounded px-2 py-1.5 bg-background focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all"
                   placeholder={generateDefaultName(op, idx)}

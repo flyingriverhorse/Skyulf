@@ -1,5 +1,5 @@
 import { describe, expect, it, beforeEach, beforeAll } from 'vitest';
-import { act, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { PropertiesPanel } from './PropertiesPanel';
 import { useGraphStore } from '../../core/store/useGraphStore';
@@ -84,6 +84,15 @@ describe('PropertiesPanel merge strategy', () => {
     ]);
     renderPanel();
     expect(screen.queryByText('Merge Strategy')).not.toBeInTheDocument();
+  });
+
+  it('names the merge strategy control and applies the selected winner', () => {
+    // Assistive technology must identify which setting changes overlapping-column ownership.
+    seedStore([{ node_id: 'merge-node', kind: 'sibling_fan_in', inputs: ['branch-a', 'branch-b'], overlap_columns: ['age'] }]);
+    renderPanel();
+    const strategy = screen.getByRole('combobox', { name: 'Merge Strategy' });
+    fireEvent.change(strategy, { target: { value: 'first_wins' } });
+    expect(useGraphStore.getState().nodes.find(node => node.id === 'merge-node')?.data.merge_strategy).toBe('first_wins');
   });
 
   it('shows it, naming the contested columns, once two branches edited the same column', () => {
@@ -180,5 +189,17 @@ describe('PropertiesPanel multi-input mode merge-winner hint', () => {
     seedTraining('parallel');
     renderPanel();
     expect(screen.queryByText(/If two branches carry the same column/)).not.toBeInTheDocument();
+  });
+
+  it('announces the selected multi-input mode when toggling it', () => {
+    // Color alone must not be the only way to distinguish merged and parallel execution.
+    seedTraining('merge');
+    renderPanel();
+    const merge = screen.getByRole('button', { name: 'Merge' });
+    const parallel = screen.getByRole('button', { name: 'Parallel' });
+    expect(merge).toHaveAttribute('aria-pressed', 'true');
+    fireEvent.click(parallel);
+    expect(merge).toHaveAttribute('aria-pressed', 'false');
+    expect(parallel).toHaveAttribute('aria-pressed', 'true');
   });
 });

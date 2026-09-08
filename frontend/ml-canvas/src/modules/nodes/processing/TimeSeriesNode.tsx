@@ -50,6 +50,7 @@ function ChipMultiSelect({ options, selected, onChange }: {
           <button
             key={opt}
             type="button"
+            aria-pressed={active}
             onClick={() => { toggle(opt); }}
             className={`px-2 py-1 rounded text-[11px] border transition-colors ${active ? 'bg-primary text-primary-foreground border-primary' : 'bg-background hover:bg-accent border-muted-foreground/30'}`}
           >
@@ -79,6 +80,7 @@ function OrderingSelectors({ config, allColumns, update }: {
     <div className="space-y-1">
       <span className="block text-xs font-medium text-muted-foreground">Sort By (optional)</span>
       <select
+        aria-label="Sort By (optional)"
         className="w-full p-1.5 border rounded bg-background text-xs"
         value={config.sort_by ?? ''}
         onChange={e => { update({ sort_by: e.target.value || undefined }); }}
@@ -90,6 +92,7 @@ function OrderingSelectors({ config, allColumns, update }: {
     <div className="space-y-1">
       <span className="block text-xs font-medium text-muted-foreground">Group By (optional)</span>
       <select
+        aria-label="Group By (optional)"
         className="w-full p-1.5 border rounded bg-background text-xs"
         value={config.group_by?.[0] ?? ''}
         onChange={e => { update({ group_by: e.target.value ? [e.target.value] : undefined }); }}
@@ -109,6 +112,7 @@ function LagSettings({ config, update }: { config: TimeSeriesConfig; update: Upd
       <span className="block text-xs font-medium">Lags (comma-separated)</span>
       <ValidationField field="lags">
         <input
+          aria-label="Lags (comma-separated)"
           type="text"
           className="w-full p-1.5 border rounded text-sm"
           value={(config.lags ?? [1]).join(', ')}
@@ -143,6 +147,7 @@ function RollingSettings({ config, update }: { config: TimeSeriesConfig; update:
       <div className="space-y-1">
         <span className="block text-xs font-medium">Window</span>
         <input
+          aria-label="Window"
           type="number"
           min="1"
           className="w-full p-1.5 border rounded text-sm"
@@ -153,6 +158,7 @@ function RollingSettings({ config, update }: { config: TimeSeriesConfig; update:
       <div className="space-y-1">
         <span className="block text-xs font-medium">Min Periods</span>
         <input
+          aria-label="Min Periods"
           type="number"
           min="1"
           className="w-full p-1.5 border rounded text-sm"
@@ -227,6 +233,7 @@ function TimeSeriesSettings({ config, onChange, nodeId }: {
         <div className="space-y-1.5">
           <span className="block text-xs font-medium text-muted-foreground">Method</span>
           <select
+            aria-label="Method"
             className="w-full p-2 border rounded bg-background text-sm"
             value={config.method}
             onChange={e => { update({ method: e.target.value as TimeSeriesMethod }); }}

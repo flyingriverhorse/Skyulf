@@ -14,6 +14,7 @@ import {
     Map,
     ChevronRight,
     Lightbulb,
+    Shield,
     Plus,
     X,
     EyeOff,
@@ -133,6 +134,7 @@ export const EDASidebar: React.FC<EDASidebarProps> = ({
             title: "Overview",
             items: [
                 { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, show: true },
+                { id: 'pii', label: 'PII Review', icon: Shield, show: true },
                 { id: 'sample', label: 'Sample Data', icon: Table, show: !!profile.sample_data },
                 { id: 'insights', label: 'Smart Insights', icon: Lightbulb, show: true },
             ]
@@ -174,7 +176,7 @@ export const EDASidebar: React.FC<EDASidebarProps> = ({
         <div className={`${isCollapsed ? 'w-14' : 'w-60'} bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex-shrink-0 h-full overflow-y-auto flex flex-col transition-all duration-300`}>
 
             {/* Data Controls Section */}
-            {!isCollapsed && (
+            {!isCollapsed && activeTab !== 'pii' && (
             <div className="p-3 border-b border-gray-200 dark:border-gray-700 space-y-3 bg-gray-50/50 dark:bg-gray-900/20">
 
                 {/* Filters */}
@@ -451,8 +453,10 @@ export const EDASidebar: React.FC<EDASidebarProps> = ({
                                         <button
                                             key={item.id}
                                             onClick={() => setActiveTab(item.id)}
+                                            aria-label={item.label}
+                                            aria-current={activeTab === item.id ? 'page' : undefined}
                                             title={isCollapsed ? item.label : undefined}
-                                            className={`w-full flex items-center ${isCollapsed ? 'justify-center py-2' : 'px-2 py-2'} text-sm font-medium rounded-md transition-colors ${
+                                            className={`w-full flex items-center ${isCollapsed ? 'justify-center py-2' : 'px-2 py-2'} text-sm font-medium rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-gray-800 ${
                                                 activeTab === item.id
                                                     ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400'
                                                     : 'text-gray-600 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-700'

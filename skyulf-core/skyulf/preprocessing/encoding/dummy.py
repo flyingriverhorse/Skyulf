@@ -29,8 +29,8 @@ def _resolve_valid_cols(X: Any, params: dict[str, Any]) -> list[str]:
 
 
 def _drop_first_if_needed(cats: list[Any], drop_first: bool) -> list[Any]:
-    """Drop the first category when ``drop_first`` is enabled (and we have ≥ 2)."""
-    if drop_first and len(cats) > 1:
+    """Drop the first category when ``drop_first`` is enabled and any category exists."""
+    if drop_first and cats:
         return cats[1:]
     return cats
 

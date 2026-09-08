@@ -1,8 +1,9 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useId, useRef } from 'react';
 import { Activity, Loader2, Database, AlertCircle, RefreshCw, Check, X } from 'lucide-react';
 import { jobsApi, JobInfo } from '../../../../core/api/jobs';
 import { RegistryItem } from '../../../../core/api/registry';
 import { formatMetricName } from '../../../../core/utils/format';
+import { useModalFocus } from '../../../../components/shared/useModalFocus';
 
 export interface BestParamsModalProps {
     isOpen: boolean;
@@ -30,6 +31,17 @@ export const BestParamsModal: React.FC<BestParamsModalProps> = ({
     onSelect,
     theme = 'blue',
 }) => {
+    const fieldId = useId();
+    const dialogRef = useRef<HTMLDivElement>(null);
+    useModalFocus({ isOpen, containerRef: dialogRef });
+    useEffect(() => {
+        if (!isOpen) return;
+        const onKeyDown = (event: KeyboardEvent) => {
+            if (event.key === 'Escape') onClose();
+        };
+        window.addEventListener('keydown', onKeyDown);
+        return () => window.removeEventListener('keydown', onKeyDown);
+    }, [isOpen, onClose]);
     const [currentModelType, setCurrentModelType] = useState(initialModelType);
     const [jobs, setJobs] = useState<JobInfo[]>([]);
     const [isLoading, setIsLoading] = useState(false);
@@ -66,19 +78,20 @@ export const BestParamsModal: React.FC<BestParamsModalProps> = ({
         <div className="fixed inset-0 z-[100] flex justify-center items-center p-4">
             {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events,jsx-a11y/no-static-element-interactions -- backdrop dismiss zone */}
             <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-            <div className="relative w-full max-w-2xl max-h-[85vh] bg-white dark:bg-gray-800 shadow-2xl rounded-xl flex flex-col border border-gray-200 dark:border-gray-700 overflow-hidden animate-in fade-in zoom-in duration-200">
+            <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby={`${fieldId}-title`} tabIndex={-1} className="relative w-full max-w-2xl max-h-[85vh] bg-white dark:bg-gray-800 shadow-2xl rounded-xl flex flex-col border border-gray-200 dark:border-gray-700 overflow-hidden animate-in fade-in zoom-in duration-200">
                 <div className="p-4 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center bg-gray-50/50 dark:bg-gray-800/50">
                     <div className="flex items-center gap-3">
                         <div className={`p-2 ${colors.iconBg} rounded-lg`}>
                             <Activity className={`w-5 h-5 ${colors.iconText}`} />
                         </div>
                         <div>
-                            <h3 className="font-semibold text-gray-900 dark:text-gray-100">Best Parameters History</h3>
+                            <h3 id={`${fieldId}-title`} className="font-semibold text-gray-900 dark:text-gray-100">Best Parameters History</h3>
                             <div className="flex items-center gap-2 mt-1">
-                                <span className="text-xs text-gray-500 dark:text-gray-400">
+                                <label htmlFor={`${fieldId}-model`} className="text-xs text-gray-500 dark:text-gray-400">
                                     {onSelect ? 'Select parameters for:' : 'View parameters for:'}
-                                </span>
+                                </label>
                                 <select
+                                    id={`${fieldId}-model`}
                                     value={currentModelType}
                                     onChange={(e) => { setCurrentModelType(e.target.value); }}
                                     className={`text-xs border border-gray-200 dark:border-gray-700 rounded px-2 py-0.5 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 focus:ring-1 ${colors.ring} outline-none`}
@@ -101,13 +114,15 @@ export const BestParamsModal: React.FC<BestParamsModalProps> = ({
                     </div>
                     <div className="flex items-center gap-2">
                         <button
+                            type="button"
+                            aria-label="Refresh history"
                             onClick={fetchJobs}
                             className="p-2 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-500 transition-colors"
                             title="Refresh"
                         >
                             <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
                         </button>
-                        <button onClick={onClose} className="p-2 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-500 transition-colors">
+                        <button type="button" aria-label="Close history" onClick={onClose} className="p-2 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-500 transition-colors focus-ring">
                             <X className="w-4 h-4" />
                         </button>
                     </div>

@@ -129,6 +129,7 @@ const ScalingSettings: React.FC<{ config: ScalingConfig; onChange: (c: ScalingCo
           <div>
             <span className="block text-sm font-medium mb-1">Scaling Method</span>
             <select
+              aria-label="Scaling Method"
               className="w-full p-2 border rounded bg-background text-sm"
               value={config.method}
               onChange={(e) => onChange({ ...config, method: e.target.value as ScalingConfig['method'] })}
@@ -176,6 +177,7 @@ const ScalingSettings: React.FC<{ config: ScalingConfig; onChange: (c: ScalingCo
               <span className="block text-sm font-medium">Feature Range</span>
               <div className="flex gap-2 items-center">
                 <input
+                  aria-label="Feature Range Minimum"
                   type="number"
                   className="w-full p-2 border rounded bg-background text-sm"
                   placeholder="Min (0)"
@@ -184,6 +186,7 @@ const ScalingSettings: React.FC<{ config: ScalingConfig; onChange: (c: ScalingCo
                 />
                 <span className="text-muted-foreground">-</span>
                 <input
+                  aria-label="Feature Range Maximum"
                   type="number"
                   className="w-full p-2 border rounded bg-background text-sm"
                   placeholder="Max (1)"
@@ -200,6 +203,7 @@ const ScalingSettings: React.FC<{ config: ScalingConfig; onChange: (c: ScalingCo
               <span className="block text-sm font-medium">Quantile Range</span>
               <div className="flex gap-2 items-center">
                 <input
+                  aria-label="Quantile Range Minimum"
                   type="number"
                   className="w-full p-2 border rounded bg-background text-sm"
                   placeholder="Min (25.0)"
@@ -208,6 +212,7 @@ const ScalingSettings: React.FC<{ config: ScalingConfig; onChange: (c: ScalingCo
                 />
                 <span className="text-muted-foreground">-</span>
                 <input
+                  aria-label="Quantile Range Maximum"
                   type="number"
                   className="w-full p-2 border rounded bg-background text-sm"
                   placeholder="Max (75.0)"

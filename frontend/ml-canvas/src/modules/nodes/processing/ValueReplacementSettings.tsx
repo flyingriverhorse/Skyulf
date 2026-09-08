@@ -21,11 +21,12 @@ export interface ValueReplacementConfig {
 type ValueReplacementValueType = ReplacementItem['oldType'];
 
 const TypedInput: React.FC<{
+  label: string;
   value: unknown;
   type: ValueReplacementValueType;
   onChange: (val: unknown, type: ValueReplacementValueType) => void;
   placeholder?: string;
-}> = ({ value, type, onChange, placeholder }) => {
+}> = ({ label, value, type, onChange, placeholder }) => {
 
   const handleTypeChange = (newType: ValueReplacementValueType) => {
     let newValue = value;
@@ -47,6 +48,7 @@ const TypedInput: React.FC<{
   return (
     <div className="flex gap-1">
       <select
+        aria-label={`${label} type`}
         className="w-20 text-[10px] rounded border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 px-1"
         value={type}
         onChange={(e) => { handleTypeChange(e.target.value as ValueReplacementValueType); }}
@@ -59,6 +61,7 @@ const TypedInput: React.FC<{
 
       {type === 'string' && (
         <input
+          aria-label={label}
           type="text"
           className="flex-1 min-w-0 text-xs rounded border border-gray-300 dark:border-gray-600 px-2 py-1"
           value={(value as string) || ''}
@@ -68,6 +71,7 @@ const TypedInput: React.FC<{
       )}
       {type === 'number' && (
         <input
+          aria-label={label}
           type="number"
           className="flex-1 min-w-0 text-xs rounded border border-gray-300 dark:border-gray-600 px-2 py-1"
           value={(value as number) || ''}
@@ -77,6 +81,7 @@ const TypedInput: React.FC<{
       )}
       {type === 'boolean' && (
         <select
+          aria-label={label}
           className="flex-1 min-w-0 text-xs rounded border border-gray-300 dark:border-gray-600 px-2 py-1"
           value={String(value)}
           onChange={(e) => onChange(e.target.value === 'true', 'boolean')}
@@ -95,20 +100,24 @@ const TypedInput: React.FC<{
 };
 
 const ReplacementEditor: React.FC<{
+  index: number;
   item: ReplacementItem;
   onChange: (item: ReplacementItem) => void;
   onDelete: () => void;
-}> = ({ item, onChange, onDelete }) => {
+}> = ({ index, item, onChange, onDelete }) => {
   return (
     <div className="p-2 border rounded-md bg-gray-50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700 flex flex-col gap-2">
       <div className="flex items-center justify-between">
         <div className="text-[10px] text-gray-500 uppercase font-semibold tracking-wider">Find</div>
-        <button onClick={onDelete} className="text-gray-400 hover:text-red-500 transition-colors p-1">
+        <button
+          aria-label={`Remove replacement ${index + 1}`}
+          onClick={onDelete} className="text-gray-400 hover:text-red-500 transition-colors p-1">
           <Trash2 size={14} />
         </button>
       </div>
 
       <TypedInput
+        label={`Find value for replacement ${index + 1}`}
         value={item.old}
         type={item.oldType}
         onChange={(val, type) => onChange({ ...item, old: val, oldType: type })}
@@ -123,6 +132,7 @@ const ReplacementEditor: React.FC<{
       </div>
 
       <TypedInput
+        label={`Replace With value for replacement ${index + 1}`}
         value={item.new}
         type={item.newType}
         onChange={(val, type) => onChange({ ...item, new: val, newType: type })}
@@ -172,6 +182,8 @@ export const ValueReplacementSettings: React.FC<{ config: ValueReplacementConfig
       <div className="space-y-2">
         <span className="text-xs font-medium text-gray-700 dark:text-gray-300">Target Columns</span>
         <ColumnMultiSelect
+
+          aria-label="Target Columns"
           variant="compact"
           columns={availableColumns}
           selected={config.columns}
@@ -186,6 +198,7 @@ export const ValueReplacementSettings: React.FC<{ config: ValueReplacementConfig
         <div className="flex items-center justify-between">
           <span className="text-xs font-medium text-gray-700 dark:text-gray-300">Replacements</span>
           <button
+            aria-label="Add replacement"
             onClick={addReplacement}
             className="text-xs flex items-center gap-1 text-blue-600 hover:text-blue-700 dark:text-blue-400"
           >
@@ -196,6 +209,7 @@ export const ValueReplacementSettings: React.FC<{ config: ValueReplacementConfig
         <div className="space-y-3">
           {config.replacements.map((item, i) => (
             <ReplacementEditor
+              index={i}
               key={i}
               item={item}
               onChange={(newItem) => { updateReplacement(i, newItem); }}

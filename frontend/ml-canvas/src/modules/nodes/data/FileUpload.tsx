@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { Upload, FileSpreadsheet, AlertCircle, X } from 'lucide-react';
 import { useUploadDataset } from '../../../core/hooks/useDatasets';
 import { useUploadConfig } from '../../../core/hooks/useUploadConfig';
@@ -25,6 +25,9 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onUploadComplete, onCanc
   const [isDragging, setIsDragging] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState(0);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => { fileInputRef.current?.focus(); }, []);
 
   // Mutation invalidates the dataset list cache on success so the next
   // `useDatasets()` consumer (e.g. DataSources page) sees the new row
@@ -87,8 +90,11 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onUploadComplete, onCanc
   return (
     <div className="p-4 border rounded-lg bg-slate-50 dark:bg-slate-900 dark:border-slate-700 relative">
       <button
+        type="button"
+        aria-label="Close dataset upload"
+        title="Close dataset upload"
         onClick={onCancel}
-        className="absolute top-2 right-2 p-1 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-full text-slate-500 dark:text-slate-400"
+        className="absolute top-2 right-2 p-1 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-full text-slate-500 dark:text-slate-400 focus-ring"
       >
         <X size={16} />
       </button>
@@ -124,11 +130,13 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onUploadComplete, onCanc
             <FileSpreadsheet className="w-10 h-10 text-slate-500 dark:text-slate-400 mx-auto mb-3" />
             <p className="text-sm text-slate-600 dark:text-slate-300 mb-2">
               Drag and drop your file here, or{' '}
-              <label className="text-blue-600 dark:text-blue-400 hover:underline cursor-pointer font-medium">
+              <label className="text-blue-600 dark:text-blue-400 hover:underline cursor-pointer font-medium rounded focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 focus-within:ring-offset-background">
                 browse
                 <input
+                  ref={fileInputRef}
+                  aria-label="Browse dataset file"
                   type="file"
-                  className="hidden"
+                  className="sr-only"
                   accept={allowedExtensions?.join(',') ?? ''}
                   onChange={handleChange}
                 />

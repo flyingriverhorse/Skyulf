@@ -58,6 +58,7 @@ export const SegmentationSettings: React.FC<{
   const submissionMessage = feedback?.message ?? '';
   const runFeedback = feedback?.run;
   const runHelpId = useId();
+  const fieldId = useId();
   const [showInfo, setShowInfo] = useState(() => !sessionStorage.getItem('hide_info_segmentation'));
 
   const { toggleDrawer: toggleJobDrawer, setTab, setActiveParallelRun, startPolling } = useJobStore();
@@ -218,9 +219,10 @@ export const SegmentationSettings: React.FC<{
           <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Model Configuration</span>
           <div className="grid gap-3">
             <ValidationField field="model_type">
-              <span className="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Clustering Algorithm</span>
+              <label htmlFor={`${fieldId}-model_type`} className="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Clustering Algorithm</label>
               <div className="relative">
                 <select
+                  id={`${fieldId}-model_type`}
                   value={config.model_type}
                   onChange={(e) => {
                     if (Object.keys(config.hyperparameters).length > 0) {
@@ -241,6 +243,7 @@ export const SegmentationSettings: React.FC<{
               {requiresScaling && (
                 <div className="mt-2 text-xs border border-blue-200 dark:border-blue-800 rounded-md bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 overflow-hidden transition-all">
                   <button
+                    aria-expanded={showScalingAlert}
                     onClick={() => setShowScalingAlert(!showScalingAlert)}
                     className="w-full flex items-center justify-between p-2 hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors"
                   >
@@ -261,11 +264,12 @@ export const SegmentationSettings: React.FC<{
 
             <div>
               <div className="flex items-center gap-1.5 mb-1">
-                <span className="block text-xs font-medium text-gray-700 dark:text-gray-300">Reference Column (optional)</span>
+                <label htmlFor={`${fieldId}-reference_column`} className="block text-xs font-medium text-gray-700 dark:text-gray-300">Reference Column (optional)</label>
                 <HelpTooltip text="A column with a known real-world label (e.g. a species/customer-type name) that you want excluded from clustering, but kept around afterward to see which cluster corresponds to which group — e.g. 'Cluster 0 is 92% setosa'. The model never sees this column." />
               </div>
               <div className="relative">
                 <select
+                  id={`${fieldId}-reference_column`}
                   value={config.reference_column ?? ''}
                   onChange={(e) => onChange({ ...config, reference_column: e.target.value || undefined })}
                   className="w-full appearance-none border border-gray-300 dark:border-gray-600 rounded-lg p-2.5 text-sm bg-white dark:bg-gray-800 dark:text-gray-100 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none transition-all"
@@ -303,13 +307,14 @@ export const SegmentationSettings: React.FC<{
           hyperparameters.map((param) => (
             <div key={param.name} className="bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-lg p-3">
               <div className="flex justify-between items-center mb-2">
-                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300">
+                <label htmlFor={`${fieldId}-param-${param.name}`} className="block text-xs font-medium text-gray-700 dark:text-gray-300">
                   {param.label}
                 </label>
                 {param.description && <HelpTooltip text={param.description} />}
               </div>
               {param.type === 'select' ? (
                 <select
+                  id={`${fieldId}-param-${param.name}`}
                   value={(config.hyperparameters[param.name] ?? param.default) as string | number | readonly string[] | undefined}
                   onChange={(e) => onChange({
                     ...config,
@@ -323,6 +328,7 @@ export const SegmentationSettings: React.FC<{
                 </select>
               ) : (
                 <HyperparameterInput
+                  id={`${fieldId}-param-${param.name}`}
                   type={param.type}
                   value={config.hyperparameters[param.name] ?? param.default}
                   onChange={(val) => onChange({
@@ -352,6 +358,7 @@ export const SegmentationSettings: React.FC<{
         <div className="mb-4 p-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded text-xs text-blue-700 dark:text-blue-300 flex justify-between items-start gap-2">
           <span>Group rows into clusters by similarity — no target column needed.</span>
           <button
+            aria-label="Dismiss segmentation information"
             onClick={() => {
               setShowInfo(false);
               sessionStorage.setItem('hide_info_segmentation', 'true');
@@ -371,6 +378,7 @@ export const SegmentationSettings: React.FC<{
                 ? 'border-blue-500 text-blue-600 dark:text-blue-400'
                 : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700'
             }`}
+            aria-pressed={activeTab === 'model'}
             onClick={() => { setActiveTab('model'); }}
           >
             Configuration
@@ -381,6 +389,7 @@ export const SegmentationSettings: React.FC<{
                 ? 'border-blue-500 text-blue-600 dark:text-blue-400'
                 : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700'
             }`}
+            aria-pressed={activeTab === 'params'}
             onClick={() => { setActiveTab('params'); }}
           >
             Hyperparameters

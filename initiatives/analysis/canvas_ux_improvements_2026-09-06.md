@@ -1,7 +1,7 @@
 # Canvas UX improvement backlog
 
 Date: 2026-09-06
-Status: CUX-01 through CUX-06 complete; CUX-08 in progress. Completed portions are recorded below.
+Status: CUX-01 through CUX-06, CUX-08, and CUX-09 complete. CUX-07 remains open; payload inventory is complete.
 
 ## Purpose and review scope
 
@@ -32,9 +32,9 @@ before implementation because other work may have changed these components.
 | CUX-04 | Medium | Improve component discovery | Complete; shared task search, readable results, and collapsible preprocessing groups verified |
 | CUX-05 | Medium | Navigate from validation issues to the exact setting | Complete; field navigation and general-issue fallback verified |
 | CUX-06 | Medium | Reduce connection and settings visual noise | Complete; contextual connection controls and node details verified |
-| CUX-07 | Medium | Inspect a selected node's input and output | Open |
-| CUX-08 | High, alongside related work | Fix keyboard and accessible-name gaps | In progress; panel labels, sidebar keyboard access, and primary field labels complete |
-| CUX-09 | Medium | Make possible PII findings easy to review without exposing raw values | Open; core accessors are planned, frontend UX is not implemented |
+| CUX-07 | Medium | Inspect a selected node's input and output | Open; payload inventory complete, backend capture extension needed |
+| CUX-08 | High, alongside related work | Fix keyboard and accessible-name gaps | Complete; remaining settings labels, keyboard controls, and focus transitions verified |
+| CUX-09 | Medium | Make possible PII findings easy to review without exposing raw values | Complete; dedicated profiling review panel verified, core accessors already available |
 
 ### CUX-01 — Preserve canvas space
 
@@ -314,6 +314,14 @@ stays outside graph objects so connected nodes remain copyable and pasteable.
 
 ### CUX-07 — Inspect input and output for the selected node
 
+**Inventory (2026-09-08):** Existing previews provide terminal samples and
+totals, per-node metrics/summaries, and separate predicted schemas. They do not
+provide each selected node's paired input/output or a distinct preview receipt
+with captured settings for stale-result detection. Temporary preview artifacts
+are removed after the request. Shared-node results also need branch identity.
+The required extension and file map are recorded in
+`canvas_node_inspection_payloads_2026-09-08.md`. CUX-07 remains open.
+
 **Opportunity:** Existing schema badges, data previews, node summaries, and
 inspection tools provide parts of the answer to “What did this step do?” A
 single selected-node view could make those answers easier to find.
@@ -366,19 +374,35 @@ does not also toggle collapse. These controls have visible focus rings; the
 title button uses the theme foreground color. A targeted axe scan of the
 dark results panel with an error and reduced motion passes.
 
+**Completion (2026-09-08):** Remaining preprocessing, split, modeling, ensemble,
+and dynamic hyperparameter controls now have explicit accessible labels.
+Repeated editors use contextual field/action names, and checkbox/datalist IDs
+are unique per instance. Shared column pickers expose their purpose and search
+field; toggles announce selected/expanded state. Feature Generation and
+Transformation headers use separate native buttons so keyboard use of their
+fields or delete actions does not collapse the editor.
+Dataset upload supports native keyboard file browsing and returns focus to its
+opener on cancellation or the dataset selector on completion. Closing settings
+or results focuses the named canvas without moving its viewport. Settings
+expand/close and operation headers have visible focus rings. Modeling help
+uses a collision-aware portal: Escape dismisses help before its parent dialog,
+and refocus/rehover reopens it. Parameter history traps focus and restores its
+opener. Catalog/conditional-field unit checks and focused browser checks cover
+these paths, including existing issue navigation and panel resizing.
+
 **Proposal:** Address these gaps alongside the affected interaction changes.
 Use semantic controls, associated labels, and visible keyboard focus.
 
 **Acceptance criteria:**
 
 - [x] Properties-panel expand/collapse and close buttons have accessible names and tooltips.
-- [ ] Remaining icon-only controls have meaningful accessible names.
+- [x] Remaining icon-only controls have meaningful accessible names.
 - [x] Sidebar nodes can be reached and added using the keyboard.
 - [x] Select Dataset, Model Type, and both Target Column variants have associated labels.
 - [x] Tuning and cross-validation fields have associated labels, including conditional fields.
-- [ ] Remaining form controls have programmatically associated labels.
-- [ ] Focus remains visible through panel changes and issue navigation.
-- [ ] Targeted accessibility checks cover the changed states and interactions.
+- [x] Remaining form controls have programmatically associated labels.
+- [x] Focus remains visible through panel changes and issue navigation.
+- [x] Targeted accessibility checks cover the changed states and interactions.
 
 **Starting points:** `src/components/layout/PropertiesPanel.tsx`,
 `Sidebar.tsx`, `src/modules/nodes/modeling/TrainingSettings.tsx`, and
@@ -389,7 +413,19 @@ Reference used in the review:
 
 ### CUX-09 — Review possible PII findings without exposing raw values
 
-**Observed:** Profiling can emit `PII` alerts for columns that may contain
+**Progress (2026-09-08):** The selected dataset's profiling view now includes
+PII Review. It consumes structured `type: "PII"` alerts and shows flagged
+columns, severity, the combined Email / phone category, and a static advisory
+explanation. The detector does not identify which individual pattern matched.
+Alert messages, sample data, statistics, and sidebar filter values are excluded
+from this view. Generic Dashboard alerts remain available. Existing page states
+distinguish loading, no saved profile, pending/failed analysis, retrieval errors,
+and a completed profile with no PII findings. Keyboard navigation, a scrollable
+named table, and light/dark layouts are covered by focused browser checks.
+The Python `has_pii`, `pii_columns`, and `pii_alerts` properties already exist;
+they are not serialized by `model_dump()`, so the frontend uses `alerts`.
+
+**Observed during the original review:** Profiling can emit `PII` alerts for columns that may contain
 email addresses or phone numbers, but the current consumer must inspect the
 generic alert list manually. There is no focused review surface, and the core
 API requires callers to filter `profile.alerts` themselves.
@@ -407,15 +443,15 @@ alerts view for other data-quality findings.
 
 **Acceptance criteria:**
 
-- [ ] A selected dataset has a dedicated PII tab or panel in its profiling view.
-- [ ] The view lists flagged column names, detector category, severity, and explanation.
-- [ ] Raw values and profiling samples are not rendered in the PII view.
-- [ ] Empty and loading states explain whether the dataset has no findings or
+- [x] A selected dataset has a dedicated PII tab or panel in its profiling view.
+- [x] The view lists flagged column names, detector category, severity, and explanation.
+- [x] Raw values and profiling samples are not rendered in the PII view.
+- [x] Empty and loading states explain whether the dataset has no findings or
       has not been profiled yet.
-- [ ] The view explains that findings are advisory heuristics, not compliance
+- [x] The view explains that findings are advisory heuristics, not compliance
       classifications or automatic remediation.
-- [ ] Email/phone alerts remain available in the generic alerts view.
-- [ ] The view is keyboard accessible and works in light and dark themes.
+- [x] Email/phone alerts remain available in the generic alerts view.
+- [x] The view is keyboard accessible and works in light and dark themes.
 
 **Starting points:** the dataset profile API/client types, the EDA/profile
 results view, and the existing generic alert rendering. Recheck the current
@@ -759,3 +795,21 @@ explicitly recorded above is complete; remaining interaction details need review
   the export fixture was corrected before its passing rerun). Lint, production
   build, size-check, and diff checks passed. Main gzip size dropped to 298.6 KB;
   served assets and v0.8.16 notes were updated. No commit was created.
+- 2026-09-08: Completed CUX-08 and CUX-09. Settings catalog checks reproduced
+  missing accessible names before fixes; focused browser regressions reproduced
+  upload/panel focus loss and verified native file browsing, cancellation,
+  upload completion, repeated editor controls, and retained viewport position.
+  Independent review found tooltip Escape/clipping problems; Radix tooltips and
+  browser checks resolved them, including history focus trapping/restoration.
+  PII tests verify metadata-only rendering, preserved generic alerts, dataset
+  switching, and distinct loading/missing/pending/failed/empty profile states.
+  All 1,212 frontend unit tests passed on the final production code. The combined
+  browser sweep passed 27 scenarios, and two final modeling-dialog scenarios
+  passed after correcting entrance-animation waits in their fixture. Scoped axe
+  checks cover changed controls and the PII view in both themes. Final lint,
+  TypeScript/production build, size-check, and diff checks passed; served assets
+  were rebuilt. Main gzip size is 300.9 KB against the 325 KB size-check budget.
+  Browser APIs are mocked; no live training or hosted CI run was triggered.
+  Existing mocked connection logs and circular/empty chunk warnings remain.
+  CUX-07's source/payload inventory is recorded separately; its Input / Output
+  implementation remains open and requires backend capture and run identity.

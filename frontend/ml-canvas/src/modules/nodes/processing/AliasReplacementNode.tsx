@@ -45,6 +45,7 @@ const CustomPairEditor: React.FC<{
         <div className="flex-1 space-y-1">
           <span className="text-[10px] text-gray-500 uppercase font-semibold">Alias (Old)</span>
           <input
+            aria-label="Alias (Old)"
             className="w-full text-xs rounded border border-gray-300 dark:border-gray-600 px-2 py-1.5"
             placeholder="e.g. NY"
             value={newKey}
@@ -54,6 +55,7 @@ const CustomPairEditor: React.FC<{
         <div className="flex-1 space-y-1">
           <span className="text-[10px] text-gray-500 uppercase font-semibold">Canonical (New)</span>
           <input
+            aria-label="Canonical (New)"
             className="w-full text-xs rounded border border-gray-300 dark:border-gray-600 px-2 py-1.5"
             placeholder="e.g. New York"
             value={newValue}
@@ -62,6 +64,7 @@ const CustomPairEditor: React.FC<{
           />
         </div>
         <button
+          aria-label="Add alias mapping"
           onClick={addPair}
           disabled={!newKey || !newValue}
           className="p-1.5 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -81,7 +84,9 @@ const CustomPairEditor: React.FC<{
                 <ArrowLeftRight size={12} className="text-gray-400 shrink-0" />
                 <span className="font-medium text-green-600 truncate max-w-[80px]">{val}</span>
               </div>
-              <button onClick={() => { removePair(key); }} className="text-gray-400 hover:text-red-500">
+              <button
+                aria-label={`Remove alias ${key}`}
+                onClick={() => { removePair(key); }} className="text-gray-400 hover:text-red-500">
                 <Trash2 size={14} />
               </button>
             </div>
@@ -129,6 +134,8 @@ const AliasReplacementSettings: React.FC<{ config: AliasReplacementConfig; onCha
             </label>
             <ValidationField field="columns">
               <ColumnMultiSelect
+
+                aria-label="Target Columns"
                 variant="compact"
                 columns={textColumns}
                 selected={config.columns}
@@ -169,6 +176,7 @@ const AliasReplacementSettings: React.FC<{ config: AliasReplacementConfig; onCha
               Replacement Mode
             </span>
             <select
+              aria-label="Replacement Mode"
               className="w-full text-xs rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 p-2"
               value={config.mode}
               onChange={(e) => onChange({ ...config, mode: e.target.value as AliasReplacementConfig['mode'] })}

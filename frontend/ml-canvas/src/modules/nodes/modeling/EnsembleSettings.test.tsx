@@ -46,6 +46,34 @@ beforeEach(() => {
 
 afterEach(() => vi.unstubAllGlobals());
 
+/** Ensemble controls need names and selection state across basic and advanced modes. */
+it('labels voting weights, target and conditional tuning fields', async () => {
+  await renderSettings({ run_mode: 'advanced', calibrate_base_models: true, cv_enabled: true });
+  expect(screen.getByRole('button', { name: 'Voting', pressed: true })).toBeVisible();
+  expect(screen.getByRole('group', { name: 'Base Models' })).toBeVisible();
+  for (const name of ['Random Forest weight', 'Logistic Regression weight', 'Trials', 'Random State', 'Calibration CV Folds']) {
+    expect(screen.getByRole('spinbutton', { name })).toBeVisible();
+  }
+  for (const name of ['Parallel Jobs', 'Calibration Method', 'Search Strategy', 'Optimize Metric']) {
+    expect(screen.getByRole('combobox', { name })).toBeVisible();
+  }
+  expect(screen.getByRole('textbox', { name: 'Target Column' })).toBeVisible();
+  expect(screen.getByRole('checkbox', { name: 'Tune base model hyperparameters' })).toBeVisible();
+  fireEvent.click(screen.getByRole('button', { name: 'Cross Validation' }));
+  expect(screen.getByRole('spinbutton', { name: 'Folds' })).toBeVisible();
+  expect(screen.getByRole('combobox', { name: 'Method' })).toBeVisible();
+  expect(screen.getByRole('spinbutton', { name: 'Fold Split Seed' })).toBeVisible();
+});
+
+/** Stacking and time-series options must remain named when their sections appear. */
+it('labels stacking and time-series controls', async () => {
+  await renderSettings({ strategy: 'stacking', cv_enabled: true, cv_type: 'time_series_split' });
+  expect(screen.getByRole('combobox', { name: 'Final Estimator (meta-learner)' })).toBeVisible();
+  expect(screen.getByRole('spinbutton', { name: 'Stacking CV Folds' })).toBeVisible();
+  fireEvent.click(screen.getByRole('button', { name: 'Cross Validation' }));
+  expect(screen.getByRole('combobox', { name: 'Time Column (optional)' })).toBeVisible();
+});
+
 /** Missing prerequisites must explain the correction and prevent a submission. */
 it.each([
   { name: 'disconnected dataset', patch: {}, datasetId: undefined, reason: /Connect a dataset node upstream/ },

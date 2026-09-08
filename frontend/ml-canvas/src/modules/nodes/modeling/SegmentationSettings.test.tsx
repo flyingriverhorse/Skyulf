@@ -54,6 +54,20 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+/** Clustering's fixed and dynamic fields must expose the captions users see. */
+it('labels clustering configuration and dynamic parameters', async () => {
+  vi.mocked(jobsApi.getHyperparameters).mockResolvedValue([
+    { name: 'n_clusters', label: 'Clusters', type: 'number', default: 3 },
+    { name: 'init', label: 'Initialization', type: 'select', default: 'random', options: [{ label: 'Random', value: 'random' }] },
+  ]);
+  await renderSettings();
+  expect(screen.getByRole('combobox', { name: 'Clustering Algorithm' })).toBeVisible();
+  expect(screen.getByRole('combobox', { name: 'Reference Column (optional)' })).toBeDisabled();
+  fireEvent.click(screen.getByRole('button', { name: 'Hyperparameters' }));
+  expect(screen.getByRole('textbox', { name: 'Clusters' })).toHaveValue('3');
+  expect(screen.getByRole('combobox', { name: 'Initialization' })).toBeVisible();
+});
+
 /** Unsupervised training needs a dataset and algorithm, but no target column. */
 it.each([
   { name: 'missing dataset', connected: false, model_type: 'kmeans', reason: /Connect a dataset node upstream/ },

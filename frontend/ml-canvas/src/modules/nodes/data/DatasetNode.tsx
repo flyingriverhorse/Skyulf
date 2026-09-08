@@ -1,4 +1,4 @@
-import React, { useEffect, useId, useState } from 'react';
+import React, { useEffect, useId, useRef, useState } from 'react';
 import { ValidationField, useValidationReveal } from '../../../components/shared/ValidationField';
 import { NodeDefinition } from '../../../core/types/nodes';
 import { Database, TableProperties, Plus } from 'lucide-react';
@@ -19,6 +19,9 @@ const DatasetSettings: React.FC<{ config: DatasetNodeConfig; onChange: (c: Datas
 }) => {
   const datasetSelectId = useId();
   const [showUpload, setShowUpload] = useState(false);
+  const uploadButtonRef = useRef<HTMLButtonElement>(null);
+  const datasetSelectRef = useRef<HTMLSelectElement>(null);
+  const restoreUploadFocus = useRef<'opener' | 'dataset' | null>(null);
   useValidationReveal((field) => {
     if (field === 'datasetId') setShowUpload(false);
   });
@@ -31,6 +34,16 @@ const DatasetSettings: React.FC<{ config: DatasetNodeConfig; onChange: (c: Datas
   const datasets: Dataset[] = datasetsQuery.data ?? [];
   const loading = datasetsQuery.isLoading;
 
+  useEffect(() => {
+    if (!showUpload && restoreUploadFocus.current) {
+      const control = restoreUploadFocus.current === 'dataset' ? datasetSelectRef.current : uploadButtonRef.current;
+      if (control) {
+        restoreUploadFocus.current = null;
+        control.focus();
+      }
+    }
+  }, [showUpload, loading]);
+
   const handleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const selectedId = e.target.value;
     const selectedDataset = datasets.find(d => String(d.id) === selectedId);
@@ -42,6 +55,7 @@ const DatasetSettings: React.FC<{ config: DatasetNodeConfig; onChange: (c: Datas
   };
 
   const handleUploadComplete = (newId: string, newName: string) => {
+    restoreUploadFocus.current = 'dataset';
     setShowUpload(false);
     // The upload mutation already invalidated the cached usable list;
     // no manual fetch needed.
@@ -53,7 +67,10 @@ const DatasetSettings: React.FC<{ config: DatasetNodeConfig; onChange: (c: Datas
   };
 
   if (showUpload) {
-    return <FileUpload onUploadComplete={handleUploadComplete} onCancel={() => { setShowUpload(false); }} />;
+    return <FileUpload onUploadComplete={handleUploadComplete} onCancel={() => {
+      restoreUploadFocus.current = 'opener';
+      setShowUpload(false);
+    }} />;
   }
 
   return (
@@ -62,6 +79,7 @@ const DatasetSettings: React.FC<{ config: DatasetNodeConfig; onChange: (c: Datas
         <div className="flex justify-between items-center">
           <label htmlFor={datasetSelectId} className="block text-sm font-medium">Select Dataset</label>
           <button
+            ref={uploadButtonRef}
             onClick={() => { setShowUpload(true); }}
             className="text-xs flex items-center gap-1 text-link hover:underline font-medium focus-ring"
           >
@@ -75,6 +93,7 @@ const DatasetSettings: React.FC<{ config: DatasetNodeConfig; onChange: (c: Datas
             <div className="text-xs text-muted-foreground">Loading datasets...</div>
           ) : (
             <select
+              ref={datasetSelectRef}
               id={datasetSelectId}
               className="w-full p-2 border rounded bg-background focus:ring-1 focus:ring-primary outline-none"
               value={config.datasetId || ''}

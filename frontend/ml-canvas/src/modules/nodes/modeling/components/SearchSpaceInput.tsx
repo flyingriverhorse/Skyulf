@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useId, useState } from 'react';
 import { AlertCircle } from 'lucide-react';
 import { HelpTooltip } from './HelpTooltip';
 import type { HyperparameterDef } from './types';
@@ -15,6 +15,7 @@ export interface SearchSpaceInputProps {
  * For `select` defs, option chips toggle inclusion in the value list.
  */
 export const SearchSpaceInput: React.FC<SearchSpaceInputProps> = ({ def, value, onChange }) => {
+    const fieldId = useId();
     const [localValue, setLocalValue] = useState('');
     const [error, setError] = useState<string | null>(null);
 
@@ -73,15 +74,18 @@ export const SearchSpaceInput: React.FC<SearchSpaceInputProps> = ({ def, value, 
     return (
         <div className="space-y-1">
             <div className="flex justify-between items-center">
-                <label className="text-xs font-medium text-gray-700 dark:text-gray-300 flex items-center gap-1">
-                    {def.label}
+                <div className="text-xs font-medium text-gray-700 dark:text-gray-300 flex items-center gap-1">
+                    <label htmlFor={fieldId}>{def.label}</label>
                     {def.description && <HelpTooltip text={def.description} placement="bottom-left" />}
-                </label>
+                </div>
                 <span className="text-[10px] text-gray-400 uppercase">{def.type}</span>
             </div>
 
             <div className="relative">
                 <input
+                    id={fieldId}
+                    aria-invalid={error ? true : undefined}
+                    aria-describedby={error ? `${fieldId}-error` : undefined}
                     type="text"
                     className={`w-full border rounded px-2 py-1.5 text-sm font-mono bg-white dark:bg-gray-900 dark:text-gray-100 outline-none transition-all ${
                         error
@@ -97,9 +101,11 @@ export const SearchSpaceInput: React.FC<SearchSpaceInputProps> = ({ def, value, 
                     onBlur={handleBlur}
                 />
                 {def.type === 'select' && def.options && (
-                    <div className="mt-1 flex flex-wrap gap-1">
+                    <div role="group" aria-label={`${def.label} options`} className="mt-1 flex flex-wrap gap-1">
                         {def.options.map(opt => (
                             <button
+                                type="button"
+                                aria-pressed={value.includes(opt.value)}
                                 key={String(opt.value)}
                                 onClick={() => {
                                     const current = validateAndParse(localValue);
@@ -138,7 +144,7 @@ export const SearchSpaceInput: React.FC<SearchSpaceInputProps> = ({ def, value, 
                 )}
             </div>
             {error && (
-                <p className="text-[10px] text-red-500 flex items-center gap-1">
+                <p id={`${fieldId}-error`} role="alert" className="text-[10px] text-red-500 flex items-center gap-1">
                     <AlertCircle className="w-3 h-3" />
                     {error}
                 </p>

@@ -157,6 +157,7 @@ const ImputationSettings: React.FC<{ config: ImputationConfig; onChange: (c: Imp
           <div>
             <span className="block text-sm font-medium mb-1">Imputation Method</span>
             <select
+              aria-label="Imputation Method"
               className="w-full p-2 border rounded bg-background text-sm"
               value={config.method || 'simple'}
               onChange={(e) => onChange({ ...config, method: e.target.value as ImputationConfig['method'] })}
@@ -173,6 +174,7 @@ const ImputationSettings: React.FC<{ config: ImputationConfig; onChange: (c: Imp
               <div>
                 <span className="block text-sm font-medium mb-1">Strategy</span>
                 <select
+                  aria-label="Strategy"
                   className="w-full p-2 border rounded bg-background text-sm"
                   value={config.strategy}
                   onChange={(e) => onChange({ ...config, strategy: e.target.value as ImputationConfig['strategy'] })}
@@ -195,6 +197,7 @@ const ImputationSettings: React.FC<{ config: ImputationConfig; onChange: (c: Imp
                   <span className="block text-sm font-medium mb-1">Fill Value</span>
                   <ValidationField field="fill_value">
                     <input
+                      aria-label="Fill Value"
                       type="text"
                       className="w-full p-2 border rounded bg-background text-sm"
                       value={config.fill_value || ''}
@@ -213,6 +216,7 @@ const ImputationSettings: React.FC<{ config: ImputationConfig; onChange: (c: Imp
               <div>
                 <span className="block text-sm font-medium mb-1">Number of Neighbors</span>
                 <input
+                  aria-label="Number of Neighbors"
                   type="number"
                   min="1"
                   className="w-full p-2 border rounded bg-background text-sm"
@@ -223,6 +227,7 @@ const ImputationSettings: React.FC<{ config: ImputationConfig; onChange: (c: Imp
               <div>
                 <span className="block text-sm font-medium mb-1">Weights</span>
                 <select
+                  aria-label="Weights"
                   className="w-full p-2 border rounded bg-background text-sm"
                   value={config.weights || 'uniform'}
                   onChange={(e) => onChange({ ...config, weights: e.target.value as ImputationConfig['weights'] })}
@@ -244,6 +249,7 @@ const ImputationSettings: React.FC<{ config: ImputationConfig; onChange: (c: Imp
               <div>
                 <span className="block text-sm font-medium mb-1">Max Iterations</span>
                 <input
+                  aria-label="Max Iterations"
                   type="number"
                   min="1"
                   className="w-full p-2 border rounded bg-background text-sm"
@@ -254,6 +260,7 @@ const ImputationSettings: React.FC<{ config: ImputationConfig; onChange: (c: Imp
               <div>
                 <span className="block text-sm font-medium mb-1">Estimator</span>
                 <select
+                  aria-label="Estimator"
                   className="w-full p-2 border rounded bg-background text-sm"
                   value={config.estimator || 'bayesian_ridge'}
                   onChange={(e) => onChange({ ...config, estimator: e.target.value as ImputationConfig['estimator'] })}
@@ -270,6 +277,7 @@ const ImputationSettings: React.FC<{ config: ImputationConfig; onChange: (c: Imp
               <div>
                 <span className="block text-sm font-medium mb-1">Random State</span>
                 <input
+                  aria-label="Random State"
                   type="number"
                   className="w-full p-2 border rounded bg-background text-sm"
                   value={config.random_state ?? 0}

@@ -53,6 +53,7 @@ export const NumberField: React.FC<{
   <div>
     <label className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-1 block">{label}</label>
     <input
+      aria-label={label}
       type="number"
       className="w-full text-xs rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 p-1.5"
       value={value ?? ''}
@@ -157,6 +158,8 @@ const VectorizerSettings: React.FC<NodeSettingsProps<AnyVectorizerConfig> & { va
             </label>
             <ValidationField field="columns">
               <ColumnMultiSelect
+
+                aria-label="Text Columns"
                 columns={textColumns}
                 selected={config.columns}
                 onChange={(cols) => patch({ columns: cols })}
