@@ -15,7 +15,7 @@ file deliberately carries no history.
 per-area report files `00`–`18`).
 **Baseline:** commit `93d7719e` (master), audit run 2026-08-31 → 09-01 by 15
 parallel read-only agents (Claude Opus 5). 116 findings: 5 🔴 / 45 🟠 / 44 🟡 /
-22 ⚪, plus OC-160–212 filed by later reviews. OC-100 was retracted as a false
+22 ⚪, plus OC-160–215 filed by later reviews. OC-100 was retracted as a false
 positive and is not counted; the corrections pass stays in the archive.
 
 **Status key:** ⬜ open · 🟨 in progress · ✅ done · ⏭️ parked
@@ -190,12 +190,15 @@ closed that on 2026-09-07.
 | OC-54 | 🟡 | `DebugNode` is dead code that would silently no-op if wired up (`nodes/DebugNode.tsx`) | small | ⬜ open |
 | OC-56 | ⚪ | `useSchemaPreview` does not cancel in-flight requests on unmount (`hooks/useSchemaPreview.ts`) | small | ⬜ open |
 | OC-57 | ⚪ | `any`-typed chart props bypass type safety in EDA components (`modules/eda/`) | small | ⬜ open |
+| OC-214 | 🟠 | Frontend lockfile and installed PostCSS dependency retain `nanoid@3.3.17`, affected by CVE-2026-67213; the parent range permits the patched 3.3.18 release (`frontend/ml-canvas/package-lock.json`) | small | ⬜ open — dependency presence confirmed; application exploitability not established |
+| OC-215 | 🟡 | Frontend Tailwind/PostCSS dependencies retain `postcss-selector-parser@6.1.2`, affected by CVE-2026-9358; both parent ranges permit the patched 6.1.3 release (`frontend/ml-canvas/package-lock.json`) | small | ⬜ open — dependency presence confirmed; application exploitability not established |
 
 ### Remaining — tests / packaging / CI (outside the Ongoing tier)
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
 | OC-80 | 🟡 | 3 weakest-covered modules untested exactly where silence is dangerous (`_sklearn_compat.py`, `value_replacement.py`, `config_validation.py`) | ~1 day | ⬜ open |
+| OC-213 | ⚪ | Leakage examples produce 22 ty diagnostics: 16 in the notebook and six in the Python script, caused by heterogeneous configuration inference and un-narrowed `SplitDataset` slots (`skyulf-core/examples/09_leakage_safety.ipynb`, `09_leakage_safety.py`) | small | ⬜ open — both examples execute successfully; type information needs correction |
 
 ---
 
@@ -227,6 +230,49 @@ source read when the finding was filed, so they may have moved.
 
 Findings filed before 2026-09-05 — OC-169 and OC-178–182 among them — keep
 their reproduction detail in the archive's `## Log` entries instead.
+
+### 2026-09-08 — OC-213–215: Problems panel review
+
+Source: [the complete diagnostic disposition](problems_panel_review-2026-09-08.md),
+against working tree `f12dde9f`. The repeated export contains 105 distinct
+file/rule/locations, including external type stubs, obsolete rules, and optional
+style suggestions. Only the actionable example/dependency findings are filed here.
+
+**OC-213 — leakage examples have inaccurate inferred types.** Run
+`.venv\Scripts\python.exe -m ty check skyulf-core/examples/09_leakage_safety.ipynb
+skyulf-core/examples/09_leakage_safety.py --output-format concise`: 22 diagnostics.
+The notebook's unannotated configuration conflates modeling dictionaries with
+preprocessing lists; `SplitDataset` slots also admit several frame types and
+`(X,y)` tuples, so pandas indexing, subtraction, and `.drop(columns=...)` are
+not justified by their declared types. Executing all 12 notebook code cells in
+order and running the Python example succeeds, including assertions. This is
+an example typing defect, not a reproduced training failure.
+**Fix/verification target:** annotate the configuration appropriately and retain
+named pandas partition variables, or narrow slot types explicitly. Preserve
+the general `SplitDataset` contract and the example assertions. Rerun the
+explicit example ty command and execute both examples.
+
+**OC-214 — vulnerable transitive nanoid version.** `npm ls nanoid --all` reports
+`postcss@8.5.26 -> nanoid@3.3.17`; the lockfile agrees. PostCSS's `^3.3.17` range
+allows 3.3.18, listed as patched in the
+[CVE-2026-67213 advisory](https://github.com/advisories/GHSA-2v37-7h3g-55p8).
+The advisory concerns zero-size custom generators. The inspected PostCSS call
+uses a constant size of 6 via `nanoid/non-secure`, so dependency presence alone
+does not establish an exploitable Skyulf path.
+**Fix/verification target:** update the compatible transitive patch version,
+inspect the lockfile diff, confirm the installed tree and vulnerability scan,
+and run frontend lint/tests/build.
+
+**OC-215 — vulnerable transitive selector-parser version.**
+`npm ls postcss-selector-parser --all` reports 6.1.2 under Tailwind 3.4.18 and
+its postcss-nested 6.2.0 dependency. The lockfile agrees; the recorded `^6.1.2`
+and `^6.1.1` ranges allow 6.1.3. The maintainer's
+[6.1.3 release](https://github.com/postcss/postcss-selector-parser/releases/tag/6.1.3)
+explicitly backports the CVE-2026-9358 recursion fix. No direct application
+import was found during this review; application exploitability is unproven.
+**Fix/verification target:** update the compatible transitive patch version,
+inspect the lockfile diff, confirm the installed tree and vulnerability scan,
+and run frontend lint/tests/build.
 
 ### 2026-09-08 — OC-208/209/211: remaining reproduced core findings
 
