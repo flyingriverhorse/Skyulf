@@ -4,8 +4,9 @@ import { useViewStore } from '../../core/store/useViewStore';
 import { useSidebarOpen } from '../../core/hooks/useSidebarOpen';
 import { FOCUS_CANVAS_EVENT, FOCUS_NODE_EVENT } from '../../core/hooks/useKeyboardShortcuts';
 import { registry } from '../../core/registry/NodeRegistry';
-import { ValidationNavigation } from '../shared/ValidationField';
+import { ValidationNavigation, useValidationReveal } from '../shared/ValidationField';
 import { NodeDetails } from './NodeDetails';
+import { NodeInspectionPanel } from './NodeInspectionPanel';
 import {
   ExecutionMode,
   getExecutionMode,
@@ -147,6 +148,11 @@ const PropertiesContent: React.FC<{
 }> = ({ selectedNode, isExpanded, toggleExpand }) => {
   const updateNodeData = useGraphStore((state) => state.updateNodeData);
   const onNodesChange = useGraphStore((state) => state.onNodesChange);
+  const tabs = ['Settings', 'Input', 'Output'] as const;
+  const [activeTab, setActiveTab] = React.useState<typeof tabs[number]>('Settings');
+  const tabsId = React.useId();
+  const tabRefs = React.useRef<(HTMLButtonElement | null)[]>([]);
+  useValidationReveal(() => setActiveTab('Settings'));
 
   const handleClose = () => {
     onNodesChange([{ id: selectedNode.id, type: 'select', selected: false }]);
@@ -210,7 +216,29 @@ const PropertiesContent: React.FC<{
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4">
+      <div role="tablist" aria-label="Node properties" className="flex shrink-0 border-b px-4">
+        {tabs.map((tab, index) => (
+          <button key={tab} ref={(element) => { tabRefs.current[index] = element; }} type="button"
+            role="tab" id={`${tabsId}-${tab}-tab`} aria-controls={`${tabsId}-${tab === 'Settings' ? 'Settings' : 'inspection'}-panel`}
+            aria-selected={activeTab === tab} tabIndex={activeTab === tab ? 0 : -1}
+            onClick={() => setActiveTab(tab)}
+            onKeyDown={(event) => {
+              const nextIndex = event.key === 'ArrowRight' ? (index + 1) % tabs.length
+                : event.key === 'ArrowLeft' ? (index + tabs.length - 1) % tabs.length
+                  : event.key === 'Home' ? 0 : event.key === 'End' ? tabs.length - 1 : null;
+              if (nextIndex === null) return;
+              event.preventDefault();
+              setActiveTab(tabs[nextIndex]!);
+              tabRefs.current[nextIndex]?.focus();
+            }}
+            className={`flex-1 border-b-2 px-2 py-2.5 text-xs font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary ${activeTab === tab
+              ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
+          >{tab}</button>
+        ))}
+      </div>
+
+      <div role="tabpanel" id={`${tabsId}-Settings-panel`} aria-labelledby={`${tabsId}-Settings-tab`}
+        hidden={activeTab !== 'Settings'} className="flex-1 min-h-0 overflow-y-auto p-4">
         <div className="space-y-6">
           <SettingsComponent
             key={`settings-${selectedNode.id}`}
@@ -222,6 +250,10 @@ const PropertiesContent: React.FC<{
           <MultiInputModeSection selectedNode={selectedNode} />
           <MergeStrategySection selectedNode={selectedNode} />
         </div>
+      </div>
+      <div role="tabpanel" id={`${tabsId}-inspection-panel`} aria-labelledby={`${tabsId}-${activeTab === 'Input' ? 'Input' : 'Output'}-tab`}
+        hidden={activeTab === 'Settings'} className="flex-1 min-h-0 min-w-0 overflow-y-auto p-4">
+        {activeTab !== 'Settings' && <NodeInspectionPanel nodeId={selectedNode.id} side={activeTab === 'Input' ? 'input' : 'output'} />}
       </div>
     </div>
   );

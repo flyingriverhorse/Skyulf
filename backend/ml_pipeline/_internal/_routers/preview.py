@@ -13,15 +13,17 @@ The largest single endpoint in the package. Owns:
 All ML execution still runs through `PipelineEngine`.
 """
 
+import hashlib
 import json
 import logging
 import shutil
 import tempfile
 from collections.abc import Callable
 from typing import Any, cast
+from uuid import uuid4
 
 import pandas as pd
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 import backend.database.engine as db_engine
@@ -30,6 +32,12 @@ from backend.data_ingestion.service import DataIngestionService
 from backend.database.engine import get_async_session
 from backend.exceptions.core import SkyulfException
 from backend.ml_pipeline._execution.engine import PipelineEngine
+from backend.ml_pipeline._execution.engine._inspection import (
+    MAX_RUN_SAMPLE_BYTES,
+    MAX_SAMPLE_BYTES,
+    unavailable_side,
+)
+from backend.ml_pipeline._execution.graph_utils import topological_order
 from backend.ml_pipeline._execution.schemas import (
     NodeConfig,
     PipelineConfig,
@@ -42,6 +50,7 @@ from backend.ml_pipeline._internal._advisor import (
 )
 from backend.ml_pipeline._internal._helpers import branch_label as _branch_label
 from backend.ml_pipeline._internal._schemas import (
+    NodeInspection,
     PipelineConfigModel,
     PreviewResponse,
 )
@@ -641,6 +650,58 @@ def _dedupe_preview_warnings(
     return deduped_warnings, deduped_node_warnings
 
 
+def _inspection_path(node_id: str, config: PipelineConfig) -> tuple[str | None, str | None]:
+    """Identify a node's partition-specific ancestry without downstream experiment details."""
+    node_map = {node.node_id: node for node in config.nodes}
+    ancestor_ids: set[str] = set()
+    pending = [node_id]
+    while pending:
+        current_id = pending.pop()
+        if current_id in ancestor_ids or current_id not in node_map:
+            continue
+        ancestor_ids.add(current_id)
+        pending.extend(node_map[current_id].inputs)
+    ancestors = [node for node in config.nodes if node.node_id in ancestor_ids]
+    if not ancestors:
+        return None, None
+    try:
+        identity = json.dumps(
+            {
+                "node_id": node_id,
+                "nodes": [
+                    {
+                        "node_id": node.node_id,
+                        "step_type": node.step_type,
+                        "inputs": node.inputs,
+                        "params": {
+                            key: value
+                            for key, value in node.params.items()
+                            if key != "_display_name"
+                        },
+                    }
+                    for node in sorted(ancestors, key=lambda node: node.node_id)
+                ],
+            },
+            sort_keys=True,
+            separators=(",", ":"),
+            allow_nan=False,
+        )
+        labels = []
+        for node in topological_order(ancestors):
+            if node.step_type == StepType.TRAINING:
+                continue
+            display_name = node.params.get("_display_name")
+            label = display_name.strip() if isinstance(display_name, str) else ""
+            labels.append((label or str(node.step_type))[:48])
+        path_label = " · ".join(labels) or "Data input"
+        if len(path_label) > 240:
+            path_label = path_label[:77] + " … " + path_label[-160:]
+        return "path-" + hashlib.sha256(identity.encode("utf-8")).hexdigest(), path_label
+    except (TypeError, ValueError):
+        # Optional provenance must not change whether an existing preview runs.
+        return None, None
+
+
 def _run_preview_sub_pipelines(
     pipeline_config: PipelineConfig,
     nodes: list[NodeConfig],
@@ -648,13 +709,16 @@ def _run_preview_sub_pipelines(
     resolved_s3_options: Any,
     sync_session: Any,
     artifact_store: LocalArtifactStore,
+    inspect_node_id: str | None = None,
+    node_inspections: list[NodeInspection] | None = None,
+    inspect_all: bool = False,
 ) -> list[tuple[PipelineConfig, PipelineConfig, Any]]:
     """Partition the pipeline into branches, run each through the engine, and return results.
 
     Branches are sorted by BFS position of their terminal node so branch
     letters (A, B, C, …) match the canvas edge colors from useBranchColors.
-    A single shared artifact store across branches deduplicates work for
-    ancestor nodes that appear in multiple sub-pipelines.
+    Branches share an artifact store, so inspection receipts are serialized
+    before the next branch can overwrite a shared node's output.
     """
     paired_subs = _partition_preview_pipeline(pipeline_config, nodes)
 
@@ -668,12 +732,91 @@ def _run_preview_sub_pipelines(
             len(pipeline_config.nodes),
         )
     )
-    return [(orig, runnable, engine.run(runnable)) for orig, runnable in paired_subs]
+    sub_results = []
+    capture_requested = inspect_all or inspect_node_id is not None
+    # Every original branch node reserves both sides, including sources and
+    # skipped terminals. This gives later nodes the same allowance as earlier
+    # ones without retaining full artifacts or making a second execution pass.
+    side_budget = (
+        min(
+            MAX_SAMPLE_BYTES,
+            MAX_RUN_SAMPLE_BYTES // max(1, 2 * sum(len(orig.nodes) for orig, _ in paired_subs)),
+        )
+        if inspect_all
+        else MAX_SAMPLE_BYTES
+    )
+    suffixes = (
+        _compute_branch_dup_suffixes([(orig, runnable, None) for orig, runnable in paired_subs])
+        if capture_requested
+        else {}
+    )
+    for index, (orig, runnable) in enumerate(paired_subs):
+        selected_nodes = (
+            (orig.nodes if inspect_all else [n for n in orig.nodes if n.node_id == inspect_node_id])
+            if capture_requested
+            else []
+        )
+        runnable_ids = {node.node_id for node in runnable.nodes} if capture_requested else set()
+        # Freeze semantic provenance before a runner can mutate node parameters.
+        paths = {
+            node.node_id: _inspection_path(
+                node.node_id, runnable if node.node_id in runnable_ids else orig
+            )
+            for node in selected_nodes
+        }
+        result = (
+            engine.run(
+                runnable,
+                inspect_node_id=inspect_node_id,
+                inspect_all=inspect_all,
+                inspection_sample_budget=side_budget,
+            )
+            if capture_requested
+            else engine.run(runnable)
+        )
+        sub_results.append((orig, runnable, result))
+        if capture_requested and node_inspections is not None:
+            # Capture is already serialized: another branch may overwrite the
+            # same artifact keys or reuse mutable objects in the catalog.
+            for selected in selected_nodes:
+                path_id, path_label = paths[selected.node_id]
+                capture = engine.inspections.get(selected.node_id)
+                if capture is not None:
+                    input_side, output_side = capture.input, capture.output
+                else:
+                    reason = _inspection_unavailable_reason(selected)
+                    input_side, output_side = unavailable_side(reason), unavailable_side(reason)
+                node_inspections.append(
+                    NodeInspection(
+                        node_id=selected.node_id,
+                        branch_id=f"branch-{index}",
+                        branch_label=_branch_label(index, orig, suffixes.get(index, "")),
+                        path_id=path_id,
+                        path_label=path_label,
+                        input=input_side,
+                        output=output_side,
+                    )
+                )
+    return sub_results
+
+
+def _inspection_unavailable_reason(node: Any) -> str:
+    """Explain why a requested node has no measured execution in the preview."""
+    if node is None:
+        return "The requested node is not present in this preview configuration."
+    if node.step_type == StepType.TRAINING:
+        return "Training nodes are skipped by data preview; no model was trained."
+    if node.step_type == "data_preview":
+        return "Data Preview nodes use a separate background job and are skipped here."
+    return "The node did not execute in this preview."
 
 
 @router.post("/preview", response_model=PreviewResponse)
 async def preview_pipeline(
-    config: PipelineConfigModel, session: AsyncSession = Depends(get_async_session)
+    config: PipelineConfigModel,
+    session: AsyncSession = Depends(get_async_session),
+    inspect_node_id: str | None = None,
+    inspect_all: bool = False,
 ):
     """Run the pipeline in Preview Mode.
 
@@ -682,14 +825,13 @@ async def preview_pipeline(
     """
     # 1. Create Temporary Artifact Store
     temp_dir = tempfile.mkdtemp(prefix="skyulf_preview_")
-    artifact_store = LocalArtifactStore(temp_dir)
-
-    # Resolve paths and credentials for Preview (Async)
-    ingestion_service = DataIngestionService(session)
-    resolved_s3_options = await resolve_pipeline_nodes(config.nodes, ingestion_service)
-
     sync_session = None
     try:
+        artifact_store = LocalArtifactStore(temp_dir)
+        # Resolution also owns temporary resources, including when it raises
+        # a dataset-not-found response before any branch starts.
+        ingestion_service = DataIngestionService(session)
+        resolved_s3_options = await resolve_pipeline_nodes(config.nodes, ingestion_service)
         logger.debug(f"Preview request received with {len(config.nodes)} nodes")
         for n in config.nodes:
             logger.debug(f"Node {n.node_id} - Type: {n.step_type}")
@@ -709,9 +851,36 @@ async def preview_pipeline(
 
         sync_session = db_engine.sync_session_factory()
 
+        node_inspections: list[NodeInspection] = []
         sub_results = _run_preview_sub_pipelines(
-            pipeline_config, nodes, config.nodes, resolved_s3_options, sync_session, artifact_store
+            pipeline_config,
+            nodes,
+            config.nodes,
+            resolved_s3_options,
+            sync_session,
+            artifact_store,
+            inspect_node_id=inspect_node_id,
+            node_inspections=node_inspections,
+            inspect_all=inspect_all,
         )
+        captured_ids = {entry.node_id for entry in node_inspections}
+        if inspect_all:
+            missing_nodes = [node for node in nodes if node.node_id not in captured_ids]
+        elif inspect_node_id is not None and not node_inspections:
+            missing_nodes = [next((n for n in nodes if n.node_id == inspect_node_id), None)]
+        else:
+            missing_nodes = []
+        for selected in missing_nodes:
+            reason = _inspection_unavailable_reason(selected)
+            node_inspections.append(
+                NodeInspection(
+                    node_id=selected.node_id if selected is not None else str(inspect_node_id),
+                    branch_id="unavailable",
+                    branch_label="Preview",
+                    input=unavailable_side(reason),
+                    output=unavailable_side(reason),
+                )
+            )
 
         # 4. Aggregate per-branch previews
         dup_suffix_by_branch = _compute_branch_dup_suffixes(sub_results)
@@ -733,6 +902,8 @@ async def preview_pipeline(
 
         return PreviewResponse(
             pipeline_id=pipeline_config.pipeline_id,
+            run_id=str(uuid4()) if inspect_all or inspect_node_id is not None else None,
+            node_inspections=node_inspections,
             status=agg_status,
             node_results=combined_node_results,
             preview_data=preview_data,
@@ -745,14 +916,18 @@ async def preview_pipeline(
             node_warnings=deduped_node_warnings,
         )
 
+    except HTTPException:
+        raise
     except Exception:
         logger.exception("Pipeline preview failed")
         raise SkyulfException(message="Pipeline preview failed") from None
     finally:
         # 5. Cleanup — close sync session before removing temp artefacts.
-        if sync_session is not None:
-            sync_session.close()
-        shutil.rmtree(temp_dir, ignore_errors=True)
+        try:
+            if sync_session is not None:
+                sync_session.close()
+        finally:
+            shutil.rmtree(temp_dir, ignore_errors=True)
 
 
 __all__ = ["router"]

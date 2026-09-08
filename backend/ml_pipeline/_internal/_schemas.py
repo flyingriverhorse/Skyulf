@@ -7,7 +7,7 @@ shared `_advisor.Recommendation` re-export so legacy
 imports continue to work via `api.py`'s re-export shim.
 """
 
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel
 
@@ -71,6 +71,45 @@ class RunPipelineResponse(BaseModel):
     job_ids: list[str] = []  # All jobs when parallel branches are detected
 
 
+class InspectionColumn(BaseModel):
+    """A measured column name and dtype within a bounded inspection table."""
+
+    name: str
+    dtype: str
+
+
+class InspectionTable(BaseModel):
+    """A bounded sample with the full shape of the data processed during preview."""
+
+    port: str
+    split: str | None = None
+    row_count: int
+    column_count: int
+    columns: list[InspectionColumn]
+    rows: list[dict[str, Any]]
+    truncated: bool
+
+
+class InspectionSide(BaseModel):
+    """Measured tables or an explicit reason a node side has no captured data."""
+
+    status: Literal["available", "unavailable", "error"]
+    reason: str | None = None
+    tables: list[InspectionTable] = []
+
+
+class NodeInspection(BaseModel):
+    """One node's actual input and output for a preview branch execution."""
+
+    node_id: str
+    branch_id: str
+    branch_label: str
+    path_id: str | None = None
+    path_label: str | None = None
+    input: InspectionSide
+    output: InspectionSide
+
+
 class PreviewResponse(BaseModel):
     """Payload returned by POST /preview for a sample run of the graph.
 
@@ -83,6 +122,9 @@ class PreviewResponse(BaseModel):
     pipeline_id: str
     status: str
     node_results: dict[str, Any]
+    # Optional node receipts; omitted inspection requests perform no sample capture.
+    run_id: str | None = None
+    node_inspections: list[NodeInspection] = []
     # Preview data for the last node (or specific nodes).
     preview_data: list[dict[str, Any]] | dict[str, Any] | None = None
     # True row counts per split key in `preview_data` (rows are capped at 50

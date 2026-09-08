@@ -1,9 +1,9 @@
 # CUX-07 selected-node inspection: payload inventory
 
 Date: 2026-09-08
-Status: Inventory complete; Input / Output UI and payload extension remain open.
+Status: Inventory and CUX-07 implementation complete; see the implementation record below.
 
-## Existing contracts
+## Contracts recorded before implementation
 
 | Source | Available today | Limit for CUX-07 |
 |---|---|---|
@@ -70,5 +70,45 @@ inspector should retain its current behavior.
 - Browser: keyboard switching, light/dark layouts, compact settings and results
   panels, focus retained through refresh and selection changes.
 
-This inventory is based on source inspection. It does not claim that CUX-07 is
-implemented or that live training was exercised.
+## Implementation record
+
+The extension is implemented in
+`canvas_node_inspection_implementation_2026-09-08.md`. POST /pipeline/preview
+accepts optional `inspect_all=true` or `inspect_node_id` and returns `run_id` plus
+branch-specific `node_inspections`. Bulk mode takes precedence when both are
+supplied. Default callers do not capture intermediate data. Actual
+input is captured at resolution after merging; output is captured before another
+branch can replace artifacts. Capture failures do not fail execution, and
+request cleanup now also covers failures during source resolution.
+
+Settings / Input / Output tabs show measured schema, bounded samples and shape
+changes, separate predicted schemas and explicit availability/error states.
+The frontend requests all nodes and stores the submitted semantic configuration
+with its latest receipt. Changing selection reuses captured data without another
+request or modifying global Results. Toolbar Preview data is the single execution
+action; Input / Output has no Refresh button and directs empty/stale states to
+the toolbar. Optional `path_id` and `path_label` identify each node's actual
+partition ancestry independently of downstream training choices. The UI groups
+matching path IDs with equal captured input/output, preserves distinct paths and
+measurements/errors, and hides the selector for one result. Missing provenance
+is kept separate. Path labels describe upstream steps and are capped at 240 chars.
+Data path and compatible split selection survive side switches; settings retain
+keyboard focus. Captured data remains in session memory, not a historical
+training-artifact API. Limits: 50 rows, 100 columns, six tables per side, 500
+characters per captured display value and 256 KiB of sample-row JSON per side.
+Bulk capture shares an 8 MiB sample-row budget fairly across all branch-node
+sides; bounded schema metadata is separate. Capture uses existing branch runs
+without additional pipeline executions or catalog reads.
+
+Follow-up verification passed 237 backend tests, seven configuration snapshots,
+the full 1,248-test frontend suite and 46 final focused frontend tests. The
+28-scenario browser sweep passed; all five inspection scenarios passed after
+adding HTTP-200 runtime-error coverage. Ruff, ty, eslint, TypeScript/build and
+bundle-size checks passed; served assets rebuilt. Runtime errors retain bounded
+detail within the failing branch, and legacy selected-model requests retain
+their explicit skipped-training explanation.
+The subsequent single-action/data-path follow-up passed 154 targeted backend
+tests (41 inspection cases and seven snapshots), 1,254 frontend tests, 70 focused
+tests and 17 browser scenarios. Independent review, Ruff/format, ty, eslint,
+TypeScript/build and bundle budgets passed; served assets rebuilt. These checks
+use a fixture catalog and mocked browser APIs, not live training.

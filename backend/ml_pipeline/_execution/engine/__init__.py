@@ -62,6 +62,7 @@ from ..schemas import (
 from ..summary import build_summary
 from ._artifacts import ArtifactsMixin
 from ._feature_eng import FeatureEngMixin
+from ._inspection import MAX_SAMPLE_BYTES, NodeInspectionCapture, snapshot_side, unavailable_side
 from ._merge import MergeMixin
 from ._node_runners import NodeRunnersMixin
 from ._warning_capture import WarningCaptureHandler
@@ -91,6 +92,8 @@ class PipelineEngine(ArtifactsMixin, MergeMixin, FeatureEngMixin, NodeRunnersMix
         # Initialized here (not just in run()) so direct callers of
         # _merge_inputs / _merge_frames in tests don't hit AttributeError.
         self.merge_warnings: list[dict[str, Any]] = []
+        self.inspection: NodeInspectionCapture | None = None
+        self.inspections: dict[str, NodeInspectionCapture] = {}
 
     def _pipeline_has_training_node(self) -> bool:
         """Checks if the current pipeline workflow includes a model training step."""
@@ -207,9 +210,31 @@ class PipelineEngine(ArtifactsMixin, MergeMixin, FeatureEngMixin, NodeRunnersMix
         return deduped
 
     def run(
-        self, config: PipelineConfig, job_id: str = "unknown", dataset_name: str = "dataset"
+        self,
+        config: PipelineConfig,
+        job_id: str = "unknown",
+        dataset_name: str = "dataset",
+        *,
+        inspect_node_id: str | None = None,
+        inspect_all: bool = False,
+        inspection_sample_budget: int = MAX_SAMPLE_BYTES,
     ) -> PipelineExecutionResult:
         """Executes the pipeline defined by the configuration."""
+        if inspect_all:
+            inspection_ids = [node.node_id for node in config.nodes]
+        elif inspect_node_id is not None:
+            inspection_ids = [
+                node.node_id for node in config.nodes if node.node_id == inspect_node_id
+            ]
+        else:
+            inspection_ids = []
+        self.inspections = {
+            node_id: NodeInspectionCapture(node_id, sample_budget=inspection_sample_budget)
+            for node_id in inspection_ids
+        }
+        self.inspection = (
+            self.inspections.get(inspect_node_id) if inspect_node_id is not None else None
+        )
         self.log(f"Starting pipeline execution: {config.pipeline_id} (Job: {job_id})")
 
         # Fail fast on cyclic graphs before anything runs: nodes in a loop
@@ -342,9 +367,26 @@ class PipelineEngine(ArtifactsMixin, MergeMixin, FeatureEngMixin, NodeRunnersMix
         """Executes a single node based on its type."""
         self.log(f"Executing node: {node.node_id} ({node.step_type})")
         start_ts = time.time()
+        capture = self.inspections.get(node.node_id)
+        if capture is not None and not node.inputs:
+            capture.input = unavailable_side("This source node has no upstream input.")
 
         try:
             output_artifact_id, metrics = self._dispatch_node(node, job_id)
+            if capture is not None:
+                try:
+                    output = (
+                        self.artifact_store.load(output_artifact_id)
+                        if output_artifact_id is not None
+                        else None
+                    )
+                    capture.output = snapshot_side(
+                        output, "output", sample_budget=capture.sample_budget
+                    )
+                except Exception:  # noqa: BLE001 - capture must not fail a successful node
+                    capture.output = unavailable_side(
+                        "The output artifact could not be captured.", error=True
+                    )
             duration = time.time() - start_ts
             metadata = self._build_node_metadata(node, metrics)
 
@@ -360,6 +402,12 @@ class PipelineEngine(ArtifactsMixin, MergeMixin, FeatureEngMixin, NodeRunnersMix
 
         except Exception as e:
             logger.exception(f"Error in node {node.node_id}")
+            if capture is not None:
+                capture.output = unavailable_side(f"Node execution failed: {e}"[:500], error=True)
+                if node.inputs and not capture.input_resolved:
+                    capture.input = unavailable_side(
+                        "The node input could not be resolved.", error=True
+                    )
             duration = time.time() - start_ts
             return NodeExecutionResult(
                 node_id=node.node_id,
@@ -442,5 +490,11 @@ class PipelineEngine(ArtifactsMixin, MergeMixin, FeatureEngMixin, NodeRunnersMix
         """
         unique_inputs = list(dict.fromkeys(node.inputs or []))
         if len(unique_inputs) > 1:
-            return self._merge_inputs(node, target_col)
-        return self._resolve_input(node)
+            data = self._merge_inputs(node, target_col)
+        else:
+            data = self._resolve_input(node)
+        capture = self.inspections.get(node.node_id)
+        if capture is not None:
+            capture.input = snapshot_side(data, "input", sample_budget=capture.sample_budget)
+            capture.input_resolved = True
+        return data

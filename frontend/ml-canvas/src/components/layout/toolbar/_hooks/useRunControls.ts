@@ -3,7 +3,8 @@ import { collectGraphValidationIssues, useGraphStore } from '../../../../core/st
 import { useJobStore } from '../../../../core/store/useJobStore';
 import { useViewStore } from '../../../../core/store/useViewStore';
 import { useNotificationsStore } from '../../../../core/store/useNotificationsStore';
-import { runPipelinePreview } from '../../../../core/api/client';
+import { useNodeInspectionStore } from '../../../../core/store/useNodeInspectionStore';
+import { buildPreviewConfiguration } from '../../../../core/utils/previewConfiguration';
 import { jobsApi } from '../../../../core/api/jobs';
 import { convertGraphToPipelineConfig } from '../../../../core/utils/pipelineConverter';
 import { RUN_PREVIEW_EVENT } from '../../../../core/hooks/useKeyboardShortcuts';
@@ -33,7 +34,7 @@ export function useRunControls(): RunControls {
   const { toggleDrawer, setActiveParallelRun, startPolling } = useJobStore();
   const { setResultsPanelExpanded } = useViewStore();
 
-  const [isRunning, setIsRunning] = useState(false);
+  const isRunning = useNodeInspectionStore(state => state.isLoading);
   const [isRunningAll, setIsRunningAll] = useState(false);
   const previewPending = useRef(false);
   const experimentsPending = useRef(false);
@@ -85,8 +86,9 @@ export function useRunControls(): RunControls {
   }, [nodes, edges]);
 
   const handleRun = async (): Promise<void> => {
-    if (previewPending.current || getReadOnlyMode()) return;
-    const issues = useGraphStore.getState().validateGraph();
+    if (previewPending.current || useNodeInspectionStore.getState().isLoading || getReadOnlyMode()) return;
+    const graph = useGraphStore.getState();
+    const issues = graph.validateGraph();
     if (issues.length > 0) {
       notifyPreview(`Preview blocked. Review ${issues.length} validation issue${issues.length === 1 ? '' : 's'}.`);
       setExecutionResult(null);
@@ -95,28 +97,19 @@ export function useRunControls(): RunControls {
       return;
     }
 
-    const datasetNode = nodes.find((n) => n.data.definitionType === 'dataset_node');
+    const datasetNode = graph.nodes.find((n) => n.data.definitionType === 'dataset_node');
     const datasetId = datasetNode?.data.datasetId as string;
     if (!datasetId) {
       notifyPreview('Preview blocked. Add a dataset node and select a dataset.');
       return;
     }
     previewPending.current = true;
-    setIsRunning(true);
     useNotificationsStore.getState().dismiss('canvas-preview');
     setExecutionResult(null);
     setLastRunError(null);
       try {
-        // Exclude Data Preview nodes — they're inspection sinks, not pipeline steps.
-        const previewIds = new Set(
-          nodes.filter((n) => n.data.definitionType === 'data_preview').map((n) => n.id),
-        );
-        const filteredNodes = nodes.filter((n) => !previewIds.has(n.id));
-        const filteredEdges = edges.filter(
-          (e) => !previewIds.has(e.source) && !previewIds.has(e.target),
-        );
-        const pipelineConfig = convertGraphToPipelineConfig(filteredNodes, filteredEdges);
-      const result = await runPipelinePreview(pipelineConfig);
+        const pipelineConfig = buildPreviewConfiguration(graph.nodes, graph.edges);
+      const result = await useNodeInspectionStore.getState().runPreview(pipelineConfig);
       setExecutionResult(result);
       if (result.status === 'failed') notifyPreview('Preview failed. Open preview results for details.');
         setLastRunError(null);
@@ -127,13 +120,12 @@ export function useRunControls(): RunControls {
         setResultsPanelExpanded(true);
         notifyPreview('Preview failed. Open preview results for details.');
       } finally {
-        setIsRunning(false);
         previewPending.current = false;
       }
     };
 
     const handleRunAll = async (): Promise<void> => {
-      if (experimentsPending.current || previewPending.current || getReadOnlyMode()) return;
+      if (experimentsPending.current || previewPending.current || useNodeInspectionStore.getState().isLoading || getReadOnlyMode()) return;
       const issues = useGraphStore.getState().validateGraph();
       if (issues.length > 0) {
         notifyExperimentError('Experiments blocked. Review the validation issues in preview results.');

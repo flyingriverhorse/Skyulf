@@ -41,6 +41,7 @@ for (const dark of [false, true]) {
 test('settings expansion and dismissal retain visible keyboard focus', async ({ page }) => {
   // Removing a panel must not strand focus on the document or reset the graph viewport.
   await page.setViewportSize({ width: 1440, height: 900 });
+  await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto('/canvas');
   await page.getByRole('button', { name: 'Add Dataset node', exact: true }).click();
   await page.getByRole('button', { name: 'Expand settings panel', exact: true }).press('Enter');

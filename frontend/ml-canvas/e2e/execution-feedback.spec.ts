@@ -138,7 +138,7 @@ test('keyboard preview explains blocked input and reports completion for a valid
   await expect(page.getByRole('button', { name: 'Review preview results', exact: true })).toHaveCount(0);
   await seed(page);
   let pendingRoute: Route | undefined;
-  await page.route('**/api/pipeline/preview', route => { pendingRoute = route; });
+  await page.route('**/api/pipeline/preview?*', route => { pendingRoute = route; });
   await page.getByRole('button', { name: 'Preview data', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Previewing data...', exact: true })).toBeDisabled();
   await expect.poll(() => Boolean(pendingRoute)).toBe(true);

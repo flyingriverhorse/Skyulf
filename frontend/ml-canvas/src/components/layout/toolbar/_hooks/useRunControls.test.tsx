@@ -2,6 +2,8 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vite
 import { act, cleanup, renderHook } from '@testing-library/react';
 import { useRunControls } from './useRunControls';
 import { useGraphStore } from '../../../../core/store/useGraphStore';
+import { useNodeInspectionStore } from '../../../../core/store/useNodeInspectionStore';
+import { buildPreviewConfiguration } from '../../../../core/utils/previewConfiguration';
 import { initializeRegistry } from '../../../../core/registry/init';
 import { useJobStore } from '../../../../core/store/useJobStore';
 import { useNotificationsStore } from '../../../../core/store/useNotificationsStore';
@@ -41,6 +43,7 @@ describe('useRunControls', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    useNodeInspectionStore.setState({ receipt: null, isLoading: false, error: null });
     vi.mocked(runPipelinePreview).mockReset();
     vi.mocked(jobsApi.runPipeline).mockReset();
     useNotificationsStore.getState().clear();
@@ -76,6 +79,48 @@ describe('useRunControls', () => {
     expect(useNotificationsStore.getState().items[0]).toMatchObject({ message: expect.stringContaining('Preview blocked'), action: { type: 'preview' } });
     expect(useNotificationsStore.getState().items).toHaveLength(1);
     expect(runPipelinePreview).not.toHaveBeenCalled();
+  });
+
+  it('captures the graph even when no node is selected when the toolbar previews data', async () => {
+    // One toolbar run should populate Input / Output for any node selected afterward.
+    const graph = previewGraph();
+    useGraphStore.setState(graph);
+    vi.mocked(runPipelinePreview).mockResolvedValueOnce({ pipeline_id: 'p', run_id: 'r', status: 'success', node_results: {}, preview_data: null, recommendations: [] });
+    const { result } = renderHook(() => useRunControls());
+    await act(async () => { await result.current.handleRun(); });
+    expect(runPipelinePreview).toHaveBeenCalledWith(expect.any(Object), { inspectAll: true });
+    expect(useNodeInspectionStore.getState().receipt?.response.run_id).toBe('r');
+  });
+
+  it('reflects an inspection request already running and prevents another toolbar request', async () => {
+    // The panel and toolbar must share one pending preview instead of racing results.
+    const graph = previewGraph();
+    useGraphStore.setState(graph);
+    let finish!: (value: Awaited<ReturnType<typeof runPipelinePreview>>) => void;
+    vi.mocked(runPipelinePreview).mockReturnValueOnce(new Promise(resolve => { finish = resolve; }));
+    const { result } = renderHook(() => useRunControls());
+    let pending!: Promise<unknown>;
+    act(() => { pending = useNodeInspectionStore.getState().runPreview(buildPreviewConfiguration(graph.nodes, graph.edges)); });
+    const running = result.current.isRunning;
+    await act(async () => { await result.current.handleRun(); });
+    await act(async () => { finish({ pipeline_id: 'p', status: 'success', node_results: {}, preview_data: null, recommendations: [] }); await pending; });
+    expect(running).toBe(true);
+    expect(runPipelinePreview).toHaveBeenCalledOnce();
+  });
+
+  it('submits the graph and selection present at activation before React rerenders', async () => {
+    // A shortcut immediately after an edit must validate and execute the same graph snapshot.
+    useGraphStore.setState(previewGraph());
+    vi.mocked(runPipelinePreview).mockResolvedValueOnce({ pipeline_id: 'p', status: 'success', node_results: {}, preview_data: null, recommendations: [] });
+    const { result } = renderHook(() => useRunControls());
+    await act(async () => {
+      useGraphStore.setState(state => ({ nodes: state.nodes.map(node => node.id === 'dataset'
+        ? { ...node, selected: true, data: { ...node.data, datasetId: 'ds-2' } } : node) }));
+      await result.current.handleRun();
+    });
+    expect(runPipelinePreview).toHaveBeenCalledWith(expect.objectContaining({
+      metadata: { dataset_source_id: 'ds-2' },
+    }), { inspectAll: true });
   });
 
   it('blocks preview submission when graph validation finds issues', async () => {

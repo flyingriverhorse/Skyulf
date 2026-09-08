@@ -1,7 +1,7 @@
 # Canvas UX improvement backlog
 
 Date: 2026-09-06
-Status: CUX-01 through CUX-06, CUX-08, and CUX-09 complete. CUX-07 remains open; payload inventory is complete.
+Status: CUX-01 through CUX-09 complete at the verified scope below.
 
 ## Purpose and review scope
 
@@ -32,7 +32,7 @@ before implementation because other work may have changed these components.
 | CUX-04 | Medium | Improve component discovery | Complete; shared task search, readable results, and collapsible preprocessing groups verified |
 | CUX-05 | Medium | Navigate from validation issues to the exact setting | Complete; field navigation and general-issue fallback verified |
 | CUX-06 | Medium | Reduce connection and settings visual noise | Complete; contextual connection controls and node details verified |
-| CUX-07 | Medium | Inspect a selected node's input and output | Open; payload inventory complete, backend capture extension needed |
+| CUX-07 | Medium | Inspect a selected node's input and output | Complete; all-node preview capture, Input / Output tabs and stale-result detection verified |
 | CUX-08 | High, alongside related work | Fix keyboard and accessible-name gaps | Complete; remaining settings labels, keyboard controls, and focus transitions verified |
 | CUX-09 | Medium | Make possible PII findings easy to review without exposing raw values | Complete; dedicated profiling review panel verified, core accessors already available |
 
@@ -320,7 +320,35 @@ provide each selected node's paired input/output or a distinct preview receipt
 with captured settings for stale-result detection. Temporary preview artifacts
 are removed after the request. Shared-node results also need branch identity.
 The required extension and file map are recorded in
-`canvas_node_inspection_payloads_2026-09-08.md`. CUX-07 remains open.
+`canvas_node_inspection_payloads_2026-09-08.md`.
+
+**Progress (2026-09-08):** Selected-node settings now expose Settings / Input /
+Output tabs. Toolbar Preview data captures every node's actual resolved input
+before transformation and output immediately after execution. It is the single
+execution action; Input / Output has no Refresh button. Changing selection reuses
+the same run without another request or changing global Results. Data path choices
+are scoped to the selected node's upstream history; repeated captures caused only
+by downstream models are grouped. A single shared pending request prevents
+duplicate runs, and a captured configuration marks results stale after parameter,
+connection or dataset edits. Moving, selecting, renaming and expanding settings
+do not invalidate measured data. Each captured preview has a distinct receipt;
+branches and train/test/validation or X/y tables remain separate, with branch
+and compatible split selection preserved while switching Input / Output. A node
+with one result has no data-path selector; distinct paths or measurements retain
+separate choices, even when different paths have matching sample rows.
+
+Samples are capped at 50 rows and 100 columns per table, six tables per side,
+500 characters per captured display value and 256 KiB of sample-row JSON per
+side, with an 8 MiB total sample-row budget shared across nodes and branches.
+Counts describe the data processed by preview (loaders sample up to 1,000
+source rows). Empty tables retain their measured schema. Predicted output schema
+is labeled separately. Source inputs, unsupported or skipped nodes, capture
+failures and request failures have explicit states. Training remains excluded.
+Paired tables show measured row/column changes and complete-schema added/removed
+columns; incompatible or truncated schemas do not produce invented counts.
+Settings remain mounted across tab switches, validation navigation reveals them,
+and pending refresh preserves keyboard focus. Implementation and verification:
+`canvas_node_inspection_implementation_2026-09-08.md`.
 
 **Opportunity:** Existing schema badges, data previews, node summaries, and
 inspection tools provide parts of the answer to “What did this step do?” A
@@ -334,12 +362,12 @@ reports those measurements.
 
 **Acceptance criteria:**
 
-- [ ] Users can inspect the selected node without adding a separate preview node for each step.
-- [ ] Predicted schemas are clearly distinguished from measured execution results.
-- [ ] Results identify their run and indicate when settings have changed since that run.
-- [ ] Samples are bounded; loading, unavailable, and failed states are explicit.
-- [ ] Multi-input and split nodes identify the branch/split being inspected.
-- [ ] Summaries use available measurements and never invent transformation counts.
+- [x] Users can inspect the selected node without adding a separate preview node for each step.
+- [x] Predicted schemas are clearly distinguished from measured execution results.
+- [x] Results identify their run and indicate when settings have changed since that run.
+- [x] Samples are bounded; loading, unavailable, and failed states are explicit.
+- [x] Multi-input and split nodes identify the branch/split being inspected.
+- [x] Summaries use available measurements and never invent transformation counts.
 
 **Starting points:** `src/components/shared/NodeInspectorModal.tsx`,
 `src/modules/nodes/inspection/DataPreviewNode.ts`,
@@ -813,3 +841,35 @@ explicitly recorded above is complete; remaining interaction details need review
   Existing mocked connection logs and circular/empty chunk warnings remain.
   CUX-07's source/payload inventory is recorded separately; its Input / Output
   implementation remains open and requires backend capture and run identity.
+- 2026-09-08: Completed CUX-07 with optional selected-node preview capture and
+  Settings / Input / Output tabs. Independent review and browser regressions
+  identified and resolved stale toolbar activation snapshots, Decimal value
+  loss, branch/plain-split selection changes and pending-refresh focus loss.
+  Final backend verification passed 228 tests and seven existing configuration
+  snapshots, including 27 new inspection cases. The full frontend suite passed
+  1,243 tests; the final focused sweep after UI refinements passed 61 tests.
+  All 26 browser scenarios passed across inspection, existing execution feedback,
+  validation navigation and accessibility. Light/dark screenshots were inspected.
+  Ruff, formatting, backend ty, frontend lint, TypeScript/build and bundle-size
+  checks passed. Served assets were rebuilt; main gzip is 304.8 KB against 325 KB.
+- 2026-09-08: Follow-up to CUX-07 captures all nodes with one preview and reuses
+  the run when selection changes. Inspector Refresh preview updates only the
+  inspection receipt/errors, preserving global Results visibility and content.
+  Sample-row JSON shares an 8 MiB budget across nodes and branches. Independent
+  review also preserved detailed branch-specific execution errors and legacy
+  skipped-training reasons. Verification: 237 backend tests and seven snapshots,
+  1,248 frontend tests and 46 final focused tests passed. The 28-scenario browser
+  sweep passed, followed by all five inspection cases with new runtime-error
+  coverage. Ruff/format, ty, eslint, TypeScript/build and bundle budgets passed.
+  Served assets rebuilt; main gzip 304.7 KB / 325 KB. Browser APIs are mocked.
+- 2026-09-08: Removed inspector Refresh preview; toolbar Preview data is the
+  single run action. Inspection choices now use recorded node-local upstream
+  paths instead of downstream model branches. Repeated paths with matching
+  captures share one choice; distinct paths or measurements remain separate,
+  and one result has no selector. Empty/stale states direct users to the toolbar.
+  Verification: 154 targeted backend tests with seven snapshots, 1,254 frontend
+  tests, 70 focused tests and 17 browser scenarios passed. Independent review,
+  Ruff/format, ty, eslint, TypeScript/build and bundle budgets passed. Served
+  assets rebuilt; main gzip 304.6 KB / 325 KB. Browser APIs are mocked.
+  Backend tests exercise the real router/engine with a fixture catalog; browser
+  API responses are mocked. No live training or hosted CI run was triggered.
