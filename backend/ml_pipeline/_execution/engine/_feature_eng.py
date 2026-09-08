@@ -692,15 +692,14 @@ class FeatureEngMixin:
                     payload = self._split_train_payload(split_artifact, target_col)
                     validation_payload = self._split_validation_payload(split_artifact, target_col)
                 else:
-                    # Splitter + learning steps share one FE node; re-run the
-                    # splitter-only step prefix on the raw loader frame to
-                    # reconstruct the pre-learning train rows.
-                    prefix_steps = [s for s, *_ in flat[: splitter_positions[0] + 1]]
-                    split_output, _metrics = FeatureEngineer(prefix_steps).fit_transform(
-                        self.artifact_store.load(loader_id), target_column=target_col
-                    )
-                    payload = self._split_train_payload(split_output, target_col)
-                    validation_payload = self._split_validation_payload(split_output, target_col)
+                    # An in-node split must retain its original row membership.
+                    # Re-running even an otherwise identical prefix can move
+                    # held-out rows into training when randomness is unseeded.
+                    split_artifact = self.artifact_store.load(f"exec_{node_id}_split")
+                    if not isinstance(split_artifact, SplitDataset):
+                        raise ValueError("Saved pre-transform split payload is not a SplitDataset")
+                    payload = self._split_train_payload(split_artifact, target_col)
+                    validation_payload = self._split_validation_payload(split_artifact, target_col)
 
             adapter = FeatureEngineerFoldAdapter(learning_steps, target_column=target_col)
             self.log(
@@ -738,10 +737,23 @@ class FeatureEngMixin:
             self.artifact_store.save(f"exec_{node.node_id}_input", df)
 
         # params: {"steps": [...]}
-        engineer = FeatureEngineer(node.params.get("steps", []))
+        steps = node.params.get("steps", [])
+        engineer = FeatureEngineer(steps)
+
+        def persist_split_payload(payload: SplitDataset) -> None:
+            """Preserve the actual row partition before any later step can mutate it."""
+            self.artifact_store.save(f"exec_{node.node_id}_split", payload)
+
+        capture_split = any(
+            step.get("transformer") in train_test_splitters() for step in steps[:-1]
+        )
 
         # SDK FeatureEngineer.fit_transform(data) -> (transformed_data, metrics)
-        processed_df, metrics = engineer.fit_transform(df, target_column=target_column)
+        processed_df, metrics = engineer.fit_transform(
+            df,
+            target_column=target_column,
+            on_split=persist_split_payload if capture_split else None,
+        )
 
         # Save the fitted FeatureEngineer itself (holds engineer.fitted_steps state)
         # as this node's artifact, so downstream inference can reload the pipeline.

@@ -1,7 +1,7 @@
 """Feature Engineering Pipeline Orchestrator."""
 
 import logging
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from typing import Any, ClassVar
 
 import pandas as pd
@@ -95,13 +95,26 @@ class FeatureEngineer:
         node_id_prefix="",
         *,
         target_column: str | None = None,
+        on_split: Callable[[SplitDataset], None] | None = None,
     ) -> Any:
         """Runs the pipeline on data.
 
-        Returns: (transformed_data, metrics_dict)
+        Args:
+            data: Input frame, feature-target pair, or existing split dataset.
+            node_id_prefix: Prefix for the per-step transformer identifiers.
+            target_column: Execution target excluded from automatic feature selection.
+            on_split: Optional synchronous callback receiving the first actual row
+                split before later transformations run. Skipped splitters and
+                feature-target separation do not invoke it. The callback is not
+                retained; consumers must copy or persist the payload immediately
+                if they need a snapshot. Callback errors propagate to the caller.
+
+        Returns:
+            A pair containing the transformed data and per-step metrics.
         """
         self.fitted_steps = []  # Reset fitted steps
         current_data = data
+        split_captured = False
         metrics: dict[str, Any] = {
             "summary": {
                 "fit_time": 0.0,
@@ -143,6 +156,16 @@ class FeatureEngineer:
                 current_data=current_data,
                 params=params,
             )
+
+            if (
+                on_split is not None
+                and not split_captured
+                and transformer_type in {"TrainTestSplitter", "Split"}
+                and not isinstance(data_before, SplitDataset)
+                and isinstance(current_data, SplitDataset)
+            ):
+                split_captured = True
+                on_split(current_data)
 
             logger.debug(f"Step {i} complete. New data type: {type(current_data)}")
 
