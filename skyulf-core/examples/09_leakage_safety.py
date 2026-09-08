@@ -4,7 +4,7 @@ Run from the repository root after installing skyulf-core:
     python skyulf-core/examples/09_leakage_safety.py
 
 Uses small in-memory pandas data, with no backend, dataset download, or files.
-Assertions document the expected behavior; deliberately unsafe fits are labeled.
+Runtime checks document the expected behavior; deliberately unsafe fits are labeled.
 """
 
 import logging
@@ -15,6 +15,12 @@ import pandas as pd
 
 from skyulf import SkyulfPipeline, validate_leakage_safety
 from skyulf.data.dataset import SplitDataset
+
+
+def _require(condition: bool, message: str) -> None:
+    """Keep tutorial correctness checks active under optimized Python."""
+    if not condition:
+        raise RuntimeError(message)
 
 
 def main() -> None:
@@ -48,7 +54,7 @@ def main() -> None:
         print(error)
     else:
         raise AssertionError("Expected the unsafe fit to be rejected")
-    assert not leaking_pipeline.is_fitted(), "Rejection must happen before any fit"
+    _require(not leaking_pipeline.is_fitted(), "Rejection must happen before any fit")
 
     # get_fitted_split() fits a throwaway preprocessing chain and has the same gate.
     try:
@@ -61,18 +67,21 @@ def main() -> None:
     print("\n2. warn: deliberately allow the unsafe fit, with a warning")
     # A diagnostic returns messages without training or logging them itself.
     messages = validate_leakage_safety(leaking_config, on_leakage="warn")
-    assert messages
+    _require(bool(messages), "The unsafe configuration must produce a warning diagnostic")
     print("Diagnostic messages:", messages)
     # fit() logs those messages and continues. This DOES NOT make the fit safe.
     warning_pipeline = SkyulfPipeline(deepcopy(leaking_config))
     warning_pipeline.fit(data, target_column="target", on_leakage="warn")
-    assert warning_pipeline.is_fitted()
+    _require(warning_pipeline.is_fitted(), "Warning mode must permit the explicitly requested fit")
 
     print("\n3. ignore: deliberately allow the unsafe fit, without leakage warnings")
-    assert validate_leakage_safety(leaking_config, on_leakage="ignore") == []
+    _require(
+        validate_leakage_safety(leaking_config, on_leakage="ignore") == [],
+        "Ignore mode must suppress leakage diagnostics",
+    )
     ignored_pipeline = SkyulfPipeline(deepcopy(leaking_config))
     ignored_pipeline.fit(data, target_column="target", on_leakage="ignore")
-    assert ignored_pipeline.is_fitted()
+    _require(ignored_pipeline.is_fitted(), "Ignore mode must permit the explicitly requested fit")
     # ignore affects only leakage diagnostics, not other validation or errors.
     print("The pipeline fitted, but its evaluation is still contaminated.")
 
@@ -80,12 +89,17 @@ def main() -> None:
     safe_config = deepcopy(leaking_config)
     safe_config["preprocessing"] = [deepcopy(split_step), deepcopy(scale_step)]
     pipeline = SkyulfPipeline(safe_config)
-    assert pipeline.validate_leakage_safety() == []
+    _require(
+        pipeline.validate_leakage_safety() == [], "The split-first pipeline must pass validation"
+    )
     pipeline.fit(data, target_column="target")
     print("Predictions:", pipeline.predict(pd.DataFrame({"x": [9.0, 10.0]})))
     X_train, y_train, X_test, y_test = pipeline.get_fitted_split(data, target_column="target")
     np.testing.assert_allclose(X_train["x"].mean(), 0, atol=1e-12)
-    assert len(X_train) == len(y_train) and len(X_test) == len(y_test)
+    _require(
+        len(X_train) == len(y_train) and len(X_test) == len(y_test),
+        "Preprocessing must keep feature and target row counts aligned",
+    )
     print("Preprocessed train/test shapes:", X_train.shape, X_test.shape)
     # These X frames are already transformed. Use them with a raw estimator,
     # not pipeline.predict(), which expects raw data and would transform again.
@@ -98,7 +112,9 @@ def main() -> None:
         ],
         "modeling": {},
     }
-    assert validate_leakage_safety(stateless_config) == []
+    _require(
+        validate_leakage_safety(stateless_config) == [], "Stateless row rules must remain allowed"
+    )
     print("DropMissingRows before splitting: no fitted statistic, so allowed.")
 
     constant_config = {
@@ -112,10 +128,15 @@ def main() -> None:
         ],
         "modeling": {},
     }
-    assert validate_leakage_safety(constant_config) == []
+    _require(
+        validate_leakage_safety(constant_config) == [], "Constant imputation must remain allowed"
+    )
     mean_config = deepcopy(constant_config)
     mean_config["preprocessing"][0]["params"] = {"strategy": "mean"}
-    assert validate_leakage_safety(mean_config, on_leakage="warn")
+    _require(
+        bool(validate_leakage_safety(mean_config, on_leakage="warn")),
+        "Mean imputation before a split must produce a leakage diagnostic",
+    )
     print("Constant imputation is allowed; mean imputation must follow the split.")
 
     print("\n6. Supply an external SplitDataset instead of a splitter node")
@@ -125,6 +146,10 @@ def main() -> None:
     external_pipeline = SkyulfPipeline(scaler_only_config)
     external_pipeline.fit(dataset, target_column="target")
     X_train, _, X_test, _ = external_pipeline.get_fitted_split(dataset, target_column="target")
+    if not isinstance(dataset.train, pd.DataFrame):
+        raise RuntimeError("This example requires a pandas training partition")
+    if not isinstance(dataset.test, pd.DataFrame):
+        raise RuntimeError("This example requires a pandas test partition")
     train_mean = dataset.train["x"].mean()
     train_std = dataset.train["x"].std(ddof=0)
     np.testing.assert_allclose(X_train["x"], (dataset.train["x"] - train_mean) / train_std)
@@ -135,7 +160,10 @@ def main() -> None:
     print("\n7. No splitter in a config is advisory, not proof of safety")
     # A config-only diagnostic cannot know about the external dataset above.
     messages = validate_leakage_safety(scaler_only_config, on_leakage="raise")
-    assert messages and "No train/test split" in messages[0]
+    _require(
+        bool(messages) and "No train/test split" in messages[0],
+        "Unsplit configurations must retain their advisory",
+    )
     print(messages[0])
     # An unsplit DataFrame still gets this advisory during fit(). If you intend
     # to evaluate generalization, supply SplitDataset or configure a splitter.
