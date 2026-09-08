@@ -143,6 +143,11 @@ def leakage_exemption_reason(
     if is_explicit_hash_encoding(step_type, params):
         return "hash encoding with explicit columns"
     columns = params.get("columns")
+    if step_type in {"PolynomialFeatures", "PolynomialFeaturesNode"}:
+        if columns:
+            return "polynomial features with explicit columns"
+        if not params.get("auto_detect", False):
+            return "polynomial features without automatic column discovery"
     if step_type in {"count_vectorizer", "tfidf_vectorizer"}:
         if columns is None or columns == []:
             return "text vectorization requires an explicit nonempty column selection"

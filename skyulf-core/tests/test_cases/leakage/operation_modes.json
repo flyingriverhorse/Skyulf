@@ -4,6 +4,90 @@
   "description": "Operation-level expectations derived from fit/apply audit, not registry metadata.",
   "cases": [
     {
+      "id": "polynomial_auto_omitted_columns",
+      "transformer": "PolynomialFeatures",
+      "params": {"auto_detect": true},
+      "learns": true
+    },
+    {
+      "id": "polynomial_auto_empty_columns",
+      "transformer": "PolynomialFeatures",
+      "params": {"auto_detect": true, "columns": []},
+      "learns": true
+    },
+    {
+      "id": "polynomial_auto_explicit_columns",
+      "transformer": "PolynomialFeatures",
+      "params": {"auto_detect": true, "columns": ["x"]},
+      "learns": false
+    },
+    {
+      "id": "polynomial_explicit_columns",
+      "transformer": "PolynomialFeatures",
+      "params": {"columns": ["x"]},
+      "learns": false
+    },
+    {
+      "id": "polynomial_default_noop",
+      "transformer": "PolynomialFeatures",
+      "params": {},
+      "learns": false
+    },
+    {
+      "id": "polynomial_empty_noop",
+      "transformer": "PolynomialFeatures",
+      "params": {"columns": []},
+      "learns": false
+    },
+    {
+      "id": "polynomial_disabled_auto_noop",
+      "transformer": "PolynomialFeatures",
+      "params": {"auto_detect": false, "columns": []},
+      "learns": false
+    },
+    {
+      "id": "polynomial_node_auto_omitted_columns",
+      "transformer": "PolynomialFeaturesNode",
+      "params": {"auto_detect": true},
+      "learns": true
+    },
+    {
+      "id": "polynomial_node_auto_empty_columns",
+      "transformer": "PolynomialFeaturesNode",
+      "params": {"auto_detect": true, "columns": []},
+      "learns": true
+    },
+    {
+      "id": "polynomial_node_auto_explicit_columns",
+      "transformer": "PolynomialFeaturesNode",
+      "params": {"auto_detect": true, "columns": ["x"]},
+      "learns": false
+    },
+    {
+      "id": "polynomial_node_explicit_columns",
+      "transformer": "PolynomialFeaturesNode",
+      "params": {"columns": ["x"]},
+      "learns": false
+    },
+    {
+      "id": "polynomial_node_default_noop",
+      "transformer": "PolynomialFeaturesNode",
+      "params": {},
+      "learns": false
+    },
+    {
+      "id": "polynomial_node_empty_noop",
+      "transformer": "PolynomialFeaturesNode",
+      "params": {"columns": []},
+      "learns": false
+    },
+    {
+      "id": "polynomial_node_disabled_auto_noop",
+      "transformer": "PolynomialFeaturesNode",
+      "params": {"auto_detect": false, "columns": []},
+      "learns": false
+    },
+    {
       "id": "general_yeo-johnson",
       "transformer": "GeneralTransformation",
       "params": {

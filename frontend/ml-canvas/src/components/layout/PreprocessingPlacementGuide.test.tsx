@@ -57,3 +57,24 @@ describe('PreprocessingPlacementGuide', () => {
     expect(screen.getAllByRole('article')).toHaveLength(62);
   });
 });
+
+/** Both saved polynomial aliases must expose their operation-sensitive placement in the catalog. */
+it('keeps both polynomial aliases searchable under conditional placement', () => {
+  render(<HelpGuideModal isOpen={true} onClose={() => undefined} initialTab="leakage" />);
+  fireEvent.change(screen.getByRole('searchbox', { name: 'Search preprocessing nodes' }), {
+    target: { value: 'PolynomialFeatures' },
+  });
+  fireEvent.change(screen.getByRole('combobox', { name: 'Filter by placement' }), {
+    target: { value: 'conditional' },
+  });
+  const entries = screen.getAllByRole('article');
+  expect(entries).toHaveLength(2);
+  for (const entry of entries) {
+    expect(entry.textContent).toContain('auto_detect');
+    expect(entry.textContent).toContain('Depends on operation');
+  }
+  fireEvent.change(screen.getByRole('combobox', { name: 'Filter by placement' }), {
+    target: { value: 'before' },
+  });
+  expect(screen.queryAllByRole('article')).toHaveLength(0);
+});

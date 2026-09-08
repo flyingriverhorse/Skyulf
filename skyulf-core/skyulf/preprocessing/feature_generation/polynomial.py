@@ -105,7 +105,8 @@ class PolynomialFeaturesApplier(BaseApplier):
     category="Feature Engineering",
     description="Generate polynomial and interaction features.",
     params={"degree": 2, "interaction_only": False, "include_bias": False},
-    learns_from_data=False,
+    # Automatic column discovery inspects values; fixed selections are exempted.
+    learns_from_data=True,
 )
 class PolynomialFeaturesCalculator(BaseCalculator):
     """Resolve the polynomial configuration and the names it will emit."""

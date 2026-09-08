@@ -24,6 +24,10 @@ const featureGenerationRule =
 const polynomialRule =
   'Builds a polynomial basis from the input schema and configured degree/options. ' +
   'No feature-value distribution is fitted. Only use inputs available at prediction time.';
+const polynomialSelectionRule =
+  'With auto_detect enabled and columns omitted or [], learns which columns are eligible from the data; ' +
+  'place after the row split. An explicit nonempty column list, or auto_detect disabled/omitted, ' +
+  'keeps selection fixed. Polynomial math itself fits no feature-value statistics.';
 
 const rows: ReadonlyArray<readonly [string, string, string, PreprocessingPlacement, string]> = [
   ['AliasReplacement', 'Alias Replacement', 'Cleaning', 'before',
@@ -94,8 +98,8 @@ const rows: ReadonlyArray<readonly [string, string, string, PreprocessingPlaceme
     'Omitted/null columns auto-detect and learn feature categories. Explicit [] is target-only/no-op; exact known-target selection is also exempt. Explicit feature columns remain conservatively learned, including configured category orders.'],
   ['Oversampling', 'Oversampling', 'Resampling', 'after',
     'Resample training rows only, including only the training partition of each CV fold. Never oversample validation or test rows; their original population is the evaluation target.'],
-  ['PolynomialFeatures', 'Polynomial Features', 'Feature engineering', 'before', polynomialRule],
-  ['PolynomialFeaturesNode', 'Polynomial Features (alias)', 'Feature engineering', 'before', polynomialRule],
+  ['PolynomialFeatures', 'Polynomial Features', 'Feature engineering', 'conditional', polynomialSelectionRule],
+  ['PolynomialFeaturesNode', 'Polynomial Features (alias)', 'Feature engineering', 'conditional', polynomialSelectionRule],
   ['PowerTransformer', 'Power Transformer', 'Transformations', 'after',
     'Fits Yeo-Johnson or Box-Cox parameters using training values. Disabling standardization does not make the fitted power parameter fixed.'],
   ['RobustScaler', 'Robust Scaler', 'Scaling', 'after',

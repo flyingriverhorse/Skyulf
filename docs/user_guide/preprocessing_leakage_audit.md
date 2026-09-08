@@ -76,8 +76,8 @@ table still apply.
 | 34 | `OneHotEncoder` | True | Learns categories and optional frequency-based grouping. Replay retains the training schema; unknowns follow the configured ignore/error policy. |
 | 35 | `OrdinalEncoder` | True | Omitted/null columns auto-detect and learn feature categories. Explicit `[]` is target-only/no-op; an exact known-target selection is also exempt. Explicit feature selections remain conservatively learned, including configured category orders. |
 | 36 | `Oversampling` | True | Learns/changes the training sample distribution. Resampling belongs only on training data, never validation or test rows. |
-| 37 | `PolynomialFeatures` | False | Builds a basis from schema and configured degree/options. No feature-value distribution is learned. |
-| 38 | `PolynomialFeaturesNode` | False | Polynomial-feature alias with the same schema/configuration-only basis. |
+| 37 | `PolynomialFeatures` | True | Automatic selection learns eligible columns when `auto_detect` is enabled and columns are omitted/empty. Explicit nonempty columns or disabled/omitted `auto_detect` remain fixed; the polynomial basis itself fits no feature-value statistics. |
+| 38 | `PolynomialFeaturesNode` | True | Polynomial-feature alias with the same operation-dependent automatic-selection rule and fixed explicit-column mode. |
 | 39 | `PowerTransformer` | True | Fits Yeo-Johnson or Box-Cox parameters on training values. Disabling standardization does not make the fitted power parameter fixed. |
 | 40 | `RobustScaler` | True | Learns training robust location/scale statistics and reuses them. |
 | 41 | `RollingAggregate` | False | Computes ordered/grouped rolling features and includes the current row. Sequence-dependent; a current-target input can leak the answer directly. |

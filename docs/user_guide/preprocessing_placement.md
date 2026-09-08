@@ -64,6 +64,21 @@ power parameter fixed.
 Inspect the entire transformation list. If one entry learns, the mixed node learns.
 The name "General Transformation" alone cannot establish its placement.
 
+### Polynomial Features and its alias
+
+`PolynomialFeatures` and `PolynomialFeaturesNode` build a fixed mathematical
+basis, but their optional automatic column selection learns from the fitting rows.
+
+| Configuration | Placement |
+|---|---|
+| `auto_detect: true`, with `columns` omitted or `[]` | After the row split: discover eligible columns from training data only. |
+| Explicit nonempty `columns`, even with `auto_detect: true` | Before split is allowed: column selection and polynomial math are fixed. |
+| `auto_detect` omitted or `false` | Before split is allowed: automatic discovery is disabled. |
+
+The registry conservatively marks both aliases as learned; the configured
+operation determines placement. `FeatureInteraction` is a separate fixed node
+and does not inherit this automatic-selection rule.
+
 ### Feature Generation and its aliases
 
 Arithmetic, ratios, similarity and datetime extraction are fixed calculations.
@@ -173,8 +188,8 @@ explicit-empty and target-only exceptions above still apply. Aliases remain sepa
 | `OneHotEncoder` | After split | Fit categories/frequency grouping and preserve the training output schema. |
 | `OrdinalEncoder` | Depends on operation | Default learns feature categories; explicit [] or exact known-target selection is exempt. |
 | `Oversampling` | After split, training only | Resample each training partition only, never validation or test rows. |
-| `PolynomialFeatures` | Before split (fixed) | Build the configured polynomial basis from input schema. |
-| `PolynomialFeaturesNode` | Before split (fixed) | Polynomial-feature alias; no feature-value statistic is fitted. |
+| `PolynomialFeatures` | Depends on operation | `auto_detect: true` with omitted/empty columns learns column selection; otherwise fixed polynomial math. |
+| `PolynomialFeaturesNode` | Depends on operation | Same automatic-selection rule as `PolynomialFeatures`; explicit nonempty columns remain fixed. |
 | `PowerTransformer` | After split | Fit Yeo-Johnson/Box-Cox parameters even when standardization is disabled. |
 | `RobustScaler` | After split | Fit robust training location and scale statistics. |
 | `RollingAggregate` | Time/history review | Ordered/grouped rolling features include the current row; current-target input can leak directly. |

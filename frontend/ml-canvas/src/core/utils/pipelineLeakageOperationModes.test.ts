@@ -13,12 +13,13 @@ const emptySelectionNoops = [
   'IQR', 'ZScore', 'Winsorize', 'EllipticEnvelope',
 ];
 const featureGenerationTypes = ['FeatureGeneration', 'FeatureMath', 'FeatureGenerationNode'];
+const polynomialTypes = ['PolynomialFeatures', 'PolynomialFeaturesNode'];
 const selectionIsAutomatic = [
   'MissingIndicator', 'VarianceThreshold', 'CorrelationThreshold', 'UnivariateSelection',
   'ModelBasedSelection', 'feature_selection', 'Oversampling', 'Undersampling',
 ];
 const registeredTypes = [
-  ...emptySelectionNoops, ...featureGenerationTypes, ...selectionIsAutomatic,
+  ...emptySelectionNoops, ...featureGenerationTypes, ...selectionIsAutomatic, ...polynomialTypes,
   'GeneralTransformation', 'Casting', 'LabelEncoder', 'OrdinalEncoder',
   'count_vectorizer', 'tfidf_vectorizer',
 ];
@@ -89,6 +90,29 @@ describe.each(['bundled', 'registry'])('operation-sensitive leakage with %s flag
       operations: [{ operation_type: 'ratio' }, { operation_type: 'group_agg' }],
     }, true);
     expectBlocked(stepType, { operations: [{ operation_type: 'unknown' }] }, true);
+  });
+
+  /** Only automatic column discovery learns; selecting columns explicitly preserves fixed math. */
+  it.each(polynomialTypes)('distinguishes automatic column selection from fixed math for %s', (stepType) => {
+    for (const params of [
+      {},
+      { columns: [] },
+      { columns: ['value'] },
+      { auto_detect: false },
+      { auto_detect: false, columns: [] },
+      { auto_detect: true, columns: ['value'] },
+    ]) {
+      expectBlocked(stepType, params, false);
+    }
+    expectBlocked(stepType, { auto_detect: true }, true);
+    expectBlocked(stepType, { auto_detect: true, columns: [] }, true);
+    // Null is not a valid calculator selection; malformed imported configs gain no exemption.
+    expectBlocked(stepType, { auto_detect: true, columns: null }, true);
+  });
+
+  /** The separate interaction node does not inherit Polynomial's automatic-selection behavior. */
+  it('keeps FeatureInteraction fixed before the split', () => {
+    expectBlocked('FeatureInteraction', { columns: ['value'], degree: 2 }, false);
   });
 
   /** Explicit empty selections are real no-ops for these calculators only. */

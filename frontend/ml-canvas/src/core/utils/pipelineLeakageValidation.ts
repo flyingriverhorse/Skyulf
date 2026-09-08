@@ -69,6 +69,8 @@ const BUNDLED_DATA_DEPENDENT_FIT_STEP_TYPES: readonly string[] = [
   'FeatureGeneration',
   'FeatureMath',
   'FeatureGenerationNode',
+  'PolynomialFeatures',
+  'PolynomialFeaturesNode',
   'Casting',
   // Text vectorization (vocabulary/IDF learned from the corpus)
   'count_vectorizer',
@@ -303,6 +305,10 @@ function isFixedOperation(
     && Array.isArray(params.columns) && params.columns.length === 0) return true;
   if (stepType === 'CustomBinning') return Array.isArray(params.columns);
   if (stepType === 'Casting') return isFixedCasting(params);
+  if (stepType === 'PolynomialFeatures' || stepType === 'PolynomialFeaturesNode') {
+    // The basis is fixed math; optional column discovery learns from the fitting rows.
+    return !params.auto_detect || (Array.isArray(params.columns) && params.columns.length > 0);
+  }
   if (stepType === 'count_vectorizer' || stepType === 'tfidf_vectorizer') {
     const columns = params.columns;
     // Only graph target context can grant an exemption, never a node's own hint.

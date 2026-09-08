@@ -31,6 +31,12 @@
       ]
     },
     "Oversampling": {},
+    "PolynomialFeatures": {
+      "auto_detect": true
+    },
+    "PolynomialFeaturesNode": {
+      "auto_detect": true
+    },
     "PowerTransformer": {},
     "RobustScaler": {},
     "SimpleImputer": {},
@@ -131,8 +137,6 @@
     "InvalidValueReplacement": {},
     "LagFeatures": {},
     "ManualBounds": {},
-    "PolynomialFeatures": {},
-    "PolynomialFeaturesNode": {},
     "RollingAggregate": {},
     "SimpleTransformation": {},
     "TextCleaning": {},
@@ -187,6 +191,56 @@
     "xgboost_regressor"
   ],
   "parameter_exemptions": [
+    {
+      "id": "polynomial_default_noop",
+      "transformer": "PolynomialFeatures",
+      "params": {}
+    },
+    {
+      "id": "polynomial_empty_noop",
+      "transformer": "PolynomialFeatures",
+      "params": {"columns": []}
+    },
+    {
+      "id": "polynomial_explicit_columns",
+      "transformer": "PolynomialFeatures",
+      "params": {"columns": ["x"]}
+    },
+    {
+      "id": "polynomial_auto_explicit_columns",
+      "transformer": "PolynomialFeatures",
+      "params": {"columns": ["x"], "auto_detect": true}
+    },
+    {
+      "id": "polynomial_disabled_auto_noop",
+      "transformer": "PolynomialFeatures",
+      "params": {"columns": [], "auto_detect": false}
+    },
+    {
+      "id": "polynomial_node_default_noop",
+      "transformer": "PolynomialFeaturesNode",
+      "params": {}
+    },
+    {
+      "id": "polynomial_node_empty_noop",
+      "transformer": "PolynomialFeaturesNode",
+      "params": {"columns": []}
+    },
+    {
+      "id": "polynomial_node_explicit_columns",
+      "transformer": "PolynomialFeaturesNode",
+      "params": {"columns": ["x"]}
+    },
+    {
+      "id": "polynomial_node_auto_explicit_columns",
+      "transformer": "PolynomialFeaturesNode",
+      "params": {"columns": ["x"], "auto_detect": true}
+    },
+    {
+      "id": "polynomial_node_disabled_auto_noop",
+      "transformer": "PolynomialFeaturesNode",
+      "params": {"columns": [], "auto_detect": false}
+    },
     {
       "id": "constant_imputation",
       "transformer": "SimpleImputer",
