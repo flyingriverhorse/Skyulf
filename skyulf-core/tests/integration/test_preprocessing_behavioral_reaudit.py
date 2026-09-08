@@ -201,6 +201,7 @@ def test_group_aggregations_replay_training_statistics_only(engine, node_id, met
     result = transformer.fit_transform(
         SplitDataset(train=train, test=test, validation=test), params
     )
+    assert isinstance(result, SplitDataset)
     expected = pd.Series([2.0, 4.0]).agg(method)
     values = _pandas(result.test)["stat"]
     assert values.iloc[0] == pytest.approx(expected)
@@ -235,6 +236,9 @@ def test_temporal_nodes_keep_target_alignment_and_split_history_separate(engine,
         ),
         config,
     )
+    assert isinstance(result, SplitDataset)
+    assert isinstance(result.train, tuple)
+    assert isinstance(result.test, tuple)
     train_x, train_y = map(_pandas, result.train)
     test_x, test_y = map(_pandas, result.test)
     assert train_x["value"].tolist() == train_y.tolist() == [10, 20, 30]
@@ -255,6 +259,7 @@ def test_inspection_artifacts_do_not_change_heldout_features(engine, node_id):
     calculator, applier = _pair(node_id)
     transformer = StatefulTransformer(calculator, applier, node_id)
     result = transformer.fit_transform(SplitDataset(train, test), {"n_rows": 1})
+    assert isinstance(result, SplitDataset)
     assert result.test is test
     if node_id == "DatasetProfile":
         assert transformer.params["profile"]["rows"] == 3

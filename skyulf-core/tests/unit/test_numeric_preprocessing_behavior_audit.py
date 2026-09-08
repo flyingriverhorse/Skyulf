@@ -137,6 +137,8 @@ def test_numeric_modes_isolate_training_and_replay_state(node_type, config, engi
             validation=(deepcopy(held), _labels([1, 0], engine)),
         )
         output = transformer.fit_transform(dataset, deepcopy(config))
+        assert isinstance(output, SplitDataset)
+        assert isinstance(output.train, tuple)
         training_outputs.append(output.train[0])
         first_probe = transformer.transform(deepcopy(held_a))
         transformer.transform(deepcopy(held_b))

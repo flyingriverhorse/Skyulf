@@ -99,6 +99,9 @@ def test_polynomial_auto_selection_artifact_uses_only_training_rows(
 
     output = transformer.fit_transform(SplitDataset(train=train, test=heldout), params)
 
+    assert isinstance(output, SplitDataset)
+    assert isinstance(output.train, (pd.DataFrame, pl.DataFrame))
+    assert isinstance(output.test, (pd.DataFrame, pl.DataFrame))
     assert list(output.train.columns) == ["x"]
     assert list(output.test.columns) == ["x"]
 
