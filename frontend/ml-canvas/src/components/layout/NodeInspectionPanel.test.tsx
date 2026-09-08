@@ -87,9 +87,12 @@ describe('NodeInspectionPanel', () => {
       rows: Array.from({ length: 70 }, () => row) }];
     render(<NodeInspectionPanel nodeId="selected" side="output" />);
     const table = screen.getByRole('table', { name: 'Measured output sample' });
-    expect(within(table).getAllByRole('row')).toHaveLength(51);
-    expect(within(table).getAllByRole('columnheader')).toHaveLength(100);
-    expect(within(table).getAllByRole('cell')[0]!.textContent!.length).toBeLessThanOrEqual(201);
+    // Structural bounds do not need visibility checks for every one of 5,000 cells.
+    expect(table.querySelectorAll('tr')).toHaveLength(51);
+    expect(table.querySelectorAll('th')).toHaveLength(100);
+    const cells = table.querySelectorAll('td');
+    expect(cells).toHaveLength(5000);
+    expect(cells[0]!.textContent!.length).toBeLessThanOrEqual(201);
     expect(screen.getByText(/^900 rows/)).toHaveTextContent(/120 columns/);
     expect(screen.getByText(/Showing 50 of 900 rows/)).toHaveTextContent(/100 of 120 columns/);
     expect(screen.getByText(/Truncated/)).toBeVisible();

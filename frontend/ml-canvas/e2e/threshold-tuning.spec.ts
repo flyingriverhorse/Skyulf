@@ -45,7 +45,7 @@ test.describe('Decision threshold tuning control', () => {
     await page.getByRole('button', { name: 'Advanced (Tuning)' }).click();
     await expect(page.getByText('Tuning Strategy')).toBeVisible();
 
-    const checkbox = page.locator('#tune_threshold');
+    const checkbox = page.getByRole('checkbox', { name: 'Tune decision threshold', exact: true });
     await expect(checkbox).toBeVisible();
     await expect(checkbox).not.toBeChecked();
 
@@ -63,6 +63,6 @@ test.describe('Decision threshold tuning control', () => {
     await page.getByRole('button', { name: 'Advanced (Tuning)' }).click();
     await expect(page.getByText('Tuning Strategy')).toBeVisible();
 
-    await expect(page.locator('#tune_threshold')).toHaveCount(0);
+    await expect(page.getByRole('checkbox', { name: 'Tune decision threshold', exact: true })).toHaveCount(0);
   });
 });

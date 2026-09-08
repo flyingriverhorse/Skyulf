@@ -4,6 +4,7 @@ import * as Popover from '@radix-ui/react-popover';
 
 /** Keep troubleshooting identifiers available without expanding the settings header. */
 export function NodeDetails({ nodeId }: { nodeId: string }) {
+  const [open, setOpen] = useState(false);
   const [copyStatus, setCopyStatus] = useState('');
   const copyId = async () => {
     try {
@@ -14,7 +15,7 @@ export function NodeDetails({ nodeId }: { nodeId: string }) {
     }
   };
 
-  return <Popover.Root>
+  return <Popover.Root open={open} onOpenChange={setOpen}>
     <Popover.Trigger asChild>
       <button type="button" aria-label="Node information" title="Node information"
         className="shrink-0 rounded-md p-1.5 bg-primary/10 text-primary hover:bg-primary/20 focus-ring">
@@ -23,6 +24,13 @@ export function NodeDetails({ nodeId }: { nodeId: string }) {
     </Popover.Trigger>
     <Popover.Portal>
     <Popover.Content aria-label="Node information" side="bottom" align="start" sideOffset={8} collisionPadding={12}
+      onKeyDown={event => {
+        // A later canvas hover tooltip must not consume this focused dialog's Escape.
+        if (event.key === 'Escape') {
+          event.stopPropagation();
+          setOpen(false);
+        }
+      }}
       className="nokey z-50 w-72 max-w-[calc(100vw-24px)] space-y-3 rounded-lg border bg-popover p-3 text-xs text-popover-foreground shadow-lg">
       <p className="font-semibold">Node information</p>
       <dl className="space-y-2">

@@ -450,7 +450,13 @@ describe('useRunControls', () => {
       executionResult: { pipeline_id: 'earlier', status: 'success', node_results: {}, preview_data: [{ value: 3 }], recommendations: [] },
     });
     const { result } = renderHook(() => useRunControls());
-    await act(async () => { await result.current[action](); });
+    await act(async () => {
+      if (action === 'handleRun') {
+        await result.current.handleRun();
+      } else {
+        await result.current.handleRunAll();
+      }
+    });
     expect(useViewStore.getState().isResultsPanelExpanded).toBe(false);
     expect(useGraphStore.getState().executionResult?.pipeline_id).toBe('earlier');
     expect(useNotificationsStore.getState().items[0]?.message).toMatch(/marked nodes/i);
@@ -467,7 +473,13 @@ describe('useRunControls', () => {
     vi.mocked(runPipelinePreview).mockRejectedValueOnce({ response: { data: { detail } } });
     vi.mocked(jobsApi.runPipeline).mockRejectedValueOnce({ response: { data: { detail } } });
     const { result } = renderHook(() => useRunControls());
-    await act(async () => { await result.current[action](); });
+    await act(async () => {
+      if (action === 'handleRun') {
+        await result.current.handleRun();
+      } else {
+        await result.current.handleRunAll();
+      }
+    });
     expect(useViewStore.getState().leakageNotice?.message).toBe(detail);
     expect(useViewStore.getState().isResultsPanelExpanded).toBe(false);
     expect(useGraphStore.getState().lastRunError).toBeNull();
