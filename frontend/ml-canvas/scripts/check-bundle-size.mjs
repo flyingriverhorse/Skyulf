@@ -50,6 +50,7 @@ const BUDGETS = [
   { prefix: 'DataDriftPage', maxGzipBytes: 20 * 1024,   label: 'route:DataDrift',   kind: 'route' },
   { prefix: 'ModelRegistry', maxGzipBytes: 15 * 1024,   label: 'route:ModelRegistry', kind: 'route' },
   { prefix: 'DeploymentsPage', maxGzipBytes: 10 * 1024, label: 'route:Deployments', kind: 'route' },
+  { prefix: 'InferencePage', maxGzipBytes: 20 * 1024, label: 'view:Inference', kind: 'route' },
 ];
 
 function listAssets() {

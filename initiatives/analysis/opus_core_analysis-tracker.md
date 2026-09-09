@@ -350,6 +350,56 @@ respective fix logs; OC-167 closed with canonical artifact framing on 2026-09-09
 
 ## Log
 
+### 2026-09-09 - frontend complexity refactor batch: verified
+
+Plan: [`frontend_ccn_refactor_2026-09-09.md`](frontend_ccn_refactor_2026-09-09.md).
+The five measured hotspots are pipeline conversion, job details, the toolbar,
+canvas node cards and inference. Existing API payloads and UI behavior are the
+contract; extracted helpers are included in the CCN 8 target.
+
+- Pipeline conversion: main function **138 -> 6**, extracted helpers at most
+  **8**. Existing payload tests/snapshots plus six characterization cases pass
+  (**53 tests**). A temporary differential probe compared **1,345 payloads**
+  with HEAD across dispatch/default/ensemble/graph cases without differences;
+  temporary reference/probe files were removed.
+- Toolbar: main component **86 -> 7**, all toolbar helpers at most **8**.
+  **55 focused tests** pass, including eight new behavior cases; shortcuts,
+  read-only restrictions, menus, exports and submission guards are preserved.
+- Job details: main component **112 -> 5**, all extracted helpers at most **8**.
+  **43 focused tests** pass, including seven new characterization cases verified
+  against both versions. Chart/log state stays mounted across tab changes.
+- The first three areas pass **151 tests** together and a combined strict CCN 8
+  ESLint check. Existing jsdom network-error logging remains in job-detail tests.
+- Inference: main component **73 -> 1**, extracted helpers at most **8**.
+  **11 focused tests** pass, including three new cases verified before/after;
+  sample projection, schema acknowledgement and manual thresholds are covered.
+- Canvas cards: main component **75 -> 6**, extracted helpers at most **7**.
+  **21 focused tests** pass, covering telemetry, validation timing, branch
+  ordering/fallback labels and in-flight job summaries.
+- Three independent reviewers found no material regressions across all five
+  refactors. The strict frontend CI command now includes their entry files and
+  complete helper folders in addition to the original clean Core scope.
+
+Integration caught a main-bundle increase to **326.1 KiB gzip**, above the
+existing **325 KiB** limit. Inference now loads its code on first visit while
+remaining mounted across view switches. A new browser test failed on eager
+loading before the change and passed afterward, also checking unsaved schema
+acknowledgement. The final main bundle is **313.3 KiB** and inference is
+**13.7 KiB**, with a separate **20 KiB** budget. The loading change also passed
+independent review; no existing budget was raised.
+
+Final verification passed **1,669 Vitest tests** (147 files), **98 Playwright
+tests**, ESLint, the expanded CCN 8 gate, TypeScript/production build, all bundle
+budgets, workflow YAML checks and `git diff --check`. There are **27 new unit
+cases** and **one new browser case**. Existing jsdom diagnostic logs and Vite
+circular/empty vendor-chunk warnings remain. Production assets were rebuilt.
+
+The full report now has **212 functions** above CCN 8 in **128 of 521 files**
+(previously 230 in 134 of 478); its highest CCN fell from **138 to 72**.
+`TrainingSettings.tsx` (72) and `useBranchColors.ts` (70) lead the remaining
+report-only hotspots. This maintenance closes no audit finding; the live queue
+remains **57 open** and **4 parked**. The v0.8.18 notes were updated.
+
 ### 2026-09-09 - frontend complexity workflow
 
 ESLint now enforces CCN 8 in `src/core/{api,constants,contexts,factories,perf,

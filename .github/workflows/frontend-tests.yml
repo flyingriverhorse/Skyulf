@@ -58,7 +58,9 @@ jobs:
 
       - name: Complexity gate (ESLint, CCN 8)
         # Enforce core/api, constants, contexts, factories, perf, realtime,
-        # registry, theme and types; expanding this scope requires a clean report.
+        # registry, theme and types, plus the cleaned pipeline converter,
+        # Toolbar, JobDetailsView, CustomNodeWrapper and InferencePage and
+        # their helper folders. Expanding scope requires a clean report.
         run: bash ../../.github/scripts/run_check.sh "ESLint complexity (CCN 8)" npm run complexity:check
         working-directory: frontend/ml-canvas
 
