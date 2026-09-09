@@ -2,7 +2,7 @@ import { act, fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, expect, it, vi } from 'vitest';
 import type { JobInfo } from '../../core/api/jobs';
 import { useJobStore } from '../../core/store/useJobStore';
-import { RunFeedback } from './RunFeedback';
+import { RunFeedback, summariseRunJobs } from './RunFeedback';
 
 /** Keep job transitions realistic without starting backend polling. */
 function job(job_id: string, status: JobInfo['status']): JobInfo {
@@ -48,4 +48,14 @@ it('opens the model tab without grouping when feedback belongs to a node', () =>
   expect(useJobStore.getState().setTab).toHaveBeenCalledWith('regression');
   expect(useJobStore.getState().toggleDrawer).toHaveBeenCalledWith(true);
   expect(useJobStore.getState().inspectedRun).toBeNull();
+});
+
+it('summarises only the submitted job ids', () => {
+  const summary = summariseRunJobs(
+    ['new', 'missing'],
+    [job('old', 'completed'), job('new', 'queued')],
+    {},
+  );
+
+  expect(summary).toBe('1 queued · 1 awaiting status');
 });
