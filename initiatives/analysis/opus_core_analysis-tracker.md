@@ -350,6 +350,23 @@ respective fix logs; OC-167 closed with canonical artifact framing on 2026-09-09
 
 ## Log
 
+### 2026-09-09 - frontend complexity workflow
+
+ESLint now enforces CCN 8 in `src/core/{api,constants,contexts,factories,perf,
+realtime,registry,theme,types}` through `npm run complexity:check`. The frontend
+CI gate runs this command before downstream build and browser-test jobs.
+`npm run complexity:report` reports all TypeScript/TSX sources without blocking
+CI on legacy complexity: the initial inventory found **230 functions** above
+CCN 8 in **134 of 478 files**. Other folders remain report-only until cleaned.
+
+Temporary TS and TSX probes verified that CCN 8 passes and CCN 9 exits with an
+error; the probes were removed. ESLint, the scoped complexity gate, workflow
+YAML checks, **1,642 frontend tests**, production build and bundle-size checks
+passed. The full report exited successfully with 230 warnings and no errors.
+Vite reported circular and empty vendor chunks during the successful build.
+The v0.8.18 note was updated. This CI addition closes no audit finding, so the
+live queue remains unchanged at **57 open** and **4 parked** rows.
+
 ### 2026-09-09 - OC-172 follow-up: sklearn bridge complexity gate
 
 Lizard reproduced `_convert_single` at CCN 12 against the CI limit of 8.
