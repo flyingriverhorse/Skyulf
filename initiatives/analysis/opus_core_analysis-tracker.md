@@ -209,6 +209,12 @@ uses, so a fixed finding stays where it was filed.
 | OC-25 | 🟠 | RFE "K" chosen in UI ignored by backend (`feature_selection/_common.py:236-240`) | small | ✅ fixed 2026-09-05 — closes OC-143 too |
 | OC-28 | 🟠 | Box-Cox transform failures silently return untransformed data (`transformations/power.py:97-104`) | small | ✅ fixed 2026-09-06 — the silent path was the `valid_cols` filter, not the `except` (which has logged since the node was created); both engines now share `_fitted_columns_present`, which names the fitted columns the frame lacks, and fail-open is kept by decision. See the log entry |
 
+### Remaining — core / engines / pipeline
+
+| ID | Sev | Item | Effort | Status |
+|---|---|---|---|---|
+| OC-208 | 🟡 | Failed pipeline refit leaves new preprocessing attached to the previous model (`pipeline/_pipeline.py`, `modeling/base.py`) | half day | ✅ fixed 2026-09-09 — any failed fit clears partial fitted state and blocks prediction until a successful refit. |
+
 ### Remaining — outliers / casting / binning / timeseries / geo
 
 | ID | Sev | Item | Effort | Status |
@@ -220,6 +226,8 @@ uses, so a fixed finding stays where it was filed.
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
+| OC-168 | 🟡 | Pipeline refitting retains decision thresholds from the previous model (`pipeline/_pipeline.py`) | small | ✅ fixed 2026-09-09 — fitting clears thresholds and requires fresh optimization for both unchanged and new class labels. |
+| OC-209 | 🟡 | Time-series tuning drops its time column only from training, corrupting explicit validation concatenation (`modeling/_tuning/engine.py`, `_tuning/splitters.py`) | half day | ✅ fixed 2026-09-09 — named and array validation payloads mirror training's removed time columns without reordering held-out rows. |
 | OC-210 | 🟡 | Public `SkyulfPipeline.optimize_thresholds()` rejects hyperparameter-tuned classifiers because it reads `classes_` from the `(fitted_model, TuningResult)` tuple instead of the underlying classifier (`pipeline/_pipeline.py:511`) | small | ✅ fixed 2026-09-08 — threshold search and thresholded prediction resolve classes from the fitted model through the existing unwrap helper; see the Log entry. |
 | OC-200 | 🟠 | Halving search accepts an all-NaN score set as a successful best result and refits a model; grid search correctly fails on identical folds (`modeling/_tuning/strategies/runner.py:110-127`) | small | ✅ fixed 2026-09-06 — with OC-205: a search left with no fully-scored candidate now fails with grid's "All trials failed" instead of returning `nan` and refitting. See the log entry |
 | OC-205 | 🟠 | Grid/random tuning discards failed folds from each candidate's average, allowing a partially failed candidate to win with an apparently valid score and no failure count in the result (`modeling/_tuning/grid_random.py:91-92`) | small | ✅ fixed 2026-09-06 — with OC-200: a candidate is eligible only if every fold scored, and a partly-failed one is logged as disqualified. See the log entry |
@@ -297,7 +305,7 @@ parameter search. The source's comment already promises this behavior.
 
 ### 2026-09-05 — OC-163–168 filed: supplemental core review, six additional reproduced bugs
 
-Filed with 6 findings; OC-164, OC-167, OC-168 still open — those blocks and this
+Filed with 6 findings; only OC-167 remains open — its block and this
 batch's context are in [the live queue](opus_core_analysis-open_queue.md).
 
 **OC-163 — time-series sort loses X/y alignment (🟠).** With tuple input `X = {time: [3,1,2], value: [30,10,20]}` and `y = [300,100,200]`, fit/apply `LagFeatures` with `columns=["value"], lags=[1], sort_by="time"`, or `RollingAggregate` with `columns=["value"], window=2, sort_by="time"`. Both pandas and Polars return times `[1,2,3]` but targets `[300,100,200]`; the correct targets are `[100,200,300]`. The engine branches sort only X and return the original y. Downstream conversion to NumPy consumes these mismatched rows positionally, silently corrupting supervised training. Locations: `skyulf-core/skyulf/preprocessing/time_series/lag.py:45,81` and `rolling.py:63,119`. **Fix/verification target:** apply the same positional permutation to X and y; cover both nodes, both engines, and sorting combined with lag row removal. This is separate from OC-162's reserved-column collision in cross-validation and OC-165's filtering-only failure.
@@ -309,6 +317,66 @@ batch's context are in [the live queue](opus_core_analysis-open_queue.md).
 ---
 
 ## Log
+
+### 2026-09-09 — OC-208/168/209 final verification
+
+The final implementation passed the complete core suite: **6,395 passed,
+72 skipped, 3 snapshots passed**. Tests used a writable temporary directory
+and offline model-cache settings. Backend fold-replay, split-identity,
+cross-validation and threshold service/router regressions passed **198 tests**.
+Repository-wide Ruff, scoped Ty, formatting checks for all five changed Python
+files and `git diff --check` passed. Independent review confirmed the failed-fit
+lifecycle, threshold reset and final validation alignment without remaining
+material findings.
+
+### 2026-09-09 — OC-209 fixed: time-series holdout feature parity
+
+Reproduced Ridge tuning on clean `x/time/target` data split into 18 training,
+6 validation and 6 test rows: ordinary tuning succeeded, while time-series
+tuning introduced NaNs by concatenating training without `time` and validation
+with it. The tuner now applies the training time-column removal to both
+`validation_data` and raw `validation_frames` before conversion/search. Named
+frames and NumPy arrays are supported; already-selected validation features,
+held-out row/target order and caller-owned frames are preserved.
+
+Added 18 direct-tuner cases and four pipeline holdout cases, covering
+pandas/Polars, explicit numeric and inferred datetime keys, and already-selected
+validation. The initial reproduction had 12 failing cases and eight passing
+controls. Review added a one-hot encoding case where raw and prepared NumPy
+payloads have the same width: positional selection incorrectly removed a real
+feature and skipped threshold tuning. That regression failed while its named
+control passed; arrays supplied alongside preprocessing and raw validation
+frames now keep their prepared features. All 72 focused holdout, lifecycle,
+core-pipeline and fold-refit tests passed; scoped Ruff and Ty checks passed.
+
+### 2026-09-09 — OC-168 fixed: decision thresholds belong to the current fit
+
+Reproduced stale thresholds after refitting a logistic classifier: unchanged
+labels reused the previous cutoffs, while new string labels raised a missing-class
+threshold error. Starting a fit now clears `_tuned_thresholds`; thresholded
+prediction directs callers to optimize again for the current fitted model.
+Validation rejected before learning still preserves the prior fitted state.
+
+Four new lifecycle cases cover ordinary and tuned classifiers with unchanged
+and relabeled targets, plus successful optimization and prediction after refit.
+All four failed before the reset. The lifecycle, threshold, leakage-validation
+and core-tuning suites passed 66 tests; scoped Ruff and Ty checks passed.
+
+### 2026-09-09 — OC-208 fixed: failed refits invalidate partial fitted state
+
+Reproduced the original StandardScaler/LinearRegression case: prediction at
+`x=25` changed from 50 to -150 after replacing the training data with shifted
+features and all-missing targets failed. `fit()` now invalidates prior model
+metadata before learning and clears partial preprocessing/model state on failure,
+including errors after the replacement model has fitted. Prediction checks fitted
+state before applying preprocessing. A successful refit restores normal use.
+
+Added 12 real regression cases in `test_pipeline_fit_lifecycle.py`, covering
+pandas/Polars, plain models/tuners, failures during preprocessing, model training
+and held-out processing, and successful recovery. All 12 failed before the fix.
+The lifecycle, threshold, leakage-validation and core-tuning suites then passed
+62 tests; scoped Ruff and Ty checks passed. OC-168 threshold reset remains a
+separate lifecycle fix.
 
 ### 2026-09-08 — OC-210 fixed: threshold optimization after hyperparameter tuning
 
@@ -339,7 +407,7 @@ comparison; that updated test passed all **4 cases**. Changed Python files
 pass `ruff format --check`. Independent review found no actionable issues.
 
 This closes the standalone core post-training API issue, separate from automatic
-tuning thresholds, backend job threshold endpoints, and still-open OC-168.
+tuning thresholds, backend job threshold endpoints, and the OC-168 lifecycle issue.
 
 ### 2026-09-08 — OC-212 fixed: similarity preserves repeated row labels
 

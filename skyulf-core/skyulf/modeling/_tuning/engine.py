@@ -75,6 +75,32 @@ def __getattr__(name: str) -> Any:
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
+def _align_time_series_validation(
+    payload: tuple[Any, Any] | None,
+    original_columns: list[str],
+    feature_columns: list[str],
+    *,
+    array_is_preprocessed: bool = False,
+) -> tuple[Any, Any] | None:
+    """Remove training's time columns from validation without reordering its rows."""
+    if payload is None or original_columns == feature_columns:
+        return payload
+    X_val, y_val = payload
+    if hasattr(X_val, "columns"):
+        removed = set(original_columns) - set(feature_columns)
+        columns = [column for column in X_val.columns if column not in removed]
+        return X_val[columns], y_val
+    if (
+        not array_is_preprocessed
+        and isinstance(X_val, np.ndarray)
+        and X_val.ndim == 2
+        and X_val.shape[1] == len(original_columns)
+    ):
+        positions = [i for i, column in enumerate(original_columns) if column in feature_columns]
+        return X_val[:, positions], y_val
+    return payload
+
+
 class TuningCalculator(BaseModelCalculator):
     """Tune a plain ``BaseModelCalculator`` and refit it with the best parameters.
 
@@ -350,7 +376,20 @@ class TuningCalculator(BaseModelCalculator):
         # without it, tuning with cv_type="time_series_split" silently leaks
         # the time column and evaluates folds out of chronological order.
         if tuning_config.cv_type == "time_series_split" and hasattr(X, "columns"):
+            original_columns = list(X.columns)
             X, y = _sort_by_time(X, y, tuning_config.cv_time_column, log_callback, logger)
+            feature_columns = list(X.columns)
+            validation_data = _align_time_series_validation(
+                validation_data,
+                original_columns,
+                feature_columns,
+                # With raw validation frames supplied separately, an array is
+                # already transformed; its width cannot identify raw columns.
+                array_is_preprocessed=preprocessing is not None and validation_frames is not None,
+            )
+            validation_frames = _align_time_series_validation(
+                validation_frames, original_columns, feature_columns
+            )
 
         # Convert data to Numpy for tuning
         X_np, y_np = SklearnBridge.to_sklearn((X, y))

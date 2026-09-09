@@ -159,7 +159,6 @@ closed that on 2026-09-07.
 | OC-161 | 🟡 | Polars clustering evaluation reserves `__skyulf_cluster__` without collision protection: a numeric feature with that name is overwritten by internal labels and then dropped, so centroid calculation crashes with `ColumnNotFoundError` (`modeling/_evaluation/clustering.py:92-101`) | small | ⬜ open |
 | OC-162 | 🟡 | Polars time-series CV reserves `__cv_y__` for an unnamed/list target: an input feature with that name is overwritten and dropped before fitting, silently changing the feature matrix (`modeling/cross_validation.py:317-322`) | small | ⬜ open |
 | OC-167 | 🟡 | Ambiguous string boundaries in artifact serialization give different fitted label encoders identical pipeline fingerprints, despite encoding the same input as 0 vs −1 (`pipeline/seal.py:52,64`) — distinct from OC-62's pointer instability | small | ⬜ open |
-| OC-208 | 🟡 | A failed `SkyulfPipeline.fit()` leaves new preprocessing attached to the previous model, so prediction remains enabled with inconsistent fitted state; executed prediction changes from 50 to −150 after the replacement model fails (`pipeline/_pipeline.py:329`, `modeling/base.py:427`) | half day | ⬜ open |
 
 ### Remaining — outliers / casting / binning / timeseries / geo
 
@@ -180,8 +179,6 @@ closed that on 2026-09-07.
 | OC-187 | 🟡 | LightGBM's advertised `subsample` control and default search dimension have no effect: both calculators retain native `subsample_freq=0`, disabling row bagging (`modeling/hyperparameters/_tree.py:576`, `_registry.py:298,309`; `classification.py:754`, `regression.py:547`) | small | ⬜ open |
 | OC-204 | 🟡 | `fit_predict` drops an embedded target during training but keeps it in held-out tuple features when explicit y is also supplied, causing prediction to fail (`modeling/base.py:317-324`) | small | ⬜ open |
 | OC-206 | ⚪ | Ensemble configuration resolution shallow-copies nested base-model parameters, so fitting mutates the caller's configuration (`modeling/ensemble.py:473,484`) | small | ⬜ open |
-| OC-168 | 🟡 | `SkyulfPipeline.fit()` retains the previous model's tuned thresholds — refitting with new class labels makes thresholded prediction crash; unchanged labels reuse stale cutoffs (`pipeline/_pipeline.py:135,380-389`) | small | ⬜ open |
-| OC-209 | 🟡 | Time-series tuning with an explicit validation partition fails on clean input: the time column is dropped only from training, and concatenating mismatched frames introduces NaNs (`modeling/_tuning/engine.py:353`, `_tuning/splitters.py:91`) | half day | ⬜ open |
 
 ### Remaining — frontend
 
@@ -274,40 +271,13 @@ import was found during this review; application exploitability is unproven.
 inspect the lockfile diff, confirm the installed tree and vulnerability scan,
 and run frontend lint/tests/build.
 
-### 2026-09-08 — OC-208/209/211: remaining reproduced core findings
+### 2026-09-08 — OC-211: remaining reproduced core finding
 
 Source: [the supplemental review](skyulf_core_review-2026-09-08.md), against the
 working tree based on `28f12473`, including its staged and unstaged changes.
-All three remaining findings were executed and independently reproduced by the
-main reviewer. They are newly discovered defects, not necessarily regressions
-introduced by that working tree, and remain open.
-
-**OC-208 — failed refit mixes new preprocessing with the old model.** Fit a
-`SkyulfPipeline` containing `StandardScaler(columns=["x"])` and
-`linear_regression` on `x=0..23`, `target=2*x`. Prediction at `x=25` is **50**.
-Refit the same instance with `x += 100` and all-missing targets: fitting raises
-`ValueError: Input y contains NaN`. The subsequent prediction at `x=25` is
-**−150** because the scaler has already been replaced but the previous fitted
-model remains accessible. **Fix/verification target:** make failed fitting
-preserve the previous complete fitted state or invalidate prediction until a
-successful refit; pin predictions after an intentionally failed replacement
-fit. Locations: `pipeline/_pipeline.py:329`, `modeling/base.py:427`. Distinct
-from OC-168's stale thresholds and closed OC-164's `get_fitted_split()` mutation.
-
-**OC-209 — time-series tuning corrupts the train/validation feature schema.**
-Build a pandas frame with 30 rows: `x=arange(30, dtype=float)`, `time=arange(30)`,
-`target=2*x`. Supply a `SplitDataset` with train rows `[:18]`, validation
-`[18:24]`, and test `[24:]`. Run a `ridge_regression` hyperparameter tuner with
-`strategy="grid"`, `search_space={"alpha":[1.0]}`, `metric="r2"`, `cv_folds=3`,
-`cv_type="time_series_split"`, `cv_time_column="time"`. Public pipeline fitting
-raises `All trials failed ... First trial error: Input X contains NaN`, while
-the same setup with ordinary CV succeeds. Sorting removes `time` from training
-features but not validation features; frame concatenation restores it with
-missing training values. **Fix/verification target:** keep training and
-validation feature selection consistent before holdout concatenation; cover
-clean explicit partitions and retain chronological sorting and X/y alignment.
-Locations: `modeling/_tuning/engine.py:353`, `_tuning/splitters.py:91`. This
-requires neither OC-162's reserved name nor OC-194's missing timestamps.
+The remaining finding was executed and independently reproduced by the main
+reviewer. It was newly discovered, not necessarily introduced by that working
+tree, and remains open pending reconciliation with later date-parsing fixes.
 
 **OC-211 — date extraction changes with unrelated batch companions.** Fit and
 apply both `FeatureGeneration` with `operation_type="datetime_extract"`,
@@ -477,11 +447,9 @@ the fitted model when bagging is enabled. No implementation change made.
 
 ### 2026-09-05 — OC-163–168 filed: supplemental core review, six additional reproduced bugs
 
-All six were reproduced through executed Python probes against the working tree and checked against the existing tracker and relevant source-audit reports. IDs follow the review's reported order. **Four have since closed** — OC-163/165/166 on 2026-09-06 with the shared positional y-selection helper, and OC-164 the same day — leaving OC-167 and OC-168 below, both still open; their reproduction detail and the fixes' Log entries are in the archive.
+All six were reproduced through executed Python probes against the working tree and checked against the existing tracker and relevant source-audit reports. IDs follow the review's reported order. Five have since closed; only OC-167 remains below. Closed findings and their verification are in the archive.
 
 **OC-167 — ambiguous canonical serialization creates fingerprint collisions (🟡).** `artifact_digest(np.array(["a", "bstr:c"], dtype=object))` equals the digest of `np.array(["astr:b", "c"], dtype=object)`: strings contribute `b"str:" + value` without a length prefix, and object-array elements have no boundary markers. Ordinary lists also collide: `["a", "b,str:c"]` versus `["a,str:b", "c"]`. Confirmed through the public pipeline API: two otherwise identical `LabelEncoder(columns=["x"])` pipelines fitted on the first pair of category lists return **identical `fingerprint()` values**, but transform input `"a"` to **0 versus −1**. Locations: `pipeline/seal.py:52,64` (and the list serialization branch). This is deterministic aliasing of distinct values, not OC-62's process-dependent pointer hashing, and not OC-63's cycle handling. **Fix/verification target:** make the canonical byte encoding unambiguous for strings/bytes and nested containers; regress both direct digest collisions and differing fitted pipeline behavior, while preserving process stability.
-
-**OC-168 — refitting leaves old decision thresholds active (🟡).** Fit a logistic-regression pipeline on `x = arange(40)`, `target = (x >= 20).astype(int)`, using the frame as both train and test for this lifecycle probe. Tune on the same features/labels with `accuracy_score`, obtaining `{0: 0.5, 1: 0.5}`. Refit the same pipeline instance with labels mapped to `{0: "no", 1: "yes"}`. Normal prediction at x=25 returns `"yes"`, but `predict(..., use_tuned_thresholds=True)` raises `ValueError: thresholds is missing entries for classes: ['no', 'yes']`. `_tuned_thresholds` is initialized in `__init__` and assigned by optimization, but never reset by `fit()` (`pipeline/_pipeline.py:135,380-389`). With unchanged labels the same stale thresholds remain accepted, even though they belong to a previous model. **Fix/verification target:** invalidate tuned thresholds when retraining begins and require fresh tuning for the replacement model; cover both changed and unchanged label sets. This is lifecycle state retention, separate from OC-36's degenerate validation search and OC-147's tie comparison.
 
 **Verification during the review:** full command `.venv/Scripts/python.exe -m pytest skyulf-core/tests -q --no-cov --tb=short -o addopts=''` produced **3680 passed, 56 skipped, 1 failed, 2 errors** in 130.11 seconds. The three unsuccessful tests were environmental: two serializer fixtures could not access pytest's default temporary directory, and the wrapped-Polars sentence-embedder test hit restricted network access while checking the model cache. All three passed on a targeted rerun with a writable temporary directory and `HF_HUB_OFFLINE=1` (cached model available): **3 passed**. These suite results are separate from the six successful bug reproductions; no fixes are implied by the rerun. Temporary verification files were removed after use.
 
