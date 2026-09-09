@@ -310,23 +310,40 @@ def _auto_detect_sort_column(
 
 
 def _sort_polars_by_column(X: Any, y: Any, sort_col: str) -> tuple:
-    """Sort a Polars X/y pair by sort_col and drop that column from X."""
-    # Sort y in lockstep by attaching it as a temporary column so the
-    # same row order is applied to both X and y, then split apart.
-    y_series = y if hasattr(y, "name") else pl.Series("__cv_y__", y)
-    y_name = getattr(y_series, "name", None) or "__cv_y__"
-    combined = X.with_columns(y_series.alias(y_name))
-    combined = combined.sort(sort_col)
-    y = combined[y_name]
-    X = combined.drop([y_name, sort_col])
-    return X, y
+    """Stably sort a Polars X/y pair, keeping missing dates last and dropping the time key."""
+    y_series = y if isinstance(y, pl.Series) else pl.Series(getattr(y, "name", None), y)
+    if len(y_series) != len(X):
+        raise ValueError("X and y must contain the same number of rows for time-series sorting.")
+    # Reuse row positions without materializing y in X: its name may also
+    # belong to a legitimate feature (or even to the time column itself).
+    sort_order = (
+        X[sort_col]
+        .to_frame()
+        .select(pl.arg_sort_by(sort_col, nulls_last=True, maintain_order=True))
+        .to_series()
+    )
+    return X[sort_order].drop(sort_col), y_series.gather(sort_order)
 
 
 def _sort_pandas_by_column(X: Any, y: Any, sort_col: str) -> tuple:
-    """Sort a pandas X/y pair by sort_col and drop that column from X."""
-    sort_order = X[sort_col].argsort()
+    """Stably sort a pandas X/y pair, keeping missing dates last and dropping the time key."""
+    if len(y) != len(X):
+        raise ValueError("X and y must contain the same number of rows for time-series sorting.")
+    # Reset labels before sorting so duplicate indices cannot multiply rows.
+    # Series.argsort() can return -1 sentinels for missing dates, not positions.
+    sort_order = (
+        X[sort_col]
+        .reset_index(drop=True)
+        .sort_values(kind="stable", na_position="last")
+        .index.to_numpy()
+    )
     X = X.iloc[sort_order].reset_index(drop=True)
-    y = y.iloc[sort_order].reset_index(drop=True) if hasattr(y, "iloc") else y[sort_order]
+    if hasattr(y, "iloc"):
+        y = y.iloc[sort_order].reset_index(drop=True)
+    elif isinstance(y, (list, tuple)):
+        y = np.asarray(y)[sort_order]
+    else:
+        y = y[sort_order]
     # Drop the time column from features so it doesn't leak into the model
     X = X.drop(columns=[sort_col])
     return X, y

@@ -92,15 +92,12 @@ def _compute_centroids_polars(X_numeric: pl.DataFrame, labels: np.ndarray) -> li
         return mean_dict, std_dict
 
     overall_mean, overall_std = _column_stats(X_numeric)
-    labeled = X_numeric.with_columns(pl.Series("__skyulf_cluster__", labels))
 
     centroids: list[ClusterCentroid] = []
     for cluster_id in sorted(int(c) for c in np.unique(labels)):
         mask = labels == cluster_id
         size = int(mask.sum())
-        subset = labeled.filter(pl.col("__skyulf_cluster__") == cluster_id).drop(
-            "__skyulf_cluster__"
-        )
+        subset = X_numeric.filter(mask)
         center, _ = _column_stats(subset)
         center_rounded = {k: round(v, 6) for k, v in center.items()}
         centroids.append(

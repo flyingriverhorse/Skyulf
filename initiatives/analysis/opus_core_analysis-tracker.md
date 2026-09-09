@@ -128,6 +128,7 @@ uses, so a fixed finding stays where it was filed.
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
+| OC-03 | 🟠 | Systemic `infer_output_schema` int→float misprediction across 22 nodes — one sweep + parametrized test (predicted schema == actual schema for every node) | ~1 day | ✅ done - runtime dtype parity covered by parametrized tests; completed row moved from the live queue on 2026-09-09. |
 | OC-77 | 🟠 | `--maxfail=1` hides real failure count; `--cov-fail-under=45` vs 98.4% actual (two flag changes, `.github/workflows/skyulf-core-tests.yml:82-87`) | mechanical | ✅ fixed 2026-09-06 — floor raised 45 → 90 against a measured 96% (CI run 34032836551), and `--maxfail=1` removed here **and** in `backend-tests.yml`, which carried the same flag unfilled. See the log entry |
 | OC-01 | 🟠 | `skyulf.__version__` ambiguous: stale `0.5.8` dist-info shadows real `0.8.8` (path-order dependent) — packaging-integrity cluster — re-verified 2026-09-05: the venv holds exactly one dist-info (`skyulf_core-0.8.13`), the stale `0.5.8` is gone, and `skyulf.__version__` reports `0.8.13` | small | ✅ resolved by the 0.8.13 install refresh |
 | OC-02 | 🟠 | Dev editable install dangling; `import skyulf` fails outside repo — packaging-integrity cluster — re-verified 2026-09-05 by importing from a CWD outside the repo: resolves to `skyulf-core/skyulf/__init__.py` at `0.8.13` | small | ✅ resolved by the 0.8.13 install refresh |
@@ -195,6 +196,8 @@ uses, so a fixed finding stays where it was filed.
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
+| OC-178 | 🟡 | `HashEncoder` hashes the same missing value into different buckets across Polars, pandas object, and pandas nullable string inputs, even with one shared fitted artifact (`preprocessing/encoding/hash.py:45,76`) | small | ✅ already fixed - verified 2026-09-09: one shared hash artifact gives identical missing-value buckets across pandas object/string and Polars. |
+| OC-171 | 🟡 | Pandas `SimpleImputer` silently excludes explicitly selected constant/binary numeric columns for mean/median, leaving missing values unfilled; Polars honors the selection (`preprocessing/imputation/simple.py:173-177`) | small | ✅ already fixed - verified 2026-09-09: explicit constant/binary mean and median imputation fills missing values in both engines. |
 | OC-179 | ð¡ | `DummyEncoder(drop_first=True)` retains a single-category indicator on Polars but removes it on pandas, changing feature width across engines (`preprocessing/encoding/dummy.py:33`) | small | â fixed 2026-09-08 |
 | OC-180 | ð¡ | Pandas `TextCleaning(normalize_slash_dates)` crashes on `pd.NA` in a nullable string column; equivalent Polars input preserves the missing value (`preprocessing/cleaning/text.py:35-37,116`) | small | â fixed 2026-09-08 |
 | OC-181 | ð¡ | `ValueReplacement` coerces every unrecognized boolean mapping key to `False`: mapping `{"banana": true}` changes `[true,false]` to `[true,true]` on both engines (`preprocessing/cleaning/value_replacement.py:31-32`) | small | â fixed 2026-09-08 |
@@ -205,6 +208,7 @@ uses, so a fixed finding stays where it was filed.
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
+| OC-211 | 🟡 | Pandas datetime features depend on prediction-batch composition: prepending a different valid date format makes the original rows' year/month/day missing in both `FeatureGeneration.datetime_extract` and `DateFeatures` (`feature_generation/_pandas_ops.py:179`, `time_series/date_features.py:64`) | small | ✅ already fixed - verified 2026-09-09: mixed-format batch companions preserve calendar features across both engines and aliases. |
 | OC-212 | 🟡 | Similarity generation silently omits its output column for duplicate pandas indexes: label-based `.at[i]` returns Series to a scalar helper and the operation exception is swallowed (`feature_generation/_common.py:137-139`) | small | ✅ fixed 2026-09-08 — similarity now reads and assigns by row position, preserving duplicate indexes and individual scores; see the Log entry. |
 | OC-25 | 🟠 | RFE "K" chosen in UI ignored by backend (`feature_selection/_common.py:236-240`) | small | ✅ fixed 2026-09-05 — closes OC-143 too |
 | OC-28 | 🟠 | Box-Cox transform failures silently return untransformed data (`transformations/power.py:97-104`) | small | ✅ fixed 2026-09-06 — the silent path was the `valid_cols` filter, not the `except` (which has logged since the node was created); both engines now share `_fitted_columns_present`, which names the fitted columns the frame lacks, and fail-open is kept by decision. See the log entry |
@@ -213,12 +217,19 @@ uses, so a fixed finding stays where it was filed.
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
+| OC-167 | 🟡 | Ambiguous string boundaries in artifact serialization give different fitted label encoders identical pipeline fingerprints, despite encoding the same input as 0 vs −1 (`pipeline/seal.py:52,64`) — distinct from OC-62's pointer instability | small | ✅ fixed 2026-09-09 - typed length framing and canonical unordered entries distinguish different fitted values deterministically. |
+| OC-63 | 🟠 | `artifact_digest` raises `RecursionError` instead of the documented `TypeError` on cyclic graphs (`pipeline/seal.py`) | small | ✅ fixed 2026-09-09 - active-path cycle detection raises TypeError and still accepts shared acyclic state. |
+| OC-170 | 🟡 | `validate_leakage_safety()` rejects registered stateless nodes before the split as unknown/data-dependent, including `TextCleaning`, `DateFeatures`, `Casting`, and `feature_target_split` (`leakage.py:140-156`) | small | ✅ already fixed - verified 2026-09-09: all four filed stateless nodes are accepted before a split. |
 | OC-208 | 🟡 | Failed pipeline refit leaves new preprocessing attached to the previous model (`pipeline/_pipeline.py`, `modeling/base.py`) | half day | ✅ fixed 2026-09-09 — any failed fit clears partial fitted state and blocks prediction until a successful refit. |
+| OC-161 | 🟡 | Polars clustering evaluation overwrites a numeric feature named `__skyulf_cluster__`, then fails while computing centroids (`modeling/_evaluation/clustering.py`) | small | ✅ fixed 2026-09-09 — centroid subsets use positional label masks without creating a helper column. |
+| OC-160 | 🟡 | DropMissingRows and Deduplicate collide with valid `__idx__` feature or target columns (`preprocessing/drop_and_missing/`) | small | ✅ fixed 2026-09-09 — collision-free X row-position names and direct target gathering preserve user columns and positional alignment. |
+| OC-162 | 🟡 | Polars time-series CV overwrites feature columns with temporary or real target names (`modeling/cross_validation.py`) | small | ✅ fixed 2026-09-09 — a shared positional permutation sorts X/y separately without materializing target columns. |
 
 ### Remaining — outliers / casting / binning / timeseries / geo
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
+| OC-174 | 🟡 | Polars `DateFeatures` crashes on an entirely invalid string date column despite `strict=False`; pandas produces nullable calendar features (`preprocessing/time_series/date_features.py:102`) | small | ✅ already fixed - verified 2026-09-09: wholly invalid date strings produce nullable calendar features in both engines. |
 | OC-165 | 🟡 | Pandas `LagFeatures(drop_na=True)` removes X rows but leaves tuple y untouched — 3 rows become 2 features / 3 targets even with a unique index (`preprocessing/time_series/lag.py:85-87`) | small | ✅ fixed 2026-09-06 — with OC-163; `drop_na` now filters y through the same positional keep-mask as X, duplicate-index case included. See the log entry |
 | OC-166 | 🟡 | Polars `IQR`, `ZScore`, and `ManualBounds` filter X but leave NumPy y untouched — 5 rows become 4 features / 5 targets; Polars Series y works (`preprocessing/outliers/_common.py:9-15`) | small | ✅ fixed 2026-09-06 — with OC-163, and **broader than filed**: a fourth copy of the same silent pass-through sat inline in `EllipticEnvelope`, and list targets failed too (crashing on pandas, no-opping on polars). See the log entry |
 
@@ -228,6 +239,7 @@ uses, so a fixed finding stays where it was filed.
 |---|---|---|---|---|
 | OC-168 | 🟡 | Pipeline refitting retains decision thresholds from the previous model (`pipeline/_pipeline.py`) | small | ✅ fixed 2026-09-09 — fitting clears thresholds and requires fresh optimization for both unchanged and new class labels. |
 | OC-209 | 🟡 | Time-series tuning drops its time column only from training, corrupting explicit validation concatenation (`modeling/_tuning/engine.py`, `_tuning/splitters.py`) | half day | ✅ fixed 2026-09-09 — named and array validation payloads mirror training's removed time columns without reordering held-out rows. |
+| OC-194 | 🟠 | Pandas time-series CV interprets missing-date argsort sentinels as row positions, duplicating/dropping observations (`modeling/cross_validation.py`) | small | ✅ fixed 2026-09-09 — stable positional sorting keeps every row once, with missing dates last and X/y pairing intact. |
 | OC-210 | 🟡 | Public `SkyulfPipeline.optimize_thresholds()` rejects hyperparameter-tuned classifiers because it reads `classes_` from the `(fitted_model, TuningResult)` tuple instead of the underlying classifier (`pipeline/_pipeline.py:511`) | small | ✅ fixed 2026-09-08 — threshold search and thresholded prediction resolve classes from the fitted model through the existing unwrap helper; see the Log entry. |
 | OC-200 | 🟠 | Halving search accepts an all-NaN score set as a successful best result and refits a model; grid search correctly fails on identical folds (`modeling/_tuning/strategies/runner.py:110-127`) | small | ✅ fixed 2026-09-06 — with OC-205: a search left with no fully-scored candidate now fails with grid's "All trials failed" instead of returning `nan` and refitting. See the log entry |
 | OC-205 | 🟠 | Grid/random tuning discards failed folds from each candidate's average, allowing a partially failed candidate to win with an apparently valid score and no failure count in the result (`modeling/_tuning/grid_random.py:91-92`) | small | ✅ fixed 2026-09-06 — with OC-200: a candidate is eligible only if every fold scored, and a partly-failed one is logged as disqualified. See the log entry |
@@ -305,8 +317,8 @@ parameter search. The source's comment already promises this behavior.
 
 ### 2026-09-05 — OC-163–168 filed: supplemental core review, six additional reproduced bugs
 
-Filed with 6 findings; only OC-167 remains open — its block and this
-batch's context are in [the live queue](opus_core_analysis-open_queue.md).
+All six findings are now closed. OC-164 and OC-168 are recorded in their
+respective fix logs; OC-167 closed with canonical artifact framing on 2026-09-09.
 
 **OC-163 — time-series sort loses X/y alignment (🟠).** With tuple input `X = {time: [3,1,2], value: [30,10,20]}` and `y = [300,100,200]`, fit/apply `LagFeatures` with `columns=["value"], lags=[1], sort_by="time"`, or `RollingAggregate` with `columns=["value"], window=2, sort_by="time"`. Both pandas and Polars return times `[1,2,3]` but targets `[300,100,200]`; the correct targets are `[100,200,300]`. The engine branches sort only X and return the original y. Downstream conversion to NumPy consumes these mismatched rows positionally, silently corrupting supervised training. Locations: `skyulf-core/skyulf/preprocessing/time_series/lag.py:45,81` and `rolling.py:63,119`. **Fix/verification target:** apply the same positional permutation to X and y; cover both nodes, both engines, and sorting combined with lag row removal. This is separate from OC-162's reserved-column collision in cross-validation and OC-165's filtering-only failure.
 
@@ -317,6 +329,135 @@ batch's context are in [the live queue](opus_core_analysis-open_queue.md).
 ---
 
 ## Log
+
+### 2026-09-09 — parallel core fixes: final verification
+
+Closed OC-160/161/162/194/167/63 with 158 new regression cases across row
+filtering, clustering, time-series CV/tuning and artifact seals. Three independent
+implementers and primary/peer review covered separate file groups. Review-found
+pandas target truncation, deep recursion and structured-array hashing issues were
+fixed and rechecked before completion.
+
+The final combined core suite passed **6,553 tests**, with **72 skipped** and
+**3 snapshots passed**. Backend fold-replay, split-identity, cross-validation and
+modeling integration checks passed **169 tests**. Repository-wide Ruff, scoped
+Ty, formatting for all ten changed Python files and `git diff --check` passed.
+Tests used writable temporary directories and offline model-cache settings.
+
+The live queue now has **69 open** and **4 parked** rows. In addition to the six
+new fixes, five previously fixed findings were verified and archived, and OC-03's
+already-completed row was moved out of the queue. All twelve rows appear exactly
+once in the archive; each new fix has a short v0.8.18 release note.
+
+### 2026-09-09 - OC-167/63 fixed: unambiguous semantic artifact seals
+
+OC-167 reproduced identical digests for object arrays ['a', 'bstr:c'] and
+['astr:b', 'c'], plus analogous list/tuple/bytes/dict boundaries. Public fitted
+LabelEncoder pipelines shared a fingerprint while transforming 'a' to 0 versus
+-1. Typed byte lengths, container counts and canonical child digests now preserve
+value boundaries. Unordered values no longer depend on repr/hash-seed ordering,
+and dataclass identity includes its defining module.
+
+OC-63 reproduced RecursionError on cyclic list, dict, tuple, object, dataclass,
+object-array and fitted-estimator state. Active recursion-path detection now
+raises TypeError and removes each visited identity on exit, so shared acyclic
+values still hash like independent equal copies.
+
+Primary review also identified pointer-byte hashing for structured arrays with
+object fields. Three regressions failed before an explicit unsupported-dtype
+guard; these arrays now raise TypeError. Plain object arrays still hash values,
+and numeric structured arrays and fitted random-forest trees remain supported.
+
+Peer review also caught reduced recursion capacity and numeric record-padding
+bytes entering hashes. The recursive feeder now keeps one frame per list level;
+600-level acyclic data succeeds, cycles raise TypeError, and excessive depth
+fails with an explicit TypeError explanation. Numeric structured arrays now
+traverse field values, retaining dtype/shape while ignoring direct, nested and
+subarray padding.
+
+The original 24 cases produced 17 failures and seven passing controls. The
+object-containing structured-array follow-up produced three failures and one
+passing numeric control; all 28 then passed on primary rerun. Seven depth/padding
+cases reproduced six failures and one control before the final adjustment.
+The final 35-case seal suite and broader pipeline/serialization checks passed
+89 tests. Cross-process checks use distinct PYTHONHASHSEED values. Scoped Ruff,
+formatting and Ty checks passed; independent re-review confirmed the corrections.
+
+Compatibility: recompute stored artifact digests and fitted pipeline fingerprints
+after upgrading to the corrected encoding. Unfitted topology-only fingerprints
+are unchanged; object-containing structured NumPy arrays now fail explicitly.
+
+### 2026-09-09 — OC-162/194 fixed: chronological sorting preserves paired observations
+
+Public CV and tuner regressions reproduced two independent failures: Polars
+replaced/dropped `__cv_y__` or a feature matching y's name; pandas used missing-date
+`argsort()` sentinels as negative row positions, duplicating and losing rows.
+Both engines now derive a stable positional permutation and apply it separately
+to X/y. Missing dates sort last, ties preserve input order, and only the time
+feature is dropped. Both engines reject unequal X/y lengths; pandas also accepts
+list/tuple targets without trying to index a list with a NumPy permutation.
+
+All initial 32 regression cases failed before the change. Peer review caught
+silent truncation of extra pandas list targets; both engines now validate lengths
+before sorting. Sixteen public CV mismatch cases cover short/long list/tuple
+targets across all engines/wrappers (eight pandas failures and eight Polars
+controls before the follow-up). All 48 integrity cases now pass, covering public
+CV folds and final tuner refit, target-name collisions, duplicate dates/index
+labels and entirely missing dates. The final focused CV/integrity/OC-209 holdout
+suites passed 104 tests; earlier broader CV/tuning checks passed 253. Scoped Ruff,
+formatting and Ty checks passed. Peer re-review found no remaining material issue.
+
+### 2026-09-09 — OC-160 fixed: row filtering preserves user column names
+
+Public DropMissingRows/Deduplicate fit/apply calls reproduced `DuplicateError`
+when X or a multi-output y contained `__idx__`. X now receives a collision-free
+position column, while DataFrame targets are gathered directly by retained
+positions. The real `__idx__` feature still participates in missingness checks
+and explicit deduplication keys; helper columns never reach the output.
+
+The new 69-case suite covers pandas duplicate-index controls, native/wrapped
+Polars, missingness policies, dedup keep modes, empty outputs, subset keys,
+successive helper-name collisions and multi-output targets. Before the fix,
+46 cases failed and 23 pandas controls passed. All 69 passed on independent
+rerun; the implementer's broader checks passed 444 tests with two skips.
+Scoped Ruff, formatting and Ty checks passed; primary review found no issue.
+
+### 2026-09-09 - reconcile previously fixed queue entries
+
+Fresh public-API probes confirmed five filed defects were already fixed by prior
+changes; this reconciliation adds no new implementation or release-note claims:
+
+- OC-170: TextCleaning, DateFeatures, Casting and feature_target_split all pass
+  leakage validation before TrainTestSplitter, instead of being rejected as unknown.
+- OC-171: explicit mean/median imputation fills constant [1, missing, 1] and binary
+  [0, missing, 1] inputs with 1.0 and 0.5, respectively; all eight engine/strategy
+  combinations passed instead of retaining the missing cell.
+- OC-174: DateFeatures on entirely invalid strings returns missing year/month/day
+  fields on both engines instead of raising a Polars format-inference error.
+- OC-178: one newly fitted HashEncoder artifact gives the same [7704, 4494, 2274]
+  buckets for ['a', missing, 'b'] across pandas object, pandas nullable string and
+  Polars inputs, with n_features=10007.
+- OC-211: the existing calendar batch-composition regression passes all eight
+  cases for DateFeatures and FeatureGeneration aliases across pandas/Polars.
+  Adding '04/05/2024' leaves the original ISO dates' year/month/day intact.
+
+Moved these five rows to their archive domains and removed their obsolete live
+reproductions. Also moved OC-03's already-completed row out of the open queue;
+its status was already done before this reconciliation.
+
+### 2026-09-09 — OC-161 fixed: clustering preserves internal-looking feature names
+
+Public `evaluate_clustering_model()` reproduced `ColumnNotFoundError` when a
+numeric feature was named `__skyulf_cluster__`: attaching labels replaced the
+feature, and dropping the helper removed it. Centroid calculation now filters
+the original numeric frame using the existing label mask, preserving all input
+columns and values without an intermediate helper column.
+
+Six regression cases cover pandas, native/wrapped Polars, and ordinary/noise
+cluster labels; they compare full evaluation reports and caller-owned data.
+Before the fix, four Polars cases failed and both pandas controls passed.
+After the fix, all 93 clustering evaluation/integration tests passed; scoped
+Ruff and formatting checks passed.
 
 ### 2026-09-09 — OC-208/168/209 final verification
 

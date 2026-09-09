@@ -14,6 +14,7 @@ from ._common import (
     _normalize_subset,
     _pandas_filter_y_by_kept_positions,
     _polars_filter_y_by_kept_indices,
+    _polars_with_row_positions,
 )
 
 
@@ -23,6 +24,7 @@ def _normalize_keep(keep: Any) -> Any:
 
 
 def _dedup_apply_polars(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
+    """Deduplicate real feature columns and select targets at matching positions."""
     keep = _normalize_keep(params.get("keep", "first"))
     subset = _normalize_subset(params.get("subset"), list(X.columns))
 
@@ -32,15 +34,14 @@ def _dedup_apply_polars(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, An
     if y is None:
         return X.unique(subset=subset, keep=pl_keep, maintain_order=True), None
 
-    # Resolve the dedup key columns before adding "__idx__" below: if left as
-    # None, Polars' unique(subset=None) dedups on *all* columns, which would
-    # include the always-unique "__idx__" column and defeat deduplication.
+    # Resolve real key columns before adding positions, or unique(subset=None)
+    # would include the always-unique helper and defeat deduplication.
     dedup_subset = subset if subset is not None else list(X.columns)
 
-    X_with_idx = X.with_row_index("__idx__")
+    X_with_idx, index_name = _polars_with_row_positions(X)
     X_dedup = X_with_idx.unique(subset=dedup_subset, keep=pl_keep, maintain_order=True)
-    kept = X_dedup["__idx__"]
-    return X_dedup.drop("__idx__"), _polars_filter_y_by_kept_indices(y, kept)
+    kept = X_dedup[index_name]
+    return X_dedup.drop(index_name), _polars_filter_y_by_kept_indices(y, kept)
 
 
 def _dedup_apply_pandas(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
