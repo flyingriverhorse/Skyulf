@@ -1,20 +1,24 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { ResultsPanel } from './ResultsPanel';
 import { useGraphStore } from '../../core/store/useGraphStore';
 import { useViewStore } from '../../core/store/useViewStore';
 import { initializeRegistry } from '../../core/registry/init';
+import { FOCUS_NODE_EVENT } from '../../core/hooks/useKeyboardShortcuts';
+
+const confirm = vi.hoisted(() => vi.fn());
 
 vi.mock('../shared', async () => {
   const actual = await vi.importActual<typeof import('../shared')>('../shared');
   return {
     ...actual,
-    useConfirm: () => vi.fn(),
+    useConfirm: () => confirm,
   };
 });
 
 describe('ResultsPanel', () => {
   beforeEach(() => {
+    confirm.mockReset();
     initializeRegistry();
     useGraphStore.setState({
       nodes: [],
@@ -25,7 +29,120 @@ describe('ResultsPanel', () => {
     useViewStore.setState({
       isResultsPanelExpanded: true,
       isResultsPanelDismissed: false,
+      isResultsPanelMaximized: false,
+      resultsPanelHeight: 384,
+      readOnlyOverride: 'off',
+      validationFocusRequest: null,
     });
+  });
+
+  /** Branch-filtered advisories retain their expanded state and rewire only after confirmation. */
+  it.each([false, true])('preserves branch advisories and respects confirmation %s', async accepted => {
+    useGraphStore.setState({ executionResult: {
+      pipeline_id: 'advisories', status: 'success', node_results: {}, recommendations: [], preview_data: null,
+      branch_previews: { Left: [{ value: 1 }], Right: [{ value: 2 }] },
+      branch_node_ids: { Left: ['left-consumer'], Right: ['right-consumer'] },
+      merge_warnings: [
+        { node_id: 'left-consumer', kind: 'sibling_fanin', inputs: ['a', 'b'], overlap_columns: ['value'], message: 'left warning' },
+        { node_id: 'right-consumer', kind: 'sibling_fanin', inputs: ['c', 'd'], overlap_columns: ['value'], message: 'right warning' },
+      ],
+    } });
+    const originalChain = useGraphStore.getState().chainSiblings;
+    const chain = vi.fn().mockReturnValue(true);
+    useGraphStore.setState({ chainSiblings: chain });
+    confirm.mockResolvedValue(accepted);
+    try {
+      render(<ResultsPanel />);
+      fireEvent.click(screen.getByRole('tab', { name: 'Steps 1' }));
+      expect(screen.getByText('left-consumer')).toBeVisible();
+      expect(screen.queryByText('right-consumer')).not.toBeInTheDocument();
+      fireEvent.click(screen.getByRole('tab', { name: 'Issues 1' }));
+      fireEvent.click(screen.getByRole('button', { name: /1 merge advisory/ }));
+      fireEvent.click(screen.getByRole('tab', { name: 'Data' }));
+      fireEvent.click(screen.getByRole('button', { name: /Right/ }));
+      fireEvent.click(screen.getByRole('tab', { name: 'Issues 1' }));
+      expect(screen.getByRole('button', { name: /1 merge advisory/ })).toHaveAttribute('aria-expanded', 'true');
+      expect(screen.queryByText('left-consumer')).not.toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: 'Chain instead' }));
+      await waitFor(() => expect(confirm).toHaveBeenCalledWith(expect.objectContaining({ title: 'Rewire as a linear chain?', confirmLabel: 'Rewire' })));
+      if (accepted) expect(chain).toHaveBeenCalledWith('right-consumer', ['c', 'd']);
+      else expect(chain).not.toHaveBeenCalled();
+    } finally {
+      useGraphStore.setState({ chainSiblings: originalChain });
+    }
+  });
+
+  /** Branch changes must preserve shared split selection and prefer train, then X, for new splits. */
+  it('retains branch order, split intent and true row totals across branches', () => {
+    useGraphStore.setState({ executionResult: {
+      pipeline_id: 'branches', status: 'success', node_results: {}, recommendations: [],
+      preview_data: null,
+      branch_previews: {
+        Zebra: { test: [{ value: 'z-test' }], train: [{ value: 'z-train' }] },
+        Alpha: { test: [{ value: 'a-test' }], train: [{ value: 'a-train' }] },
+        Other: { y: [{ value: 'o-y' }], X: [{ value: 'o-x' }] },
+      },
+      branch_preview_totals: { Zebra: { train: 120 }, Alpha: { test: 40 }, Other: { _total: 75 } },
+    } });
+    render(<ResultsPanel />);
+    expect(screen.getByText('z-train')).toBeVisible();
+    expect(screen.getByText('1 of 120 rows shown · 3 branches')).toBeVisible();
+    expect(screen.getAllByRole('button').filter(button => ['Zebra', 'Alpha', 'Other'].includes(button.textContent ?? '')).map(button => button.textContent)).toEqual(['Zebra', 'Alpha', 'Other']);
+    fireEvent.click(screen.getByRole('button', { name: 'test 1' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Alpha' }));
+    expect(screen.getByText('a-test')).toBeVisible();
+    expect(screen.getByText('1 of 40 rows shown · 3 branches')).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: 'Other' }));
+    expect(screen.getByText('o-x')).toBeVisible();
+    expect(screen.getByText('1 of 75 rows shown · 3 branches')).toBeVisible();
+  });
+
+  /** Choosing a pane is durable UI intent across collapse, dismissal and fresh results. */
+  it('retains the chosen pane when hidden and reopened by a new result', () => {
+    const result = { pipeline_id: 'first', status: 'success', node_results: {}, preview_data: [{ value: 1 }], recommendations: [] };
+    useGraphStore.setState({ executionResult: result });
+    render(<ResultsPanel />);
+    fireEvent.click(screen.getByRole('tab', { name: 'Steps' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Collapse results panel' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Expand results panel' }));
+    expect(screen.getByRole('tab', { name: 'Steps' })).toHaveAttribute('aria-selected', 'true');
+    fireEvent.click(screen.getByRole('button', { name: 'Close preview results' }));
+    expect(screen.queryByRole('region', { name: 'Preview results' })).not.toBeInTheDocument();
+    act(() => useGraphStore.setState({ executionResult: { ...result, pipeline_id: 'second' } }));
+    expect(screen.getByRole('tab', { name: 'Steps' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByText('No steps ran. Run a preview to see which nodes executed.')).toBeVisible();
+  });
+
+  /** Read-only issue navigation selects the node without requesting editable settings focus. */
+  it.each(['off', 'on'] as const)('routes validation focus with read-only override %s', override => {
+    useGraphStore.setState({ nodes: [{ id: 'unknown', position: { x: 0, y: 0 }, data: { definitionType: 'unknown_node' } }] });
+    useViewStore.setState({ readOnlyOverride: override });
+    const focus = vi.fn();
+    window.addEventListener(FOCUS_NODE_EVENT, focus);
+    render(<ResultsPanel />);
+    fireEvent.click(screen.getByRole('button', { name: /Unknown Node/i }));
+    window.removeEventListener(FOCUS_NODE_EVENT, focus);
+    expect(focus).toHaveBeenCalledWith(expect.objectContaining({ detail: { id: 'unknown', focusWrapper: override === 'on' } }));
+    expect(useViewStore.getState().validationFocusRequest?.nodeId).toBe(override === 'on' ? undefined : 'unknown');
+    expect(useGraphStore.getState().nodes[0]?.selected).toBe(true);
+  });
+
+  /** Home retains the preferred height even in a short viewport; other resize keys obey its cap. */
+  it('preserves keyboard resize bounds and the Home height preference', () => {
+    useGraphStore.setState({ lastRunError: 'Resize this panel' });
+    render(<ResultsPanel maxHeight={300} />);
+    const separator = screen.getByRole('separator', { name: 'Resize results panel' });
+    fireEvent.keyDown(separator, { key: 'Home' });
+    expect(useViewStore.getState().resultsPanelHeight).toBe(384);
+    expect(separator).toHaveAttribute('aria-valuenow', '300');
+    fireEvent.keyDown(separator, { key: 'ArrowDown' });
+    expect(separator).toHaveAttribute('aria-valuenow', '280');
+    fireEvent.keyDown(separator, { key: 'End' });
+    expect(separator).toHaveAttribute('aria-valuenow', '300');
+    fireEvent.click(screen.getByRole('button', { name: 'Maximize results panel' }));
+    expect(screen.queryByRole('separator')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Restore results panel' }));
+    expect(screen.getByRole('separator')).toHaveAttribute('aria-valuenow', '300');
   });
 
   it('shows validation issues and lets the user select the offending node', () => {

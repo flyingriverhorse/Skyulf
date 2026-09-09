@@ -142,3 +142,36 @@ it('clears open advice when the issue is removed and never reopens stale content
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   expect(screen.getByRole('button', { name: /Remove connection/ })).toBeInTheDocument();
 });
+
+it('measures controls along the curve and searches both directions for warning spacing', () => {
+  /** Tight bends need geometric separation, and a changed invalid path must use its new label. */
+  const lengthDescriptor = Object.getOwnPropertyDescriptor(SVGElement.prototype, 'getTotalLength');
+  const pointDescriptor = Object.getOwnPropertyDescriptor(SVGElement.prototype, 'getPointAtLength');
+  const getTotalLength = vi.fn(() => 200);
+  Object.defineProperty(SVGElement.prototype, 'getTotalLength', { configurable: true, value: getTotalLength });
+  Object.defineProperty(SVGElement.prototype, 'getPointAtLength', { configurable: true, value: (length: number) => (
+    length <= 100 ? { x: length, y: 0 } : { x: 100, y: (length - 100) / 2 }
+  ) });
+  try {
+    const { rerender } = render(<svg><LeakageEdge {...edgeProps} issues={[issue]} /></svg>);
+    expect(screen.getByRole('button', { name: /Remove connection/ }).parentElement).toHaveStyle({
+      transform: 'translate(-50%, -50%) translate(100px,0px)',
+    });
+    expect(screen.getByRole('button', { name: /Data leakage error/ }).parentElement).toHaveStyle({
+      transform: 'translate(-50%, -50%) translate(72px,0px)',
+    });
+    getTotalLength.mockReturnValue(0);
+    rerender(<svg><LeakageEdge {...edgeProps} targetX={300} issues={[issue]} /></svg>);
+    expect(screen.getByRole('button', { name: /Remove connection/ }).parentElement).toHaveStyle({
+      transform: 'translate(-50%, -50%) translate(150px,0px)',
+    });
+    expect(screen.getByRole('button', { name: /Data leakage error/ }).parentElement).toHaveStyle({
+      transform: 'translate(-50%, -50%) translate(150px,0px)',
+    });
+  } finally {
+    if (lengthDescriptor) Object.defineProperty(SVGElement.prototype, 'getTotalLength', lengthDescriptor);
+    else Reflect.deleteProperty(SVGElement.prototype, 'getTotalLength');
+    if (pointDescriptor) Object.defineProperty(SVGElement.prototype, 'getPointAtLength', pointDescriptor);
+    else Reflect.deleteProperty(SVGElement.prototype, 'getPointAtLength');
+  }
+});

@@ -350,6 +350,67 @@ respective fix logs; OC-167 closed with canonical artifact framing on 2026-09-09
 
 ## Log
 
+### 2026-09-09 - frontend complexity refactor batch 2: verified
+
+Plan: [`frontend_ccn_refactor_batch2_2026-09-09.md`](frontend_ccn_refactor_batch2_2026-09-09.md).
+Baseline `4bd55065`: 212 functions above CCN 8 across 128 of 521 files.
+The user authorized multiple Astra 6 agents for this batch; separate owners
+handle training settings, preview results, encoding and canvas edges, with
+primary-controlled branch coloring, integration and independent review.
+
+- Training settings: entry **72 -> 2**, extracted production helpers at most
+  **8**. Original 13 tests plus six new characterization cases pass both before
+  and after extraction (**19 tests**); model switches, target synchronization,
+  strategy boundaries, CV state, zero seeds and threshold options are covered.
+- Branch colors: entry **70 -> 1**, extracted production helpers at most **8**.
+  Original 10 tests plus four new characterization cases pass before and after
+  extraction (**14 tests**). A temporary differential probe compared ordered
+  edge maps for **2,000 varied graphs** against the original with no differences;
+  temporary test/reference files were removed. Path ordering, cycles, shared
+  edges, multi-handle grouping and target passthrough are preserved.
+- Preview results: entry **58 -> 8**, new presentation helpers at most **8**.
+  **21 focused tests** pass before and after extraction, covering branch/split
+  selection, totals, persistent panes/advisories, confirmation, read-only
+  navigation and keyboard resizing. Original hooks/effects remain in the entry.
+- Encoding settings: entry **58 -> 6**, extracted production helpers at most
+  **6**. **18 tests** pass against both original and final extracted code.
+  Coverage includes all seven methods, numeric zero/empty input behavior,
+  schema choices, recommendations, metrics and control state across switches.
+- Review caught and corrected an introduced encoding dispatch issue for imported
+  method names matching inherited object keys. `__proto__`, `constructor` and
+  `toString` reproduced three failures in the extraction; own-property guards
+  restore the original unsupported-method fallback. All four unknown-method
+  cases pass against the original and fixed code. No released audit issue is
+  introduced or closed by this review correction.
+
+- Canvas edges: entry **53 -> 2**, six new helpers at most **6**. Original nine
+  tests plus nine new characterizations pass before and after extraction
+  (**18 tests**), covering path thresholds, grouped split geometry, branch/merge
+  styling, hover cleanup, measured controls and stale/invalid measurement fallback.
+
+Three independent Astra 6 reviews found no further regressions. They ran
+**40**, **32** and **90** focused tests plus strict CCN 8 checks; UI literals,
+effect lifetimes, graph ordering, method dispatch, edge geometry and public
+contracts were inspected against the base. A type-only review observation was
+addressed: branch labels explicitly allow the existing nullable FlowCanvas value.
+
+Full verification passed **1,712 Vitest tests** across 149 files (**43 new
+behavior cases**), **98 Playwright tests**, full ESLint, the expanded strict
+CCN 8 gate, TypeScript/production build and all bundle budgets. Main bundle:
+**316.3 KiB gzip / 325 KiB budget**; no limits raised. Workflow/package scope,
+whitespace and removal of temporary differential/compiler outputs were checked.
+Existing diagnostic logs and circular/empty vendor-chunk warnings remain.
+The user also confirmed the frontend works after manual testing and requested
+a commit of this batch.
+
+The full report now has **204 functions** above CCN 8 in **123 of 555 files**
+(previously 212 in 128 of 521); its highest CCN fell from **72 to 52**.
+All five entries and 32 new production helper modules are enforced by CI.
+Next report-only hotspots: `EnsembleSettings.tsx` (**52**), `VariableRow.tsx`
+(**51**), `EDASidebar.tsx` (**47**), `FeatureSelectionNode.tsx` (**46**) and
+`EvaluationView.tsx` (**43**). The v0.8.18 notes were updated. No audit finding
+is closed by this maintenance; the live queue remains **57 open, 4 parked**.
+
 ### 2026-09-09 - frontend complexity refactor batch: verified
 
 Plan: [`frontend_ccn_refactor_2026-09-09.md`](frontend_ccn_refactor_2026-09-09.md).

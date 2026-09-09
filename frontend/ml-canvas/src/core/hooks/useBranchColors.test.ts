@@ -33,6 +33,71 @@ describe('generateBranchColors', () => {
 });
 
 describe('useBranchColors', () => {
+  it('orders duplicate-model labels by graph traversal and terminates through cycles', () => {
+    /** Canvas path names must follow execution order even when insertion order differs. */
+    const nodes = [
+      node('later', 'classification', { model_type: 'random_forest_classifier' }),
+      node('early', 'classification', { model_type: 'random_forest_classifier' }),
+      node('ds', 'dataset_node'), node('prep', 'encoding'), node('cycle', 'scaling'),
+    ];
+    const edges = [edge('ds-prep', 'ds', 'prep'), edge('ds-early', 'ds', 'early'),
+      edge('prep-cycle', 'prep', 'cycle'), edge('cycle-prep', 'cycle', 'prep'),
+      edge('cycle-later', 'cycle', 'later')];
+    const original = structuredClone({ nodes, edges });
+    const { result } = renderHook(() => useBranchColors(nodes, edges));
+    expect(result.current.get('ds-early')?.label).toBe('Path A · Random Forest #1');
+    expect(result.current.get('cycle-later')?.label).toBe('Path B · Random Forest #2');
+    expect(result.current.size).toBe(5);
+    expect({ nodes, edges }).toEqual(original);
+  });
+
+  it('groups split handles and assigns target passthrough to its data branch', () => {
+    /** Train/test handles and their target helper must remain one experiment. */
+    const nodes = [node('ds', 'dataset_node'), node('fts', 'feature_target_split'),
+      node('split', 'train_test_split'), node('other', 'dataset_node'),
+      node('train', 'classification', { execution_mode: 'parallel', model_type: 'logistic_regression' })];
+    const edges = [edge('ds-fts', 'ds', 'fts'), edge('fts-split', 'fts', 'split'),
+      { ...edge('train-handle', 'split', 'train'), sourceHandle: 'train' },
+      { ...edge('test-handle', 'split', 'train'), sourceHandle: 'test' },
+      { ...edge('target-helper', 'fts', 'train'), sourceHandle: 'y' },
+      edge('other-train', 'other', 'train')];
+    const { result } = renderHook(() => useBranchColors(nodes, edges));
+    expect(result.current.get('train-handle')?.label).toBe('Path A · Logistic Regression');
+    expect(result.current.get('other-train')?.label).toBe('Path B · Logistic Regression');
+    expect(result.current.get('test-handle')).toEqual({
+      color: result.current.get('train-handle')?.color, label: null, shared: false,
+    });
+    expect(result.current.get('target-helper')).toEqual(result.current.get('test-handle'));
+  });
+
+  it('keeps the first branch color on shared edges and labels only representative terminal edges', () => {
+    /** Shared preprocessing must retain a stable color without duplicate path badges. */
+    const nodes = [node('ds', 'dataset_node'), node('prep', 'encoding'),
+      node('a', 'classification'), node('b', 'regression')];
+    const edges = [edge('ds-prep', 'ds', 'prep'), edge('prep-a', 'prep', 'a'),
+      edge('prep-a-copy', 'prep', 'a'), edge('prep-b', 'prep', 'b')];
+    const { result } = renderHook(() => useBranchColors(nodes, edges));
+    expect(result.current.get('ds-prep')).toEqual({
+      color: result.current.get('prep-a')?.color, label: null, shared: true,
+    });
+    expect(result.current.get('prep-a-copy')?.label).toBeNull();
+    expect(result.current.get('prep-b')?.label).toBe('Path B · Regression');
+  });
+
+  it('uses source labels for parallel branches and friendly terminal names for preview leaves', () => {
+    /** Non-model paths still need meaningful labels aligned with their global tab order. */
+    const nodes = [node('a', 'dataset_node', { label: 'Left source' }),
+      node('b', 'dataset_node', { title: 'Right source' }),
+      node('train', 'classification', { execution_mode: 'parallel' }),
+      node('leaf', 'StandardScaler')];
+    const edges = [edge('a-train', 'a', 'train'), edge('b-train', 'b', 'train'),
+      edge('a-leaf', 'a', 'leaf')];
+    const { result } = renderHook(() => useBranchColors(nodes, edges));
+    expect(result.current.get('a-train')?.label).toBe('Path A · Left source');
+    expect(result.current.get('b-train')?.label).toBe('Path B · Right source');
+    expect(result.current.get('a-leaf')?.label).toBe('Path C · Standard Scaler');
+  });
+
   it('returns an empty map when no terminals are present', () => {
     const nodes = [node('a', 'imputation_node'), node('b', 'encoding')];
     const edges = [edge('a-b', 'a', 'b')];
