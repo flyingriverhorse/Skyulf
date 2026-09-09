@@ -40,18 +40,22 @@ def _polars_rolling_expr(col_expr: Any, agg: str, window: int, min_periods: int)
 
 def _polars_rolling_exprs(
     columns: list[str],
-    available: list[str],
+    available: dict[str, Any],
     aggs: list[str],
     window: int,
     min_periods: int,
     group_by: list[str] | None,
 ) -> list:
+    """Build rolling expressions that treat floating NaN as missing observations."""
     exprs = []
     for col in columns:
         if col not in available:
             continue
+        source = pl.col(col)
+        if available[col].is_float():
+            source = source.fill_nan(None)
         for agg in aggs:
-            expr = _polars_rolling_expr(pl.col(col), agg, window, min_periods)
+            expr = _polars_rolling_expr(source, agg, window, min_periods)
             if group_by:
                 expr = expr.over(group_by)
             exprs.append(expr.alias(_roll_name(col, agg, window)))
@@ -68,7 +72,7 @@ def _apply_polars(X: Any, _y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
     _y = select_rows_by_position(_y, sort_positions)
     exprs = _polars_rolling_exprs(
         columns,
-        list(X_out.columns),
+        X_out.schema,
         aggs,
         int(params.get("window", 3)),
         int(params.get("min_periods", 1)),

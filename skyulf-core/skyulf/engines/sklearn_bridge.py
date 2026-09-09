@@ -3,7 +3,9 @@
 from typing import Any
 
 import numpy as np
+import pandas as pd
 
+from .pandas_engine import SkyulfPandasWrapper
 from .registry import get_engine
 
 
@@ -49,4 +51,19 @@ class SklearnBridge:
 
         # Use engine to convert
         engine = get_engine(data)
-        return engine.to_numpy(data)
+        values = engine.to_numpy(data)
+        if values.dtype != object:
+            return values
+
+        native = data.to_native() if isinstance(data, SkyulfPandasWrapper) else data
+        if isinstance(native, pd.DataFrame | pd.Series):
+            dtypes = native.dtypes if isinstance(native, pd.DataFrame) else [native.dtype]
+            # Mixed nullable numeric columns can retain pd.NA in an object array.
+            # Replace only missing sentinels; floating casts would round integer categories.
+            if (
+                all(dtype.kind in "biuf" for dtype in dtypes)
+                and any(isinstance(dtype, pd.api.extensions.ExtensionDtype) for dtype in dtypes)
+                and pd.isna(values).any()
+            ):
+                return native.to_numpy(na_value=np.nan)
+        return values

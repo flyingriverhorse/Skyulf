@@ -99,7 +99,6 @@ closed that on 2026-09-07.
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
-| OC-172 | 🟡 | `StandardScaler` crashes on mixed pandas nullable numeric columns containing `pd.NA`; native sklearn and equivalent Polars input succeed (`preprocessing/scaling/standard.py:144,154`, `engines/sklearn_bridge.py:52`) | small | ⬜ open |
 | OC-18 | 🟡 | One-hot/dummy generated names can collide with existing columns (`encoding/one_hot.py:68-92`, `dummy.py:76-99`) | small | ⬜ open |
 | OC-21 | 🟡 | WOE additive smoothing not normalized over categories (`encoding/woe.py:130-145`) | small | ⬜ open |
 
@@ -149,9 +148,6 @@ closed that on 2026-09-07.
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
-| OC-173 | 🟡 | Pandas `EllipticEnvelope` reselects valid values by duplicated index labels, can feed NaN back into prediction, then fails open and retains an outlier that a unique-index control removes (`preprocessing/outliers/elliptic.py:32-43`) | small | ⬜ open |
-| OC-175 | 🟡 | Polars `RollingAggregate` propagates float NaN through windows instead of ignoring missing observations like pandas — `[1,NaN,3]` with window 2 yields mean `[1,NaN,NaN]` vs `[1,1,3]` (`preprocessing/time_series/rolling.py:48`) | small | ⬜ open |
-| OC-176 | 🟡 | Polars `LagFeatures(drop_na=True)` removes nulls but retains float NaN in source/lag columns; equivalent pandas input drops those rows (`preprocessing/time_series/lag.py:54-59`) — independent of OC-165's y desynchronization | small | ⬜ open |
 | OC-59 | 🟠 | `DatasetProfile` numeric-column coverage completely different between engines (`preprocessing/inspection/`) | small | ⬜ open |
 | OC-60 | 🟠 | `GeneralBinning`'s `missing_strategy: "label"` silent no-op on polars (`preprocessing/bucketing.py`) | small | ⬜ open |
 
@@ -160,7 +156,6 @@ closed that on 2026-09-07.
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
 | OC-187 | 🟡 | LightGBM's advertised `subsample` control and default search dimension have no effect: both calculators retain native `subsample_freq=0`, disabling row bagging (`modeling/hyperparameters/_tree.py:576`, `_registry.py:298,309`; `classification.py:754`, `regression.py:547`) | small | ⬜ open |
-| OC-204 | 🟡 | `fit_predict` drops an embedded target during training but keeps it in held-out tuple features when explicit y is also supplied, causing prediction to fail (`modeling/base.py:317-324`) | small | ⬜ open |
 | OC-206 | ⚪ | Ensemble configuration resolution shallow-copies nested base-model parameters, so fitting mutates the caller's configuration (`modeling/ensemble.py:473,484`) | small | ⬜ open |
 
 ### Remaining — frontend
@@ -275,16 +270,6 @@ configuration after removing a temporary override therefore retains it.
 **Fix/verification target:** copy the nested parameter mappings before
 normalization and pin non-mutation of caller-owned configuration.
 
-**OC-204 — tuple target extraction differs between train and test.** Executed
-`StatefulEstimator(LogisticRegressionCalculator(),LogisticRegressionApplier(),'probe')`
-with `X=DataFrame({'x':range(10),'target':[0]*5+[1]*5})`, and a `SplitDataset`
-whose train/test splits both contain `(X,X.target)`. `fit_predict(...,
-'target',{})` fits one feature, then raises
-`X has 2 features, but LogisticRegression is expecting 1 features as input`.
-Changing tuple y to `None` succeeds for both splits. **Fix/verification target:**
-use the same target-column exclusion contract for training, test and validation,
-regardless of whether y is supplied separately.
-
 **OC-195 — wrapped pandas clustering loses numeric filtering.** Executed
 `KMeansCalculator().fit(X,None,{'n_clusters':2})` for pandas
 `x=[0.,.1,.2,10.,10.1,10.2]`, `text=['name']*6`: it fits one feature.
@@ -388,61 +373,3 @@ ignores a requested regularization setting and wastes trials on equivalent
 models. **Fix/verification target:** define and expose the bagging activation
 policy for supported boosting modes, and verify a selected fraction changes
 the fitted model when bagging is enabled. No implementation change made.
-
-### 2026-09-05 — OC-170–176 filed: source review plus bounded 10-file follow-up
-
-At filing, all seven findings were reproduced against the local source, including
-working controls where applicable. OC-170/171/174 are now archived after verifying
-prior fixes; OC-172/173/175/176 remain below. The original review batch read
-every line of five remaining `outliers/` files and all five `time_series/` files;
-the coverage ledger lists the exact files and the remaining review scope.
-Existing targeted suites passed **141 tests** (one pytest-cache permission warning),
-so the additional probes expose gaps not covered by those passing suites.
-
-**OC-172 — nullable pandas scaling fails at the NumPy boundary (🟡).** Construct
-`X=pd.DataFrame({"x": pd.Series([1,None,3], dtype="Int64"), "z":
-pd.Series([2,None,4], dtype="Float64")})`. Calling
-`StandardScalerCalculator().fit(X, {"columns":["x","z"]})` raises
-`TypeError: float() argument must be a string or a real number, not 'NAType'`.
-Native sklearn `StandardScaler().fit(X)` succeeds with means `[2,3]`, as does
-the Skyulf calculator on `pl.from_pandas(X)`. The scaler's subset enters the
-generic bridge without the nullable-to-float/NaN normalization already present
-in `resolve_columns_then_to_numpy`. **Fix/verification target:** cover mixed
-nullable numeric columns with missing cells; preserve missing values as `np.nan`
-and verify other scaler callers of the same bridge. This reproduction requires
-the mixed-column case; a single nullable integer column was not found broken.
-Locations: `preprocessing/scaling/standard.py:144,154`,
-`engines/sklearn_bridge.py:52`.
-
-**OC-173 — duplicate pandas indexes disable EllipticEnvelope filtering (🟡).**
-Fit `EllipticEnvelope` on `x=[-2,-1,-0.5,0,0.5,1,2,100]` with
-`columns=["x"], contamination=0.125`. Apply to `x=[0,100,None,1]` with indexes
-`[0,0,1,1]`: all four rows survive and a warning says prediction received NaN.
-The same values with a unique index return `[0,NaN,1]`, correctly removing 100.
-`series.dropna().index` followed by `series.loc[valid_idx]` expands duplicate
-labels and reintroduces the missing row; the broad exception handler skips
-that column's filtering. **Fix/verification target:** select and scatter by row
-position, testing duplicate labels with and without missing values and X/y
-alignment. This is not OC-12's already-fixed DropMissingRows/Deduplicate target
-selection. Location: `preprocessing/outliers/elliptic.py:32-43`.
-
-**OC-175 — rolling float NaN semantics diverge across engines (🟡).** Fit/apply
-`RollingAggregate` to numeric `x=[1.0,float("nan"),3.0]` using `columns=["x"],
-window=2, min_periods=1, aggregations=["mean"]`. Pandas emits `[1,1,3]`; a native
-Polars Float64 column emits `[1,NaN,NaN]`. Sum/min/max/median show the same
-divergence in the probe. The Polars expression passes NaN directly into rolling
-operators; pandas treats it as a missing observation. **Fix/verification target:**
-normalize numeric missing-value semantics before aggregation and cover actual
-float NaN, not just Polars null, across aggregations and grouped windows.
-This concerns generated feature values, not OC-163's sorting/target alignment.
-Location: `preprocessing/time_series/rolling.py:48`.
-
-**OC-176 — lag drop-na leaves float NaN rows on Polars (🟡).** Fit/apply
-`LagFeatures` to numeric `x=[1.0,float("nan"),3.0]` with `columns=["x"], lags=[1],
-drop_na=True`, with no target and no sorting. Pandas returns zero rows because
-every row has a missing source or lag; Polars retains two rows, each with NaN
-in one of those columns. Its filtering uses only `is_null()`/`drop_nulls()`.
-**Fix/verification target:** treat NaN and null consistently for floating columns
-without calling numeric-only checks on other dtypes; cover frame-only and tuple
-input and apply any keep-mask identically to y. Unlike OC-165, this reproduces
-without a target. Location: `preprocessing/time_series/lag.py:54-59`.

@@ -11,6 +11,7 @@ from hypothesis import strategies as st
 from tests.utils.dataset_loader import load_sample_dataset
 from tests.utils.test_case_loader import TestCaseLoader
 
+from skyulf.engines.registry import EngineRegistry
 from skyulf.preprocessing.encoding.one_hot import (
     OneHotEncoderApplier,
     OneHotEncoderCalculator,
@@ -44,6 +45,42 @@ def test_fit_apply_round_trip_basic_values() -> None:
     assert out.loc[0, "color_blue"] == 0
     assert out.loc[1, "color_blue"] == 1
     assert out.loc[3, "color_green"] == 1
+
+
+@pytest.mark.parametrize("wrapped", [False, True])
+@pytest.mark.parametrize("companion_dtype", ["float64", "Float64"])
+def test_nullable_integer_categories_stay_distinct_with_missing_companion(
+    wrapped: bool, companion_dtype: str
+) -> None:
+    """Missing numeric neighbors must not round large integer category IDs or their indicators."""
+    first_id = 2**53
+    train = pd.DataFrame(
+        {
+            "category_id": pd.Series([first_id, first_id + 1] * 2, dtype="Int64"),
+            "companion": pd.Series([1.0, None, 1.0, 1.0], dtype=companion_dtype),
+        }
+    )
+    holdout = pd.DataFrame(
+        {
+            "category_id": pd.Series([first_id + 1, first_id, first_id + 2], dtype="Int64"),
+            "companion": pd.Series([1.0, 1.0, 1.0], dtype=companion_dtype),
+        }
+    )
+    original_train, original_holdout = train.copy(deep=True), holdout.copy(deep=True)
+    fit_data = EngineRegistry.wrap(train) if wrapped else train
+    apply_data = EngineRegistry.wrap(holdout) if wrapped else holdout
+    params = OneHotEncoderCalculator().fit(
+        fit_data, {"columns": ["category_id", "companion"], "drop_original": False}
+    )
+
+    out = OneHotEncoderApplier().apply(apply_data, dict(params))
+
+    category_columns = [col for col in params["feature_names"] if col.startswith("category_id_")]
+    assert len(category_columns) == 2
+    np.testing.assert_array_equal(out[category_columns].to_numpy(), [[0, 1], [1, 0], [0, 0]])
+    pd.testing.assert_frame_equal(out[list(holdout.columns)], original_holdout)
+    pd.testing.assert_frame_equal(train, original_train)
+    pd.testing.assert_frame_equal(holdout, original_holdout)
 
 
 def test_drop_original_false_keeps_source_column() -> None:

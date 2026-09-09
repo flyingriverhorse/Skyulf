@@ -300,12 +300,7 @@ class StatefulEstimator:
         validation splits of ``fit_predict``.
         """
         if isinstance(split_data, tuple):
-            X, y_split = split_data
-            X = cast(Any, X)
-            # If y is None, the target may still be in X — drop it
-            if y_split is None and hasattr(X, "columns") and target_column in X.columns:
-                X = self._drop_target_column(X, target_column)
-            return X
+            return self._extract_xy(split_data, target_column)[0]
 
         if target_column in split_data.columns:
             return self._drop_target_column(split_data, target_column)

@@ -38,9 +38,10 @@ OC-186 has since been fixed and pinned by a test (see the Log), leaving
 OC-183–185 open. Historical baseline counts remain unchanged.
 
 **Remaining-source continuation (2026-09-06):** OC-187–206 add 20 executed
-findings (5 🟠 / 14 🟡 / 1 ⚪). Five are fixed — OC-200/201/202/203/205, closed
-in one pass with OC-67 from an earlier batch (see the Log); the other 15 remain
-open. Rows and reproduction evidence for all 20 are grouped by domain — 8
+findings (5 🟠 / 14 🟡 / 1 ⚪). As of 2026-09-09, ten are fixed — OC-194–197,
+OC-200–205 — and ten remain open. OC-200/201/202/203/205 closed in one pass with
+OC-67 from an earlier batch (see the Log). Rows and reproduction evidence are
+grouped by domain — 8
 profiling, 9 modeling/tuning, 3 evaluation & explainability — with the open ones
 in the live queue and the closed ones below.
 The original core-source ledger now records
@@ -196,6 +197,7 @@ uses, so a fixed finding stays where it was filed.
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
+| OC-172 | 🟡 | `StandardScaler` crashes on mixed pandas nullable numeric columns containing `pd.NA`; native sklearn and equivalent Polars input succeed (`preprocessing/scaling/standard.py:144,154`, `engines/sklearn_bridge.py:52`) | small | ✅ fixed 2026-09-09 - nullable numeric missing sentinels become NumPy NaN without rounding observed integers; StandardScaler applies numeric arithmetic safely. |
 | OC-178 | 🟡 | `HashEncoder` hashes the same missing value into different buckets across Polars, pandas object, and pandas nullable string inputs, even with one shared fitted artifact (`preprocessing/encoding/hash.py:45,76`) | small | ✅ already fixed - verified 2026-09-09: one shared hash artifact gives identical missing-value buckets across pandas object/string and Polars. |
 | OC-171 | 🟡 | Pandas `SimpleImputer` silently excludes explicitly selected constant/binary numeric columns for mean/median, leaving missing values unfilled; Polars honors the selection (`preprocessing/imputation/simple.py:173-177`) | small | ✅ already fixed - verified 2026-09-09: explicit constant/binary mean and median imputation fills missing values in both engines. |
 | OC-179 | ð¡ | `DummyEncoder(drop_first=True)` retains a single-category indicator on Polars but removes it on pandas, changing feature width across engines (`preprocessing/encoding/dummy.py:33`) | small | â fixed 2026-09-08 |
@@ -229,7 +231,10 @@ uses, so a fixed finding stays where it was filed.
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
+| OC-176 | 🟡 | Polars `LagFeatures(drop_na=True)` removes nulls but retains float NaN in source/lag columns; equivalent pandas input drops those rows (`preprocessing/time_series/lag.py:54-59`) — independent of OC-165's y desynchronization | small | ✅ fixed 2026-09-09 - Polars lag filtering removes both null and floating NaN rows with one positional selection shared by X and y. |
+| OC-175 | 🟡 | Polars `RollingAggregate` propagates float NaN through windows instead of ignoring missing observations like pandas — `[1,NaN,3]` with window 2 yields mean `[1,NaN,NaN]` vs `[1,1,3]` (`preprocessing/time_series/rolling.py:48`) | small | ✅ fixed 2026-09-09 - floating NaN is treated as missing inside Polars rolling expressions, preserving source values and grouped-window semantics. |
 | OC-174 | 🟡 | Polars `DateFeatures` crashes on an entirely invalid string date column despite `strict=False`; pandas produces nullable calendar features (`preprocessing/time_series/date_features.py:102`) | small | ✅ already fixed - verified 2026-09-09: wholly invalid date strings produce nullable calendar features in both engines. |
+| OC-173 | 🟡 | Duplicate pandas indexes reintroduce missing rows during EllipticEnvelope prediction, disabling outlier filtering (`preprocessing/outliers/elliptic.py`) | small | ✅ fixed 2026-09-08 in `f12dde9f8`; reverified 2026-09-09 — finite-row selection and prediction scatter are positional, preserving indexes and X/y alignment. |
 | OC-165 | 🟡 | Pandas `LagFeatures(drop_na=True)` removes X rows but leaves tuple y untouched — 3 rows become 2 features / 3 targets even with a unique index (`preprocessing/time_series/lag.py:85-87`) | small | ✅ fixed 2026-09-06 — with OC-163; `drop_na` now filters y through the same positional keep-mask as X, duplicate-index case included. See the log entry |
 | OC-166 | 🟡 | Polars `IQR`, `ZScore`, and `ManualBounds` filter X but leave NumPy y untouched — 5 rows become 4 features / 5 targets; Polars Series y works (`preprocessing/outliers/_common.py:9-15`) | small | ✅ fixed 2026-09-06 — with OC-163, and **broader than filed**: a fourth copy of the same silent pass-through sat inline in `EllipticEnvelope`, and list targets failed too (crashing on pandas, no-opping on polars). See the log entry |
 
@@ -237,6 +242,7 @@ uses, so a fixed finding stays where it was filed.
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
+| OC-204 | 🟡 | `fit_predict` drops an embedded target during training but keeps it in held-out tuple features when explicit y is also supplied, causing prediction to fail (`modeling/base.py:317-324`) | small | ✅ fixed 2026-09-09 - held-out tuples use training target extraction, excluding embedded targets while preserving explicit-y precedence. |
 | OC-168 | 🟡 | Pipeline refitting retains decision thresholds from the previous model (`pipeline/_pipeline.py`) | small | ✅ fixed 2026-09-09 — fitting clears thresholds and requires fresh optimization for both unchanged and new class labels. |
 | OC-209 | 🟡 | Time-series tuning drops its time column only from training, corrupting explicit validation concatenation (`modeling/_tuning/engine.py`, `_tuning/splitters.py`) | half day | ✅ fixed 2026-09-09 — named and array validation payloads mirror training's removed time columns without reordering held-out rows. |
 | OC-194 | 🟠 | Pandas time-series CV interprets missing-date argsort sentinels as row positions, duplicating/dropping observations (`modeling/cross_validation.py`) | small | ✅ fixed 2026-09-09 — stable positional sorting keeps every row once, with missing dates last and X/y pairing intact. |
@@ -329,6 +335,98 @@ respective fix logs; OC-167 closed with canonical artifact framing on 2026-09-09
 ---
 
 ## Log
+
+### 2026-09-09 - nullable/time-series/tuple batch: final verification
+
+After committing the preceding batch as `a5e5d991` with DCO sign-off and passing
+pre-commit hooks, three parallel implementers fixed OC-172/175/176/204. Primary
+and independent peer review caught and resolved integer-category rounding and
+empty-frame lag filtering regressions. The four fixes add **173 test cases**.
+OC-173 was separately verified as already fixed and archived without a duplicate
+implementation or release note.
+
+The final complete core run passed **6,726 tests**, with **72 skipped**, **421
+warnings** and **3 snapshots passed**, using offline model-cache settings and a
+writable temporary directory. Backend scaling, numeric guards, fold replay,
+split-identity and modeling checks passed **109 tests** (two deprecation warnings).
+Repository-wide Ruff, the CI Ty scope, formatting for all ten changed Python
+files and `git diff --check` passed. This batch is verified in the working tree;
+it is not part of the preceding commit.
+
+The live queue now contains **64 open** and **4 parked** rows. All five closed
+rows appear exactly once in the archive and none remains in the live table or
+its reproduction blocks. Each new fix has a short v0.8.18 entry; the parked
+OC-71/72/73/185 rows retain their status.
+
+### 2026-09-09 - OC-172 fixed: nullable numeric scaling and exact category values
+
+Mixed pandas Int64/Float64 columns `[1, missing, 3]` / `[2, missing, 4]`
+previously raised an NAType conversion error in StandardScaler fit. The shared
+sklearn bridge now normalizes nullable numeric missing sentinels to NumPy NaN
+without casting observed values to float. StandardScaler's pandas apply performs
+its own floating arithmetic; disabling both scaling flags preserves input dtypes.
+
+The first regression run reported **11 failures and 7 passing controls**.
+Follow-up tests pinned clean nullable holdouts, disabled flags and exact integer
+targets. Peer review then caught a draft float cast collapsing category IDs
+`2**53` and `2**53 + 1` when another numeric column contained NaN. Four real
+OneHotEncoder fit/apply cases failed before removing that cast and now pass,
+covering native/wrapped pandas and native/nullable missing companions. They assert
+held-out indicator values, unknown categories and caller-input immutability.
+
+The final related bridge, scaling, parity, modeling-wrapper, encoding and
+imputation run passed **313 tests** (12 existing warnings). This change adds
+**35 cases**; mixed categorical inputs and nonmissing integer labels remain
+unchanged. The OC-170-176 source-review batch is now fully archived; its coverage
+ledger and the per-finding fix logs retain the review and reproduction evidence.
+
+### 2026-09-09 - OC-204 fixed: held-out tuple feature extraction
+
+The public `StatefulEstimator.fit_predict` probe fitted one feature from
+`(X, X.target)` but passed two features to prediction when X also contained the
+target column. Held-out tuple features now go through the same extraction helper
+as training: embedded targets are excluded even with an explicit y, and the
+explicit target retains precedence. Caller inputs and row order are unchanged.
+
+The new suite first reported **16 failures and 16 passing controls**, then all
+**32 cases passed**. Real plain/tuned classifiers cover independent test and
+validation splits, pandas/Polars native/wrapped frames, conflicting explicit and
+embedded labels, duplicate indexes and input immutability. Related modeling and
+tuning tests passed **107 tests**. Independent peer review found no material issue.
+
+### 2026-09-09 - OC-175/176 fixed: missing values in time-series features
+
+The original rolling probe `[1, NaN, 3]` now gives mean `[1, 1, 3]` for window 2
+and minimum count 1 on both engines. Polars floating NaN is converted to null only
+inside generated rolling expressions, so the original source column is retained.
+Grouped windows, six aggregations and minimum-count rules follow pandas.
+
+Lag filtering now removes null and floating NaN across source/generated columns,
+using the same positional selection for X and tuple targets. The original
+`[1, NaN, 3]`, lag 1, `drop_na=True` probe retains zero rows on both engines.
+Nonfloating columns use null checks only. The initial regression suite reported
+**30 failures and 74 passing controls**; all **104 cases then passed**, with
+**320 related tests passing**. Coverage includes Float32/Float64, grouped/sorted
+windows, native/wrapped engines, dates, strings and multiple target containers.
+
+Peer review caught an empty Polars frame reaching an empty horizontal mask;
+filtering now skips frames without columns. Two native/wrapped public regressions
+failed before that guard and pass afterward: **106 new cases** and **322 related
+tests** now pass. Primary review confirmed the guard preserves the prior no-op.
+
+### 2026-09-09 — OC-173 reconciled: positional EllipticEnvelope filtering already fixed
+
+Commit `f12dde9f8` replaced duplicate-label selection/scatter with finite row
+positions on 2026-09-08. The exact filed probe now passes with duplicate and
+unique indexes: fitting [-2,-1,-0.5,0,0.5,1,2,100] and applying [0,100,missing,1]
+removes 100, retains [0,missing,1], and selects targets [10,30,40]. Primary rerun
+confirmed both controls and seven existing regression tests.
+
+Independent verification also passed eight multicolumn pandas/Polars checks with
+list, NumPy, Series and DataFrame targets, plus 76 related EllipticEnvelope tests.
+Current feature values, index metadata, paired targets and caller-owned inputs
+are preserved. No new implementation or duplicate release-note claim was needed;
+the stale row and reproduction were moved from the live queue to this archive.
 
 ### 2026-09-09 — parallel core fixes: final verification
 

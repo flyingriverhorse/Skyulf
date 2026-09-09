@@ -88,12 +88,14 @@ class StandardScalerApplier(BaseApplier):
         valid = resolve_valid_columns(X, cols)
         with_mean = params.get("with_mean", True)
         with_std = params.get("with_std", True)
+        if not (with_mean or with_std):
+            return X, _y
         if _needs_fitted_artifact(valid, with_mean, mean, with_std, scale):
             return X, _y
 
         X_out = X.copy()
         col_indices = [cols.index(c) for c in valid]
-        vals = X_out[valid].values
+        vals = X_out[valid].to_numpy(dtype=np.float64, na_value=np.nan)
         if with_mean:
             vals = vals - np.array(mean)[col_indices]
         if with_std:
