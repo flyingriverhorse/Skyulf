@@ -30,9 +30,11 @@ def _slash_date_repl(match: re.Match[str]) -> str:
     return f"{year}-{int(month):02d}-{int(day):02d}"
 
 
-def _normalize_slash_dates_text(text: str | None) -> str | None:
+def _normalize_slash_dates_text(text: Any) -> Any:
     """Replace any M/D/YYYY-style substrings in `text` with ISO YYYY-MM-DD."""
-    if text is None or (isinstance(text, float) and pd.isna(text)):
+    if text is None or pd.isna(text):
+        return text
+    if not isinstance(text, str):
         return text
     return _SLASH_DATE_RE.sub(_slash_date_repl, text)
 
@@ -70,6 +72,25 @@ def _regex_polars(expr: Any, mode: str, pattern: str | None, repl: str) -> Any:
     if mode == "custom" and pattern:
         return expr.str.replace_all(pattern, repl)
     return expr
+
+
+def _validate_text_operations(operations: list[dict[str, Any]]) -> None:
+    """Reject unrecognized text operations with a precise error message.
+
+    The caller relies on every entry having a supported ``op`` key. Unsupported
+    names are a configuration error, not a no-op.
+    """
+    for op in operations:
+        if not isinstance(op, dict):
+            raise ValueError("Each TextCleaning operation must be an object with an 'op' field.")
+        name = op.get("op")
+        if not isinstance(name, str):
+            raise ValueError("Each TextCleaning operation must include a string 'op'.")
+        if name not in _TEXT_OPS_POLARS:
+            valid_ops = ", ".join(sorted(_TEXT_OPS_POLARS))
+            raise ValueError(
+                f"Unrecognized TextCleaning operation '{name}'. Valid choices: {valid_ops}"
+            )
 
 
 _TEXT_OPS_POLARS: dict[str, Callable[[Any, dict[str, Any]], Any]] = {
@@ -138,8 +159,8 @@ class TextCleaningApplier(BaseApplier):
     coerced to string first, then every entry in ``operations`` is applied in
     list order so later operations see earlier results. The pandas coercion
     masks nulls back afterwards, otherwise ``astype(str)`` would turn them into
-    the literal ``"nan"``. Unrecognised operation names are skipped rather than
-    raising, and an empty column set or empty operation list is a no-op.
+    the literal ``"nan"``. Unrecognized operation names raise ``ValueError``, and
+    an empty column set or empty operation list is a no-op.
     """
 
     @apply_method
@@ -156,14 +177,14 @@ class TextCleaningApplier(BaseApplier):
         valid = resolve_valid_columns(X, cols)
         if not valid or not operations:
             return X, _y
+        _validate_text_operations(operations)
 
         exprs = []
         for col in valid:
             expr = pl.col(col).cast(pl.String)
             for op in operations:
-                handler = _TEXT_OPS_POLARS.get(op.get("op", ""))
-                if handler is not None:
-                    expr = handler(expr, op)
+                handler = _TEXT_OPS_POLARS[op["op"]]
+                expr = handler(expr, op)
             exprs.append(expr.alias(col))
         return X.with_columns(exprs), _y
 
@@ -174,6 +195,7 @@ class TextCleaningApplier(BaseApplier):
         valid = resolve_valid_columns(X, cols)
         if not valid or not operations:
             return X, _y
+        _validate_text_operations(operations)
 
         df_out = X.copy()
         for col in valid:
@@ -182,9 +204,8 @@ class TextCleaningApplier(BaseApplier):
                 df_out[col] = df_out[col].astype(str).mask(null_mask)
             series = df_out[col]
             for op in operations:
-                handler = _TEXT_OPS_PANDAS.get(op.get("op", ""))
-                if handler is not None:
-                    series = handler(series, op)
+                handler = _TEXT_OPS_PANDAS[op["op"]]
+                series = handler(series, op)
             df_out[col] = series
         return df_out, _y
 

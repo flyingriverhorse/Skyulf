@@ -111,6 +111,7 @@ export const FeatureInteractionNode: NodeDefinition = {
                   </span>
                   <ValidationField field="degree">
                     <select
+                      aria-label="Degree"
                       className="w-full px-2 py-1.5 text-xs border rounded bg-background"
                       value={config.degree || 2}
                       onChange={(e) => {

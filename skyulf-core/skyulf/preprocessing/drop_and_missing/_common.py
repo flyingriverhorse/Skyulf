@@ -2,11 +2,12 @@
 
 from typing import Any
 
+import numpy as np
 import polars as pl
 
 
 def _polars_filter_y_by_kept_indices(y: Any, kept_indices: Any) -> Any:
-    """Filter ``y`` (Polars Series / DataFrame) to the rows kept in ``X``.
+    """Filter native Polars or engine-neutral targets to the rows kept in ``X``.
 
     ``kept_indices`` is a Polars Series of integer row indices that survived
     a filter on ``X``. Used by Deduplicate + DropMissingRows so dropping rows
@@ -22,14 +23,18 @@ def _polars_filter_y_by_kept_indices(y: Any, kept_indices: Any) -> Any:
         )
     if isinstance(y, pl.Series):
         return y.gather(kept_indices)
+    if isinstance(y, np.ndarray):
+        return y[kept_indices.to_numpy()]
+    if isinstance(y, list):
+        return [y[position] for position in kept_indices]
     raise TypeError(
         f"Cannot filter y of type {type(y).__name__} by kept row indices on the Polars "
-        "engine; expected a polars DataFrame or Series (or None)."
+        "engine; expected a polars DataFrame or Series, numpy array, list, or None."
     )
 
 
 def _pandas_filter_y_by_kept_positions(y: Any, kept_positions: Any) -> Any:
-    """Select rows of ``y`` (pandas Series / DataFrame) by positional index.
+    """Select rows of native pandas or engine-neutral targets by positional index.
 
     Positional (``.iloc``) selection is required because label-based ``.loc``
     selection returns every row matching a duplicated index label, which
@@ -37,6 +42,10 @@ def _pandas_filter_y_by_kept_positions(y: Any, kept_positions: Any) -> Any:
     """
     if y is None:
         return None
+    if isinstance(y, np.ndarray):
+        return y[kept_positions]
+    if isinstance(y, list):
+        return [y[position] for position in kept_positions]
     return y.iloc[kept_positions]
 
 

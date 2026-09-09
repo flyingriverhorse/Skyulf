@@ -1,0 +1,19 @@
+flowchart LR
+    raw["Raw DataFrame"]:::plain
+    split["TrainTestSplitter"]:::boundary
+    train["Training rows"]:::safe
+    test["Held-out rows"]:::plain
+    fit["Fit preprocessing<br/>and model<br/>on training rows"]:::safe
+    apply["Apply fitted<br/>preprocessing<br/>without refitting"]:::plain
+    score["Evaluate<br/>held-out rows"]:::safe
+    raw --> split
+    split --> train
+    split --> test
+    train --> fit
+    test --> apply
+    fit -.->|"fitted parameters"| apply
+    apply --> score
+    classDef plain fill:#ffffff,stroke:#64748b,color:#172b3a
+    classDef boundary fill:#e8f0fb,stroke:#245997,color:#172b3a
+    classDef safe fill:#e9f5ee,stroke:#287447,color:#172b3a
+    classDef risk fill:#fff0e8,stroke:#aa4b23,color:#172b3a

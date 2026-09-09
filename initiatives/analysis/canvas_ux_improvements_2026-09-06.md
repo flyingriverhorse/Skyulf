@@ -1,7 +1,7 @@
 # Canvas UX improvement backlog
 
 Date: 2026-09-06
-Status: CUX-01, CUX-02, CUX-04, CUX-05, and CUX-06 complete; CUX-03 and CUX-08 in progress. Completed portions are recorded below.
+Status: CUX-01 through CUX-09 complete at the verified scope below.
 
 ## Purpose and review scope
 
@@ -28,13 +28,13 @@ before implementation because other work may have changed these components.
 |---|---|---|---|
 | CUX-01 | High | Preserve canvas space with resizable panels | Complete at checked desktop/laptop sizes |
 | CUX-02 | High | Guide node connections and adding the next step | Complete; drag guidance and keyboard next-step picker verified |
-| CUX-03 | High | Clearly distinguish previewing data from training | In progress; visible action labels and training guidance complete |
+| CUX-03 | High | Clearly distinguish previewing data from training | Complete; experiment review, visible blockers, and scoped run feedback verified |
 | CUX-04 | Medium | Improve component discovery | Complete; shared task search, readable results, and collapsible preprocessing groups verified |
 | CUX-05 | Medium | Navigate from validation issues to the exact setting | Complete; field navigation and general-issue fallback verified |
 | CUX-06 | Medium | Reduce connection and settings visual noise | Complete; contextual connection controls and node details verified |
-| CUX-07 | Medium | Inspect a selected node's input and output | Open |
-| CUX-08 | High, alongside related work | Fix keyboard and accessible-name gaps | In progress; panel labels, sidebar keyboard access, and primary field labels complete |
-| CUX-09 | Medium | Make possible PII findings easy to review without exposing raw values | Open; core accessors are planned, frontend UX is not implemented |
+| CUX-07 | Medium | Inspect a selected node's input and output | Complete; all-node preview capture, Input / Output tabs and stale-result detection verified |
+| CUX-08 | High, alongside related work | Fix keyboard and accessible-name gaps | Complete; remaining settings labels, keyboard controls, and focus transitions verified |
+| CUX-09 | Medium | Make possible PII findings easy to review without exposing raw values | Complete; dedicated profiling review panel verified, core accessors already available |
 
 ### CUX-01 — Preserve canvas space
 
@@ -159,15 +159,33 @@ and explain the action below the button. Missing upstream dataset selection
 has a visible explanation associated with the disabled button. The help guide
 and shortcut overlay use the same preview label.
 
+**Further progress (2026-09-07):** Run all opens a model list showing each
+node's name, configured algorithm, and Train/Tune mode. The review explains
+parallel experiment creation, provides visible validation reasons, supports
+cancel/focus restoration, and closes in read-only mode. Preview loading stays
+on its button; blocked/failed feedback and experiment status appear in the
+navbar notification center with direct results/history actions. Successful
+preview completion adds no persistent banner.
+Training, tuning, ensemble, and segmentation retain submission feedback by
+node ID across settings remounts and prevent duplicate pending requests.
+Their compact action footers stay visible inside the settings scroll area;
+explanations expand at its end, respecting reduced motion and keyboard focus.
+Submitted job IDs drive queued/running/completed/failed/cancelled summaries;
+missing statuses remain explicit. Run all groups submitted jobs across task
+and search filters, resolves jobs outside the first history page, and retains
+retry jobs. Individual node actions keep the normal model-specific history
+tab. API payload conversion and existing submission handlers remain
+the execution path; both single and parallel submissions start monitoring.
+
 **Acceptance criteria:**
 
 - [x] Preview and training have distinct visible labels at checked desktop/laptop widths (1440px and 1100px).
 - [x] Selected-model training identifies its model and explains how to enable the action when no dataset is connected.
-- [ ] Training identifies the model or set of experiments it will run.
-- [ ] Blocked actions expose actionable reasons without requiring a tooltip.
+- [x] Training identifies the model or set of experiments it will run.
+- [x] Blocked actions expose actionable reasons without requiring a tooltip.
 - [x] Keyboard shortcuts use the same action names and behavior.
-- [ ] Loading, queued, running, and completed states identify the relevant action.
-- [ ] Existing run handlers remain the source of execution behavior.
+- [x] Loading, queued, running, and completed states identify the relevant action.
+- [x] Existing run handlers remain the source of execution behavior.
 
 **Starting points:** `src/components/layout/Toolbar.tsx`,
 `src/components/layout/toolbar/_hooks/useRunControls.ts`,
@@ -296,6 +314,42 @@ stays outside graph objects so connected nodes remain copyable and pasteable.
 
 ### CUX-07 — Inspect input and output for the selected node
 
+**Inventory (2026-09-08):** Existing previews provide terminal samples and
+totals, per-node metrics/summaries, and separate predicted schemas. They do not
+provide each selected node's paired input/output or a distinct preview receipt
+with captured settings for stale-result detection. Temporary preview artifacts
+are removed after the request. Shared-node results also need branch identity.
+The required extension and file map are recorded in
+`canvas_node_inspection_payloads_2026-09-08.md`.
+
+**Progress (2026-09-08):** Selected-node settings now expose Settings / Input /
+Output tabs. Toolbar Preview data captures every node's actual resolved input
+before transformation and output immediately after execution. It is the single
+execution action; Input / Output has no Refresh button. Changing selection reuses
+the same run without another request or changing global Results. Data path choices
+are scoped to the selected node's upstream history; repeated captures caused only
+by downstream models are grouped. A single shared pending request prevents
+duplicate runs, and a captured configuration marks results stale after parameter,
+connection or dataset edits. Moving, selecting, renaming and expanding settings
+do not invalidate measured data. Each captured preview has a distinct receipt;
+branches and train/test/validation or X/y tables remain separate, with branch
+and compatible split selection preserved while switching Input / Output. A node
+with one result has no data-path selector; distinct paths or measurements retain
+separate choices, even when different paths have matching sample rows.
+
+Samples are capped at 50 rows and 100 columns per table, six tables per side,
+500 characters per captured display value and 256 KiB of sample-row JSON per
+side, with an 8 MiB total sample-row budget shared across nodes and branches.
+Counts describe the data processed by preview (loaders sample up to 1,000
+source rows). Empty tables retain their measured schema. Predicted output schema
+is labeled separately. Source inputs, unsupported or skipped nodes, capture
+failures and request failures have explicit states. Training remains excluded.
+Paired tables show measured row/column changes and complete-schema added/removed
+columns; incompatible or truncated schemas do not produce invented counts.
+Settings remain mounted across tab switches, validation navigation reveals them,
+and pending refresh preserves keyboard focus. Implementation and verification:
+`canvas_node_inspection_implementation_2026-09-08.md`.
+
 **Opportunity:** Existing schema badges, data previews, node summaries, and
 inspection tools provide parts of the answer to “What did this step do?” A
 single selected-node view could make those answers easier to find.
@@ -308,12 +362,12 @@ reports those measurements.
 
 **Acceptance criteria:**
 
-- [ ] Users can inspect the selected node without adding a separate preview node for each step.
-- [ ] Predicted schemas are clearly distinguished from measured execution results.
-- [ ] Results identify their run and indicate when settings have changed since that run.
-- [ ] Samples are bounded; loading, unavailable, and failed states are explicit.
-- [ ] Multi-input and split nodes identify the branch/split being inspected.
-- [ ] Summaries use available measurements and never invent transformation counts.
+- [x] Users can inspect the selected node without adding a separate preview node for each step.
+- [x] Predicted schemas are clearly distinguished from measured execution results.
+- [x] Results identify their run and indicate when settings have changed since that run.
+- [x] Samples are bounded; loading, unavailable, and failed states are explicit.
+- [x] Multi-input and split nodes identify the branch/split being inspected.
+- [x] Summaries use available measurements and never invent transformation counts.
 
 **Starting points:** `src/components/shared/NodeInspectorModal.tsx`,
 `src/modules/nodes/inspection/DataPreviewNode.ts`,
@@ -348,19 +402,35 @@ does not also toggle collapse. These controls have visible focus rings; the
 title button uses the theme foreground color. A targeted axe scan of the
 dark results panel with an error and reduced motion passes.
 
+**Completion (2026-09-08):** Remaining preprocessing, split, modeling, ensemble,
+and dynamic hyperparameter controls now have explicit accessible labels.
+Repeated editors use contextual field/action names, and checkbox/datalist IDs
+are unique per instance. Shared column pickers expose their purpose and search
+field; toggles announce selected/expanded state. Feature Generation and
+Transformation headers use separate native buttons so keyboard use of their
+fields or delete actions does not collapse the editor.
+Dataset upload supports native keyboard file browsing and returns focus to its
+opener on cancellation or the dataset selector on completion. Closing settings
+or results focuses the named canvas without moving its viewport. Settings
+expand/close and operation headers have visible focus rings. Modeling help
+uses a collision-aware portal: Escape dismisses help before its parent dialog,
+and refocus/rehover reopens it. Parameter history traps focus and restores its
+opener. Catalog/conditional-field unit checks and focused browser checks cover
+these paths, including existing issue navigation and panel resizing.
+
 **Proposal:** Address these gaps alongside the affected interaction changes.
 Use semantic controls, associated labels, and visible keyboard focus.
 
 **Acceptance criteria:**
 
 - [x] Properties-panel expand/collapse and close buttons have accessible names and tooltips.
-- [ ] Remaining icon-only controls have meaningful accessible names.
+- [x] Remaining icon-only controls have meaningful accessible names.
 - [x] Sidebar nodes can be reached and added using the keyboard.
 - [x] Select Dataset, Model Type, and both Target Column variants have associated labels.
 - [x] Tuning and cross-validation fields have associated labels, including conditional fields.
-- [ ] Remaining form controls have programmatically associated labels.
-- [ ] Focus remains visible through panel changes and issue navigation.
-- [ ] Targeted accessibility checks cover the changed states and interactions.
+- [x] Remaining form controls have programmatically associated labels.
+- [x] Focus remains visible through panel changes and issue navigation.
+- [x] Targeted accessibility checks cover the changed states and interactions.
 
 **Starting points:** `src/components/layout/PropertiesPanel.tsx`,
 `Sidebar.tsx`, `src/modules/nodes/modeling/TrainingSettings.tsx`, and
@@ -371,7 +441,19 @@ Reference used in the review:
 
 ### CUX-09 — Review possible PII findings without exposing raw values
 
-**Observed:** Profiling can emit `PII` alerts for columns that may contain
+**Progress (2026-09-08):** The selected dataset's profiling view now includes
+PII Review. It consumes structured `type: "PII"` alerts and shows flagged
+columns, severity, the combined Email / phone category, and a static advisory
+explanation. The detector does not identify which individual pattern matched.
+Alert messages, sample data, statistics, and sidebar filter values are excluded
+from this view. Generic Dashboard alerts remain available. Existing page states
+distinguish loading, no saved profile, pending/failed analysis, retrieval errors,
+and a completed profile with no PII findings. Keyboard navigation, a scrollable
+named table, and light/dark layouts are covered by focused browser checks.
+The Python `has_pii`, `pii_columns`, and `pii_alerts` properties already exist;
+they are not serialized by `model_dump()`, so the frontend uses `alerts`.
+
+**Observed during the original review:** Profiling can emit `PII` alerts for columns that may contain
 email addresses or phone numbers, but the current consumer must inspect the
 generic alert list manually. There is no focused review surface, and the core
 API requires callers to filter `profile.alerts` themselves.
@@ -389,15 +471,15 @@ alerts view for other data-quality findings.
 
 **Acceptance criteria:**
 
-- [ ] A selected dataset has a dedicated PII tab or panel in its profiling view.
-- [ ] The view lists flagged column names, detector category, severity, and explanation.
-- [ ] Raw values and profiling samples are not rendered in the PII view.
-- [ ] Empty and loading states explain whether the dataset has no findings or
+- [x] A selected dataset has a dedicated PII tab or panel in its profiling view.
+- [x] The view lists flagged column names, detector category, severity, and explanation.
+- [x] Raw values and profiling samples are not rendered in the PII view.
+- [x] Empty and loading states explain whether the dataset has no findings or
       has not been profiled yet.
-- [ ] The view explains that findings are advisory heuristics, not compliance
+- [x] The view explains that findings are advisory heuristics, not compliance
       classifications or automatic remediation.
-- [ ] Email/phone alerts remain available in the generic alerts view.
-- [ ] The view is keyboard accessible and works in light and dark themes.
+- [x] Email/phone alerts remain available in the generic alerts view.
+- [x] The view is keyboard accessible and works in light and dark themes.
 
 **Starting points:** the dataset profile API/client types, the EDA/profile
 results view, and the existing generic alert rendering. Recheck the current
@@ -697,3 +779,97 @@ explicitly recorded above is complete; remaining interaction details need review
   and size-check passed. At the user's request the main gzip budget increased
   from 300 to 325 KB; the rebuilt entry measured 303.6 KB. Independent review
   found no blockers. The hosted Linux CI run has not been rerun here.
+- 2026-09-07: Completed CUX-03 with experiment review, action-specific preview
+  and model-run feedback, visible blocking reasons, and sticky training action
+  footers. Submission receipts and pending guards survive keyed settings
+  remounts. Scoped job history bypasses old filters, resolves submitted IDs
+  outside the first page, includes retry jobs, and refreshes active snapshots
+  after their original receipt is replaced. Review findings in those lifecycle
+  paths were reproduced with regression tests and corrected. Added 12 unit
+  tests and eight browser scenarios; all 949 frontend unit tests and all 71
+  browser tests passed on the final implementation. Checks cover light/dark,
+  laptop/reduced motion, cancellation/focus restoration, read-only transitions,
+  blocked preview shortcuts, model/ensemble/segmentation submissions, and
+  mixed background outcomes. Lint, TypeScript/build, and size-check passed;
+  the main gzip bundle is 306.9 KB against a 325 KB budget. Served assets and
+  v0.8.16 notes were updated. Browser APIs are mocked; no live training or
+  hosted CI run was triggered. Existing circular/empty chunk warnings remain.
+- 2026-09-07: Refined CUX-03 after hands-on feedback. Individual Train/Tune
+  actions keep the normal model-specific Job History tab; grouped inspection
+  is reserved for Run all. Removed toolbar status strips and the successful
+  preview banner. Preview issues and live experiment summaries now appear in
+  the navbar notification center, with actions that return from Experiments or
+  Inference to Canvas. Training controls follow settings as a compact button,
+  expanding explanations/history at the end with reduced-motion support and
+  preserved keyboard focus. Split-node label clearance now uses measured,
+  unscaled label widths instead of a fixed font-dependent padding value.
+  The full 959-test unit suite passed; final targeted verification passed 15
+  tests including four added view-switch regressions. The browser sweep passed
+  72 checks; after correcting the preview fixture expectation, all ten execution
+  scenarios passed, including notification navigation and both footer themes.
+  All seven guided-connection checks passed with font stress and compact-height
+  assertions retained. Lint, TypeScript/build, size-check, and diff checks passed.
+  Main gzip size is 307.7 KB against 325 KB. Served assets and v0.8.16 notes
+  were updated. Browser APIs are mocked; hosted Linux CI has not been rerun.
+- 2026-09-07: Removed pop-up toasts in favor of the notification center. The
+  shared app-message API now retains messages and descriptions in the bell;
+  preview and Run all no longer add duplicate notices. Repeated app failures
+  refresh the existing entry as unread, and a hidden live region preserves
+  screen-reader announcements. The same bell is available outside Canvas in
+  the desktop header and existing mobile navigation bar. Full unit verification
+  passed 965 tests before the final retry regression; all 20 targeted tests then
+  passed. Browser checks passed for execution feedback, responsive layouts,
+  accessibility, and a failed dataset export on desktop/mobile (23 scenarios;
+  the export fixture was corrected before its passing rerun). Lint, production
+  build, size-check, and diff checks passed. Main gzip size dropped to 298.6 KB;
+  served assets and v0.8.16 notes were updated. No commit was created.
+- 2026-09-08: Completed CUX-08 and CUX-09. Settings catalog checks reproduced
+  missing accessible names before fixes; focused browser regressions reproduced
+  upload/panel focus loss and verified native file browsing, cancellation,
+  upload completion, repeated editor controls, and retained viewport position.
+  Independent review found tooltip Escape/clipping problems; Radix tooltips and
+  browser checks resolved them, including history focus trapping/restoration.
+  PII tests verify metadata-only rendering, preserved generic alerts, dataset
+  switching, and distinct loading/missing/pending/failed/empty profile states.
+  All 1,212 frontend unit tests passed on the final production code. The combined
+  browser sweep passed 27 scenarios, and two final modeling-dialog scenarios
+  passed after correcting entrance-animation waits in their fixture. Scoped axe
+  checks cover changed controls and the PII view in both themes. Final lint,
+  TypeScript/production build, size-check, and diff checks passed; served assets
+  were rebuilt. Main gzip size is 300.9 KB against the 325 KB size-check budget.
+  Browser APIs are mocked; no live training or hosted CI run was triggered.
+  Existing mocked connection logs and circular/empty chunk warnings remain.
+  CUX-07's source/payload inventory is recorded separately; its Input / Output
+  implementation remains open and requires backend capture and run identity.
+- 2026-09-08: Completed CUX-07 with optional selected-node preview capture and
+  Settings / Input / Output tabs. Independent review and browser regressions
+  identified and resolved stale toolbar activation snapshots, Decimal value
+  loss, branch/plain-split selection changes and pending-refresh focus loss.
+  Final backend verification passed 228 tests and seven existing configuration
+  snapshots, including 27 new inspection cases. The full frontend suite passed
+  1,243 tests; the final focused sweep after UI refinements passed 61 tests.
+  All 26 browser scenarios passed across inspection, existing execution feedback,
+  validation navigation and accessibility. Light/dark screenshots were inspected.
+  Ruff, formatting, backend ty, frontend lint, TypeScript/build and bundle-size
+  checks passed. Served assets were rebuilt; main gzip is 304.8 KB against 325 KB.
+- 2026-09-08: Follow-up to CUX-07 captures all nodes with one preview and reuses
+  the run when selection changes. Inspector Refresh preview updates only the
+  inspection receipt/errors, preserving global Results visibility and content.
+  Sample-row JSON shares an 8 MiB budget across nodes and branches. Independent
+  review also preserved detailed branch-specific execution errors and legacy
+  skipped-training reasons. Verification: 237 backend tests and seven snapshots,
+  1,248 frontend tests and 46 final focused tests passed. The 28-scenario browser
+  sweep passed, followed by all five inspection cases with new runtime-error
+  coverage. Ruff/format, ty, eslint, TypeScript/build and bundle budgets passed.
+  Served assets rebuilt; main gzip 304.7 KB / 325 KB. Browser APIs are mocked.
+- 2026-09-08: Removed inspector Refresh preview; toolbar Preview data is the
+  single run action. Inspection choices now use recorded node-local upstream
+  paths instead of downstream model branches. Repeated paths with matching
+  captures share one choice; distinct paths or measurements remain separate,
+  and one result has no selector. Empty/stale states direct users to the toolbar.
+  Verification: 154 targeted backend tests with seven snapshots, 1,254 frontend
+  tests, 70 focused tests and 17 browser scenarios passed. Independent review,
+  Ruff/format, ty, eslint, TypeScript/build and bundle budgets passed. Served
+  assets rebuilt; main gzip 304.6 KB / 325 KB. Browser APIs are mocked.
+  Backend tests exercise the real router/engine with a fixture catalog; browser
+  API responses are mocked. No live training or hosted CI run was triggered.

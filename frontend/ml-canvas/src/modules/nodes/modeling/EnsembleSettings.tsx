@@ -1,10 +1,12 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useId } from 'react';
 import { ValidationField } from '../../../components/shared/ValidationField';
 import {
-  Play, Boxes, ChevronRight, BarChart3, AlertTriangle, Info, X, Sparkles,
+  Play, Boxes, ChevronRight, BarChart3, AlertTriangle, Info, X, Sparkles, Loader2,
 } from 'lucide-react';
 import { useIsWideContainer } from '../../../core/hooks/useIsWideContainer';
 import { useTrainingNodeContext } from '../../../core/hooks/useTrainingNodeContext';
+import { RunFeedback } from '../../../components/shared/RunFeedback';
+import { TrainingActionFooter } from '../../../components/shared/TrainingActionFooter';
 import { MultiSelectChips } from './components/MultiSelectChips';
 import { BaseModelParamsEditor } from './components/BaseModelParamsEditor';
 import { HelpTooltip } from './components/HelpTooltip';
@@ -236,17 +238,19 @@ function optionLabelMap(options: Option[]): Record<string, string> {
 type UpdateFn = (patch: Partial<EnsembleConfig>) => void;
 
 /** Two-option segmented control (Classification/Regression, Voting/Stacking). */
-function SegmentedToggle({ options, value, onSelect }: {
+function SegmentedToggle({ label, options, value, onSelect }: {
+  label: string;
   options: Option[];
   value: string;
   onSelect: (v: string) => void;
 }) {
   return (
-    <div className="flex bg-gray-100 dark:bg-gray-800 rounded-lg p-0.5">
+    <div role="group" aria-label={label} className="flex bg-gray-100 dark:bg-gray-800 rounded-lg p-0.5">
       {options.map((opt) => (
         <button
           key={opt.value}
           type="button"
+          aria-pressed={value === opt.value}
           onClick={() => { onSelect(opt.value); }}
           className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-colors ${
             value === opt.value
@@ -263,6 +267,7 @@ function SegmentedToggle({ options, value, onSelect }: {
 
 /** Strategy-specific options: voting type (clf voting) or final estimator + CV (stacking). */
 function StrategyOptions({ config, update, options }: { config: EnsembleConfig; update: UpdateFn; options: Option[] }) {
+  const fieldId = useId();
   if (config.strategy === 'voting') {
     if (config.task !== 'classification') return null;
     return (
@@ -270,6 +275,7 @@ function StrategyOptions({ config, update, options }: { config: EnsembleConfig; 
         <span className="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Voting Type</span>
         <SegmentedToggle
           options={[{ label: 'Soft (probabilities)', value: 'soft' }, { label: 'Hard (majority)', value: 'hard' }]}
+          label="Voting Type"
           value={config.voting}
           onSelect={(v) => { update({ voting: v as 'soft' | 'hard' }); }}
         />
@@ -279,8 +285,9 @@ function StrategyOptions({ config, update, options }: { config: EnsembleConfig; 
   return (
     <div className="space-y-3">
       <div>
-        <span className="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Final Estimator (meta-learner)</span>
+        <label htmlFor={`${fieldId}-final_estimator`} className="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Final Estimator (meta-learner)</label>
         <select
+          id={`${fieldId}-final_estimator`}
           value={config.final_estimator}
           onChange={(e) => { update({ final_estimator: e.target.value }); }}
           className="w-full border border-gray-300 dark:border-gray-600 rounded-lg p-2 text-sm bg-white dark:bg-gray-800 dark:text-gray-100 focus:ring-2 focus:ring-purple-500 outline-none"
@@ -292,10 +299,11 @@ function StrategyOptions({ config, update, options }: { config: EnsembleConfig; 
       </div>
       <div>
         <div className="flex items-center gap-1 mb-1">
-          <span className="block text-xs font-medium text-gray-700 dark:text-gray-300">Stacking CV Folds</span>
+          <label htmlFor={`${fieldId}-cv`} className="block text-xs font-medium text-gray-700 dark:text-gray-300">Stacking CV Folds</label>
           <HelpTooltip text="Out-of-fold folds used to train the final estimator without leakage. Keep small (e.g. 3) when also running an outer hyperparameter search." />
         </div>
         <input
+          id={`${fieldId}-cv`}
           type="number"
           min={2}
           max={10}
@@ -328,6 +336,7 @@ function VotingWeightsSection({ config, update, optionLabels }: {
   update: UpdateFn;
   optionLabels: Record<string, string>;
 }) {
+  const fieldId = useId();
   const bases = config.base_estimators ?? [];
   if (config.strategy !== 'voting' || bases.length === 0) return null;
   const weights = config.weights ?? {};
@@ -343,11 +352,13 @@ function VotingWeightsSection({ config, update, optionLabels }: {
       <div className="space-y-1.5">
         {bases.map((key) => (
           <div key={key} className="flex items-center gap-2">
-            <span className="flex-1 text-xs text-gray-700 dark:text-gray-300 truncate">{optionLabels[key] ?? key}</span>
+            <label htmlFor={`${fieldId}-weight-${key}`} className="flex-1 text-xs text-gray-700 dark:text-gray-300 truncate">{optionLabels[key] ?? key}</label>
             <input
               type="number"
               min={0}
               step={0.5}
+              id={`${fieldId}-weight-${key}`}
+              aria-label={`${optionLabels[key] ?? key} weight`}
               value={weights[key] ?? 1}
               onChange={(e) => { setWeight(key, Number(e.target.value)); }}
               className="w-20 border border-gray-300 dark:border-gray-600 rounded-lg p-1.5 text-sm bg-white dark:bg-gray-800 dark:text-gray-100"
@@ -361,6 +372,7 @@ function VotingWeightsSection({ config, update, optionLabels }: {
 
 /** Parallel base-model fitting (sklearn `n_jobs`). Applies to all ensembles. */
 function ParallelJobsSection({ config, update }: { config: EnsembleConfig; update: UpdateFn }) {
+  const fieldId = useId();
   const options: Option[] = [
     { label: 'Sequential (1)', value: '1' },
     { label: '2 cores', value: '2' },
@@ -371,10 +383,11 @@ function ParallelJobsSection({ config, update }: { config: EnsembleConfig; updat
   return (
     <div className="space-y-1.5">
       <div className="flex items-center gap-1">
-        <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Parallel Jobs</span>
+        <label htmlFor={`${fieldId}-n_jobs`} className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Parallel Jobs</label>
         <HelpTooltip text="How many base models to fit in parallel. -1 uses all CPU cores; 1 trains sequentially." />
       </div>
       <select
+        id={`${fieldId}-n_jobs`}
         value={String(config.n_jobs ?? 1)}
         onChange={(e) => { update({ n_jobs: Number(e.target.value) }); }}
         className="w-full border border-gray-300 dark:border-gray-600 rounded-lg p-2 text-sm bg-white dark:bg-gray-800 dark:text-gray-100 focus:ring-2 focus:ring-purple-500 outline-none"
@@ -389,6 +402,7 @@ function ParallelJobsSection({ config, update }: { config: EnsembleConfig; updat
 
 /** Classification only: wrap each base classifier in CalibratedClassifierCV. */
 function CalibrationSection({ config, update }: { config: EnsembleConfig; update: UpdateFn }) {
+  const fieldId = useId();
   if (config.task !== 'classification') return null;
   const enabled = config.calibrate_base_models === true;
   return (
@@ -411,8 +425,10 @@ function CalibrationSection({ config, update }: { config: EnsembleConfig; update
       {enabled && (
         <div className="grid grid-cols-2 gap-3 pl-6">
           <div>
-            <span className="block text-xs text-gray-500 mb-1">Method</span>
+            <label htmlFor={`${fieldId}-calibration_method`} className="block text-xs text-gray-500 mb-1">Method</label>
             <select
+              id={`${fieldId}-calibration_method`}
+              aria-label="Calibration Method"
               value={config.calibration_method ?? 'sigmoid'}
               onChange={(e) => { update({ calibration_method: e.target.value as 'sigmoid' | 'isotonic' }); }}
               className="w-full border border-gray-300 dark:border-gray-600 rounded-lg p-2 text-sm bg-white dark:bg-gray-800 dark:text-gray-100"
@@ -422,8 +438,10 @@ function CalibrationSection({ config, update }: { config: EnsembleConfig; update
             </select>
           </div>
           <div>
-            <span className="block text-xs text-gray-500 mb-1">CV Folds</span>
+            <label htmlFor={`${fieldId}-calibration_cv`} className="block text-xs text-gray-500 mb-1">CV Folds</label>
             <input
+              id={`${fieldId}-calibration_cv`}
+              aria-label="Calibration CV Folds"
               type="number"
               min={2}
               max={10}
@@ -446,10 +464,12 @@ function CrossValidationSection({ config, update, showCV, setShowCV, columns }: 
   setShowCV: (v: boolean) => void;
   columns: ColumnProfile[];
 }) {
+  const fieldId = useId();
   return (
     <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
       <button
         type="button"
+        aria-expanded={showCV}
         onClick={() => { setShowCV(!showCV); }}
         className="w-full flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800/50 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
       >
@@ -479,8 +499,9 @@ function CrossValidationSection({ config, update, showCV, setShowCV, columns }: 
             <div className="space-y-3 pl-6 border-l-2 border-gray-100 dark:border-gray-800">
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <span className="block text-xs text-gray-500 mb-1">Folds</span>
+                  <label htmlFor={`${fieldId}-cv_folds`} className="block text-xs text-gray-500 mb-1">Folds</label>
                   <input
+                    id={`${fieldId}-cv_folds`}
                     type="number"
                     min={2}
                     value={config.cv_folds ?? 5}
@@ -489,8 +510,9 @@ function CrossValidationSection({ config, update, showCV, setShowCV, columns }: 
                   />
                 </div>
                 <div>
-                  <span className="block text-xs text-gray-500 mb-1">Method</span>
+                  <label htmlFor={`${fieldId}-cv_type`} className="block text-xs text-gray-500 mb-1">Method</label>
                   <select
+                    id={`${fieldId}-cv_type`}
                     value={config.cv_type ?? 'k_fold'}
                     onChange={(e) => { update({ cv_type: e.target.value }); }}
                     className="w-full border border-gray-300 dark:border-gray-600 rounded p-1.5 text-sm bg-white dark:bg-gray-800 dark:text-gray-100"
@@ -511,8 +533,9 @@ function CrossValidationSection({ config, update, showCV, setShowCV, columns }: 
                     <span>Data must be sorted by time. Select a date column below or ensure your data is pre-sorted.</span>
                   </div>
                   <div>
-                    <span className="block text-xs text-gray-500 mb-1">Time Column (optional)</span>
+                    <label htmlFor={`${fieldId}-cv_time_column`} className="block text-xs text-gray-500 mb-1">Time Column (optional)</label>
                     <select
+                      id={`${fieldId}-cv_time_column`}
                       value={config.cv_time_column ?? ''}
                       onChange={(e) => { update({ cv_time_column: e.target.value }); }}
                       className="w-full border border-gray-300 dark:border-gray-600 rounded p-1.5 text-sm bg-white dark:bg-gray-800 dark:text-gray-100"
@@ -553,10 +576,11 @@ function CrossValidationSection({ config, update, showCV, setShowCV, columns }: 
               {config.cv_shuffle !== false && config.cv_type !== 'time_series_split' && (
                 <div>
                   <span className="flex items-center gap-1 text-xs text-gray-500 mb-1">
-                    Fold Split Seed
+                    <label htmlFor={`${fieldId}-cv_random_state`}>Fold Split Seed</label>
                     <HelpTooltip text="Seed controlling how rows are dealt to folds — same seed = identical fold splits, so CV scores stay comparable across runs." />
                   </span>
                   <input
+                    id={`${fieldId}-cv_random_state`}
                     type="number"
                     min={0}
                     value={config.cv_random_state ?? 42}
@@ -578,11 +602,13 @@ function TargetSelector({ config, update, columns }: {
   update: UpdateFn;
   columns: ColumnProfile[];
 }) {
+  const fieldId = useId();
   return (
     <ValidationField field="target_column">
-      <span className="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Target Column</span>
+      <label htmlFor={`${fieldId}-target_column`} className="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Target Column</label>
       {columns.length === 0 ? (
         <input
+          id={`${fieldId}-target_column`}
           type="text"
           value={config.target_column}
           onChange={(e) => { update({ target_column: e.target.value }); }}
@@ -591,6 +617,7 @@ function TargetSelector({ config, update, columns }: {
         />
       ) : (
         <select
+          id={`${fieldId}-target_column`}
           value={config.target_column}
           onChange={(e) => { update({ target_column: e.target.value }); }}
           className="w-full border border-gray-300 dark:border-gray-600 rounded-lg p-2 text-sm bg-white dark:bg-gray-800 dark:text-gray-100 focus:ring-2 focus:ring-purple-500 outline-none"
@@ -607,6 +634,7 @@ function TargetSelector({ config, update, columns }: {
 
 /** Tuning controls shown in Advanced mode: search strategy, trial budget, metric. */
 function AdvancedTuningOptions({ config, update }: { config: EnsembleConfig; update: UpdateFn }) {
+  const fieldId = useId();
   const [showStrategyModal, setShowStrategyModal] = useState(false);
   const [showBaseTuningDetails, setShowBaseTuningDetails] = useState(false);
   const showStrategyBtn =
@@ -624,7 +652,7 @@ function AdvancedTuningOptions({ config, update }: { config: EnsembleConfig; upd
         <div>
           <div className="flex items-center justify-between mb-1">
             <span className="flex items-center gap-1 text-xs font-medium text-gray-700 dark:text-gray-300">
-              Search Strategy
+              <label htmlFor={`${fieldId}-search_strategy`}>Search Strategy</label>
               <HelpTooltip
                 placement="bottom-left"
                 text="Searches the ensemble's own params (e.g. voting/cv), not each base model. Enable &quot;Tune base model hyperparameters&quot; below to also search each model's params."
@@ -635,6 +663,7 @@ function AdvancedTuningOptions({ config, update }: { config: EnsembleConfig; upd
                 type="button"
                 onClick={() => { setShowStrategyModal(true); }}
                 className="text-blue-600 hover:text-blue-700 dark:text-blue-400 p-0.5 rounded hover:bg-blue-50 dark:hover:bg-blue-900/20 transition group flex items-center justify-center"
+                aria-label="Search strategy settings"
                 title={`${config.search_strategy.replace('_', ' ')} Settings`}
               >
                 <Settings2 size={13} className="group-hover:rotate-45 transition-transform duration-300" />
@@ -642,6 +671,7 @@ function AdvancedTuningOptions({ config, update }: { config: EnsembleConfig; upd
             )}
           </div>
           <select
+            id={`${fieldId}-search_strategy`}
             value={config.search_strategy}
             onChange={(e) => {
               update({
@@ -657,8 +687,9 @@ function AdvancedTuningOptions({ config, update }: { config: EnsembleConfig; upd
           </select>
         </div>
         <div>
-          <span className="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Trials</span>
+          <label htmlFor={`${fieldId}-n_trials`} className="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Trials</label>
           <input
+            id={`${fieldId}-n_trials`}
             type="number"
             min={1}
             value={config.n_trials}
@@ -668,10 +699,11 @@ function AdvancedTuningOptions({ config, update }: { config: EnsembleConfig; upd
         </div>
         <div>
           <span className="flex items-center gap-1 text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-            Random State
+            <label htmlFor={`${fieldId}-random_state`}>Random State</label>
             <HelpTooltip text="Seed for the search and the final refit — same seed + same data = identical tuning outcome." />
           </span>
           <input
+            id={`${fieldId}-random_state`}
             type="number"
             min={0}
             value={config.random_state ?? 42}
@@ -681,8 +713,9 @@ function AdvancedTuningOptions({ config, update }: { config: EnsembleConfig; upd
         </div>
       </div>
       <div>
-        <span className="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Optimize Metric</span>
+        <label htmlFor={`${fieldId}-metric`} className="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Optimize Metric</label>
         <select
+          id={`${fieldId}-metric`}
           value={config.metric}
           onChange={(e) => { update({ metric: e.target.value }); }}
           className="w-full border border-gray-300 dark:border-gray-600 rounded-lg p-2 text-sm bg-white dark:bg-gray-800 dark:text-gray-100 focus:ring-2 focus:ring-purple-500 outline-none"
@@ -704,6 +737,8 @@ function AdvancedTuningOptions({ config, update }: { config: EnsembleConfig; upd
             <strong>Tune base model hyperparameters</strong>
             <button
               type="button"
+              aria-label="Base model tuning details"
+              aria-expanded={showBaseTuningDetails}
               onClick={() => { setShowBaseTuningDetails(!showBaseTuningDetails); }}
               className="text-gray-400 hover:text-purple-600 dark:hover:text-purple-400 transition-colors"
               title={showBaseTuningDetails ? 'Hide details' : 'Show details'}
@@ -750,6 +785,7 @@ function BaseParamsSection({ config, update, open, setOpen, options }: {
     <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
       <button
         type="button"
+        aria-expanded={open}
         onClick={() => { setOpen(!open); }}
         className="w-full flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800/50 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
       >
@@ -789,7 +825,8 @@ export function EnsembleSettings({ config, onChange, nodeId }: {
   const [showCV, setShowCV] = useState(false);
   const [showBaseParams, setShowBaseParams] = useState(false);
   const [showInfo, setShowInfo] = useState(() => !sessionStorage.getItem('hide_info_ensemble'));
-  const { availableColumns, upstreamTarget, runJob } = useTrainingNodeContext(nodeId);
+  const { availableColumns, upstreamTarget, datasetId, runJob, isSubmitting, submissionMessage, runFeedback } = useTrainingNodeContext(nodeId);
+  const runHelpId = useId();
 
   const [availableModelIds, setAvailableModelIds] = useState<Set<string>>(new Set());
 
@@ -1077,6 +1114,7 @@ export function EnsembleSettings({ config, onChange, nodeId }: {
           <span>Combine several models into one. <strong>Voting</strong> averages their predictions; <strong>Stacking</strong> trains a meta-learner on their out-of-fold predictions.</span>
           <button
             type="button"
+            aria-label="Dismiss ensemble information"
             onClick={() => { setShowInfo(false); sessionStorage.setItem('hide_info_ensemble', 'true'); }}
             className="text-purple-400 hover:text-purple-600 dark:hover:text-purple-200"
           >
@@ -1109,6 +1147,7 @@ export function EnsembleSettings({ config, onChange, nodeId }: {
           </div>
           <SegmentedToggle
             options={[{ label: 'Classification', value: 'classification' }, { label: 'Regression', value: 'regression' }]}
+            label="Task"
             value={config.task}
             onSelect={(v) => { onTask(v as Task); }}
           />
@@ -1118,6 +1157,7 @@ export function EnsembleSettings({ config, onChange, nodeId }: {
           <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Strategy</span>
           <SegmentedToggle
             options={[{ label: 'Voting', value: 'voting' }, { label: 'Stacking', value: 'stacking' }]}
+            label="Strategy"
             value={config.strategy}
             onSelect={(v) => { onStrategy(v as Strategy); }}
           />
@@ -1127,6 +1167,7 @@ export function EnsembleSettings({ config, onChange, nodeId }: {
           <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Training Mode</span>
           <SegmentedToggle
             options={[{ label: 'Basic', value: 'basic' }, { label: 'Advanced (Tuning)', value: 'advanced' }]}
+            label="Training Mode"
             value={config.run_mode}
             onSelect={(v) => { update({ run_mode: v as RunMode }); }}
           />
@@ -1140,6 +1181,7 @@ export function EnsembleSettings({ config, onChange, nodeId }: {
             </div>
             <p className="text-[11px] text-gray-500 dark:text-gray-400">Click to add or remove each model in the ensemble.</p>
             <MultiSelectChips
+              ariaLabel="Base Models"
               options={currentOptions}
               selected={config.base_estimators ?? []}
               onChange={(vals) => { update({ base_estimators: vals as string[] }); }}
@@ -1185,19 +1227,29 @@ export function EnsembleSettings({ config, onChange, nodeId }: {
         </div>
       </div>
 
-      <div className="pt-4 mt-auto border-t border-gray-100 dark:border-gray-700 flex flex-col gap-3 items-center">
+      <TrainingActionFooter details={
+        <p id={runHelpId} className="text-xs text-center text-muted-foreground">
+          {!datasetId ? 'Connect a dataset node upstream and select a dataset to enable this action.'
+            : !config.target_column?.trim() ? 'Choose a target column to enable this action.'
+            : tooFewModels ? 'Choose at least two base models to enable this action.'
+            : `${isAdvanced ? 'Tunes' : 'Trains'} the ${config.strategy} ensemble with ${config.base_estimators.length} base models in the background.`}
+        </p>
+      }>
         <button
           type="button"
           onClick={() => { void runJob(isAdvanced ? 'tuning' : 'training', 'ensemble'); }}
-          disabled={!config.target_column || tooFewModels}
+          disabled={!datasetId || !config.target_column?.trim() || tooFewModels || isSubmitting}
+          aria-describedby={runHelpId}
           className="w-full max-w-xs flex items-center justify-center gap-2 px-6 py-2.5 action-primary rounded-lg shadow-lg transition-all hover:shadow-xl hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 focus-ring"
         >
-          {isAdvanced ? <Sparkles className="w-4 h-4" /> : <Play className="w-4 h-4 fill-current" />}
+          {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : isAdvanced ? <Sparkles className="w-4 h-4" /> : <Play className="w-4 h-4 fill-current" />}
           <span className="text-sm font-semibold">
-            {isAdvanced ? 'Start Ensemble Modeling' : 'Start Ensemble Training'}
+            {isSubmitting ? 'Submitting job...' : isAdvanced ? 'Tune ensemble' : 'Train ensemble'}
           </span>
         </button>
-      </div>
+        {submissionMessage && <p role="status" aria-atomic="true" className="text-xs text-center text-muted-foreground break-words">{submissionMessage}</p>}
+        {runFeedback && <RunFeedback run={runFeedback} task="ensemble" />}
+      </TrainingActionFooter>
     </div>
   );
 }

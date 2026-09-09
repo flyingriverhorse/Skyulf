@@ -50,8 +50,9 @@ export const SchemaDriftPanel: React.FC<SchemaDriftPanelProps> = ({ missingColum
                     </summary>
                     <div className="px-4 pb-4">
                         <p className="text-[11px] text-blue-600/70 dark:text-blue-300/60 mb-2">
-                            Columns in your uploaded file that were not in the training data (e.g. target column,
-                            IDs, or dropped features). These are ignored during drift analysis.
+                            Columns in your uploaded file that were not in the training reference.
+                            These are excluded from distribution metrics but reported as schema changes.
+                            The model target is excluded from both checks.
                         </p>
                         <ul className="list-disc list-inside text-sm text-blue-700 dark:text-blue-300">
                             {added.map(col => (

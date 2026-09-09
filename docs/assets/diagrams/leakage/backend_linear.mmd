@@ -1,0 +1,16 @@
+flowchart LR
+    data["Dataset"]:::plain
+    fixed["Fixed row rules<br/>optional"]:::plain
+    split["Train-Test Split"]:::boundary
+    power["Yeo-Johnson<br/>fit on train"]:::safe
+    encoder["Encoding<br/>fit on train"]:::safe
+    model["Model / tuning"]:::safe
+    data --> fixed
+    fixed --> split
+    split --> power
+    power --> encoder
+    encoder --> model
+    classDef plain fill:#ffffff,stroke:#64748b,color:#172b3a
+    classDef boundary fill:#e8f0fb,stroke:#245997,color:#172b3a
+    classDef safe fill:#e9f5ee,stroke:#287447,color:#172b3a
+    classDef risk fill:#fff0e8,stroke:#aa4b23,color:#172b3a

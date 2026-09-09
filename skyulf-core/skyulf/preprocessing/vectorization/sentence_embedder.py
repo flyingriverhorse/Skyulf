@@ -214,7 +214,7 @@ class SentenceEmbedderCalculator(BaseCalculator):
         empty or wholly-absent selection yields an empty artifact so the applier
         no-ops — and, importantly, skips loading the model at all.
         """
-        valid_cols = resolve_fit_text_valid_columns(X, config)
+        valid_cols = resolve_fit_text_valid_columns(X, config, _y)
         if valid_cols is None:
             return {}
 

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { ResultsPanel } from './ResultsPanel';
 import { useGraphStore } from '../../core/store/useGraphStore';
 import { useViewStore } from '../../core/store/useViewStore';
@@ -24,6 +24,7 @@ describe('ResultsPanel', () => {
     });
     useViewStore.setState({
       isResultsPanelExpanded: true,
+      isResultsPanelDismissed: false,
     });
   });
 
@@ -141,5 +142,68 @@ describe('ResultsPanel', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Close preview results' }));
 
     expect(container.querySelector('.absolute.bottom-0')).toBeNull();
+  });
+
+  /** Canvas-only safety feedback must not create an empty results panel or hide existing data. */
+  it.each([false, true])('omits leakage issues while preserving existing data: %s', withResults => {
+    useGraphStore.setState({
+      nodes: [
+        { id: 'dataset', position: { x: 0, y: 0 }, data: { definitionType: 'dataset_node', datasetId: 'ds-1' } },
+        { id: 'imputer', position: { x: 100, y: 0 }, data: { definitionType: 'imputation_node', columns: ['value'], strategy: 'mean' } },
+        { id: 'split', position: { x: 200, y: 0 }, data: { definitionType: 'TrainTestSplitter', test_size: 0.2, validation_size: 0, random_state: 42, stratify: false, shuffle: true } },
+      ],
+      edges: [{ id: 'e1', source: 'dataset', target: 'imputer' }, { id: 'e2', source: 'imputer', target: 'split' }],
+      executionResult: withResults ? { pipeline_id: 'earlier', status: 'success', node_results: {}, preview_data: [{ value: 3 }], recommendations: [] } : null,
+    });
+    render(<ResultsPanel />);
+    expect(screen.queryByText('Validation issues')).not.toBeInTheDocument();
+    if (withResults) {
+      expect(screen.getByRole('region', { name: 'Preview results' })).toBeVisible();
+      expect(screen.getByRole('tab', { name: 'Data' })).toHaveAttribute('aria-selected', 'true');
+      expect(screen.getByText('3')).toBeInTheDocument();
+    } else {
+      expect(screen.queryByRole('region', { name: 'Preview results' })).not.toBeInTheDocument();
+    }
+  });
+
+  /** Mixed graphs must retain actionable ordinary issues without duplicating canvas leakage feedback. */
+  it('keeps configuration errors in the panel when leakage also exists', () => {
+    useGraphStore.setState({
+      nodes: [
+        { id: 'dataset', position: { x: 0, y: 0 }, data: { definitionType: 'dataset_node', datasetId: 'ds-1' } },
+        { id: 'imputer', position: { x: 100, y: 0 }, data: { definitionType: 'imputation_node', columns: ['value'], strategy: 'mean' } },
+        { id: 'split', position: { x: 200, y: 0 }, data: { definitionType: 'TrainTestSplitter', test_size: 0.2, validation_size: 0, random_state: 42, stratify: false, shuffle: true } },
+        { id: 'unknown', position: { x: 300, y: 0 }, data: { definitionType: 'unknown_node' } },
+      ],
+      edges: [{ id: 'e1', source: 'dataset', target: 'imputer' }, { id: 'e2', source: 'imputer', target: 'split' }],
+    });
+    render(<ResultsPanel />);
+    expect(screen.getByText('Validation issues')).toBeVisible();
+    expect(screen.queryByText('leakage')).not.toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent('1 validation issue blocking preview');
+  });
+
+  /** Leakage-only edits must respect dismissal even if prior preview data is still available. */
+  it('does not reopen a dismissed data panel when only leakage issues change', () => {
+    useGraphStore.setState({
+      nodes: [
+        { id: 'dataset', position: { x: 0, y: 0 }, data: { definitionType: 'dataset_node', datasetId: 'ds-1' } },
+        { id: 'drop', position: { x: 100, y: 100 }, data: { definitionType: 'drop_missing_columns', columns: ['id'], missing_threshold: 0 } },
+      ],
+      edges: [{ id: 'e0', source: 'dataset', target: 'drop' }],
+      executionResult: { pipeline_id: 'earlier', status: 'success', node_results: {}, preview_data: [{ value: 3 }], recommendations: [] },
+    });
+    render(<ResultsPanel />);
+    act(() => useViewStore.getState().setResultsPanelDismissed(true));
+    act(() => useGraphStore.setState(state => ({
+      nodes: [...state.nodes,
+        { id: 'imputer', position: { x: 100, y: 0 }, data: { definitionType: 'imputation_node', columns: ['value'], strategy: 'mean' } },
+        { id: 'split', position: { x: 200, y: 0 }, data: { definitionType: 'TrainTestSplitter', test_size: 0.2, validation_size: 0, random_state: 42, stratify: false, shuffle: true } },
+      ],
+      edges: [...state.edges, { id: 'e1', source: 'dataset', target: 'imputer' }, { id: 'e2', source: 'imputer', target: 'split' }],
+    })));
+    expect(useGraphStore.getState().executionResult?.pipeline_id).toBe('earlier');
+    expect(useViewStore.getState().isResultsPanelDismissed).toBe(true);
+    expect(screen.queryByRole('region', { name: 'Preview results' })).not.toBeInTheDocument();
   });
 });

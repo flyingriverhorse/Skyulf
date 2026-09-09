@@ -127,6 +127,8 @@ export interface MergeWarning {
 }
 
 export interface PreviewResponse {
+  run_id?: string | null;
+  node_inspections?: import('../types/nodeInspection').NodeInspection[];
   pipeline_id: string;
   status: string;
   node_results: Record<string, NodeExecutionResult>;
@@ -166,8 +168,12 @@ export interface UploadConfig {
 
 // --- Functions ---
 
-export const runPipelinePreview = async (payload: PipelineConfigModel): Promise<PreviewResponse> => {
-  const response = await apiClient.post<PreviewResponse>('/pipeline/preview', payload);
+export const runPipelinePreview = async (
+  payload: PipelineConfigModel,
+  inspection?: { inspectNodeId?: string; inspectAll?: boolean },
+): Promise<PreviewResponse> => {
+  const response = await apiClient.post<PreviewResponse>('/pipeline/preview', payload,
+    inspection ? { params: { inspect_node_id: inspection.inspectNodeId, inspect_all: inspection.inspectAll } } : undefined);
   return response.data;
 };
 

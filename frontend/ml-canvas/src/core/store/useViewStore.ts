@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import type { GraphValidationIssue } from './useGraphStore';
+import type { LeakageNotice } from '../types/leakage';
 
 type ViewType = 'canvas' | 'experiments' | 'inference';
 
@@ -29,6 +30,11 @@ const writePerfOverlayPreference = (enabled: boolean): void => {
 };
 
 interface ViewState {
+  helpGuideTab: 'basics' | 'leakage' | null;
+  openHelpGuide: (tab?: 'basics' | 'leakage') => void;
+  closeHelpGuide: () => void;
+  leakageNotice: LeakageNotice | null;
+  setLeakageNotice: (notice: LeakageNotice | null) => void;
   validationFocusRequest: (GraphValidationIssue & { requestId: number }) | null;
   requestValidationFocus: (issue: GraphValidationIssue) => void;
   activeView: ViewType;
@@ -65,6 +71,11 @@ interface ViewState {
 }
 
 export const useViewStore = create<ViewState>((set) => ({
+  helpGuideTab: null,
+  openHelpGuide: (tab = 'basics') => set({ helpGuideTab: tab }),
+  closeHelpGuide: () => set({ helpGuideTab: null }),
+  leakageNotice: null,
+  setLeakageNotice: (notice) => set({ leakageNotice: notice }),
   validationFocusRequest: null,
   requestValidationFocus: (issue) => set((state) => ({
     validationFocusRequest: { ...issue, requestId: (state.validationFocusRequest?.requestId ?? 0) + 1 },

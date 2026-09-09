@@ -1,5 +1,7 @@
 import React, { useEffect, useId, useState, useRef } from 'react';
 import { ValidationField, useValidationReveal } from '../../../components/shared/ValidationField';
+import { RunFeedback } from '../../../components/shared/RunFeedback';
+import { TrainingActionFooter } from '../../../components/shared/TrainingActionFooter';
 import {
     Play, Download, Loader2, Activity, Settings2,
     BarChart3, X, ChevronRight, ChevronDown, AlertCircle, AlertTriangle
@@ -47,11 +49,12 @@ export interface TrainingConfig {
 
 /** Two-option segmented control matching `EnsembleSettings`'s run-mode toggle. */
 const RunModeToggle: React.FC<{ value: TrainingRunMode; onSelect: (v: TrainingRunMode) => void }> = ({ value, onSelect }) => (
-  <div className="flex bg-gray-100 dark:bg-gray-800 rounded-lg p-0.5">
+  <div role="group" aria-label="Training Mode" className="flex bg-gray-100 dark:bg-gray-800 rounded-lg p-0.5">
     {([['basic', 'Basic'], ['advanced', 'Advanced (Tuning)']] as const).map(([v, label]) => (
       <button
         key={v}
         type="button"
+        aria-pressed={value === v}
         onClick={() => { onSelect(v); }}
         className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-colors ${
           value === v
@@ -179,7 +182,7 @@ export const TrainingSettings: React.FC<{
   const [showParamsModal, setShowParamsModal] = useState(false);
   const [showInfo, setShowInfo] = useState(() => !sessionStorage.getItem('hide_info_training_node'));
 
-  const { availableColumns, upstreamTarget, datasetId, runJob } = useTrainingNodeContext(nodeId);
+  const { availableColumns, upstreamTarget, datasetId, runJob, isSubmitting, submissionMessage, runFeedback } = useTrainingNodeContext(nodeId);
 
   // Responsive layout: switch to a 2-column layout once the panel is wider than 450px.
   const [containerRef, isWide] = useIsWideContainer();
@@ -334,6 +337,8 @@ export const TrainingSettings: React.FC<{
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [upstreamTarget, config.target_column, isAdvanced]);
 
+  const resolvedTask = task ?? getTaskForModelType(config.model_type, availableModels);
+  const historyTask = resolvedTask === 'other' ? 'classification' : resolvedTask;
   const handleSubmit = async () => {
     // Task-scoped nodes already know their task; the generic (hidden)
     // TrainingNode resolves it from the selected model's registry tags —
@@ -341,8 +346,7 @@ export const TrainingSettings: React.FC<{
     // Falls back to 'classification' (like jobMeta.ts's own default) if
     // unresolvable — this only affects which drawer tab opens, never
     // whether the job itself is submitted.
-    const resolvedTask = task ?? getTaskForModelType(config.model_type, availableModels);
-    await runJob(isAdvanced ? 'tuning' : 'training', resolvedTask === 'other' ? 'classification' : resolvedTask);
+    await runJob(isAdvanced ? 'tuning' : 'training', historyTask);
   };
 
   const ModelConfigSection = (
@@ -391,6 +395,7 @@ export const TrainingSettings: React.FC<{
                         {requiresScaling && (
                            <div className="mt-2 text-xs border border-blue-200 dark:border-blue-800 rounded-md bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 overflow-hidden transition-all">
                                <button
+                                   aria-expanded={showScalingAlert}
                                    onClick={() => setShowScalingAlert(!showScalingAlert)}
                                    className="w-full flex items-center justify-between p-2 hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors"
                                >
@@ -472,6 +477,7 @@ export const TrainingSettings: React.FC<{
                                           type="button"
                                           onClick={() => setShowStrategyModal(true)}
                                           className="text-blue-600 hover:text-blue-700 dark:text-blue-400 p-1 rounded hover:bg-blue-50 dark:hover:bg-blue-900/20 transition group flex items-center justify-center"
+                                          aria-label="Search strategy settings"
                                           title={`${config.search_strategy.replace('_', ' ')} Settings`}
                                       >
                                           <Settings2 size={14} className="group-hover:rotate-45 transition-transform duration-300" />
@@ -560,12 +566,12 @@ export const TrainingSettings: React.FC<{
                                 <div className="col-span-2 flex items-center gap-2">
                                     <input
                                         type="checkbox"
-                                        id="tune_threshold"
+                                        id={`${fieldId}-tune_threshold`}
                                         checked={config.tune_threshold ?? false}
                                         onChange={(e) => onChange({ ...config, tune_threshold: e.target.checked })}
                                         className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                                     />
-                                    <label htmlFor="tune_threshold" className="text-xs text-gray-600 dark:text-gray-400">
+                                    <label htmlFor={`${fieldId}-tune_threshold`} className="text-xs text-gray-600 dark:text-gray-400">
                                         Tune decision threshold
                                     </label>
                                     <HelpTooltip text="After tuning, picks the probability cutoff that maximises your metric on the validation split (binary targets). Predictions then use that cutoff instead of the default 0.5. Needs a validation split; probability-only metrics like ROC AUC fall back to balanced accuracy for the cutoff search." />
@@ -581,6 +587,7 @@ export const TrainingSettings: React.FC<{
             {/* CV Settings */}
             <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
                 <button
+                    aria-expanded={showCV}
                     onClick={() => { setShowCV(!showCV); }}
                     className="w-full flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800/50 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
                 >
@@ -596,12 +603,12 @@ export const TrainingSettings: React.FC<{
                         <div className="flex items-center gap-2 mb-2">
                             <input
                                 type="checkbox"
-                                id="cv_enabled"
+                                id={`${fieldId}-cv_enabled`}
                                 checked={config.cv_enabled !== false}
                                 onChange={(e) => onChange({ ...config, cv_enabled: e.target.checked })}
                                 className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                             />
-                            <label htmlFor="cv_enabled" className="text-sm text-gray-700 dark:text-gray-300">Enable Cross-Validation</label>
+                            <label htmlFor={`${fieldId}-cv_enabled`} className="text-sm text-gray-700 dark:text-gray-300">Enable Cross-Validation</label>
                         </div>
                         <p className="text-xs text-gray-500 dark:text-gray-400 mb-2 pl-6">
                             {isAdvanced
@@ -679,12 +686,12 @@ export const TrainingSettings: React.FC<{
                                 <div className="flex items-center gap-2">
                                     <input
                                         type="checkbox"
-                                        id="cv_shuffle"
+                                        id={`${fieldId}-cv_shuffle`}
                                         checked={config.cv_shuffle !== false}
                                         onChange={(e) => onChange({ ...config, cv_shuffle: e.target.checked })}
                                         className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                                     />
-                                    <label htmlFor="cv_shuffle" className="text-xs text-gray-600 dark:text-gray-400">Shuffle Data</label>
+                                    <label htmlFor={`${fieldId}-cv_shuffle`} className="text-xs text-gray-600 dark:text-gray-400">Shuffle Data</label>
                                 </div>
                                 {config.cv_shuffle !== false && config.cv_type !== 'time_series_split' && (
                                     <div>
@@ -786,13 +793,14 @@ export const TrainingSettings: React.FC<{
                   hyperparameters.filter(param => isBasicParamVisible(param, config.hyperparameters)).map((param) => (
                     <div key={param.name} className="bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-lg p-3">
                       <div className="flex justify-between items-center mb-2">
-                          <label className="block text-xs font-medium text-gray-700 dark:text-gray-300">
+                          <label htmlFor={`${fieldId}-param-${param.name}`} className="block text-xs font-medium text-gray-700 dark:text-gray-300">
                             {param.label}
                           </label>
                           {param.description && <HelpTooltip text={param.description} />}
                       </div>
                       {param.type === 'select' ? (
                         <select
+                          id={`${fieldId}-param-${param.name}`}
                           value={(config.hyperparameters[param.name] ?? param.default) as string | number | readonly string[] | undefined}
                           onChange={(e) => onChange({
                             ...config,
@@ -806,6 +814,7 @@ export const TrainingSettings: React.FC<{
                         </select>
                       ) : (
                         <HyperparameterInput
+                          id={`${fieldId}-param-${param.name}`}
                           type={param.type}
                           value={config.hyperparameters[param.name] ?? param.default}
                           onChange={(val) => onChange({
@@ -886,6 +895,7 @@ export const TrainingSettings: React.FC<{
         <div className="mb-4 p-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded text-xs text-blue-700 dark:text-blue-300 flex justify-between items-start gap-2">
           <span>Train a model with fixed parameters, or switch to Advanced to automatically tune it.</span>
           <button
+            aria-label="Dismiss training information"
             onClick={() => {
                 setShowInfo(false);
                 sessionStorage.setItem('hide_info_training_node', 'true');
@@ -944,6 +954,7 @@ export const TrainingSettings: React.FC<{
                 ? 'border-blue-500 text-blue-600 dark:text-blue-400'
                 : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700'
             }`}
+            aria-pressed={activeTab === 'model'}
             onClick={() => { setActiveTab('model'); }}
           >
             Configuration
@@ -954,6 +965,7 @@ export const TrainingSettings: React.FC<{
                 ? 'border-blue-500 text-blue-600 dark:text-blue-400'
                 : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700'
             }`}
+            aria-pressed={activeTab === 'params'}
             onClick={() => { setActiveTab('params'); }}
           >
             {secondaryTabLabel}
@@ -976,23 +988,15 @@ export const TrainingSettings: React.FC<{
       </div>
 
       {/* Footer */}
-      <div className="pt-4 mt-auto border-t border-gray-100 dark:border-gray-700 flex flex-col gap-3 items-center">
+      <TrainingActionFooter details={<>
         <p className="text-xs text-center text-gray-600 dark:text-gray-400 break-words">
           Selected model: {selectedModelItem?.name || config.model_type.replace(/_/g, ' ')}
         </p>
-        <button
-          type="button"
-          onClick={() => { void handleSubmit(); }}
-          disabled={!datasetId}
-          aria-describedby={`${fieldId}-run-help`}
-          className="w-full max-w-xs flex items-center justify-center gap-2 px-6 py-2.5 action-primary rounded-lg shadow-lg transition-all hover:shadow-xl hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-lg disabled:hover:translate-y-0 focus-ring"
-        >
-          <Play className="w-4 h-4 fill-current" />
-          <span className="text-sm font-semibold">{isAdvanced ? 'Tune model' : 'Train model'}</span>
-        </button>
         <p id={`${fieldId}-run-help`} className="text-xs text-center text-gray-600 dark:text-gray-400">
           {!datasetId
             ? 'Connect a dataset node upstream and select a dataset to enable this action.'
+            : !config.target_column?.trim() ? 'Choose a target column to enable this action.'
+            : !config.model_type ? 'Choose a model to enable this action.'
             : isAdvanced
               ? 'Searches hyperparameters and trains the selected model in the background.'
               : 'Trains the selected model with fixed parameters in the background.'}
@@ -1007,7 +1011,20 @@ export const TrainingSettings: React.FC<{
                 View Best Parameters History
             </button>
         )}
-      </div>
+      </>}>
+        <button
+          type="button"
+          onClick={() => { void handleSubmit(); }}
+          disabled={!datasetId || isSubmitting || !config.target_column?.trim() || !config.model_type}
+          aria-describedby={`${fieldId}-run-help`}
+          className="w-full max-w-xs flex items-center justify-center gap-2 px-6 py-2.5 action-primary rounded-lg shadow-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus-ring"
+        >
+          {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4 fill-current" />}
+          <span className="text-sm font-semibold">{isSubmitting ? 'Submitting job...' : isAdvanced ? 'Tune model' : 'Train model'}</span>
+        </button>
+        {submissionMessage && <p role="status" aria-atomic="true" className="text-xs text-center text-muted-foreground break-words">{submissionMessage}</p>}
+        {runFeedback && <RunFeedback run={runFeedback} task={historyTask} />}
+      </TrainingActionFooter>
     </div>
   );
 };

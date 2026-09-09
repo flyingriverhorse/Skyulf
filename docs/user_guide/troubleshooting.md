@@ -130,7 +130,7 @@ In the canvas:
 | Linear chain `A → B → C` | No warning, full data flow |
 | Redundant ancestor edge | Suppressed silently |
 | Disjoint-column fan-in | Advisory only, all columns kept |
-| **Overlapping-column fan-in** | **Last input wins — chain instead** |
+| **Overlapping-column fan-in** | A sole modifying owner wins when a baseline is available; otherwise conflicting versions follow `first_wins` or `last_wins` (default). Unique columns are retained. |
 | Cycles | Engine rejects |
 
 **Rule of thumb:** if two branches touch the same columns, chain them; if they touch different columns, fanning in is fine.
@@ -141,16 +141,21 @@ In the canvas:
 
 Training fails with an error like:
 
-> *Node node_training: training frame contains 1 non-numeric column(s): city. Supervised models can only fit numeric features. After a Split, merged branches resolve overlapping columns by merge order — the last connected branch wins every shared column — …*
+> *Node node_training: training frame contains 1 non-numeric column(s): city. Supervised models can only fit numeric features.*
 
 ### What it means
 
-Your branches fork **after a Split node** and merge back into a training node. In that shape,
-per-column ownership cannot apply — the nearest shared ancestor is the splitter, whose stored
-artifact is a train/test split rather than a frame — so overlapping columns resolve by **pure
-merge order**: with `last_wins` (the default) the **last connected branch wins every shared
-column**. If an earlier branch encoded a column but the last branch still carries it as raw
-text/categories, the raw version wins and the model receives a non-numeric column.
+Your branches fork **after a Train-Test Split node** and merge back into a training node.
+The configured merge strategy still applies, separately within Train, Validation and Test.
+The splitter's stored artifact is a split dataset rather than a baseline frame, so column
+ownership is generally unavailable. Each overlapping feature column then follows `last_wins`
+(the default) or `first_wins`; different-named columns from both branches remain in the result.
+
+For sibling branches, first/last follows saved incoming-edge order, not canvas position or
+completion time. Ancestor inputs are ordered before descendants. If the winning branch carries
+a column as raw text while another branch encoded it, the model receives the raw version.
+This is a choice of an entire column, not selection of one whole branch or blending individual
+cells. X/y merges retain y from the first input, so all branches need the same aligned target.
 
 Before this guard existed, the same misconfiguration surfaced as the cryptic
 *"Hyperparameter tuning failed: All trials failed"* because every fold failed inside the model fit.
@@ -168,7 +173,7 @@ Pick one:
 
 Text pipelines: after a vectorizer, set `drop_original=True` (or drop the raw text column) so the
 raw text does not survive into the merge. See also
-[Multi-Path Pipelines — After a Split: Order Decides Everything](../guides/multi_path_pipelines.md#after-a-split-order-decides-everything).
+[Multi-Path Pipelines: After a Split](../guides/multi_path_pipelines.md#after-a-split-merge-strategy-still-applies).
 
 ---
 
@@ -194,7 +199,9 @@ Move the Drop Columns node **after** the merge if you want the columns to surviv
 
 If your target column is categorical and you apply `OneHotEncoder` with `drop_original=True`, the target column may be dropped or expanded.
 
-**Fix:** Always run `TrainTestSplitter` (which separates `X` and `y`) **before** encoding. This ensures the target is safely stored in `y` and never touched by the encoder.
+**Fix:** Identify the target explicitly; Feature-Target Split separates feature columns X
+from target y. Keep learned feature encoding after Train-Test Split, which reserves rows for
+evaluation. X/y separation alone does not create a train/test boundary.
 
 ---
 

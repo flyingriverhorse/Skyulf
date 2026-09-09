@@ -15,7 +15,7 @@ file deliberately carries no history.
 per-area report files `00`–`18`).
 **Baseline:** commit `93d7719e` (master), audit run 2026-08-31 → 09-01 by 15
 parallel read-only agents (Claude Opus 5). 116 findings: 5 🔴 / 45 🟠 / 44 🟡 /
-22 ⚪, plus OC-160–206 filed by later reviews. OC-100 was retracted as a false
+22 ⚪, plus OC-160–215 filed by later reviews. OC-100 was retracted as a false
 positive and is not counted; the corrections pass stays in the archive.
 
 **Status key:** ⬜ open · 🟨 in progress · ✅ done · ⏭️ parked
@@ -60,8 +60,6 @@ closed that on 2026-09-07.
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
-| OC-70 | 🟡 | Leakage validator checks for *a* splitter globally, not that *this* branch is protected (`_execution/_leakage_validation.py:189-267`) | small | ⬜ open |
-| OC-145 | 🟡 | Crashed cross-validation returns the same `{}` sentinel as a disabled one — job reports success with missing `cv_*` metrics (`_node_runners.py:871-907`) | small | ⬜ open |
 | OC-151 | 🟡 | Trial-buffer `clear_*` hooks documented but never called — 110.9 MB retained for process lifetime (`realtime/trial_buffer.py:56-59,103-106`) | small | ⬜ open |
 | OC-156 | 🟡 | `roc_auc` threshold-tuning objective scores hard predictions — bit-identical to `balanced_accuracy` (`threshold_tuning_service.py:77-92`) | small | ⬜ open |
 | OC-158 | 🟡 | Sync/async JSON serializers disagree: sync nulls 8 of 15 legitimate strings (`"nan"`, `"NaT"`, `"<NA>"`, `"inf"`…), async nulls none; 603-line module production-dead but test-covered (`serialization.py:369,435-446`) | half day | ⬜ open |
@@ -83,7 +81,6 @@ closed that on 2026-09-07.
 | OC-114 | 🟡 | All-null tracked column yields 30 `NaN` autocorrelation lags as real analysis (≥1000-row datasets) (`temporal.py:167-191`) | small | ⬜ open |
 | OC-102 | ⚪ | Five tunable models return an empty search space from the live `/defaults` endpoint (`hyperparameters/_registry.py`) | small | ⬜ open |
 | OC-121 | ⚪ | polars `Enum` columns invisible to text auto-detection, diverging from pandas `Categorical` (`_helpers.py:148-157`) | small | ⬜ open |
-| OC-122 | ⚪ | `TextCleaning` silently ignores unrecognised operation name (`cleaning/text.py:151-153`) | small | ⬜ open |
 | OC-90 | ⚪ | Unknown split config keys silently dropped instead of rejected (`preprocessing/split.py`) | small | ⬜ open |
 
 ### Remaining — file-coverage closure
@@ -109,10 +106,6 @@ closed that on 2026-09-07.
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
 | OC-178 | 🟡 | `HashEncoder` hashes the same missing value into different buckets across Polars, pandas object, and pandas nullable string inputs, even with one shared fitted artifact (`preprocessing/encoding/hash.py:45,76`) | small | ⬜ open |
-| OC-179 | 🟡 | `DummyEncoder(drop_first=True)` retains a single-category indicator on Polars but removes it on pandas, changing feature width across engines (`preprocessing/encoding/dummy.py:33`) | small | ⬜ open |
-| OC-180 | 🟡 | Pandas `TextCleaning(normalize_slash_dates)` crashes on `pd.NA` in a nullable string column; equivalent Polars input preserves the missing value (`preprocessing/cleaning/text.py:35-37,116`) | small | ⬜ open |
-| OC-181 | 🟡 | `ValueReplacement` coerces every unrecognized boolean mapping key to `False`: mapping `{"banana": true}` changes `[true,false]` to `[true,true]` on both engines (`preprocessing/cleaning/value_replacement.py:31-32`) | small | ⬜ open |
-| OC-182 | 🟡 | Encoder auto-detection ignores pandas `StringDtype` columns: Dummy/Hash encoding silently leaves strings untouched unless columns are selected explicitly (`preprocessing/encoding/_common.py:140`) | small | ⬜ open |
 | OC-171 | 🟡 | Pandas `SimpleImputer` silently excludes explicitly selected constant/binary numeric columns for mean/median, leaving missing values unfilled; Polars honors the selection (`preprocessing/imputation/simple.py:173-177`) | small | ⬜ open |
 | OC-172 | 🟡 | `StandardScaler` crashes on mixed pandas nullable numeric columns containing `pd.NA`; native sklearn and equivalent Polars input succeed (`preprocessing/scaling/standard.py:144,154`, `engines/sklearn_bridge.py:52`) | small | ⬜ open |
 | OC-18 | 🟡 | One-hot/dummy generated names can collide with existing columns (`encoding/one_hot.py:68-92`, `dummy.py:76-99`) | small | ⬜ open |
@@ -128,6 +121,7 @@ closed that on 2026-09-07.
 | OC-27 | 🟠 | `GeneralTransformation` ignores the UI `standardize` toggle (`transformations/general.py:34-39,138-139`) | small | ⬜ open |
 | OC-29 | 🟡 | `FeatureGeneration` advertises `polynomial` but silently skips it (`feature_generation/_common.py:24-31`) | small | ⬜ open |
 | OC-30 | 🟡 | Datetime extraction ignores the UI output name, overwrites collisions (`_pandas_ops.py:173-184`) | small | ⬜ open |
+| OC-211 | 🟡 | Pandas datetime features depend on prediction-batch composition: prepending a different valid date format makes the original rows' year/month/day missing in both `FeatureGeneration.datetime_extract` and `DateFeatures` (`feature_generation/_pandas_ops.py:179`, `time_series/date_features.py:64`) | small | ⬜ open |
 | OC-31 | 🟡 | Frontend wrongly requires a target for unsupervised CorrelationThreshold (`FeatureSelectionNode.tsx:564-566`) | small | ⬜ open |
 | OC-32 | 🟡 | `VarianceThreshold` crashes when all candidates are constant (`feature_selection/variance.py:38-47`) | small | ⬜ open |
 | OC-33 | 🟡 | `FeatureInteraction` cannot generate single-column self-products (`feature_generation/interaction.py:173-178`) | small | ⬜ open |
@@ -165,6 +159,7 @@ closed that on 2026-09-07.
 | OC-161 | 🟡 | Polars clustering evaluation reserves `__skyulf_cluster__` without collision protection: a numeric feature with that name is overwritten by internal labels and then dropped, so centroid calculation crashes with `ColumnNotFoundError` (`modeling/_evaluation/clustering.py:92-101`) | small | ⬜ open |
 | OC-162 | 🟡 | Polars time-series CV reserves `__cv_y__` for an unnamed/list target: an input feature with that name is overwritten and dropped before fitting, silently changing the feature matrix (`modeling/cross_validation.py:317-322`) | small | ⬜ open |
 | OC-167 | 🟡 | Ambiguous string boundaries in artifact serialization give different fitted label encoders identical pipeline fingerprints, despite encoding the same input as 0 vs −1 (`pipeline/seal.py:52,64`) — distinct from OC-62's pointer instability | small | ⬜ open |
+| OC-208 | 🟡 | A failed `SkyulfPipeline.fit()` leaves new preprocessing attached to the previous model, so prediction remains enabled with inconsistent fitted state; executed prediction changes from 50 to −150 after the replacement model fails (`pipeline/_pipeline.py:329`, `modeling/base.py:427`) | half day | ⬜ open |
 
 ### Remaining — outliers / casting / binning / timeseries / geo
 
@@ -186,6 +181,7 @@ closed that on 2026-09-07.
 | OC-204 | 🟡 | `fit_predict` drops an embedded target during training but keeps it in held-out tuple features when explicit y is also supplied, causing prediction to fail (`modeling/base.py:317-324`) | small | ⬜ open |
 | OC-206 | ⚪ | Ensemble configuration resolution shallow-copies nested base-model parameters, so fitting mutates the caller's configuration (`modeling/ensemble.py:473,484`) | small | ⬜ open |
 | OC-168 | 🟡 | `SkyulfPipeline.fit()` retains the previous model's tuned thresholds — refitting with new class labels makes thresholded prediction crash; unchanged labels reuse stale cutoffs (`pipeline/_pipeline.py:135,380-389`) | small | ⬜ open |
+| OC-209 | 🟡 | Time-series tuning with an explicit validation partition fails on clean input: the time column is dropped only from training, and concatenating mismatched frames introduces NaNs (`modeling/_tuning/engine.py:353`, `_tuning/splitters.py:91`) | half day | ⬜ open |
 
 ### Remaining — frontend
 
@@ -194,12 +190,15 @@ closed that on 2026-09-07.
 | OC-54 | 🟡 | `DebugNode` is dead code that would silently no-op if wired up (`nodes/DebugNode.tsx`) | small | ⬜ open |
 | OC-56 | ⚪ | `useSchemaPreview` does not cancel in-flight requests on unmount (`hooks/useSchemaPreview.ts`) | small | ⬜ open |
 | OC-57 | ⚪ | `any`-typed chart props bypass type safety in EDA components (`modules/eda/`) | small | ⬜ open |
+| OC-214 | 🟠 | Frontend lockfile and installed PostCSS dependency retain `nanoid@3.3.17`, affected by CVE-2026-67213; the parent range permits the patched 3.3.18 release (`frontend/ml-canvas/package-lock.json`) | small | ⬜ open — dependency presence confirmed; application exploitability not established |
+| OC-215 | 🟡 | Frontend Tailwind/PostCSS dependencies retain `postcss-selector-parser@6.1.2`, affected by CVE-2026-9358; both parent ranges permit the patched 6.1.3 release (`frontend/ml-canvas/package-lock.json`) | small | ⬜ open — dependency presence confirmed; application exploitability not established |
 
 ### Remaining — tests / packaging / CI (outside the Ongoing tier)
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
 | OC-80 | 🟡 | 3 weakest-covered modules untested exactly where silence is dangerous (`_sklearn_compat.py`, `value_replacement.py`, `config_validation.py`) | ~1 day | ⬜ open |
+| OC-213 | ⚪ | Leakage examples produce 22 ty diagnostics: 16 in the notebook and six in the Python script, caused by heterogeneous configuration inference and un-narrowed `SplitDataset` slots (`skyulf-core/examples/09_leakage_safety.ipynb`, `09_leakage_safety.py`) | small | ⬜ open — both examples execute successfully; type information needs correction |
 
 ---
 
@@ -231,6 +230,102 @@ source read when the finding was filed, so they may have moved.
 
 Findings filed before 2026-09-05 — OC-169 and OC-178–182 among them — keep
 their reproduction detail in the archive's `## Log` entries instead.
+
+### 2026-09-08 — OC-213–215: Problems panel review
+
+Source: [the complete diagnostic disposition](problems_panel_review-2026-09-08.md),
+against working tree `f12dde9f`. The repeated export contains 105 distinct
+file/rule/locations, including external type stubs, obsolete rules, and optional
+style suggestions. Only the actionable example/dependency findings are filed here.
+
+**OC-213 — leakage examples have inaccurate inferred types.** Run
+`.venv\Scripts\python.exe -m ty check skyulf-core/examples/09_leakage_safety.ipynb
+skyulf-core/examples/09_leakage_safety.py --output-format concise`: 22 diagnostics.
+The notebook's unannotated configuration conflates modeling dictionaries with
+preprocessing lists; `SplitDataset` slots also admit several frame types and
+`(X,y)` tuples, so pandas indexing, subtraction, and `.drop(columns=...)` are
+not justified by their declared types. Executing all 12 notebook code cells in
+order and running the Python example succeeds, including assertions. This is
+an example typing defect, not a reproduced training failure.
+**Fix/verification target:** annotate the configuration appropriately and retain
+named pandas partition variables, or narrow slot types explicitly. Preserve
+the general `SplitDataset` contract and the example assertions. Rerun the
+explicit example ty command and execute both examples.
+
+**OC-214 — vulnerable transitive nanoid version.** `npm ls nanoid --all` reports
+`postcss@8.5.26 -> nanoid@3.3.17`; the lockfile agrees. PostCSS's `^3.3.17` range
+allows 3.3.18, listed as patched in the
+[CVE-2026-67213 advisory](https://github.com/advisories/GHSA-2v37-7h3g-55p8).
+The advisory concerns zero-size custom generators. The inspected PostCSS call
+uses a constant size of 6 via `nanoid/non-secure`, so dependency presence alone
+does not establish an exploitable Skyulf path.
+**Fix/verification target:** update the compatible transitive patch version,
+inspect the lockfile diff, confirm the installed tree and vulnerability scan,
+and run frontend lint/tests/build.
+
+**OC-215 — vulnerable transitive selector-parser version.**
+`npm ls postcss-selector-parser --all` reports 6.1.2 under Tailwind 3.4.18 and
+its postcss-nested 6.2.0 dependency. The lockfile agrees; the recorded `^6.1.2`
+and `^6.1.1` ranges allow 6.1.3. The maintainer's
+[6.1.3 release](https://github.com/postcss/postcss-selector-parser/releases/tag/6.1.3)
+explicitly backports the CVE-2026-9358 recursion fix. No direct application
+import was found during this review; application exploitability is unproven.
+**Fix/verification target:** update the compatible transitive patch version,
+inspect the lockfile diff, confirm the installed tree and vulnerability scan,
+and run frontend lint/tests/build.
+
+### 2026-09-08 — OC-208/209/211: remaining reproduced core findings
+
+Source: [the supplemental review](skyulf_core_review-2026-09-08.md), against the
+working tree based on `28f12473`, including its staged and unstaged changes.
+All three remaining findings were executed and independently reproduced by the
+main reviewer. They are newly discovered defects, not necessarily regressions
+introduced by that working tree, and remain open.
+
+**OC-208 — failed refit mixes new preprocessing with the old model.** Fit a
+`SkyulfPipeline` containing `StandardScaler(columns=["x"])` and
+`linear_regression` on `x=0..23`, `target=2*x`. Prediction at `x=25` is **50**.
+Refit the same instance with `x += 100` and all-missing targets: fitting raises
+`ValueError: Input y contains NaN`. The subsequent prediction at `x=25` is
+**−150** because the scaler has already been replaced but the previous fitted
+model remains accessible. **Fix/verification target:** make failed fitting
+preserve the previous complete fitted state or invalidate prediction until a
+successful refit; pin predictions after an intentionally failed replacement
+fit. Locations: `pipeline/_pipeline.py:329`, `modeling/base.py:427`. Distinct
+from OC-168's stale thresholds and closed OC-164's `get_fitted_split()` mutation.
+
+**OC-209 — time-series tuning corrupts the train/validation feature schema.**
+Build a pandas frame with 30 rows: `x=arange(30, dtype=float)`, `time=arange(30)`,
+`target=2*x`. Supply a `SplitDataset` with train rows `[:18]`, validation
+`[18:24]`, and test `[24:]`. Run a `ridge_regression` hyperparameter tuner with
+`strategy="grid"`, `search_space={"alpha":[1.0]}`, `metric="r2"`, `cv_folds=3`,
+`cv_type="time_series_split"`, `cv_time_column="time"`. Public pipeline fitting
+raises `All trials failed ... First trial error: Input X contains NaN`, while
+the same setup with ordinary CV succeeds. Sorting removes `time` from training
+features but not validation features; frame concatenation restores it with
+missing training values. **Fix/verification target:** keep training and
+validation feature selection consistent before holdout concatenation; cover
+clean explicit partitions and retain chronological sorting and X/y alignment.
+Locations: `modeling/_tuning/engine.py:353`, `_tuning/splitters.py:91`. This
+requires neither OC-162's reserved name nor OC-194's missing timestamps.
+
+**OC-211 — date extraction changes with unrelated batch companions.** Fit and
+apply both `FeatureGeneration` with `operation_type="datetime_extract"`,
+`input_columns=["date"]`, `datetime_features=["year","month","day"]`, and
+`DateFeatures(columns=["date"])` to dates `["2024-01-02","2024-03-04"]`.
+Both return months **[1,3]**. Apply the same fitted artifact after prepending
+`"04/05/2024"` to that batch: the original two rows' year/month/day all become
+missing. Both pandas implementations infer one date format again from each
+apply batch. **Fix/verification target:** define a stable parsing policy and
+verify that unrelated rows and batch order do not change a given valid date's
+features in either node. Locations: `feature_generation/_pandas_ops.py:179`,
+`time_series/date_features.py:64`. Distinct from OC-30's output-name collision
+and OC-174's entirely invalid Polars dates.
+
+**Verification during the review:** the full core suite produced **5,494 passed,
+56 skipped, 281 warnings**; the remaining small reproductions expose behavior the
+passing suite does not assert. The linked report includes reproduction commands,
+the separate editor-diagnostics investigation, and existing-queue reconciliation.
 
 ### 2026-09-06 — remaining-source continuation (findings added as verified)
 

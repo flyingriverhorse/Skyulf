@@ -82,7 +82,7 @@ def _onehot_apply_pandas(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, A
     X_out = X.copy()
     X_subset = X_out[valid_cols]
     if include_missing:
-        X_subset = X_subset.fillna(_MISSING_TOKEN)
+        X_subset = X_subset.astype(object).where(X_subset.notna(), _MISSING_TOKEN)
 
     X_input = X_subset.to_numpy() if hasattr(X_subset, "to_numpy") else X_subset
     encoded = _to_dense(encoder.transform(X_input))
@@ -206,7 +206,7 @@ def _onehot_fit_pandas(X: Any, y: Any, config: dict[str, Any]) -> Mapping[str, A
     opts = _resolve_fit_options(config)
     X_subset = X[cols]
     if opts["include_missing"]:
-        X_subset = X_subset.fillna(_MISSING_TOKEN)
+        X_subset = X_subset.astype(object).where(X_subset.notna(), _MISSING_TOKEN)
 
     encoder = _fit_sklearn_onehot(X_subset, opts, cols)
     return _build_onehot_artifact(encoder, cols, opts)

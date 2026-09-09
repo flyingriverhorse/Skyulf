@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { collectGraphValidationIssues, useGraphStore, type GraphValidationIssue } from '../../core/store/useGraphStore';
-import { FOCUS_NODE_EVENT } from '../../core/hooks/useKeyboardShortcuts';
+import { FOCUS_CANVAS_EVENT, FOCUS_NODE_EVENT } from '../../core/hooks/useKeyboardShortcuts';
 import { getReadOnlyMode } from '../../core/hooks/useReadOnlyMode';
 import { useViewStore } from '../../core/store/useViewStore';
 import { AlertTriangle, ChevronUp, ChevronDown, Maximize2, Minimize2, Table, X, XCircle } from 'lucide-react';
@@ -55,19 +55,23 @@ export const ResultsPanel: React.FC<{ maxHeight?: number }> = ({ maxHeight = 720
   const [pane, setPane] = useState<ResultsPane | null>(null);
   const validationHeadingId = React.useId();
   const validationIssues = useMemo(
-    () => collectGraphValidationIssues(canvasNodes, canvasEdges),
+    () => collectGraphValidationIssues(canvasNodes, canvasEdges).filter(issue => issue.category !== 'leakage'),
     [canvasNodes, canvasEdges],
   );
+  const validationIssueKey = JSON.stringify(validationIssues);
 
   // After the user closes the panel with X it stays hidden until something
   // new happens: fresh preview/run results arrive, or the set of validation
   // issues changes (edited graph → new problem to look at).
   React.useEffect(() => {
-    if (executionResult || lastRunError) setDismissed(false);
-  }, [executionResult, lastRunError, setDismissed]);
+    if (executionResult) setDismissed(false);
+  }, [executionResult, setDismissed]);
+  React.useEffect(() => {
+    if (lastRunError) setDismissed(false);
+  }, [lastRunError, setDismissed]);
   React.useEffect(() => {
     setDismissed(false);
-  }, [validationIssues, setDismissed]);
+  }, [validationIssueKey, setDismissed]);
 
   // Map node id → readable label (falls back to a prettified definitionType
   // so users see "Drop Rows" instead of "drop_rows-04475cca-eef7-4fdb-...").
@@ -413,6 +417,7 @@ export const ResultsPanel: React.FC<{ maxHeight?: number }> = ({ maxHeight = 720
                 setIsMaximized(false);
                 setMergeWarningsOpen(false);
                 setDismissed(true);
+                window.dispatchEvent(new Event(FOCUS_CANVAS_EVENT));
               }}
             >
               <X className="w-4 h-4" />

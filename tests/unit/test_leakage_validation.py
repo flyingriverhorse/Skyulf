@@ -125,6 +125,105 @@ def test_reclassified_stateful_nodes_before_splitter_are_blocked(step_type, para
         validate_no_preprocessing_before_split(nodes)
 
 
+def test_flags_data_dependent_nodes_on_unprotected_training_branch():
+    """A training branch without its own splitter must be reported as unprotected."""
+    nodes = [
+        _node("load", "DataLoader", []),
+        _node("scale_unprotected", "StandardScaler", ["load"]),
+        _node("split_protected", "TrainTestSplitter", ["load"]),
+        _node("scale_protected", "StandardScaler", ["split_protected"]),
+        _node("training_unprotected", "training", ["scale_unprotected"]),
+        _node("training_protected", "training", ["scale_protected"]),
+    ]
+
+    verdict = validate_no_preprocessing_before_split(nodes, on_leakage="warn")
+
+    assert verdict["status"] == "warnings"
+    assert verdict["checked"] == [
+        {
+            "node_id": "scale_unprotected",
+            "step_type": "StandardScaler",
+            "before_split": False,
+            "violation": True,
+        },
+        {
+            "node_id": "scale_protected",
+            "step_type": "StandardScaler",
+            "before_split": False,
+            "violation": False,
+        },
+    ]
+    assert "training_unprotected" in verdict["messages"][0]
+
+
+@pytest.mark.parametrize(
+    "params",
+    [{"cv_enabled": True}, {"run_mode": "tuned", "tuning_config": {"cv_enabled": False}}],
+)
+def test_allows_unprotected_training_branch_with_explicit_cross_validation(params):
+    """Explicit CV protects a training branch that has no train/test splitter."""
+    nodes = [
+        _node("load", "DataLoader", []),
+        _node("scale_unprotected", "StandardScaler", ["load"]),
+        _node("split_protected", "TrainTestSplitter", ["load"]),
+        _node("training_unprotected", "training", ["scale_unprotected"], params=params),
+        _node("training_protected", "training", ["split_protected"]),
+    ]
+
+    verdict = validate_no_preprocessing_before_split(nodes, on_leakage="warn")
+
+    assert verdict["status"] == "passed"
+    assert verdict["messages"] == []
+
+
+@pytest.mark.parametrize(
+    "params",
+    [{"cv_enabled": True}, {"run_mode": "tuned", "tuning_config": {"cv_enabled": False}}],
+)
+@pytest.mark.parametrize("nested_merge", [False, True])
+@pytest.mark.parametrize("on_leakage", ["raise", "warn", "ignore"])
+def test_cv_does_not_exempt_unsplit_merged_preprocessing(params, nested_merge, on_leakage):
+    """CV must not approve graphs whose preprocessing cannot be refitted per fold."""
+    nodes = [
+        _node("load", "data_loader", []),
+        _node("split", "TrainTestSplitter", ["load"]),
+        _node("scale_a", "StandardScaler", ["load"]),
+        _node("scale_b", "MinMaxScaler", ["load"]),
+    ]
+    inputs = ["scale_a", "scale_b"]
+    if nested_merge:
+        nodes.append(_node("merge", "feature_engineering", inputs, {"steps": []}))
+        inputs = ["merge"]
+    nodes.append(_node("training_unprotected", "training", inputs, params))
+
+    if on_leakage == "raise":
+        with pytest.raises(ValueError, match="training_unprotected"):
+            validate_no_preprocessing_before_split(nodes)
+    else:
+        verdict = validate_no_preprocessing_before_split(nodes, on_leakage=on_leakage)
+
+        assert verdict["status"] == "warnings"
+        assert {item["node_id"] for item in verdict["checked"] if item["violation"]} == {
+            "scale_a",
+            "scale_b",
+        }
+
+
+def test_cv_allows_duplicate_edges_on_a_linear_preprocessing_path():
+    """Duplicate handles from one source must not be mistaken for an unsupported merge."""
+    nodes = [
+        _node("load", "data_loader", []),
+        _node("split", "TrainTestSplitter", ["load"]),
+        _node("scale", "StandardScaler", ["load", "load"]),
+        _node("training", "training", ["scale", "scale"], {"cv_enabled": True}),
+    ]
+
+    verdict = validate_no_preprocessing_before_split(nodes)
+
+    assert verdict["status"] == "passed"
+    assert verdict["messages"] == []
+
+
 def test_step_type_lists_are_derived_from_the_core_registry():
     """G2: the backend gate consumes the skyulf-core registry-derived lists;
     there is no second hand-maintained copy to drift.
@@ -303,16 +402,15 @@ def test_raises_for_indirect_ancestor_through_branching_graph():
 
 @pytest.mark.parametrize("step_type", ["LabelEncoder", "OrdinalEncoder"])
 def test_target_only_label_or_ordinal_encoding_before_split_is_allowed(step_type):
-    """Label/Ordinal encoders with no `columns` selected only encode the
-    target (y), which is standard leak-free practice - not a leakage risk.
-    """
+    """An explicit empty column selection encodes only the target, not inferred features."""
     nodes = [
         _node("load", "DataLoader", []),
-        _node("encode_target", step_type, ["load"], params={}),
+        _node("encode_target", step_type, ["load"], params={"columns": []}),
         _node("split", "TrainTestSplitter", ["encode_target"]),
         _node("model", "LogisticRegression", ["split"]),
     ]
-    validate_no_preprocessing_before_split(nodes)  # must not raise
+    verdict = validate_no_preprocessing_before_split(nodes)
+    assert verdict["status"] == "passed"
 
 
 @pytest.mark.parametrize("step_type", ["LabelEncoder", "OrdinalEncoder"])

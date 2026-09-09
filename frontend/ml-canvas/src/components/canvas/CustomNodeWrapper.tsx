@@ -1,4 +1,4 @@
-import { memo, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { NodeProps, useReactFlow } from '@xyflow/react';
 import { ConnectionPort } from './ConnectionPort';
 import { registry } from '../../core/registry/NodeRegistry';
@@ -8,6 +8,8 @@ import { useJobStore } from '../../core/store/useJobStore';
 import { useViewStore } from '../../core/store/useViewStore';
 import { bucketDuration, getPerfFamily } from '../../core/perf/perfThresholds';
 import { useReadOnlyMode } from '../../core/hooks/useReadOnlyMode';
+import { useCanvasLeakageFeedback } from '../../core/contexts/CanvasLeakageContext';
+import { LeakageIssuePopover } from './LeakageIssuePopover';
 import {
   isAutoParallelType,
   supportsExecutionModeToggle,
@@ -17,6 +19,26 @@ import {
 function CustomNodeWrapperImpl({ id, data, selected, isConnectable }: NodeProps) {
   const definitionType = data.definitionType as string;
   const definition = registry.get(definitionType);
+  const { nodeIssues, openGuide } = useCanvasLeakageFeedback();
+  const leakageIssues = nodeIssues[id] ?? [];
+  const leakageSeverity = leakageIssues.some(issue => issue.severity === 'error')
+    ? 'error' : leakageIssues.length > 0 ? 'warning' : null;
+  const splitBodyRef = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const body = splitBodyRef.current;
+    if (!body || (definition?.outputs.length ?? 0) < 2) return;
+    const labels = Array.from(body.querySelectorAll<HTMLElement>('[data-output-label]'));
+    const reserveLabelSpace = () => {
+      // offsetWidth excludes canvas zoom and the selected-card transform.
+      // Include the labels' right-4 inset and 8px of clearance for the summary.
+      const width = Math.max(0, ...labels.map(label => label.offsetWidth)) + 24;
+      body.style.setProperty('--split-output-space', `${width}px`);
+    };
+    reserveLabelSpace();
+    const observer = new ResizeObserver(reserveLabelSpace);
+    labels.forEach(label => observer.observe(label));
+    return () => observer.disconnect();
+  }, [definition]);
   const { deleteElements, getEdges } = useReactFlow();
   // In read-only mode the per-node X is hidden along with the global
   // editor affordances (Backspace, sidebars, undo/redo, palette).
@@ -224,8 +246,7 @@ function CustomNodeWrapperImpl({ id, data, selected, isConnectable }: NodeProps)
   }
 
   const hasMultipleOutputs = definition.outputs.length > 1;
-  // Reserve room for both "Features (X)" and "Validation" with wider platform fallback fonts.
-  const splitBodyPadding = 'pl-3 pr-28';
+  const splitBodyPadding = 'pl-3 pr-[var(--split-output-space,0px)]';
   const bodyTextClass = `${hasMultipleOutputs ? splitBodyPadding : 'px-10'} py-2 min-h-[2.75rem] flex items-center justify-center`;
   const outputPorts = definition.outputs.map((output, index) => (
     <ConnectionPort
@@ -244,10 +265,15 @@ function CustomNodeWrapperImpl({ id, data, selected, isConnectable }: NodeProps)
       data-node-definition-type={definitionType}
       data-perf-bucket={perfBucket ?? undefined}
       data-perf-duration-ms={perfDurationMs ?? undefined}
+      data-leakage-severity={leakageSeverity ?? undefined}
       title={perfTooltip}
       className={`
       relative group min-w-[200px] bg-card border-2 rounded-lg shadow-sm transition-all duration-150
-      ${selected
+      ${leakageSeverity === 'error'
+        ? 'border-red-500 hover:border-red-500'
+        : leakageSeverity === 'warning'
+        ? 'border-amber-500 hover:border-amber-500'
+        : selected
         ? 'border-primary shadow-lg shadow-primary/30 scale-[1.02]'
         : nodeResult?.status === 'failed'
         ? 'border-red-500 shadow-sm shadow-red-500/20 hover:border-red-500'
@@ -256,7 +282,8 @@ function CustomNodeWrapperImpl({ id, data, selected, isConnectable }: NodeProps)
         : hasBrokenRefs
         ? 'border-amber-500/40 hover:border-amber-500/60'
         : 'border-border hover:border-primary/50'}
-      ${isPulsing ? 'animate-validation-pulse' : ''}
+      ${leakageSeverity && selected ? 'shadow-lg shadow-primary/30 scale-[1.02]' : ''}
+      ${isPulsing && !leakageSeverity ? 'animate-validation-pulse' : ''}
       ${perfRingClass}
     `}>
       {/* Floating delete chip — absolute on the card corner so it never
@@ -278,8 +305,9 @@ function CustomNodeWrapperImpl({ id, data, selected, isConnectable }: NodeProps)
           out of the header text row so they can't be squeezed by long
           titles and out of the right edge so they can't collide with
           output-handle labels in the body of split nodes. */}
-      {(nodeResult || validationMessage || hasBrokenRefs) && (
+      {(leakageSeverity || nodeResult || validationMessage || hasBrokenRefs) && (
         <div className="absolute -top-2 -left-2 z-10 flex items-center gap-1">
+          {leakageSeverity && <LeakageIssuePopover issues={leakageIssues} subject={definition.label} openGuide={openGuide} compact />}
           {nodeResult && (
             <span
               title={nodeResult.status === 'success'
@@ -381,7 +409,7 @@ function CustomNodeWrapperImpl({ id, data, selected, isConnectable }: NodeProps)
           5. Nothing — collapse padding so card visually shrinks.
           Split outputs share the existing body height, with the summary
           on the left and compact port labels on the right. */}
-      <div className={hasMultipleOutputs ? 'relative' : undefined}>
+      <div ref={splitBodyRef} className={hasMultipleOutputs ? 'relative' : undefined}>
       {(() => {
         if (definition.component) {
           return (

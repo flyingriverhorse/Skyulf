@@ -138,6 +138,18 @@ def test_apply_empty_columns_is_noop(engine: str) -> None:
     assert result["b"].tolist() == [-999, 2]
 
 
+def test_apply_unrecognized_mapping_key_does_not_mutate_boolean_column() -> None:
+    """An unrecognized string mapping key for a boolean column should not mutate values."""
+    params: dict[str, Any] = {"columns": ["flag"], "mapping": {"banana": True}}
+    for engine in ("pandas", "polars"):
+        data = {"flag": [True, False]}
+        df = pd.DataFrame(data, dtype="boolean") if engine == "pandas" else pl.DataFrame(data)
+        result = ValueReplacementApplier().apply(df, params)
+        if hasattr(result, "to_pandas"):
+            result = result.to_pandas()
+        assert result["flag"].tolist() == [True, False]
+
+
 # ---------------------------------------------------------------------------
 # fit -> apply round trip
 # ---------------------------------------------------------------------------

@@ -61,8 +61,17 @@ const BUNDLED_DATA_DEPENDENT_FIT_STEP_TYPES: readonly string[] = [
   'EqualWidthBinning',
   'EqualFrequencyBinning',
   'KBinsDiscretizer',
+  'CustomBinning',
   // Distribution transforms
   'PowerTransformer',
+  'GeneralTransformation',
+  // Operation-sensitive nodes: fixed rules are exempted below.
+  'FeatureGeneration',
+  'FeatureMath',
+  'FeatureGenerationNode',
+  'PolynomialFeatures',
+  'PolynomialFeaturesNode',
+  'Casting',
   // Text vectorization (vocabulary/IDF learned from the corpus)
   'count_vectorizer',
   'tfidf_vectorizer',
@@ -90,6 +99,19 @@ export const TRAIN_TEST_SPLIT_STEP_TYPES = new Set<string>(
   BUNDLED_TRAIN_TEST_SPLIT_STEP_TYPES,
 );
 
+let leakageFlagsRevision = 0;
+const leakageFlagListeners = new Set<() => void>();
+export const getLeakageFlagsRevision = (): number => leakageFlagsRevision;
+export function subscribeLeakageFlags(listener: () => void): () => void {
+  leakageFlagListeners.add(listener);
+  return () => { leakageFlagListeners.delete(listener); };
+}
+
+function notifyLeakageFlagsChanged(): void {
+  leakageFlagsRevision += 1;
+  leakageFlagListeners.forEach(listener => listener());
+}
+
 export interface RegistryLeakageFlags {
   id: string;
   learns_from_data?: boolean;
@@ -116,6 +138,7 @@ export function applyRegistryLeakageFlags(items: readonly RegistryLeakageFlags[]
     if (item.learns_from_data) names.forEach((n) => DATA_DEPENDENT_FIT_STEP_TYPES.add(n));
     if (item.is_splitter) names.forEach((n) => TRAIN_TEST_SPLIT_STEP_TYPES.add(n));
   }
+  notifyLeakageFlagsChanged();
 }
 
 /** Restore the bundled fallback gate lists (e.g. after a failed fetch). */
@@ -124,6 +147,7 @@ export function resetLeakageFlags(): void {
   TRAIN_TEST_SPLIT_STEP_TYPES.clear();
   for (const id of BUNDLED_DATA_DEPENDENT_FIT_STEP_TYPES) DATA_DEPENDENT_FIT_STEP_TYPES.add(id);
   for (const id of BUNDLED_TRAIN_TEST_SPLIT_STEP_TYPES) TRAIN_TEST_SPLIT_STEP_TYPES.add(id);
+  notifyLeakageFlagsChanged();
 }
 
 // Encoder step types that can operate purely on the target column (y)
@@ -139,15 +163,15 @@ const TARGET_COLUMN_SOURCE_STEP_TYPES = new Set<string>([
   'training',
 ]);
 
-/** Finds the pipeline's configured target column name, if any node declares one. */
-function findTargetColumn(nodes: NodeConfigModel[]): string | undefined {
-  for (const n of nodes) {
-    if (TARGET_COLUMN_SOURCE_STEP_TYPES.has(n.step_type)) {
-      const targetColumn = n.params.target_column;
-      if (typeof targetColumn === 'string' && targetColumn) return targetColumn;
-    }
+/** Use only unambiguous target context from this node's execution lineage. */
+function findTargetColumn(nodes: NodeConfigModel[], relatedIds: ReadonlySet<string>): string | undefined {
+  const targets = new Set<string>();
+  for (const node of nodes) {
+    if (!relatedIds.has(node.node_id) || !TARGET_COLUMN_SOURCE_STEP_TYPES.has(node.step_type)) continue;
+    const value = node.params.target_column;
+    if (typeof value === 'string' && value) targets.add(value);
   }
-  return undefined;
+  return targets.size === 1 ? [...targets][0] : undefined;
 }
 
 /**
@@ -156,10 +180,10 @@ function findTargetColumn(nodes: NodeConfigModel[]): string | undefined {
  * `_is_target_only_encoding` (see
  * `backend/ml_pipeline/_execution/_leakage_validation.py`) — the node fits
  * only on `y` (a deterministic category->integer mapping, not a leakage
- * risk before the train/test split) when its `columns` param is
- * empty/missing, OR when `columns` names exactly the target column (users
- * commonly pick the target explicitly from the column picker rather than
- * leaving it blank). Keep in sync with the backend check.
+ * risk before the train/test split) when `columns` is explicitly empty or
+ * names exactly the target. Only LabelEncoder treats omitted/null columns
+ * as target-only; OrdinalEncoder auto-detects feature categories in that
+ * mode. Keep in sync with the backend check.
  */
 export function isTargetOnlyEncoding(
   stepType: string,
@@ -168,7 +192,8 @@ export function isTargetOnlyEncoding(
 ): boolean {
   if (!TARGET_CAPABLE_ENCODER_STEP_TYPES.has(stepType)) return false;
   const columns = params.columns;
-  if (!columns || (Array.isArray(columns) && columns.length === 0)) return true;
+  if (Array.isArray(columns) && columns.length === 0) return true;
+  if (stepType === 'LabelEncoder' && columns == null) return true;
   return (
     !!targetColumn && Array.isArray(columns) && columns.length === 1 && columns[0] === targetColumn
   );
@@ -235,6 +260,78 @@ export function isExplicitHashEncoding(stepType: string, params: Record<string, 
   return stepType === 'HashEncoder' && Array.isArray(params.columns);
 }
 
+const EMPTY_SELECTION_NOOP_STEP_TYPES = new Set([
+  'OneHotEncoder', 'DummyEncoder', 'TargetEncoder', 'WOEEncoder', 'PowerTransformer',
+  'StandardScaler', 'MinMaxScaler', 'MaxAbsScaler', 'RobustScaler', 'SimpleImputer',
+  'KNNImputer', 'IterativeImputer', 'GeneralBinning', 'KBinsDiscretizer', 'CustomBinning',
+  'IQR', 'ZScore', 'Winsorize', 'EllipticEnvelope',
+]);
+const FEATURE_GENERATION_STEP_TYPES = new Set([
+  'FeatureGeneration', 'FeatureMath', 'FeatureGenerationNode',
+]);
+const FIXED_TRANSFORMATION_METHODS = new Set([
+  'log', 'sqrt', 'square_root', 'cube_root', 'reciprocal', 'square', 'exp', 'exponential',
+]);
+const FIXED_FEATURE_OPERATIONS = new Set(['arithmetic', 'ratio', 'similarity', 'datetime_extract']);
+
+/** Narrow untrusted node parameters without treating arrays as operation objects. */
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+/** Resolve the same casting overrides as the calculator before checking for learned categories. */
+function isFixedCasting(params: Record<string, unknown>): boolean {
+  const columnTypes = new Map<string, unknown>(
+    isRecord(params.column_types) ? Object.entries(params.column_types) : [],
+  );
+  const targetType = params.target_type;
+  if (Array.isArray(params.columns) && typeof targetType === 'string' && targetType) {
+    for (const column of params.columns) {
+      if (typeof column === 'string') columnTypes.set(column, targetType);
+    }
+  }
+  return ![...columnTypes.values()].some(type =>
+    typeof type === 'string' && ['category', 'categorical'].includes(type.toLowerCase()),
+  );
+}
+
+/** Exempt parameter modes whose actual calculator only records fixed rules or performs no work. */
+function isFixedOperation(
+  stepType: string,
+  params: Record<string, unknown>,
+  targetColumn: string | undefined,
+): boolean {
+  if (EMPTY_SELECTION_NOOP_STEP_TYPES.has(stepType)
+    && Array.isArray(params.columns) && params.columns.length === 0) return true;
+  if (stepType === 'CustomBinning') return Array.isArray(params.columns);
+  if (stepType === 'Casting') return isFixedCasting(params);
+  if (stepType === 'PolynomialFeatures' || stepType === 'PolynomialFeaturesNode') {
+    // The basis is fixed math; optional column discovery learns from the fitting rows.
+    return !params.auto_detect || (Array.isArray(params.columns) && params.columns.length > 0);
+  }
+  if (stepType === 'count_vectorizer' || stepType === 'tfidf_vectorizer') {
+    const columns = params.columns;
+    // Only graph target context can grant an exemption, never a node's own hint.
+    return columns == null || (Array.isArray(columns)
+      && (columns.length === 0 || (!!targetColumn && columns.every(column => column === targetColumn))));
+  }
+  if (stepType === 'GeneralTransformation') {
+    const rules = params.transformations ?? [];
+    return Array.isArray(rules) && rules.every(rule =>
+      isRecord(rule) && typeof rule.method === 'string' && FIXED_TRANSFORMATION_METHODS.has(rule.method),
+    );
+  }
+  if (FEATURE_GENERATION_STEP_TYPES.has(stepType)) {
+    const operations = params.operations ?? [];
+    return Array.isArray(operations) && operations.every(operation => {
+      if (!isRecord(operation)) return false;
+      const type = operation.operation_type === undefined ? 'arithmetic' : operation.operation_type;
+      return typeof type === 'string' && FIXED_FEATURE_OPERATIONS.has(type);
+    });
+  }
+  return false;
+}
+
 export interface LeakageIssue {
   nodeId: string;
   stepType: string;
@@ -280,15 +377,42 @@ export function findPreprocessingBeforeSplitIssues(nodes: NodeConfigModel[]): Le
     return result;
   }
 
+  const nodesById = new Map(nodes.map(node => [node.node_id, node]));
+  const protection = new Map<string, boolean>();
+  function protectedBySplit(nodeId: string, active = new Set<string>()): boolean {
+    if (splitterIds.has(nodeId)) return true;
+    const cached = protection.get(nodeId);
+    if (cached !== undefined) return cached;
+    const node = nodesById.get(nodeId);
+    if (!node?.inputs.length || active.has(nodeId)) return false;
+    active.add(nodeId);
+    const protectedInput = node.inputs.every(parentId => protectedBySplit(parentId, active));
+    active.delete(nodeId);
+    protection.set(nodeId, protectedInput);
+    return protectedInput;
+  }
+
   const issues: LeakageIssue[] = [];
-  const targetColumn = findTargetColumn(nodes);
   for (const n of nodes) {
     if (!DATA_DEPENDENT_FIT_STEP_TYPES.has(n.step_type)) continue;
+    if (protectedBySplit(n.node_id)) continue;
+    const relatedIds = new Set([n.node_id, ...collect(n.node_id)]);
+    const upstream = [...n.inputs];
+    const visited = new Set<string>();
+    while (upstream.length) {
+      const parentId = upstream.pop()!;
+      if (visited.has(parentId)) continue;
+      visited.add(parentId);
+      relatedIds.add(parentId);
+      upstream.push(...(nodesById.get(parentId)?.inputs ?? []));
+    }
+    const targetColumn = findTargetColumn(nodes, relatedIds);
     if (isTargetOnlyEncoding(n.step_type, n.params, targetColumn)) continue;
     if (isExplicitColumnDrop(n.step_type, n.params)) continue;
     if (isConstantImputation(n.step_type, n.params)) continue;
     if (isExplicitMissingIndicator(n.step_type, n.params)) continue;
     if (isExplicitHashEncoding(n.step_type, n.params)) continue;
+    if (isFixedOperation(n.step_type, n.params, targetColumn)) continue;
     const reachable = collect(n.node_id);
     const hitSplitter = [...splitterIds].find((id) => reachable.has(id));
     if (hitSplitter) {

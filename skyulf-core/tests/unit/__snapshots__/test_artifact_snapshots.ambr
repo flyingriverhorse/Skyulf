@@ -53,6 +53,7 @@
 # ---
 # name: test_woe_encoder_artifact_snapshot
   dict({
+    'category_key_version': 1,
     'columns': list([
       'city',
     ]),

@@ -43,6 +43,7 @@ import { RecentPipelinesMenu } from './toolbar/RecentPipelinesMenu';
 import { VersionLoadMenu } from './toolbar/VersionLoadMenu';
 import { ToolbarIconButton } from './toolbar/ToolbarIconButton';
 import { NotebookExportMenuItems } from './toolbar/NotebookExportMenuItems';
+import { ExperimentRunDialog } from './toolbar/ExperimentRunDialog';
 
 export const Toolbar: React.FC = () => {
   const nodes = useGraphStore((state) => state.nodes);
@@ -114,7 +115,12 @@ export const Toolbar: React.FC = () => {
     hasMultipleBranches,
     handleRun,
     handleRunAll,
+    experimentModels,
+    experimentBlockReason,
   } = useRunControls();
+  const [reviewingExperiments, setReviewingExperiments] = useState(false);
+  useEffect(() => { if (readOnly) setReviewingExperiments(false); }, [readOnly]);
+  const reviewPreviewResults = () => useViewStore.getState().setResultsPanelExpanded(true);
 
   const {
     isSaving,
@@ -246,8 +252,9 @@ export const Toolbar: React.FC = () => {
       <div
         ref={toolbarRef}
         data-canvas-toolbar
-        className={`absolute top-4 right-4 flex items-start gap-2 ${showMoreMenu || showLoadMenu || showRecentMenu || showExportMenu ? 'z-40' : 'z-10'} ${isSidebarOpen || readOnly ? 'left-4' : 'left-16'}`}
+        className={`absolute top-4 right-4 flex flex-col gap-2 ${showMoreMenu || showLoadMenu || showRecentMenu || showExportMenu ? 'z-40' : 'z-10'} ${isSidebarOpen || readOnly ? 'left-4' : 'left-16'}`}
       >
+      <div className="flex w-full items-start gap-2">
       <div
         ref={legendRef}
         className="flex shrink-0 gap-2"
@@ -363,7 +370,7 @@ export const Toolbar: React.FC = () => {
                       <Save className="w-4 h-4" /> {isSaving ? 'Saving...' : 'Save pipeline'}
                     </button>
                     {hasMultipleBranches && (
-                      <button role="menuitem" disabled={isRunningAll || isRunning} onClick={() => { setShowMoreMenu(false); void handleRunAll(); }} className="w-full flex items-center gap-2 text-left px-3 py-2 text-sm hover:bg-accent disabled:opacity-50">
+                      <button role="menuitem" disabled={isRunningAll || isRunning} onClick={() => { setShowMoreMenu(false); setReviewingExperiments(true); }} className="w-full flex items-center gap-2 text-left px-3 py-2 text-sm hover:bg-accent disabled:opacity-50">
                         <Rocket className="w-4 h-4" /> {isRunningAll ? 'Queuing experiments...' : 'Run all experiments'}
                       </button>
                     )}
@@ -637,7 +644,7 @@ export const Toolbar: React.FC = () => {
         )}
         {!readOnly && !isNarrow && hasMultipleBranches && (
           <button
-            onClick={() => { void handleRunAll(); }}
+            onClick={() => setReviewingExperiments(true)}
             disabled={isRunningAll || isRunning}
             title="Run all branches as separate experiments"
             aria-label="Run all parallel branches as separate experiments"
@@ -674,6 +681,19 @@ export const Toolbar: React.FC = () => {
         )}
       </div>
       </div>
+      </div>
+      <ExperimentRunDialog isOpen={reviewingExperiments && !readOnly} models={experimentModels}
+        blockReason={experimentBlockReason || (isRunning ? 'Wait for the data preview to finish.' : '')}
+        onClose={() => {
+          setReviewingExperiments(false);
+          requestAnimationFrame(() => {
+            const opener = toolbarRef.current?.querySelector<HTMLButtonElement>('[data-testid="toolbar-run-all"]')
+              ?? toolbarRef.current?.querySelector<HTMLButtonElement>('[data-testid="toolbar-more"]');
+            opener?.focus();
+          });
+        }}
+        onSubmit={() => { setReviewingExperiments(false); void handleRunAll(); }}
+        onReviewIssues={() => { setReviewingExperiments(false); useGraphStore.getState().validateGraph(); reviewPreviewResults(); }} />
       {showLegend && (
         <div ref={legendPopoverRef} className={`absolute top-4 right-4 z-40 ${isSidebarOpen || readOnly ? 'left-4' : 'left-16'}`}>
           <CanvasLegend onClose={() => setShowLegend(false)} />

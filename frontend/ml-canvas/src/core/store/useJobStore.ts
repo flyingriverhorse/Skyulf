@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { jobsApi, JobInfo, RunPipelineRequest } from '../api/jobs';
 import { jobEventsSocket } from '../realtime/jobEventsSocket';
 import type { TaskType } from '../types/taskType';
+import type { NodeSubmission, SubmittedRun } from '../types/runFeedback';
 
 interface ActiveParallelRun {
   jobIds: string[];
@@ -22,6 +23,11 @@ interface JobState {
   activeParallelRun: ActiveParallelRun | null;
   /** job_id -> action currently in flight. Guards cancel/retry against double-submission. */
   pendingJobActions: Record<string, JobActionKind>;
+  nodeSubmissions: Record<string, NodeSubmission>;
+  setNodeSubmission: (nodeId: string, submission: NodeSubmission) => void;
+  inspectedRun: SubmittedRun | null;
+  setInspectedRun: (run: SubmittedRun | null) => void;
+  runJobs: Record<string, JobInfo>;
 
   // Actions
   fetchJobs: () => Promise<void>;
@@ -57,6 +63,31 @@ export const useJobStore = create<JobState>((set, get) => {
 
   // Hard cap: never poll for more than 30 minutes after startPolling.
   const MAX_POLL_DURATION_MS = 30 * 60 * 1000;
+
+  /** Keep submitted runs observable even after they leave the paginated history's first page. */
+  const refreshRunJobs = async (latestJobs: JobInfo[]): Promise<void> => {
+    const state = get();
+    const ids = new Set([
+      ...Object.values(state.nodeSubmissions).flatMap(submission => submission.run?.jobIds ?? []),
+      ...state.inspectedRun?.jobIds ?? [],
+      ...state.activeParallelRun?.jobIds ?? [],
+      ...Object.values(state.runJobs).filter(job => ['pending', 'queued', 'running'].includes(job.status)).map(job => job.job_id),
+    ]);
+    const snapshots: Record<string, JobInfo> = {};
+    await Promise.all([...ids].map(async id => {
+      let job = latestJobs.find(item => item.job_id === id);
+      if (!job) {
+        const cached = state.runJobs[id];
+        if (cached && ['completed', 'succeeded', 'failed', 'cancelled'].includes(cached.status)) job = cached;
+        else {
+          try { job = await jobsApi.getJob(id); }
+          catch { /* Retain the last known state; a later refresh can recover. */ }
+        }
+      }
+      if (job?.job_id === id) snapshots[id] = job;
+    }));
+    if (Object.keys(snapshots).length) set(current => ({ runJobs: { ...current.runJobs, ...snapshots } }));
+  };
 
   // Coalesce bursty WS events (a Celery task can publish status +
   // progress + status within a few ms). One refresh per 250ms is enough
@@ -96,6 +127,7 @@ export const useJobStore = create<JobState>((set, get) => {
               return { jobs: [...latestJobs, ...state.jobs.slice(PAGE_SIZE)] };
           }
       });
+      await refreshRunJobs(latestJobs);
 
       // Stop polling as soon as there are no *fresh* active jobs.
       // "Fresh" = created within the last 2 hours. Jobs stuck in
@@ -103,8 +135,8 @@ export const useJobStore = create<JobState>((set, get) => {
       // not block the stop condition indefinitely.
       const TWO_HOURS_MS = 2 * 60 * 60 * 1000;
       const now = Date.now();
-      const hasActive = latestJobs.some(j =>
-        (j.status === 'running' || j.status === 'queued') &&
+      const hasActive = [...latestJobs, ...Object.values(get().runJobs)].some(j =>
+        (j.status === 'running' || j.status === 'queued' || j.status === 'pending') &&
         now - new Date(j.created_at).getTime() < TWO_HOURS_MS
       );
       if (!hasActive) {
@@ -113,9 +145,9 @@ export const useJobStore = create<JobState>((set, get) => {
 
       const parallelRun = get().activeParallelRun;
       if (parallelRun) {
-        const TERMINAL = new Set(['completed', 'failed', 'cancelled']);
+        const TERMINAL = new Set(['completed', 'succeeded', 'failed', 'cancelled']);
         const allDone = parallelRun.jobIds.every(id => {
-          const j = latestJobs.find(job => job.job_id === id);
+          const j = get().runJobs[id] ?? latestJobs.find(job => job.job_id === id);
           return j && TERMINAL.has(j.status);
         });
         if (allDone) {
@@ -141,12 +173,18 @@ export const useJobStore = create<JobState>((set, get) => {
     skip: 0,
     activeParallelRun: null,
     pendingJobActions: {},
+    nodeSubmissions: {},
+    setNodeSubmission: (nodeId, submission) => set(state => ({ nodeSubmissions: { ...state.nodeSubmissions, [nodeId]: submission } })),
+    inspectedRun: null,
+    setInspectedRun: (run) => set({ inspectedRun: run }),
+    runJobs: {},
 
     fetchJobs: async () => {
       set({ isLoading: true, skip: 0 });
       try {
         const jobs = await jobsApi.getJobs(PAGE_SIZE, 0);
         set({ jobs, isLoading: false, hasMore: jobs.length === PAGE_SIZE });
+        await refreshRunJobs(jobs);
       } catch (error) {
         console.error('Failed to fetch jobs:', error);
         set({ isLoading: false });
@@ -214,6 +252,8 @@ export const useJobStore = create<JobState>((set, get) => {
       set(state => ({ pendingJobActions: { ...state.pendingJobActions, [jobId]: 'retry' } }));
       try {
         const response = await jobsApi.retryJob(jobId);
+        const run = get().inspectedRun;
+        if (run?.jobIds.includes(jobId)) set({ inspectedRun: { ...run, jobIds: [...new Set([...run.jobIds, response.job_id])] } });
         await get().fetchJobs();
         get().startPolling();
         return response.job_id;
@@ -233,7 +273,7 @@ export const useJobStore = create<JobState>((set, get) => {
       const currentOpen = get().isDrawerOpen;
       const nextOpen = isOpen !== undefined ? isOpen : !currentOpen;
 
-      set({ isDrawerOpen: nextOpen });
+      set({ isDrawerOpen: nextOpen, ...(!nextOpen ? { inspectedRun: null } : {}) });
 
       // Opening: one-time fetch to populate the list. Do NOT start
       // sustained polling here — that only happens when a job is submitted.

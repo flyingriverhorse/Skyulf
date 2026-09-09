@@ -169,7 +169,7 @@ def _fit_power_for_column(X: Any, col: str, method: str, is_polars: bool) -> dic
     category="Preprocessing",
     description="Apply various function transformations (log, sqrt, square, exp) to columns.",
     params={"transformations": []},
-    learns_from_data=False,
+    learns_from_data=True,
 )
 class GeneralTransformationCalculator(BaseCalculator):
     """Resolve configured transformations, fitting lambdas for the power methods."""

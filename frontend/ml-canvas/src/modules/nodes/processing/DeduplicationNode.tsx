@@ -60,6 +60,7 @@ const DeduplicationSettings: React.FC<{ config: DeduplicationConfig; onChange: (
           <div>
             <span className="block text-sm font-medium mb-1">Keep Strategy</span>
             <select
+              aria-label="Keep Strategy"
               className="w-full p-2 border rounded bg-background focus:ring-1 focus:ring-primary outline-none"
               value={config.keep}
               onChange={(e) => onChange({ ...config, keep: e.target.value as DeduplicationConfig['keep'] })}

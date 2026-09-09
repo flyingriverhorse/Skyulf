@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useId, useMemo, useState } from 'react';
 import { ChevronRight, SlidersHorizontal } from 'lucide-react';
 import { jobsApi } from '../../../../core/api/jobs';
 import type { HyperparameterDef } from './types';
@@ -51,7 +51,8 @@ function coerce(def: HyperparameterDef, raw: string): unknown {
 }
 
 /** Renders a single typed input (number / select / boolean) for one param. */
-function ParamInput({ def, value, onChange }: {
+function ParamInput({ id, def, value, onChange }: {
+  id: string;
   def: HyperparameterDef;
   value: unknown;
   onChange: (v: unknown) => void;
@@ -62,7 +63,7 @@ function ParamInput({ def, value, onChange }: {
     'bg-white dark:bg-gray-800 dark:text-gray-100';
   if (def.type === 'select' && def.options) {
     return (
-      <select className={cls} value={String(current)} onChange={(e) => { onChange(coerce(def, e.target.value)); }}>
+      <select id={id} className={cls} value={String(current)} onChange={(e) => { onChange(coerce(def, e.target.value)); }}>
         <option value="">default</option>
         {def.options.map((o) => (
           <option key={String(o.value)} value={String(o.value)}>{o.label}</option>
@@ -72,7 +73,7 @@ function ParamInput({ def, value, onChange }: {
   }
   if (def.type === 'boolean') {
     return (
-      <select className={cls} value={current === '' ? '' : String(current)} onChange={(e) => { onChange(e.target.value === '' ? undefined : e.target.value === 'true'); }}>
+      <select id={id} className={cls} value={current === '' ? '' : String(current)} onChange={(e) => { onChange(e.target.value === '' ? undefined : e.target.value === 'true'); }}>
         <option value="">default</option>
         <option value="true">True</option>
         <option value="false">False</option>
@@ -81,6 +82,7 @@ function ParamInput({ def, value, onChange }: {
   }
   return (
     <input
+      id={id}
       type="number"
       className={cls}
       min={def.min}
@@ -101,12 +103,15 @@ function ModelSection({ label, defs, values, onParam }: {
   onParam: (param: string, value: unknown) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const fieldId = useId();
   const setCount = Object.keys(values).length;
   const renderable = defs.filter((d) => d.type !== 'multiselect');
   return (
     <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
       <button
         type="button"
+        aria-expanded={open}
+        aria-controls={`${fieldId}-params`}
         onClick={() => { setOpen(!open); }}
         className="w-full flex items-center justify-between p-2 bg-gray-50 dark:bg-gray-800/50 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
       >
@@ -119,14 +124,15 @@ function ModelSection({ label, defs, values, onParam }: {
         </span>
       </button>
       {open && (
-        <div className="p-2 grid grid-cols-2 gap-2 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700">
+        <div id={`${fieldId}-params`} role="group" aria-label={label} className="p-2 grid grid-cols-2 gap-2 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700">
           {renderable.length === 0 && (
             <p className="col-span-2 text-[11px] text-gray-400">No tunable parameters.</p>
           )}
           {renderable.map((def) => (
             <div key={def.name}>
-              <span className="block text-[10px] text-gray-500 mb-0.5 truncate" title={def.description}>{def.label}</span>
+              <label htmlFor={`${fieldId}-${def.name}`} className="block text-[10px] text-gray-500 mb-0.5 truncate" title={def.description}>{def.label}</label>
               <ParamInput
+                id={`${fieldId}-${def.name}`}
                 def={def}
                 value={values[def.name]}
                 onChange={(v) => { onParam(def.name, v); }}

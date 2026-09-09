@@ -49,6 +49,7 @@ const FeatureSelectionSettings: React.FC<{ config: FeatureSelectionConfig; onCha
   onChange,
   nodeId,
 }) => {
+  const id = React.useId();
   const upstreamData = useUpstreamData(nodeId || '');
 
   // Recursive search for datasetId
@@ -276,6 +277,7 @@ const FeatureSelectionSettings: React.FC<{ config: FeatureSelectionConfig; onCha
           <div className="space-y-2">
             <span className="text-sm font-medium">Selection Method</span>
             <select
+              aria-label="Selection Method"
               className="w-full p-2 border rounded bg-background text-sm"
               value={config.method}
               onChange={(e) => onChange({ ...config, method: e.target.value as FeatureSelectionConfig['method'] })}
@@ -309,6 +311,7 @@ const FeatureSelectionSettings: React.FC<{ config: FeatureSelectionConfig; onCha
               ) : (
                 <ValidationField field="target_column">
                   <select
+                    aria-label="Target Column"
                     className="w-full p-2 border rounded bg-background text-sm"
                     value={config.target_column ?? ''}
                     onChange={(e) => onChange({ ...config, target_column: e.target.value })}
@@ -328,6 +331,7 @@ const FeatureSelectionSettings: React.FC<{ config: FeatureSelectionConfig; onCha
              <div className="space-y-2">
                <span className="text-sm font-medium">Problem Type</span>
                <select
+                 aria-label="Problem Type"
                  className="w-full p-2 border rounded bg-background text-sm"
                  value={config.problem_type ?? 'auto'}
                  onChange={(e) => onChange({ ...config, problem_type: e.target.value as FeatureSelectionConfig['problem_type'] })}
@@ -352,6 +356,7 @@ const FeatureSelectionSettings: React.FC<{ config: FeatureSelectionConfig; onCha
             <div className="space-y-2">
               <span className="text-sm font-medium">Threshold</span>
               <input
+                aria-label="Threshold"
                 type="number"
                 step="0.01"
                 className="w-full p-2 border rounded bg-background text-sm"
@@ -368,6 +373,7 @@ const FeatureSelectionSettings: React.FC<{ config: FeatureSelectionConfig; onCha
               <div className="space-y-2">
                 <span className="text-sm font-medium">Threshold</span>
                 <input
+                  aria-label="Threshold"
                   type="number"
                   step="0.01"
                   max="1"
@@ -380,6 +386,7 @@ const FeatureSelectionSettings: React.FC<{ config: FeatureSelectionConfig; onCha
               <div className="space-y-2">
                 <span className="text-sm font-medium">Method</span>
                 <select
+                  aria-label="Method"
                   className="w-full p-2 border rounded bg-background text-sm"
                   value={config.correlation_method ?? 'pearson'}
                   onChange={(e) => onChange({ ...config, correlation_method: e.target.value as FeatureSelectionConfig['correlation_method'] })}
@@ -397,6 +404,7 @@ const FeatureSelectionSettings: React.FC<{ config: FeatureSelectionConfig; onCha
             <div className="space-y-2">
               <span className="text-sm font-medium">Scoring Function</span>
               <select
+                aria-label="Scoring Function"
                 className="w-full p-2 border rounded bg-background text-sm"
                 value={config.score_func ?? ''}
                 onChange={(e) => onChange({ ...config, score_func: e.target.value })}
@@ -414,6 +422,7 @@ const FeatureSelectionSettings: React.FC<{ config: FeatureSelectionConfig; onCha
             <div className="space-y-2">
               <span className="text-sm font-medium">K (Number of Features)</span>
               <input
+                aria-label="K (Number of Features)"
                 type="number"
                 className="w-full p-2 border rounded bg-background text-sm"
                 value={config.k ?? 10}
@@ -427,6 +436,7 @@ const FeatureSelectionSettings: React.FC<{ config: FeatureSelectionConfig; onCha
             <div className="space-y-2">
               <span className="text-sm font-medium">Percentile</span>
               <input
+                aria-label="Percentile"
                 type="number"
                 className="w-full p-2 border rounded bg-background text-sm"
                 value={config.percentile ?? 10}
@@ -440,6 +450,7 @@ const FeatureSelectionSettings: React.FC<{ config: FeatureSelectionConfig; onCha
             <div className="space-y-2">
               <span className="text-sm font-medium">Alpha (Significance)</span>
               <input
+                aria-label="Alpha (Significance)"
                 type="number"
                 step="0.001"
                 className="w-full p-2 border rounded bg-background text-sm"
@@ -455,6 +466,7 @@ const FeatureSelectionSettings: React.FC<{ config: FeatureSelectionConfig; onCha
               <div className="space-y-2">
                 <span className="text-sm font-medium">Mode</span>
                 <select
+                  aria-label="Mode"
                   className="w-full p-2 border rounded bg-background text-sm"
                   value={config.mode ?? 'k_best'}
                   onChange={(e) => onChange({ ...config, mode: e.target.value as FeatureSelectionConfig['mode'] })}
@@ -469,6 +481,7 @@ const FeatureSelectionSettings: React.FC<{ config: FeatureSelectionConfig; onCha
               <div className="space-y-2">
                 <span className="text-sm font-medium">Parameter</span>
                 <input
+                  aria-label="Parameter"
                   type="number"
                   step="0.001"
                   className="w-full p-2 border rounded bg-background text-sm"
@@ -485,6 +498,7 @@ const FeatureSelectionSettings: React.FC<{ config: FeatureSelectionConfig; onCha
             <div className="space-y-2">
               <span className="text-sm font-medium">Estimator</span>
               <select
+                aria-label="Estimator"
                 className="w-full p-2 border rounded bg-background text-sm"
                 value={config.estimator ?? 'auto'}
                 onChange={(e) => onChange({ ...config, estimator: e.target.value as FeatureSelectionConfig['estimator'] })}
@@ -502,6 +516,7 @@ const FeatureSelectionSettings: React.FC<{ config: FeatureSelectionConfig; onCha
             <div className="space-y-2">
               <span className="text-sm font-medium">Threshold</span>
               <input
+                aria-label="Threshold"
                 type="text"
                 className="w-full p-2 border rounded bg-background text-sm"
                 placeholder="e.g., median, mean, 1.25*mean"
@@ -511,6 +526,7 @@ const FeatureSelectionSettings: React.FC<{ config: FeatureSelectionConfig; onCha
               <p className="text-xs text-muted-foreground">String (e.g. &quot;median&quot;) or float.</p>
                 <span className="text-sm font-medium">Max Features</span>
                 <input
+                  aria-label="Max Features"
                   type="number"
                   className="w-full p-2 border rounded bg-background text-sm"
                   placeholder="Optional"
@@ -526,6 +542,7 @@ const FeatureSelectionSettings: React.FC<{ config: FeatureSelectionConfig; onCha
             <div className="space-y-2">
               <span className="text-sm font-medium">Step</span>
               <input
+                aria-label="Step"
                 type="number"
                 min="1"
                 className="w-full p-2 border rounded bg-background text-sm"
@@ -540,12 +557,12 @@ const FeatureSelectionSettings: React.FC<{ config: FeatureSelectionConfig; onCha
           <div className="flex items-center space-x-2 pt-2 border-t">
             <input
               type="checkbox"
-              id="drop_columns"
+              id={`${id}-drop-columns`}
               className="rounded border-gray-300"
               checked={config.drop_columns !== false}
               onChange={(e) => onChange({ ...config, drop_columns: e.target.checked })}
             />
-            <label htmlFor="drop_columns" className="text-sm font-medium">
+            <label htmlFor={`${id}-drop-columns`} className="text-sm font-medium">
               Drop Columns
             </label>
           </div>

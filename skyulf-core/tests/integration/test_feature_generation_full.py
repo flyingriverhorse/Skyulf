@@ -12,6 +12,7 @@ import pytest
 from tests.utils.dataset_loader import load_sample_dataset
 from tests.utils.test_case_loader import TestCaseLoader
 
+from skyulf.engines.pandas_engine import SkyulfPandasWrapper
 from skyulf.preprocessing.feature_generation import (
     FeatureGenerationApplier,
     FeatureGenerationCalculator,
@@ -201,6 +202,36 @@ class TestSimilarityPandas:
             df=df,
         )
         assert (out["similarity_0"] == 100.0).all()
+
+    @pytest.mark.parametrize("wrapped", [False, True], ids=["pandas", "wrapped-pandas"])
+    def test_similarity_duplicate_indexes_preserve_each_rows_score(self, wrapped: bool) -> None:
+        """Repeated row labels must neither drop the feature nor overwrite sibling scores."""
+        frame = pd.DataFrame(
+            {
+                "a": ["abc", "abc", None, "hello", "", pd.NA, "abc"],
+                "b": ["abc", "xyz", None, "", "world", "", "axc"],
+            },
+            index=pd.Index([7, 7, 4, 7, 4, 9, 9], name="row_id"),
+        )
+        source = SkyulfPandasWrapper(frame) if wrapped else frame
+        config = {
+            "operations": [
+                {
+                    "operation_type": "similarity",
+                    "method": "ratio",
+                    "input_columns": ["a"],
+                    "secondary_columns": ["b"],
+                    "output_column": "score",
+                }
+            ]
+        }
+        params = _CALC.fit(source, config)
+
+        out = _APPLIER.apply(source, params)
+
+        assert "score" in out.columns
+        pd.testing.assert_frame_equal(out.drop(columns="score"), frame)
+        assert out["score"].tolist() == pytest.approx([100.0, 0.0, 100.0, 0.0, 0.0, 100.0, 200 / 3])
 
 
 # ---------------------------------------------------------------------------

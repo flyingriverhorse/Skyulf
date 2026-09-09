@@ -26,26 +26,36 @@ The training node collects **all** upstream branch outputs via `_resolve_all_inp
 | Same columns, different rows | **Row-wise concat** | Data augmentation |
 | No common columns, different shapes | **Error** | Incompatible inputs |
 
-- Duplicate columns are automatically deduplicated after merging.
+- Each output column appears once. Different-named columns are kept from both branches;
+  overlapping columns follow the ownership and merge-strategy rules below.
 - Inputs are merged in the order their edges enter the node, except that an input which is an
-  ancestor of another input is always applied first. This is the same order the merge advisory
-  banner reports as the `last_wins` winner.
-- **Per-column ownership:** for column-wise merges the engine compares each branch against the
-  nearest shared ancestor. A column changed by only one branch keeps that branch's value no matter
-  the edge order. The merge strategy is consulted — and the advisory banner shown — only for columns
-  that two or more branches both modified.
+  ancestor of another input is always applied first. For sibling branches this is saved incoming-edge
+  order, not their position on the canvas or completion time. `last_wins` is the default;
+  `first_wins` selects the first version of a conflicting column instead.
+- **Per-column ownership:** when a shared-ancestor baseline frame is available, the engine compares
+  each branch against it. A column changed by only one branch keeps that branch's value under
+  either strategy. Differing changes to the same column follow the configured strategy; branches
+  that agree do not introduce a conflicting version. Without a usable baseline, overlapping
+  columns follow the strategy directly. The strategy selects entire columns, not a whole branch
+  or individual cells from different versions.
 
-#### After a Split: Order Decides Everything
+<a id="after-a-split-order-decides-everything"></a>
+
+#### After a Split: Merge Strategy Still Applies
 
 !!! warning
-    When branches fork **after a Split node** (fork-join shape), per-column ownership does not
-    apply: the nearest shared ancestor is the splitter, whose stored artifact is a train/test
-    split rather than a frame, so there is no baseline to compare against. Overlapping columns
-    fall back to **pure merge order — the last connected branch wins every shared column**
-    (`first_wins` mirrors this, keeping the first).
+    When branches fork **after Train-Test Split**, its split artifact is not a baseline frame,
+    so per-column ownership is generally unavailable. The configured strategy still applies:
+    `last_wins` (default) keeps the last input's overlapping column, while `first_wins` keeps
+    the first. Different-named columns from both branches survive.
 
-    The practical consequence: an earlier branch's encoding of a column can be silently discarded
-    if the last branch still carries that column raw. Training then fails fast with
+    Train, Validation and Test merge separately; this does not concatenate the partitions.
+    For X/y inputs, y is retained from the first branch regardless of the feature strategy.
+    Every branch must preserve the same rows, row order and aligned target. First/last wins
+    does not repair alignment or establish leakage safety.
+
+    The practical consequence: under default `last_wins`, an earlier branch's encoding can be
+    discarded if the last branch still carries that column raw. Training then fails fast with
     *"training frame contains N non-numeric column(s): …"*.
 
     Design post-split merges accordingly:
@@ -70,7 +80,7 @@ Model-to-model connections (e.g., training → training) are **blocked** with an
 |---|---|---|
 | "Empty DataFrame from upstream branch" | A preprocessing branch produced no rows | Check filters/cleaning nodes upstream |
 | "No common columns" | Branches have incompatible schemas | Ensure branches produce compatible columns |
-| "training frame contains N non-numeric column(s)" | After a Split, the winning branch left a column unencoded (ownership is inert post-split; merge order decides) | Encode the column on the winning branch, drop it, or make branches disjoint / fully numeric |
+| "training frame contains N non-numeric column(s)" | After Train-Test Split, the configured strategy retained a raw column from the winning input | Encode the column on the winning branch, drop it, or make branches disjoint / fully numeric |
 
 ---
 

@@ -183,6 +183,7 @@ const EncodingSettings: React.FC<{ config: EncodingConfig; onChange: (c: Encodin
               <div className="space-y-1">
                 <span className="block text-xs font-medium">Handle Unknown</span>
                 <select
+                  aria-label="Handle Unknown"
                   className="w-full p-1 text-sm border rounded"
                   value={config.handle_unknown || 'ignore'}
                   onChange={(e) => onChange({ ...config, handle_unknown: e.target.value as EncodingConfig['handle_unknown'] })}
@@ -198,6 +199,7 @@ const EncodingSettings: React.FC<{ config: EncodingConfig; onChange: (c: Encodin
               <div className="space-y-1">
                 <span className="block text-xs font-medium">Max Categories</span>
                 <input
+                  aria-label="Max Categories"
                   type="number"
                   min="2"
                   max="200"
@@ -242,6 +244,7 @@ const EncodingSettings: React.FC<{ config: EncodingConfig; onChange: (c: Encodin
               <span className="block text-sm font-medium">Target Column</span>
               <ValidationField field="target_column">
                 <select
+                  aria-label="Target Column"
                   className="w-full p-2 border rounded bg-background text-sm"
                   value={config.target_column || ''}
                   onChange={(e) => onChange({ ...config, target_column: e.target.value })}
@@ -258,6 +261,7 @@ const EncodingSettings: React.FC<{ config: EncodingConfig; onChange: (c: Encodin
               <div className="space-y-1">
                 <span className="block text-xs font-medium">Smoothing</span>
                 <input
+                  aria-label="Smoothing"
                   type="text"
                   className="w-full p-1 text-sm border rounded"
                   value={config.smooth ?? 'auto'}
@@ -273,6 +277,7 @@ const EncodingSettings: React.FC<{ config: EncodingConfig; onChange: (c: Encodin
               <div className="space-y-1">
                 <span className="block text-xs font-medium">Target Type</span>
                 <select
+                  aria-label="Target Type"
                   className="w-full p-1 text-sm border rounded"
                   value={config.target_type || 'auto'}
                   onChange={(e) => onChange({ ...config, target_type: e.target.value as EncodingConfig['target_type'] })}
@@ -291,6 +296,7 @@ const EncodingSettings: React.FC<{ config: EncodingConfig; onChange: (c: Encodin
               <span className="block text-sm font-medium">Target Column</span>
               <ValidationField field="target_column">
                 <select
+                  aria-label="Target Column"
                   className="w-full p-2 border rounded bg-background text-sm"
                   value={config.target_column || ''}
                   onChange={(e) => onChange({ ...config, target_column: e.target.value })}
@@ -308,6 +314,7 @@ const EncodingSettings: React.FC<{ config: EncodingConfig; onChange: (c: Encodin
               <div className="space-y-1">
                 <span className="block text-xs font-medium">Regularization</span>
                 <input
+                  aria-label="Regularization"
                   type="number"
                   step="0.1"
                   min="0"
@@ -325,6 +332,7 @@ const EncodingSettings: React.FC<{ config: EncodingConfig; onChange: (c: Encodin
             <div className="space-y-2 p-3 bg-muted/20 rounded border h-full">
               <span className="block text-xs font-medium">Number of Features</span>
               <input
+                aria-label="Number of Features"
                 type="number"
                 min="1"
                 className="w-full p-2 border rounded"
@@ -341,6 +349,7 @@ const EncodingSettings: React.FC<{ config: EncodingConfig; onChange: (c: Encodin
               <div className="space-y-1">
                 <span className="block text-xs font-medium">Handle Unknown</span>
                 <select
+                  aria-label="Handle Unknown"
                   className="w-full p-1 text-sm border rounded"
                   value={config.handle_unknown === 'ignore' || !config.handle_unknown ? 'use_encoded_value' : config.handle_unknown}
                   onChange={(e) => onChange({ ...config, handle_unknown: e.target.value as EncodingConfig['handle_unknown'] })}
@@ -356,6 +365,7 @@ const EncodingSettings: React.FC<{ config: EncodingConfig; onChange: (c: Encodin
               <div className="space-y-1">
                 <span className="block text-xs font-medium">Unknown Value</span>
                 <input
+                  aria-label="Unknown Value"
                   type="number"
                   className="w-full p-2 border rounded"
                   value={config.unknown_value ?? -1}
@@ -369,6 +379,7 @@ const EncodingSettings: React.FC<{ config: EncodingConfig; onChange: (c: Encodin
                   Category Order <span className="font-normal text-muted-foreground">(optional)</span>
                 </span>
                 <textarea
+                  aria-label="Category Order (optional)"
                   className="w-full p-1.5 text-xs border rounded font-mono resize-y min-h-[56px]"
                   placeholder={"One line per column:\nlow, medium, high\ncat1, cat2, cat3"}
                   value={config.categories_order || ''}
@@ -387,6 +398,7 @@ const EncodingSettings: React.FC<{ config: EncodingConfig; onChange: (c: Encodin
             <div className="space-y-2 p-3 bg-muted/20 rounded border h-full">
               <span className="block text-sm font-medium">Missing/Unknown Code</span>
               <input
+                aria-label="Missing/Unknown Code"
                 type="number"
                 className="w-full p-2 border rounded"
                 value={config.missing_code ?? -1}

@@ -4,12 +4,14 @@ import hashlib
 import logging
 from typing import Any
 
+import pandas as pd
 import polars as pl
 
 from ...core.meta.decorators import node_meta
 from ...registry import NodeRegistry
 from ...utils import resolve_columns, user_picked_no_columns
 from .._artifacts import HashEncoderArtifact
+from .._category_keys import category_key_expr, category_keys_pandas
 from .._schema import SkyulfSchema
 from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
 from ..dispatcher import apply_dual_engine
@@ -22,6 +24,19 @@ def _resolve_valid_cols(X: Any, params: dict[str, Any]) -> list[str]:
     """Filter requested columns down to those present in ``X``."""
     cols = params.get("columns", [])
     return [c for c in cols if c in X.columns]
+
+
+def _uses_numeric_normalization(params: dict[str, Any]) -> bool:
+    """Preserve legacy buckets and reject unknown numeric-normalization versions."""
+    if "numeric_normalization_version" not in params:
+        return False
+    version = params["numeric_normalization_version"]
+    if isinstance(version, bool) or not isinstance(version, int) or version not in (1, 2):
+        raise ValueError(
+            f"Unsupported HashEncoder numeric normalization version {version!r}; "
+            "refit the encoder with a supported version."
+        )
+    return True
 
 
 def _hash_apply_polars(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
@@ -38,11 +53,17 @@ def _hash_apply_polars(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, Any
         return X, y
 
     n_features = params.get("n_features", 10)
+    normalize_numeric = _uses_numeric_normalization(params)
     exprs = []
     for col in valid_cols:
         # fill_null("nan") mirrors pandas' astype(str) so missing values land
         # in the same bucket on both engines.
-        str_col = pl.col(col).cast(pl.Utf8).fill_null("nan")
+        if params.get("numeric_normalization_version") == 2:
+            str_col = category_key_expr(col)
+        else:
+            str_col = pl.col(col).cast(pl.Utf8).fill_null("nan")
+            if normalize_numeric and X.schema[col].is_float():
+                str_col = str_col.str.replace(r"\.0$", "")
         unique_vals = X.select(str_col.alias(col)).to_series().unique().to_list()
         bucket_by_value = {v: _stable_hash(v) % n_features for v in unique_vals}
         exprs.append(str_col.replace_strict(bucket_by_value, default=None).alias(col))
@@ -71,9 +92,16 @@ def _hash_apply_pandas(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, Any
         return X, y
 
     n_features = params.get("n_features", 10)
+    normalize_numeric = _uses_numeric_normalization(params)
     X_out = X.copy()
     for col in valid_cols:
-        s = X_out[col].astype(str)
+        if params.get("numeric_normalization_version") == 2:
+            s = category_keys_pandas(X_out[col])
+        else:
+            s = X_out[col].astype(str)
+            # Retain the exact bucket contract for artifacts fitted before v2.
+            if normalize_numeric and pd.api.types.is_float_dtype(X_out[col]):
+                s = s.str.replace(r"\.0$", "", regex=True)
         # Hash each *unique* value once, then vectorize the lookup via
         # `.map()` — cheaper than a per-row `.apply()` on high-row-count,
         # low-cardinality columns. Building the mapping from this column's
@@ -92,9 +120,9 @@ class HashEncoderApplier(BaseApplier):
     which the hashing trick accepts by design. Both engines must agree on the
     bucket, which is why they share ``_stable_hash`` (blake2b) instead of using
     polars' native ``hash()``: deployment always crosses engines, so a
-    divergence would corrupt every production encoding. Nulls are filled with
-    the literal ``"nan"`` on polars to mirror pandas' ``astype(str)``, keeping
-    them in the same bucket on both sides.
+    divergence would corrupt every production encoding. Version 2 normalizes
+    missing and numeric scalars per value, keeping literal strings distinct.
+    Older normalization versions retain their original bucket assignments.
     """
 
     @apply_method
@@ -141,6 +169,7 @@ class HashEncoderCalculator(BaseCalculator):
             "type": "hash_encoder",
             "columns": cols,
             "n_features": config.get("n_features", 10),
+            "numeric_normalization_version": 2,
         }
 
     def infer_output_schema(

@@ -10,7 +10,9 @@ interface SummaryCardsProps {
 export const SummaryCards: React.FC<SummaryCardsProps> = ({ report }) => {
     const allCols: ColumnDrift[] = Object.values(report.column_drifts);
     const totalCols = allCols.length;
-    const driftedCount = report.drifted_columns_count;
+    // The report-wide count includes schema changes, which are shown separately.
+    // Feature percentages must use the same measured columns as the denominator.
+    const driftedCount = allCols.filter(c => c.drift_detected).length;
     const psiValues = allCols
         .map(c => c.metrics.find(m => m.metric === 'psi')?.value)
         .filter((v): v is number => v != null);

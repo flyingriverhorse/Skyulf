@@ -1,32 +1,21 @@
-/**
- * Thin wrapper around `sonner` so call sites import from a stable
- * project path, not a third-party dep. Lets us swap the underlying
- * library (or stub it in tests) without touching ~40 call sites.
- *
- * The `<Toaster />` component is mounted once in `main.tsx`. It renders its own
- * `aria-live="polite"` region, so toasts are already announced; adding a second
- * live region here would make screen readers read every toast twice.
- */
+import { useNotificationsStore } from './store/useNotificationsStore';
 
-import { toast as sonner } from 'sonner';
+/** Preserve the shared message API while delivering feedback only to the navbar bell. */
+function notify(level: string, message: string, description?: string): void {
+  useNotificationsStore.getState().addAppMessage(level, description ? `${message}\n${description}` : message);
+}
 
 export const toast = {
   success: (message: string, description?: string): void => {
-    sonner.success(message, description ? { description } : undefined);
+    notify('success', message, description);
   },
   error: (message: string, description?: string): void => {
-    sonner.error(message, description ? { description } : undefined);
+    notify('error', message, description);
   },
   info: (message: string, description?: string): void => {
-    sonner.info(message, description ? { description } : undefined);
+    notify('info', message, description);
   },
   warning: (message: string, description?: string): void => {
-    sonner.warning(message, description ? { description } : undefined);
+    notify('warning', message, description);
   },
-  /** Dismiss all visible toasts at once. */
-  dismissAll: (): void => {
-    sonner.dismiss();
-  },
-  /** Escape hatch for callers that need full sonner options (custom JSX, etc.). */
-  raw: sonner,
 };

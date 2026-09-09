@@ -89,6 +89,7 @@ const DropRowsSettings: React.FC<{ config: DropRowsConfig; onChange: (c: DropRow
             </span>
             <div className="flex items-center gap-2">
               <input
+                aria-label="Missing Value Threshold (%)"
                 type="range"
                 min="0"
                 max="100"

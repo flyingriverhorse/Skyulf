@@ -1,9 +1,15 @@
 import { describe, expect, it, beforeEach, beforeAll } from 'vitest';
-import { act, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { useState } from 'react';
+import userEvent from '@testing-library/user-event';
 import { PropertiesPanel } from './PropertiesPanel';
 import { useGraphStore } from '../../core/store/useGraphStore';
+import { useViewStore } from '../../core/store/useViewStore';
+import { registry } from '../../core/registry/NodeRegistry';
 import { initializeRegistry } from '../../core/registry/init';
+import { ValidationField } from '../shared/ValidationField';
+import { useNodeInspectionStore } from '../../core/store/useNodeInspectionStore';
 
 const MERGE_NODE = {
   id: 'merge-node',
@@ -84,6 +90,15 @@ describe('PropertiesPanel merge strategy', () => {
     ]);
     renderPanel();
     expect(screen.queryByText('Merge Strategy')).not.toBeInTheDocument();
+  });
+
+  it('names the merge strategy control and applies the selected winner', () => {
+    // Assistive technology must identify which setting changes overlapping-column ownership.
+    seedStore([{ node_id: 'merge-node', kind: 'sibling_fan_in', inputs: ['branch-a', 'branch-b'], overlap_columns: ['age'] }]);
+    renderPanel();
+    const strategy = screen.getByRole('combobox', { name: 'Merge Strategy' });
+    fireEvent.change(strategy, { target: { value: 'first_wins' } });
+    expect(useGraphStore.getState().nodes.find(node => node.id === 'merge-node')?.data.merge_strategy).toBe('first_wins');
   });
 
   it('shows it, naming the contested columns, once two branches edited the same column', () => {
@@ -180,5 +195,124 @@ describe('PropertiesPanel multi-input mode merge-winner hint', () => {
     seedTraining('parallel');
     renderPanel();
     expect(screen.queryByText(/If two branches carry the same column/)).not.toBeInTheDocument();
+  });
+
+  it('announces the selected multi-input mode when toggling it', () => {
+    // Color alone must not be the only way to distinguish merged and parallel execution.
+    seedTraining('merge');
+    renderPanel();
+    const merge = screen.getByRole('button', { name: 'Merge' });
+    const parallel = screen.getByRole('button', { name: 'Parallel' });
+    expect(merge).toHaveAttribute('aria-pressed', 'true');
+    fireEvent.click(parallel);
+    expect(merge).toHaveAttribute('aria-pressed', 'false');
+    expect(parallel).toHaveAttribute('aria-pressed', 'true');
+  });
+});
+
+/** Keep an unsaved local edit so remounting settings loses observable state. */
+function InspectionTestSettings() {
+  const [draft, setDraft] = useState('');
+  return <ValidationField field="name"><input aria-label="Draft name" value={draft}
+    onChange={(event) => setDraft(event.target.value)} /></ValidationField>;
+}
+
+describe('PropertiesPanel inspection tabs', () => {
+  beforeAll(() => {
+    registry.register({
+      type: 'inspection_tabs_test', label: 'Inspection test', category: 'Utility',
+      description: '', inputs: [], outputs: [], settings: InspectionTestSettings,
+      getDefaultConfig: () => ({}),
+      validate: () => ({ isValid: false, field: 'name', message: 'Enter a name' }),
+    });
+  });
+
+  beforeEach(() => {
+    useGraphStore.setState({
+      nodes: [
+        { id: 'inspect-first', position: { x: 0, y: 0 }, data: { definitionType: 'inspection_tabs_test' }, selected: true },
+        { id: 'inspect-second', position: { x: 0, y: 0 }, data: { definitionType: 'inspection_tabs_test' } },
+      ], edges: [], executionResult: null,
+    });
+    useViewStore.setState({ validationFocusRequest: null });
+    useNodeInspectionStore.setState({ receipt: null, isLoading: false, error: null });
+  });
+
+  it('keeps settings edits mounted while inspecting input and output', async () => {
+    // Inspecting a sample must not discard an in-progress settings form.
+    const user = userEvent.setup();
+    render(<PropertiesPanel />);
+    const draft = screen.getByRole('textbox', { name: 'Draft name' });
+    await act(async () => { await user.type(draft, 'unfinished'); });
+    await act(async () => { await user.click(screen.getByRole('tab', { name: 'Input' })); });
+    expect(draft).toBeInTheDocument();
+    expect(draft).not.toBeVisible();
+    expect(screen.getByRole('tabpanel', { name: 'Input' })).toBeVisible();
+    await act(async () => { await user.click(screen.getByRole('tab', { name: 'Output' })); });
+    expect(screen.getByRole('tabpanel', { name: 'Output' })).toBeVisible();
+    await act(async () => { await user.click(screen.getByRole('tab', { name: 'Settings' })); });
+    expect(screen.getByRole('textbox', { name: 'Draft name' })).toHaveValue('unfinished');
+  });
+
+  it('supports arrow keys and preserves tab focus when selection changes', async () => {
+    // Node selection must not remount the focused tab or strand keyboard navigation.
+    const user = userEvent.setup();
+    render(<PropertiesPanel />);
+    const settings = screen.getByRole('tab', { name: 'Settings' });
+    act(() => settings.focus());
+    await act(async () => { await user.keyboard('{ArrowRight}'); });
+    expect(screen.getByRole('tab', { name: 'Input' })).toHaveFocus();
+    expect(screen.getByRole('tab', { name: 'Input' })).toHaveAttribute('aria-selected', 'true');
+    await act(async () => { await user.keyboard('{End}'); });
+    const output = screen.getByRole('tab', { name: 'Output' });
+    expect(output).toHaveFocus();
+    act(() => useGraphStore.getState().selectNode('inspect-second'));
+    expect(output).toHaveFocus();
+    expect(output).toHaveAttribute('aria-selected', 'true');
+    await act(async () => { await user.keyboard('{ArrowRight}'); });
+    expect(settings).toHaveFocus();
+    await act(async () => { await user.keyboard('{ArrowLeft}'); });
+    expect(output).toHaveFocus();
+    await act(async () => { await user.keyboard('{Home}'); });
+    expect(settings).toHaveFocus();
+  });
+
+  it('preserves the selected branch when comparing Input and Output tabs', () => {
+    // Tab switches must compare measurements from the same branch execution.
+    useNodeInspectionStore.setState({ receipt: {
+      configurationKey: 'captured-configuration',
+      response: { pipeline_id: 'pipeline', status: 'success', node_results: {}, preview_data: null,
+        recommendations: [], run_id: 'receipt', node_inspections:
+        ['Branch A', 'Branch B'].map((label, index) => ({
+          node_id: 'inspect-first', branch_id: `branch-${index}`, branch_label: label,
+          input: { status: 'available' as const, reason: null, tables: [] },
+          output: { status: 'available' as const, reason: null, tables: [] },
+        })),
+      },
+    } });
+    render(<PropertiesPanel />);
+    fireEvent.click(screen.getByRole('tab', { name: 'Output' }));
+    fireEvent.change(screen.getByRole('combobox', { name: 'Data path' }), { target: { value: 'branch-1' } });
+    fireEvent.click(screen.getByRole('tab', { name: 'Input' }));
+    expect(screen.getByRole('combobox', { name: 'Data path' })).toHaveDisplayValue('Branch B');
+    fireEvent.click(screen.getByRole('tab', { name: 'Output' }));
+    expect(screen.getByRole('combobox', { name: 'Data path' })).toHaveDisplayValue('Branch B');
+  });
+
+  it('reveals Settings and focuses a validation field hidden by inspection', async () => {
+    // An issue link must reach the editable control even while samples are open.
+    const user = userEvent.setup();
+    render(<PropertiesPanel />);
+    await act(async () => { await user.click(screen.getByRole('tab', { name: 'Output' })); });
+    act(() => useViewStore.getState().requestValidationFocus({
+      nodeId: 'inspect-first', nodeLabel: 'Inspection test', category: 'configuration',
+      field: 'name', message: 'Enter a name',
+    }));
+    const input = await screen.findByRole('textbox', { name: 'Draft name' });
+    expect(screen.getByRole('tab', { name: 'Settings' })).toHaveAttribute('aria-selected', 'true');
+    expect(input).toHaveFocus();
+    await act(async () => { await user.click(screen.getByRole('tab', { name: 'Input' })); });
+    expect(screen.getByRole('tab', { name: 'Input' })).toHaveFocus();
+    expect(screen.getByRole('tab', { name: 'Input' })).toHaveAttribute('aria-selected', 'true');
   });
 });

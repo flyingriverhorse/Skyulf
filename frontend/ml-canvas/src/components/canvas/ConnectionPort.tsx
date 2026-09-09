@@ -25,7 +25,8 @@ export const ConnectionPort = memo(function ConnectionPort({ nodeId, port, direc
     className={`!w-3 !h-3 transition-colors ${disabled ? '!bg-muted opacity-40' : guidance === 'compatible' ? '!bg-primary ring-2 ring-primary ring-offset-2 ring-offset-card'
       : guidance === 'incompatible' ? '!bg-destructive opacity-60' : '!bg-muted-foreground hover:!bg-primary'}`}
     style={{ top }}>
-    <div className={`absolute top-1/2 -translate-y-1/2 text-[10px] ${compact ? 'leading-3' : ''} text-muted-foreground whitespace-nowrap rounded bg-card/90 ${direction === 'target' ? 'left-4 px-1 pointer-events-none' : 'right-4'}`}>
+    <div data-output-label={direction === 'source' ? port.id : undefined}
+      className={`absolute top-1/2 -translate-y-1/2 text-[10px] ${compact ? 'leading-3' : ''} text-muted-foreground whitespace-nowrap rounded bg-card/90 ${direction === 'target' ? 'left-4 px-1 pointer-events-none' : 'right-4'}`}>
       {direction === 'target' || disabled || !canConnect ? port.label : <ConnectionPicker nodeId={nodeId} port={port} compact={compact} />}
     </div>
   </Handle>;

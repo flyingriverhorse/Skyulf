@@ -689,3 +689,136 @@ def test_scenario_09_path_a_full_chain(tmp_path: Path) -> None:
     assert "Species" not in enc_out["train"]["X_columns"]
     # MissingIndicator flags survived all the way through to the encoder
     assert any("_missing" in c for c in enc_out["train"]["X_columns"])
+
+
+def test_scenario_10_normal_ml_pipeline_generates_json_artifact(tmp_path: Path) -> None:
+    """A complete ML canvas pipeline runs every configured node and trains a model."""
+    import numpy as np
+
+    n = 150
+    rng = np.random.default_rng(10)
+    df = pd.DataFrame(
+        {
+            "Id": list(range(1, n + 1)),
+            "SepalLengthCm": rng.uniform(4, 8, n),
+            "SepalWidthCm": rng.uniform(2, 5, n),
+            "PetalLengthCm": rng.uniform(1, 7, n),
+            "PetalWidthCm": rng.uniform(0, 3, n),
+            "FlowerGroup": [" Small ", " MEDIUM ", " Large "] * 50,
+            "Species": ["a", "b", "c"] * 50,
+        }
+    )
+    df.loc[0, "SepalLengthCm"] = np.nan
+    df.loc[1, "SepalWidthCm"] = np.nan
+    csv_path = tmp_path / "normal_ml_pipeline.csv"
+    df.to_csv(csv_path, index=False)
+
+    engine, store = _new_engine(tmp_path)
+    cfg = PipelineConfig(
+        pipeline_id="s10_normal_ml_pipeline",
+        nodes=[
+            NodeConfig(
+                node_id="data",
+                step_type=StepType.DATA_LOADER,
+                params={"path": str(csv_path), "format": "csv"},
+            ),
+            NodeConfig(
+                node_id="clean_text",
+                step_type="TextCleaning",
+                inputs=["data"],
+                params={
+                    "columns": ["FlowerGroup"],
+                    "operations": [
+                        {"op": "trim", "mode": "both"},
+                        {"op": "case", "mode": "lower"},
+                    ],
+                },
+            ),
+            NodeConfig(
+                node_id="replace_values",
+                step_type="ValueReplacement",
+                inputs=["clean_text"],
+                params={"columns": ["SepalLengthCm"], "to_replace": 0.0, "value": 5.0},
+            ),
+            NodeConfig(
+                node_id="missing_indicator",
+                step_type="MissingIndicator",
+                inputs=["replace_values"],
+                params={
+                    "columns": ["SepalLengthCm", "SepalWidthCm"],
+                    "flag_suffix": "_missing",
+                },
+            ),
+            NodeConfig(
+                node_id="drop_missing_rows",
+                step_type="DropMissingRows",
+                inputs=["missing_indicator"],
+                params={"drop_if_any_missing": True},
+            ),
+            NodeConfig(
+                node_id="drop_id",
+                step_type="DropMissingColumns",
+                inputs=["drop_missing_rows"],
+                params={"columns": ["Id"], "missing_threshold": 0},
+            ),
+            NodeConfig(
+                node_id="feature_target_split",
+                step_type="feature_target_split",
+                inputs=["drop_id"],
+                params={"target_column": "Species"},
+            ),
+            NodeConfig(
+                node_id="train_test_split",
+                step_type="TrainTestSplitter",
+                inputs=["feature_target_split"],
+                params={
+                    "target_column": "Species",
+                    "test_size": 0.2,
+                    "random_state": 10,
+                },
+            ),
+            NodeConfig(
+                node_id="dummy_encode",
+                step_type="DummyEncoder",
+                inputs=["train_test_split"],
+                params={"columns": ["FlowerGroup"], "drop_first": True},
+            ),
+            NodeConfig(
+                node_id="scale_features",
+                step_type="StandardScaler",
+                inputs=["dummy_encode"],
+                params={
+                    "columns": [
+                        "SepalLengthCm",
+                        "SepalWidthCm",
+                        "PetalLengthCm",
+                        "PetalWidthCm",
+                    ],
+                },
+            ),
+            NodeConfig(
+                node_id="training",
+                step_type=StepType.TRAINING,
+                inputs=["scale_features"],
+                params={
+                    "target_column": "Species",
+                    "algorithm": "logistic_regression",
+                    "hyperparameters": {"C": 1.0, "max_iter": 200},
+                    "evaluate": True,
+                    "cv_enabled": False,
+                },
+            ),
+        ],
+    )
+    result = engine.run(cfg)
+    payload = _record_run("10_normal_ml_pipeline", cfg, store, result)
+
+    assert result.status == "success"
+    assert all(
+        payload["node_results"][node_id]["status"] == "success"
+        for node_id in [node.node_id for node in cfg.nodes]
+    )
+    assert payload["node_outputs"]["dummy_encode"]["kind"] == "SplitDataset"
+    assert payload["node_outputs"]["scale_features"]["kind"] == "SplitDataset"
+    assert payload["node_outputs"]["training"]["kind"] == "(X, y) tuple"
+    assert any("test" in key.lower() for key in payload["node_results"]["training"]["metrics_keys"])

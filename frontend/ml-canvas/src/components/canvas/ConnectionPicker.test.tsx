@@ -1,5 +1,6 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import * as Tooltip from '@radix-ui/react-tooltip';
 import { initializeRegistry } from '../../core/registry/init';
 import { registry } from '../../core/registry/NodeRegistry';
 import { useGraphStore } from '../../core/store/useGraphStore';
@@ -30,6 +31,40 @@ function openPicker(type: string, handle: string) {
 }
 
 describe('ConnectionPicker', () => {
+  it.each(['Add new node', 'Existing node'])('closes %s on Escape when a later background tooltip owns the Radix layer', async mode => {
+    // A tooltip appearing after focus must not consume the picker keyboard dismissal or mutate its graph.
+    const source = useGraphStore.getState().addNode('TrainTestSplitter', { x: 0, y: 0 });
+    const target = useGraphStore.getState().addNode('imputation_node', { x: 350, y: 0 });
+    useGraphStore.getState().onConnect({ source, sourceHandle: 'train', target, targetHandle: 'in' });
+    const port = registry.get('TrainTestSplitter')?.outputs.find(output => output.id === 'train');
+    if (!port) throw new Error('Missing Train output');
+    const originalNodes = useGraphStore.getState().nodes;
+    const originalEdges = useGraphStore.getState().edges;
+    const content = (tooltipOpen: boolean) => <Tooltip.Provider>
+      <ConnectionPicker nodeId={source} port={port} />
+      <Tooltip.Root open={tooltipOpen}>
+        <Tooltip.Trigger>Background edge action</Tooltip.Trigger>
+        <Tooltip.Portal><Tooltip.Content>Background connection tooltip</Tooltip.Content></Tooltip.Portal>
+      </Tooltip.Root>
+    </Tooltip.Provider>;
+    const { rerender } = render(content(false));
+    const trigger = screen.getByRole('button', { name: 'Next step from Train' });
+    fireEvent.click(trigger);
+    fireEvent.click(screen.getByRole('button', { name: mode }));
+    const search = screen.getByRole('textbox', { name: 'Search next steps' });
+    act(() => { search.focus(); });
+    rerender(content(true));
+    await waitFor(() => expect(screen.getByRole('tooltip')).toBeVisible());
+    expect(search).toHaveFocus();
+
+    fireEvent.keyDown(search, { key: 'Escape' });
+
+    expect(screen.queryByRole('dialog', { name: 'Connect next step' })).not.toBeInTheDocument();
+    await waitFor(() => expect(trigger).toHaveFocus());
+    expect(useGraphStore.getState().nodes).toEqual(originalNodes);
+    expect(useGraphStore.getState().edges).toEqual(originalEdges);
+  });
+
   it('focuses the search and offers only an ensemble after a trained model', async () => {
     // Keyboard users must find valid next steps without being offered data-processing inputs.
     openPicker('classification', 'model');

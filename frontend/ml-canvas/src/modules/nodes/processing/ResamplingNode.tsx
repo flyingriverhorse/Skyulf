@@ -104,6 +104,7 @@ const ResamplingSettings: React.FC<{ config: ResamplingConfig; onChange: (c: Res
   onChange,
   nodeId,
 }) => {
+  const id = React.useId();
   // Responsive layout: switch to a 2-column layout once the panel is wider than 400px.
   const [containerRef, isWide] = useIsWideContainer(400);
   const [showRecommendations, setShowRecommendations] = useState(true);
@@ -188,6 +189,7 @@ const ResamplingSettings: React.FC<{ config: ResamplingConfig; onChange: (c: Res
             <div className="space-y-2">
                 <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Resampling Type</span>
                 <select
+                  aria-label="Resampling Type"
                     className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 p-2 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                     value={config.type}
                     onChange={(e) => { handleChange('type', e.target.value as ResamplingConfig['type']); }}
@@ -200,6 +202,7 @@ const ResamplingSettings: React.FC<{ config: ResamplingConfig; onChange: (c: Res
             <div className="space-y-2">
                 <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Method</span>
                 <select
+                  aria-label="Method"
                     className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 p-2 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                     value={config.method}
                     onChange={(e) => { handleChange('method', e.target.value); }}
@@ -235,16 +238,17 @@ const ResamplingSettings: React.FC<{ config: ResamplingConfig; onChange: (c: Res
                 <div className="relative">
                     <ValidationField field="target_column">
                       <input
+                        aria-label="Target Column"
                           type="text"
                           className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 p-2 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                           placeholder="e.g., target"
                           value={config.target_column}
                           onChange={(e) => { handleChange('target_column', e.target.value); }}
-                          list="target-column-suggestions"
+                        list={`${id}-target-column-suggestions`}
                       />
                     </ValidationField>
                     {schema?.columns && (
-                        <datalist id="target-column-suggestions">
+                        <datalist id={`${id}-target-column-suggestions`}>
                             {Object.values(schema.columns).filter((col: ColumnProfile) => !droppedUpstream.has(col.name)).map((col: ColumnProfile) => (
                                 <option key={col.name} value={col.name} />
                             ))}
@@ -259,6 +263,7 @@ const ResamplingSettings: React.FC<{ config: ResamplingConfig; onChange: (c: Res
             <div className="space-y-2">
                 <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Sampling Strategy</span>
                 <select
+                  aria-label="Sampling Strategy"
                     className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 p-2 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                     value={config.sampling_strategy}
                     onChange={(e) => { handleChange('sampling_strategy', e.target.value); }}
@@ -275,6 +280,7 @@ const ResamplingSettings: React.FC<{ config: ResamplingConfig; onChange: (c: Res
             <div className="space-y-2">
                 <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Random State</span>
                 <input
+                  aria-label="Random State"
                     type="number"
                     className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 p-2 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                     value={config.random_state}
@@ -295,6 +301,7 @@ const ResamplingSettings: React.FC<{ config: ResamplingConfig; onChange: (c: Res
                             <span className="text-sm font-medium text-gray-700 dark:text-gray-300">k Neighbors</span>
                             <ValidationField field="k_neighbors">
                               <input
+                                aria-label="k Neighbors"
                                   type="number"
                                   className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 p-2 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                                   value={config.k_neighbors ?? 5}
@@ -308,6 +315,7 @@ const ResamplingSettings: React.FC<{ config: ResamplingConfig; onChange: (c: Res
                         <div className="space-y-2">
                             <span className="text-sm font-medium text-gray-700 dark:text-gray-300">m Neighbors</span>
                             <input
+                              aria-label="m Neighbors"
                                 type="number"
                                 className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 p-2 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                                 value={config.m_neighbors ?? 10}
@@ -320,6 +328,7 @@ const ResamplingSettings: React.FC<{ config: ResamplingConfig; onChange: (c: Res
                         <div className="space-y-2">
                             <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Kind</span>
                             <select
+                              aria-label="Kind"
                                 className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 p-2 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                                 value={config.kind ?? 'borderline-1'}
                                 onChange={(e) => { handleChange('kind', e.target.value); }}
@@ -334,6 +343,7 @@ const ResamplingSettings: React.FC<{ config: ResamplingConfig; onChange: (c: Res
                         <div className="space-y-2">
                             <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Out Step</span>
                             <input
+                              aria-label="Out Step"
                                 type="number"
                                 step="0.1"
                                 className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 p-2 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
@@ -348,6 +358,7 @@ const ResamplingSettings: React.FC<{ config: ResamplingConfig; onChange: (c: Res
                             <div className="space-y-2">
                                 <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Cluster Balance Threshold</span>
                                 <input
+                                  aria-label="Cluster Balance Threshold"
                                     type="number"
                                     step="0.1"
                                     className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 p-2 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
@@ -358,6 +369,7 @@ const ResamplingSettings: React.FC<{ config: ResamplingConfig; onChange: (c: Res
                             <div className="space-y-2">
                                 <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Density Exponent</span>
                                 <input
+                                  aria-label="Density Exponent"
                                     type="text"
                                     className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 p-2 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                                     value={config.density_exponent ?? 'auto'}
@@ -376,6 +388,7 @@ const ResamplingSettings: React.FC<{ config: ResamplingConfig; onChange: (c: Res
                         <span className="text-xs text-gray-500 dark:text-gray-400">Sample with replacement</span>
                     </div>
                     <input
+                      aria-label="Replacement"
                         type="checkbox"
                         className="h-4 w-4 rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500"
                         checked={config.replacement ?? false}
@@ -388,6 +401,7 @@ const ResamplingSettings: React.FC<{ config: ResamplingConfig; onChange: (c: Res
                 <div className="space-y-2">
                     <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Version</span>
                     <select
+                      aria-label="Version"
                         className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 p-2 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                         value={config.version ?? 1}
                         onChange={(e) => { handleChange('version', parseIntSafe(e.target.value, config.version)); }}
@@ -404,6 +418,7 @@ const ResamplingSettings: React.FC<{ config: ResamplingConfig; onChange: (c: Res
                     <div className="space-y-2">
                         <span className="text-sm font-medium text-gray-700 dark:text-gray-300">n Neighbors</span>
                         <input
+                          aria-label="n Neighbors"
                             type="number"
                             className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 p-2 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                             value={config.n_neighbors ?? 3}
@@ -413,6 +428,7 @@ const ResamplingSettings: React.FC<{ config: ResamplingConfig; onChange: (c: Res
                     <div className="space-y-2">
                         <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Selection Kind</span>
                         <select
+                          aria-label="Selection Kind"
                             className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 p-2 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                             value={config.kind_sel ?? 'all'}
                             onChange={(e) => { handleChange('kind_sel', e.target.value); }}

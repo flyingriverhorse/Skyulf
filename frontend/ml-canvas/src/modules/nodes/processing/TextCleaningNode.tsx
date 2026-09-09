@@ -26,15 +26,17 @@ interface TextCleaningConfig {
 // --- Components ---
 
 const OperationEditor: React.FC<{
+  index: number;
   operation: TextOperation;
   onChange: (op: TextOperation) => void;
   onDelete: () => void;
-}> = ({ operation, onChange, onDelete }) => {
+}> = ({ index, operation, onChange, onDelete }) => {
   return (
     <div className="p-3 border rounded-md bg-gray-50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700 space-y-3">
       <div className="flex items-center justify-between">
         <select
-          className="text-xs font-medium bg-transparent border-none focus:ring-0 p-0 text-gray-900 dark:text-gray-100"
+          aria-label={`Cleaning operation ${index + 1}`}
+          className="text-xs font-medium bg-transparent border-none focus:ring-1 focus:ring-primary focus:outline-none p-0 text-gray-900 dark:text-gray-100"
           value={operation.op}
           onChange={(e) => {
             const newOp = e.target.value as TextOperation['op'];
@@ -50,7 +52,9 @@ const OperationEditor: React.FC<{
           <option value="remove_special">Remove Special Chars</option>
           <option value="regex">Regex Replace</option>
         </select>
-        <button onClick={onDelete} className="text-gray-400 hover:text-red-500 transition-colors">
+        <button
+          aria-label={`Remove cleaning step ${index + 1}`}
+          onClick={onDelete} className="text-gray-400 hover:text-red-500 transition-colors">
           <Trash2 size={14} />
         </button>
       </div>
@@ -58,6 +62,7 @@ const OperationEditor: React.FC<{
       <div className="space-y-2">
         {operation.op === 'trim' && (
           <select
+            aria-label={`Trim mode for step ${index + 1}`}
             className="w-full text-xs rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 p-1.5"
             value={operation.mode}
             onChange={(e) => onChange({ ...operation, mode: e.target.value })}
@@ -70,6 +75,7 @@ const OperationEditor: React.FC<{
 
         {operation.op === 'case' && (
           <select
+            aria-label={`Case mode for step ${index + 1}`}
             className="w-full text-xs rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 p-1.5"
             value={operation.mode}
             onChange={(e) => onChange({ ...operation, mode: e.target.value })}
@@ -84,6 +90,7 @@ const OperationEditor: React.FC<{
         {operation.op === 'remove_special' && (
           <div className="space-y-2">
             <select
+              aria-label={`Special character mode for step ${index + 1}`}
               className="w-full text-xs rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 p-1.5"
               value={operation.mode}
               onChange={(e) => onChange({ ...operation, mode: e.target.value })}
@@ -94,6 +101,7 @@ const OperationEditor: React.FC<{
               <option value="digits_only">Digits Only</option>
             </select>
             <input
+              aria-label={`Replacement (optional) for step ${index + 1}`}
               type="text"
               className="w-full text-xs rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 p-1.5"
               placeholder="Replacement (optional)"
@@ -106,6 +114,7 @@ const OperationEditor: React.FC<{
         {operation.op === 'regex' && (
           <div className="space-y-2">
             <select
+              aria-label={`Regex mode for step ${index + 1}`}
               className="w-full text-xs rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 p-1.5"
               value={operation.mode}
               onChange={(e) => onChange({ ...operation, mode: e.target.value })}
@@ -119,6 +128,7 @@ const OperationEditor: React.FC<{
               <>
                 <div className="flex gap-1">
                   <input
+                    aria-label={`Regex Pattern for step ${index + 1}`}
                     type="text"
                     className="flex-1 min-w-0 text-xs rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 p-1.5 font-mono"
                     placeholder="Regex Pattern"
@@ -126,6 +136,7 @@ const OperationEditor: React.FC<{
                     onChange={(e) => onChange({ ...operation, pattern: e.target.value })}
                   />
                   <button
+                    aria-label={`Generate regex from literal text for step ${index + 1}`}
                     className="p-1.5 bg-gray-100 dark:bg-gray-700 rounded border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600"
                     title="Generate regex from literal text"
                     onClick={() => {
@@ -141,6 +152,7 @@ const OperationEditor: React.FC<{
                   </button>
                 </div>
                 <input
+                  aria-label={`Replacement for step ${index + 1}`}
                   type="text"
                   className="w-full text-xs rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 p-1.5"
                   placeholder="Replacement"
@@ -211,6 +223,8 @@ const TextCleaningSettings: React.FC<{ config: TextCleaningConfig; onChange: (c:
             </label>
             <ValidationField field="columns">
               <ColumnMultiSelect
+
+                aria-label="Target Columns"
                 variant="compact"
                 columns={textColumns}
                 selected={config.columns}
@@ -276,6 +290,7 @@ const TextCleaningSettings: React.FC<{ config: TextCleaningConfig; onChange: (c:
             ) : (
               config.operations.map((op, idx) => (
                 <OperationEditor
+                  index={idx}
                   key={idx}
                   operation={op}
                   onChange={(newOp) => { updateOperation(idx, newOp); }}

@@ -21,9 +21,10 @@ interface BinningConfig {
 }
 
 const CustomBinInput: React.FC<{
+  column: string;
   value: number[] | undefined;
   onChange: (val: number[]) => void;
-}> = ({ value, onChange }) => {
+}> = ({ column, value, onChange }) => {
   const [text, setText] = useState(value?.join(', ') || '');
   const lastValueRef = useRef(value);
 
@@ -41,6 +42,7 @@ const CustomBinInput: React.FC<{
 
   return (
     <input
+      aria-label={`Bin edges for ${column}`}
       type="text"
       className="w-full p-1 text-xs border rounded bg-background text-foreground"
       placeholder="0, 10, 20, 100..."
@@ -56,6 +58,7 @@ const BinningSettings: React.FC<{ config: BinningConfig; onChange: (c: BinningCo
   onChange,
   nodeId,
 }) => {
+  const id = React.useId();
   const upstreamData = useUpstreamData(nodeId || '');
   const datasetId = upstreamData.find(d => d.datasetId)?.datasetId as string | undefined;
   const { data: schema, isLoading } = useDatasetSchema(datasetId);
@@ -90,6 +93,7 @@ const BinningSettings: React.FC<{ config: BinningConfig; onChange: (c: BinningCo
           <div className="space-y-2">
             <span className="block text-sm font-medium">Binning Strategy</span>
             <select
+              aria-label="Binning Strategy"
               className="w-full p-2 border rounded bg-background focus:ring-1 focus:ring-primary outline-none"
               value={config.strategy}
               onChange={(e) => onChange({ ...config, strategy: e.target.value as BinningConfig['strategy'] })}
@@ -112,6 +116,7 @@ const BinningSettings: React.FC<{ config: BinningConfig; onChange: (c: BinningCo
               <span className="block text-sm font-medium">Number of Bins</span>
               <ValidationField field="n_bins">
                 <input
+                  aria-label="Number of Bins"
                   type="number"
                   min={2}
                   max={100}
@@ -134,6 +139,7 @@ const BinningSettings: React.FC<{ config: BinningConfig; onChange: (c: BinningCo
                      <div key={col} className="space-y-1">
                        <label className="text-[10px] font-medium">{col}</label>
                        <CustomBinInput
+                         column={col}
                          value={config.custom_bins?.[col]}
                          onChange={(edges) => onChange({
                            ...config,
@@ -150,6 +156,7 @@ const BinningSettings: React.FC<{ config: BinningConfig; onChange: (c: BinningCo
           <div className="space-y-2">
             <span className="block text-sm font-medium">Label Format</span>
             <select
+              aria-label="Label Format"
               className="w-full p-2 border rounded bg-background focus:ring-1 focus:ring-primary outline-none"
               value={config.label_format}
               onChange={(e) => onChange({ ...config, label_format: e.target.value as BinningConfig['label_format'] })}
@@ -164,6 +171,7 @@ const BinningSettings: React.FC<{ config: BinningConfig; onChange: (c: BinningCo
             <div className="space-y-2">
               <span className="block text-sm font-medium">Precision (Decimals)</span>
               <input
+                aria-label="Precision (Decimals)"
                 type="number"
                 min={0}
                 max={10}
@@ -181,18 +189,19 @@ const BinningSettings: React.FC<{ config: BinningConfig; onChange: (c: BinningCo
             <div className="flex items-center gap-2">
               <input
                 type="checkbox"
-                id="drop_original"
+                id={`${id}-drop-original`}
                 checked={config.drop_original}
                 onChange={(e) => onChange({ ...config, drop_original: e.target.checked })}
                 className="rounded border-gray-300 text-primary focus:ring-primary"
               />
-              <label htmlFor="drop_original" className="text-sm">Drop Original Columns</label>
+              <label htmlFor={`${id}-drop-original`} className="text-sm">Drop Original Columns</label>
             </div>
 
             {!config.drop_original && (
               <div className="space-y-1">
                 <span className="text-xs font-medium text-muted-foreground">Output Suffix</span>
                 <input
+                  aria-label="Output Suffix"
                   type="text"
                   className="w-full p-1.5 border rounded text-xs"
                   placeholder="_binned"

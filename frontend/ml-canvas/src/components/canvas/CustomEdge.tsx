@@ -1,4 +1,4 @@
-import React, { memo, useEffect, useId, useRef, useState } from 'react';
+import React, { memo, useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import {
   BaseEdge,
   EdgeLabelRenderer,
@@ -12,6 +12,8 @@ import {
 import { X } from 'lucide-react';
 import { getReadOnlyMode } from '../../core/hooks/useReadOnlyMode';
 import { ConnectionHoverCard } from './ConnectionHoverCard';
+import { useCanvasLeakageFeedback } from '../../core/contexts/CanvasLeakageContext';
+import { LeakageIssuePopover } from './LeakageIssuePopover';
 
 export const CustomEdge: React.FC<EdgeProps> = memo(({
   id,
@@ -29,6 +31,14 @@ export const CustomEdge: React.FC<EdgeProps> = memo(({
   deletable,
 }) => {
   const { deleteElements, getInternalNode } = useReactFlow();
+  const { edgeIssues, openGuide } = useCanvasLeakageFeedback();
+  const leakageIssues = edgeIssues[id] ?? [];
+  const measurementPathRef = useRef<SVGPathElement>(null);
+  const [controlPoints, setControlPoints] = useState<{
+    path: string;
+    remove: { x: number; y: number };
+    warning: { x: number; y: number };
+  } | null>(null);
   const [hovered, setHovered] = useState(false);
   const [buttonFocused, setButtonFocused] = useState(false);
   const tooltipId = useId();
@@ -84,6 +94,47 @@ export const CustomEdge: React.FC<EdgeProps> = memo(({
         borderRadius: 16,
       });
 
+  useLayoutEffect(() => {
+    const path = measurementPathRef.current;
+    if (!path || typeof path.getTotalLength !== 'function' || typeof path.getPointAtLength !== 'function') return;
+    const length = path.getTotalLength();
+    if (!Number.isFinite(length) || length <= 0) return;
+
+    const midpoint = length / 2;
+    const remove = path.getPointAtLength(midpoint);
+    const spacing = 28;
+    const available = Math.min(midpoint, spacing * 4);
+    let warning = remove;
+    let separation = 0;
+
+    // Sample the same curve in either direction; a tight bend may need more arc length
+    // than a straight segment to leave room between two upright 24px buttons.
+    for (let offset = Math.min(spacing, available); offset < available + 4; offset += 4) {
+      const arcOffset = Math.min(offset, available);
+      for (const direction of [1, -1]) {
+        const point = path.getPointAtLength(midpoint + direction * arcOffset);
+        const distance = Math.hypot(point.x - remove.x, point.y - remove.y);
+        if (distance > separation) {
+          warning = point;
+          separation = distance;
+        }
+        if (separation >= spacing) break;
+      }
+      if (separation >= spacing) break;
+    }
+
+    setControlPoints({
+      path: edgePath,
+      remove: { x: remove.x, y: remove.y },
+      warning: { x: warning.x, y: warning.y },
+    });
+  }, [edgePath]);
+
+  const measuredPoints = controlPoints?.path === edgePath ? controlPoints : null;
+  const deletePoint = measuredPoints?.remove ?? { x: labelX, y: labelY };
+  const warningPoint = measuredPoints?.warning ?? deletePoint;
+  const badgeY = leakageIssues.length > 0 ? Math.min(deletePoint.y, warningPoint.y) : deletePoint.y;
+
   const branchColor = (data as Record<string, unknown>)?.branchColor as string | undefined;
   const branchLabel = (data as Record<string, unknown>)?.branchLabel as string | undefined;
   const branchShared = (data as Record<string, unknown>)?.branchShared as boolean | undefined;
@@ -133,15 +184,16 @@ export const CustomEdge: React.FC<EdgeProps> = memo(({
           className="react-flow__edge-path"
           interactionWidth={24}
         />
+        <path ref={measurementPathRef} d={edgePath} fill="none" stroke="none" pointerEvents="none" aria-hidden="true" />
       </g>
       <EdgeLabelRenderer>
-        {showTooltip && <ConnectionHoverCard id={tooltipId} x={labelX} y={labelY}
+        {showTooltip && <ConnectionHoverCard id={tooltipId} x={deletePoint.x} y={deletePoint.y}
           sourceLabel={sourceLabel} targetLabel={targetLabel} onEnter={enter} onLeave={leave} />}
         {isMergeWinner && (
           <div
             style={{
               position: 'absolute',
-              transform: `translate(-50%, -100%) translate(${labelX}px,${labelY - (branchLabel ? 40 : 16)}px)`,
+              transform: `translate(-50%, -100%) translate(${deletePoint.x}px,${badgeY - (branchLabel ? 40 : 16)}px)`,
               fontSize: 9,
               fontWeight: 700,
               letterSpacing: '0.06em',
@@ -164,7 +216,7 @@ export const CustomEdge: React.FC<EdgeProps> = memo(({
           <div
             style={{
               position: 'absolute',
-              transform: `translate(-50%, -100%) translate(${labelX}px,${labelY - 16}px)`,
+              transform: `translate(-50%, -100%) translate(${deletePoint.x}px,${badgeY - 16}px)`,
               fontSize: 10,
               fontWeight: 600,
               letterSpacing: '0.02em',
@@ -185,7 +237,7 @@ export const CustomEdge: React.FC<EdgeProps> = memo(({
         {canDelete && <div
           style={{
             position: 'absolute',
-            transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`,
+            transform: `translate(-50%, -50%) translate(${deletePoint.x}px,${deletePoint.y}px)`,
             fontSize: 12,
             pointerEvents: showControls ? 'all' : 'none',
           }}
@@ -206,6 +258,16 @@ export const CustomEdge: React.FC<EdgeProps> = memo(({
           >
             <X size={10} />
           </button>
+        </div>}
+        {leakageIssues.length > 0 && <div
+          style={{
+            position: 'absolute',
+            transform: `translate(-50%, -50%) translate(${warningPoint.x}px,${warningPoint.y}px)`,
+            pointerEvents: 'all',
+          }}
+          className="nodrag nopan"
+        >
+          <LeakageIssuePopover issues={leakageIssues} subject={`${sourceLabel} to ${targetLabel}`} openGuide={openGuide} />
         </div>}
       </EdgeLabelRenderer>
     </>

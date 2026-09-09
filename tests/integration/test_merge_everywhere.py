@@ -410,10 +410,27 @@ class TestTrainingMerge:
             f"SplitDataset merge, got: {sorted(metrics)}"
         )
 
-    def test_training_merges_two_dataset_branches(self, numeric_csv, artifact_store, catalog):
-        """Sanity check: two parallel preprocessing chains from raw dataset
-        still feed into a training node (existing behaviour, not regressed).
-        """
+    @pytest.mark.parametrize("learned", [False, True], ids=["stateless", "learned_without_split"])
+    def test_training_merges_two_dataset_branches(
+        self, numeric_csv, artifact_store, catalog, learned
+    ):
+        """Raw forks preserve both fixed transforms but reject pre-fitted learners."""
+        branch_params = [
+            {"columns": [column]}
+            if learned
+            else {
+                "operations": [
+                    {
+                        "operation_type": "arithmetic",
+                        "method": "multiply",
+                        "input_columns": [column],
+                        "constants": [multiplier],
+                        "output_column": output,
+                    }
+                ]
+            }
+            for column, multiplier, output in [("f1", 2, "left_f1"), ("f2", 3, "right_f2")]
+        ]
         config = PipelineConfig(
             pipeline_id="training_dataset_merge",
             nodes=[
@@ -424,15 +441,15 @@ class TestTrainingMerge:
                 ),
                 NodeConfig(
                     node_id="scaler_a",
-                    step_type="StandardScaler",
+                    step_type="StandardScaler" if learned else "FeatureGeneration",
                     inputs=["data"],
-                    params={"columns": ["f1"]},
+                    params=branch_params[0],
                 ),
                 NodeConfig(
                     node_id="scaler_b",
-                    step_type="MinMaxScaler",
+                    step_type="MinMaxScaler" if learned else "FeatureGeneration",
                     inputs=["data"],
-                    params={"columns": ["f2"]},
+                    params=branch_params[1],
                 ),
                 NodeConfig(
                     node_id="training",
@@ -452,7 +469,28 @@ class TestTrainingMerge:
         engine = PipelineEngine(artifact_store, catalog=catalog)
         result = engine.run(config)
 
+        if learned:
+            assert result.status == "failed"
+            assert result.node_results["scaler_a"].status == "success"
+            assert result.node_results["scaler_b"].status == "success"
+            assert "Per-fold preprocessing refit skipped: branches share no common trunk" in (
+                result.node_results["training"].error or ""
+            )
+            assert not artifact_store.exists("training")
+            return
+
         assert result.status == "success", _failure_summary(result)
+        merged = engine._to_dataframe(
+            engine._merge_inputs(config.nodes[-1], target_col="target"), target_col="target"
+        )
+        source = engine._to_dataframe(artifact_store.load("data"), target_col="target")
+        assert list(merged.columns) == ["f1", "f2", "target", "left_f1", "right_f2"]
+        assert len(merged) == len(source) == 30
+        assert list(merged["f1"]) == list(source["f1"])
+        assert list(merged["f2"]) == list(source["f2"])
+        assert list(merged["left_f1"]) == list(source["f1"] * 2)
+        assert list(merged["right_f2"]) == list(source["f2"] * 3)
+        assert list(merged["target"]) == list(source["target"])
         assert artifact_store.exists("training")
 
 

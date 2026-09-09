@@ -648,7 +648,7 @@ def test_advanced_tuning_evaluate_failure_is_logged_not_raised(
 
 
 def test_run_tuned_cv_exception_is_caught(pipeline_data_csv, tmp_path, monkeypatch):
-    """If cross_validate raises during post-tuning CV, the exception is caught and cv metrics are empty."""
+    """A post-tuning CV crash fails the node instead of masquerading as success."""
     from skyulf.modeling.base import StatefulEstimator
 
     def boom_cv(self, *args, **kwargs):
@@ -685,10 +685,10 @@ def test_run_tuned_cv_exception_is_caught(pipeline_data_csv, tmp_path, monkeypat
         ],
     )
     result = engine.run(config)
-    assert result.status == "success"
+    assert result.status == "failed"
     tuning_res = result.node_results["node_tuning"]
-    assert tuning_res.status == "success"
-    assert not any(k.startswith("cv_") for k in tuning_res.metrics)
+    assert tuning_res.status == "failed"
+    assert "cv boom" in (tuning_res.error or "")
 
 
 def test_data_loader_uses_dataset_id_param(pipeline_data_csv, tmp_path):

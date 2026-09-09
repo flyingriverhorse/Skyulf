@@ -8,17 +8,18 @@ from skyulf.pipeline import SkyulfPipeline
 
 
 def _config(test_size=0.25, random_state=42):
+    """Keep split-extraction tests independent of unsafe preprocessing order."""
     return {
         "preprocessing": [
-            {
-                "name": "imputer",
-                "transformer": "SimpleImputer",
-                "params": {"strategy": "mean"},
-            },
             {
                 "name": "split",
                 "transformer": "TrainTestSplitter",
                 "params": {"test_size": test_size, "random_state": random_state},
+            },
+            {
+                "name": "imputer",
+                "transformer": "SimpleImputer",
+                "params": {"strategy": "mean"},
             },
         ],
         "modeling": {"type": "logistic_regression"},
@@ -93,12 +94,12 @@ def test_get_fitted_split_leaves_a_fitted_pipeline_untouched():
     data = pd.DataFrame({"x": x, "target": 10 * x})
     config = {
         "preprocessing": [
-            {"name": "scale", "transformer": "StandardScaler", "params": {"columns": ["x"]}},
             {
                 "name": "split",
                 "transformer": "TrainTestSplitter",
                 "params": {"test_size": 0.25, "random_state": 42},
             },
+            {"name": "scale", "transformer": "StandardScaler", "params": {"columns": ["x"]}},
         ],
         "modeling": {"type": "linear_regression"},
     }

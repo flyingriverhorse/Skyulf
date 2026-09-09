@@ -172,8 +172,19 @@ class ArtifactsMixin:
         if isinstance(raw_train, tuple) and len(raw_train) == 2:
             # (X, y) tuple
             X, y = raw_train
+            # Splitters do not pass target_col, but split_xy preserves the
+            # label's name. Never persist an anonymous target as a feature.
+            if not target_col:
+                if isinstance(y, pd.Series) and y.name is not None:
+                    target_col = str(y.name)
+                elif isinstance(y, pl.Series):
+                    target_col = y.name
+                elif isinstance(y, (pd.DataFrame, pl.DataFrame)) and len(y.columns) == 1:
+                    target_col = str(y.columns[0])
             if isinstance(X, pd.DataFrame):
                 train_df = X.copy()
+                if not target_col:
+                    return train_df
                 # Add target column back if y is compatible. A single-column
                 # `pd.DataFrame` is a legitimate target shape (``split_xy`` can
                 # produce one); squeeze it rather than silently dropping the
@@ -186,6 +197,8 @@ class ArtifactsMixin:
                 return train_df
             if isinstance(X, pl.DataFrame):
                 train_df = X.clone()
+                if not target_col:
+                    return train_df
                 if isinstance(y, pl.DataFrame):
                     if y.width == 1:
                         train_df = train_df.with_columns(

@@ -11,6 +11,7 @@ from sklearn.preprocessing import LabelEncoder
 from ...core.meta.decorators import node_meta
 from ...registry import NodeRegistry
 from .._artifacts import LabelEncoderArtifact
+from .._category_keys import category_key_expr, category_keys_pandas, uses_category_keys
 from .._schema import SkyulfSchema
 from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
 from ..dispatcher import apply_dual_engine, fit_dual_engine
@@ -34,7 +35,11 @@ def _le_mapping_str(le: LabelEncoder) -> dict[str, int]:
 
 
 def _build_polars_feature_exprs(
-    X: Any, cols: list[str], encoders: dict[str, Any], missing_code: Any
+    X: Any,
+    cols: list[str],
+    encoders: dict[str, Any],
+    missing_code: Any,
+    canonical_keys: bool = False,
 ) -> list[Any]:
     # `fill_null("nan")` mirrors the pandas path's `.astype(str)`, which turns
     # NaN into the literal "nan" string that the fitted LabelEncoder learned a
@@ -44,13 +49,13 @@ def _build_polars_feature_exprs(
     for col in cols:
         if col in X.columns and col in encoders:
             mapping = _le_mapping_str(encoders[col])
+            values = (
+                category_key_expr(col)
+                if canonical_keys
+                else pl.col(col).cast(pl.Utf8).fill_null("nan")
+            )
             exprs.append(
-                pl.col(col)
-                .cast(pl.Utf8)
-                .fill_null("nan")
-                .replace_strict(mapping, default=missing_code)
-                .cast(pl.Int64)
-                .alias(col)
+                values.replace_strict(mapping, default=missing_code).cast(pl.Int64).alias(col)
             )
     return exprs
 
@@ -64,7 +69,9 @@ def _label_apply_polars(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, An
     y_out = y.clone() if y is not None else None
 
     if cols:
-        exprs = _build_polars_feature_exprs(X_out, cols, encoders, missing_code)
+        exprs = _build_polars_feature_exprs(
+            X_out, cols, encoders, missing_code, uses_category_keys(params)
+        )
         if exprs:
             X_out = X_out.with_columns(exprs)
 
@@ -96,9 +103,12 @@ def _label_apply_pandas(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, An
                 # NaN (even after `.fillna(missing_code)` the column stays
                 # float, since pandas never upcasts back to int) - explicit
                 # `.astype("int64")` matches the Polars path's `.cast(pl.Int64)`.
-                X_out[col] = (
-                    X_out[col].astype(str).map(mapping).fillna(missing_code).astype("int64")
+                keys = (
+                    category_keys_pandas(X_out[col])
+                    if uses_category_keys(params)
+                    else X_out[col].astype(str)
                 )
+                X_out[col] = keys.map(mapping).fillna(missing_code).astype("int64")
 
     if y_out is not None and "__target__" in encoders:
         mapping = _le_mapping(encoders["__target__"])
@@ -110,12 +120,10 @@ def _label_apply_pandas(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, An
 class LabelEncoderApplier(BaseApplier):
     """Replace categorical values in place with the integer ids their fitted encoder assigned.
 
-    The engines only agree because two conventions line up: values are
-    stringified before lookup, and polars fills nulls with the literal ``"nan"``
-    to mirror pandas' ``astype(str)``, so a null resolves to the ``"nan"`` class
-    the encoder actually learned instead of falling back to ``missing_code``.
-    Values unseen at fit time do map to ``missing_code``. ``y`` is encoded too
-    when the artifact carries a ``__target__`` encoder.
+    New feature artifacts use typed scalar keys: integral floats match their
+    integer category without matching literal numeric strings. Legacy artifacts
+    retain their original string lookup. Values unseen at fit time map to
+    ``missing_code``. Target encoders retain their existing string-label behavior.
     """
 
     @apply_method
@@ -255,6 +263,7 @@ def _build_label_artifact(
         "columns": cols,
         "classes_count": counts,
         "missing_code": config.get("missing_code", -1),
+        "category_key_version": 1,
     }
 
 
@@ -266,7 +275,9 @@ def _label_fit_polars(X: Any, y: Any, config: dict[str, Any]) -> Mapping[str, An
 
     if cols:
         valid = [c for c in cols if c in X.columns]
-        encoders, counts = _fit_feature_encoders(valid, lambda c: _polars_col_to_str_array(X, c))
+        encoders, counts = _fit_feature_encoders(
+            valid, lambda c: X.select(category_key_expr(c)).to_series().to_numpy()
+        )
 
     _maybe_fit_target(y, cols, encoders, counts)
     _warn_if_no_encoders_fit(encoders, cols, y)
@@ -281,7 +292,7 @@ def _label_fit_pandas(X: Any, y: Any, config: dict[str, Any]) -> Mapping[str, An
 
     if cols:
         valid = [c for c in cols if c in X.columns]
-        encoders, counts = _fit_feature_encoders(valid, lambda c: X[c].astype(str))
+        encoders, counts = _fit_feature_encoders(valid, lambda c: category_keys_pandas(X[c]))
 
     _maybe_fit_target(y, cols, encoders, counts)
     _warn_if_no_encoders_fit(encoders, cols, y)

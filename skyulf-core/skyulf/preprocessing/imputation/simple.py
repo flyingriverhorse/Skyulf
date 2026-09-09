@@ -184,16 +184,27 @@ class SimpleImputerCalculator(BaseCalculator):
 
         # Mean/median: extra safety filter to numeric columns only.
         if strategy in ("mean", "median"):
-            numeric = set(detect_numeric_columns(X))
+            # Automatic selection already applied its cardinality heuristics.
+            # Do not discard explicitly selected binary or constant columns here.
+            numeric = set(detect_numeric_columns(X, exclude_binary=False, exclude_constant=False))
             cols = [c for c in cols if c in numeric]
             if not cols:
                 return {}
 
-        imputer = SimpleImputer(strategy=strategy, fill_value=fill_value)
+        imputer = SimpleImputer(
+            strategy=strategy,
+            fill_value=fill_value,
+            keep_empty_features=strategy == "constant",
+        )
         imputer.fit(X[cols])
 
-        statistics = imputer.statistics_.tolist()
-        fill_values = dict(zip(cols, statistics, strict=True))
+        if strategy == "constant" and fill_value is not None:
+            # Validation still runs, but heldout missingness must not choose a constant.
+            fill_values = dict.fromkeys(cols, fill_value)
+        else:
+            # Keeping empty constant columns preserves sklearn's dtype-based defaults.
+            statistics = imputer.statistics_.tolist()
+            fill_values = dict(zip(cols, statistics, strict=True))
         missing_counts = X[cols].isnull().sum().to_dict()
         total_missing = int(sum(missing_counts.values()))
 

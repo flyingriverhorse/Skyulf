@@ -6,6 +6,7 @@ from typing import Any
 
 import polars as pl
 
+from ..time_series._common import parse_datetime_scalar
 from ._common import (
     DEFAULT_EPSILON,
     SEASON_BY_MONTH,
@@ -199,7 +200,11 @@ def _polars_datetime_apply(op: dict[str, Any], X_out: Any) -> Any:
         try:
             base_dt = pl.col(col)
             if X_out.schema[col] == pl.String:
-                base_dt = pl.col(col).str.to_datetime(strict=False)
+                base_dt = base_dt.map_elements(
+                    parse_datetime_scalar, return_dtype=pl.Datetime(time_zone="UTC")
+                )
+            elif X_out.schema[col] == pl.Null:
+                base_dt = base_dt.cast(pl.Datetime)
             col_exprs = _build_polars_dt_exprs(col, base_dt, features)
             if col_exprs:
                 X_out = X_out.with_columns(col_exprs)
@@ -219,8 +224,31 @@ _POLARS_AGG_BUILDERS: dict[str, Callable[[Any], Any]] = {
 }
 
 
-def _polars_group_agg(op: dict[str, Any], existing: list[str], _epsilon: float) -> Any | None:
-    """Group-by aggregation broadcast back per row via Polars window ``over``."""
+def _polars_group_agg(
+    op: dict[str, Any], existing: list[str], _epsilon: float, group_dtype: Any = None
+) -> Any | None:
+    """Map fitted training aggregates, retaining the private unfitted batch helper."""
+    if "group_agg_mapping" in op:
+        fitted = op["group_agg_mapping"] or {}
+        group_col = fitted.get("group_column")
+        if group_col not in existing:
+            return None
+        group_expr = pl.col(group_col)
+        if group_dtype in (pl.Float32, pl.Float64):
+            group_expr = group_expr.fill_nan(None)
+        mapped = (
+            group_expr.replace_strict(
+                fitted["keys"], fitted["values"], default=None, return_dtype=pl.Float64
+            )
+            if fitted["keys"]
+            else pl.lit(None, dtype=pl.Float64)
+        )
+        return (
+            pl.when(group_expr.is_null())
+            .then(pl.lit(fitted.get("null_value"), dtype=pl.Float64))
+            .otherwise(mapped)
+        )
+
     resolved = _resolve_group_agg_cols(op, existing)
     if resolved is None:
         return None
@@ -250,7 +278,7 @@ def _featgen_apply_polars(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, 
     allow_overwrite = params.get("allow_overwrite", False)
 
     X_out = X
-    for i, op in enumerate(operations):
+    for i, op in enumerate(operations, start=params.get("_operation_offset", 0)):
         op_type = op.get("operation_type", "arithmetic")
         try:
             if op_type == "datetime_extract":
@@ -259,7 +287,13 @@ def _featgen_apply_polars(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, 
             handler = _POLARS_OP_HANDLERS.get(op_type)
             if handler is None:
                 continue
-            expr = handler(op, list(X_out.columns), epsilon)
+            if op_type == "group_agg":
+                fitted_group = (op.get("group_agg_mapping") or {}).get("group_column")
+                expr = _polars_group_agg(
+                    op, list(X_out.columns), epsilon, X_out.schema.get(fitted_group)
+                )
+            else:
+                expr = handler(op, list(X_out.columns), epsilon)
             if expr is None:
                 continue
             output_col = _resolve_output_col(op, i, list(X_out.columns), allow_overwrite)

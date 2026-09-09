@@ -71,6 +71,10 @@ function PickerContent({ nodeId, port, close }: { nodeId: string; port: PortDefi
   return <Popover.Portal>
     <Popover.Content aria-label="Connect next step" side="right" align="start" sideOffset={12} collisionPadding={12}
       onOpenAutoFocus={event => { event.preventDefault(); searchRef.current?.focus(); }}
+      onKeyDown={event => {
+        // A background tooltip can consume Radix's document-level Escape before this focused picker.
+        if (event.key === 'Escape') { event.stopPropagation(); close(); }
+      }}
       className="nodrag nopan nokey z-50 w-80 max-w-[calc(100vw-24px)] overflow-y-auto rounded-lg border bg-popover p-3 text-popover-foreground shadow-lg"
       style={{ maxHeight: 'min(480px, var(--radix-popover-content-available-height))' }}
       onPointerDown={event => event.stopPropagation()} onMouseDown={event => event.stopPropagation()}

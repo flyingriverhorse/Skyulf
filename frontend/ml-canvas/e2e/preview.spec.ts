@@ -25,7 +25,7 @@ test.describe('Run Preview happy path', () => {
     // Capture the request so we can assert the toolbar dispatched it.
     let previewRequestSeen = false;
 
-    await page.route('**/api/pipeline/preview', (route: Route) => {
+    await page.route('**/api/pipeline/preview?*', (route: Route) => {
       previewRequestSeen = true;
       void route.fulfill({
         status: 200,

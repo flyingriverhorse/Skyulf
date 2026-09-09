@@ -7,6 +7,7 @@ import { JobsHistoryModal } from '../components/eda/JobsHistoryModal';
 import { EDASidebar } from '../components/eda/EDASidebar';
 import { DashboardTab } from '../components/eda/tabs/DashboardTab';
 import { InsightsTab } from '../components/eda/tabs/InsightsTab';
+import { PIIReviewTab } from '../components/eda/tabs/PIIReviewTab';
 import { PCATab } from '../components/eda/tabs/PCATab';
 import { GeospatialTab } from '../components/eda/tabs/GeospatialTab';
 import { TargetAnalysisTab } from '../components/eda/tabs/TargetAnalysisTab';
@@ -401,6 +402,10 @@ export const EDAPage: React.FC = () => {
 
             {activeTab === 'insights' && (
                 <InsightsTab profile={profile} />
+            )}
+
+            {activeTab === 'pii' && (
+                <PIIReviewTab alerts={profile.alerts ?? []} />
             )}
 
             {activeTab === 'pca' && (

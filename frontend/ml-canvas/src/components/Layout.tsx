@@ -5,6 +5,7 @@ import { monitoringApi } from '../core/api/monitoring';
 import { useViewport } from '../core/hooks/useViewport';
 import { applyTheme } from '../core/theme/applyTheme';
 import logoUrl from '../../../../static/img/logo.png';
+import { NotificationCenter } from './layout/NotificationCenter';
 
 export const Layout: React.FC = () => {
   const location = useLocation();
@@ -207,6 +208,12 @@ export const Layout: React.FC = () => {
             </button>
             <img src={logoUrl} alt="" width={28} height={28} className="ml-2 h-7 w-7 object-contain" />
             <span className="ml-2 font-semibold text-foreground">Skyulf ML</span>
+            {location.pathname !== '/canvas' && <div className="ml-auto"><NotificationCenter /></div>}
+          </div>
+        )}
+        {!isMobile && location.pathname !== '/canvas' && (
+          <div className="h-14 shrink-0 border-b border-border bg-background flex items-center justify-end px-4 sticky top-0 z-20">
+            <NotificationCenter />
           </div>
         )}
         {/* min-h-0 lets this flex item shrink below its content's natural

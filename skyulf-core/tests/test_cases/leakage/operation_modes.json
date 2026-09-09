@@ -1,0 +1,892 @@
+{
+  "schema_version": 1,
+  "target_column": "target",
+  "description": "Operation-level expectations derived from fit/apply audit, not registry metadata.",
+  "cases": [
+    {
+      "id": "polynomial_auto_omitted_columns",
+      "transformer": "PolynomialFeatures",
+      "params": {"auto_detect": true},
+      "learns": true
+    },
+    {
+      "id": "polynomial_auto_empty_columns",
+      "transformer": "PolynomialFeatures",
+      "params": {"auto_detect": true, "columns": []},
+      "learns": true
+    },
+    {
+      "id": "polynomial_auto_explicit_columns",
+      "transformer": "PolynomialFeatures",
+      "params": {"auto_detect": true, "columns": ["x"]},
+      "learns": false
+    },
+    {
+      "id": "polynomial_explicit_columns",
+      "transformer": "PolynomialFeatures",
+      "params": {"columns": ["x"]},
+      "learns": false
+    },
+    {
+      "id": "polynomial_default_noop",
+      "transformer": "PolynomialFeatures",
+      "params": {},
+      "learns": false
+    },
+    {
+      "id": "polynomial_empty_noop",
+      "transformer": "PolynomialFeatures",
+      "params": {"columns": []},
+      "learns": false
+    },
+    {
+      "id": "polynomial_disabled_auto_noop",
+      "transformer": "PolynomialFeatures",
+      "params": {"auto_detect": false, "columns": []},
+      "learns": false
+    },
+    {
+      "id": "polynomial_node_auto_omitted_columns",
+      "transformer": "PolynomialFeaturesNode",
+      "params": {"auto_detect": true},
+      "learns": true
+    },
+    {
+      "id": "polynomial_node_auto_empty_columns",
+      "transformer": "PolynomialFeaturesNode",
+      "params": {"auto_detect": true, "columns": []},
+      "learns": true
+    },
+    {
+      "id": "polynomial_node_auto_explicit_columns",
+      "transformer": "PolynomialFeaturesNode",
+      "params": {"auto_detect": true, "columns": ["x"]},
+      "learns": false
+    },
+    {
+      "id": "polynomial_node_explicit_columns",
+      "transformer": "PolynomialFeaturesNode",
+      "params": {"columns": ["x"]},
+      "learns": false
+    },
+    {
+      "id": "polynomial_node_default_noop",
+      "transformer": "PolynomialFeaturesNode",
+      "params": {},
+      "learns": false
+    },
+    {
+      "id": "polynomial_node_empty_noop",
+      "transformer": "PolynomialFeaturesNode",
+      "params": {"columns": []},
+      "learns": false
+    },
+    {
+      "id": "polynomial_node_disabled_auto_noop",
+      "transformer": "PolynomialFeaturesNode",
+      "params": {"auto_detect": false, "columns": []},
+      "learns": false
+    },
+    {
+      "id": "general_yeo-johnson",
+      "transformer": "GeneralTransformation",
+      "params": {
+        "transformations": [
+          {
+            "column": "x",
+            "method": "yeo-johnson"
+          }
+        ]
+      },
+      "learns": true
+    },
+    {
+      "id": "general_box-cox",
+      "transformer": "GeneralTransformation",
+      "params": {
+        "transformations": [
+          {
+            "column": "x",
+            "method": "box-cox"
+          }
+        ]
+      },
+      "learns": true
+    },
+    {
+      "id": "general_mixed",
+      "transformer": "GeneralTransformation",
+      "params": {
+        "transformations": [
+          {
+            "column": "value",
+            "method": "log"
+          },
+          {
+            "column": "x",
+            "method": "yeo-johnson"
+          }
+        ]
+      },
+      "learns": true
+    },
+    {
+      "id": "general_log",
+      "transformer": "GeneralTransformation",
+      "params": {
+        "transformations": [
+          {
+            "column": "x",
+            "method": "log"
+          }
+        ]
+      },
+      "learns": false
+    },
+    {
+      "id": "general_sqrt",
+      "transformer": "GeneralTransformation",
+      "params": {
+        "transformations": [
+          {
+            "column": "x",
+            "method": "sqrt"
+          }
+        ]
+      },
+      "learns": false
+    },
+    {
+      "id": "general_square_root",
+      "transformer": "GeneralTransformation",
+      "params": {
+        "transformations": [
+          {
+            "column": "x",
+            "method": "square_root"
+          }
+        ]
+      },
+      "learns": false
+    },
+    {
+      "id": "general_cube_root",
+      "transformer": "GeneralTransformation",
+      "params": {
+        "transformations": [
+          {
+            "column": "x",
+            "method": "cube_root"
+          }
+        ]
+      },
+      "learns": false
+    },
+    {
+      "id": "general_reciprocal",
+      "transformer": "GeneralTransformation",
+      "params": {
+        "transformations": [
+          {
+            "column": "x",
+            "method": "reciprocal"
+          }
+        ]
+      },
+      "learns": false
+    },
+    {
+      "id": "general_square",
+      "transformer": "GeneralTransformation",
+      "params": {
+        "transformations": [
+          {
+            "column": "x",
+            "method": "square"
+          }
+        ]
+      },
+      "learns": false
+    },
+    {
+      "id": "general_exp",
+      "transformer": "GeneralTransformation",
+      "params": {
+        "transformations": [
+          {
+            "column": "x",
+            "method": "exp"
+          }
+        ]
+      },
+      "learns": false
+    },
+    {
+      "id": "general_exponential",
+      "transformer": "GeneralTransformation",
+      "params": {
+        "transformations": [
+          {
+            "column": "x",
+            "method": "exponential"
+          }
+        ]
+      },
+      "learns": false
+    },
+    {
+      "id": "general_empty",
+      "transformer": "GeneralTransformation",
+      "params": {
+        "transformations": []
+      },
+      "learns": false
+    },
+    {
+      "id": "general_omitted",
+      "transformer": "GeneralTransformation",
+      "params": {},
+      "learns": false
+    },
+    {
+      "id": "FeatureGeneration_group",
+      "transformer": "FeatureGeneration",
+      "params": {
+        "operations": [
+          {
+            "operation_type": "group_agg",
+            "method": "mean",
+            "input_columns": [
+              "group"
+            ],
+            "secondary_columns": [
+              "value"
+            ],
+            "output_column": "group_value"
+          }
+        ]
+      },
+      "learns": true
+    },
+    {
+      "id": "FeatureGeneration_arithmetic",
+      "transformer": "FeatureGeneration",
+      "params": {
+        "operations": [
+          {
+            "operation_type": "arithmetic",
+            "method": "multiply",
+            "input_columns": [
+              "x"
+            ],
+            "constants": [
+              2
+            ],
+            "output_column": "twice_x"
+          }
+        ]
+      },
+      "learns": false
+    },
+    {
+      "id": "FeatureGeneration_empty",
+      "transformer": "FeatureGeneration",
+      "params": {
+        "operations": []
+      },
+      "learns": false
+    },
+    {
+      "id": "FeatureGenerationNode_group",
+      "transformer": "FeatureGenerationNode",
+      "params": {
+        "operations": [
+          {
+            "operation_type": "group_agg",
+            "method": "mean",
+            "input_columns": [
+              "group"
+            ],
+            "secondary_columns": [
+              "value"
+            ],
+            "output_column": "group_value"
+          }
+        ]
+      },
+      "learns": true
+    },
+    {
+      "id": "FeatureGenerationNode_arithmetic",
+      "transformer": "FeatureGenerationNode",
+      "params": {
+        "operations": [
+          {
+            "operation_type": "arithmetic",
+            "method": "multiply",
+            "input_columns": [
+              "x"
+            ],
+            "constants": [
+              2
+            ],
+            "output_column": "twice_x"
+          }
+        ]
+      },
+      "learns": false
+    },
+    {
+      "id": "FeatureGenerationNode_empty",
+      "transformer": "FeatureGenerationNode",
+      "params": {
+        "operations": []
+      },
+      "learns": false
+    },
+    {
+      "id": "FeatureMath_group",
+      "transformer": "FeatureMath",
+      "params": {
+        "operations": [
+          {
+            "operation_type": "group_agg",
+            "method": "mean",
+            "input_columns": [
+              "group"
+            ],
+            "secondary_columns": [
+              "value"
+            ],
+            "output_column": "group_value"
+          }
+        ]
+      },
+      "learns": true
+    },
+    {
+      "id": "FeatureMath_arithmetic",
+      "transformer": "FeatureMath",
+      "params": {
+        "operations": [
+          {
+            "operation_type": "arithmetic",
+            "method": "multiply",
+            "input_columns": [
+              "x"
+            ],
+            "constants": [
+              2
+            ],
+            "output_column": "twice_x"
+          }
+        ]
+      },
+      "learns": false
+    },
+    {
+      "id": "FeatureMath_empty",
+      "transformer": "FeatureMath",
+      "params": {
+        "operations": []
+      },
+      "learns": false
+    },
+    {
+      "id": "ordinal_omitted",
+      "transformer": "OrdinalEncoder",
+      "params": {},
+      "learns": true
+    },
+    {
+      "id": "ordinal_null",
+      "transformer": "OrdinalEncoder",
+      "params": {
+        "columns": null
+      },
+      "learns": true
+    },
+    {
+      "id": "ordinal_empty",
+      "transformer": "OrdinalEncoder",
+      "params": {
+        "columns": []
+      },
+      "learns": false
+    },
+    {
+      "id": "ordinal_target",
+      "transformer": "OrdinalEncoder",
+      "params": {
+        "columns": [
+          "target"
+        ]
+      },
+      "learns": false
+    },
+    {
+      "id": "ordinal_mixed_target_features",
+      "transformer": "OrdinalEncoder",
+      "params": {
+        "columns": [
+          "target",
+          "category"
+        ]
+      },
+      "learns": true
+    },
+    {
+      "id": "label_target_27",
+      "transformer": "LabelEncoder",
+      "params": {},
+      "learns": false
+    },
+    {
+      "id": "label_target_28",
+      "transformer": "LabelEncoder",
+      "params": {
+        "columns": null
+      },
+      "learns": false
+    },
+    {
+      "id": "label_target_29",
+      "transformer": "LabelEncoder",
+      "params": {
+        "columns": []
+      },
+      "learns": false
+    },
+    {
+      "id": "label_target_30",
+      "transformer": "LabelEncoder",
+      "params": {
+        "columns": [
+          "target"
+        ]
+      },
+      "learns": false
+    },
+    {
+      "id": "label_feature",
+      "transformer": "LabelEncoder",
+      "params": {
+        "columns": [
+          "category"
+        ]
+      },
+      "learns": true
+    },
+    {
+      "id": "custom_bins_auto",
+      "transformer": "CustomBinning",
+      "params": {
+        "bins": [
+          0,
+          5,
+          10,
+          100
+        ]
+      },
+      "learns": true
+    },
+    {
+      "id": "custom_bins_null",
+      "transformer": "CustomBinning",
+      "params": {
+        "columns": null,
+        "bins": [
+          0,
+          5,
+          10,
+          100
+        ]
+      },
+      "learns": true
+    },
+    {
+      "id": "custom_bins_explicit",
+      "transformer": "CustomBinning",
+      "params": {
+        "columns": [
+          "x"
+        ],
+        "bins": [
+          0,
+          5,
+          10,
+          100
+        ]
+      },
+      "learns": false
+    },
+    {
+      "id": "custom_bins_empty_columns",
+      "transformer": "CustomBinning",
+      "params": {
+        "columns": [],
+        "bins": [
+          0,
+          5,
+          10,
+          100
+        ]
+      },
+      "learns": false
+    },
+    {
+      "id": "casting_category",
+      "transformer": "Casting",
+      "params": {
+        "column_types": {
+          "category": "category"
+        }
+      },
+      "learns": true
+    },
+    {
+      "id": "casting_categorical_alias",
+      "transformer": "Casting",
+      "params": {
+        "columns": [
+          "category"
+        ],
+        "target_type": "CATEGORICAL"
+      },
+      "learns": true
+    },
+    {
+      "id": "casting_mixed",
+      "transformer": "Casting",
+      "params": {
+        "column_types": {
+          "x": "float",
+          "category": "category"
+        }
+      },
+      "learns": true
+    },
+    {
+      "id": "casting_float",
+      "transformer": "Casting",
+      "params": {
+        "columns": [
+          "x"
+        ],
+        "target_type": "float"
+      },
+      "learns": false
+    },
+    {
+      "id": "casting_datetime",
+      "transformer": "Casting",
+      "params": {
+        "column_types": {
+          "date": "datetime"
+        }
+      },
+      "learns": false
+    },
+    {
+      "id": "casting_override_to_float",
+      "transformer": "Casting",
+      "params": {
+        "column_types": {
+          "x": "category"
+        },
+        "columns": [
+          "x"
+        ],
+        "target_type": "float"
+      },
+      "learns": false
+    },
+    {
+      "id": "casting_override_to_category",
+      "transformer": "Casting",
+      "params": {
+        "column_types": {
+          "category": "string"
+        },
+        "columns": [
+          "category"
+        ],
+        "target_type": "category"
+      },
+      "learns": true
+    },
+    {
+      "id": "casting_empty",
+      "transformer": "Casting",
+      "params": {},
+      "learns": false
+    },
+    {
+      "id": "casting_empty_columns_but_category_mapping",
+      "transformer": "Casting",
+      "params": {
+        "column_types": {
+          "category": "category"
+        },
+        "columns": [],
+        "target_type": "float"
+      },
+      "learns": true
+    },
+    {
+      "id": "OneHotEncoder_explicit_empty",
+      "transformer": "OneHotEncoder",
+      "params": {
+        "columns": []
+      },
+      "learns": false
+    },
+    {
+      "id": "DummyEncoder_explicit_empty",
+      "transformer": "DummyEncoder",
+      "params": {
+        "columns": []
+      },
+      "learns": false
+    },
+    {
+      "id": "TargetEncoder_explicit_empty",
+      "transformer": "TargetEncoder",
+      "params": {
+        "columns": []
+      },
+      "learns": false
+    },
+    {
+      "id": "WOEEncoder_explicit_empty",
+      "transformer": "WOEEncoder",
+      "params": {
+        "columns": []
+      },
+      "learns": false
+    },
+    {
+      "id": "PowerTransformer_explicit_empty",
+      "transformer": "PowerTransformer",
+      "params": {
+        "columns": []
+      },
+      "learns": false
+    },
+    {
+      "id": "StandardScaler_explicit_empty",
+      "transformer": "StandardScaler",
+      "params": {
+        "columns": []
+      },
+      "learns": false
+    },
+    {
+      "id": "MinMaxScaler_explicit_empty",
+      "transformer": "MinMaxScaler",
+      "params": {
+        "columns": []
+      },
+      "learns": false
+    },
+    {
+      "id": "MaxAbsScaler_explicit_empty",
+      "transformer": "MaxAbsScaler",
+      "params": {
+        "columns": []
+      },
+      "learns": false
+    },
+    {
+      "id": "RobustScaler_explicit_empty",
+      "transformer": "RobustScaler",
+      "params": {
+        "columns": []
+      },
+      "learns": false
+    },
+    {
+      "id": "SimpleImputer_explicit_empty",
+      "transformer": "SimpleImputer",
+      "params": {
+        "columns": []
+      },
+      "learns": false
+    },
+    {
+      "id": "KNNImputer_explicit_empty",
+      "transformer": "KNNImputer",
+      "params": {
+        "columns": []
+      },
+      "learns": false
+    },
+    {
+      "id": "IterativeImputer_explicit_empty",
+      "transformer": "IterativeImputer",
+      "params": {
+        "columns": []
+      },
+      "learns": false
+    },
+    {
+      "id": "GeneralBinning_explicit_empty",
+      "transformer": "GeneralBinning",
+      "params": {
+        "columns": []
+      },
+      "learns": false
+    },
+    {
+      "id": "KBinsDiscretizer_explicit_empty",
+      "transformer": "KBinsDiscretizer",
+      "params": {
+        "columns": []
+      },
+      "learns": false
+    },
+    {
+      "id": "IQR_explicit_empty",
+      "transformer": "IQR",
+      "params": {
+        "columns": []
+      },
+      "learns": false
+    },
+    {
+      "id": "ZScore_explicit_empty",
+      "transformer": "ZScore",
+      "params": {
+        "columns": []
+      },
+      "learns": false
+    },
+    {
+      "id": "Winsorize_explicit_empty",
+      "transformer": "Winsorize",
+      "params": {
+        "columns": []
+      },
+      "learns": false
+    },
+    {
+      "id": "EllipticEnvelope_explicit_empty",
+      "transformer": "EllipticEnvelope",
+      "params": {
+        "columns": []
+      },
+      "learns": false
+    },
+    {
+      "id": "missing_indicator_empty_auto",
+      "transformer": "MissingIndicator",
+      "params": {
+        "columns": []
+      },
+      "learns": true
+    },
+    {
+      "id": "missing_indicator_named",
+      "transformer": "MissingIndicator",
+      "params": {
+        "columns": [
+          "x"
+        ]
+      },
+      "learns": false
+    },
+    {
+      "id": "drop_columns_threshold",
+      "transformer": "DropMissingColumns",
+      "params": {
+        "columns": [
+          "x"
+        ],
+        "missing_threshold": 50
+      },
+      "learns": true
+    },
+    {
+      "id": "constant_imputation",
+      "transformer": "SimpleImputer",
+      "params": {
+        "columns": [
+          "x"
+        ],
+        "strategy": "constant",
+        "fill_value": 0
+      },
+      "learns": false
+    },
+    {
+      "id": "unknown_transformer",
+      "transformer": "UnknownLeakagePlugin",
+      "params": {},
+      "learns": true
+    },
+    {
+      "id": "count_vectorizer_omitted",
+      "transformer": "count_vectorizer",
+      "params": {},
+      "learns": false
+    },
+    {
+      "id": "count_vectorizer_null",
+      "transformer": "count_vectorizer",
+      "params": {
+        "columns": null
+      },
+      "learns": false
+    },
+    {
+      "id": "count_vectorizer_empty",
+      "transformer": "count_vectorizer",
+      "params": {
+        "columns": []
+      },
+      "learns": false
+    },
+    {
+      "id": "count_vectorizer_target_only",
+      "transformer": "count_vectorizer",
+      "params": {
+        "columns": [
+          "target"
+        ]
+      },
+      "learns": false
+    },
+    {
+      "id": "tfidf_vectorizer_omitted",
+      "transformer": "tfidf_vectorizer",
+      "params": {},
+      "learns": false
+    },
+    {
+      "id": "tfidf_vectorizer_null",
+      "transformer": "tfidf_vectorizer",
+      "params": {
+        "columns": null
+      },
+      "learns": false
+    },
+    {
+      "id": "tfidf_vectorizer_empty",
+      "transformer": "tfidf_vectorizer",
+      "params": {
+        "columns": []
+      },
+      "learns": false
+    },
+    {
+      "id": "tfidf_vectorizer_target_only",
+      "transformer": "tfidf_vectorizer",
+      "params": {
+        "columns": [
+          "target"
+        ]
+      },
+      "learns": false
+    }
+  ]
+}

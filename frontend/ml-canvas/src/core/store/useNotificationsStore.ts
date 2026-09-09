@@ -1,15 +1,18 @@
 /**
- * Notifications store — buffers per-pipeline-run warnings (toasts come and
- * go in seconds; users want a place to scroll back through what happened).
+ * Notifications store — retains app messages, execution feedback, and pipeline warnings
+ * for the navbar bell so users can review them without transient popups.
  *
- * Populated by `useExecutionWarnings` whenever the canvas receives a new
- * `executionResult.node_warnings` payload from the backend. Surfaced by
+ * Populated by canvas run controls and `useExecutionWarnings` whenever the
+ * canvas receives an `executionResult.node_warnings` payload. Surfaced by
  * `NotificationCenter` (bell icon in the navbar).
  */
 
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { NodeWarning } from '../api/client';
+import type { SubmittedRun } from '../types/runFeedback';
+
+export type ExecutionNotificationAction = { type: 'preview' } | { type: 'jobs'; run: SubmittedRun };
 
 export interface StoredNotification extends NodeWarning {
   /** Unique id so React lists are stable across re-renders. */
@@ -18,12 +21,18 @@ export interface StoredNotification extends NodeWarning {
   ts: number;
   /** False until the user opens the notification panel. */
   read: boolean;
+  /** Serializable destination for execution feedback; absent on legacy warnings. */
+  action?: ExecutionNotificationAction;
 }
 
 interface NotificationsState {
   items: StoredNotification[];
   /** Add a batch of warnings (deduped against existing items by message+node). */
   addMany: (warnings: NodeWarning[]) => void;
+  /** Refresh a repeated app message as unread without accumulating duplicate rows. */
+  addAppMessage: (level: string, message: string) => void;
+  /** Insert or replace one execution notice while keeping unchanged messages read. */
+  upsertExecution: (id: string, message: string, action: ExecutionNotificationAction, level?: string) => void;
   /** Mark every item as read (called when the panel opens). */
   markAllRead: () => void;
   /** Drop a single item by id. */
@@ -34,10 +43,38 @@ interface NotificationsState {
 
 const MAX_ITEMS = 100;
 
+/** Generate a notification ID from 128 bits of cryptographic randomness. */
+function createNotificationId(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  return Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('');
+}
+
 export const useNotificationsStore = create<NotificationsState>()(
   persist(
     (set) => ({
   items: [],
+  addAppMessage: (level, message) => set(state => {
+    const previous = state.items.find(item => item.logger === 'app' && item.level === level && item.message === message);
+    const id = previous?.id ?? createNotificationId();
+    const item: StoredNotification = {
+      id, level, message, node_id: null, node_type: null, logger: 'app', ts: Date.now(), read: false,
+    };
+    return { items: [item, ...state.items.filter(existing => existing.id !== id)].slice(0, MAX_ITEMS) };
+  }),
+  upsertExecution: (id, message, action, level = 'info') =>
+    set(state => {
+      const previous = state.items.find(item => item.id === id);
+      const changed = !previous || previous.message !== message || previous.level !== level;
+      const item: StoredNotification = {
+        id, message, action, level, node_id: null, node_type: null, logger: 'canvas',
+        ts: changed ? Date.now() : previous.ts,
+        read: changed ? false : previous.read,
+      };
+      return { items: changed
+        ? [item, ...state.items.filter(existing => existing.id !== id)].slice(0, MAX_ITEMS)
+        : state.items.map(existing => existing.id === id ? item : existing),
+      };
+    }),
   addMany: (warnings) =>
     set((state) => {
       if (warnings.length === 0) return state;
@@ -53,9 +90,7 @@ export const useNotificationsStore = create<NotificationsState>()(
         existingKeys.add(key);
         fresh.push({
           ...w,
-          // nosemgrep: insecure-random-generator -- non-cryptographic local UI id
-          // suffix, not used for security tokens/secrets.
-          id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+          id: createNotificationId(),
           ts: Date.now(),
           read: false,
         });

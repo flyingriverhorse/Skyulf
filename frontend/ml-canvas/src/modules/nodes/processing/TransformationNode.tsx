@@ -7,7 +7,6 @@ import { useDatasetSchema } from '../../../core/hooks/useDatasetSchema';
 import { useUpstreamDroppedColumns } from '../../../core/hooks/useUpstreamDroppedColumns';
 import { useRecommendations } from '../../../core/hooks/useRecommendations';
 import { RecommendationsPanel } from '../../../components/panels/RecommendationsPanel';
-import { clickableProps } from '../../../core/utils/a11y';
 import { ColumnMultiSelect } from '../shared/ColumnMultiSelect';
 import { useIsWideContainer } from '../../../core/hooks/useIsWideContainer';
 
@@ -70,6 +69,7 @@ const TransformationSettings: React.FC<{ config: TransformationConfig; onChange:
   // Responsive layout: switch to a 2-column layout once the panel is wider than 450px.
   const [containerRef, isWide] = useIsWideContainer();
 
+  const id = React.useId();
   const upstreamData = useUpstreamData(nodeId || '');
   const datasetId = upstreamData.find(d => d.datasetId)?.datasetId as string | undefined;
   const { data: schema } = useDatasetSchema(datasetId);
@@ -147,19 +147,25 @@ const TransformationSettings: React.FC<{ config: TransformationConfig; onChange:
             <div key={idx} className="border rounded bg-card shadow-sm overflow-hidden">
               {/* Header */}
               <div
-                className="flex items-center justify-between p-3 cursor-pointer hover:bg-accent/50 transition-colors"
-                {...clickableProps(() => { toggleRule(idx); })}
+                className="flex items-center justify-between p-3"
               >
-                <div className="flex items-center gap-2 overflow-hidden">
+                <button
+                  type="button"
+                  aria-label={`${isExpanded ? 'Collapse' : 'Expand'} ${methodLabel} transformation rule ${idx + 1}`}
+                  aria-expanded={isExpanded}
+                  onClick={() => { toggleRule(idx); }}
+                  className="flex flex-1 items-center gap-2 overflow-hidden text-left rounded hover:bg-accent/50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                >
                   {isExpanded ? <ChevronDown size={16} className="text-muted-foreground flex-shrink-0" /> : <ChevronRight size={16} className="text-muted-foreground flex-shrink-0" />}
-                  <div className="flex flex-col overflow-hidden">
+                  <span className="flex flex-col overflow-hidden">
                     <span className="text-sm font-medium truncate">{methodLabel}</span>
                     <span className="text-xs text-muted-foreground truncate">
                       {rule.columns.length === 0 ? 'No columns selected' : `${rule.columns.length} columns`}
                     </span>
-                  </div>
-                </div>
+                  </span>
+                </button>
                 <button
+                  aria-label={`Remove transformation rule ${idx + 1}`}
                   onClick={(e) => { e.stopPropagation(); removeRule(idx); }}
                   className="text-destructive hover:bg-destructive/10 p-1.5 rounded flex-shrink-0"
                   title="Remove rule"
@@ -177,6 +183,7 @@ const TransformationSettings: React.FC<{ config: TransformationConfig; onChange:
                     <div className="flex flex-col gap-2">
                       <span className="text-xs font-medium text-muted-foreground">Method</span>
                       <select
+                        aria-label={`Method type for rule ${idx + 1}`}
                         className="w-full p-1.5 border rounded text-xs bg-background font-medium"
                         value={currentType}
                         onChange={(e) => { handleTypeChange(idx, e.target.value as 'power' | 'simple'); }}
@@ -187,6 +194,7 @@ const TransformationSettings: React.FC<{ config: TransformationConfig; onChange:
                       </select>
 
                       <select
+                        aria-label={`Method for rule ${idx + 1}`}
                         className="w-full p-1.5 border rounded text-xs bg-background"
                         value={rule.method}
                         onChange={(e) => { updateRule(idx, { method: e.target.value as TransformationRule['method'] }); }}
@@ -202,12 +210,13 @@ const TransformationSettings: React.FC<{ config: TransformationConfig; onChange:
                       // eslint-disable-next-line jsx-a11y/click-events-have-key-events,jsx-a11y/no-static-element-interactions -- stopPropagation wrapper, child controls handle their own keyboard input
                       <div className="flex items-center gap-2 pt-1" onClick={(e) => { e.stopPropagation(); }}>
                         <input
+                          aria-label={`Standardize result for rule ${idx + 1}`}
                           type="checkbox"
-                          id={`std-${idx}`}
+                          id={`${id}-std-${idx}`}
                           checked={rule.params?.standardize !== false}
                           onChange={(e) => { updateRule(idx, { params: { ...rule.params, standardize: e.target.checked } }); }}
                         />
-                        <label htmlFor={`std-${idx}`} className="text-xs text-muted-foreground">Standardize result</label>
+                        <label htmlFor={`${id}-std-${idx}`} className="text-xs text-muted-foreground">Standardize result</label>
                       </div>
                     )}
 
@@ -216,6 +225,7 @@ const TransformationSettings: React.FC<{ config: TransformationConfig; onChange:
                        <div className="flex flex-col gap-1 pt-1" onClick={(e) => { e.stopPropagation(); }}>
                          <span className="text-xs text-muted-foreground">Clip Threshold:</span>
                          <input
+                           aria-label={`Clip Threshold for rule ${idx + 1}`}
                            type="number"
                            className="w-full p-1 border rounded text-xs"
                            value={rule.params?.clip_threshold || 700}
@@ -231,6 +241,8 @@ const TransformationSettings: React.FC<{ config: TransformationConfig; onChange:
                     <span className="text-xs font-medium text-muted-foreground">Target Columns</span>
                     <ValidationField field={`transformations.${idx}.columns`}>
                       <ColumnMultiSelect
+
+                        aria-label={`Target Columns for rule ${idx + 1}`}
                         columns={columns}
                         selected={rule.columns}
                         onChange={(newCols) => { updateRule(idx, { columns: newCols }); }}

@@ -1,4 +1,5 @@
 import React from 'react';
+import * as Tooltip from '@radix-ui/react-tooltip';
 import { HelpCircle } from 'lucide-react';
 
 export interface HelpTooltipProps {
@@ -12,24 +13,28 @@ export interface HelpTooltipProps {
  * Two placements: above the icon (Basic Training style) or below-left (Advanced Tuning style).
  */
 export const HelpTooltip: React.FC<HelpTooltipProps> = ({ text, placement = 'top' }) => {
-    if (placement === 'bottom-left') {
-        return (
-            <div className="group relative flex items-center">
-                <HelpCircle className="w-3 h-3 text-gray-400 cursor-help" />
-                <div className="absolute top-full mt-2 -left-20 hidden group-hover:block w-56 p-2.5 bg-gray-900 text-white text-xs rounded-md shadow-xl z-50">
-                    {text}
-                    <div className="absolute bottom-full left-20 ml-1.5 border-4 border-transparent border-b-gray-900" />
-                </div>
-            </div>
-        );
-    }
     return (
-        <div className="group relative flex items-center">
-            <HelpCircle className="w-3 h-3 text-gray-400 cursor-help" />
-            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block w-48 p-2 bg-gray-900 text-white text-xs rounded shadow-lg z-50">
-                {text}
-                <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-900" />
-            </div>
-        </div>
+        <Tooltip.Provider delayDuration={0}>
+            <Tooltip.Root>
+                <Tooltip.Trigger asChild>
+                    <button type="button" aria-label="Help" className="inline-flex shrink-0 rounded focus-ring">
+                        <HelpCircle aria-hidden="true" className="w-3 h-3 text-gray-400 cursor-help" />
+                    </button>
+                </Tooltip.Trigger>
+                <Tooltip.Portal>
+                    <Tooltip.Content
+                        side={placement === 'bottom-left' ? 'bottom' : 'top'}
+                        align={placement === 'bottom-left' ? 'start' : 'center'}
+                        sideOffset={6}
+                        collisionPadding={8}
+                        onEscapeKeyDown={(event) => event.stopPropagation()}
+                        className={`z-[200] rounded-md bg-gray-900 p-2.5 text-xs text-white shadow-xl ${placement === 'bottom-left' ? 'w-56' : 'w-48'}`}
+                    >
+                        {text}
+                        <Tooltip.Arrow className="fill-gray-900" />
+                    </Tooltip.Content>
+                </Tooltip.Portal>
+            </Tooltip.Root>
+        </Tooltip.Provider>
     );
 };

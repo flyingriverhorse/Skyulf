@@ -192,6 +192,30 @@ def test_applier_no_valid_columns_is_noop() -> None:
     assert result["text"].iloc[0] == "hello"
 
 
+def test_applier_unknown_operation_raises_value_error() -> None:
+    """An unknown ``op`` must raise a configuration error."""
+    df = pd.DataFrame({"text": ["hello", "world"]})
+    params: dict[str, Any] = {
+        "columns": ["text"],
+        "operations": [{"op": "not_a_real_op", "mode": "both"}],
+    }
+    with pytest.raises(ValueError, match=r"Unrecognized TextCleaning operation"):
+        TextCleaningApplier().apply(df, params)
+
+
+def test_applier_normalize_slash_dates_preserves_nullable_na() -> None:
+    """normalize_slash_dates must preserve pd.NA in nullable string columns."""
+    df = pd.DataFrame({"text": pd.Series(["01/02/2024", pd.NA], dtype="string")})
+    params: dict[str, Any] = {
+        "columns": ["text"],
+        "operations": [{"op": "regex", "mode": "normalize_slash_dates"}],
+    }
+    result = TextCleaningApplier().apply(df, params)
+
+    assert result["text"].iloc[0] == "2024-01-02"
+    assert pd.isna(result["text"].iloc[1])
+
+
 def test_applier_empty_string_survives() -> None:
     """Empty strings must not raise; trim/case should produce an empty string."""
     df = pd.DataFrame({"text": ["", "  ", "hello"]})

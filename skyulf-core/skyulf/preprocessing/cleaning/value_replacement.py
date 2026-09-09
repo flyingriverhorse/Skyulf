@@ -14,6 +14,8 @@ from .._schema import SkyulfSchema
 from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
 from ..dispatcher import apply_dual_engine
 
+_SKIP_MAPPING_KEY = object()
+
 
 def _is_mapping_like(obj: Any) -> bool:
     return isinstance(obj, (dict, pd.Series)) or hasattr(obj, "items")
@@ -29,7 +31,10 @@ def _coerce_key(key: Any, dtype_kind: str) -> Any:
         if dtype_kind == "f":
             return float(key)
         if dtype_kind == "b":
-            return key.strip().lower() in ("true", "1")
+            key_lower = key.strip().lower()
+            if key_lower in {"true", "1", "false", "0"}:
+                return key_lower in {"true", "1"}
+            return _SKIP_MAPPING_KEY
     except (ValueError, TypeError):
         return key
     return key
@@ -44,7 +49,12 @@ def _coerce_mapping_keys(mapping: dict[str, Any], dtype_kind: str) -> dict[Any, 
     """
     if dtype_kind not in ("i", "u", "f", "b"):
         return mapping
-    return {_coerce_key(k, dtype_kind): v for k, v in mapping.items()}
+    coerce = {}
+    for key, value in mapping.items():
+        coerced_key = _coerce_key(key, dtype_kind)
+        if coerced_key is not _SKIP_MAPPING_KEY:
+            coerce[coerced_key] = value
+    return coerce
 
 
 def _polars_dtype_kind(dtype: Any) -> str:

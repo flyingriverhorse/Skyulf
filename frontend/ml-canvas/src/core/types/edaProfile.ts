@@ -112,9 +112,11 @@ export interface ColumnProfile {
 }
 
 export interface EDAAlert {
+  /** Structured detector type; absent in some older saved profiles. */
+  type?: string;
   severity: 'info' | 'warning' | 'error' | string;
   message: string;
-  column?: string;
+  column?: string | null;
 }
 
 export interface EDAProfile {

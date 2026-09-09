@@ -1,0 +1,373 @@
+{
+  "scenario": "10_normal_ml_pipeline",
+  "pipeline_id": "s10_normal_ml_pipeline",
+  "status": "success",
+  "node_outputs": {
+    "data": {
+      "kind": "DataFrame",
+      "columns": [
+        "Id",
+        "SepalLengthCm",
+        "SepalWidthCm",
+        "PetalLengthCm",
+        "PetalWidthCm",
+        "FlowerGroup",
+        "Species"
+      ],
+      "rows": 150
+    },
+    "clean_text": {
+      "kind": "DataFrame",
+      "columns": [
+        "Id",
+        "SepalLengthCm",
+        "SepalWidthCm",
+        "PetalLengthCm",
+        "PetalWidthCm",
+        "FlowerGroup",
+        "Species"
+      ],
+      "rows": 150
+    },
+    "replace_values": {
+      "kind": "DataFrame",
+      "columns": [
+        "Id",
+        "SepalLengthCm",
+        "SepalWidthCm",
+        "PetalLengthCm",
+        "PetalWidthCm",
+        "FlowerGroup",
+        "Species"
+      ],
+      "rows": 150
+    },
+    "missing_indicator": {
+      "kind": "DataFrame",
+      "columns": [
+        "Id",
+        "SepalLengthCm",
+        "SepalWidthCm",
+        "PetalLengthCm",
+        "PetalWidthCm",
+        "FlowerGroup",
+        "Species",
+        "SepalLengthCm_missing",
+        "SepalWidthCm_missing"
+      ],
+      "rows": 150
+    },
+    "drop_missing_rows": {
+      "kind": "DataFrame",
+      "columns": [
+        "Id",
+        "SepalLengthCm",
+        "SepalWidthCm",
+        "PetalLengthCm",
+        "PetalWidthCm",
+        "FlowerGroup",
+        "Species",
+        "SepalLengthCm_missing",
+        "SepalWidthCm_missing"
+      ],
+      "rows": 148
+    },
+    "drop_id": {
+      "kind": "DataFrame",
+      "columns": [
+        "SepalLengthCm",
+        "SepalWidthCm",
+        "PetalLengthCm",
+        "PetalWidthCm",
+        "FlowerGroup",
+        "Species",
+        "SepalLengthCm_missing",
+        "SepalWidthCm_missing"
+      ],
+      "rows": 148
+    },
+    "feature_target_split": {
+      "kind": "(X, y) tuple",
+      "X_columns": [
+        "SepalLengthCm",
+        "SepalWidthCm",
+        "PetalLengthCm",
+        "PetalWidthCm",
+        "FlowerGroup",
+        "SepalLengthCm_missing",
+        "SepalWidthCm_missing"
+      ],
+      "y_name": "Species"
+    },
+    "train_test_split": {
+      "kind": "SplitDataset",
+      "train": {
+        "kind": "(X, y) tuple",
+        "X_columns": [
+          "SepalLengthCm",
+          "SepalWidthCm",
+          "PetalLengthCm",
+          "PetalWidthCm",
+          "FlowerGroup",
+          "SepalLengthCm_missing",
+          "SepalWidthCm_missing"
+        ],
+        "X_rows": 118,
+        "y_name": "Species",
+        "y_len": 118
+      },
+      "test": {
+        "kind": "(X, y) tuple",
+        "X_columns": [
+          "SepalLengthCm",
+          "SepalWidthCm",
+          "PetalLengthCm",
+          "PetalWidthCm",
+          "FlowerGroup",
+          "SepalLengthCm_missing",
+          "SepalWidthCm_missing"
+        ],
+        "X_rows": 30,
+        "y_name": "Species",
+        "y_len": 30
+      },
+      "validation": null
+    },
+    "dummy_encode": {
+      "kind": "SplitDataset",
+      "train": {
+        "kind": "(X, y) tuple",
+        "X_columns": [
+          "SepalLengthCm",
+          "SepalWidthCm",
+          "PetalLengthCm",
+          "PetalWidthCm",
+          "SepalLengthCm_missing",
+          "SepalWidthCm_missing",
+          "FlowerGroup_medium",
+          "FlowerGroup_small"
+        ],
+        "X_rows": 118,
+        "y_name": "Species",
+        "y_len": 118
+      },
+      "test": {
+        "kind": "(X, y) tuple",
+        "X_columns": [
+          "SepalLengthCm",
+          "SepalWidthCm",
+          "PetalLengthCm",
+          "PetalWidthCm",
+          "SepalLengthCm_missing",
+          "SepalWidthCm_missing",
+          "FlowerGroup_medium",
+          "FlowerGroup_small"
+        ],
+        "X_rows": 30,
+        "y_name": "Species",
+        "y_len": 30
+      },
+      "validation": null
+    },
+    "scale_features": {
+      "kind": "SplitDataset",
+      "train": {
+        "kind": "(X, y) tuple",
+        "X_columns": [
+          "SepalLengthCm",
+          "SepalWidthCm",
+          "PetalLengthCm",
+          "PetalWidthCm",
+          "SepalLengthCm_missing",
+          "SepalWidthCm_missing",
+          "FlowerGroup_medium",
+          "FlowerGroup_small"
+        ],
+        "X_rows": 118,
+        "y_name": "Species",
+        "y_len": 118
+      },
+      "test": {
+        "kind": "(X, y) tuple",
+        "X_columns": [
+          "SepalLengthCm",
+          "SepalWidthCm",
+          "PetalLengthCm",
+          "PetalWidthCm",
+          "SepalLengthCm_missing",
+          "SepalWidthCm_missing",
+          "FlowerGroup_medium",
+          "FlowerGroup_small"
+        ],
+        "X_rows": 30,
+        "y_name": "Species",
+        "y_len": 30
+      },
+      "validation": null
+    },
+    "training": {
+      "kind": "(X, y) tuple",
+      "X_columns": null,
+      "y_name": null
+    }
+  },
+  "merge_warnings": [],
+  "node_results": {
+    "data": {
+      "status": "success",
+      "error": null,
+      "metrics_keys": []
+    },
+    "clean_text": {
+      "status": "success",
+      "error": null,
+      "metrics_keys": [
+        "fit_time",
+        "peak_memory_bytes",
+        "rows_in",
+        "rows_out",
+        "steps",
+        "summary"
+      ]
+    },
+    "replace_values": {
+      "status": "success",
+      "error": null,
+      "metrics_keys": [
+        "fit_time",
+        "peak_memory_bytes",
+        "rows_in",
+        "rows_out",
+        "steps",
+        "summary"
+      ]
+    },
+    "missing_indicator": {
+      "status": "success",
+      "error": null,
+      "metrics_keys": [
+        "fit_time",
+        "peak_memory_bytes",
+        "rows_in",
+        "rows_out",
+        "steps",
+        "summary"
+      ]
+    },
+    "drop_missing_rows": {
+      "status": "success",
+      "error": null,
+      "metrics_keys": [
+        "fit_time",
+        "peak_memory_bytes",
+        "rows_in",
+        "rows_out",
+        "steps",
+        "summary"
+      ]
+    },
+    "drop_id": {
+      "status": "success",
+      "error": null,
+      "metrics_keys": [
+        "fit_time",
+        "peak_memory_bytes",
+        "rows_in",
+        "rows_out",
+        "steps",
+        "summary"
+      ]
+    },
+    "feature_target_split": {
+      "status": "success",
+      "error": null,
+      "metrics_keys": [
+        "fit_time",
+        "peak_memory_bytes",
+        "rows_in",
+        "rows_out",
+        "steps",
+        "summary"
+      ]
+    },
+    "train_test_split": {
+      "status": "success",
+      "error": null,
+      "metrics_keys": [
+        "fit_time",
+        "peak_memory_bytes",
+        "rows_in",
+        "rows_out",
+        "steps",
+        "summary"
+      ]
+    },
+    "dummy_encode": {
+      "status": "success",
+      "error": null,
+      "metrics_keys": [
+        "fit_time",
+        "peak_memory_bytes",
+        "rows_in",
+        "rows_out",
+        "steps",
+        "summary"
+      ]
+    },
+    "scale_features": {
+      "status": "success",
+      "error": null,
+      "metrics_keys": [
+        "fit_time",
+        "peak_memory_bytes",
+        "rows_in",
+        "rows_out",
+        "steps",
+        "summary"
+      ]
+    },
+    "training": {
+      "status": "success",
+      "error": null,
+      "metrics_keys": [
+        "best_params",
+        "best_score",
+        "feature_importances",
+        "fold_refit_audit",
+        "n_features",
+        "n_rows",
+        "scoring_metric",
+        "shap_explanation",
+        "test_accuracy",
+        "test_balanced_accuracy",
+        "test_f1_weighted",
+        "test_g_score",
+        "test_log_loss",
+        "test_matthews_corrcoef",
+        "test_pr_auc_weighted",
+        "test_precision_weighted",
+        "test_recall_weighted",
+        "test_roc_auc_ovo",
+        "test_roc_auc_ovo_weighted",
+        "test_roc_auc_ovr",
+        "test_roc_auc_ovr_weighted",
+        "test_roc_auc_weighted",
+        "train_accuracy",
+        "train_balanced_accuracy",
+        "train_f1_weighted",
+        "train_g_score",
+        "train_log_loss",
+        "train_matthews_corrcoef",
+        "train_pr_auc_weighted",
+        "train_precision_weighted",
+        "train_recall_weighted",
+        "train_roc_auc_ovo",
+        "train_roc_auc_ovo_weighted",
+        "train_roc_auc_ovr",
+        "train_roc_auc_ovr_weighted",
+        "train_roc_auc_weighted",
+        "trials"
+      ]
+    }
+  }
+}

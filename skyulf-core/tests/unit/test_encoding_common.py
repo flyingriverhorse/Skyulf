@@ -82,3 +82,9 @@ class TestDetectCategoricalColumns:
         data = {"city": ["a", "b"], "amount": [1, 2]}
         df = pl.DataFrame(data) if engine == "polars" else pd.DataFrame(data)
         assert detect_categorical_columns(df) == ["city"]
+
+
+def test_detect_categorical_columns_includes_pandas_string_dtype() -> None:
+    """Pandas nullable ``string`` dtype columns should be auto-detected as categorical."""
+    df = pd.DataFrame({"city": pd.Series(["a", "b"], dtype="string"), "amount": [1, 2]})
+    assert detect_categorical_columns(df) == ["city"]

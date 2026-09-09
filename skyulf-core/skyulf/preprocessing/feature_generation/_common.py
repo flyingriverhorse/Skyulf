@@ -134,9 +134,11 @@ def _vectorised_similarity(s_a: pd.Series, s_b: pd.Series, method: str) -> pd.Se
     result.loc[one_empty] = 0.0
 
     if needs_compute.any():
-        idx = needs_compute[needs_compute].index
-        for i in idx:
-            result.loc[i] = _compute_similarity_score(a_str.at[i], b_str.at[i], method)
+        # Duplicate labels identify several rows; pair and assign by position.
+        for position in np.flatnonzero(needs_compute.to_numpy()):
+            result.iloc[position] = _compute_similarity_score(
+                a_str.iloc[position], b_str.iloc[position], method
+            )
 
     return result
 

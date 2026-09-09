@@ -303,6 +303,7 @@ const OutlierSettings: React.FC<{ config: OutlierConfig; onChange: (c: OutlierCo
           <div>
             <span className="block text-sm font-medium mb-1">Method</span>
             <select
+              aria-label="Method"
               className="w-full p-2 border rounded bg-background text-sm"
               value={config.method}
               onChange={(e) => onChange({ ...config, method: e.target.value as OutlierConfig['method'] })}
@@ -325,6 +326,7 @@ const OutlierSettings: React.FC<{ config: OutlierConfig; onChange: (c: OutlierCo
             <div className="space-y-2">
               <span className="block text-sm font-medium">Multiplier</span>
               <input
+                aria-label="Multiplier"
                 type="number"
                 step="0.1"
                 className="w-full p-2 border rounded bg-background text-sm"
@@ -340,6 +342,7 @@ const OutlierSettings: React.FC<{ config: OutlierConfig; onChange: (c: OutlierCo
             <div className="space-y-2">
               <span className="block text-sm font-medium">Threshold (Sigma)</span>
               <input
+                aria-label="Threshold (Sigma)"
                 type="number"
                 step="0.1"
                 className="w-full p-2 border rounded bg-background text-sm"
@@ -358,6 +361,7 @@ const OutlierSettings: React.FC<{ config: OutlierConfig; onChange: (c: OutlierCo
                 <div className="flex-1">
                   <span className="text-[10px] text-muted-foreground">Lower</span>
                   <input
+                    aria-label="Lower Percentile"
                     type="number"
                     className="w-full p-2 border rounded bg-background text-sm"
                     value={config.lower_percentile ?? 5.0}
@@ -367,6 +371,7 @@ const OutlierSettings: React.FC<{ config: OutlierConfig; onChange: (c: OutlierCo
                 <div className="flex-1">
                   <span className="text-[10px] text-muted-foreground">Upper</span>
                   <input
+                    aria-label="Upper Percentile"
                     type="number"
                     className="w-full p-2 border rounded bg-background text-sm"
                     value={config.upper_percentile ?? 95.0}
@@ -382,6 +387,7 @@ const OutlierSettings: React.FC<{ config: OutlierConfig; onChange: (c: OutlierCo
             <div className="space-y-2">
               <span className="block text-sm font-medium">Contamination</span>
               <input
+                aria-label="Contamination"
                 type="number"
                 step="0.01"
                 min="0"

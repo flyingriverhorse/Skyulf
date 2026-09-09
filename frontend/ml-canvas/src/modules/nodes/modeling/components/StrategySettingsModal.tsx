@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { Save, RotateCcw, HelpCircle, AlertTriangle } from 'lucide-react';
+import React, { useState, useEffect, useId } from 'react';
+import { Save, RotateCcw, AlertTriangle } from 'lucide-react';
+import { HelpTooltip } from './HelpTooltip';
 import { ModalShell } from '../../../../components/shared';
 
 // Models whose search spaces contain string/boolean/None params that CMA-ES
@@ -43,16 +44,6 @@ interface StrategySettingsModalProps {
     modelKey?: string | undefined;
 }
 
-const Tooltip: React.FC<{ text: string }> = ({ text }) => (
-    <div className="group relative flex items-center">
-        <HelpCircle className="w-3.5 h-3.5 text-gray-400 cursor-help" />
-        <div className="absolute top-full mt-2 left-0 hidden group-hover:block w-56 p-2.5 bg-gray-900 text-white text-xs rounded-md shadow-xl z-[200]">
-            {text}
-            <div className="absolute bottom-full left-1 border-4 border-transparent border-b-gray-900" />
-        </div>
-    </div>
-);
-
 export const StrategySettingsModal: React.FC<StrategySettingsModalProps> = ({
     isOpen,
     onClose,
@@ -61,6 +52,7 @@ export const StrategySettingsModal: React.FC<StrategySettingsModalProps> = ({
     initialConfig,
     modelKey,
 }) => {
+    const fieldId = useId();
     const showCmaesWarning =
         strategy === 'optuna' &&
         modelKey !== undefined &&
@@ -142,14 +134,15 @@ export const StrategySettingsModal: React.FC<StrategySettingsModalProps> = ({
                             )}
                             <div>
                                 <div className="flex items-center gap-1.5 mb-1">
-                                    <span className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                                    <label htmlFor={`${fieldId}-factor`} className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                                         Factor
-                                    </span>
-                                    <Tooltip text="The rate at which candidate combinations are reduced in each iteration. For example, a factor of 3 means only the best 1/3 of candidates survive to the next round." />
+                                    </label>
+                                    <HelpTooltip placement="bottom-left" text="The rate at which candidate combinations are reduced in each iteration. For example, a factor of 3 means only the best 1/3 of candidates survive to the next round." />
                                 </div>
                                 <input
                                     type="number"
                                     min="2"
+                                    id={`${fieldId}-factor`}
                                     value={config.factor ?? 3}
                                     onChange={(e) => setConfig({ ...config, factor: Number.parseInt(e.target.value, 10) })}
                                     className="w-full text-sm border-gray-300 dark:border-gray-600 rounded-lg p-2.5 bg-gray-50 dark:bg-gray-900 dark:text-white border focus:ring-2 focus:ring-blue-500"
@@ -159,13 +152,14 @@ export const StrategySettingsModal: React.FC<StrategySettingsModalProps> = ({
 
                             <div>
                                 <div className="flex items-center gap-1.5 mb-1">
-                                    <span className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                                    <label htmlFor={`${fieldId}-min_resources`} className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                                         Min Resources
-                                    </span>
-                                    <Tooltip text="'exhaust' automatically calculates the maximum resources to use. Alternatively, input an integer like 10 or 100 to set the starting budget explicitly." />
+                                    </label>
+                                    <HelpTooltip placement="bottom-left" text="'exhaust' automatically calculates the maximum resources to use. Alternatively, input an integer like 10 or 100 to set the starting budget explicitly." />
                                 </div>
                                 <input
                                     type="text"
+                                    id={`${fieldId}-min_resources`}
                                     value={config.min_resources ?? 'exhaust'}
                                     onChange={(e) => setConfig({ ...config, min_resources: e.target.value })}
                                     className="w-full text-sm border-gray-300 dark:border-gray-600 rounded-lg p-2.5 bg-gray-50 dark:bg-gray-900 dark:text-white border focus:ring-2 focus:ring-blue-500"
@@ -176,12 +170,13 @@ export const StrategySettingsModal: React.FC<StrategySettingsModalProps> = ({
 
                             <div>
                                 <div className="flex items-center gap-1.5 mb-1">
-                                    <span className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                                    <label htmlFor={`${fieldId}-resource`} className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                                         Resource
-                                    </span>
-                                    <Tooltip text="Determines how resources are limited during fast initial rounds. 'n_samples' limits the amount of training data used, while 'n_estimators' limits the number of trees in ensemble models." />
+                                    </label>
+                                    <HelpTooltip placement="bottom-left" text="Determines how resources are limited during fast initial rounds. 'n_samples' limits the amount of training data used, while 'n_estimators' limits the number of trees in ensemble models." />
                                 </div>
                                 <select
+                                    id={`${fieldId}-resource`}
                                     value={config.resource ?? 'n_samples'}
                                     onChange={(e) => setConfig({ ...config, resource: e.target.value })}
                                     className="w-full text-sm border-gray-300 dark:border-gray-600 rounded-lg p-2.5 bg-gray-50 dark:bg-gray-900 dark:text-white border focus:ring-2 focus:ring-blue-500"
@@ -198,12 +193,13 @@ export const StrategySettingsModal: React.FC<StrategySettingsModalProps> = ({
                         <>
                             <div>
                                 <div className="flex items-center gap-1.5 mb-1">
-                                    <span className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                                    <label htmlFor={`${fieldId}-sampler`} className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                                         Sampler
-                                    </span>
-                                    <Tooltip text="TPE provides smart Bayesian learning based on past trials. Random is purely blind chance. CMA-ES is advanced evolutionary sampling meant for complex continuous search spaces." />
+                                    </label>
+                                    <HelpTooltip placement="bottom-left" text="TPE provides smart Bayesian learning based on past trials. Random is purely blind chance. CMA-ES is advanced evolutionary sampling meant for complex continuous search spaces." />
                                 </div>
                                 <select
+                                    id={`${fieldId}-sampler`}
                                     value={config.sampler ?? 'tpe'}
                                     onChange={(e) => setConfig({ ...config, sampler: e.target.value as 'tpe' | 'random' | 'cmaes' })}
                                     className="w-full text-sm border-gray-300 dark:border-gray-600 rounded-lg p-2.5 bg-gray-50 dark:bg-gray-900 dark:text-white border focus:ring-2 focus:ring-blue-500"
@@ -225,12 +221,13 @@ export const StrategySettingsModal: React.FC<StrategySettingsModalProps> = ({
 
                             <div>
                                 <div className="flex items-center gap-1.5 mb-1">
-                                    <span className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                                    <label htmlFor={`${fieldId}-pruner`} className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                                         Pruner
-                                    </span>
-                                    <Tooltip text="Median prunes trials worse than the median of previous runs. Hyperband is an aggressively fast early-stopping algorithm. None disables early stopping." />
+                                    </label>
+                                    <HelpTooltip placement="bottom-left" text="Median prunes trials worse than the median of previous runs. Hyperband is an aggressively fast early-stopping algorithm. None disables early stopping." />
                                 </div>
                                 <select
+                                    id={`${fieldId}-pruner`}
                                     value={config.pruner ?? 'median'}
                                     onChange={(e) => setConfig({ ...config, pruner: e.target.value as 'median' | 'hyperband' | 'none' })}
                                     className="w-full text-sm border-gray-300 dark:border-gray-600 rounded-lg p-2.5 bg-gray-50 dark:bg-gray-900 dark:text-white border focus:ring-2 focus:ring-blue-500"
@@ -244,14 +241,15 @@ export const StrategySettingsModal: React.FC<StrategySettingsModalProps> = ({
 
                             <div>
                                 <div className="flex items-center gap-1.5 mb-1">
-                                    <span className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                                    <label htmlFor={`${fieldId}-timeout`} className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                                         Timeout (Seconds)
-                                    </span>
-                                    <Tooltip text="Set a hard time limit for the entire Optuna study. Regardless of N-Trials, optimization will yield the best found parameters once time is up." />
+                                    </label>
+                                    <HelpTooltip placement="bottom-left" text="Set a hard time limit for the entire Optuna study. Regardless of N-Trials, optimization will yield the best found parameters once time is up." />
                                 </div>
                                 <input
                                     type="number"
                                     min="1"
+                                    id={`${fieldId}-timeout`}
                                     value={config.timeout ?? ''}
                                     onChange={(e) => setConfig({ ...config, timeout: e.target.value ? Number.parseInt(e.target.value, 10) : '' })}
                                     className="w-full text-sm border-gray-300 dark:border-gray-600 rounded-lg p-2.5 bg-gray-50 dark:bg-gray-900 dark:text-white border focus:ring-2 focus:ring-blue-500"

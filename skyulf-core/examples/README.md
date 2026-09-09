@@ -1,9 +1,9 @@
 # Skyulf Core — Examples
 
-Nine end-to-end Jupyter notebooks showing `skyulf-core` on real Kaggle
+The nine original Jupyter notebooks show `skyulf-core` on real Kaggle
 datasets — regression, text classification, clustering, multiclass +
 ensembling, imbalanced classification, extreme-imbalance classification, and
-binary classification. Every notebook is **Polars + NumPy only** (no
+binary classification. Those notebooks are **Polars + NumPy only** (no
 pandas anywhere in the pipeline), uses `skyulf`'s own `EDAAnalyzer` /
 `EDAVisualizer` for a full exploratory pass before any modeling, builds a
 **leakage-safe** preprocessing pipeline (`TrainTestSplitter` is always the
@@ -23,7 +23,57 @@ Each notebook is self-contained and reads its dataset from `examples/data/`
 (bundled in this repo — see the table below and each `SOURCE.md` /
 `README.md` for provenance). No downloads or Kaggle API keys required.
 
-## Notebooks
+## Standalone leakage-safety notebook and script
+
+[`09_leakage_safety.ipynb`](09_leakage_safety.ipynb) is the interactive,
+**pandas-based** walkthrough. Run its cells in order to build a real pipeline
+with FeatureGeneration, explicit column dropping, train/test splitting, X/y
+separation, encoding, scaling, and a regression model. Inspect preprocessing
+tables, predictions, leakage modes, and numerical train-only scaling checks.
+It also shows a fresh core pipeline per CV fold and explains why the backend's
+`unsupported_graph` fallback differs from ordinary leakage-gate acceptance.
+
+The notebook uses synthetic in-memory data and needs no backend or downloads.
+The simpler [`09_leakage_safety.py`](09_leakage_safety.py) remains available for
+terminal use without Jupyter. Select a notebook kernel with the core library
+installed, or run the script:
+
+From the repository root:
+
+```bash
+uv pip install -e ./skyulf-core
+python skyulf-core/examples/09_leakage_safety.py
+```
+
+The script's numbered sections demonstrate:
+
+1. Default `raise`: reject scaler-before-split before any training, including
+   calls through `get_fitted_split()`.
+2. `warn`: return diagnostic messages or log them during `fit()`, then continue
+   despite the unsafe order.
+3. `ignore`: continue without leakage warnings; this does not fix leakage or
+   suppress unrelated errors.
+4. The recommended `Split -> StandardScaler -> Model` order, prediction, and
+   extraction of already-preprocessed train/test frames.
+5. Why stateless row rules and constant imputation are allowed before splitting,
+   while mean imputation is not.
+6. An external `SplitDataset`, with numerical assertions showing that both
+   partitions are transformed using only the training mean and standard deviation.
+7. Why a config with no splitter returns an advisory even under `raise`.
+
+`leaking_pipeline`, `warning_pipeline`, and `pipeline` are ordinary Python
+variables holding `SkyulfPipeline` instances, not separate classes or modes.
+The mode is selected by the `on_leakage` argument. Keep its default unless you
+deliberately accept an unsafe fit; choose correct ordering rather than hiding
+the warning. The script catches the expected rejections so later sections can
+still run, and assertions describe the expected results.
+
+The shared JSON contract is in
+[`../tests/test_cases/leakage/registry_nodes.json`](../tests/test_cases/leakage/registry_nodes.json).
+The core and backend test matrices cover `raise`, `warn`, and `ignore`, safe and
+unsafe placements, and parameter-dependent exceptions for all registered nodes.
+
+## Original notebooks (00-08)
 
 | # | Notebook | Task | Dataset | Rows | Highlights |
 |---|----------|------|---------|------|------------|
@@ -37,7 +87,7 @@ Each notebook is self-contained and reads its dataset from `examples/data/`
 | 07 | `07_spaceship_titanic_classification.ipynb` | Binary classification | [Spaceship Titanic](https://www.kaggle.com/c/spaceship-titanic) | 8,693 | Structured-string parsing (`PassengerId`/`Cabin`), domain-knowledge consistency features, feature generation (`FeatureInteraction` + `PolynomialFeatures`), Logistic Regression vs. Random-Search-tuned RF vs. Grid-Search-tuned RF vs. voting vs. stacking ensemble, Kaggle submission generation |
 | 08 | `08_online_retail_customer_segmentation.ipynb` | Clustering (RFM segmentation) | [Online Retail](https://archive.ics.uci.edu/dataset/352/online+retail) | 153,150 transactions / 1,800 customers (stratified-by-customer subsample) | Raw-transaction-to-RFM feature engineering, log1p + scaling, KMeans vs. MiniBatchKMeans vs. GaussianMixture vs. BIRCH, business-named segments (Champions/Hibernating/etc.) from per-cluster medians, bonus time-series feature engineering (`DateFeatures`/`LagFeatures`/`RollingAggregate`) |
 
-## Design principles followed in every notebook
+## Design principles followed in notebooks 00-08
 
 - **No pandas.** Data loading, feature engineering, and inspection all use
   Polars (+ NumPy where needed); `skyulf`'s own dual-engine pipeline nodes
@@ -67,3 +117,14 @@ Every dataset under `examples/data/<name>/` ships its own `SOURCE.md` (or
 from, how it was verified, and — for the two subsampled datasets (Santander,
 Credit Card Fraud) — precisely how the stratified sample was drawn and how
 its class ratio compares to the real, full-scale dataset.
+
+### Leakage execution and node audit
+
+Example 09 also demonstrates native core tuning with per-fold refitting. Its
+core/backend diagrams are embedded SVG attachments for offline notebook viewing.
+See the [illustrated core/backend guide](../../docs/user_guide/leakage_core_backend.md)
+and the [complete preprocessing audit](../../docs/user_guide/preprocessing_leakage_audit.md).
+
+The [preprocessing placement reference](../../docs/user_guide/preprocessing_placement.md)
+lists all node registrations and their settings. The same guide is searchable
+in the canvas under **How pipelines work > Preprocessing & Leakage**.

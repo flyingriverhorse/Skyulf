@@ -156,6 +156,8 @@ uses, so a fixed finding stays where it was filed.
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
 | OC-68 | 🟠 | Model alias map task-unaware — direct API caller silently trains the wrong estimator family (`_execution/engine/_node_runners.py:1157-1183`) | small | ✅ fixed 2026-09-07 — ambiguous aliases are task-aware and mismatched model/task combinations fail clearly |
+| OC-70 | 🟡 | Leakage validator checks for *a* splitter globally, not that *this* branch is protected (`_execution/_leakage_validation.py:189-267`) | small | ✅ fixed 2026-09-08 — every training branch now needs its own splitter or explicit CV; data-dependent ancestors on unprotected branches are reported |
+| OC-145 | 🟡 | Crashed cross-validation returns the same `{}` sentinel as a disabled one — job reports success with missing `cv_*` metrics (`_node_runners.py:871-907`) | small | ✅ fixed 2026-09-08 — post-tuning CV exceptions now fail the training node and pipeline; regression coverage added |
 | OC-130 | 🟠 | Typo in `FASTAPI_ENV` silently disables the entire production security posture (wildcard CORS w/ credentials, DEBUG=True, no SECRET_KEY check) (`config/factory.py:27-32`) — **worse than filed**: a second, unfiled channel — `FASTAPI_ENV` is not a `Settings` field and pydantic-settings never exports dotenv values into `os.environ`, so the bare `os.getenv` could not see a `.env`-only `production` either; both now fail closed through `resolve_environment()` | small | ✅ fixed 2026-09-05 |
 | OC-150 | 🟠 | S3 error "sanitiser" matches credential key names case-sensitively — S3 403 bodies + replayable presigned URLs logged verbatim; duplicated in two files (`connectors/s3.py:31-37`, `artifacts/s3.py:67-73`) — **worse than filed**: executed against real shapes the old helper was a *no-op* on all three leaks and exposed the **secret access key** (the audit only ever demonstrated key IDs and signatures), while separately destroying benign text (`key=reports/2026/q3.csv` → `redacted sensitive S3 error`); both copies deleted in favour of one shape-based `redact_credentials()` | small | ✅ fixed 2026-09-05 |
 | OC-153 | 🟠 | Multi-input merge silently switches column-wise→row-wise when a branch changes row count — 5-row set + filtered branch yields 8 rows, 3 duplicates, zero UI warnings (`_merge.py:338-348`) — repro came out **9 rows / 4 duplicates**; fixed by warning, not raising, so appending datasets still works | small | ✅ fixed 2026-09-05 |
@@ -174,6 +176,7 @@ uses, so a fixed finding stays where it was filed.
 |---|---|---|---|---|
 | OC-112 | ⚪ | Comment and code disagree in the categorical profiler — the comment promises a rendered missing-value marker, the code `continue`s and discards the null category (`profiling/_analyzer/categorical.py:22-30`). *Filed as "disagree about the applied threshold"; the real subject is the null-category marker* | 1 line | ✅ fixed 2026-09-06 — comment-only, no behaviour change; the reasoning for why dropping the null category is correct now lives in the code comment it rewrote. See the log entry |
 | OC-148 | 🟡 | PII detector flags ordinary 7+ digit numeric ID columns as "Email/Phone" (`profiling/_analyzer/text.py:107-128`) | small | ✅ fixed 2026-09-07 — phone detection now requires positive format evidence and repeated sample evidence; plain IDs, ZIP+4, and isolated phone-shaped IDs are excluded |
+| OC-122 | ð¡ | `TextCleaning` silently ignores unrecognised operation name (`cleaning/text.py:151-153`) | small | â fixed 2026-09-08 |
 
 ### Remaining — file-coverage closure
 
@@ -192,12 +195,17 @@ uses, so a fixed finding stays where it was filed.
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
+| OC-179 | ð¡ | `DummyEncoder(drop_first=True)` retains a single-category indicator on Polars but removes it on pandas, changing feature width across engines (`preprocessing/encoding/dummy.py:33`) | small | â fixed 2026-09-08 |
+| OC-180 | ð¡ | Pandas `TextCleaning(normalize_slash_dates)` crashes on `pd.NA` in a nullable string column; equivalent Polars input preserves the missing value (`preprocessing/cleaning/text.py:35-37,116`) | small | â fixed 2026-09-08 |
+| OC-181 | ð¡ | `ValueReplacement` coerces every unrecognized boolean mapping key to `False`: mapping `{"banana": true}` changes `[true,false]` to `[true,true]` on both engines (`preprocessing/cleaning/value_replacement.py:31-32`) | small | â fixed 2026-09-08 |
+| OC-182 | ð¡ | Encoder auto-detection ignores pandas `StringDtype` columns: Dummy/Hash encoding silently leaves strings untouched unless columns are selected explicitly (`preprocessing/encoding/_common.py:140`) | small | â fixed 2026-09-08 |
 | OC-22 | ⚪ | `TargetEncoder.infer_output_schema` checks an impossible `regression` value (`encoding/target.py:340-360`) | 1 line | ✅ fixed 2026-09-06 — the `("binary", "regression")` passthrough was pinned by a test asserting a prediction for a config sklearn 1.8 rejects outright; changed to `"continuous"` and confirmed it really encodes rather than merely being reachable. See the log entry |
 
 ### Remaining — feature generation / selection / vectorization / transformations
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
+| OC-212 | 🟡 | Similarity generation silently omits its output column for duplicate pandas indexes: label-based `.at[i]` returns Series to a scalar helper and the operation exception is swallowed (`feature_generation/_common.py:137-139`) | small | ✅ fixed 2026-09-08 — similarity now reads and assigns by row position, preserving duplicate indexes and individual scores; see the Log entry. |
 | OC-25 | 🟠 | RFE "K" chosen in UI ignored by backend (`feature_selection/_common.py:236-240`) | small | ✅ fixed 2026-09-05 — closes OC-143 too |
 | OC-28 | 🟠 | Box-Cox transform failures silently return untransformed data (`transformations/power.py:97-104`) | small | ✅ fixed 2026-09-06 — the silent path was the `valid_cols` filter, not the `except` (which has logged since the node was created); both engines now share `_fitted_columns_present`, which names the fitted columns the frame lacks, and fail-open is kept by decision. See the log entry |
 
@@ -212,6 +220,7 @@ uses, so a fixed finding stays where it was filed.
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
+| OC-210 | 🟡 | Public `SkyulfPipeline.optimize_thresholds()` rejects hyperparameter-tuned classifiers because it reads `classes_` from the `(fitted_model, TuningResult)` tuple instead of the underlying classifier (`pipeline/_pipeline.py:511`) | small | ✅ fixed 2026-09-08 — threshold search and thresholded prediction resolve classes from the fitted model through the existing unwrap helper; see the Log entry. |
 | OC-200 | 🟠 | Halving search accepts an all-NaN score set as a successful best result and refits a model; grid search correctly fails on identical folds (`modeling/_tuning/strategies/runner.py:110-127`) | small | ✅ fixed 2026-09-06 — with OC-205: a search left with no fully-scored candidate now fails with grid's "All trials failed" instead of returning `nan` and refitting. See the log entry |
 | OC-205 | 🟠 | Grid/random tuning discards failed folds from each candidate's average, allowing a partially failed candidate to win with an apparently valid score and no failure count in the result (`modeling/_tuning/grid_random.py:91-92`) | small | ✅ fixed 2026-09-06 — with OC-200: a candidate is eligible only if every fold scored, and a partly-failed one is logged as disqualified. See the log entry |
 | OC-201 | 🟡 | Optuna skips search-space normalization: `max_depth=['none']` works in grid search but fails every Optuna trial (`modeling/_tuning/strategies/optuna.py:199`) | small | ✅ fixed 2026-09-06 — Optuna now runs `clean_search_space` like grid/random and halving already did. See the log entry |
@@ -300,6 +309,87 @@ batch's context are in [the live queue](opus_core_analysis-open_queue.md).
 ---
 
 ## Log
+
+### 2026-09-08 — OC-210 fixed: threshold optimization after hyperparameter tuning
+
+**Reproduction:** fit a logistic-regression grid tuner with
+`search_space={"C":[1.0]}`, `metric="accuracy"`, and `cv_folds=3` on
+`x=arange(30, dtype=float)`, `target=[0,1]*15`, using train rows `[:24]` and test
+rows `[24:]`. Fitting succeeded, but
+`pipeline.optimize_thresholds(raw_X, y, accuracy_score)` rejected the classifier
+because it read `classes_` from `(fitted_model, TuningResult)`. Thresholded
+prediction independently read `classes_` from the same tuple.
+
+Both sites now use `StatefulEstimator._unwrap_tuned_model()`, the existing
+model-resolution path used by evaluation. Probability prediction continues
+through the tuning applier with the complete artifact. No signatures or
+threshold-selection rules change.
+
+**TDD/verification:** the new end-to-end regression failed in all three class
+configurations before the fix: numeric binary, string binary, and string
+multiclass. All now optimize thresholds and reproduce predictions from the
+fitted classifier's probabilities while retaining default predictions. A
+tuned-regressor control still rejects threshold optimization. The complete
+pipeline threshold module passes **11 tests**. Joint verification with OC-212:
+**5,492 core tests passed, 70 skipped** (benchmarks explicitly skipped),
+**40 targeted backend tests passed**, `ruff check .` and the configured full
+`ty check` passed. The pre-existing two ty diagnostics in the repeated-split
+test were resolved by asserting the actual DataFrame/Series type before
+comparison; that updated test passed all **4 cases**. Changed Python files
+pass `ruff format --check`. Independent review found no actionable issues.
+
+This closes the standalone core post-training API issue, separate from automatic
+tuning thresholds, backend job threshold endpoints, and still-open OC-168.
+
+### 2026-09-08 — OC-212 fixed: similarity preserves repeated row labels
+
+**Reproduction:** configure `FeatureGeneration` with a `similarity` operation,
+`input_columns=["a"]`, `secondary_columns=["b"]`, `output_column="score"`.
+For `a=["apple","pear"]`, `b=["apple","pear"]`, the unique-index result was
+`score=[100.0,100.0]`. Changing only the index to `[7,7]` removed `score`
+entirely and logged `The truth value of a Series is ambiguous`. Label-based
+`.at[i]` returned Series to the scalar scorer, and the dispatcher skipped the
+failed operation.
+
+`_vectorised_similarity()` now selects pairs and stores scores by position.
+The original index, row order, null/empty handling, and input columns remain
+intact. The public fit/apply regression covers raw and wrapped pandas with
+repeated nonmonotonic labels, different scores sharing one label, missing values
+and empty strings. Both parametrizations failed at the missing output-column
+assertion before the fix and pass afterward. The four feature-generation
+integration suites pass **197 tests**. Independent checks also passed for
+MultiIndex, missing index labels, and the fallback scorer. Joint full-suite and
+lint/type results are recorded in the OC-210 entry above.
+
+### 2026-09-08 - OC-70 fixed
+
+The backend leakage gate now checks each leaf training/tuning branch
+independently. A data-dependent ancestor such as `StandardScaler` on a branch
+without its own splitter is reported, even when another branch has a valid
+splitter. Explicit CV on the training node remains an accepted protection.
+Regression coverage includes the unprotected branch and both fixed-mode and
+tuned-mode CV configuration.
+
+### 2026-09-08 - OC-145 fixed
+
+Post-tuning cross-validation failures were caught by `_run_tuned_cv`, logged,
+and converted to the same empty metrics mapping used when CV was disabled. The
+training node therefore completed successfully without `cv_*` metrics. The
+exception now propagates through the engine's existing node-failure path, so
+both the node and pipeline report `failed` while retaining the original error.
+`test_run_tuned_cv_exception_is_caught` now reproduces the crash and asserts the
+failure status and error text; the 57-test node-runner integration file passes,
+along with targeted Ruff and ty checks.
+
+### 2026-09-08 - OC-122, OC-179, OC-180, OC-181, OC-182 fixed
+
+`TextCleaning` now rejects unknown operation names so invalid configs fail fast.
+`DummyEncoder(drop_first=True)` behavior is now parity-stable for single-category
+columns in both pandas and Polars; nullable `pd.NA` no longer crashes
+`normalize_slash_dates`; `ValueReplacement` only applies declared boolean
+mapping keys instead of coercing unknown ones; and encoder auto-detection now
+treats pandas `StringDtype` columns as textual inputs for auto-selection.
+Core parity and unit tests for all five IDs were updated and pass.
 
 ### 2026-09-07 — OC-68 fixed: ambiguous model aliases now respect the task
 

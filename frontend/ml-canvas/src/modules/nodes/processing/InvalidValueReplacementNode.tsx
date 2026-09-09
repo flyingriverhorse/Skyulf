@@ -51,6 +51,8 @@ const InvalidValueSettings: React.FC<{ config: InvalidValueReplacementConfig; on
             </label>
             <ValidationField field="columns">
               <ColumnMultiSelect
+
+                aria-label="Target Columns"
                 variant="compact"
                 columns={numericColumns}
                 selected={config.columns}
@@ -91,6 +93,7 @@ const InvalidValueSettings: React.FC<{ config: InvalidValueReplacementConfig; on
               Replacement Mode
             </span>
             <select
+              aria-label="Replacement Mode"
               className="w-full text-xs rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 p-2"
               value={config.mode}
               onChange={(e) => onChange({ ...config, mode: e.target.value as InvalidValueReplacementConfig['mode'] })}
@@ -116,6 +119,7 @@ const InvalidValueSettings: React.FC<{ config: InvalidValueReplacementConfig; on
                 <span className="text-[10px] text-gray-500 uppercase font-semibold">Min Value</span>
                 <ValidationField field="min_value">
                   <input
+                    aria-label="Min Value"
                     type="number"
                     className="w-full text-xs rounded border border-gray-300 dark:border-gray-600 px-2 py-1.5"
                     placeholder={config.mode === 'percentage_bounds' ? '0' : 'Min'}
@@ -127,6 +131,7 @@ const InvalidValueSettings: React.FC<{ config: InvalidValueReplacementConfig; on
               <div>
                 <span className="text-[10px] text-gray-500 uppercase font-semibold">Max Value</span>
                 <input
+                  aria-label="Max Value"
                   type="number"
                   className="w-full text-xs rounded border border-gray-300 dark:border-gray-600 px-2 py-1.5"
                   placeholder={config.mode === 'percentage_bounds' ? '100' : 'Max'}

@@ -313,13 +313,9 @@ class TestMergeInputs:
 
 
 class TestMultiPathPipeline:
-    def test_forked_pipeline_basic_training(self, sample_csv, tmp_path):
-        """Dataset → [Scaler branch (f1,f2), Encoder branch (cat)] → Training
-        Both branches feed into the same training node.
-        The scaler outputs all columns (scaled f1 & f2 + cat + target).
-        The encoder outputs all columns (encoded cat + f1 + f2 + target).
-        Column-wise merge deduplicates overlapping columns.
-        """
+    @pytest.mark.parametrize("learned", [False, True], ids=["stateless", "learned_without_split"])
+    def test_forked_pipeline_basic_training(self, sample_csv, tmp_path, learned):
+        """Raw branch outputs merge without permitting learned holdout contamination."""
         artifact_store = LocalArtifactStore(str(tmp_path / "artifacts"))
         catalog = FileSystemCatalog()
 
@@ -335,6 +331,22 @@ class TestMultiPathPipeline:
         csv_path = tmp_path / "numeric_data.csv"
         df.to_csv(csv_path, index=False)
 
+        branch_params = [
+            {"columns": [column]}
+            if learned
+            else {
+                "operations": [
+                    {
+                        "operation_type": "arithmetic",
+                        "method": "multiply",
+                        "input_columns": [column],
+                        "constants": [multiplier],
+                        "output_column": output,
+                    }
+                ]
+            }
+            for column, multiplier, output in [("f1", 2, "left_f1"), ("f2", 3, "right_f2")]
+        ]
         config = PipelineConfig(
             pipeline_id="multi_path_test",
             nodes=[
@@ -345,15 +357,15 @@ class TestMultiPathPipeline:
                 ),
                 NodeConfig(
                     node_id="scaler",
-                    step_type="StandardScaler",
+                    step_type="StandardScaler" if learned else "FeatureGeneration",
                     inputs=["data"],
-                    params={"columns": ["f1"]},
+                    params=branch_params[0],
                 ),
                 NodeConfig(
                     node_id="scaler2",
-                    step_type="MinMaxScaler",
+                    step_type="MinMaxScaler" if learned else "FeatureGeneration",
                     inputs=["data"],
-                    params={"columns": ["f2"]},
+                    params=branch_params[1],
                 ),
                 NodeConfig(
                     node_id="training",
@@ -373,11 +385,31 @@ class TestMultiPathPipeline:
         engine = PipelineEngine(artifact_store, catalog=catalog)
         result = engine.run(config)
 
+        if learned:
+            assert result.status == "failed"
+            assert result.node_results["scaler"].status == "success"
+            assert result.node_results["scaler2"].status == "success"
+            assert "Per-fold preprocessing refit skipped: branches share no common trunk" in (
+                result.node_results["training"].error or ""
+            )
+            assert not artifact_store.exists("training")
+            return
+
         assert result.status == "success", (
             f"Pipeline failed: "
             f"{[(nid, nr.error) for nid, nr in result.node_results.items() if nr.status == 'failed']}"
         )
         assert result.node_results["training"].status == "success"
+        merged = engine._to_dataframe(
+            engine._merge_inputs(config.nodes[-1], target_col="target"), target_col="target"
+        )
+        assert list(merged.columns) == ["f1", "f2", "target", "left_f1", "right_f2"]
+        assert len(merged) == len(df) == 60
+        assert list(merged["f1"]) == list(df["f1"])
+        assert list(merged["f2"]) == list(df["f2"])
+        assert list(merged["left_f1"]) == list(df["f1"] * 2)
+        assert list(merged["right_f2"]) == list(df["f2"] * 3)
+        assert list(merged["target"]) == list(df["target"])
         assert artifact_store.exists("training")
 
     def test_single_input_still_works(self, tmp_path):

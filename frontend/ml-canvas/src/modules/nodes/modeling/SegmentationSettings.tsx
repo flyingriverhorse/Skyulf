@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useId } from 'react';
 import { ValidationField, useValidationReveal } from '../../../components/shared/ValidationField';
 import { Play, Loader2, Settings2, AlertCircle, ChevronDown, X } from 'lucide-react';
 import { jobsApi } from '../../../core/api/jobs';
@@ -7,14 +7,19 @@ import { useIsWideContainer } from '../../../core/hooks/useIsWideContainer';
 import { useDatasetSchema } from '../../../core/hooks/useDatasetSchema';
 import { useGraphStore } from '../../../core/store/useGraphStore';
 import { useJobStore } from '../../../core/store/useJobStore';
+import { useViewStore } from '../../../core/store/useViewStore';
 import { convertGraphToPipelineConfig } from '../../../core/utils/pipelineConverter';
 import { warnAndBlockOnLeakage } from '../../../core/utils/pipelineLeakageValidation';
+import { getLeakageErrorMessage, graphSemanticSignature } from '../../../core/utils/leakageFeedback';
 import { getIncomers } from '@xyflow/react';
 import { HelpTooltip } from './components/HelpTooltip';
 import { HyperparameterInput } from './components/HyperparameterInput';
 import type { HyperparameterDef } from './components/types';
 import type { ExecutionMode } from '../../../core/types/executionMode';
 import { toast } from '../../../core/toast';
+import { RunFeedback } from '../../../components/shared/RunFeedback';
+import { TrainingActionFooter } from '../../../components/shared/TrainingActionFooter';
+import type { NodeSubmission } from '../../../core/types/runFeedback';
 
 /** Config for the dedicated Segmentation (clustering) node.
  *
@@ -50,6 +55,12 @@ export const SegmentationSettings: React.FC<{
 }> = ({ config, onChange, nodeId }) => {
   const [hyperparameters, setHyperparameters] = useState<HyperparameterDef[]>([]);
   const [isLoadingDefs, setIsLoadingDefs] = useState(false);
+  const feedback = useJobStore(state => nodeId ? state.nodeSubmissions[nodeId] : undefined);
+  const isSubmitting = feedback?.pending ?? false;
+  const submissionMessage = feedback?.message ?? '';
+  const runFeedback = feedback?.run;
+  const runHelpId = useId();
+  const fieldId = useId();
   const [showInfo, setShowInfo] = useState(() => !sessionStorage.getItem('hide_info_segmentation'));
 
   const { toggleDrawer: toggleJobDrawer, setTab, setActiveParallelRun, startPolling } = useJobStore();
@@ -164,32 +175,46 @@ export const SegmentationSettings: React.FC<{
   }, [config.model_type]);
 
   const handleTrain = async () => {
-    if (!nodeId) return;
+    if (!nodeId || useJobStore.getState().nodeSubmissions[nodeId]?.pending) return;
     if (!datasetId) {
       toast.error('No dataset connected', 'Connect a dataset node upstream before starting training.');
       return;
     }
+    const update = (value: NodeSubmission) => useJobStore.getState().setNodeSubmission(nodeId, value);
+    const label = `Segmentation — ${config.model_type.replace(/_/g, ' ')}`;
+    useViewStore.getState().setLeakageNotice(null);
+    const graphSignature = graphSemanticSignature(nodes, edges);
+    update({ pending: true, run: null, message: `${label}: Submitting...` });
     try {
       const pipelineConfig = convertGraphToPipelineConfig(nodes, edges);
-      if (warnAndBlockOnLeakage(pipelineConfig)) return;
+      if (warnAndBlockOnLeakage(pipelineConfig)) {
+        update({ pending: false, run: null, message: `${label} blocked. Move data-learning preprocessing after the train/test split.` });
+        return;
+      }
       const response = await jobsApi.runPipeline({
         ...pipelineConfig,
         target_node_id: nodeId,
         job_type: 'training'
       });
       const jobCount = response.job_ids?.length || 1;
+      const run = { label, jobIds: response.job_ids?.length ? response.job_ids : [response.job_id] };
+      update({ pending: false, run, message: '' });
+      startPolling();
       if (jobCount > 1) {
         setActiveParallelRun({ jobIds: response.job_ids, startedAt: new Date().toISOString() });
-        startPolling();
         toast.success('Parallel execution started', `${jobCount} branches submitted.`);
       } else {
         toast.success('Segmentation job submitted');
       }
       setTab('segmentation');
+      useJobStore.getState().setInspectedRun(null);
       toggleJobDrawer(true);
     } catch (error) {
       console.error('Failed to submit segmentation job:', error);
-      toast.error('Failed to submit segmentation job', 'Check console for details.');
+      const leakageMessage = getLeakageErrorMessage(error);
+      if (leakageMessage) useViewStore.getState().setLeakageNotice({ message: leakageMessage, graphSignature });
+      update({ pending: false, run: null, message: `${label}: Submission failed. ${leakageMessage ?? 'Check your connection and settings, then try again.'}` });
+      toast.error('Failed to submit segmentation job', leakageMessage ?? 'Check console for details.');
     }
   };
 
@@ -200,9 +225,10 @@ export const SegmentationSettings: React.FC<{
           <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Model Configuration</span>
           <div className="grid gap-3">
             <ValidationField field="model_type">
-              <span className="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Clustering Algorithm</span>
+              <label htmlFor={`${fieldId}-model_type`} className="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Clustering Algorithm</label>
               <div className="relative">
                 <select
+                  id={`${fieldId}-model_type`}
                   value={config.model_type}
                   onChange={(e) => {
                     if (Object.keys(config.hyperparameters).length > 0) {
@@ -223,6 +249,7 @@ export const SegmentationSettings: React.FC<{
               {requiresScaling && (
                 <div className="mt-2 text-xs border border-blue-200 dark:border-blue-800 rounded-md bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 overflow-hidden transition-all">
                   <button
+                    aria-expanded={showScalingAlert}
                     onClick={() => setShowScalingAlert(!showScalingAlert)}
                     className="w-full flex items-center justify-between p-2 hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors"
                   >
@@ -243,11 +270,12 @@ export const SegmentationSettings: React.FC<{
 
             <div>
               <div className="flex items-center gap-1.5 mb-1">
-                <span className="block text-xs font-medium text-gray-700 dark:text-gray-300">Reference Column (optional)</span>
+                <label htmlFor={`${fieldId}-reference_column`} className="block text-xs font-medium text-gray-700 dark:text-gray-300">Reference Column (optional)</label>
                 <HelpTooltip text="A column with a known real-world label (e.g. a species/customer-type name) that you want excluded from clustering, but kept around afterward to see which cluster corresponds to which group — e.g. 'Cluster 0 is 92% setosa'. The model never sees this column." />
               </div>
               <div className="relative">
                 <select
+                  id={`${fieldId}-reference_column`}
                   value={config.reference_column ?? ''}
                   onChange={(e) => onChange({ ...config, reference_column: e.target.value || undefined })}
                   className="w-full appearance-none border border-gray-300 dark:border-gray-600 rounded-lg p-2.5 text-sm bg-white dark:bg-gray-800 dark:text-gray-100 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none transition-all"
@@ -285,13 +313,14 @@ export const SegmentationSettings: React.FC<{
           hyperparameters.map((param) => (
             <div key={param.name} className="bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-lg p-3">
               <div className="flex justify-between items-center mb-2">
-                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300">
+                <label htmlFor={`${fieldId}-param-${param.name}`} className="block text-xs font-medium text-gray-700 dark:text-gray-300">
                   {param.label}
                 </label>
                 {param.description && <HelpTooltip text={param.description} />}
               </div>
               {param.type === 'select' ? (
                 <select
+                  id={`${fieldId}-param-${param.name}`}
                   value={(config.hyperparameters[param.name] ?? param.default) as string | number | readonly string[] | undefined}
                   onChange={(e) => onChange({
                     ...config,
@@ -305,6 +334,7 @@ export const SegmentationSettings: React.FC<{
                 </select>
               ) : (
                 <HyperparameterInput
+                  id={`${fieldId}-param-${param.name}`}
                   type={param.type}
                   value={config.hyperparameters[param.name] ?? param.default}
                   onChange={(val) => onChange({
@@ -334,6 +364,7 @@ export const SegmentationSettings: React.FC<{
         <div className="mb-4 p-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded text-xs text-blue-700 dark:text-blue-300 flex justify-between items-start gap-2">
           <span>Group rows into clusters by similarity — no target column needed.</span>
           <button
+            aria-label="Dismiss segmentation information"
             onClick={() => {
               setShowInfo(false);
               sessionStorage.setItem('hide_info_segmentation', 'true');
@@ -353,6 +384,7 @@ export const SegmentationSettings: React.FC<{
                 ? 'border-blue-500 text-blue-600 dark:text-blue-400'
                 : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700'
             }`}
+            aria-pressed={activeTab === 'model'}
             onClick={() => { setActiveTab('model'); }}
           >
             Configuration
@@ -363,6 +395,7 @@ export const SegmentationSettings: React.FC<{
                 ? 'border-blue-500 text-blue-600 dark:text-blue-400'
                 : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700'
             }`}
+            aria-pressed={activeTab === 'params'}
             onClick={() => { setActiveTab('params'); }}
           >
             Hyperparameters
@@ -384,17 +417,26 @@ export const SegmentationSettings: React.FC<{
         )}
       </div>
 
-      <div className="pt-4 mt-auto border-t border-gray-100 dark:border-gray-700 flex flex-col gap-3 items-center">
+      <TrainingActionFooter details={
+        <p id={runHelpId} className="text-xs text-center text-muted-foreground">
+          {!datasetId ? 'Connect a dataset node upstream and select a dataset to enable this action.'
+            : !config.model_type ? 'Choose a clustering algorithm to enable this action.'
+            : `Trains ${selectedModelItem?.name || config.model_type.replace(/_/g, ' ')} in the background without a target column.`}
+        </p>
+      }>
         <button
+          type="button"
           onClick={() => { void handleTrain(); }}
-          disabled={!datasetId}
-          title={!datasetId ? 'Connect a dataset node upstream to enable training' : undefined}
+          disabled={!datasetId || !config.model_type || isSubmitting}
+          aria-describedby={runHelpId}
           className="w-full max-w-xs flex items-center justify-center gap-2 px-6 py-2.5 action-primary rounded-lg shadow-lg transition-all hover:shadow-xl hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-lg disabled:hover:translate-y-0 focus-ring"
         >
-          <Play className="w-4 h-4 fill-current" />
-          <span className="text-sm font-semibold">Start Segmentation</span>
+          {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4 fill-current" />}
+          <span className="text-sm font-semibold">{isSubmitting ? 'Submitting job...' : 'Train segmentation'}</span>
         </button>
-      </div>
+        {submissionMessage && <p role="status" aria-atomic="true" className="text-xs text-center text-muted-foreground break-words">{submissionMessage}</p>}
+        {runFeedback && <RunFeedback run={runFeedback} task="segmentation" />}
+      </TrainingActionFooter>
     </div>
   );
 };

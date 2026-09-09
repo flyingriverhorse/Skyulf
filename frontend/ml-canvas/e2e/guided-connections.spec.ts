@@ -173,26 +173,29 @@ for (const split of [
           button.style.letterSpacing = font === 'monospace' ? '0.5px' : '';
         });
       }, font);
-      expect(await splitCard.evaluate(element => (element as HTMLElement).offsetHeight)).toBeLessThanOrEqual(110);
-      const measurements = await splitCard.evaluate(element => {
-        const card = element.getBoundingClientRect();
-        const summary = element.querySelector('.text-\\[11px\\]')!.getBoundingClientRect();
-        const labels = Array.from(element.querySelectorAll('.react-flow__handle.source button')).map(button => ({
-          text: button.textContent, bounds: button.getBoundingClientRect(),
-        }));
-        return labels.map((label, index) => ({
-          text: label.text,
-          summaryGap: label.bounds.left - summary.right,
-          bottomGap: card.bottom - label.bounds.bottom,
-          previousLabelGap: index === 0 ? 0 : label.bounds.top - labels[index - 1]!.bounds.bottom,
-        }));
-      });
-      for (const label of measurements) {
-        const context = `${split.type}, ${font || 'default font'}, ${label.text}`;
-        expect(label.summaryGap, `${context}: summary clearance`).toBeGreaterThanOrEqual(0);
-        expect(label.bottomGap, `${context}: card clearance`).toBeGreaterThanOrEqual(0);
-        expect(label.previousLabelGap, `${context}: preceding label clearance`).toBeGreaterThanOrEqual(0);
-      }
+      // ResizeObserver updates the reserved label space after the changed font is laid out.
+      await expect(async () => {
+        expect(await splitCard.evaluate(element => (element as HTMLElement).offsetHeight)).toBeLessThanOrEqual(110);
+        const measurements = await splitCard.evaluate(element => {
+          const card = element.getBoundingClientRect();
+          const summary = element.querySelector('.text-\\[11px\\]')!.getBoundingClientRect();
+          const labels = Array.from(element.querySelectorAll('.react-flow__handle.source button')).map(button => ({
+            text: button.textContent, bounds: button.getBoundingClientRect(),
+          }));
+          return labels.map((label, index) => ({
+            text: label.text,
+            summaryGap: label.bounds.left - summary.right,
+            bottomGap: card.bottom - label.bounds.bottom,
+            previousLabelGap: index === 0 ? 0 : label.bounds.top - labels[index - 1]!.bounds.bottom,
+          }));
+        });
+        for (const label of measurements) {
+          const context = `${split.type}, ${font || 'default font'}, ${label.text}`;
+          expect(label.summaryGap, `${context}: summary clearance`).toBeGreaterThanOrEqual(0);
+          expect(label.bottomGap, `${context}: card clearance`).toBeGreaterThanOrEqual(0);
+          expect(label.previousLabelGap, `${context}: preceding label clearance`).toBeGreaterThanOrEqual(0);
+        }
+      }).toPass();
     }
     await splitCard.evaluate(element => {
       (element as HTMLElement).style.fontFamily = '';

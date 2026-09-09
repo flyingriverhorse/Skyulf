@@ -115,6 +115,7 @@ export const PolynomialFeaturesNode: NodeDefinition = {
                   </span>
                   <ValidationField field="degree">
                     <input
+                      aria-label="Degree"
                       type="number"
                       min={2}
                       max={5}
@@ -128,6 +129,7 @@ export const PolynomialFeaturesNode: NodeDefinition = {
                 <div className="space-y-1.5">
                   <span className="text-xs font-medium text-muted-foreground">Output Prefix</span>
                   <input
+                    aria-label="Output Prefix"
                     type="text"
                     className="w-full px-2 py-1.5 text-xs border rounded bg-background"
                     value={config.output_prefix || 'poly'}

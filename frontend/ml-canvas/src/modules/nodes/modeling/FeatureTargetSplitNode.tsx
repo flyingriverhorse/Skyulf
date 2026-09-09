@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useId } from 'react';
 import { ValidationField } from '../../../components/shared/ValidationField';
 import { NodeDefinition } from '../../../core/types/nodes';
 import { Split } from 'lucide-react';
@@ -16,6 +16,7 @@ const FeatureTargetSplitSettings: React.FC<{ config: FeatureTargetSplitConfig; o
   onChange,
   nodeId,
 }) => {
+  const fieldId = useId();
   // Recursive search for datasetId
   const nodes = useGraphStore((state) => state.nodes);
   const edges = useGraphStore((state) => state.edges);
@@ -67,9 +68,10 @@ const FeatureTargetSplitSettings: React.FC<{ config: FeatureTargetSplitConfig; o
     <div className="p-4 space-y-4">
       <ValidationField field="target_column">
         <div className="space-y-2">
-          <span className="text-sm font-medium">Target Column</span>
+          <label htmlFor={`${fieldId}-target_column`} className="text-sm font-medium">Target Column</label>
           <select
             className="w-full p-2 border rounded bg-background text-sm"
+            id={`${fieldId}-target_column`}
             value={config.target_column}
             onChange={(e) => onChange({ ...config, target_column: e.target.value })}
           >

@@ -256,6 +256,7 @@ class CastingArtifact(TypedDict, total=False):
     type: str
     type_map: dict[str, str]
     coerce_on_error: bool
+    categories: dict[str, list[Any]]
 
 
 # ── Bucketing ────────────────────────────────────────────────────────────────
@@ -551,6 +552,7 @@ class OrdinalArtifact(TypedDict, total=False):
     # Per-column LabelEncoder objects keyed by column name (plus optional "__target__")
     encoders: dict[str, Any]
     categories_count: list[int]
+    category_key_version: int
 
 
 class LabelEncoderArtifact(TypedDict, total=False):
@@ -561,6 +563,7 @@ class LabelEncoderArtifact(TypedDict, total=False):
     encoders: dict[str, Any]
     classes_count: dict[str, int]
     missing_code: int
+    category_key_version: int
 
 
 class TargetEncoderArtifact(TypedDict, total=False):
@@ -578,6 +581,7 @@ class HashEncoderArtifact(TypedDict, total=False):
     type: str
     columns: list[str]
     n_features: int
+    numeric_normalization_version: int
 
 
 class DummyEncoderArtifact(TypedDict, total=False):
