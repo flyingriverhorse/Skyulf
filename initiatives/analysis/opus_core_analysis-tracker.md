@@ -350,6 +350,19 @@ respective fix logs; OC-167 closed with canonical artifact framing on 2026-09-09
 
 ## Log
 
+### 2026-09-09 - OC-172 follow-up: sklearn bridge complexity gate
+
+Lizard reproduced `_convert_single` at CCN 12 against the CI limit of 8.
+Nullable numeric normalization now lives in a focused helper, preserving the
+conversion predicates, missing sentinels and exact integer-category values.
+`_convert_single` is CCN 6 and the new helper is CCN 7.
+
+The full CI Lizard scope (core/engines/scaling/transformations) passed with
+`--CCN 8 -w`. Existing bridge, scaling, parity, modeling-wrapper, encoding and
+imputation checks passed **313 tests** (12 existing warnings). Scoped Ruff,
+formatting, the CI Ty scope and `git diff --check` passed. The v0.8.18 note was
+updated; no live issue was reopened, leaving **57 open** and **4 parked** rows.
+
 ### 2026-09-09 - profiling/ensemble batch: final verification
 
 The preceding nullable/time-series/tuple batch was committed as `9f44d6f3`
