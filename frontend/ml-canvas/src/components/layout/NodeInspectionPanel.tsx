@@ -56,8 +56,8 @@ function tableIdentity(table: Pick<InspectionTable, 'port' | 'split'>): string {
 /** Compare only matching measured tables; bounded samples cannot establish cell changes. */
 function MeasuredChanges({ branch, output }: { branch: NodeInspection; output: InspectionTable }) {
   if (branch.input.status !== 'available') return null;
-  const inputShape = branch.input.tables.map(tableIdentity).sort();
-  const outputShape = branch.output.tables.map(tableIdentity).sort();
+  const inputShape = branch.input.tables.map(tableIdentity).sort((a, b) => a.localeCompare(b));
+  const outputShape = branch.output.tables.map(tableIdentity).sort((a, b) => a.localeCompare(b));
   const sameShape = inputShape.length === outputShape.length && inputShape.every((key, index) => key === outputShape[index]);
   const matches = branch.input.tables.filter(input => tableIdentity(input) === tableIdentity(output));
   const input = sameShape && matches.length === 1 ? matches[0] : undefined;
