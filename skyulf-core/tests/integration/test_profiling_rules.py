@@ -2,6 +2,7 @@
 
 import numpy as np
 import polars as pl
+import pytest
 from tests.utils.dataset_loader import load_sample_dataset
 
 from skyulf.profiling._analyzer import rules as rules_mod
@@ -24,6 +25,131 @@ def _regression_df(n: int = 80) -> pl.DataFrame:
     b = rng.normal(0, 1, n)
     target = a * 2 + b + rng.normal(0, 0.1, n)
     return pl.DataFrame({"a": a, "b": b, "target": target})
+
+
+@pytest.mark.parametrize("public_profile", [False, True], ids=["rules", "profile"])
+@pytest.mark.parametrize("target_kind", ["string", "numeric", "categorical_subset", "missing"])
+def test_rule_labels_use_only_observed_target_classes(
+    public_profile: bool, target_kind: str
+) -> None:
+    """Shared category dictionaries must not substitute unrelated or unused target labels."""
+    held = pl.Series(["unrelated_1", "unrelated_2"]).cast(pl.Categorical)
+    target = pl.Series("target", ["yes"] * 30 + ["no"] * 30)
+    expected_labels = ["yes", "no"]
+    if target_kind == "numeric":
+        target = pl.Series("target", [20] * 30 + [10] * 30)
+        expected_labels = ["20", "10"]
+    elif target_kind == "categorical_subset":
+        target = pl.Series("target", ["unused_target"] + target.to_list()).cast(pl.Categorical)
+        target = target.slice(1)
+    elif target_kind == "missing":
+        target = pl.Series("target", [None] * 30 + ["no"] * 30)
+        expected_labels = ["Missing", "no"]
+    df = pl.DataFrame({"x": np.arange(60, dtype=float), "target": target})
+    analyzer = EDAAnalyzer(df)
+
+    tree = (
+        analyzer.analyze(target_col="target", task_type="classification").rule_tree
+        if public_profile
+        else analyzer._discover_rules(["x"], "target", "classification")
+    )
+
+    assert tree is not None
+    assert tree.accuracy == 1.0
+    leaves = [node for node in tree.nodes if node.is_leaf]
+    assert [node.class_name for node in leaves] == expected_labels
+    assert tree.rules is not None
+    assert [rule.split(" THEN ")[1].split(" (")[0] for rule in tree.rules] == expected_labels
+    assert {node.class_name for node in tree.nodes}.isdisjoint(held.to_list())
+
+
+@pytest.mark.parametrize("task_type", ["classification", "regression"])
+def test_rule_text_reports_actual_leaf_sample_counts(task_type: str) -> None:
+    """Rule support must count rows while confidence remains the winning class proportion."""
+    target = (
+        [0, 0, 0, 1, 0, 0, 1, 1, 1, 1] if task_type == "classification" else [10.0] * 4 + [20.0] * 6
+    )
+    df = pl.DataFrame({"x": [0.0] * 4 + [1.0] * 6, "target": target})
+
+    tree = EDAAnalyzer(df).analyze(target_col="target", task_type=task_type).rule_tree
+
+    assert tree is not None
+    leaves = [node for node in tree.nodes if node.is_leaf]
+    assert [node.samples for node in leaves] == [4, 6]
+    assert tree.rules is not None
+    assert [int(rule.split("Samples: ")[1].rstrip(")")) for rule in tree.rules] == [4, 6]
+    if task_type == "classification":
+        assert [rule.split("Confidence: ")[1].split("%")[0] for rule in tree.rules] == [
+            "75.0",
+            "66.7",
+        ]
+    else:
+        assert [node.class_name for node in leaves] == ["10.00", "20.00"]
+
+
+@pytest.mark.parametrize("target_col", ["target", "count"])
+def test_rule_class_cap_keeps_target_labels_with_reserved_column_name(target_col: str) -> None:
+    """A target named count must retain its top ten labels and the combined Other class."""
+    labels = [f"class_{i}" for i in range(15) for _ in range(40 - i)]
+    feature = [float(i) for i in range(15) for _ in range(40 - i)]
+    df = pl.DataFrame({"x": feature, target_col: labels})
+
+    tree = EDAAnalyzer(df)._discover_rules(["x"], target_col, "classification")
+
+    assert tree is not None
+    assert tree.rules is not None
+    predicted = {rule.split(" THEN ")[1].split(" (")[0] for rule in tree.rules}
+    assert predicted <= {f"class_{i}" for i in range(10)} | {"Other"}
+    assert "Other" in predicted
+
+
+@pytest.mark.parametrize(
+    "feature_kind, public_profile",
+    [
+        ("string", False),
+        ("categorical_subset", False),
+        ("missing", False),
+        ("numeric", False),
+        ("numeric", True),
+    ],
+)
+def test_rule_conditions_use_only_observed_feature_categories(
+    feature_kind: str, public_profile: bool
+) -> None:
+    """Rule conditions must match observed feature values without unrelated dictionary entries."""
+    held = pl.Series(["unrelated_1", "unrelated_2"]).cast(pl.Categorical)
+    feature = pl.Series("feature", ["red"] * 30 + ["blue"] * 30)
+    expected_categories = ["red", "blue"]
+    if feature_kind == "categorical_subset":
+        feature = pl.Series("feature", ["unused_feature"] + feature.to_list()).cast(pl.Categorical)
+        feature = feature.slice(1)
+    elif feature_kind == "missing":
+        feature = pl.Series("feature", [None] * 30 + ["blue"] * 30)
+        expected_categories = ["Missing", "blue"]
+    elif feature_kind == "numeric":
+        feature = pl.Series("feature", [10] * 30 + [20] * 30)
+        expected_categories = ["10", "20"]
+    df = pl.DataFrame({"feature": feature, "target": ["yes"] * 29 + ["no"] * 30 + ["yes"]})
+    analyzer = EDAAnalyzer(df)
+
+    tree = (
+        analyzer.analyze(target_col="target", task_type="classification").rule_tree
+        if public_profile
+        else analyzer._discover_rules(["feature"], "target", "classification")
+    )
+
+    assert tree is not None
+    assert tree.categories is not None
+    assert set(tree.categories["feature"]) == set(expected_categories)
+    assert tree.rules is not None
+    conditions_and_labels = {
+        (rule.split(" THEN ")[0], rule.split(" THEN ")[1].split(" (")[0]) for rule in tree.rules
+    }
+    assert conditions_and_labels == {
+        (f"IF feature in ['{expected_categories[0]}']", "yes"),
+        (f"IF feature in ['{expected_categories[1]}']", "no"),
+    }
+    assert not any(label in rule for label in held.to_list() for rule in tree.rules)
 
 
 def test_discover_rules_classification_auto_detected() -> None:

@@ -6,6 +6,14 @@ import numpy as np
 import polars as pl
 
 
+def _polars_with_row_positions(X: Any) -> tuple[Any, str]:
+    """Add row positions under a name that cannot overwrite a user column."""
+    index_name = "__idx__"
+    while index_name in X.columns:
+        index_name += "_"
+    return X.with_row_index(index_name), index_name
+
+
 def _polars_filter_y_by_kept_indices(y: Any, kept_indices: Any) -> Any:
     """Filter native Polars or engine-neutral targets to the rows kept in ``X``.
 
@@ -15,13 +23,7 @@ def _polars_filter_y_by_kept_indices(y: Any, kept_indices: Any) -> Any:
     """
     if y is None:
         return None
-    if isinstance(y, pl.DataFrame):
-        return (
-            y.with_row_index("__idx__")
-            .filter(pl.col("__idx__").is_in(kept_indices))
-            .drop("__idx__")
-        )
-    if isinstance(y, pl.Series):
+    if isinstance(y, (pl.DataFrame, pl.Series)):
         return y.gather(kept_indices)
     if isinstance(y, np.ndarray):
         return y[kept_indices.to_numpy()]

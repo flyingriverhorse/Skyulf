@@ -15,6 +15,7 @@ from ._common import (
     _normalize_subset,
     _pandas_filter_y_by_kept_positions,
     _polars_filter_y_by_kept_indices,
+    _polars_with_row_positions,
 )
 
 
@@ -58,16 +59,17 @@ def _polars_dropna_filter(
 
 
 def _drop_missing_rows_apply_polars(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
+    """Filter missing rows without reserving any user column names."""
     subset = _normalize_subset(params.get("subset"), list(X.columns))
     how = params.get("how", "any")
     threshold = params.get("threshold")
     missing_threshold = params.get("missing_threshold")
 
-    X_with_idx = X.with_row_index("__idx__")
-    check_cols = subset if subset else [c for c in X.columns if c != "__idx__"]
+    X_with_idx, index_name = _polars_with_row_positions(X)
+    check_cols = subset if subset else list(X.columns)
     X_clean = _polars_dropna_filter(X_with_idx, check_cols, how, threshold, missing_threshold)
-    kept = X_clean["__idx__"]
-    X_out = X_clean.drop("__idx__")
+    kept = X_clean[index_name]
+    X_out = X_clean.drop(index_name)
 
     if y is None:
         return X_out, None

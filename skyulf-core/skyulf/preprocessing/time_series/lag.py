@@ -42,6 +42,7 @@ def _polars_lag_exprs(
 
 
 def _apply_polars(X: Any, _y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
+    """Add lag features and filter X/y by the same null-or-NaN keep positions."""
     columns: list[str] = params.get("columns", [])
     lags: list[int] = params.get("lags", [])
     if not columns or not lags:
@@ -52,15 +53,12 @@ def _apply_polars(X: Any, _y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
     exprs = _polars_lag_exprs(columns, list(X_out.columns), lags, params.get("group_by") or None)
     if exprs:
         X_out = X_out.with_columns(exprs)
-    if params.get("drop_na"):
-        if _y is None:
-            X_out = X_out.drop_nulls()
-        else:
-            null_mask = pl.any_horizontal([pl.col(c).is_null() for c in X_out.columns])
-            mask_series = X_out.select(null_mask.alias("__null")).get_column("__null")
-            keep = (~mask_series).arg_true()
-            X_out = X_out.gather(keep)
-            _y = select_rows_by_position(_y, keep)
+    if params.get("drop_na") and X_out.columns:
+        missing = [pl.col(c).is_null() for c in X_out.columns]
+        missing.extend(pl.col(c).is_nan() for c, dtype in X_out.schema.items() if dtype.is_float())
+        keep = X_out.select(~pl.any_horizontal(missing)).to_series().arg_true()
+        X_out = X_out.gather(keep)
+        _y = select_rows_by_position(_y, keep)
     return X_out, _y
 
 
@@ -99,7 +97,7 @@ class LagFeaturesApplier(BaseApplier):
 
     @apply_method
     def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
-        """Add lag columns on the active engine; ``drop_na`` drops rows containing nulls."""
+        """Add lag columns; ``drop_na`` drops rows containing nulls or floating NaN."""
         return apply_dual_engine(
             (X, _y) if _y is not None else X,
             params,

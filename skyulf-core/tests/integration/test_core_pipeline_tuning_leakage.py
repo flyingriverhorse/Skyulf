@@ -211,15 +211,20 @@ def test_core_holdout_tuning_never_fits_preprocessing_on_validation(
 
 @pytest.mark.parametrize("engine", ["pandas", "polars"])
 @pytest.mark.parametrize("explicit_time_column", [True, False])
+@pytest.mark.parametrize("with_validation", [False, True])
 def test_core_time_series_tuning_drops_sort_column_at_serving(
-    engine: str, explicit_time_column: bool
+    engine: str, explicit_time_column: bool, with_validation: bool
 ) -> None:
     """The CV sort key must stay excluded during final evaluation and raw-data prediction."""
     frame = _regression_frame()
     frame["time"] = pd.date_range("2024-01-01", periods=len(frame))[::-1]
     if engine == "polars":
         frame = pl.from_pandas(frame)
-    dataset = SplitDataset(train=frame[:18], test=frame[18:])
+    dataset = SplitDataset(
+        train=frame[:18],
+        test=frame[21:] if with_validation else frame[18:],
+        validation=frame[18:21] if with_validation else None,
+    )
     config = _tuning_config([_step("scale", "StandardScaler", columns=["value"])])
     config["modeling"]["cv_type"] = "time_series_split"
     if explicit_time_column:

@@ -14,9 +14,11 @@ import numpy as np
 import pandas as pd
 import polars as pl
 import pytest
+from sklearn.preprocessing import StandardScaler
 from tests.utils.dataset_loader import load_sample_dataset
 from tests.utils.test_case_loader import TestCaseLoader
 
+from skyulf.engines.registry import EngineRegistry
 from skyulf.preprocessing.scaling.maxabs import (
     MaxAbsScalerApplier,
     MaxAbsScalerCalculator,
@@ -176,6 +178,102 @@ def test_standard_scaler_fit_transform_round_trip() -> None:
 
     pd.testing.assert_frame_equal(cast(pd.DataFrame, piped_out), direct_out)
     assert transformer.params == direct_params
+
+
+@pytest.mark.parametrize("engine", ["pandas", "polars"])
+@pytest.mark.parametrize("wrapped", [False, True])
+@pytest.mark.parametrize("with_mean, with_std", [(True, True), (False, True), (True, False)])
+def test_standard_scaler_nullable_numeric_round_trip(
+    engine: str, wrapped: bool, with_mean: bool, with_std: bool
+) -> None:
+    """Mixed nullable numbers and explicit booleans must scale like sklearn on either engine."""
+    frame = pd.DataFrame(
+        {
+            "x": pd.Series([1, None, 3], dtype="Int64"),
+            "z": pd.Series([2, None, 4], dtype="Float64"),
+            "flag": pd.Series([True, None, False], dtype="boolean"),
+            "label": ["north", "south", "north"],
+            "untouched": pd.Series([100, None, 300], dtype="Int64"),
+        }
+    )
+    original = frame.copy(deep=True)
+    columns = ["z", "flag", "x"]
+    config = {"columns": columns, "with_mean": with_mean, "with_std": with_std}
+    reference = StandardScaler(with_mean=with_mean, with_std=with_std).fit(frame[columns])
+    data: Any = pl.from_pandas(frame) if engine == "polars" else frame
+    if wrapped:
+        data = EngineRegistry.wrap(data)
+
+    params = StandardScalerCalculator().fit(data, config)
+    out = StandardScalerApplier().apply(data, params)
+    if hasattr(out, "to_native"):
+        out = out.to_native()
+    if engine == "polars":
+        out = out.to_pandas()
+
+    assert params["columns"] == columns
+    np.testing.assert_allclose(params["mean"], reference.mean_)
+    np.testing.assert_allclose(out[columns].to_numpy(), reference.transform(frame[columns]))
+    assert all(pd.api.types.is_float_dtype(out[col]) for col in columns)
+    assert out["label"].tolist() == frame["label"].tolist()
+    np.testing.assert_allclose(
+        out["untouched"].to_numpy(dtype=float, na_value=np.nan), [100, np.nan, 300]
+    )
+    if engine == "pandas":
+        pd.testing.assert_series_equal(out["untouched"], frame["untouched"])
+    pd.testing.assert_frame_equal(frame, original)
+
+
+@pytest.mark.parametrize("with_missing", [False, True])
+def test_standard_scaler_nullable_apply_after_native_fit(with_missing: bool) -> None:
+    """A native fit must produce numeric output for nullable inference with or without pd.NA."""
+    train = pd.DataFrame({"x": [1.0, 3.0], "z": [2.0, 4.0]})
+    params = StandardScalerCalculator().fit(train, {"columns": ["z", "x"]})
+    inference = pd.DataFrame(
+        {
+            "x": pd.Series([5, None if with_missing else 7], dtype="Int64"),
+            "z": pd.Series([6, None if with_missing else 8], dtype="Float64"),
+        }
+    )
+    inference.index = [7, 7]
+    target = pd.Series([10, 20], index=[7, 7])
+
+    out, out_target = StandardScalerApplier().apply((inference, target), params)
+
+    assert all(pd.api.types.is_float_dtype(out[col]) for col in ["x", "z"])
+    expected_last = [np.nan, np.nan] if with_missing else [5, 5]
+    np.testing.assert_allclose(out[["x", "z"]].to_numpy(), [[3, 3], expected_last])
+    pd.testing.assert_index_equal(out.index, inference.index)
+    assert out_target is target
+
+
+@pytest.mark.parametrize("engine", ["pandas", "polars"])
+@pytest.mark.parametrize("wrapped", [False, True])
+def test_standard_scaler_disabled_flags_preserve_nullable_dtypes(
+    engine: str, wrapped: bool
+) -> None:
+    """Disabling both scaling operations must preserve nullable values, dtypes and columns."""
+    frame = pd.DataFrame(
+        {
+            "x": pd.Series([1, None, 3], dtype="Int64"),
+            "z": pd.Series([2, None, 4], dtype="Float64"),
+            "label": ["north", "south", "north"],
+        }
+    )
+    native: Any = pl.from_pandas(frame) if engine == "polars" else frame
+    data = EngineRegistry.wrap(native) if wrapped else native
+    params = StandardScalerCalculator().fit(
+        data, {"columns": ["z", "x"], "with_mean": False, "with_std": False}
+    )
+
+    out = StandardScalerApplier().apply(data, params)
+    if hasattr(out, "to_native"):
+        out = out.to_native()
+
+    if engine == "pandas":
+        pd.testing.assert_frame_equal(out, frame)
+    else:
+        assert out.equals(native)
 
 
 # ---------------------------------------------------------------------------

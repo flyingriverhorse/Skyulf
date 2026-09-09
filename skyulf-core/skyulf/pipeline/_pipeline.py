@@ -294,6 +294,9 @@ class SkyulfPipeline:
     ) -> dict[str, Any]:
         """Fit the pipeline.
 
+        Once fitting starts, any failure invalidates the fitted model and
+        preprocessing. Call ``fit()`` successfully again before predicting.
+
         Args:
             data: Input data (DataFrame or SplitDataset).
             target_column: Name of the target column.
@@ -307,8 +310,6 @@ class SkyulfPipeline:
             ValueError: If learned preprocessing precedes a train/test split
                 with ``on_leakage="raise"``, or the mode is invalid.
         """
-        metrics = {}
-
         # Check before any transformer or estimator can learn from the data.
         for warning in validate_leakage_safety(
             self.config,
@@ -317,6 +318,29 @@ class SkyulfPipeline:
             already_split=isinstance(data, SplitDataset),
         ):
             logger.warning(warning)
+
+        self._fit_metrics = None
+        self._target_column = None
+        self._tuned_thresholds = None
+        if self.model_estimator is not None:
+            self.model_estimator.model = None
+        try:
+            return self._fit(data, target_column)
+        except BaseException:
+            # A failure can occur after model fitting, while transforming or
+            # predicting held-out data. Never expose that partial replacement.
+            self.feature_engineer.fitted_steps = []
+            if self.model_estimator is not None:
+                self.model_estimator.model = None
+            raise
+
+    def _fit(
+        self,
+        data: pd.DataFrame | pl.DataFrame | SkyulfDataFrame | SplitDataset,
+        target_column: str,
+    ) -> dict[str, Any]:
+        """Fit validated data, publishing metadata only after all stages complete."""
+        metrics = {}
 
         # 1. Feature Engineering
         logger.info("Starting Feature Engineering...")
@@ -545,7 +569,7 @@ class SkyulfPipeline:
                 stored by a prior ``optimize_thresholds()`` call instead of
                 the model's default decision rule (argmax/0.5). Requires
                 ``optimize_thresholds()`` to have been called on this
-                pipeline instance first.
+                pipeline instance since its most recent fit.
 
         Returns:
             Series (or array, when ``use_tuned_thresholds=True``) of
@@ -555,8 +579,11 @@ class SkyulfPipeline:
             ValueError: If the input still contains the target column used
                 during fit(); if the pipeline isn't fitted; or if
                 ``use_tuned_thresholds=True`` but ``optimize_thresholds()``
-                was never called on this instance.
+                has not been called since the most recent fit.
         """
+        if not (self.model_estimator and self.model_estimator.model is not None):
+            raise ValueError("Pipeline not fitted or no model configured.")
+
         if self._target_column is not None and self._target_column in data.columns:
             raise ValueError(
                 f"predict() input still contains the target column '{self._target_column}' "
@@ -567,9 +594,6 @@ class SkyulfPipeline:
         transformed_data = self.feature_engineer.transform(data)
 
         # 2. Modeling
-        if not (self.model_estimator and self.model_estimator.model is not None):
-            raise ValueError("Pipeline not fitted or no model configured.")
-
         if not use_tuned_thresholds:
             return self.model_estimator.applier.predict(
                 transformed_data, self.model_estimator.model
@@ -577,8 +601,8 @@ class SkyulfPipeline:
 
         if self._tuned_thresholds is None:
             raise ValueError(
-                "use_tuned_thresholds=True but optimize_thresholds() was never "
-                "called on this pipeline instance. Call optimize_thresholds() first."
+                "use_tuned_thresholds=True but no decision thresholds are available "
+                "for the current fit. Call optimize_thresholds() first."
             )
 
         proba_df = self._predict_proba_transformed(transformed_data)

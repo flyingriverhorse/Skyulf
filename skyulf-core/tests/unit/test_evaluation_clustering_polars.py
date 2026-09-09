@@ -98,6 +98,35 @@ def test_evaluate_clustering_model_matches_golden_centroids(engine: str) -> None
 
 
 @pytest.mark.parametrize("engine", ["pandas", "raw_polars", "wrapped_polars"])
+@pytest.mark.parametrize("with_noise", [False, True])
+def test_clustering_preserves_features_named_like_internal_cluster_column(
+    engine: str, with_noise: bool
+) -> None:
+    """A legitimate feature name must retain its values in every cluster centroid."""
+    fixture = {
+        "__skyulf_cluster__" if name == "x" else name: values for name, values in _FIXTURE.items()
+    }
+    labels = [-1 if with_noise and label == 0 else label for label in _LABELS]
+    frame: Any = pd.DataFrame(fixture)
+    expected = evaluate_clustering_model(None, frame, labels, reference_column="species")
+    if engine != "pandas":
+        frame = pl.DataFrame(fixture)
+        if engine == "wrapped_polars":
+            frame = SkyulfPolarsWrapper(frame)
+
+    report = evaluate_clustering_model(None, frame, labels, reference_column="species")
+
+    assert report.model_dump() == expected.model_dump()
+    assert report.clustering is not None
+    assert [c.center["__skyulf_cluster__"] for c in report.clustering.centroids] == [
+        0.0,
+        10.0,
+        20.0,
+    ]
+    assert frame["__skyulf_cluster__"].to_list() == fixture["__skyulf_cluster__"]
+
+
+@pytest.mark.parametrize("engine", ["pandas", "raw_polars", "wrapped_polars"])
 def test_evaluate_clustering_model_matches_golden_crosstab(engine: str) -> None:
     df = _frames()[engine]
     report = evaluate_clustering_model(

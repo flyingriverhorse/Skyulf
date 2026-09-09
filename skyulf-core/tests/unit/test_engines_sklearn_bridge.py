@@ -5,6 +5,7 @@ import pandas as pd
 import polars as pl
 import pytest
 
+from skyulf.engines.registry import EngineRegistry
 from skyulf.engines.sklearn_bridge import SklearnBridge
 
 
@@ -68,3 +69,85 @@ def test_to_sklearn_tuple_with_none_target():
 def test_convert_single_returns_none_for_none_input():
     """_convert_single should short-circuit to None for None input."""
     assert SklearnBridge._convert_single(None) is None
+
+
+@pytest.mark.parametrize("wrapped", [False, True])
+def test_to_sklearn_normalizes_nullable_numeric_frame(wrapped: bool) -> None:
+    """Nullable numeric features must reach sklearn as numbers and NaN, never pd.NA."""
+    frame = pd.DataFrame(
+        {
+            "integer": pd.Series([1, None, 3], dtype="Int64"),
+            "real": pd.Series([2, None, 4], dtype="Float64"),
+            "flag": pd.Series([True, None, False], dtype="boolean"),
+        }
+    )
+    original = frame.copy(deep=True)
+    data = EngineRegistry.wrap(frame) if wrapped else frame
+
+    values, target = SklearnBridge.to_sklearn(data)
+
+    assert values[[0, 2]].tolist() == [[1, 2, True], [3, 4, False]]
+    assert all(np.isnan(value) for value in values[1])
+    assert target is None
+    pd.testing.assert_frame_equal(frame, original)
+
+
+@pytest.mark.parametrize("as_frame", [False, True])
+def test_to_sklearn_normalizes_nullable_boolean_target(as_frame: bool) -> None:
+    """Nullable boolean targets preserve missing labels as NaN across target shapes."""
+    target = pd.Series([True, None, False], dtype="boolean")
+    values, labels = SklearnBridge.to_sklearn(
+        (np.array([[1], [2], [3]]), target.to_frame() if as_frame else target)
+    )
+
+    assert values.shape == (3, 1)
+    assert labels.shape == (3,)
+    assert labels[[0, 2]].tolist() == [True, False]
+    assert np.isnan(labels[1])
+
+
+@pytest.mark.parametrize("dtype", ["category", "string", "object"])
+@pytest.mark.parametrize("wrapped", [False, True])
+def test_to_sklearn_preserves_nonnumeric_columns(dtype: str, wrapped: bool) -> None:
+    """The numeric bridge fix must leave categorical values and missing sentinels intact."""
+    frame = pd.DataFrame(
+        {
+            "number": pd.Series([1, None, 3], dtype="Int64"),
+            "label": pd.Series(["north", "south", "north"], dtype=dtype),
+        }
+    )
+    data = EngineRegistry.wrap(frame) if wrapped else frame
+
+    values, _ = SklearnBridge.to_sklearn(data)
+
+    assert values.dtype == object
+    assert values[:, 1].tolist() == ["north", "south", "north"]
+    assert values[1, 0] is pd.NA
+    assert values[[0, 2], 0].tolist() == [1, 3]
+
+
+@pytest.mark.parametrize("as_frame", [False, True])
+def test_to_sklearn_preserves_nullable_integer_label_precision(as_frame: bool) -> None:
+    """Integer class labels above float precision must remain distinct after conversion."""
+    target = pd.Series([2**53, 2**53 + 1], dtype="Int64")
+
+    _, labels = SklearnBridge.to_sklearn(
+        (np.array([[1], [2]]), target.to_frame() if as_frame else target)
+    )
+
+    assert labels.dtype.kind == "i"
+    assert labels.tolist() == [2**53, 2**53 + 1]
+
+
+def test_to_sklearn_preserves_nonmissing_nullable_integer_object_array() -> None:
+    """Mixed nullable integer columns without missing data must keep exact large values."""
+    frame = pd.DataFrame(
+        {
+            "first": pd.Series([2**53, 2**53 + 1], dtype="Int64"),
+            "second": pd.Series([1, 2], dtype="Int32"),
+        }
+    )
+
+    _, labels = SklearnBridge.to_sklearn((np.array([[1], [2]]), frame))
+
+    assert labels.tolist() == [[2**53, 1], [2**53 + 1, 2]]
