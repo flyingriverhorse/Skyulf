@@ -274,6 +274,7 @@ uses, so a fixed finding stays where it was filed.
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
+| OC-221 | 🟡 | Error Log applies an older search response after a newer response, displaying rows that disagree with the current search | small | ✅ fixed 2026-09-10 — request generations guard HTTP/pipeline results, errors and loading; refresh and effect cleanup invalidate obsolete work. |
 | OC-220 | 🟡 | Resampling Target Column native suggestions open away from the input in the user's browser | small | ✅ fixed 2026-09-09 — use an anchored editable listbox; docked/expanded browser geometry and keyboard selection are covered. |
 | OC-55 | 🟡 | `tsc --noEmit` fails: `mermaid` declared but not installed (`frontend/ml-canvas/package.json`) | 1 line | ✅ verified stale 2026-09-06 — `mermaid@11.17.2` is in `dependencies`, in the lockfile, installed and lazy-imported into its own chunk; the exact CI `tsc --noEmit` exits 0, `npm run build` succeeds, and the 5 real-parser tests pass. No change needed |
 
@@ -352,6 +353,96 @@ respective fix logs; OC-167 closed with canonical artifact framing on 2026-09-09
 ---
 
 ## Log
+
+### 2026-09-10 - frontend CCN 8 gate expanded to all source files
+
+The user confirmed the batch 5 frontend checks, requested a signed commit, and
+chose source-wide enforcement while the remaining backlog is being addressed.
+`complexity:check` now runs
+`eslint src --ext ts,tsx --rule "complexity: [error, 8]" --max-warnings 0`.
+The explicit file/folder list is removed; new TypeScript files under `src` are
+automatically covered. The workflow retains the informational report and runs
+the same strict command, with no increased limit or baseline exemption.
+
+Verification: the new command exits **1 with 172 complexity errors**, as expected
+from the existing backlog in 110 files (maximum 32). This supersedes the scoped
+gate's passing status recorded below; the source-wide gate will fail until those
+violations are resolved. Normal ESLint and a fresh TypeScript/Vite build pass;
+the rebuilt main asset hash is unchanged. No runtime code changed in this
+follow-up. Evidence: `tmp_repro_artifacts/ccn-global-{check,lint,build}-2026-09-10.log`.
+The v0.8.19 CI note reflects the final policy; queue stays **57 open / 4 parked**.
+
+### 2026-09-10 - frontend complexity refactor batch 5: verified
+
+Plan: [`frontend_ccn_refactor_batch5_2026-09-09.md`](frontend_ccn_refactor_batch5_2026-09-09.md).
+Baseline `15aa043a`, branch `0819`; the removed CCN 10 exception is not restored.
+Independent Astra implementers and reviewers covered three separate scopes:
+
+| Scope | Previous maximum | Final maximum | Preserved behavior evidence |
+|---|---:|---:|---|
+| Comparison table and 11 helpers | 34 | 8 | 11 original/refactored public-component tests: scoring groups, ties, config precedence, graph alignment and expansion |
+| Pipeline diff and 5 helpers | 33 | 8 | 35 original/refactored related tests: snapshots, failures, cancellation, Swap, graph diff and labels |
+| Error Log and 10 helpers | 32 | 8 | 28 original/refactored page tests: filters, diagnostics, actions, export, links and asynchronous results |
+
+All three pure extractions passed independent spec/quality review. A separate
+OC-221 repair then increased Error Log coverage to 38 cases (see below); its
+independent review found no actionable issue. New actual-page browser coverage
+passed four cases against both original and extracted source at 1440px/900px,
+including keyboard Swap, focus retention, comparison folds and error filters.
+
+Final integration: **156 Vitest files / 1,926 tests**, **105 Chromium tests**,
+ESLint, strict CCN 8, TypeScript/Vite production build and all **11 bundle
+budgets pass**. Main bundle: **319.7 KiB gzip / 325 KiB**. Exact logs are under
+`tmp_repro_artifacts/ccn5-{vitest,lint,gate,build,size,playwright,report}-final.log`.
+Browser tests use mocked API routes; no live-backend integration claim is made.
+
+The full report falls from **181 functions / 113 files / maximum 34** to
+**172 functions / 110 files / maximum 32** above CCN 8. The three entries and
+all 26 helper modules are included in the strict gate without raised limits.
+Next active hotspots include `useGraphStore.confirmConnection` (32),
+`AuditLogPage`/`DriftAlertModal` (31) and `FeatureGenerationNode` (30).
+Unreferenced `VariableCard` (32) is not selected merely to reduce the report.
+
+Generated assets and concise v0.8.19 notes are updated. The v0.8.18 and older
+sections still match branch base `784649d9`. Queue: **57 open, 4 parked** after
+OC-221 closure; parked decisions remain unchanged. No backend, dependency or
+lockfile change. The user confirmed the frontend checks and requested a signed
+commit; the subsequent source-wide CCN policy change is recorded above.
+
+### 2026-09-10 - OC-221 fixed: retain the latest Error Log request
+
+After independent review of the behavior-preserving extraction, a separate fix
+adds request generations to `errorLog/useErrorLogPage.ts`. Every filter load and
+refresh supersedes older HTTP and pipeline requests. Success, rejection and
+loading settlement check the same generation; effect cleanup also invalidates
+pending work on filter change or unmount. HTTP results remain usable before
+pipeline logs arrive. Requests are not aborted, and API arguments are unchanged.
+
+The desired latest-request behavior failed **11 of 38 tests** against the reviewed
+extraction; all **38 now pass**. Coverage includes both completion orders, stale
+success/error/loading, same-filter refresh, delayed pipeline results/rejections
+and unmount. Independent Astra review found no actionable issue. Scoped ESLint,
+strict CCN 8 and project TypeScript pass; the hook's maximum remains 7.
+Evidence: `tmp_repro_artifacts/ccn5-task-5-{red,green,ccn,types,metrics}.log` and
+the batch 5 independent review. Full Vitest also passes **1,926 tests**.
+
+OC-221 moves from the live queue to the closed frontend rows above. The queue
+returns to **57 open and 4 parked**; OC-71/72/73/185 remain parked. Release note:
+v0.8.19. No backend changes.
+
+### 2026-09-09 - OC-221 filed during Error Log characterization
+
+The original `ErrorLogPage.tsx` at `15aa043a` applies every completed `load()`
+without checking whether its filter scope is still current. The new public-page
+test `retains the current completion-order behavior when searches overlap`
+starts searches `older` then `newer`, resolves the newer response first and the
+older one last, and observes `older result` while the input still says `newer`.
+It passes against original source, establishing this as a pre-existing defect.
+Pipeline results and loading/error state use the same unguarded completion style;
+a repair must cover stale completions without making HTTP results wait for logs.
+
+Filed separately from the behavior-preserving CCN extraction. At filing the queue
+had **58 open and 4 parked** findings, before the request-lifetime repair above.
 
 ### 2026-09-09 - branch 0819 release-note placement corrected
 

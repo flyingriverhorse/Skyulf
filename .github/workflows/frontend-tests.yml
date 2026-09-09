@@ -50,21 +50,13 @@ jobs:
         working-directory: frontend/ml-canvas
 
       - name: Frontend complexity report (informational)
-        # Existing components/hooks have legacy hotspots. Keep the complete
-        # report visible while promoting verified-clean folders to the gate.
+        # Show every remaining hotspot before the strict source-wide gate.
         continue-on-error: true
         run: npm run complexity:report
         working-directory: frontend/ml-canvas
 
       - name: Complexity gate (ESLint, CCN 8)
-        # Enforce core/api, constants, contexts, factories, perf, realtime,
-        # registry, theme and types, plus the cleaned pipeline converter,
-        # Toolbar, JobDetailsView, CustomNodeWrapper, InferencePage, training/
-        # encoding/ensemble settings, branch colors, ResultsPanel, CustomEdge,
-        # EDA variables/sidebar/page, EvaluationView, NodeInspectionPanel and
-        # resampling/imputation settings with their helper folders.
-        # FeatureSelection helpers are gated; its cohesive bodyPreview remains
-        # at CCN 9 in the report. Expanding scope requires a clean report.
+        # All src TypeScript files are covered, including new files.
         run: bash ../../.github/scripts/run_check.sh "ESLint complexity (CCN 8)" npm run complexity:check
         working-directory: frontend/ml-canvas
 
