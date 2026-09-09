@@ -19,6 +19,23 @@ The functionality is available at three levels:
   split and applies it in every subsequent prediction automatically (binary
   classifiers only). See [Integrated with hyperparameter tuning](#integrated-with-hyperparameter-tuning).
 
+## After training in the canvas
+
+You can tune a completed classifier from **Experiments → Model Evaluation →
+Threshold Tuning**, even if **Tune decision threshold** was off during training.
+The evaluation must include class probabilities.
+
+1. Choose a metric and click **Preview** to calculate thresholds. This does not
+   save them or change predictions.
+2. Click **Save** to persist the thresholds and enable them for predictions.
+3. Use **Use tuned thresholds at prediction time** to turn the saved set off
+   or on. The switch stays disabled until a saved set exists.
+4. **Clear** deletes the saved set and restores the default prediction rule.
+
+Preview uses validation data when available, otherwise the test split, as shown
+in the panel. No retraining is required. If training already saved thresholds,
+the panel loads that set and its enabled state automatically.
+
 ## Pipeline usage
 
 Tune against explicit, out-of-sample validation data — **never** the

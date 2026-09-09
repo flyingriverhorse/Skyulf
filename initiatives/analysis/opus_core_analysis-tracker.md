@@ -148,6 +148,7 @@ uses, so a fixed finding stays where it was filed.
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
+| OC-219 | 🟡 | Threshold toggle accepts unsaved previews and returns HTTP 400; Save help incorrectly says saving leaves thresholds inactive | small | ✅ fixed 2026-09-09 — track saved state separately, disable the toggle until persistence, and explain that Save also enables predictions. |
 | OC-38 | ⚪ | Clustering metrics treat DBSCAN `-1` noise as a real cluster (`metrics.py:432-459`) | small | ✅ fixed 2026-09-07 — DBSCAN noise rows are excluded from cluster counts and quality scores; regression coverage added |
 | OC-146 | 🔴 | Binary `pr_auc` scored against wrong class on `{1,n}` labels — reports 0.32 vs true 0.97, no warning (`metrics.py:324-326`) | small | ✅ fixed 2026-09-05 |
 | OC-37 | 🟡 | Binary PR-AUC dropped for string-labeled classifiers (`metrics.py:324-327`) | small | ✅ fixed 2026-09-05 — same one-arg fix as OC-146 |
@@ -255,6 +256,7 @@ uses, so a fixed finding stays where it was filed.
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
+| OC-218 | 🟡 | Connected model CV seed `0` is replaced by the existing ensemble seed during frontend settings synchronization | small | ✅ fixed 2026-09-09 - explicit zero now survives synchronization and both fixed/tuned request conversion; missing seeds retain the ensemble default. |
 | OC-206 | ⚪ | Ensemble configuration resolution shallow-copies nested base-model parameters, so fitting mutates the caller's configuration (`modeling/ensemble.py:473,484`) | small | ✅ fixed 2026-09-09 - inner base-model parameter maps are copied before temporary overrides, preserving caller settings and later refits. |
 | OC-204 | 🟡 | `fit_predict` drops an embedded target during training but keeps it in held-out tuple features when explicit y is also supplied, causing prediction to fail (`modeling/base.py:317-324`) | small | ✅ fixed 2026-09-09 - held-out tuples use training target extraction, excluding embedded targets while preserving explicit-y precedence. |
 | OC-168 | 🟡 | Pipeline refitting retains decision thresholds from the previous model (`pipeline/_pipeline.py`) | small | ✅ fixed 2026-09-09 — fitting clears thresholds and requires fresh optimization for both unchanged and new class labels. |
@@ -349,6 +351,119 @@ respective fix logs; OC-167 closed with canonical artifact framing on 2026-09-09
 ---
 
 ## Log
+
+### 2026-09-09 - OC-219 fixed: require saved thresholds before toggling
+
+The evaluation hook now tracks saved-threshold availability separately from
+the preview and enabled flag, resetting per job and hydrating behind the
+existing stale-response guard. Successful Save sets availability and enables
+predictions; successful Clear resets both. Preview leaves availability alone,
+and a saved but disabled set can still be enabled again. The checkbox is
+disabled without a saved set, with inline Preview/Save guidance and a corrected
+Save tooltip. The user guide documents post-training tuning without retraining.
+
+Regression evidence: **6 failed / 22 passed** before repair, then **33 focused
+frontend tests passed**. The complete frontend suite passes **1,795 tests**;
+unchanged backend service/router suites pass **37 tests**. The threshold browser
+spec passes all **3 tests**, including real-page Save/Clear state transitions,
+disable/re-enable, job switching and reload with a stateful API fixture.
+Independent review found no introduced issue. Lint and the strict CCN gate pass.
+Final production build, all 11 bundle budgets and all **99 browser tests** pass.
+OC-219 is closed; the queue returns to **57 open and 4 parked**. Release note:
+v0.8.18. No backend persistence semantics changed.
+
+### 2026-09-09 - OC-219 filed from threshold tuning feedback
+
+The user reproduced a successful Preview followed by toggle HTTP 400:
+`Job has no saved tuned thresholds to toggle.` Backend service and route tests
+confirm Preview does not persist and Save both persists and enables. The UI
+allows the invalid toggle and its Save tooltip incorrectly promises inactivity.
+Two new UI cases reproduce the enabled checkbox with no saved set, before and
+after Preview; four hook cases also fail before saved-state tracking is added
+(**6 failed, 22 passed**). The behavior predates the batch 3 extraction. Filed
+in the live queue before production repair.
+
+### 2026-09-09 - frontend complexity refactor batch 3: verified
+
+Plan: [`frontend_ccn_refactor_batch3_2026-09-09.md`](frontend_ccn_refactor_batch3_2026-09-09.md).
+Baseline `abe5ea7d`: 204 functions above CCN 8 in 123 of 555 files.
+Three Astra 6 agents implemented separate Ensemble, EDA and Evaluation scopes;
+primary implemented Feature Selection and owned shared verification/delivery.
+Different owners reviewed each implementation and the final public interfaces.
+
+- Ensemble settings: entry-file maximum **52 -> 6**, five helper modules at
+  most **8**. The original 12 tests grew to **31** characterizations passing on
+  both original and extracted code; implementer/reviewer differential probes
+  matched **4,000** and **2,000** connected-model configurations respectively.
+  The separately filed OC-218 repair brought this suite to **39** passing tests.
+- EDA variable row: entry maximum **51 -> 7**; two helpers at most **7**.
+  EDA sidebar: **47 -> 4**; five helpers at most **7**. **34 tests** pass against
+  both original and extracted implementations. Independent review matched
+  **84 DOM comparisons** with shared chart/UI stubs. Numeric formatting,
+  export state, filter parsing, exclusions and navigation remain equivalent.
+- Feature Selection: settings component **46 -> 7**; five helper modules at
+  most **8**. The cohesive body preview remains **9** after merging equivalent
+  K-count cases. This entry stays report-only; its helper folder is gated.
+  **16 new** characterizations plus existing coverage passed **48 tests** on
+  original and extracted code; independent review passed **131** related tests.
+- Evaluation view: entry maximum **43 -> 1**; nine helper modules at most **8**.
+  **21 tests** pass, including five new original-passing characterizations.
+  Mutation lifetimes, retries, loading/error precedence, split selection and
+  threshold/chart props were checked against the original implementation.
+
+Final independent integration review found no introduced actionable issue:
+all five public interfaces are unchanged and **99 helper imports** resolve.
+The first full build found exact-optional-property and test typing errors;
+these were repaired without widening public contracts. OC-218 is the only
+intentional product behavior change in this batch and is documented separately.
+
+Final verification passed **1,788 Vitest tests** across 152 files (**76 new**),
+**98 Playwright tests**, full ESLint, the expanded strict CCN 8 gate,
+TypeScript/production build and all 11 bundle budgets. Main bundle:
+**317.3 KiB gzip / 325 KiB budget**; no limits raised. Browser tests stub backend
+HTTP and cover UI wiring; actual data/model execution remains a useful manual
+check. Existing jsdom diagnostics and vendor/proxy warnings remain.
+
+The global report now has **189 functions** above CCN 8 in **119 of 584 files**;
+highest CCN fell from **52 to 40**. All 26 new production helper modules are
+gated, alongside four entry files. Next report-only hotspots: `ResamplingNode`
+(**40**), `EDAPage` (**40**), `NodeInspectionPanel` (**38**), `ImputationNode`
+(**35**) and `ComparisonTableView` (**34**). Release notes are under v0.8.18.
+OC-218 was filed and fixed; the queue remains **57 open and 4 parked**.
+
+### 2026-09-09 - OC-218 fixed: preserve connected ensemble CV seed zero
+
+Reproduction against `abe5ea7d` and the initial extraction showed a connected
+seed of `0` becoming `42`. A separate executable probe enabled shuffled CV and
+confirmed both fixed and tuned parameter builders forwarded `42`; a source
+seed of `7` was forwarded correctly. The finding was recorded before repair.
+
+`ensembleSettings/connectedModels.ts` now uses a nullish fallback for
+`cv_random_state`, preserving zero and retaining the local seed only when the
+source value is absent. The existing synchronization characterization was
+updated, and eight cases exercise the real `convertEnsembleNode` fixed/tuned
+branches with seed `0`, seed `7`, and absent-source fallbacks to `42` and `0`.
+Before repair: **3 failed, 36 passed**. After repair and independent review:
+**39 passed**, strict CCN 8 lint and TypeScript passed.
+
+Type repairs preserve the public interface: an undefined time-column candidate
+is omitted (the prior comparison already discarded it), and the first model
+has an explicit guard. **32 comparisons** verified unchanged time-column patch
+semantics. Other connected-model defaults are unchanged. Parameter-only
+inspector synchronization is retained: the converter rereads wired model
+parameters, so the no-op does not establish a stale training-payload defect.
+
+The closed row moved here and its evidence left the live queue; it returns to
+**57 open and 4 parked** rows. The concise fix note is under v0.8.18.
+
+### 2026-09-09 - OC-218 filed during frontend ensemble review
+
+The original and extracted Ensemble settings both replace a connected model's
+CV seed `0` with the current ensemble seed (`42` in the reproduction). A
+separate executable probe with shuffled CV confirmed fixed and tuned parameter
+builders both forward `42`; a source seed of `7` is forwarded correctly.
+The truthiness fallback is the cause. Filed in the live queue before repair;
+the fix will preserve explicit zero and verify both submission modes.
 
 ### 2026-09-09 - frontend complexity refactor batch 2: verified
 

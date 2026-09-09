@@ -4,7 +4,7 @@
 // active tab), and Tab 2 shows a placeholder until a preview exists.
 
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { act, render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { EvaluationView } from './EvaluationView';
 import type { EvaluationData } from '../types';
 import type { ThresholdPreviewResult } from '../../../../core/api/thresholdTuning';
@@ -64,6 +64,7 @@ function baseProps(overrides: Partial<React.ComponentProps<typeof EvaluationView
     onSelectedTuningMetricChange: vi.fn(),
     tuningPreview: null as ThresholdPreviewResult | null,
     tuningError: null,
+    hasSavedThresholds: false,
     useTunedThresholds: false,
     onPreviewThresholds: noop,
     onSaveThresholds: noop,
@@ -74,6 +75,107 @@ function baseProps(overrides: Partial<React.ComponentProps<typeof EvaluationView
 }
 
 describe('EvaluationView — Threshold Slider / Threshold Tuning tabs', () => {
+  it.each([null, {
+    thresholds: { '0': 0.4, '1': 0.6 }, classes: [0, 1], metric: 'f1', split_used: 'test',
+  }])('requires saved thresholds before enabling predictions (preview: %j)', (tuningPreview) => {
+    /** A preview cannot satisfy the backend toggle endpoint's persistence requirement. */
+    const onToggleThresholds = vi.fn();
+    render(<EvaluationView {...baseProps({ activeTab: 'tuning', tuningPreview, onToggleThresholds })} />);
+    const toggle = screen.getByRole('checkbox', { name: /Use tuned thresholds/ });
+    expect(toggle).toBeDisabled();
+    expect(toggle).not.toBeChecked();
+    expect(screen.getByText('Preview thresholds, then Save to enable them for predictions.')).toBeInTheDocument();
+    expect(onToggleThresholds).not.toHaveBeenCalled();
+  });
+
+  it('allows previously saved thresholds to be enabled again', async () => {
+    /** Disabling a saved set must not make the user recompute or save it again. */
+    const onToggleThresholds = vi.fn().mockResolvedValue(undefined);
+    render(<EvaluationView {...baseProps({ activeTab: 'tuning', hasSavedThresholds: true, onToggleThresholds })} />);
+    const toggle = screen.getByRole('checkbox', { name: /Use tuned thresholds/ });
+    expect(toggle).toBeEnabled();
+    await act(async () => { fireEvent.click(toggle); });
+    expect(onToggleThresholds).toHaveBeenCalledWith(true);
+  });
+
+  it('keeps stale data and its focused controls mounted while another run loads', () => {
+    /** Background loading must not reset the visible chart controls or keyboard focus. */
+    const props = baseProps();
+    const { rerender } = render(<EvaluationView {...props} />);
+    const slider = screen.getByRole('slider');
+    slider.focus();
+    rerender(<EvaluationView {...props} evalJobId="job-2" isEvalLoading />);
+    expect(screen.getByRole('slider')).toBe(slider);
+    expect(slider).toHaveFocus();
+    expect(screen.getByText('Loading evaluation data…')).toBeInTheDocument();
+  });
+
+  it('preserves a pending save across tabs and disables every mutation control', async () => {
+    /** Switching to manual exploration must not forget an in-flight save. */
+    let finish!: () => void;
+    const onSaveThresholds = vi.fn(() => new Promise<void>(resolve => { finish = resolve; }));
+    const props = baseProps({ activeTab: 'tuning', onSaveThresholds, tuningPreview: {
+      thresholds: { a: 0.4 }, classes: [0], metric: 'f1', split_used: 'test', source: 'training',
+    } });
+    const { rerender } = render(<EvaluationView {...props} />);
+    expect(screen.getByText('seeded at training')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    for (const name of ['Preview', 'Save', 'Clear']) expect(screen.getByRole('button', { name })).toBeDisabled();
+    expect(screen.getByRole('checkbox', { name: /Use tuned thresholds/ })).toBeDisabled();
+    rerender(<EvaluationView {...props} activeTab="slider" />);
+    rerender(<EvaluationView {...props} />);
+    expect(screen.getByRole('status')).toHaveTextContent('Saving tuned thresholds…');
+    await act(async () => { finish(); });
+    expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled();
+    expect(onSaveThresholds).toHaveBeenCalledTimes(1);
+  });
+
+  it('reports a non-Error disable failure and clears it when another action starts', async () => {
+    /** Mutation-specific retry text must not linger after a new successful action. */
+    const onToggleThresholds = vi.fn().mockRejectedValue('failed');
+    const onPreviewThresholds = vi.fn().mockResolvedValue(undefined);
+    render(<EvaluationView {...baseProps({ activeTab: 'tuning', hasSavedThresholds: true, useTunedThresholds: true, onToggleThresholds, onPreviewThresholds })} />);
+    fireEvent.click(screen.getByRole('checkbox', { name: /Use tuned thresholds/ }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Failed to disable thresholds');
+    expect(onToggleThresholds).toHaveBeenCalledWith(false);
+    expect(screen.getByRole('button', { name: 'Retry disable' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Preview' }));
+    await waitFor(() => expect(screen.queryByRole('status')).not.toBeInTheDocument());
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(onPreviewThresholds).toHaveBeenCalledTimes(1);
+  });
+
+  it('defaults regression charts to validation and honors an explicit available split', () => {
+    /** Tabs and charts must derive the same fallback after the selected split disappears. */
+    const split = { y_true: [1, 2, 3], y_pred: [1, 2, 3] };
+    const props = baseProps({ evaluationData: { problem_type: 'regression', splits: { train: split, test: split, validation: split } }, selectedRegressionSplit: 'missing' });
+    const { container, rerender } = render(<EvaluationView {...props} />);
+    expect(screen.getByRole('button', { name: 'Validation' })).toHaveClass('bg-blue-500');
+    expect(container.querySelector('[id*="validation"]')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Test' }));
+    expect(props.setSelectedRegressionSplit).toHaveBeenCalledWith('test');
+    rerender(<EvaluationView {...props} selectedRegressionSplit="test" />);
+    expect(screen.getByRole('button', { name: 'Test' })).toHaveClass('bg-blue-500');
+    expect(container.querySelector('[id*="test"]')).toBeInTheDocument();
+    expect(container.querySelector('[id*="validation"]')).not.toBeInTheDocument();
+  });
+
+  it('forwards manual class, metric, threshold, badge and split changes', () => {
+    /** Extracted controls must retain the original callback values and numeric parsing. */
+    const props = baseProps({ bestMetricInfos: [{ threshold: 0.3, value: 0.9, splitLabel: 'train', metricName: 'f1_weighted' }] });
+    render(<EvaluationView {...props} />);
+    const [classes, metric] = screen.getAllByRole('combobox');
+    fireEvent.change(classes!, { target: { value: 'b' } });
+    fireEvent.change(metric!, { target: { value: 'accuracy' } });
+    fireEvent.change(screen.getByRole('slider'), { target: { value: '0.27' } });
+    fireEvent.click(screen.getByRole('button', { name: /train.*0.30/ }));
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Train' }));
+    expect(props.setSelectedRocClass).toHaveBeenCalledWith('b');
+    expect(props.setSelectedMetric).toHaveBeenCalledWith('accuracy');
+    expect(props.setThreshold).toHaveBeenNthCalledWith(1, 0.27);
+    expect(props.setThreshold).toHaveBeenNthCalledWith(2, 0.3);
+    expect(props.setShowTrainMetrics).toHaveBeenCalledWith(false);
+  });
   it('renders both tab buttons', () => {
     render(<EvaluationView {...baseProps()} />);
     expect(screen.getByText('Threshold Slider')).toBeInTheDocument();
@@ -143,7 +245,7 @@ describe('EvaluationView — Threshold Slider / Threshold Tuning tabs', () => {
         }),
     );
 
-    render(<EvaluationView {...baseProps({ activeTab: 'tuning', onToggleThresholds })} />);
+    render(<EvaluationView {...baseProps({ activeTab: 'tuning', hasSavedThresholds: true, onToggleThresholds })} />);
     fireEvent.click(screen.getByRole('checkbox', { name: /use tuned thresholds at prediction time/i }));
 
     expect(screen.getByRole('checkbox', { name: /use tuned thresholds at prediction time/i })).toBeDisabled();

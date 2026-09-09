@@ -32,6 +32,7 @@ export function useEvaluationFetch(jobs: JobInfo[]) {
   const [evalJobId, setEvalJobId] = useState<string | null>(null);
   const [selectedTuningMetric, setSelectedTuningMetric] = useState<string>('f1');
   const [tuningPreview, setTuningPreview] = useState<ThresholdPreviewResult | null>(null);
+  const [hasSavedThresholds, setHasSavedThresholds] = useState(false);
   const [useTunedThresholds, setUseTunedThresholds] = useState(false);
   const [tuningError, setTuningError] = useState<string | null>(null);
   // Which metric the classification best-threshold scan optimizes for.
@@ -72,6 +73,7 @@ export function useEvaluationFetch(jobs: JobInfo[]) {
     // from a previously viewed job must not leak onto the newly selected
     // one (they're keyed per-job server-side too).
     setTuningPreview(null);
+    setHasSavedThresholds(false);
     setUseTunedThresholds(false);
     setTuningError(null);
     try {
@@ -97,6 +99,7 @@ export function useEvaluationFetch(jobs: JobInfo[]) {
       const saved = await thresholdTuningApi.get(jobId);
       if (isStale()) return;
       if (saved.thresholds && saved.classes && saved.metric && saved.split_used) {
+        setHasSavedThresholds(true);
         setTuningPreview({
           thresholds: saved.thresholds,
           classes: saved.classes,
@@ -132,6 +135,8 @@ export function useEvaluationFetch(jobs: JobInfo[]) {
     setSelectedTuningMetric,
     tuningPreview,
     setTuningPreview,
+    hasSavedThresholds,
+    setHasSavedThresholds,
     useTunedThresholds,
     setUseTunedThresholds,
     tuningError,

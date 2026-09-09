@@ -1,48 +1,13 @@
-import { ValidationField, useValidationReveal } from '../../../components/shared/ValidationField';
-import React, { useEffect, useState } from 'react';
+import { useValidationReveal } from '../../../components/shared/ValidationField';
+import React, { useState } from 'react';
 import { NodeDefinition } from '../../../core/types/nodes';
 import { Filter } from 'lucide-react';
-import { useUpstreamData } from '../../../core/hooks/useUpstreamData';
-import { useDatasetSchema } from '../../../core/hooks/useDatasetSchema';
-import { useUpstreamDroppedColumns } from '../../../core/hooks/useUpstreamDroppedColumns';
-import { useGraphStore } from '../../../core/store/useGraphStore';
-import { getIncomers } from '@xyflow/react';
-import { parseIntSafe } from '../../../core/utils/numberInput';
-import { getNodeMetricDetails, hasWrappedNodeMetrics } from '../../../core/utils/preprocessingMetrics';
 import { useIsWideContainer } from '../../../core/hooks/useIsWideContainer';
-
-interface FeatureSelectionConfig {
-  method:
-    | 'variance_threshold'
-    | 'correlation_threshold'
-    | 'select_k_best'
-    | 'select_percentile'
-    | 'select_fpr'
-    | 'select_fdr'
-    | 'select_fwe'
-    | 'generic_univariate_select'
-    | 'select_from_model'
-    | 'rfe';
-
-  // Common
-  target_column?: string | undefined;
-  datasetId?: string | undefined;
-  problem_type?: 'auto' | 'classification' | 'regression' | undefined;
-
-  // Method Specific
-  threshold?: number | string | undefined; // Variance, Correlation, SelectFromModel (can be "median")
-  correlation_method?: 'pearson' | 'kendall' | 'spearman' | undefined;
-  k?: number | undefined; // SelectKBest, RFE
-  percentile?: number | undefined; // SelectPercentile
-  alpha?: number | undefined; // FPR, FDR, FWE
-  score_func?: string | undefined; // Univariate methods
-  mode?: 'k_best' | 'percentile' | 'fpr' | 'fdr' | 'fwe' | undefined; // Generic
-  param?: number | undefined; // Generic
-  estimator?: 'RandomForest' | 'LogisticRegression' | 'LinearRegression' | 'auto' | undefined; // Model based
-  max_features?: number | undefined; // SelectFromModel
-  step?: number | undefined; // RFE
-  drop_columns?: boolean | undefined;
-}
+import { useFeatureSelectionData } from './featureSelection/useFeatureSelectionData';
+import { SelectionControls, SelectionStatus } from './featureSelection/SelectionControls';
+import { SelectionParameters } from './featureSelection/SelectionParameters';
+import { FeatureSelectionFeedback } from './featureSelection/FeatureSelectionFeedback';
+import type { FeatureSelectionConfig } from './featureSelection/types';
 
 const FeatureSelectionSettings: React.FC<{ config: FeatureSelectionConfig; onChange: (c: FeatureSelectionConfig) => void; nodeId?: string }> = ({
   config,
@@ -50,65 +15,7 @@ const FeatureSelectionSettings: React.FC<{ config: FeatureSelectionConfig; onCha
   nodeId,
 }) => {
   const id = React.useId();
-  const upstreamData = useUpstreamData(nodeId || '');
-
-  // Recursive search for datasetId
-  const nodes = useGraphStore((state) => state.nodes);
-  const edges = useGraphStore((state) => state.edges);
-  const executionResult = useGraphStore((state) => state.executionResult);
-
-  const findUpstreamDatasetId = (currentNodeId: string): string | undefined => {
-    const visited = new Set<string>();
-    const queue = [currentNodeId];
-
-    while (queue.length > 0) {
-      const id = queue.shift();
-      if (!id) continue;
-      if (visited.has(id)) continue;
-      visited.add(id);
-
-      const node = nodes.find(n => n.id === id);
-      if (!node) continue;
-
-      // If this is NOT the current node, check if it has datasetId
-      if (id !== currentNodeId && node.data?.datasetId) {
-        return node.data.datasetId as string;
-      }
-
-      const incomers = getIncomers(node, nodes, edges);
-      for (const incomer of incomers) {
-        queue.push(incomer.id);
-      }
-    }
-    return undefined;
-  };
-
-  const upstreamDatasetId = findUpstreamDatasetId(nodeId || '');
-  const upstreamTargetColumn = upstreamData.find((d: Record<string, unknown>) => d.target_column)?.target_column as string | undefined;
-
-  // Auto-detect target and dataset
-  useEffect(() => {
-    const updates: Partial<FeatureSelectionConfig> = {};
-    // Propagate datasetId, and clear it if the upstream dataset connection is removed
-    // (otherwise a stale datasetId lingers on this node's data forever, making
-    // downstream nodes think a dataset is still connected when it isn't).
-    if (upstreamDatasetId && config.datasetId !== upstreamDatasetId) {
-      updates.datasetId = upstreamDatasetId;
-    } else if (!upstreamDatasetId && config.datasetId) {
-      updates.datasetId = undefined;
-    }
-    if (upstreamTargetColumn && config.target_column !== upstreamTargetColumn) {
-      updates.target_column = upstreamTargetColumn;
-    }
-    if (Object.keys(updates).length > 0) {
-      onChange({ ...config, ...updates });
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [upstreamDatasetId, upstreamTargetColumn, config.datasetId, config.target_column, onChange]);
-
-  const { data: schema, isLoading } = useDatasetSchema(upstreamDatasetId || config.datasetId);
-  const droppedUpstream = useUpstreamDroppedColumns(nodeId);
-  const columns = schema ? Object.values(schema.columns).map(c => c.name).filter(n => !droppedUpstream.has(n)) : [];
+  const { upstreamDatasetId, upstreamTargetColumn, columns, isLoading, result } = useFeatureSelectionData({ config, onChange, nodeId });
 
   const [showInvalidTarget, setShowInvalidTarget] = useState(false);
   useValidationReveal((field) => {
@@ -117,461 +24,29 @@ const FeatureSelectionSettings: React.FC<{ config: FeatureSelectionConfig; onCha
   // Responsive layout: switch to a 2-column layout once the panel is wider than 450px.
   const [containerRef, isWide] = useIsWideContainer();
 
-  // Helper to determine available score functions based on problem type
-  const getScoreFunctions = () => {
-    const type = config.problem_type || 'auto';
-    if (type === 'classification') {
-      return [
-        { value: 'f_classif', label: 'ANOVA F-value' },
-        { value: 'mutual_info_classif', label: 'Mutual Information' },
-        { value: 'chi2', label: 'Chi-squared' },
-      ];
-    } else if (type === 'regression') {
-      return [
-        { value: 'f_regression', label: 'F-value' },
-        { value: 'mutual_info_regression', label: 'Mutual Information' },
-        { value: 'r_regression', label: 'Pearson Correlation' },
-      ];
-    }
-    return [
-      { value: 'f_classif', label: 'ANOVA F-value (Classif)' },
-      { value: 'f_regression', label: 'F-value (Reg)' },
-      { value: 'mutual_info_classif', label: 'Mutual Info (Classif)' },
-      { value: 'mutual_info_regression', label: 'Mutual Info (Reg)' },
-    ];
-  };
-
-  const isUnivariate = [
-    'select_k_best', 'select_percentile', 'select_fpr', 'select_fdr', 'select_fwe', 'generic_univariate_select'
-  ].includes(config.method);
-
-  const isModelBased = ['select_from_model', 'rfe'].includes(config.method);
-
-  const renderFeedback = () => {
-    const result = executionResult?.node_results[nodeId || ''];
-    if (!result) return null;
-
-    const metrics = getNodeMetricDetails(result.metrics);
-    const hasWrappedMetrics = hasWrappedNodeMetrics(result.metrics);
-    const dropped = metrics?.dropped_columns as string[] | undefined;
-    const scores = metrics?.feature_scores as Record<string, number> | undefined;
-    const pvalues = metrics?.p_values as Record<string, number> | undefined;
-    const importances = metrics?.feature_importances as Record<string, number> | undefined;
-    const variances = metrics?.variances as Record<string, number> | undefined;
-    const ranking = metrics?.ranking as Record<string, number> | undefined;
-    const showUnavailableWrappedMetrics = result.status === 'success' && hasWrappedMetrics && !metrics;
-    const showNoDrops = result.status === 'success' && metrics && (!dropped || dropped.length === 0);
-    const hasTopFeatures = Boolean(scores || importances);
-
-    if (!result.error && !showUnavailableWrappedMetrics && !showNoDrops && !dropped?.length && !hasTopFeatures) {
-      return null;
-    }
-
-    return (
-      <div className="mt-4 p-3 bg-muted/50 rounded border text-xs space-y-3">
-        <div className="font-medium text-muted-foreground">Execution Feedback</div>
-
-        {result.error && (
-          <div className="p-2 bg-destructive/10 text-destructive rounded border border-destructive/20">
-            {result.error}
-          </div>
-        )}
-
-        {/* Dropped Columns Section */}
-        {dropped && dropped.length > 0 ? (
-          <div>
-            <div className="font-medium text-muted-foreground mb-1 flex justify-between items-center">
-               <span>Dropped Columns ({dropped.length})</span>
-            </div>
-            <div className="max-h-40 overflow-y-auto bg-background p-2 rounded border space-y-1">
-              {dropped.map(col => {
-                const score = scores?.[col];
-                const pval = pvalues?.[col];
-                const imp = importances?.[col];
-                const variance = variances?.[col];
-                const rank = ranking?.[col];
-
-                return (
-                  <div key={col} className="flex justify-between items-center border-b border-border/50 last:border-0 pb-1 last:pb-0">
-                    <span className="truncate max-w-[120px] font-medium text-destructive" title={col}>{col}</span>
-                    <div className="flex flex-col items-end text-[10px] text-muted-foreground">
-                      {score !== undefined && <span>Score: {score.toFixed(4)}</span>}
-                      {pval !== undefined && <span>p-val: {pval.toExponential(2)}</span>}
-                      {imp !== undefined && <span>Imp: {imp.toFixed(4)}</span>}
-                      {variance !== undefined && <span>Var: {variance.toFixed(4)}</span>}
-                      {rank !== undefined && <span>Rank: {rank}</span>}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        ) : showUnavailableWrappedMetrics ? (
-          <div className="p-2 bg-yellow-50 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-400 rounded border border-yellow-200 dark:border-yellow-800">
-            Feature-selection drop details were unavailable because this wrapped metrics payload could not be resolved to a single step.
-          </div>
-        ) : (
-          showNoDrops && (
-            <div className="text-green-600 text-[10px] space-y-1">
-              <div>No columns were dropped.</div>
-              {config.method === 'variance_threshold' && (
-                <div className="text-muted-foreground italic">
-                  All features have variance &gt; {config.threshold ?? 0}. Try increasing the threshold.
-                </div>
-              )}
-              {config.method === 'select_k_best' && (
-                <div className="text-muted-foreground italic">
-                  K ({config.k ?? 10}) is likely larger than or equal to the number of features. Try reducing K.
-                </div>
-              )}
-              {config.method === 'correlation_threshold' && (
-                <div className="text-muted-foreground italic">
-                  No feature pairs found with correlation &gt; {config.threshold ?? 0.95}.
-                </div>
-              )}
-            </div>
-          )
-        )}
-
-        {/* Top Features Section */}
-        {(scores || importances) && (
-           <div>
-             <div className="font-medium text-muted-foreground mb-1">Top 5 Features</div>
-             <div className="max-h-32 overflow-y-auto bg-background p-2 rounded border space-y-1">
-                {Object.entries(scores || importances || {})
-                   .sort(([, a], [, b]) => (b as number) - (a as number))
-                   .slice(0, 5)
-                   .map(([col, val]) => (
-                     <div key={col} className="flex justify-between items-center">
-                        <span className="truncate max-w-[120px]" title={col}>{col}</span>
-                        <span className="font-mono text-[10px]">{(val as number).toFixed(4)}</span>
-                     </div>
-                   ))
-                }
-             </div>
-           </div>
-        )}
-      </div>
-    );
-  };
-
   return (
     <div ref={containerRef} className={`flex flex-col h-full w-full bg-background ${isWide ? 'overflow-hidden' : 'overflow-y-auto'}`}>
-      {/* Top Status Bar */}
-      <div className="shrink-0 p-4 pb-0 space-y-2">
-        {!upstreamDatasetId && (
-          <div className="p-2 bg-yellow-50 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-400 text-xs rounded border border-yellow-200 dark:border-yellow-800">
-            Connect a dataset node to configure.
-          </div>
-        )}
-        {isLoading && !!upstreamDatasetId && (
-          <div className="text-xs text-muted-foreground animate-pulse">Loading schema...</div>
-        )}
-      </div>
+      <SelectionStatus upstreamDatasetId={upstreamDatasetId} isLoading={isLoading} />
 
       {/* Main Content */}
       <div className={`flex-1 min-h-0 p-4 gap-4 ${isWide ? 'grid grid-cols-2' : 'flex flex-col'}`}>
 
         {/* Left Column: Method & Target */}
         <div className={`space-y-4 ${isWide ? 'overflow-y-auto pr-2' : 'shrink-0'}`}>
-          <div className="space-y-2">
-            <span className="text-sm font-medium">Selection Method</span>
-            <select
-              aria-label="Selection Method"
-              className="w-full p-2 border rounded bg-background text-sm"
-              value={config.method}
-              onChange={(e) => onChange({ ...config, method: e.target.value as FeatureSelectionConfig['method'] })}
-            >
-              <optgroup label="Simple">
-                <option value="variance_threshold">Variance Threshold</option>
-                <option value="correlation_threshold">Correlation Threshold</option>
-              </optgroup>
-              <optgroup label="Univariate">
-                <option value="select_k_best">Select K Best</option>
-                <option value="select_percentile">Select Percentile</option>
-                <option value="select_fpr">False Positive Rate (FPR)</option>
-                <option value="select_fdr">False Discovery Rate (FDR)</option>
-                <option value="select_fwe">Family-wise Error (FWE)</option>
-                <option value="generic_univariate_select">Generic Univariate</option>
-              </optgroup>
-              <optgroup label="Model Based">
-                <option value="select_from_model">Select From Model</option>
-                <option value="rfe">Recursive Feature Elimination (RFE)</option>
-              </optgroup>
-            </select>
-          </div>
-
-          {((config.method !== 'variance_threshold' && config.method !== 'correlation_threshold') || showInvalidTarget) && (
-            <div className="space-y-2">
-              <span className="text-sm font-medium">Target Column</span>
-              {upstreamTargetColumn ? (
-                <div className="p-2 bg-muted rounded text-sm text-muted-foreground border">
-                  {upstreamTargetColumn} <span className="text-xs italic">(Auto-detected)</span>
-                </div>
-              ) : (
-                <ValidationField field="target_column">
-                  <select
-                    aria-label="Target Column"
-                    className="w-full p-2 border rounded bg-background text-sm"
-                    value={config.target_column ?? ''}
-                    onChange={(e) => onChange({ ...config, target_column: e.target.value })}
-                  >
-                    <option value="">Select Target...</option>
-                    {columns.map(col => (
-                      <option key={col} value={col}>{col}</option>
-                    ))}
-                  </select>
-                </ValidationField>
-              )}
-              <p className="text-xs text-muted-foreground">Required for supervised selection methods.</p>
-            </div>
-          )}
-
-          {(isUnivariate || isModelBased) && (
-             <div className="space-y-2">
-               <span className="text-sm font-medium">Problem Type</span>
-               <select
-                 aria-label="Problem Type"
-                 className="w-full p-2 border rounded bg-background text-sm"
-                 value={config.problem_type ?? 'auto'}
-                 onChange={(e) => onChange({ ...config, problem_type: e.target.value as FeatureSelectionConfig['problem_type'] })}
-               >
-                 <option value="auto">Auto-detect</option>
-                 <option value="classification">Classification</option>
-                 <option value="regression">Regression</option>
-               </select>
-             </div>
-          )}
+          <SelectionControls config={config} onChange={onChange} columns={columns} upstreamTargetColumn={upstreamTargetColumn} showInvalidTarget={showInvalidTarget} />
 
           {/* Feedback Section - Show here if wide (Left Column) */}
-          {isWide && renderFeedback()}
+          {isWide && <FeatureSelectionFeedback config={config} result={result} />}
         </div>
 
         {/* Right Column: Parameters */}
         <div className={`space-y-4 ${isWide ? 'overflow-y-auto pl-2 border-l' : 'shrink-0 border-t pt-4'}`}>
           <h4 className="text-xs font-semibold uppercase text-muted-foreground mb-2">Parameters</h4>
 
-          {/* Variance Threshold */}
-          {config.method === 'variance_threshold' && (
-            <div className="space-y-2">
-              <span className="text-sm font-medium">Threshold</span>
-              <input
-                aria-label="Threshold"
-                type="number"
-                step="0.01"
-                className="w-full p-2 border rounded bg-background text-sm"
-                value={config.threshold ?? 0}
-                onChange={(e) => onChange({ ...config, threshold: Number.parseFloat(e.target.value) })}
-              />
-              <p className="text-xs text-muted-foreground">Features with variance lower than this will be removed.</p>
-            </div>
-          )}
-
-          {/* Correlation Threshold */}
-          {config.method === 'correlation_threshold' && (
-            <>
-              <div className="space-y-2">
-                <span className="text-sm font-medium">Threshold</span>
-                <input
-                  aria-label="Threshold"
-                  type="number"
-                  step="0.01"
-                  max="1"
-                  min="0"
-                  className="w-full p-2 border rounded bg-background text-sm"
-                  value={config.threshold ?? 0.95}
-                  onChange={(e) => onChange({ ...config, threshold: Number.parseFloat(e.target.value) })}
-                />
-              </div>
-              <div className="space-y-2">
-                <span className="text-sm font-medium">Method</span>
-                <select
-                  aria-label="Method"
-                  className="w-full p-2 border rounded bg-background text-sm"
-                  value={config.correlation_method ?? 'pearson'}
-                  onChange={(e) => onChange({ ...config, correlation_method: e.target.value as FeatureSelectionConfig['correlation_method'] })}
-                >
-                  <option value="pearson">Pearson</option>
-                  <option value="spearman">Spearman</option>
-                  <option value="kendall">Kendall</option>
-                </select>
-              </div>
-            </>
-          )}
-
-          {/* Univariate Common: Score Function */}
-          {isUnivariate && (
-            <div className="space-y-2">
-              <span className="text-sm font-medium">Scoring Function</span>
-              <select
-                aria-label="Scoring Function"
-                className="w-full p-2 border rounded bg-background text-sm"
-                value={config.score_func ?? ''}
-                onChange={(e) => onChange({ ...config, score_func: e.target.value })}
-              >
-                <option value="">Auto (Default)</option>
-                {getScoreFunctions().map(f => (
-                  <option key={f.value} value={f.value}>{f.label}</option>
-                ))}
-              </select>
-            </div>
-          )}
-
-          {/* K Best / RFE */}
-          {(config.method === 'select_k_best' || config.method === 'rfe') && (
-            <div className="space-y-2">
-              <span className="text-sm font-medium">K (Number of Features)</span>
-              <input
-                aria-label="K (Number of Features)"
-                type="number"
-                className="w-full p-2 border rounded bg-background text-sm"
-                value={config.k ?? 10}
-                onChange={(e) => onChange({ ...config, k: parseIntSafe(e.target.value, config.k) })}
-              />
-            </div>
-          )}
-
-          {/* Percentile */}
-          {config.method === 'select_percentile' && (
-            <div className="space-y-2">
-              <span className="text-sm font-medium">Percentile</span>
-              <input
-                aria-label="Percentile"
-                type="number"
-                className="w-full p-2 border rounded bg-background text-sm"
-                value={config.percentile ?? 10}
-                onChange={(e) => onChange({ ...config, percentile: parseIntSafe(e.target.value, config.percentile) })}
-              />
-            </div>
-          )}
-
-          {/* Alpha (FPR, FDR, FWE) */}
-          {['select_fpr', 'select_fdr', 'select_fwe'].includes(config.method) && (
-            <div className="space-y-2">
-              <span className="text-sm font-medium">Alpha (Significance)</span>
-              <input
-                aria-label="Alpha (Significance)"
-                type="number"
-                step="0.001"
-                className="w-full p-2 border rounded bg-background text-sm"
-                value={config.alpha ?? 0.05}
-                onChange={(e) => onChange({ ...config, alpha: Number.parseFloat(e.target.value) })}
-              />
-            </div>
-          )}
-
-          {/* Generic Univariate */}
-          {config.method === 'generic_univariate_select' && (
-            <>
-              <div className="space-y-2">
-                <span className="text-sm font-medium">Mode</span>
-                <select
-                  aria-label="Mode"
-                  className="w-full p-2 border rounded bg-background text-sm"
-                  value={config.mode ?? 'k_best'}
-                  onChange={(e) => onChange({ ...config, mode: e.target.value as FeatureSelectionConfig['mode'] })}
-                >
-                  <option value="k_best">K Best</option>
-                  <option value="percentile">Percentile</option>
-                  <option value="fpr">FPR</option>
-                  <option value="fdr">FDR</option>
-                  <option value="fwe">FWE</option>
-                </select>
-              </div>
-              <div className="space-y-2">
-                <span className="text-sm font-medium">Parameter</span>
-                <input
-                  aria-label="Parameter"
-                  type="number"
-                  step="0.001"
-                  className="w-full p-2 border rounded bg-background text-sm"
-                  value={config.param ?? 1e-5}
-                  onChange={(e) => onChange({ ...config, param: Number.parseFloat(e.target.value) })}
-                />
-                <p className="text-xs text-muted-foreground">Value for the selected mode (e.g., k, percentile, or alpha).</p>
-              </div>
-            </>
-          )}
-
-          {/* Model Based Common */}
-          {isModelBased && (
-            <div className="space-y-2">
-              <span className="text-sm font-medium">Estimator</span>
-              <select
-                aria-label="Estimator"
-                className="w-full p-2 border rounded bg-background text-sm"
-                value={config.estimator ?? 'auto'}
-                onChange={(e) => onChange({ ...config, estimator: e.target.value as FeatureSelectionConfig['estimator'] })}
-              >
-                <option value="auto">Auto</option>
-                <option value="RandomForest">Random Forest</option>
-                <option value="LogisticRegression">Logistic Regression</option>
-                <option value="LinearRegression">Linear Regression</option>
-              </select>
-            </div>
-          )}
-
-          {/* Select From Model Specific */}
-          {config.method === 'select_from_model' && (
-            <div className="space-y-2">
-              <span className="text-sm font-medium">Threshold</span>
-              <input
-                aria-label="Threshold"
-                type="text"
-                className="w-full p-2 border rounded bg-background text-sm"
-                placeholder="e.g., median, mean, 1.25*mean"
-                value={config.threshold ?? 'median'}
-                onChange={(e) => onChange({ ...config, threshold: e.target.value })}
-              />
-              <p className="text-xs text-muted-foreground">String (e.g. &quot;median&quot;) or float.</p>
-                <span className="text-sm font-medium">Max Features</span>
-                <input
-                  aria-label="Max Features"
-                  type="number"
-                  className="w-full p-2 border rounded bg-background text-sm"
-                  placeholder="Optional"
-                  value={config.max_features ?? ''}
-                  onChange={(e) => onChange({ ...config, max_features: parseIntSafe(e.target.value, config.max_features) })}
-                />
-                <p className="text-xs text-muted-foreground">Optional cap on the number of features to select. Leave empty for no cap.</p>
-            </div>
-          )}
-
-          {/* RFE Specific */}
-          {config.method === 'rfe' && (
-            <div className="space-y-2">
-              <span className="text-sm font-medium">Step</span>
-              <input
-                aria-label="Step"
-                type="number"
-                min="1"
-                className="w-full p-2 border rounded bg-background text-sm"
-                value={config.step ?? 1}
-                onChange={(e) => onChange({ ...config, step: parseIntSafe(e.target.value, config.step) })}
-              />
-              <p className="text-xs text-muted-foreground">Features to remove at each iteration.</p>
-            </div>
-          )}
-
-          {/* Drop Columns Checkbox */}
-          <div className="flex items-center space-x-2 pt-2 border-t">
-            <input
-              type="checkbox"
-              id={`${id}-drop-columns`}
-              className="rounded border-gray-300"
-              checked={config.drop_columns !== false}
-              onChange={(e) => onChange({ ...config, drop_columns: e.target.checked })}
-            />
-            <label htmlFor={`${id}-drop-columns`} className="text-sm font-medium">
-              Drop Columns
-            </label>
-          </div>
-          <p className="text-xs text-muted-foreground">
-            If unchecked, columns will be identified but not removed from the dataset.
-          </p>
+          <SelectionParameters config={config} onChange={onChange} id={id} />
 
           {/* Feedback Section - Show here if NOT wide (Mobile/Narrow) */}
-          {!isWide && renderFeedback()}
+          {!isWide && <FeatureSelectionFeedback config={config} result={result} />}
         </div>
       </div>
     </div>
@@ -589,10 +64,9 @@ export const FeatureSelectionNode: NodeDefinition<FeatureSelectionConfig> = {
   settings: FeatureSelectionSettings,
   bodyPreview: (config) => {
     const method = config.method ?? 'variance_threshold';
-    if (method === 'select_k_best' && config.k != null) return `${method} · k=${config.k}`;
+    if ((method === 'select_k_best' || method === 'rfe') && config.k != null) return `${method} · k=${config.k}`;
     if (method === 'select_percentile' && config.percentile != null) return `${method} · ${config.percentile}%`;
     if (method === 'variance_threshold' && config.threshold != null) return `${method} · σ>${config.threshold}`;
-    if (method === 'rfe' && config.k != null) return `${method} · k=${config.k}`;
     return method;
   },
   validate: (config) => {

@@ -60,8 +60,10 @@ jobs:
         # Enforce core/api, constants, contexts, factories, perf, realtime,
         # registry, theme and types, plus the cleaned pipeline converter,
         # Toolbar, JobDetailsView, CustomNodeWrapper, InferencePage, training/
-        # encoding settings, branch colors, ResultsPanel and CustomEdge with
-        # their helper folders. Expanding scope requires a clean report.
+        # encoding/ensemble settings, branch colors, ResultsPanel, CustomEdge,
+        # EDA variables/sidebar and EvaluationView with their helper folders.
+        # FeatureSelection helpers are gated; its cohesive bodyPreview remains
+        # at CCN 9 in the report. Expanding scope requires a clean report.
         run: bash ../../.github/scripts/run_check.sh "ESLint complexity (CCN 8)" npm run complexity:check
         working-directory: frontend/ml-canvas
 

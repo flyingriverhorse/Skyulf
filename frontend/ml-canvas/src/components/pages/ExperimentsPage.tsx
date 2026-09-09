@@ -79,6 +79,8 @@ export const ExperimentsPage: React.FC = () => {
     setSelectedTuningMetric,
     tuningPreview,
     setTuningPreview,
+    hasSavedThresholds,
+    setHasSavedThresholds,
     useTunedThresholds,
     setUseTunedThresholds,
     tuningError,
@@ -245,6 +247,7 @@ export const ExperimentsPage: React.FC = () => {
     setTuningError(null);
     try {
       await thresholdTuningApi.save(evalJobId, tuningPreview);
+      setHasSavedThresholds(true);
       setUseTunedThresholds(true);
     } catch (err: unknown) {
       console.error('Failed to save thresholds', err);
@@ -273,6 +276,7 @@ export const ExperimentsPage: React.FC = () => {
     setTuningError(null);
     try {
       await thresholdTuningApi.clear(evalJobId);
+      setHasSavedThresholds(false);
       setTuningPreview(null);
       setUseTunedThresholds(false);
     } catch (err: unknown) {
@@ -679,6 +683,7 @@ export const ExperimentsPage: React.FC = () => {
                   tuningPreview={tuningPreview}
                   tuningError={tuningError}
                   useTunedThresholds={useTunedThresholds}
+                  hasSavedThresholds={hasSavedThresholds}
                   onPreviewThresholds={handlePreviewThresholds}
                   onSaveThresholds={handleSaveThresholds}
                   onToggleThresholds={handleToggleThresholds}
