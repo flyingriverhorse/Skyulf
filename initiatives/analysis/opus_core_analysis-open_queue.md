@@ -15,7 +15,7 @@ file deliberately carries no history.
 per-area report files `00`–`18`).
 **Baseline:** commit `93d7719e` (master), audit run 2026-08-31 → 09-01 by 15
 parallel read-only agents (Claude Opus 5). 116 findings: 5 🔴 / 45 🟠 / 44 🟡 /
-22 ⚪, plus OC-160–215 filed by later reviews. OC-100 was retracted as a false
+22 ⚪, plus OC-160–217 filed by later reviews. OC-100 was retracted as a false
 positive and is not counted; the corrections pass stays in the archive.
 
 **Status key:** ⬜ open · 🟨 in progress · ✅ done · ⏭️ parked
@@ -72,7 +72,6 @@ closed that on 2026-09-07.
 | OC-91 | 🟡 | Three public `core/` seams (263 lines) have zero call sites; one duplicates a differently-shaped backend class name | small | ⬜ open |
 | OC-101 | 🟡 | `calibrated_classifier`'s `random_state` no-op for two independent reasons (estimator rejects it AND factories hardcode the seed) | small | ⬜ open |
 | OC-111 | 🟡 | A profiling recommendation branch is unreachable | small | ⬜ open |
-| OC-114 | 🟡 | All-null tracked column yields 30 `NaN` autocorrelation lags as real analysis (≥1000-row datasets) (`temporal.py:167-191`) | small | ⬜ open |
 | OC-102 | ⚪ | Five tunable models return an empty search space from the live `/defaults` endpoint (`hyperparameters/_registry.py`) | small | ⬜ open |
 | OC-121 | ⚪ | polars `Enum` columns invisible to text auto-detection, diverging from pandas `Categorical` (`_helpers.py:148-157`) | small | ⬜ open |
 | OC-90 | ⚪ | Unknown split config keys silently dropped instead of rejected (`preprocessing/split.py`) | small | ⬜ open |
@@ -121,13 +120,8 @@ closed that on 2026-09-07.
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
-| OC-188 | 🟠 | Rule discovery decodes sklearn class positions against Polars' shared category dictionary, publishing labels absent from the target while reporting perfect accuracy (`profiling/_analyzer/rules.py:169-170,196-198,295-298`) | small | ⬜ open |
-| OC-198 | 🟠 | Profiling a string target overwrites an existing `<target>_encoded` feature, then duplicate selection prevents correlation and causal analysis (`profiling/analyzer.py:341-348`) | small | ⬜ open |
-| OC-189 | 🟡 | Classification rule text reports `Samples: 1` for leaves containing multiple rows: it sums sklearn's normalized class proportions instead of using the leaf sample count (`profiling/_analyzer/rules.py:299-301`) | small | ⬜ open |
-| OC-190 | 🟡 | A categorical column named `count` crashes profiling and categorical drift because `value_counts()` generates the same column name (`profiling/analyzer.py:286-290`, `profiling/drift.py:380-381`) | small | ⬜ open |
 | OC-191 | 🟡 | All-null and Polars Enum columns are classified as text and sent to string-only aggregates, aborting the whole profile (`profiling/analyzer.py`, `_analyzer/column.py`) | small | ⬜ open |
 | OC-192 | 🟡 | Decomposition's categorical null bucket displays as `Unknown`, but drilling into it filters for the literal string and silently loses the bucket's rows (`profiling/_analyzer/decomposition.py:71-76`) | small | ⬜ open |
-| OC-193 | 🟡 | A single missing timestamp removes time-series analysis at the 1,000-row resampling boundary: dynamic grouping receives null date keys and the exception is swallowed (`profiling/_analyzer/temporal.py:232,243`) | small | ⬜ open |
 | OC-199 | 🟡 | Explicit latitude/longitude selections bypass `exclude_cols`, returning coordinates for columns excluded from the profile (`profiling/_analyzer/geo.py:58-59`) | small | ⬜ open |
 | OC-47 | 🟡 | Common-column dtype drift can silently disappear (`profiling/drift.py:136-153`) | small | ⬜ open |
 | OC-48 | 🟡 | Expectations pass vacuously on empty frames (`profiling/expect.py:92-209`) | small | ⬜ open |
@@ -156,7 +150,6 @@ closed that on 2026-09-07.
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
 | OC-187 | 🟡 | LightGBM's advertised `subsample` control and default search dimension have no effect: both calculators retain native `subsample_freq=0`, disabling row bagging (`modeling/hyperparameters/_tree.py:576`, `_registry.py:298,309`; `classification.py:754`, `regression.py:547`) | small | ⬜ open |
-| OC-206 | ⚪ | Ensemble configuration resolution shallow-copies nested base-model parameters, so fitting mutates the caller's configuration (`modeling/ensemble.py:473,484`) | small | ⬜ open |
 
 ### Remaining — frontend
 
@@ -260,16 +253,6 @@ Each finding's queue row — severity, effort, status — now lives in the
 **Live — fix queue** above, under the domain table it belongs to. What follows
 here is the reproduction detail those rows deliberately do not repeat.
 
-**OC-206 — fitting an ensemble mutates caller configuration.** Executed
-`VotingClassifierCalculator().fit` with one decision-tree base learner,
-`base_estimator_params={'decision_tree':{'max_depth':2}}`, and
-`decision_tree__min_samples_leaf=3`. After fitting, the caller's original
-`base_estimator_params['decision_tree']` has gained `min_samples_leaf:3`.
-Only the outer mapping is copied before nested keys are absorbed. Reusing the
-configuration after removing a temporary override therefore retains it.
-**Fix/verification target:** copy the nested parameter mappings before
-normalization and pin non-mutation of caller-owned configuration.
-
 **OC-195 — wrapped pandas clustering loses numeric filtering.** Executed
 `KMeansCalculator().fit(X,None,{'n_clusters':2})` for pandas
 `x=[0.,.1,.2,10.,10.1,10.2]`, `text=['name']*6`: it fits one feature.
@@ -298,15 +281,6 @@ target:** choose independent collision-safe names for cluster, reference and
 count columns. OC-161 concerns centroid features; this is the separate
 reference-label aggregation path.
 
-**OC-198 — profiling target encoding overwrites a real feature.** Executed
-`EDAAnalyzer` on `x=[1,2,3]`, `target=['a','a','b']`,
-`target_encoded=[100,200,300]`, then `analyze(target_col='target')`.
-The analyzer's `target_encoded` values become **[0,0,1]**. Correlation and
-causal discovery log duplicate-projection errors because the helper's name
-is also appended to the feature list. **Fix/verification target:** avoid
-overwriting user columns and duplicating feature names when materializing
-an encoded target; preserve the original values across repeated analysis.
-
 **OC-199 — explicitly selected coordinates survive exclusion.** Executed
 `EDAAnalyzer(pl.DataFrame({'lat':[1.,2.,3.], 'lon':[10.,20.,30.],
 'x':[1.,2.,3.]})).analyze(exclude_cols=['lat','lon'],lat_col='lat',lon_col='lon')`.
@@ -314,27 +288,6 @@ The result still contains all three coordinate pairs in
 `geospatial.sample_points`, plus their bounds and centroid, although the
 per-column profile excludes them. **Fix/verification target:** apply the
 exclusion policy consistently before explicit geospatial selection.
-
-**OC-188/189 — wrong rule labels and support counts.** Keep
-`held = pl.Series(['unrelated_1','unrelated_2']).cast(pl.Categorical)` alive,
-then discover classification rules for `x=[0,0,0,1,1,1]` and
-`target=['no','no','no','yes','yes','yes']`. Executed
-`EDAAnalyzer(df)._discover_rules(['x'], 'target', 'classification')` returns
-accuracy **1.0** but predicts **unrelated_1 / unrelated_2** in its nodes and
-rule text. Both leaf nodes have `samples=3`, while the text says **Samples: 1**.
-The first defect confuses encoded class values with sklearn class-array
-positions; the second independently treats normalized proportions as counts.
-**Fix/verification targets:** decode through fitted `clf.classes_` and the
-matching category mapping; use the actual leaf count for textual support.
-Cover non-contiguous category codes and leaves containing multiple samples.
-
-**OC-190 — reserved count column.** Executed
-`EDAAnalyzer(pl.DataFrame({'count': ['a']*99 + ['b']})).analyze()` raises
-`DuplicateError: using value_counts on a column/series named 'count' would
-lead to duplicate column names`. The categorical drift path reproduces the
-same failure. **Fix/verification target:** choose collision-safe internal
-count names and cover profile and drift entry points with user columns named
-`count`. This is distinct from OC-161's clustering feature overwrite.
 
 **OC-191 — unsupported string aggregation on valid dtypes.** Executed
 `EDAAnalyzer(pl.DataFrame({'x': [None,None]})).analyze()` raises
@@ -351,14 +304,6 @@ auto-selection; this finding concerns profiling aborting completely.
 **0**. Only numeric columns recognize the null sentinel.
 **Fix/verification target:** preserve null identity across split output and
 filter input for every dtype, including genuine literal `Unknown` values.
-
-**OC-193 — nullable dates break large-frame time analysis.** Executed the
-same daily-date/value construction with the final date missing: **999 rows**
-yield **998** trend points, while **1,000 rows** yield `timeseries=None` and
-log `null values in dynamic group_by not supported`. The larger-frame branch
-resamples without removing null date keys. **Fix/verification target:** apply
-an explicit missing-timestamp policy before resampling and test both sides of
-the row-count boundary. OC-114 instead concerns all-null numeric ACF results.
 
 **OC-187 — LightGBM row-subsampling control is inert.** Executed both public
 `LGBMRegressorCalculator.fit` and `LGBMClassifierCalculator.fit` on 300-row,

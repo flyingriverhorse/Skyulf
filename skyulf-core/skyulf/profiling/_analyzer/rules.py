@@ -106,7 +106,7 @@ class RulesMixin(_AnalyzerState):
 
         Returns the feature matrix, the ordered feature names, and a mapping
         from categorical feature name to its ordered category labels
-        (physical code i == cat_categories[col][i]), so rule text can show
+        (ordinal code i == cat_categories[col][i]), so rule text can show
         human-readable category names instead of the raw ordinal code the
         tree actually split on (e.g. "color <= 2.00" is meaningless without
         this mapping).
@@ -122,12 +122,11 @@ class RulesMixin(_AnalyzerState):
 
         for col in cat_cols:
             s = df_sample[col].cast(pl.Utf8).fill_null("Missing")
-            # Ordinal encode (factorize) — keeps tree splits readable.
-            cat_series = s.cast(pl.Categorical)
-            codes = cat_series.to_physical().to_numpy()
+            # Keep both codes and displayed conditions local to this feature.
+            categories, codes = np.unique(s.to_numpy(), return_inverse=True)
             X_data[col] = codes
             feature_names.append(col)
-            cat_categories[col] = cat_series.cat.get_categories().to_list()
+            cat_categories[col] = categories.tolist()
 
         X_list = [X_data[col] for col in feature_names]
         X = np.column_stack(X_list)
@@ -154,9 +153,10 @@ class RulesMixin(_AnalyzerState):
 
         if y_series.n_unique() > 10:
             top_10 = (
-                y_series.value_counts()
+                y_series.alias("value")
+                .value_counts()
                 .sort("count", descending=True)
-                .head(10)[target_col]
+                .head(10)["value"]
                 .to_list()
             )
             temp_df = pl.DataFrame({"y": y_series})
@@ -164,8 +164,10 @@ class RulesMixin(_AnalyzerState):
                 pl.when(pl.col("y").is_in(top_10)).then(pl.col("y")).otherwise(pl.lit("Other"))
             ).to_series()
 
-        y = y_series.cast(pl.Categorical).to_physical().to_numpy()
-        class_names = y_series.cast(pl.Categorical).cat.get_categories().to_list()
+        # Use contiguous target-local codes so tree class positions cannot
+        # resolve against unrelated labels in Polars' shared category dictionary.
+        classes, y = np.unique(y_series.to_numpy(), return_inverse=True)
+        class_names = classes.tolist()
         clf = classifier_cls(max_depth=4, random_state=DEFAULT_RANDOM_STATE)
         return y, class_names, clf
 
@@ -297,7 +299,7 @@ class RulesMixin(_AnalyzerState):
         class_name = str(class_names[class_idx]) if class_idx < len(class_names) else "Unknown"
         total = np.sum(value)
         confidence = (value[class_idx] / total) * 100 if total > 0 else 0
-        return f"{class_name} (Confidence: {confidence:.1f}%, Samples: {int(total)})"
+        return f"{class_name} (Confidence: {confidence:.1f}%, Samples: {total_samples})"
 
     def _split_clauses(
         self,

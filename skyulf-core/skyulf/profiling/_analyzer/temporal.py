@@ -164,29 +164,51 @@ class TemporalMixin(_AnalyzerState):
 
         return SeasonalityStats(day_of_week=dow_stats, month_of_year=moy_stats)
 
+    @staticmethod
+    def _prepare_temporal_series(
+        trend_df: pl.DataFrame, target_metric: str, min_observations: int
+    ) -> np.ndarray | None:
+        """Mean-fill gaps only when enough finite, varying observations support a test."""
+        # .copy() avoids "assignment destination is read-only" — polars
+        # returns a zero-copy read-only view when the column has no nulls.
+        series = trend_df[target_metric].to_numpy().copy()
+        finite = np.isfinite(series)
+        if np.count_nonzero(finite) < min_observations:
+            return None
+        observed = series[finite]
+        if observed.min() == observed.max():
+            return None
+        # Finite values can still overflow their mean or variance. Omit
+        # undefined diagnostics instead of forwarding NaN/inf to ACF or ADF.
+        with np.errstate(over="ignore", invalid="ignore"):
+            mean = np.mean(observed)
+            if not np.isfinite(mean):
+                return None
+            series[~finite] = mean
+            variance = np.var(series)
+        if not np.isfinite(variance) or variance == 0:
+            return None
+        return series
+
     def _compute_acf(self, trend_df: pl.DataFrame, cols_to_track: list[str]) -> list[dict]:
-        """Compute autocorrelation (lags 1..30) on the resampled trend."""
+        """Compute finite autocorrelation lags when the trend has enough varying observations."""
         acf_stats: list[dict] = []
         if not cols_to_track:
             return acf_stats
 
-        target_metric = cols_to_track[0]
-        # .copy() avoids "assignment destination is read-only" — polars
-        # returns a zero-copy read-only view when the column has no nulls.
-        series = trend_df[target_metric].to_numpy().copy()
-
-        mask = np.isnan(series)
-        if mask.any():
-            series[mask] = np.nanmean(series)
-
-        if len(series) > 10:
-            n = len(series)
-            mean = np.mean(series)
-            var = np.var(series)
-            for lag in range(1, min(31, n // 2)):
-                y1 = series[lag:]
-                y2 = series[:-lag]
-                corr = 0 if var == 0 else np.sum((y1 - mean) * (y2 - mean)) / n / var
+        series = self._prepare_temporal_series(trend_df, cols_to_track[0], min_observations=11)
+        if series is None:
+            return acf_stats
+        n = len(series)
+        mean = np.mean(series)
+        var = np.var(series)
+        if not np.isfinite(var) or var == 0:
+            return acf_stats
+        for lag in range(1, min(31, n // 2)):
+            y1 = series[lag:]
+            y2 = series[:-lag]
+            corr = np.sum((y1 - mean) * (y2 - mean)) / n / var
+            if np.isfinite(corr):
                 acf_stats.append({"lag": lag, "corr": float(corr)})
         return acf_stats
 
@@ -198,19 +220,18 @@ class TemporalMixin(_AnalyzerState):
             return None
         try:
             target_metric = cols_to_track[0]
-            series = trend_df[target_metric].to_numpy().copy()
-            mask = np.isnan(series)
-            if mask.any():
-                series[mask] = np.nanmean(series)
-
-            if len(series) > 20:
-                result = stattools.adfuller(series)
-                return {
-                    "test_statistic": float(result[0]),
-                    "p_value": float(result[1]),
-                    "is_stationary": float(result[1]) < ADF_STATIONARITY_ALPHA,
-                    "metric": target_metric,
-                }
+            series = self._prepare_temporal_series(trend_df, target_metric, min_observations=21)
+            if series is None:
+                return None
+            result = stattools.adfuller(series)
+            if not np.isfinite(result[0]) or not np.isfinite(result[1]):
+                return None
+            return {
+                "test_statistic": float(result[0]),
+                "p_value": float(result[1]),
+                "is_stationary": float(result[1]) < ADF_STATIONARITY_ALPHA,
+                "metric": target_metric,
+            }
         except Exception as e:  # noqa: BLE001 - ADF test is optional; logged
             logger.warning(f"ADF test failed: {e}")
         return None
@@ -227,7 +248,7 @@ class TemporalMixin(_AnalyzerState):
             if not date_col:
                 return None
 
-            ts_df = self.lazy_df.sort(date_col)  # type: ignore[attr-defined]
+            ts_df = self.lazy_df.sort(date_col).filter(pl.col(date_col).is_not_null())
 
             min_date = cast(Any, self.df[date_col].min())  # type: ignore[attr-defined]
             max_date = cast(Any, self.df[date_col].max())  # type: ignore[attr-defined]

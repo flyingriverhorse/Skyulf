@@ -38,8 +38,8 @@ OC-186 has since been fixed and pinned by a test (see the Log), leaving
 OC-183–185 open. Historical baseline counts remain unchanged.
 
 **Remaining-source continuation (2026-09-06):** OC-187–206 add 20 executed
-findings (5 🟠 / 14 🟡 / 1 ⚪). As of 2026-09-09, ten are fixed — OC-194–197,
-OC-200–205 — and ten remain open. OC-200/201/202/203/205 closed in one pass with
+findings (5 🟠 / 14 🟡 / 1 ⚪). As of 2026-09-09, sixteen are fixed —
+OC-188–190, OC-193–198, OC-200–206 — and four remain open. OC-200/201/202/203/205 closed in one pass with
 OC-67 from an earlier batch (see the Log). Rows and reproduction evidence are
 grouped by domain — 8
 profiling, 9 modeling/tuning, 3 evaluation & explainability — with the open ones
@@ -176,6 +176,7 @@ uses, so a fixed finding stays where it was filed.
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
+| OC-114 | 🟡 | All-null tracked column yields 30 `NaN` autocorrelation lags as real analysis (≥1000-row datasets) (`temporal.py:167-191`) | small | ✅ fixed 2026-09-09 - undefined temporal diagnostics are omitted unless sufficient finite varying observations and finite results support them. |
 | OC-112 | ⚪ | Comment and code disagree in the categorical profiler — the comment promises a rendered missing-value marker, the code `continue`s and discards the null category (`profiling/_analyzer/categorical.py:22-30`). *Filed as "disagree about the applied threshold"; the real subject is the null-category marker* | 1 line | ✅ fixed 2026-09-06 — comment-only, no behaviour change; the reasoning for why dropping the null category is correct now lives in the code comment it rewrote. See the log entry |
 | OC-148 | 🟡 | PII detector flags ordinary 7+ digit numeric ID columns as "Email/Phone" (`profiling/_analyzer/text.py:107-128`) | small | ✅ fixed 2026-09-07 — phone detection now requires positive format evidence and repeated sample evidence; plain IDs, ZIP+4, and isolated phone-shaped IDs are excluded |
 | OC-122 | ð¡ | `TextCleaning` silently ignores unrecognised operation name (`cleaning/text.py:151-153`) | small | â fixed 2026-09-08 |
@@ -215,6 +216,18 @@ uses, so a fixed finding stays where it was filed.
 | OC-25 | 🟠 | RFE "K" chosen in UI ignored by backend (`feature_selection/_common.py:236-240`) | small | ✅ fixed 2026-09-05 — closes OC-143 too |
 | OC-28 | 🟠 | Box-Cox transform failures silently return untransformed data (`transformations/power.py:97-104`) | small | ✅ fixed 2026-09-06 — the silent path was the `valid_cols` filter, not the `except` (which has logged since the node was created); both engines now share `_fitted_columns_present`, which names the fitted columns the frame lacks, and fail-open is kept by decision. See the log entry |
 
+### Remaining — profiling (outside the OC-39–46 cluster)
+
+| ID | Sev | Item | Effort | Status |
+|---|---|---|---|---|
+| OC-193 | 🟡 | A single missing timestamp removes time-series analysis at the 1,000-row resampling boundary: dynamic grouping receives null date keys and the exception is swallowed (`profiling/_analyzer/temporal.py:232,243`) | small | ✅ fixed 2026-09-09 - null timestamps are excluded from temporal calculations without changing the existing resampling threshold. |
+| OC-217 | 🟠 | Repeated profiling on one analyzer returns previously excluded columns in sample data and frame statistics because only newly excluded columns trigger the narrowed frame (`profiling/analyzer.py:analyze`) | small | ✅ fixed 2026-09-09 - persistent column exclusions remain effective for sample rows and frame statistics across repeated calls. |
+| OC-216 | 🟡 | Rule feature conditions include unrelated labels from Polars shared categorical dictionaries even when those labels never occur in the feature (`profiling/_analyzer/rules.py:_build_feature_matrix`) | small | ✅ fixed 2026-09-09 - feature-local codes and label lists exclude unrelated categories from displayed rule conditions. |
+| OC-198 | 🟠 | Profiling a string target overwrites an existing `<target>_encoded` feature, then duplicate selection prevents correlation and causal analysis (`profiling/analyzer.py:341-348`) | small | ✅ fixed 2026-09-09 - encoded targets use an unoccupied column name and temporary analyzer state is restored after analysis. |
+| OC-190 | 🟡 | A categorical column named `count` crashes profiling and categorical drift because `value_counts()` generates the same column name (`profiling/analyzer.py:286-290`, `profiling/drift.py:380-381`) | small | ✅ fixed 2026-09-09 - profiling, categorical drift and rule target counts use distinct value/count names. |
+| OC-189 | 🟡 | Classification rule text reports `Samples: 1` for leaves containing multiple rows: it sums sklearn's normalized class proportions instead of using the leaf sample count (`profiling/_analyzer/rules.py:299-301`) | small | ✅ fixed 2026-09-09 - classification rule support uses the fitted tree row count while confidence retains class proportions. |
+| OC-188 | 🟠 | Rule discovery decodes sklearn class positions against Polars' shared category dictionary, publishing labels absent from the target while reporting perfect accuracy (`profiling/_analyzer/rules.py:169-170,196-198,295-298`) | small | ✅ fixed 2026-09-09 - target-local codes map every rule prediction to the actual observed class label. |
+
 ### Remaining — core / engines / pipeline
 
 | ID | Sev | Item | Effort | Status |
@@ -242,6 +255,7 @@ uses, so a fixed finding stays where it was filed.
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
+| OC-206 | ⚪ | Ensemble configuration resolution shallow-copies nested base-model parameters, so fitting mutates the caller's configuration (`modeling/ensemble.py:473,484`) | small | ✅ fixed 2026-09-09 - inner base-model parameter maps are copied before temporary overrides, preserving caller settings and later refits. |
 | OC-204 | 🟡 | `fit_predict` drops an embedded target during training but keeps it in held-out tuple features when explicit y is also supplied, causing prediction to fail (`modeling/base.py:317-324`) | small | ✅ fixed 2026-09-09 - held-out tuples use training target extraction, excluding embedded targets while preserving explicit-y precedence. |
 | OC-168 | 🟡 | Pipeline refitting retains decision thresholds from the previous model (`pipeline/_pipeline.py`) | small | ✅ fixed 2026-09-09 — fitting clears thresholds and requires fresh optimization for both unchanged and new class labels. |
 | OC-209 | 🟡 | Time-series tuning drops its time column only from training, corrupting explicit validation concatenation (`modeling/_tuning/engine.py`, `_tuning/splitters.py`) | half day | ✅ fixed 2026-09-09 — named and array validation payloads mirror training's removed time columns without reordering held-out rows. |
@@ -335,6 +349,132 @@ respective fix logs; OC-167 closed with canonical artifact framing on 2026-09-09
 ---
 
 ## Log
+
+### 2026-09-09 - profiling/ensemble batch: final verification
+
+The preceding nullable/time-series/tuple batch was committed as `9f44d6f3`
+with DCO sign-off and all applicable pre-commit hooks passing. This continuation
+closes seven existing findings (OC-114/188/189/190/193/198/206) and two defects
+reproduced during repair (OC-216/217), each recorded before its implementation.
+Three parallel implementers, root-owned fixes and independent peer review
+covered the final code. The batch adds **83 regression cases**.
+
+The final complete Core run passed **6,809 tests**, with **72 skipped**, **412
+warnings** and **3 snapshots passed**. Backend profiling, drift, EDA API/router
+and task checks passed **79 tests** (30 warnings). Repository-wide Ruff, the
+CI Ty scope, formatting for all ten changed Python files and `git diff --check`
+passed. Core tests used offline model-cache settings; both test runs used
+unique writable temporary directories.
+
+The live queue contains **57 open** and **4 parked** rows. All nine closed rows
+appear exactly once in the archive, with their live rows/reproductions removed
+and concise v0.8.18 release notes added. OC-71/72/73/185 remain parked. This
+continuation is verified in the working tree and is not included in `9f44d6f3`.
+
+### 2026-09-09 - OC-193/114 fixed: temporal missingness and finite diagnostics
+
+The original 999/1000-row probe with one missing date now retains temporal
+analysis on both sides of the resampling boundary (OC-193). Null timestamps
+are excluded from the local temporal view while the existing total-row-count
+threshold and trend aggregation remain unchanged. All-missing date columns
+produce an empty temporal result instead of aborting the profile.
+
+ACF requires at least 11 finite varying trend observations and ADF requires 21;
+only then are remaining gaps mean-filled (OC-114). All-missing, constant,
+insufficient or overflowed series omit diagnostics instead of publishing NaN
+lags. Finite ACF remains available when ADF itself returns an undefined result;
+both returned ADF statistic and p-value must be finite before publication.
+
+The initial **26 public cases gave 10 failures / 16 passing controls**. Two
+large-finite-value controls separately reproduced NaN ADF output, and primary
+review found a tiny linear series (`arange(1000) * 1e-140`) returning an infinite
+ADF statistic despite finite variance. That public regression also failed before
+return-value validation. The final **29 new cases** plus existing temporal tests
+passed **48 tests**. Six warnings originate from unrelated sklearn outlier checks
+on intentionally extreme inputs. Scoped Ruff, Ty and formatting passed.
+
+### 2026-09-09 - OC-188/189/216 fixed: rule labels, conditions and support
+
+Keeping unrelated Polars categories alive reproduced target labels absent from
+the data at reported accuracy 1.0 (OC-188), and absent feature categories in
+IF conditions (OC-216). Targets and categorical features now use their own
+contiguous codes and matching observed-label lists. Existing Missing and top-ten
+plus Other grouping policies remain in place. Classification text uses the tree
+leaf's row count (OC-189), matching structured nodes; class proportions still
+supply confidence, including impure leaves.
+
+The first rule regressions reported **10 failures / 2 controls passed**, including
+the OC-190 high-cardinality target named `count`. Five additional OC-216 cases
+failed before feature-local encoding. All **17 new cases** now pass; the complete
+rule suite passed **28 tests**, and rules plus analyzer passed **65 tests**.
+Independent peer review verified class/feature mappings and regression controls.
+
+### 2026-09-09 - OC-190/198 fixed: profiling helper names preserve user data
+
+A categorical `count` column previously collided with the count field generated
+by Polars. Profiling now isolates value/count names inside its aggregate struct;
+drift uses a distinct count-column name, and rule discovery aliases its target
+before top-ten counting. Exact category counts and shifted/unchanged categorical
+PSI are covered, including internal-looking column names.
+
+String or Boolean target encoding now chooses an unoccupied name against every
+source column, including excluded columns. The original analyzer frame and lazy
+view are restored with try/finally, so repeated calls or later analysis failures
+do not leave an encoded helper behind. Real `<target>_encoded` features retain
+their values, correlation results and causal graph nodes.
+
+Initial public-path tests reported **8 failures / 9 controls passed**. An
+independent failure-path regression also failed against the original analyzer.
+All **18 collision cases** now pass, including repeated analysis with excluded
+occupied names. Related analyzer/drift/target/correlation/column suites passed
+**141 tests** before the separate OC-217 repair; final combined verification is
+recorded above. Scoped Ruff, Ty and formatting passed.
+
+### 2026-09-09 - OC-217 fixed: repeated profiling retains exclusions
+
+The same analyzer previously returned `private` in its second sample after
+`analyze(exclude_cols=['private'])`, while still omitting that column's profile.
+The exclusion helper now reports every column outside the persistent active
+selection, so both sample data and frame statistics keep using the narrowed
+frame. Exclusion metadata also reflects that active selection on every call.
+
+Three public regressions failed before the fix and pass afterward, covering a
+repeated exclusion, omitted later exclusions and unknown later names. They pin
+sample keys, missing-cell percentage, duplicate counts, selected-column metadata
+and source preservation. Combined repeated-exclusion, name-collision and analyzer
+checks passed **58 tests**. Independent review found no material regression.
+
+### 2026-09-09 - OC-217 filed during target-collision review
+
+The collision-fix implementer reproduced excluded data returning in sample rows
+on the second call to the same analyzer, even without a target. Root confirmed
+that `_apply_column_exclusions` reports only newly removed columns while the
+selection itself persists. OC-217 records the sample/statistics exposure before
+root applies the bounded active-selection correction.
+
+### 2026-09-09 - OC-216 filed during rule-label repair
+
+Independent execution of categorical rule features with unrelated live Polars
+categories reproduced labels absent from the feature in the displayed IF
+conditions. This is separate from OC-188's target-class position mismatch.
+Recorded as OC-216 in the live queue with its reproduction before implementing
+the same-file feature-local encoding correction.
+
+### 2026-09-09 - OC-206 fixed: ensemble overrides preserve reusable settings
+
+A real VotingClassifier fit with a decision-tree base and
+`decision_tree__min_samples_leaf=3` previously wrote that temporary setting into
+`base_estimator_params['decision_tree']`. Resolution copied only the outer map.
+It now copies each inner parameter dictionary before merging overrides; the
+existing parameter values and configuration shapes retain their behavior.
+
+All **16 new public-fit regressions failed before the change** and passed after
+it. The cases cover voting/stacking classifiers and regressors, flat/nested
+payloads, direct training and captured tuning settings. They assert requested
+base/final overrides reach the fitted estimators, input dictionaries remain
+unchanged, and later fits without overrides recover the original parameters.
+The new tests plus existing ensemble integration and unit suites passed
+**80 tests**. Production changes are confined to the shared ensemble resolver.
 
 ### 2026-09-09 - nullable/time-series/tuple batch: final verification
 

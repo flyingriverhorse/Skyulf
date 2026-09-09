@@ -393,16 +393,19 @@ class DriftCalculator:
         ref_data: pl.Series, curr_data: pl.Series, col: str
     ) -> tuple[list, np.ndarray, np.ndarray] | None:
         """Build per-category expected/actual percent arrays (union of categories), or None if <2 categories."""
-        ref_counts = ref_data.value_counts()
-        curr_counts = curr_data.value_counts()
+        count_name = f"{col}__count"
+        ref_counts = ref_data.value_counts(name=count_name)
+        curr_counts = curr_data.value_counts(name=count_name)
 
         categories = sorted(set(ref_counts[col].to_list()) | set(curr_counts[col].to_list()))
         if len(categories) < 2:
             return None
 
-        ref_map = dict(zip(ref_counts[col].to_list(), ref_counts["count"].to_list(), strict=True))
+        ref_map = dict(
+            zip(ref_counts[col].to_list(), ref_counts[count_name].to_list(), strict=True)
+        )
         curr_map = dict(
-            zip(curr_counts[col].to_list(), curr_counts["count"].to_list(), strict=True)
+            zip(curr_counts[col].to_list(), curr_counts[count_name].to_list(), strict=True)
         )
 
         n_ref = len(ref_data)

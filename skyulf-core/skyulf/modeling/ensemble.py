@@ -481,7 +481,11 @@ class _BaseEnsembleCalculator(SklearnCalculator):
         resolved = dict(config) if config else {}
         nested = isinstance(resolved.get("params"), dict)
         bucket = dict(resolved["params"]) if nested else resolved
-        base_params: dict[str, Any] = dict(bucket.pop("base_estimator_params", None) or {})
+        # Nested overrides must not mutate parameter maps reused by callers or tuning.
+        base_params: dict[str, Any] = {
+            name: dict(params) if isinstance(params, dict) else params
+            for name, params in dict(bucket.pop("base_estimator_params", None) or {}).items()
+        }
         final_params: dict[str, Any] = dict(bucket.pop("final_estimator_params", None) or {})
         # Calibration is a structural choice (wrap base classifiers), not a sklearn
         # meta-estimator param — pop it here so it never reaches the constructor.
