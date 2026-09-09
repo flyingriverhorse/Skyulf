@@ -5,7 +5,7 @@ import { useViewStore } from '../../../../core/store/useViewStore';
 import { useNotificationsStore } from '../../../../core/store/useNotificationsStore';
 import { useNodeInspectionStore } from '../../../../core/store/useNodeInspectionStore';
 import { buildPreviewConfiguration } from '../../../../core/utils/previewConfiguration';
-import { jobsApi } from '../../../../core/api/jobs';
+import { jobsApi, type RunPipelineResponse } from '../../../../core/api/jobs';
 import { convertGraphToPipelineConfig } from '../../../../core/utils/pipelineConverter';
 import { RUN_PREVIEW_EVENT } from '../../../../core/hooks/useKeyboardShortcuts';
 import { registry } from '../../../../core/registry/NodeRegistry';
@@ -86,90 +86,124 @@ export function useRunControls(): RunControls {
     return trainingNodes.length >= 2;
   }, [nodes, edges]);
 
+  const previewUnavailable = () => previewPending.current
+    || useNodeInspectionStore.getState().isLoading || getReadOnlyMode();
+
+  const showValidationResults = () => {
+    setExecutionResult(null);
+    setLastRunError(null);
+    setResultsPanelExpanded(true);
+    setResultsPanelDismissed(false);
+  };
+
+  const reportPreviewValidation = (issues: ReturnType<typeof collectGraphValidationIssues>) => {
+    const panelIssues = issues.filter(issue => issue.category !== 'leakage');
+    if (panelIssues.length === 0) {
+      notifyPreview('Preview blocked by data leakage. Review the marked nodes on the canvas.');
+      return;
+    }
+    notifyPreview(`Preview blocked. Review ${panelIssues.length} validation issue${panelIssues.length === 1 ? '' : 's'}.`);
+    showValidationResults();
+  };
+
+  const reportPreviewLeakage = (value: unknown, graphSignature: string): boolean => {
+    const leakageMessage = getLeakageErrorMessage(value);
+    if (!leakageMessage) return false;
+    useNodeInspectionStore.setState({ receipt: null, error: null });
+    setLeakageNotice({ message: leakageMessage, graphSignature });
+    notifyPreview('Preview blocked by data leakage. Review the canvas safety notice.');
+    return true;
+  };
+
+  const executePreview = async (graph: ReturnType<typeof useGraphStore.getState>): Promise<void> => {
+    previewPending.current = true;
+    const graphSignature = graphSemanticSignature(graph.nodes, graph.edges);
+    useNotificationsStore.getState().dismiss('canvas-preview');
+    setLastRunError(null);
+    try {
+      const pipelineConfig = buildPreviewConfiguration(graph.nodes, graph.edges);
+      const result = await useNodeInspectionStore.getState().runPreview(pipelineConfig);
+      if (reportPreviewLeakage(result, graphSignature)) return;
+      setExecutionResult(result);
+      if (result.status === 'failed') notifyPreview('Preview failed. Open preview results for details.');
+      setLastRunError(null);
+    } catch (error) {
+      if (reportPreviewLeakage(error, graphSignature)) return;
+      console.error('Pipeline failed:', error);
+      setExecutionResult(null);
+      setLastRunError(error instanceof Error ? error.message : String(error));
+      setResultsPanelExpanded(true);
+      notifyPreview('Preview failed. Open preview results for details.');
+    } finally {
+      previewPending.current = false;
+    }
+  };
+
   const handleRun = async (): Promise<void> => {
-    if (previewPending.current || useNodeInspectionStore.getState().isLoading || getReadOnlyMode()) return;
+    if (previewUnavailable()) return;
     const graph = useGraphStore.getState();
     setLeakageNotice(null);
     const issues = graph.validateGraph();
     if (issues.length > 0) {
-      const panelIssues = issues.filter(issue => issue.category !== 'leakage');
-      if (panelIssues.length === 0) {
-        notifyPreview('Preview blocked by data leakage. Review the marked nodes on the canvas.');
-        return;
-      }
-      notifyPreview(`Preview blocked. Review ${panelIssues.length} validation issue${panelIssues.length === 1 ? '' : 's'}.`);
-      setExecutionResult(null);
-      setLastRunError(null);
-      setResultsPanelExpanded(true);
-      setResultsPanelDismissed(false);
+      reportPreviewValidation(issues);
       return;
     }
-
     const datasetNode = graph.nodes.find((n) => n.data.definitionType === 'dataset_node');
     const datasetId = datasetNode?.data.datasetId as string;
     if (!datasetId) {
       notifyPreview('Preview blocked. Add a dataset node and select a dataset.');
       return;
     }
-    previewPending.current = true;
-    const graphSignature = graphSemanticSignature(graph.nodes, graph.edges);
-    useNotificationsStore.getState().dismiss('canvas-preview');
-    setLastRunError(null);
-      try {
-        const pipelineConfig = buildPreviewConfiguration(graph.nodes, graph.edges);
-      const result = await useNodeInspectionStore.getState().runPreview(pipelineConfig);
-      const leakageMessage = getLeakageErrorMessage(result);
-      if (leakageMessage) {
-        useNodeInspectionStore.setState({ receipt: null, error: null });
-        setLeakageNotice({ message: leakageMessage, graphSignature });
-        notifyPreview('Preview blocked by data leakage. Review the canvas safety notice.');
-        return;
-      }
-      setExecutionResult(result);
-      if (result.status === 'failed') notifyPreview('Preview failed. Open preview results for details.');
-        setLastRunError(null);
-      } catch (error) {
-        const leakageMessage = getLeakageErrorMessage(error);
-        if (leakageMessage) {
-          useNodeInspectionStore.setState({ receipt: null, error: null });
-          setLeakageNotice({ message: leakageMessage, graphSignature });
-          notifyPreview('Preview blocked by data leakage. Review the canvas safety notice.');
-          return;
-        }
-        console.error('Pipeline failed:', error);
-        setExecutionResult(null);
-        setLastRunError(error instanceof Error ? error.message : String(error));
-        setResultsPanelExpanded(true);
-        notifyPreview('Preview failed. Open preview results for details.');
-      } finally {
-        previewPending.current = false;
-      }
-    };
+    await executePreview(graph);
+  };
 
-    const handleRunAll = async (): Promise<void> => {
-      if (experimentsPending.current || previewPending.current || useNodeInspectionStore.getState().isLoading || getReadOnlyMode()) return;
-      const graph = useGraphStore.getState();
-      const { nodes, edges } = graph;
-      setLeakageNotice(null);
-      const issues = graph.validateGraph();
-      if (issues.length > 0) {
-        if (issues.every(issue => issue.category === 'leakage')) {
-          notifyExperimentError('Experiments blocked by data leakage. Review the marked nodes on the canvas.');
-          return;
-        }
-        notifyExperimentError('Experiments blocked. Review the validation issues in preview results.');
-        setExecutionResult(null);
-        setLastRunError(null);
-        setResultsPanelExpanded(true);
-        setResultsPanelDismissed(false);
-        return;
-      }
+  const reportExperimentValidation = (issues: ReturnType<typeof collectGraphValidationIssues>) => {
+    if (issues.every(issue => issue.category === 'leakage')) {
+      notifyExperimentError('Experiments blocked by data leakage. Review the marked nodes on the canvas.');
+      return;
+    }
+    notifyExperimentError('Experiments blocked. Review the validation issues in preview results.');
+    showValidationResults();
+  };
 
-      const datasetNode = nodes.find((n) => n.data.definitionType === 'dataset_node');
-      const datasetId = datasetNode?.data.datasetId as string;
-      if (!datasetId) {
-        notifyExperimentError('Experiments blocked. Add a dataset node and select a dataset.');
-        return;
+  const showSubmittedExperiments = (response: RunPipelineResponse) => {
+    const count = response.job_ids?.length || 1;
+    const jobIds = response.job_ids?.length ? response.job_ids : [response.job_id];
+    useNotificationsStore.getState().upsertExecution(`experiments:${jobIds[0]}`,
+      `${count} experiment${count > 1 ? 's' : ''} submitted`, { type: 'jobs', run: { label: 'Experiments', jobIds } });
+    startPolling();
+    if (response.job_ids?.length > 1) {
+      setActiveParallelRun({ jobIds: response.job_ids, startedAt: new Date().toISOString() });
+    }
+    useJobStore.getState().setInspectedRun({ label: 'Experiments', jobIds });
+    toggleDrawer(true);
+    // Experiments run as background jobs. An inline preview would duplicate
+    // that work; users can request canvas data separately with Preview data.
+  };
+
+  const reportExperimentFailure = (error: unknown, graphSignature: string) => {
+    const leakageMessage = getLeakageErrorMessage(error);
+    if (leakageMessage) setLeakageNotice({ message: leakageMessage, graphSignature });
+    const message = leakageMessage ?? (error instanceof Error && error.message
+      ? error.message : 'Check your connection and settings, then try again.');
+    notifyExperimentError(`Experiment submission failed. ${message}`);
+  };
+
+  const handleRunAll = async (): Promise<void> => {
+    if (experimentsPending.current || previewUnavailable()) return;
+    const graph = useGraphStore.getState();
+    const { nodes, edges } = graph;
+    setLeakageNotice(null);
+    const issues = graph.validateGraph();
+    if (issues.length > 0) {
+      reportExperimentValidation(issues);
+      return;
+    }
+    const datasetNode = nodes.find((n) => n.data.definitionType === 'dataset_node');
+    const datasetId = datasetNode?.data.datasetId as string;
+    if (!datasetId) {
+      notifyExperimentError('Experiments blocked. Add a dataset node and select a dataset.');
+      return;
     }
     experimentsPending.current = true;
     const graphSignature = graphSemanticSignature(nodes, edges);
@@ -184,30 +218,10 @@ export function useRunControls(): RunControls {
         (e) => !previewIds.has(e.source) && !previewIds.has(e.target),
       );
       const pipelineConfig = convertGraphToPipelineConfig(filteredNodes, filteredEdges);
-      const response = await jobsApi.runPipeline({
-        ...pipelineConfig,
-        job_type: 'training',
-      });
-      const count = response.job_ids?.length || 1;
-      const jobIds = response.job_ids?.length ? response.job_ids : [response.job_id];
-      useNotificationsStore.getState().upsertExecution(`experiments:${jobIds[0]}`,
-        `${count} experiment${count > 1 ? 's' : ''} submitted`, { type: 'jobs', run: { label: 'Experiments', jobIds } });
-      startPolling();
-      if (response.job_ids?.length > 1) {
-        setActiveParallelRun({ jobIds: response.job_ids, startedAt: new Date().toISOString() });
-      }
-      useJobStore.getState().setInspectedRun({ label: 'Experiments', jobIds });
-      toggleDrawer(true);
-      // Note: we intentionally do NOT trigger an inline preview here. The
-      // experiments run as background jobs; firing a synchronous preview on
-      // top would double the work and slow the queue. Users who want live
-      // canvas data can click Run Preview separately.
+      const response = await jobsApi.runPipeline({ ...pipelineConfig, job_type: 'training' });
+      showSubmittedExperiments(response);
     } catch (error) {
-      const leakageMessage = getLeakageErrorMessage(error);
-      if (leakageMessage) setLeakageNotice({ message: leakageMessage, graphSignature });
-      const message = leakageMessage ?? (error instanceof Error && error.message
-        ? error.message : 'Check your connection and settings, then try again.');
-      notifyExperimentError(`Experiment submission failed. ${message}`);
+      reportExperimentFailure(error, graphSignature);
     } finally {
       setIsRunningAll(false);
       experimentsPending.current = false;

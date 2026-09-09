@@ -1,13 +1,15 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import type { NodeProps } from '@xyflow/react';
+import type { Edge, NodeProps } from '@xyflow/react';
 import type { NodeDefinition } from '../../core/types/nodes';
 import type { CanvasLeakageIssue } from '../../core/types/leakage';
 import { CanvasLeakageContext } from '../../core/contexts/CanvasLeakageContext';
 import { useViewStore } from '../../core/store/useViewStore';
+import { useGraphStore } from '../../core/store/useGraphStore';
+import { useJobStore } from '../../core/store/useJobStore';
 import { CustomNodeWrapper } from './CustomNodeWrapper';
 
-const controls = vi.hoisted(() => ({ getDefinition: vi.fn(), deleteElements: vi.fn() }));
+const controls = vi.hoisted(() => ({ getDefinition: vi.fn(), deleteElements: vi.fn(), getEdges: vi.fn<() => Edge[]>(() => []) }));
 
 vi.mock('@xyflow/react', () => ({
   Handle: ({ children, isConnectable, 'aria-label': label, title }: React.PropsWithChildren<{
@@ -15,7 +17,7 @@ vi.mock('@xyflow/react', () => ({
   }>) => <div aria-label={label} title={title} data-connectable={isConnectable}>{children}</div>,
   Position: { Left: 'left', Right: 'right' },
   useConnection: (selector: (state: { fromHandle: null }) => unknown) => selector({ fromHandle: null }),
-  useReactFlow: () => ({ deleteElements: controls.deleteElements, getEdges: () => [] }),
+  useReactFlow: () => ({ deleteElements: controls.deleteElements, getEdges: controls.getEdges }),
 }));
 vi.mock('./ConnectionPicker', () => ({
   ConnectionPicker: ({ port }: { port: { label: string } }) => <button>{port.label}</button>,
@@ -44,10 +46,79 @@ const nodeProps: NodeProps = {
 beforeEach(() => {
   controls.getDefinition.mockReset().mockReturnValue(definition());
   controls.deleteElements.mockClear();
+  controls.getEdges.mockReset().mockReturnValue([]);
   useViewStore.setState({ readOnlyOverride: 'off', perfOverlayEnabled: false });
+  useJobStore.setState({ jobs: [] });
+  useGraphStore.setState({ executionResult: null, nodeJobSummaries: {}, branchEdgeLabels: {},
+    predictedSchemas: {}, brokenSchemaRefs: {}, incomingSourceCounts: {} });
 });
 
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
+
+it('prefers inline execution summaries and telemetry over completed job summaries', () => {
+  // The canvas must show the freshest preview, while retaining precise zero-valued metrics.
+  controls.getDefinition.mockReturnValue(definition({ outputs: [] }));
+  useGraphStore.setState({
+    executionResult: { pipeline_id: 'preview', status: 'success', preview_data: null, recommendations: [],
+      node_results: { split: { status: 'success', execution_time: 0.25,
+        metadata: { summary: '  Fresh preview  ' },
+        metrics: { fit_time: 0, peak_memory_bytes: 0, rows_in: 10, rows_out: 0 } } } },
+    nodeJobSummaries: { split: [{ summary: 'Older job', branch_index: 0, pipeline_id: 'job',
+      parent_pipeline_id: null, finished_at: null, duration_ms: 9999 }] },
+  });
+  useViewStore.setState({ perfOverlayEnabled: true });
+  render(<CustomNodeWrapper {...nodeProps} />);
+  expect(screen.getByText('Fresh preview')).toBeInTheDocument();
+  expect(screen.queryByText('Older job')).not.toBeInTheDocument();
+  expect(screen.getByTestId('canvas-node-feature_target_split')).toHaveAttribute('data-perf-duration-ms', '250');
+  expect(screen.getByTitle('Core fit time')).toHaveTextContent('0ms');
+  expect(screen.getByTitle('Peak Memory')).toHaveTextContent('0.0MB');
+  expect(screen.getByTestId('canvas-node-feature_target_split')).toHaveAttribute('title',
+    'Last run: 250ms\nFit time: 0ms\nPeak mem: 0.0 MB\nRows: 10 → 0');
+});
+
+it('keeps a validation pulse tied to the invalid transition and clears it on recovery', () => {
+  // Rendering an invalid node again must not restart its one-shot attention animation.
+  vi.useFakeTimers();
+  try {
+    controls.getDefinition.mockReturnValue(definition({ outputs: [],
+      validate: () => ({ isValid: false, message: 'Pick columns' }) }));
+    const { rerender } = render(<CustomNodeWrapper {...nodeProps} />);
+    expect(screen.getByTestId('canvas-node-feature_target_split')).toHaveClass('animate-validation-pulse');
+    act(() => { vi.advanceTimersByTime(4800); });
+    rerender(<CustomNodeWrapper {...nodeProps} selected />);
+    expect(screen.getByTestId('canvas-node-feature_target_split')).not.toHaveClass('animate-validation-pulse');
+    controls.getDefinition.mockReturnValue(definition({ outputs: [] }));
+    rerender(<CustomNodeWrapper {...nodeProps} data={{ ...nodeProps.data, columns: ['x'] }} />);
+    expect(screen.queryByLabelText('Configuration issue: Pick columns')).not.toBeInTheDocument();
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
+it('pairs branch summaries with sorted incoming handles and retains missing-label fallbacks', () => {
+  // Card letters must match canvas edge labels even when edges arrive in a different order.
+  controls.getDefinition.mockReturnValue(definition({ outputs: [] }));
+  controls.getEdges.mockReturnValue([
+    { id: 'b', source: 'second', target: 'split', sourceHandle: 'b' },
+    { id: 'unrelated', source: 'other', target: 'elsewhere', sourceHandle: '0' },
+    { id: 'a', source: 'first', target: 'split', sourceHandle: 'a' },
+  ]);
+  useGraphStore.setState({
+    branchEdgeLabels: { a: 'Path D · Train', b: 'Path C · Test' },
+    nodeJobSummaries: { split: ['First result', 'Second result', 'Third result'].map((summary, index) => ({
+      summary, branch_index: index + 2, pipeline_id: `job-${index}`, parent_pipeline_id: 'parent', finished_at: null,
+    })) },
+  });
+  useJobStore.setState({ jobs: [{ job_id: 'fresh', pipeline_id: 'fresh', node_id: 'split', job_type: 'training',
+    status: 'queued', start_time: null, end_time: null, error: null, result: null, created_at: '2026-09-09' }] });
+  render(<CustomNodeWrapper {...nodeProps} />);
+  expect(screen.getByText('First result').parentElement).toHaveTextContent('DFirst result');
+  expect(screen.getByText('Second result').parentElement).toHaveTextContent('CSecond result');
+  expect(screen.getByText('Third result').parentElement).toHaveTextContent('EThird result');
+  expect(screen.getByText('First result').parentElement!.parentElement).toHaveAttribute('title',
+    'Previous run · new run in progress—\nPath D · Train: First result\nPath C · Test: Second result\nPath E: Third result');
+});
 
 it('reserves the widest output label in unscaled pixels and updates after font changes', () => {
   // Different platform fonts and canvas zoom must not let split labels cover the summary.

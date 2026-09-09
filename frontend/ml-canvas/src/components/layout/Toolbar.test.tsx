@@ -5,11 +5,15 @@ import { useGraphStore } from '../../core/store/useGraphStore';
 import { useViewStore } from '../../core/store/useViewStore';
 import { useRunControls, type RunControls } from './toolbar/_hooks/useRunControls';
 import { usePipelineActions } from './toolbar/_hooks/usePipelineActions';
+import { exportCanvasToPng, exportCanvasToSvg } from '../../core/utils/canvasExport';
+import { toast } from '../../core/toast';
 
 const { confirm } = vi.hoisted(() => ({ confirm: vi.fn() }));
 vi.mock('../shared', () => ({ useConfirm: () => confirm }));
 vi.mock('./toolbar/_hooks/useRunControls', () => ({ useRunControls: vi.fn() }));
 vi.mock('./toolbar/_hooks/usePipelineActions', () => ({ usePipelineActions: vi.fn() }));
+vi.mock('../../core/utils/canvasExport', () => ({ exportCanvasToPng: vi.fn(), exportCanvasToSvg: vi.fn() }));
+vi.mock('../../core/toast', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 vi.mock('../canvas/TemplatesGalleryModal', () => ({ TemplatesGalleryModal: () => null }));
 
 let runControls: RunControls;
@@ -183,5 +187,81 @@ describe('Toolbar experiment controls', () => {
     await waitFor(() => expect(useGraphStore.getState().nodes).toHaveLength(0));
     fireEvent.click(screen.getByRole('button', { name: 'Undo' }));
     expect(useGraphStore.getState().nodes[0]?.id).toBe('dataset');
+  });
+
+  it.each([{ key: 'z', shiftKey: true }, { key: 'y', shiftKey: false }])('supports undo and redo hotkeys with $key', redoKey => {
+    // Canvas history must remain reachable through both supported redo shortcuts.
+    renderToolbar();
+    act(() => useGraphStore.getState().setGraph([], []));
+    fireEvent.keyDown(window, { key: 'z', ctrlKey: true });
+    expect(useGraphStore.getState().nodes).toHaveLength(1);
+    fireEvent.keyDown(window, { ...redoKey, metaKey: true });
+    expect(useGraphStore.getState().nodes).toHaveLength(0);
+  });
+
+  it('preserves input undo and blocks canvas history shortcuts in read-only mode', () => {
+    // Native editing and read-only mode must never accidentally mutate the graph.
+    render(<div><input aria-label="Pipeline name" /><Toolbar /></div>);
+    act(() => useGraphStore.getState().setGraph([], []));
+    fireEvent.keyDown(screen.getByRole('textbox'), { key: 'z', ctrlKey: true });
+    expect(useGraphStore.getState().nodes).toHaveLength(0);
+    act(() => useViewStore.getState().setReadOnlyOverride('on'));
+    fireEvent.keyDown(window, { key: 'z', ctrlKey: true });
+    expect(useGraphStore.getState().nodes).toHaveLength(0);
+    expect(screen.queryByRole('button', { name: 'Undo' })).not.toBeInTheDocument();
+  });
+
+  it('moves focus from the narrow overflow into the legend and returns it on Escape', async () => {
+    // The overflow item unmounts, so focus must move to surviving accessible controls.
+    containerWidth = 600;
+    renderToolbar();
+    const more = screen.getByRole('button', { name: 'More canvas tools' });
+    fireEvent.click(more);
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Node badge legend' }));
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Close legend' })).toHaveFocus();
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(screen.queryByText('Canvas Legend')).not.toBeInTheDocument();
+    await waitFor(() => expect(more).toHaveFocus());
+  });
+
+  it.each([1400, 600])('preserves save/load and pending-preview restrictions at width %i', width => {
+    // The narrow menu and full toolbar expose the same pipeline actions and busy state.
+    containerWidth = width;
+    const { rerender } = renderToolbar();
+    if (width < 720) fireEvent.click(screen.getByRole('button', { name: 'More canvas tools' }));
+    fireEvent.click(screen.getByRole(width < 720 ? 'menuitem' : 'button', { name: 'Save pipeline' }));
+    expect(vi.mocked(usePipelineActions).mock.results[0]!.value.handleSave).toHaveBeenCalledOnce();
+    if (width < 720) fireEvent.click(screen.getByRole('button', { name: 'More canvas tools' }));
+    fireEvent.click(screen.getByRole(width < 720 ? 'menuitem' : 'button', { name: 'Load pipeline' }));
+    expect(vi.mocked(usePipelineActions).mock.results[0]!.value.openLoadMenu).toHaveBeenCalledOnce();
+    runControls.isRunning = true;
+    rerender(<div><Toolbar /></div>);
+    if (width < 720) fireEvent.click(screen.getByRole('button', { name: 'More canvas tools' }));
+    expect(screen.getByRole(width < 720 ? 'menuitem' : 'button', { name: 'Save pipeline' })).toBeDisabled();
+    expect(screen.getByRole(width < 720 ? 'menuitem' : 'button', { name: 'Load pipeline' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Previewing data...' })).toBeDisabled();
+  });
+
+  it.each([1400, 600])('exports images and notebooks from the visible menu at width %i', async width => {
+    // Both layouts must dispatch the chosen format and close their menu before export.
+    containerWidth = width;
+    vi.mocked(exportCanvasToPng).mockResolvedValue('data:image/png;base64,canvas');
+    vi.mocked(exportCanvasToSvg).mockResolvedValue('data:image/svg+xml,canvas');
+    renderToolbar();
+    const trigger = screen.getByRole('button', { name: width < 720 ? 'More canvas tools' : 'Export canvas as image' });
+    fireEvent.click(trigger);
+    fireEvent.click(screen.getByRole('menuitem', { name: width < 720 ? 'Export PNG' : 'PNG (high-DPI)' }));
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Canvas exported as PNG'));
+    expect(exportCanvasToPng).toHaveBeenCalledWith('skyulf-canvas.png');
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+    fireEvent.click(trigger);
+    fireEvent.click(screen.getByRole('menuitem', { name: width < 720 ? 'Export SVG' : 'SVG (vector)' }));
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Canvas exported as SVG'));
+    expect(exportCanvasToSvg).toHaveBeenCalledWith('skyulf-canvas.svg');
+    fireEvent.click(trigger);
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Notebook (full)' }));
+    expect(vi.mocked(usePipelineActions).mock.results[0]!.value.exportNotebook).toHaveBeenCalledWith('full');
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
   });
 });
