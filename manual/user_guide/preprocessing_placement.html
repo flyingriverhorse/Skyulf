@@ -1,0 +1,3984 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://flyingriverhorse.github.io/Skyulf/user_guide/preprocessing_placement.html">
+      
+      
+        <link rel="prev" href="preprocessing_leakage_audit.html">
+      
+      
+        <link rel="next" href="drift_monitoring.html">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Preprocessing Placement - Skyulf</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="blue" data-md-color-accent="light-blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#preprocessing-placement-and-leakage" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../index.html" title="Skyulf" class="md-header__button md-logo" aria-label="Skyulf" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Skyulf
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Preprocessing Placement
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="blue" data-md-color-accent="light-blue"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="blue" data-md-color-accent="light-blue"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/flyingriverhorse/Skyulf" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    flyingriverhorse/Skyulf
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../index.html" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../guides/platform_setup.html" class="md-tabs__link">
+          
+  
+  
+  Backend
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../guides/getting_started.html" class="md-tabs__link">
+          
+  
+  
+  Guides
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../examples/quickstart.html" class="md-tabs__link">
+          
+  
+  
+  Examples
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../contributing/writing_docs.html" class="md-tabs__link">
+          
+  
+  
+  Contributing
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="overview.html" class="md-tabs__link">
+          
+  
+  
+  User Guide
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../reference/preprocessing_nodes.html" class="md-tabs__link">
+          
+  
+  
+  Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+  
+
+<nav class="md-nav md-nav--primary md-nav--lifted md-nav--integrated" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../index.html" title="Skyulf" class="md-nav__button md-logo" aria-label="Skyulf" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Skyulf
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/flyingriverhorse/Skyulf" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    flyingriverhorse/Skyulf
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../index.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backend
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Backend
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/platform_setup.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Platform Setup
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/platform_walkthrough.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Platform Walkthrough
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/backend_api.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/backend_configuration.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/job_idempotency.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Job Idempotency
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guides
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/getting_started.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/core-release.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core Release Process
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/multi_path_pipelines.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Multi-Path Pipelines
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/faq.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FAQ & Comparison
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/recipes.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Recipes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/sklearn_migration.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Migrating from scikit-learn
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/profiling_comparison.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Skyulf vs. YData vs. Sweetviz
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../architecture.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../data_architecture.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../performance.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Performance
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/adding_new_engine.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Adding New Engine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/engine_mechanics.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engine Mechanics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/engine_data_paths.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engine Data Paths
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/data_drift_roadmap.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data Drift Roadmap
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Examples
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Examples
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/quickstart.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quickstart
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/leakage_proof_pandas.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Leakage Proof (pandas)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/leakage_proof_polars.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Leakage Proof (polars)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Contributing
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../contributing/writing_docs.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Writing Docs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="overview.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="installation.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="pipeline_quickstart.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pipeline Quickstart
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="step_by_step_no_config.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Step-by-Step (No Config)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="eda_profiling.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Automated EDA
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="pii_detection.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    PII Detection
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="text_nlp.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Text & NLP
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="validation_vs_sklearn.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Validation vs scikit-learn
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="configuration.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    skyulf-core Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="hyperparameter_tuning.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hyperparameter Tuning
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="shap_explainability.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SHAP Explainability
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="cross_validation.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cross-Validation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="threshold_tuning.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Threshold Tuning
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="splitdataset_and_leakage.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SplitDataset & Leakage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="leakage_core_backend.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Leakage Safety - Core & Backend
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="preprocessing_leakage_audit.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Preprocessing Leakage Audit
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Preprocessing Placement
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="preprocessing_placement.html" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Preprocessing Placement
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#start-with-the-training-boundary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Start with the training boundary
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#read-the-placement-labels" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Read the placement labels
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#configuration-changes-that-change-placement" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Configuration changes that change placement
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Configuration changes that change placement">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#general-transformation-and-power-transformer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        General Transformation and Power Transformer
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#polynomial-features-and-its-alias" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Polynomial Features and its alias
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#feature-generation-and-its-aliases" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Feature Generation and its aliases
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#casting-imputation-and-column-deletion" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Casting, imputation and column deletion
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#column-selection-is-part-of-the-operation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Column selection is part of the operation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#target-encoders-lags-and-rolling-windows" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Target encoders, lags and rolling windows
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#complete-registered-node-catalog" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Complete registered-node catalog
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#supported-graph-shapes-and-current-policy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Supported graph shapes and current policy
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#where-to-use-this-reference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Where to use this reference
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="drift_monitoring.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Drift Monitoring
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="serialization.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Serialization
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="extending_custom_nodes.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Extending Skyulf-Core
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="troubleshooting.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/preprocessing_nodes.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Preprocessing Nodes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/modeling_nodes.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Modeling Nodes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/data_validation.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data Validation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/deprecation.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deprecation Policy
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_5" id="__nav_7_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/pipeline.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_5_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_5_2" id="__nav_7_5_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_7_5_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_5_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Data
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/data/dataset.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SplitDataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_5_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_5_3" id="__nav_7_5_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Preprocessing
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_7_5_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_5_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Preprocessing
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/index.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/base.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    base
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/pipeline.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/split.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    split
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/cleaning.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    cleaning
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/drop_and_missing.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    drop_and_missing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/imputation.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    imputation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/encoding.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    encoding
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/scaling.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    scaling
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/outliers.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    outliers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/transformations.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    transformations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/bucketing.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    bucketing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/casting.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    casting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/feature_generation.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    feature_generation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/feature_selection.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    feature_selection
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/resampling.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    resampling
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/inspection.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    inspection
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_5_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_5_4" id="__nav_7_5_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Modeling
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_7_5_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_5_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Modeling
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/modeling/index.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/modeling/base.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    base
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/modeling/sklearn_wrapper.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    sklearn_wrapper
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/modeling/classification.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    classification
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/modeling/regression.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    regression
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/modeling/cross_validation.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    cross_validation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/modeling/tuning_engine.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    tuning/engine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="preprocessing-placement-and-leakage">Preprocessing placement and leakage</h1>
+<p>Use this guide to decide where a preprocessing node belongs relative to the
+<strong>Train-Test Split</strong> node. It covers <strong>62 registered preprocessing IDs</strong>:
+60 transformations and two row-split registrations. Aliases have separate entries
+because older saved pipelines can contain either spelling.</p>
+<p>Placement depends on the configured operation, not just the node's display name.
+The same node can apply a fixed formula in one configuration and learn a statistic
+in another. These rules describe supported implementations and parameter modes;
+they do not guarantee that an arbitrary dataset or experiment is leakage-free.</p>
+<h2 id="start-with-the-training-boundary">Start with the training boundary</h2>
+<p>A practical linear pipeline is:</p>
+<pre><code class="language-text">Loader -&gt; Fixed rules -&gt; Train-Test Split -&gt; Learned preprocessing -&gt; Train / Tune
+</code></pre>
+<p>Learned preprocessing must fit using <strong>training rows only</strong>. Apply the resulting
+state to validation, test and inference rows without fitting it again. Examples
+include scaling statistics, imputation values, category vocabularies, feature
+selection, bin edges, target statistics and group lookup tables.</p>
+<p>Cross-validation introduces an inner boundary. Fit learned preprocessing again
+inside each training fold, then apply it to that fold's validation rows. A scaler
+fitted once on the whole outer training set has already seen the inner validation
+folds. Putting it after the outer split alone does not resolve that problem.</p>
+<p>Resampling is stricter: oversampling and undersampling act <strong>only on training
+rows</strong>, including the training partition of each CV fold. Do not resample the
+validation or test population.</p>
+<p><strong>Feature-Target Split is not Train-Test Split.</strong> Separating X from y does not
+reserve any rows for evaluation. <code>TrainTestSplitter</code> and its legacy <code>Split</code> alias
+create the row boundary checked by the leakage gate.</p>
+<h2 id="read-the-placement-labels">Read the placement labels</h2>
+<table>
+<thead>
+<tr>
+<th>Label</th>
+<th>Meaning</th>
+<th>What to do</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Before split (fixed)</td>
+<td>Uses configured rules, schema or a pretrained model without fitting the current dataset.</td>
+<td>May precede the split when its inputs and configuration are valid for prediction.</td>
+</tr>
+<tr>
+<td>Depends on operation</td>
+<td>Some configurations are fixed; others learn from data.</td>
+<td>Inspect every configured operation and selection rule.</td>
+</tr>
+<tr>
+<td>After split</td>
+<td>Active preprocessing learns state or is conservatively gated.</td>
+<td>Fit on training rows and refit inside CV training folds. Resampling is training-only.</td>
+</tr>
+<tr>
+<td>Time/history review</td>
+<td>Uses neighboring or earlier rows without fitting a distribution.</td>
+<td>Check ordering, entity groups, horizon, history availability and split strategy.</td>
+</tr>
+<tr>
+<td>Creates row split</td>
+<td>Establishes the train/test row boundary.</td>
+<td>Place learned feature preprocessing downstream and choose an appropriate split protocol.</td>
+</tr>
+</tbody>
+</table>
+<p>"Before split" is permission to apply a fixed operation, not a universal safety
+claim. A ratio that includes the answer, a timestamp recorded after an outcome,
+or a manual threshold chosen from test results can leak even though the operation
+fits no statistic. Reporting statistics is not feature fitting, but using test
+reports to select features or tune a model contaminates the evaluation.</p>
+<h2 id="configuration-changes-that-change-placement">Configuration changes that change placement</h2>
+<h3 id="general-transformation-and-power-transformer">General Transformation and Power Transformer</h3>
+<p>Fixed logarithms, square roots and squares do not fit a parameter from the dataset.
+Yeo-Johnson and Box-Cox do. Put those learned methods after the row split and fit
+them within each CV training fold. Turning off standardization does not make the
+power parameter fixed.</p>
+<p>Inspect the entire transformation list. If one entry learns, the mixed node learns.
+The name "General Transformation" alone cannot establish its placement.</p>
+<h3 id="polynomial-features-and-its-alias">Polynomial Features and its alias</h3>
+<p><code>PolynomialFeatures</code> and <code>PolynomialFeaturesNode</code> build a fixed mathematical
+basis, but their optional automatic column selection learns from the fitting rows.</p>
+<table>
+<thead>
+<tr>
+<th>Configuration</th>
+<th>Placement</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>auto_detect: true</code>, with <code>columns</code> omitted or <code>[]</code></td>
+<td>After the row split: discover eligible columns from training data only.</td>
+</tr>
+<tr>
+<td>Explicit nonempty <code>columns</code>, even with <code>auto_detect: true</code></td>
+<td>Before split is allowed: column selection and polynomial math are fixed.</td>
+</tr>
+<tr>
+<td><code>auto_detect</code> omitted or <code>false</code></td>
+<td>Before split is allowed: automatic discovery is disabled.</td>
+</tr>
+</tbody>
+</table>
+<p>The registry conservatively marks both aliases as learned; the configured
+operation determines placement. <code>FeatureInteraction</code> is a separate fixed node
+and does not inherit this automatic-selection rule.</p>
+<h3 id="feature-generation-and-its-aliases">Feature Generation and its aliases</h3>
+<p>Arithmetic, ratios, similarity and datetime extraction are fixed calculations.
+<code>group_agg</code> fits a group lookup on training rows and reuses it on held-out rows.
+Unknown groups become missing instead of obtaining statistics from the test batch;
+add suitable downstream missing-value handling when needed.</p>
+<p>This distinction applies to <code>FeatureGeneration</code>, <code>FeatureGenerationNode</code> and
+<code>FeatureMath</code>. A mixed operation list containing a learned group aggregate belongs
+after the split, even when its other entries are arithmetic. Fixed expressions
+still require inputs that exist at prediction time.</p>
+<h3 id="casting-imputation-and-column-deletion">Casting, imputation and column deletion</h3>
+<table>
+<thead>
+<tr>
+<th>Configuration</th>
+<th>Placement reason</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Casting numeric/string/datetime values</td>
+<td>Fixed conversion.</td>
+</tr>
+<tr>
+<td>Casting to <code>category</code>/<code>categorical</code></td>
+<td>Fits a training vocabulary; unseen categories become missing. Resolve per-column overrides first.</td>
+</tr>
+<tr>
+<td>Simple Imputer with a configured constant</td>
+<td>Fixed fill rule.</td>
+</tr>
+<tr>
+<td>Simple Imputer with mean, median or most-frequent strategy</td>
+<td>Fits training statistics.</td>
+</tr>
+<tr>
+<td>Drop Missing Columns without a positive threshold</td>
+<td>Fixed configured deletion.</td>
+</tr>
+<tr>
+<td>Drop Missing Columns with positive <code>missing_threshold</code></td>
+<td>Learns which columns to remove, even with explicit candidate columns.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="column-selection-is-part-of-the-operation">Column selection is part of the operation</h3>
+<p>Do not treat omitted columns, <code>null</code> and <code>[]</code> as interchangeable:</p>
+<table>
+<thead>
+<tr>
+<th>Node</th>
+<th>Omitted/null selection</th>
+<th>Explicit empty selection</th>
+<th>Explicit nonempty selection</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Custom Binning</td>
+<td>Value-based column discovery; learned.</td>
+<td>Fixed/no-op.</td>
+<td>Configured columns and edges are fixed.</td>
+</tr>
+<tr>
+<td>Hash Encoder</td>
+<td>Automatic selection; conservatively gated.</td>
+<td>Fixed/no-op.</td>
+<td>Fixed hashing of selected columns.</td>
+</tr>
+<tr>
+<td>Missing Indicator</td>
+<td>Discovers columns containing missing values; learned.</td>
+<td>Also automatic discovery; learned.</td>
+<td>Fixed indicator columns.</td>
+</tr>
+<tr>
+<td>Label Encoder</td>
+<td>Available target only, or no-op.</td>
+<td>Available target only, or no-op.</td>
+<td>Feature columns learn mappings; exact known-target selection is exempt.</td>
+</tr>
+<tr>
+<td>Ordinal Encoder</td>
+<td>Discovers and learns feature categories.</td>
+<td>Target-only/no-op.</td>
+<td>Feature encoding remains learned, including configured category orders; exact known-target selection is exempt.</td>
+</tr>
+<tr>
+<td>Count and TF-IDF Vectorizers</td>
+<td>No-op; no automatic text discovery.</td>
+<td>No-op.</td>
+<td>Feature text learns vocabulary and, for TF-IDF, IDF.</td>
+</tr>
+<tr>
+<td>Hashing Vectorizer, Tokenizer, Sentence Embedder</td>
+<td>No-op.</td>
+<td>No-op.</td>
+<td>Fixed processing or pretrained embeddings.</td>
+</tr>
+<tr>
+<td>Text Cleaning</td>
+<td>Discovers text dtypes for fixed cleaning.</td>
+<td>No-op.</td>
+<td>Fixed cleaning of selected text columns.</td>
+</tr>
+</tbody>
+</table>
+<p>Target-only exemptions require an authoritative target in the current pipeline or
+branch. A target name from an unrelated branch is not evidence that an encoder is
+operating only on labels. Text feature processing excludes the authoritative target.</p>
+<p>An explicit <code>[]</code> is also a supported no-op for <code>OneHotEncoder</code>, <code>DummyEncoder</code>,
+<code>TargetEncoder</code>, <code>WOEEncoder</code>, <code>PowerTransformer</code>, <code>StandardScaler</code>, <code>MinMaxScaler</code>,
+<code>MaxAbsScaler</code>, <code>RobustScaler</code>, <code>SimpleImputer</code>, <code>KNNImputer</code>, <code>IterativeImputer</code>,
+<code>GeneralBinning</code>, <code>KBinsDiscretizer</code>, <code>CustomBinning</code>, <code>IQR</code>, <code>ZScore</code>, <code>Winsorize</code>
+and <code>EllipticEnvelope</code>. This is a specific implementation contract, not a rule to
+apply to other nodes. Selectors, resamplers and Missing Indicator do not receive a
+general empty-list exemption.</p>
+<h3 id="target-encoders-lags-and-rolling-windows">Target encoders, lags and rolling windows</h3>
+<p><code>TargetEncoder</code> learns target statistics. Training rows in the pipeline receive
+out-of-fold encodings; held-out and inference rows use the full-training artifact.
+Unknown categories fall back to the training prior. <code>WOEEncoder</code> uses complement-fold
+mappings for training rows and the full-training mapping for held-out rows, with the
+configured unknown-category fallback, currently zero. These protections do not remove
+the need for the outer row boundary and CV preprocessing refits.</p>
+<p><code>LagFeatures</code> and <code>RollingAggregate</code> do not fit a distribution, but they depend on
+other rows. Use the correct time ordering, entity groups, prediction horizon and
+history protocol. A rolling aggregate includes the current row: a current-target
+input can expose the answer directly. A lagged target is useful only when that
+target observation is actually available at the intended prediction time. Merely
+moving a temporal node after a random split does not establish a valid protocol.</p>
+<h2 id="complete-registered-node-catalog">Complete registered-node catalog</h2>
+<p>The placement of learned entries below describes active feature processing. The
+explicit-empty and target-only exceptions above still apply. Aliases remain separate.</p>
+<table>
+<thead>
+<tr>
+<th>Registered ID</th>
+<th>Placement</th>
+<th>Behavior and practical rule</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>AliasReplacement</code></td>
+<td>Before split (fixed)</td>
+<td>Apply configured/domain aliases to each value; no fitted vocabulary.</td>
+</tr>
+<tr>
+<td><code>Casting</code></td>
+<td>Depends on operation</td>
+<td>Fixed casts may precede split; categorical vocabularies fit on train. Resolve per-column overrides.</td>
+</tr>
+<tr>
+<td><code>CorrelationThreshold</code></td>
+<td>After split</td>
+<td>Learn retained columns from training correlations; empty selection still invokes discovery.</td>
+</tr>
+<tr>
+<td><code>CustomBinning</code></td>
+<td>Depends on operation</td>
+<td>Explicit columns and configured edges are fixed; omitted/null columns learn value-based selection.</td>
+</tr>
+<tr>
+<td><code>DataSnapshot</code></td>
+<td>Before split (fixed)</td>
+<td>Report a snapshot without changing modeling data; do not tune from held-out reports.</td>
+</tr>
+<tr>
+<td><code>DatasetProfile</code></td>
+<td>Before split (fixed)</td>
+<td>Report statistics while preserving data; held-out-driven modeling decisions can still leak.</td>
+</tr>
+<tr>
+<td><code>DateFeatures</code></td>
+<td>Before split (fixed)</td>
+<td>Extract configured calendar fields from each timestamp.</td>
+</tr>
+<tr>
+<td><code>Deduplicate</code></td>
+<td>After split</td>
+<td>Conservatively gated cross-row filtering. Separately prevent duplicate entities from crossing evaluation splits.</td>
+</tr>
+<tr>
+<td><code>DropMissingColumns</code></td>
+<td>Depends on operation</td>
+<td>Positive missing threshold learns deletion; otherwise use fixed configured columns.</td>
+</tr>
+<tr>
+<td><code>DropMissingRows</code></td>
+<td>Before split (fixed)</td>
+<td>Apply fixed per-row missingness rules. Removing evaluation rows changes the scored population.</td>
+</tr>
+<tr>
+<td><code>DummyEncoder</code></td>
+<td>After split</td>
+<td>Learn training categories and fixed indicator schema; unknown categories yield zeros.</td>
+</tr>
+<tr>
+<td><code>EllipticEnvelope</code></td>
+<td>After split</td>
+<td>Fit training outlier estimator and reuse it. Filtering held-out rows changes evaluation coverage.</td>
+</tr>
+<tr>
+<td><code>FeatureGeneration</code></td>
+<td>Depends on operation</td>
+<td>Fixed arithmetic/ratio/similarity/datetime; <code>group_agg</code> learns training lookup.</td>
+</tr>
+<tr>
+<td><code>FeatureGenerationNode</code></td>
+<td>Depends on operation</td>
+<td>Feature-generation alias with the same mixed-operation rules.</td>
+</tr>
+<tr>
+<td><code>FeatureInteraction</code></td>
+<td>Before split (fixed)</td>
+<td>Build a polynomial basis from schema and configured options.</td>
+</tr>
+<tr>
+<td><code>FeatureMath</code></td>
+<td>Depends on operation</td>
+<td>Feature-generation alias; any learned group aggregate makes the node learned.</td>
+</tr>
+<tr>
+<td><code>GeneralBinning</code></td>
+<td>After split</td>
+<td>Learn bin edges or discretization state on training values and replay them.</td>
+</tr>
+<tr>
+<td><code>GeneralTransformation</code></td>
+<td>Depends on operation</td>
+<td>Fixed math may precede split; Yeo-Johnson/Box-Cox fit parameters. Inspect all rules.</td>
+</tr>
+<tr>
+<td><code>GeoDistance</code></td>
+<td>Before split (fixed)</td>
+<td>Compute configured distances from each row's coordinates.</td>
+</tr>
+<tr>
+<td><code>H3Index</code></td>
+<td>Before split (fixed)</td>
+<td>Map coordinates to cells at a configured resolution.</td>
+</tr>
+<tr>
+<td><code>HashEncoder</code></td>
+<td>Depends on operation</td>
+<td>Explicit columns use fixed hashing; automatic selection is conservatively gated.</td>
+</tr>
+<tr>
+<td><code>IQR</code></td>
+<td>After split</td>
+<td>Learn training quartiles and bounds; held-out outliers cannot move them.</td>
+</tr>
+<tr>
+<td><code>InvalidValueReplacement</code></td>
+<td>Before split (fixed)</td>
+<td>Apply configured invalid-value replacement rules.</td>
+</tr>
+<tr>
+<td><code>IterativeImputer</code></td>
+<td>After split</td>
+<td>Fit imputation models on training data and reuse them.</td>
+</tr>
+<tr>
+<td><code>KBinsDiscretizer</code></td>
+<td>After split</td>
+<td>Binning alias; active data-derived modes learn training edges/state.</td>
+</tr>
+<tr>
+<td><code>KNNImputer</code></td>
+<td>After split</td>
+<td>Fit/store training reference rows; do not use held-out rows as fitting references.</td>
+</tr>
+<tr>
+<td><code>LabelEncoder</code></td>
+<td>Depends on operation</td>
+<td>Default/empty target-only or no-op; explicit feature columns learn category mappings.</td>
+</tr>
+<tr>
+<td><code>LagFeatures</code></td>
+<td>Time/history review</td>
+<td>Positive lags require valid ordering, groups, available history and prediction horizon.</td>
+</tr>
+<tr>
+<td><code>ManualBounds</code></td>
+<td>Before split (fixed)</td>
+<td>Apply supplied bounds; do not choose them by inspecting test outcomes.</td>
+</tr>
+<tr>
+<td><code>MaxAbsScaler</code></td>
+<td>After split</td>
+<td>Fit training maximum absolute values and reuse the scale.</td>
+</tr>
+<tr>
+<td><code>MinMaxScaler</code></td>
+<td>After split</td>
+<td>Fit training extrema; held-out extrema cannot redefine the range.</td>
+</tr>
+<tr>
+<td><code>MissingIndicator</code></td>
+<td>Depends on operation</td>
+<td>Nonempty explicit columns are fixed; omitted/null/[] learns missing-column discovery.</td>
+</tr>
+<tr>
+<td><code>ModelBasedSelection</code></td>
+<td>After split</td>
+<td>Fit selector/model on training features and targets as required.</td>
+</tr>
+<tr>
+<td><code>OneHotEncoder</code></td>
+<td>After split</td>
+<td>Fit categories/frequency grouping and preserve the training output schema.</td>
+</tr>
+<tr>
+<td><code>OrdinalEncoder</code></td>
+<td>Depends on operation</td>
+<td>Default learns feature categories; explicit [] or exact known-target selection is exempt.</td>
+</tr>
+<tr>
+<td><code>Oversampling</code></td>
+<td>After split, training only</td>
+<td>Resample each training partition only, never validation or test rows.</td>
+</tr>
+<tr>
+<td><code>PolynomialFeatures</code></td>
+<td>Depends on operation</td>
+<td><code>auto_detect: true</code> with omitted/empty columns learns column selection; otherwise fixed polynomial math.</td>
+</tr>
+<tr>
+<td><code>PolynomialFeaturesNode</code></td>
+<td>Depends on operation</td>
+<td>Same automatic-selection rule as <code>PolynomialFeatures</code>; explicit nonempty columns remain fixed.</td>
+</tr>
+<tr>
+<td><code>PowerTransformer</code></td>
+<td>After split</td>
+<td>Fit Yeo-Johnson/Box-Cox parameters even when standardization is disabled.</td>
+</tr>
+<tr>
+<td><code>RobustScaler</code></td>
+<td>After split</td>
+<td>Fit robust training location and scale statistics.</td>
+</tr>
+<tr>
+<td><code>RollingAggregate</code></td>
+<td>Time/history review</td>
+<td>Ordered/grouped rolling features include the current row; current-target input can leak directly.</td>
+</tr>
+<tr>
+<td><code>SimpleImputer</code></td>
+<td>Depends on operation</td>
+<td>Configured constant is fixed; mean/median/most-frequent fits training statistics.</td>
+</tr>
+<tr>
+<td><code>SimpleTransformation</code></td>
+<td>Before split (fixed)</td>
+<td>Apply configured simple math without fitting power parameters.</td>
+</tr>
+<tr>
+<td><code>Split</code></td>
+<td>Creates row split</td>
+<td>Legacy alias of <code>TrainTestSplitter</code>.</td>
+</tr>
+<tr>
+<td><code>StandardScaler</code></td>
+<td>After split</td>
+<td>Fit training centering/scaling statistics and refit within CV folds.</td>
+</tr>
+<tr>
+<td><code>TargetEncoder</code></td>
+<td>After split</td>
+<td>OOF training encoding; full-training artifact for held-out/inference, training prior for unknowns.</td>
+</tr>
+<tr>
+<td><code>TextCleaning</code></td>
+<td>Before split (fixed)</td>
+<td>Fixed per-value cleaning; omitted/null detects text dtypes, [] does nothing.</td>
+</tr>
+<tr>
+<td><code>TrainTestSplitter</code></td>
+<td>Creates row split</td>
+<td>Create the actual train/test row boundary with a suitable split protocol.</td>
+</tr>
+<tr>
+<td><code>Undersampling</code></td>
+<td>After split, training only</td>
+<td>Preserve the original validation and test populations.</td>
+</tr>
+<tr>
+<td><code>UnivariateSelection</code></td>
+<td>After split</td>
+<td>Fit feature scores/selection on training rows and targets as required.</td>
+</tr>
+<tr>
+<td><code>ValueReplacement</code></td>
+<td>Before split (fixed)</td>
+<td>Apply explicitly configured value replacements.</td>
+</tr>
+<tr>
+<td><code>VarianceThreshold</code></td>
+<td>After split</td>
+<td>Fit feature variances and selection; [] is not a general no-op exemption.</td>
+</tr>
+<tr>
+<td><code>WOEEncoder</code></td>
+<td>After split</td>
+<td>Complement-fold training mappings; full-training held-out mapping and configured unknown fallback.</td>
+</tr>
+<tr>
+<td><code>Winsorize</code></td>
+<td>After split</td>
+<td>Fit training clipping limits; held-out extreme values cannot change them.</td>
+</tr>
+<tr>
+<td><code>ZScore</code></td>
+<td>After split</td>
+<td>Fit training location/scale and reuse the stored outlier rule.</td>
+</tr>
+<tr>
+<td><code>count_vectorizer</code></td>
+<td>Depends on operation</td>
+<td>Nonempty feature selection learns vocabulary; omitted/null/[] is no-op.</td>
+</tr>
+<tr>
+<td><code>feature_selection</code></td>
+<td>After split</td>
+<td>Dispatch to configured learned selector; preserve training-only and fold-refit boundaries.</td>
+</tr>
+<tr>
+<td><code>feature_target_split</code></td>
+<td>Before split (fixed)</td>
+<td>Separate X from y; this is not a train/test row boundary.</td>
+</tr>
+<tr>
+<td><code>hashing_vectorizer</code></td>
+<td>Before split (fixed)</td>
+<td>Fixed hash space; explicit nonempty text columns required.</td>
+</tr>
+<tr>
+<td><code>sentence_embedder</code></td>
+<td>Before split (fixed)</td>
+<td>Apply pretrained embeddings; explicit nonempty columns required, external model provenance remains separate.</td>
+</tr>
+<tr>
+<td><code>tfidf_vectorizer</code></td>
+<td>Depends on operation</td>
+<td>Nonempty feature selection learns vocabulary/IDF; omitted/null/[] is no-op.</td>
+</tr>
+<tr>
+<td><code>tokenizer</code></td>
+<td>Before split (fixed)</td>
+<td>Fixed tokenization; explicit nonempty text columns required.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="supported-graph-shapes-and-current-policy">Supported graph shapes and current policy</h2>
+<p>Prefer a linear chain when the feature operations are sequential. Backend fold
+reconstruction also supports these branch forms when their requirements hold:</p>
+<ul>
+<li>A common row splitter forks into linear transformer branches that preserve row
+  alignment and join directly into the model. Avoid additional splitters, nested
+  merges and disallowed row-changing steps in the branches.</li>
+<li>Genuinely fixed branches from a shared loader merge at the first row splitter,
+  followed by a reconstructable downstream chain. The resolver retains merged raw
+  input and outer training row selection for fold-local fitting.</li>
+</ul>
+<p>Supported topology does not establish correct feature ownership. Preserve intended
+column selection and merge order; overlapping outputs can replace earlier branch
+columns. A join into an intermediate encoder is not the same supported form as a
+direct join into the model. See the <a href="leakage_core_backend.html">core/backend guide</a>
+for diagrams and exact reconstruction requirements.</p>
+<p>With the default <code>raise</code> policy, a detected definite preprocessing-placement
+violation is rejected by the backend admission gate with HTTP 400 and no jobs
+created. Unsupported fold reconstruction involving learned preprocessing also
+stops execution by default, but that capability failure can occur after a job has
+been created. These are separate outcomes.</p>
+<p>Explicit <code>metadata.on_leakage="warn"</code> or <code>"ignore"</code> can permit the legacy fallback
+to pre-transformed data. Its CV scores can be optimistically biased, and its
+<code>fold_refit_fallback</code> diagnostic describes the missing guarantee. Choosing a weaker
+policy does not make the graph reconstructable or repair the statistical problem.</p>
+<p>Read the <strong>Leakage Gate</strong> and <strong>Fold Refit Audit</strong> separately. Green results provide
+evidence for the checks performed, not proof of feature provenance, entity
+independence, valid temporal assumptions or an untouched test-selection process.</p>
+<p>Core-only CV callers must fit a fresh pipeline on each fold's raw training
+partition; cross-validating an estimator over a globally preprocessed matrix does
+not automatically refit the core preprocessing steps.</p>
+<h2 id="where-to-use-this-reference">Where to use this reference</h2>
+<p>The canvas <strong>How pipelines work</strong> dialog contains a searchable
+<strong>Preprocessing &amp; Leakage</strong> tab with the same registered-node coverage. Search by
+display name, registry ID, category or operation, and filter by placement.</p>
+<p>For implementation evidence and the exact fit/apply contracts, see the
+<a href="preprocessing_leakage_audit.html">preprocessing leakage audit</a>. For graph diagrams,
+admission and fold-reconstruction details, see
+<a href="leakage_core_backend.html">Leakage: core and backend</a>.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "toc.integrate", "content.code.copy", "content.tabs.link"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>

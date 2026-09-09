@@ -14,7 +14,7 @@
         <link rel="prev" href="threshold_tuning.html">
       
       
-        <link rel="next" href="drift_monitoring.html">
+        <link rel="next" href="leakage_core_backend.html">
       
       
         
@@ -1842,6 +1842,28 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#branches-in-backend-pipelines" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Branches in backend pipelines
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#standalone-core-fail-before-fitting-unsafe-preprocessing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Standalone core: fail before fitting unsafe preprocessing
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#pattern-b-create-splitdataset-yourself" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1868,10 +1890,105 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#detailed-execution-and-operation-guides" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Detailed execution and operation guides
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
       
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="leakage_core_backend.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Leakage Safety - Core & Backend
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="preprocessing_leakage_audit.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Preprocessing Leakage Audit
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="preprocessing_placement.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Preprocessing Placement
+  
+
+    
+  </span>
+  
+  
+
+      </a>
     </li>
   
 
@@ -3192,6 +3309,113 @@ caller already split safely, so it does not require a <code>TrainTestSplitter</c
   &quot;params&quot;: {&quot;test_size&quot;: 0.2, &quot;random_state&quot;: 42, &quot;target_column&quot;: &quot;target&quot;}
 }
 </code></pre>
+<h3 id="branches-in-backend-pipelines">Branches in backend pipelines</h3>
+<p>When the backend executes a graph with multiple training branches, each leaf
+<code>training</code> or <code>tuning</code> node must have a <code>TrainTestSplitter</code> on its own input
+path. A splitter on a different branch does not protect it.</p>
+<p>For example:</p>
+<pre><code class="language-text">DataLoader → TrainTestSplitter → StandardScaler → training_A  (protected)
+           └→ StandardScaler ─────────────────→ training_B  (warning/error)
+</code></pre>
+<p><code>StandardScaler</code> learns its mean and standard deviation from the rows it
+receives. In the second branch it sees the full dataset, so the backend leakage
+gate reports the branch before training. With the default <code>on_leakage="raise"</code>
+mode, execution stops before any node fits. <code>on_leakage="warn"</code> records the
+warning and continues.</p>
+<p>The submission API checks the graph before partitioning it into jobs. A
+violation returns HTTP 400 before any job is created. When a single training
+node is selected, only its upstream path is checked, while the full graph's
+split/no-split context is retained.</p>
+<p>If the training node explicitly uses internal validation and its unsplit
+preprocessing path is linear, the branch is also accepted: the engine can
+refit that chain inside each fold. Set <code>cv_enabled: true</code> for a fixed training
+run or use <code>run_mode: "tuned"</code> for a tuning run. CV alone does not protect
+unsplit merged preprocessing paths; add a splitter before the learning nodes
+or use a supported linear path. A graph with no train/test splitter at all
+receives a <code>no_split</code> advisory because the backend cannot establish a
+train/test guarantee from that graph.</p>
+<h3 id="standalone-core-fail-before-fitting-unsafe-preprocessing">Standalone core: fail before fitting unsafe preprocessing</h3>
+<p><code>SkyulfPipeline.fit()</code> and <code>get_fitted_split()</code> reject learned preprocessing
+before a configured train/test splitter by default, before fitting any step.
+This protection does not require the backend or frontend:</p>
+<pre><code class="language-python">import pandas as pd
+
+from skyulf import SkyulfPipeline
+
+data = pd.DataFrame({&quot;x&quot;: range(20), &quot;target&quot;: [0, 1] * 10})
+leaking_pipeline = SkyulfPipeline({
+    &quot;preprocessing&quot;: [
+        {&quot;name&quot;: &quot;scale&quot;, &quot;transformer&quot;: &quot;StandardScaler&quot;, &quot;params&quot;: {&quot;columns&quot;: [&quot;x&quot;]}},
+        {&quot;name&quot;: &quot;split&quot;, &quot;transformer&quot;: &quot;TrainTestSplitter&quot;, &quot;params&quot;: {&quot;test_size&quot;: 0.2}},
+    ],
+    &quot;modeling&quot;: {},
+})
+try:
+    leaking_pipeline.fit(data, target_column=&quot;target&quot;)
+except ValueError as error:
+    print(error)  # Expected: scaler learns from test rows before the split.
+
+# Correct fix: put the splitter before the scaler.
+# Explicit compatibility escape hatch, not a leakage-safe fix:
+leaking_pipeline.fit(data, target_column=&quot;target&quot;, on_leakage=&quot;warn&quot;)
+</code></pre>
+<p><code>leaking_pipeline</code> is an ordinary variable containing a <code>SkyulfPipeline</code>
+instance. Its name highlights this example's intentionally wrong step order;
+it is not a special API, class, or execution mode.</p>
+<table>
+<thead>
+<tr>
+<th>Mode</th>
+<th>Config-only diagnostic for a definite violation</th>
+<th><code>fit()</code> / <code>get_fitted_split()</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>raise</code> (default)</td>
+<td>Raises <code>ValueError</code></td>
+<td>Stops before any preprocessing fit</td>
+</tr>
+<tr>
+<td><code>warn</code></td>
+<td>Returns warning strings without fitting</td>
+<td>Logs warnings and continues</td>
+</tr>
+<tr>
+<td><code>ignore</code></td>
+<td>Returns an empty list</td>
+<td>Continues without leakage warnings</td>
+</tr>
+</tbody>
+</table>
+<p>Only these three mode strings are accepted; other values raise <code>ValueError</code>.
+<code>warn</code> and <code>ignore</code> do not correct an unsafe order. Registered stateless nodes
+are not definite violations: fixed per-row rules do not fit population
+statistics. For example, constant imputation uses the configured value and is
+allowed before splitting, whereas mean imputation learns a value from the rows
+and must follow the split.</p>
+<p>For a self-contained, numbered walkthrough of all modes, safe training,
+prediction, an externally supplied split, and a fresh pipeline per CV fold,
+open <code>skyulf-core/examples/09_leakage_safety.ipynb</code> in the repository.
+The companion <code>skyulf-core/examples/09_leakage_safety.py</code> offers a shorter
+terminal-only walkthrough.</p>
+<p><code>on_leakage="ignore"</code> also permits the unsafe fit without a warning. Pipelines
+with no configured splitter still receive an advisory rather than an error;
+the diagnostic cannot guarantee leakage safety for an unsplit dataset.
+Passing an existing <code>SplitDataset</code> supplies the boundary externally, so each
+transformer learns from its training partition without a false no-split warning.</p>
+<p>Registered stateless nodes are allowed before splitting. Parameter-dependent
+exceptions are shared with the backend, including constant imputation, explicit
+column dropping/hashing/missingness indicators, and target-only label encoding.
+Feature encoders and unknown transformers remain subject to the guard. Pass
+<code>target_column</code> to <code>validate_leakage_safety()</code> when the config does not identify
+the target through a splitter.</p>
+<p>The shared JSON fixture at
+<code>skyulf-core/tests/test_cases/leakage/registry_nodes.json</code> drives the core and
+API integration matrices. Registry coverage assertions require new node types
+to be classified explicitly. These cases test admission/rejection for every
+registered node and model, not a full training run of every algorithm. A separate
+numerical case checks that held-out rows do not influence fitted scaler statistics.</p>
 <h3 id="pattern-b-create-splitdataset-yourself">Pattern B: create <code>SplitDataset</code> yourself</h3>
 <pre><code class="language-python">import pandas as pd
 from sklearn.model_selection import train_test_split
@@ -3237,6 +3461,11 @@ print(metrics)
 <h2 id="notes-on-inference">Notes on inference</h2>
 <p>At inference time, <code>FeatureEngineer.transform()</code> skips splitters and resampling steps.
 That ensures your <code>predict()</code> path remains deterministic.</p>
+<h2 id="detailed-execution-and-operation-guides">Detailed execution and operation guides</h2>
+<p>See <a href="leakage_core_backend.html">Leakage Safety: Core &amp; Backend</a> for runnable core
+examples, native tuning, supported backend graphs, and editable Mermaid diagrams.
+The <a href="preprocessing_leakage_audit.html">preprocessing leakage audit</a> documents all
+62 preprocessing registrations and their parameter-dependent behavior.</p>
 
 
 

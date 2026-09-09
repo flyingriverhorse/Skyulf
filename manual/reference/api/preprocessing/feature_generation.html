@@ -1773,6 +1773,90 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../user_guide/leakage_core_backend.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Leakage Safety - Core & Backend
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user_guide/preprocessing_leakage_audit.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Preprocessing Leakage Audit
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user_guide/preprocessing_placement.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Preprocessing Placement
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../user_guide/drift_monitoring.html" class="md-nav__link">
         
   
@@ -3359,8 +3443,7 @@ constants for backward compatibility.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>skyulf-core/skyulf/preprocessing/feature_generation/generation.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">18</span>
-<span class="normal">19</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">19</span>
 <span class="normal">20</span>
 <span class="normal">21</span>
 <span class="normal">22</span>
@@ -3373,7 +3456,18 @@ constants for backward compatibility.</p>
 <span class="normal">29</span>
 <span class="normal">30</span>
 <span class="normal">31</span>
-<span class="normal">32</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">FeatureGenerationApplier</span><span class="p">(</span><span class="n">BaseApplier</span><span class="p">):</span>
+<span class="normal">32</span>
+<span class="normal">33</span>
+<span class="normal">34</span>
+<span class="normal">35</span>
+<span class="normal">36</span>
+<span class="normal">37</span>
+<span class="normal">38</span>
+<span class="normal">39</span>
+<span class="normal">40</span>
+<span class="normal">41</span>
+<span class="normal">42</span>
+<span class="normal">43</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">FeatureGenerationApplier</span><span class="p">(</span><span class="n">BaseApplier</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""Append the columns described by a feature-generation artifact."""</span>
 
     <span class="nd">@apply_method</span>
@@ -3384,7 +3478,17 @@ constants for backward compatibility.</p>
 <span class="sd">        created. A failing operation is logged and skipped rather than aborting</span>
 <span class="sd">        the node, and an output name that already exists is suffixed until</span>
 <span class="sd">        unique unless ``allow_overwrite`` says otherwise.</span>
+
+<span class="sd">        Group aggregates require training-fitted mappings. Legacy artifacts</span>
+<span class="sd">        lacking those mappings must be refitted before inference.</span>
 <span class="sd">        """</span>
+        <span class="k">if</span> <span class="nb">any</span><span class="p">(</span>
+            <span class="n">op</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"operation_type"</span><span class="p">)</span> <span class="o">==</span> <span class="s2">"group_agg"</span> <span class="ow">and</span> <span class="s2">"group_agg_mapping"</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">op</span>
+            <span class="k">for</span> <span class="n">op</span> <span class="ow">in</span> <span class="n">params</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"operations"</span><span class="p">,</span> <span class="p">[])</span>
+        <span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s2">"FeatureGeneration group_agg requires fitted statistics; refit the node."</span>
+            <span class="p">)</span>
         <span class="k">return</span> <span class="n">apply_dual_engine</span><span class="p">(</span>
             <span class="n">X</span><span class="p">,</span> <span class="n">params</span><span class="p">,</span> <span class="p">{</span><span class="s2">"polars"</span><span class="p">:</span> <span class="n">_featgen_apply_polars</span><span class="p">,</span> <span class="s2">"pandas"</span><span class="p">:</span> <span class="n">_featgen_apply_pandas</span><span class="p">}</span>
         <span class="p">)</span>
@@ -3420,12 +3524,13 @@ constants for backward compatibility.</p>
 created. A failing operation is logged and skipped rather than aborting
 the node, and an output name that already exists is suffixed until
 unique unless <code>allow_overwrite</code> says otherwise.</p>
+<p>Group aggregates require training-fitted mappings. Legacy artifacts
+lacking those mappings must be refitted before inference.</p>
 
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>skyulf-core/skyulf/preprocessing/feature_generation/generation.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">21</span>
-<span class="normal">22</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">22</span>
 <span class="normal">23</span>
 <span class="normal">24</span>
 <span class="normal">25</span>
@@ -3435,7 +3540,18 @@ unique unless <code>allow_overwrite</code> says otherwise.</p>
 <span class="normal">29</span>
 <span class="normal">30</span>
 <span class="normal">31</span>
-<span class="normal">32</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@apply_method</span>
+<span class="normal">32</span>
+<span class="normal">33</span>
+<span class="normal">34</span>
+<span class="normal">35</span>
+<span class="normal">36</span>
+<span class="normal">37</span>
+<span class="normal">38</span>
+<span class="normal">39</span>
+<span class="normal">40</span>
+<span class="normal">41</span>
+<span class="normal">42</span>
+<span class="normal">43</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@apply_method</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">apply</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">_y</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">params</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>  <span class="c1"># pylint: disable=arguments-differ</span>
 <span class="w">    </span><span class="sd">"""Evaluate each configured operation and append its output column to ``X``.</span>
 
@@ -3443,7 +3559,17 @@ unique unless <code>allow_overwrite</code> says otherwise.</p>
 <span class="sd">    created. A failing operation is logged and skipped rather than aborting</span>
 <span class="sd">    the node, and an output name that already exists is suffixed until</span>
 <span class="sd">    unique unless ``allow_overwrite`` says otherwise.</span>
+
+<span class="sd">    Group aggregates require training-fitted mappings. Legacy artifacts</span>
+<span class="sd">    lacking those mappings must be refitted before inference.</span>
 <span class="sd">    """</span>
+    <span class="k">if</span> <span class="nb">any</span><span class="p">(</span>
+        <span class="n">op</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"operation_type"</span><span class="p">)</span> <span class="o">==</span> <span class="s2">"group_agg"</span> <span class="ow">and</span> <span class="s2">"group_agg_mapping"</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">op</span>
+        <span class="k">for</span> <span class="n">op</span> <span class="ow">in</span> <span class="n">params</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"operations"</span><span class="p">,</span> <span class="p">[])</span>
+    <span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">"FeatureGeneration group_agg requires fitted statistics; refit the node."</span>
+        <span class="p">)</span>
     <span class="k">return</span> <span class="n">apply_dual_engine</span><span class="p">(</span>
         <span class="n">X</span><span class="p">,</span> <span class="n">params</span><span class="p">,</span> <span class="p">{</span><span class="s2">"polars"</span><span class="p">:</span> <span class="n">_featgen_apply_polars</span><span class="p">,</span> <span class="s2">"pandas"</span><span class="p">:</span> <span class="n">_featgen_apply_pandas</span><span class="p">}</span>
     <span class="p">)</span>
@@ -3478,7 +3604,7 @@ unique unless <code>allow_overwrite</code> says otherwise.</p>
 
 
 
-        <p>Carry the operation configuration into the artifact; nothing is learned.</p>
+        <p>Record row-local operations and fit group aggregates from training rows.</p>
 
 
 
@@ -3489,37 +3615,52 @@ unique unless <code>allow_overwrite</code> says otherwise.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>skyulf-core/skyulf/preprocessing/feature_generation/generation.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">35</span>
-<span class="normal">36</span>
-<span class="normal">37</span>
-<span class="normal">38</span>
-<span class="normal">39</span>
-<span class="normal">40</span>
-<span class="normal">41</span>
-<span class="normal">42</span>
-<span class="normal">43</span>
-<span class="normal">44</span>
-<span class="normal">45</span>
-<span class="normal">46</span>
-<span class="normal">47</span>
-<span class="normal">48</span>
-<span class="normal">49</span>
-<span class="normal">50</span>
-<span class="normal">51</span>
-<span class="normal">52</span>
-<span class="normal">53</span>
-<span class="normal">54</span>
-<span class="normal">55</span>
-<span class="normal">56</span>
-<span class="normal">57</span>
-<span class="normal">58</span>
-<span class="normal">59</span>
-<span class="normal">60</span>
-<span class="normal">61</span>
-<span class="normal">62</span>
-<span class="normal">63</span>
-<span class="normal">64</span>
-<span class="normal">65</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">"FeatureGeneration"</span><span class="p">,</span> <span class="n">FeatureGenerationApplier</span><span class="p">)</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 79</span>
+<span class="normal"> 80</span>
+<span class="normal"> 81</span>
+<span class="normal"> 82</span>
+<span class="normal"> 83</span>
+<span class="normal"> 84</span>
+<span class="normal"> 85</span>
+<span class="normal"> 86</span>
+<span class="normal"> 87</span>
+<span class="normal"> 88</span>
+<span class="normal"> 89</span>
+<span class="normal"> 90</span>
+<span class="normal"> 91</span>
+<span class="normal"> 92</span>
+<span class="normal"> 93</span>
+<span class="normal"> 94</span>
+<span class="normal"> 95</span>
+<span class="normal"> 96</span>
+<span class="normal"> 97</span>
+<span class="normal"> 98</span>
+<span class="normal"> 99</span>
+<span class="normal">100</span>
+<span class="normal">101</span>
+<span class="normal">102</span>
+<span class="normal">103</span>
+<span class="normal">104</span>
+<span class="normal">105</span>
+<span class="normal">106</span>
+<span class="normal">107</span>
+<span class="normal">108</span>
+<span class="normal">109</span>
+<span class="normal">110</span>
+<span class="normal">111</span>
+<span class="normal">112</span>
+<span class="normal">113</span>
+<span class="normal">114</span>
+<span class="normal">115</span>
+<span class="normal">116</span>
+<span class="normal">117</span>
+<span class="normal">118</span>
+<span class="normal">119</span>
+<span class="normal">120</span>
+<span class="normal">121</span>
+<span class="normal">122</span>
+<span class="normal">123</span>
+<span class="normal">124</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">"FeatureGeneration"</span><span class="p">,</span> <span class="n">FeatureGenerationApplier</span><span class="p">)</span>
 <span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">"FeatureMath"</span><span class="p">,</span> <span class="n">FeatureGenerationApplier</span><span class="p">)</span>
 <span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">"FeatureGenerationNode"</span><span class="p">,</span> <span class="n">FeatureGenerationApplier</span><span class="p">)</span>
 <span class="nd">@node_meta</span><span class="p">(</span>
@@ -3528,28 +3669,43 @@ unique unless <code>allow_overwrite</code> says otherwise.</p>
     <span class="n">category</span><span class="o">=</span><span class="s2">"Feature Engineering"</span><span class="p">,</span>
     <span class="n">description</span><span class="o">=</span><span class="s2">"Generate new features using mathematical operations."</span><span class="p">,</span>
     <span class="n">params</span><span class="o">=</span><span class="p">{</span><span class="s2">"operations"</span><span class="p">:</span> <span class="p">[]},</span>
-    <span class="n">learns_from_data</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="n">learns_from_data</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
 <span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">FeatureGenerationCalculator</span><span class="p">(</span><span class="n">BaseCalculator</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">"""Carry the operation configuration into the artifact; nothing is learned."""</span>
+<span class="w">    </span><span class="sd">"""Record row-local operations and fit group aggregates from training rows."""</span>
 
+    <span class="nd">@fit_method</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">fit</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
-        <span class="n">df</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span> <span class="o">|</span> <span class="n">SkyulfDataFrame</span> <span class="o">|</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span> <span class="o">|</span> <span class="n">Any</span><span class="p">,</span>
+        <span class="n">X</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
+        <span class="n">_y</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
         <span class="n">config</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span>
-    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">FeatureGenerationArtifact</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">"""Copy the operation list and its guards from ``config`` into the artifact.</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">FeatureGenerationArtifact</span><span class="p">:</span>  <span class="c1"># pylint: disable=arguments-differ</span>
+<span class="w">        </span><span class="sd">"""Fit aggregate mappings against the intermediate training feature frame.</span>
 
-<span class="sd">        ``df`` is never read. The node is registered ``learns_from_data=False``,</span>
-<span class="sd">        so the train and test artifacts are identical and this calculator</span>
-<span class="sd">        contributes no leakage surface of its own.</span>
+<span class="sd">        Operations execute in order while fitting so an aggregate can consume</span>
+<span class="sd">        an earlier generated column. Its saved mapping supplies held-out rows;</span>
+<span class="sd">        unknown keys stay missing, and no inference values are aggregated.</span>
+<span class="sd">        Configurations containing only row-local operations need no data fit.</span>
 <span class="sd">        """</span>
-        <span class="k">return</span> <span class="p">{</span>
+        <span class="n">params</span><span class="p">:</span> <span class="n">FeatureGenerationArtifact</span> <span class="o">=</span> <span class="p">{</span>
             <span class="s2">"type"</span><span class="p">:</span> <span class="s2">"feature_generation"</span><span class="p">,</span>
-            <span class="s2">"operations"</span><span class="p">:</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"operations"</span><span class="p">,</span> <span class="p">[]),</span>
+            <span class="s2">"operations"</span><span class="p">:</span> <span class="n">deepcopy</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"operations"</span><span class="p">,</span> <span class="p">[])),</span>
             <span class="s2">"epsilon"</span><span class="p">:</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"epsilon"</span><span class="p">,</span> <span class="n">DEFAULT_EPSILON</span><span class="p">),</span>
             <span class="s2">"allow_overwrite"</span><span class="p">:</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"allow_overwrite"</span><span class="p">,</span> <span class="kc">False</span><span class="p">),</span>
         <span class="p">}</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">any</span><span class="p">(</span><span class="n">op</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"operation_type"</span><span class="p">)</span> <span class="o">==</span> <span class="s2">"group_agg"</span> <span class="k">for</span> <span class="n">op</span> <span class="ow">in</span> <span class="n">params</span><span class="p">[</span><span class="s2">"operations"</span><span class="p">]):</span>
+            <span class="k">return</span> <span class="n">params</span>
+
+        <span class="n">working</span> <span class="o">=</span> <span class="n">X</span>
+        <span class="k">for</span> <span class="n">index</span><span class="p">,</span> <span class="n">op</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">params</span><span class="p">[</span><span class="s2">"operations"</span><span class="p">]):</span>
+            <span class="k">if</span> <span class="n">op</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"operation_type"</span><span class="p">)</span> <span class="o">==</span> <span class="s2">"group_agg"</span><span class="p">:</span>
+                <span class="n">op</span><span class="p">[</span><span class="s2">"group_agg_mapping"</span><span class="p">]</span> <span class="o">=</span> <span class="n">_fit_group_aggregation</span><span class="p">(</span><span class="n">working</span><span class="p">,</span> <span class="n">op</span><span class="p">)</span>
+            <span class="c1"># apply_method exposes the public (data, params) call signature.</span>
+            <span class="n">working</span> <span class="o">=</span> <span class="n">FeatureGenerationApplier</span><span class="p">()</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span>  <span class="c1"># pylint: disable=no-value-for-parameter</span>
+                <span class="n">working</span><span class="p">,</span> <span class="p">{</span><span class="o">**</span><span class="n">params</span><span class="p">,</span> <span class="s2">"operations"</span><span class="p">:</span> <span class="p">[</span><span class="n">op</span><span class="p">],</span> <span class="s2">"_operation_offset"</span><span class="p">:</span> <span class="n">index</span><span class="p">}</span>
+            <span class="p">)</span>
+        <span class="k">return</span> <span class="n">params</span>
 </code></pre></div></td></tr></table></div>
               </details>
 
@@ -3570,54 +3726,85 @@ unique unless <code>allow_overwrite</code> says otherwise.</p>
 
 
 <h4 id="skyulf.preprocessing.feature_generation.FeatureGenerationCalculator.fit" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">fit</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">config</span><span class="p">)</span></code>
+            <code class="highlight language-python"><span class="n">fit</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">_y</span><span class="p">,</span> <span class="n">config</span><span class="p">)</span></code>
 
 </h4>
 
 
     <div class="doc doc-contents ">
 
-        <p>Copy the operation list and its guards from <code>config</code> into the artifact.</p>
-<p><code>df</code> is never read. The node is registered <code>learns_from_data=False</code>,
-so the train and test artifacts are identical and this calculator
-contributes no leakage surface of its own.</p>
+        <p>Fit aggregate mappings against the intermediate training feature frame.</p>
+<p>Operations execute in order while fitting so an aggregate can consume
+an earlier generated column. Its saved mapping supplies held-out rows;
+unknown keys stay missing, and no inference values are aggregated.
+Configurations containing only row-local operations need no data fit.</p>
 
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>skyulf-core/skyulf/preprocessing/feature_generation/generation.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">49</span>
-<span class="normal">50</span>
-<span class="normal">51</span>
-<span class="normal">52</span>
-<span class="normal">53</span>
-<span class="normal">54</span>
-<span class="normal">55</span>
-<span class="normal">56</span>
-<span class="normal">57</span>
-<span class="normal">58</span>
-<span class="normal">59</span>
-<span class="normal">60</span>
-<span class="normal">61</span>
-<span class="normal">62</span>
-<span class="normal">63</span>
-<span class="normal">64</span>
-<span class="normal">65</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">fit</span><span class="p">(</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 93</span>
+<span class="normal"> 94</span>
+<span class="normal"> 95</span>
+<span class="normal"> 96</span>
+<span class="normal"> 97</span>
+<span class="normal"> 98</span>
+<span class="normal"> 99</span>
+<span class="normal">100</span>
+<span class="normal">101</span>
+<span class="normal">102</span>
+<span class="normal">103</span>
+<span class="normal">104</span>
+<span class="normal">105</span>
+<span class="normal">106</span>
+<span class="normal">107</span>
+<span class="normal">108</span>
+<span class="normal">109</span>
+<span class="normal">110</span>
+<span class="normal">111</span>
+<span class="normal">112</span>
+<span class="normal">113</span>
+<span class="normal">114</span>
+<span class="normal">115</span>
+<span class="normal">116</span>
+<span class="normal">117</span>
+<span class="normal">118</span>
+<span class="normal">119</span>
+<span class="normal">120</span>
+<span class="normal">121</span>
+<span class="normal">122</span>
+<span class="normal">123</span>
+<span class="normal">124</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@fit_method</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">fit</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
-    <span class="n">df</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span> <span class="o">|</span> <span class="n">SkyulfDataFrame</span> <span class="o">|</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span> <span class="o">|</span> <span class="n">Any</span><span class="p">,</span>
+    <span class="n">X</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
+    <span class="n">_y</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
     <span class="n">config</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span>
-<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">FeatureGenerationArtifact</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">"""Copy the operation list and its guards from ``config`` into the artifact.</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">FeatureGenerationArtifact</span><span class="p">:</span>  <span class="c1"># pylint: disable=arguments-differ</span>
+<span class="w">    </span><span class="sd">"""Fit aggregate mappings against the intermediate training feature frame.</span>
 
-<span class="sd">    ``df`` is never read. The node is registered ``learns_from_data=False``,</span>
-<span class="sd">    so the train and test artifacts are identical and this calculator</span>
-<span class="sd">    contributes no leakage surface of its own.</span>
+<span class="sd">    Operations execute in order while fitting so an aggregate can consume</span>
+<span class="sd">    an earlier generated column. Its saved mapping supplies held-out rows;</span>
+<span class="sd">    unknown keys stay missing, and no inference values are aggregated.</span>
+<span class="sd">    Configurations containing only row-local operations need no data fit.</span>
 <span class="sd">    """</span>
-    <span class="k">return</span> <span class="p">{</span>
+    <span class="n">params</span><span class="p">:</span> <span class="n">FeatureGenerationArtifact</span> <span class="o">=</span> <span class="p">{</span>
         <span class="s2">"type"</span><span class="p">:</span> <span class="s2">"feature_generation"</span><span class="p">,</span>
-        <span class="s2">"operations"</span><span class="p">:</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"operations"</span><span class="p">,</span> <span class="p">[]),</span>
+        <span class="s2">"operations"</span><span class="p">:</span> <span class="n">deepcopy</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"operations"</span><span class="p">,</span> <span class="p">[])),</span>
         <span class="s2">"epsilon"</span><span class="p">:</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"epsilon"</span><span class="p">,</span> <span class="n">DEFAULT_EPSILON</span><span class="p">),</span>
         <span class="s2">"allow_overwrite"</span><span class="p">:</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"allow_overwrite"</span><span class="p">,</span> <span class="kc">False</span><span class="p">),</span>
     <span class="p">}</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="nb">any</span><span class="p">(</span><span class="n">op</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"operation_type"</span><span class="p">)</span> <span class="o">==</span> <span class="s2">"group_agg"</span> <span class="k">for</span> <span class="n">op</span> <span class="ow">in</span> <span class="n">params</span><span class="p">[</span><span class="s2">"operations"</span><span class="p">]):</span>
+        <span class="k">return</span> <span class="n">params</span>
+
+    <span class="n">working</span> <span class="o">=</span> <span class="n">X</span>
+    <span class="k">for</span> <span class="n">index</span><span class="p">,</span> <span class="n">op</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">params</span><span class="p">[</span><span class="s2">"operations"</span><span class="p">]):</span>
+        <span class="k">if</span> <span class="n">op</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"operation_type"</span><span class="p">)</span> <span class="o">==</span> <span class="s2">"group_agg"</span><span class="p">:</span>
+            <span class="n">op</span><span class="p">[</span><span class="s2">"group_agg_mapping"</span><span class="p">]</span> <span class="o">=</span> <span class="n">_fit_group_aggregation</span><span class="p">(</span><span class="n">working</span><span class="p">,</span> <span class="n">op</span><span class="p">)</span>
+        <span class="c1"># apply_method exposes the public (data, params) call signature.</span>
+        <span class="n">working</span> <span class="o">=</span> <span class="n">FeatureGenerationApplier</span><span class="p">()</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span>  <span class="c1"># pylint: disable=no-value-for-parameter</span>
+            <span class="n">working</span><span class="p">,</span> <span class="p">{</span><span class="o">**</span><span class="n">params</span><span class="p">,</span> <span class="s2">"operations"</span><span class="p">:</span> <span class="p">[</span><span class="n">op</span><span class="p">],</span> <span class="s2">"_operation_offset"</span><span class="p">:</span> <span class="n">index</span><span class="p">}</span>
+        <span class="p">)</span>
+    <span class="k">return</span> <span class="n">params</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -4267,7 +4454,8 @@ returned unchanged when nothing survives.</p>
 <span class="normal">149</span>
 <span class="normal">150</span>
 <span class="normal">151</span>
-<span class="normal">152</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">"PolynomialFeatures"</span><span class="p">,</span> <span class="n">PolynomialFeaturesApplier</span><span class="p">)</span>
+<span class="normal">152</span>
+<span class="normal">153</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">"PolynomialFeatures"</span><span class="p">,</span> <span class="n">PolynomialFeaturesApplier</span><span class="p">)</span>
 <span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">"PolynomialFeaturesNode"</span><span class="p">,</span> <span class="n">PolynomialFeaturesApplier</span><span class="p">)</span>
 <span class="nd">@node_meta</span><span class="p">(</span>
     <span class="nb">id</span><span class="o">=</span><span class="s2">"PolynomialFeatures"</span><span class="p">,</span>
@@ -4275,7 +4463,8 @@ returned unchanged when nothing survives.</p>
     <span class="n">category</span><span class="o">=</span><span class="s2">"Feature Engineering"</span><span class="p">,</span>
     <span class="n">description</span><span class="o">=</span><span class="s2">"Generate polynomial and interaction features."</span><span class="p">,</span>
     <span class="n">params</span><span class="o">=</span><span class="p">{</span><span class="s2">"degree"</span><span class="p">:</span> <span class="mi">2</span><span class="p">,</span> <span class="s2">"interaction_only"</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span> <span class="s2">"include_bias"</span><span class="p">:</span> <span class="kc">False</span><span class="p">},</span>
-    <span class="n">learns_from_data</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="c1"># Automatic column discovery inspects values; fixed selections are exempted.</span>
+    <span class="n">learns_from_data</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
 <span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">PolynomialFeaturesCalculator</span><span class="p">(</span><span class="n">BaseCalculator</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""Resolve the polynomial configuration and the names it will emit."""</span>
@@ -4357,8 +4546,7 @@ resolves.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>skyulf-core/skyulf/preprocessing/feature_generation/polynomial.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">113</span>
-<span class="normal">114</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">114</span>
 <span class="normal">115</span>
 <span class="normal">116</span>
 <span class="normal">117</span>
@@ -4396,7 +4584,8 @@ resolves.</p>
 <span class="normal">149</span>
 <span class="normal">150</span>
 <span class="normal">151</span>
-<span class="normal">152</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@fit_method</span>
+<span class="normal">152</span>
+<span class="normal">153</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@fit_method</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">fit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">_y</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">PolynomialFeaturesArtifact</span><span class="p">:</span>  <span class="c1"># pylint: disable=arguments-differ</span>
 <span class="w">    </span><span class="sd">"""Record the expansion settings and the feature names they produce.</span>
 

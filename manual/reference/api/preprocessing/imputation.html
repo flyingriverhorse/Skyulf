@@ -1773,6 +1773,90 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../user_guide/leakage_core_backend.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Leakage Safety - Core & Backend
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user_guide/preprocessing_leakage_audit.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Preprocessing Leakage Audit
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user_guide/preprocessing_placement.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Preprocessing Placement
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../user_guide/drift_monitoring.html" class="md-nav__link">
         
   
@@ -4554,7 +4638,18 @@ operate on all selected columns.</p>
 <span class="normal">204</span>
 <span class="normal">205</span>
 <span class="normal">206</span>
-<span class="normal">207</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">"SimpleImputer"</span><span class="p">,</span> <span class="n">SimpleImputerApplier</span><span class="p">)</span>
+<span class="normal">207</span>
+<span class="normal">208</span>
+<span class="normal">209</span>
+<span class="normal">210</span>
+<span class="normal">211</span>
+<span class="normal">212</span>
+<span class="normal">213</span>
+<span class="normal">214</span>
+<span class="normal">215</span>
+<span class="normal">216</span>
+<span class="normal">217</span>
+<span class="normal">218</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">"SimpleImputer"</span><span class="p">,</span> <span class="n">SimpleImputerApplier</span><span class="p">)</span>
 <span class="nd">@node_meta</span><span class="p">(</span>
     <span class="nb">id</span><span class="o">=</span><span class="s2">"SimpleImputer"</span><span class="p">,</span>
     <span class="n">name</span><span class="o">=</span><span class="s2">"Simple Imputer"</span><span class="p">,</span>
@@ -4640,16 +4735,27 @@ operate on all selected columns.</p>
 
         <span class="c1"># Mean/median: extra safety filter to numeric columns only.</span>
         <span class="k">if</span> <span class="n">strategy</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"mean"</span><span class="p">,</span> <span class="s2">"median"</span><span class="p">):</span>
-            <span class="n">numeric</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">detect_numeric_columns</span><span class="p">(</span><span class="n">X</span><span class="p">))</span>
+            <span class="c1"># Automatic selection already applied its cardinality heuristics.</span>
+            <span class="c1"># Do not discard explicitly selected binary or constant columns here.</span>
+            <span class="n">numeric</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">detect_numeric_columns</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">exclude_binary</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">exclude_constant</span><span class="o">=</span><span class="kc">False</span><span class="p">))</span>
             <span class="n">cols</span> <span class="o">=</span> <span class="p">[</span><span class="n">c</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">cols</span> <span class="k">if</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">numeric</span><span class="p">]</span>
             <span class="k">if</span> <span class="ow">not</span> <span class="n">cols</span><span class="p">:</span>
                 <span class="k">return</span> <span class="p">{}</span>
 
-        <span class="n">imputer</span> <span class="o">=</span> <span class="n">SimpleImputer</span><span class="p">(</span><span class="n">strategy</span><span class="o">=</span><span class="n">strategy</span><span class="p">,</span> <span class="n">fill_value</span><span class="o">=</span><span class="n">fill_value</span><span class="p">)</span>
+        <span class="n">imputer</span> <span class="o">=</span> <span class="n">SimpleImputer</span><span class="p">(</span>
+            <span class="n">strategy</span><span class="o">=</span><span class="n">strategy</span><span class="p">,</span>
+            <span class="n">fill_value</span><span class="o">=</span><span class="n">fill_value</span><span class="p">,</span>
+            <span class="n">keep_empty_features</span><span class="o">=</span><span class="n">strategy</span> <span class="o">==</span> <span class="s2">"constant"</span><span class="p">,</span>
+        <span class="p">)</span>
         <span class="n">imputer</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X</span><span class="p">[</span><span class="n">cols</span><span class="p">])</span>
 
-        <span class="n">statistics</span> <span class="o">=</span> <span class="n">imputer</span><span class="o">.</span><span class="n">statistics_</span><span class="o">.</span><span class="n">tolist</span><span class="p">()</span>
-        <span class="n">fill_values</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="nb">zip</span><span class="p">(</span><span class="n">cols</span><span class="p">,</span> <span class="n">statistics</span><span class="p">,</span> <span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span>
+        <span class="k">if</span> <span class="n">strategy</span> <span class="o">==</span> <span class="s2">"constant"</span> <span class="ow">and</span> <span class="n">fill_value</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="c1"># Validation still runs, but heldout missingness must not choose a constant.</span>
+            <span class="n">fill_values</span> <span class="o">=</span> <span class="nb">dict</span><span class="o">.</span><span class="n">fromkeys</span><span class="p">(</span><span class="n">cols</span><span class="p">,</span> <span class="n">fill_value</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># Keeping empty constant columns preserves sklearn's dtype-based defaults.</span>
+            <span class="n">statistics</span> <span class="o">=</span> <span class="n">imputer</span><span class="o">.</span><span class="n">statistics_</span><span class="o">.</span><span class="n">tolist</span><span class="p">()</span>
+            <span class="n">fill_values</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="nb">zip</span><span class="p">(</span><span class="n">cols</span><span class="p">,</span> <span class="n">statistics</span><span class="p">,</span> <span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span>
         <span class="n">missing_counts</span> <span class="o">=</span> <span class="n">X</span><span class="p">[</span><span class="n">cols</span><span class="p">]</span><span class="o">.</span><span class="n">isnull</span><span class="p">()</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()</span>
         <span class="n">total_missing</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="nb">sum</span><span class="p">(</span><span class="n">missing_counts</span><span class="o">.</span><span class="n">values</span><span class="p">()))</span>
 

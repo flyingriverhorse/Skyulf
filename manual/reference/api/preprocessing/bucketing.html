@@ -1773,6 +1773,90 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../user_guide/leakage_core_backend.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Leakage Safety - Core & Backend
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user_guide/preprocessing_leakage_audit.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Preprocessing Leakage Audit
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user_guide/preprocessing_placement.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Preprocessing Placement
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../user_guide/drift_monitoring.html" class="md-nav__link">
         
   
@@ -3593,14 +3677,15 @@ fitted ones, so nothing here needs to differ.</p>
 <span class="normal">556</span>
 <span class="normal">557</span>
 <span class="normal">558</span>
-<span class="normal">559</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">"CustomBinning"</span><span class="p">,</span> <span class="n">CustomBinningApplier</span><span class="p">)</span>
+<span class="normal">559</span>
+<span class="normal">560</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">"CustomBinning"</span><span class="p">,</span> <span class="n">CustomBinningApplier</span><span class="p">)</span>
 <span class="nd">@node_meta</span><span class="p">(</span>
     <span class="nb">id</span><span class="o">=</span><span class="s2">"CustomBinning"</span><span class="p">,</span>
     <span class="n">name</span><span class="o">=</span><span class="s2">"Custom Binning"</span><span class="p">,</span>
     <span class="n">category</span><span class="o">=</span><span class="s2">"Preprocessing"</span><span class="p">,</span>
     <span class="n">description</span><span class="o">=</span><span class="s2">"Bin data using custom edges."</span><span class="p">,</span>
     <span class="n">params</span><span class="o">=</span><span class="p">{</span><span class="s2">"bins"</span><span class="p">:</span> <span class="p">[],</span> <span class="s2">"columns"</span><span class="p">:</span> <span class="p">[]},</span>
-    <span class="n">learns_from_data</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="n">learns_from_data</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
 <span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">CustomBinningCalculator</span><span class="p">(</span><span class="n">BaseCalculator</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""Apply user-supplied bin edges to selected columns."""</span>
@@ -3609,8 +3694,9 @@ fitted ones, so nothing here needs to differ.</p>
     <span class="k">def</span><span class="w"> </span><span class="nf">fit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">_y</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">GeneralBinningArtifact</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">"""Attach one shared, sorted edge list from ``config["bins"]`` to every selected column.</span>
 
-<span class="sd">        Nothing is learned from the data (``learns_from_data=False``) — *X* is</span>
-<span class="sd">        only consulted for column resolution. Unlike :class:`GeneralBinningCalculator`</span>
+<span class="sd">        Edges are fixed, but automatic column selection examines observed</span>
+<span class="sd">        values to exclude binary, constant, and all-missing columns.</span>
+<span class="sd">        Unlike :class:`GeneralBinningCalculator`</span>
 <span class="sd">        the same edges go to every column, so a multi-column selection spanning</span>
 <span class="sd">        different scales will push the out-of-scale columns' values outside the</span>
 <span class="sd">        outer bins, where both engines null them. An empty or absent ``bins``</span>
@@ -3663,8 +3749,9 @@ fitted ones, so nothing here needs to differ.</p>
     <div class="doc doc-contents ">
 
         <p>Attach one shared, sorted edge list from <code>config["bins"]</code> to every selected column.</p>
-<p>Nothing is learned from the data (<code>learns_from_data=False</code>) — <em>X</em> is
-only consulted for column resolution. Unlike :class:<code>GeneralBinningCalculator</code>
+<p>Edges are fixed, but automatic column selection examines observed
+values to exclude binary, constant, and all-missing columns.
+Unlike :class:<code>GeneralBinningCalculator</code>
 the same edges go to every column, so a multi-column selection spanning
 different scales will push the out-of-scale columns' values outside the
 outer bins, where both engines null them. An empty or absent <code>bins</code>
@@ -3702,12 +3789,14 @@ leaves <code>bin_edges</code> empty, which makes apply a no-op.</p>
 <span class="normal">556</span>
 <span class="normal">557</span>
 <span class="normal">558</span>
-<span class="normal">559</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@fit_method</span>
+<span class="normal">559</span>
+<span class="normal">560</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@fit_method</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">fit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">_y</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">GeneralBinningArtifact</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""Attach one shared, sorted edge list from ``config["bins"]`` to every selected column.</span>
 
-<span class="sd">    Nothing is learned from the data (``learns_from_data=False``) — *X* is</span>
-<span class="sd">    only consulted for column resolution. Unlike :class:`GeneralBinningCalculator`</span>
+<span class="sd">    Edges are fixed, but automatic column selection examines observed</span>
+<span class="sd">    values to exclude binary, constant, and all-missing columns.</span>
+<span class="sd">    Unlike :class:`GeneralBinningCalculator`</span>
 <span class="sd">    the same edges go to every column, so a multi-column selection spanning</span>
 <span class="sd">    different scales will push the out-of-scale columns' values outside the</span>
 <span class="sd">    outer bins, where both engines null them. An empty or absent ``bins``</span>
@@ -4101,14 +4190,14 @@ the same cut as for any other binning node.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>skyulf-core/skyulf/preprocessing/bucketing.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">562</span>
-<span class="normal">563</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">563</span>
 <span class="normal">564</span>
 <span class="normal">565</span>
 <span class="normal">566</span>
 <span class="normal">567</span>
 <span class="normal">568</span>
-<span class="normal">569</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">KBinsDiscretizerApplier</span><span class="p">(</span><span class="n">GeneralBinningApplier</span><span class="p">):</span>
+<span class="normal">569</span>
+<span class="normal">570</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">KBinsDiscretizerApplier</span><span class="p">(</span><span class="n">GeneralBinningApplier</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""Applier registered for the ``KBinsDiscretizer`` node id.</span>
 
 <span class="sd">    Empty subclass — sklearn only picks the edges at fit time; applying them is</span>
@@ -4168,8 +4257,7 @@ the same cut as for any other binning node.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>skyulf-core/skyulf/preprocessing/bucketing.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">572</span>
-<span class="normal">573</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">573</span>
 <span class="normal">574</span>
 <span class="normal">575</span>
 <span class="normal">576</span>
@@ -4201,7 +4289,8 @@ the same cut as for any other binning node.</p>
 <span class="normal">602</span>
 <span class="normal">603</span>
 <span class="normal">604</span>
-<span class="normal">605</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">"KBinsDiscretizer"</span><span class="p">,</span> <span class="n">KBinsDiscretizerApplier</span><span class="p">)</span>
+<span class="normal">605</span>
+<span class="normal">606</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">"KBinsDiscretizer"</span><span class="p">,</span> <span class="n">KBinsDiscretizerApplier</span><span class="p">)</span>
 <span class="nd">@node_meta</span><span class="p">(</span>
     <span class="nb">id</span><span class="o">=</span><span class="s2">"KBinsDiscretizer"</span><span class="p">,</span>
     <span class="n">name</span><span class="o">=</span><span class="s2">"K-Bins Discretizer"</span><span class="p">,</span>
@@ -4274,8 +4363,7 @@ the <code>(X, y)</code> unpack.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>skyulf-core/skyulf/preprocessing/bucketing.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">584</span>
-<span class="normal">585</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">585</span>
 <span class="normal">586</span>
 <span class="normal">587</span>
 <span class="normal">588</span>
@@ -4295,7 +4383,8 @@ the <code>(X, y)</code> unpack.</p>
 <span class="normal">602</span>
 <span class="normal">603</span>
 <span class="normal">604</span>
-<span class="normal">605</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">fit</span><span class="p">(</span>  <span class="c1"># pylint: disable=arguments-differ</span>
+<span class="normal">605</span>
+<span class="normal">606</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">fit</span><span class="p">(</span>  <span class="c1"># pylint: disable=arguments-differ</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">df</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span> <span class="o">|</span> <span class="n">SkyulfDataFrame</span> <span class="o">|</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span> <span class="o">|</span> <span class="n">Any</span><span class="p">,</span>
     <span class="n">config</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span>
