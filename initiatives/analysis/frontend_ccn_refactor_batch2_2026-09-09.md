@@ -69,7 +69,7 @@ behavior-preservation, verification and documentation requirements.
 - [x] **CI and documentation:** extend `complexity:check` in
   `frontend/ml-canvas/package.json` to all five entries and new helper folders;
   update `.github/workflows/frontend-tests.yml` scope comments. Record each
-  verified task in `opus_core_analysis-tracker.md` and concise v0.8.18 notes in
+  verified task in `opus_core_analysis-tracker.md` and concise v0.8.19 notes in
   `changelog/0.8.x.md`. Update the open queue only for actual defect closures.
 - [x] **Integration verification:** full frontend tests, lint, complexity
   check/report, build, bundle-size check, and Playwright. Rebuild
@@ -137,6 +137,6 @@ npm.cmd run test:e2e -- --workers=2
   final newlines in five helpers. Production build repeated after cleanup.
 - Final state: all tasks complete; the user confirmed the frontend works after
   manual testing and requested a commit. The open queue remains 57 open and
-  4 parked; release notes are under v0.8.18 as requested.
+  4 parked; release notes are under v0.8.19 as requested.
 - Scheduling: encoding completed first, freeing an Astra 6 slot for canvas
   edges while primary performs branch verification and independent review.

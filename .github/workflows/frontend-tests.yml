@@ -61,7 +61,8 @@ jobs:
         # registry, theme and types, plus the cleaned pipeline converter,
         # Toolbar, JobDetailsView, CustomNodeWrapper, InferencePage, training/
         # encoding/ensemble settings, branch colors, ResultsPanel, CustomEdge,
-        # EDA variables/sidebar and EvaluationView with their helper folders.
+        # EDA variables/sidebar/page, EvaluationView, NodeInspectionPanel and
+        # resampling/imputation settings with their helper folders.
         # FeatureSelection helpers are gated; its cohesive bodyPreview remains
         # at CCN 9 in the report. Expanding scope requires a clean report.
         run: bash ../../.github/scripts/run_check.sh "ESLint complexity (CCN 8)" npm run complexity:check

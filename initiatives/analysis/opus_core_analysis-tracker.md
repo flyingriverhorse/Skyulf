@@ -274,6 +274,7 @@ uses, so a fixed finding stays where it was filed.
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
+| OC-220 | 🟡 | Resampling Target Column native suggestions open away from the input in the user's browser | small | ✅ fixed 2026-09-09 — use an anchored editable listbox; docked/expanded browser geometry and keyboard selection are covered. |
 | OC-55 | 🟡 | `tsc --noEmit` fails: `mermaid` declared but not installed (`frontend/ml-canvas/package.json`) | 1 line | ✅ verified stale 2026-09-06 — `mermaid@11.17.2` is in `dependencies`, in the lockfile, installed and lazy-imported into its own chunk; the exact CI `tsc --noEmit` exits 0, `npm run build` succeeds, and the 5 real-parser tests pass. No change needed |
 
 ---
@@ -352,6 +353,85 @@ respective fix logs; OC-167 closed with canonical artifact framing on 2026-09-09
 
 ## Log
 
+### 2026-09-09 - branch 0819 release-note placement corrected
+
+At the user's request, move all release notes added on branch `0819` since
+`784649d9` (the `0818` base), including OC-218/219/220 and the frontend CCN
+workflow/refactors, into v0.8.19. The v0.8.18 and older release contents match
+the branch base. Related tracker and frontend CCN plan references now point to
+v0.8.19. This documentation correction changes no implementation or queue status.
+
+### 2026-09-09 - OC-220 fixed: anchor Resampling target suggestions
+
+Replace native datalist rendering with `TargetColumnField`, using the existing
+Radix Popover dependency to anchor an editable listbox to the input. Matching
+suggestions retain upstream dropped-column filtering; selection still updates
+the same target setting and arbitrary column names remain editable. Keyboard
+selection, Escape dismissal, Tab and outside-click focus are preserved.
+
+Both new unit regressions went from red to green; all **119 related settings and
+accessibility tests** pass, including instance-local listbox IDs. Two Chromium
+regressions pass for docked/expanded settings: the list follows input position
+and width during viewport/panel resizing, with click and keyboard selection.
+Independent review found no behavioral defect; its test-fixture lint finding
+was corrected. The original native-popup offset remains user-reported, as
+documented in the filing; replacement geometry is verified in the browser.
+
+Full **1,869 unit tests** in 154 files, **101 Playwright tests**, ESLint, strict
+CCN 8, TypeScript/Vite build and all 11 size budgets pass.
+Main bundle: 318.9 KiB gzip / 325 KiB. Generated
+assets and the v0.8.19 release note are updated. OC-220 is closed; the live queue
+returns to **57 open and 4 parked**. No backend or dependency changes.
+
+### 2026-09-09 - OC-220 filed from Resampling manual feedback
+
+The user reports Target Column suggestions opening away from the input. Both
+baseline `63745ca3` and the extracted control use native input/datalist markup;
+the application has no DOM popup whose geometry follows the resizable settings
+panel. The exact native-popup offset is not observable through Playwright DOM
+geometry, so it is recorded as user-reported rather than locally reproduced.
+Two unit cases fail before adding an application listbox (**2 failed / 34 passed**),
+and docked/expanded browser cases fail because that listbox does not exist.
+The repair will anchor editable suggestions to the input and verify bounds after
+viewport/panel resizing, while preserving target values and dropped-column filtering.
+
+### 2026-09-09 - frontend complexity refactor batch 4: verified
+
+Plan and evidence:
+[`frontend_ccn_refactor_batch4_2026-09-09.md`](frontend_ccn_refactor_batch4_2026-09-09.md).
+Baseline `63745ca3` contains the signed batch 3 commit and OC-218/219 repairs.
+Three Astra 6 agents and the primary handled four independent scopes:
+
+- **Resampling:** settings 40 -> 7; two adjacent modules at most 8. All 34 new
+  characterization cases pass against original and extracted code; related
+  accessibility suite (117 tests) passes. Public config/defaults/validation/conversion,
+  upstream target synchronization, parser behavior and last-run results remain.
+- **EDA page:** page 30 -> 1, content renderer 40 -> 8; six modules at most 8.
+  All 19 cases pass original/extracted source. All 25 API/store/query-key
+  expressions are AST-equivalent; dataset URL selection, report polling,
+  filter application, history and tab data guards retain their behavior.
+- **Node inspection:** entry 38 -> 7; six modules at most 7. The 41 related
+  original/extracted tests and five browser scenarios pass. Receipt selection, focus,
+  Input/Output matching, complete-schema comparison and sample bounds remain.
+- **Imputation:** settings 35 -> 7; four modules at most 8. All 17 new cases pass
+  original/extracted source; 198 related tests pass. Public node definition,
+  validation, defaults and preview are unchanged; method controls, column
+  filtering, recommendation merging and execution feedback retain behavior.
+
+Each scope passed independent spec and code-quality review. Final integration:
+**1,867 unit tests** across 154 files, **99 Playwright tests**, full ESLint,
+expanded strict CCN 8 gate, TypeScript/Vite build and all 11 size budgets pass.
+Main: 318.2 KiB gzip / 325 KiB; EDA: 84.0 KiB / 140 KiB. Assets were rebuilt.
+Final whole-batch Astra review also passed with no actionable finding.
+CI now includes four more entry files and 18 helper modules; no limit or waiver
+changed. Global report: **183 warnings across 115 files, maximum 34**, versus
+189 / maximum 40 before this batch. Next largest: ComparisonTableView (34),
+PipelineDiffView (33), VariableCard/useGraphStore/ErrorLogPage (32).
+
+Release notes are under v0.8.19. This behavior-preserving maintenance closes no
+audit finding; the live queue stays **57 open and 4 parked**, including the
+unchanged parked OC-71/72/73/185 decisions. New batch 4 work is not committed.
+
 ### 2026-09-09 - OC-219 fixed: require saved thresholds before toggling
 
 The evaluation hook now tracks saved-threshold availability separately from
@@ -370,7 +450,7 @@ disable/re-enable, job switching and reload with a stateful API fixture.
 Independent review found no introduced issue. Lint and the strict CCN gate pass.
 Final production build, all 11 bundle budgets and all **99 browser tests** pass.
 OC-219 is closed; the queue returns to **57 open and 4 parked**. Release note:
-v0.8.18. No backend persistence semantics changed.
+v0.8.19. No backend persistence semantics changed.
 
 ### 2026-09-09 - OC-219 filed from threshold tuning feedback
 
@@ -428,7 +508,7 @@ The global report now has **189 functions** above CCN 8 in **119 of 584 files**;
 highest CCN fell from **52 to 40**. All 26 new production helper modules are
 gated, alongside four entry files. Next report-only hotspots: `ResamplingNode`
 (**40**), `EDAPage` (**40**), `NodeInspectionPanel` (**38**), `ImputationNode`
-(**35**) and `ComparisonTableView` (**34**). Release notes are under v0.8.18.
+(**35**) and `ComparisonTableView` (**34**). Release notes are under v0.8.19.
 OC-218 was filed and fixed; the queue remains **57 open and 4 parked**.
 
 ### 2026-09-09 - OC-218 fixed: preserve connected ensemble CV seed zero
@@ -454,7 +534,7 @@ inspector synchronization is retained: the converter rereads wired model
 parameters, so the no-op does not establish a stale training-payload defect.
 
 The closed row moved here and its evidence left the live queue; it returns to
-**57 open and 4 parked** rows. The concise fix note is under v0.8.18.
+**57 open and 4 parked** rows. The concise fix note is under v0.8.19.
 
 ### 2026-09-09 - OC-218 filed during frontend ensemble review
 
@@ -523,7 +603,7 @@ The full report now has **204 functions** above CCN 8 in **123 of 555 files**
 All five entries and 32 new production helper modules are enforced by CI.
 Next report-only hotspots: `EnsembleSettings.tsx` (**52**), `VariableRow.tsx`
 (**51**), `EDASidebar.tsx` (**47**), `FeatureSelectionNode.tsx` (**46**) and
-`EvaluationView.tsx` (**43**). The v0.8.18 notes were updated. No audit finding
+`EvaluationView.tsx` (**43**). The v0.8.19 notes were updated. No audit finding
 is closed by this maintenance; the live queue remains **57 open, 4 parked**.
 
 ### 2026-09-09 - frontend complexity refactor batch: verified
@@ -574,7 +654,7 @@ The full report now has **212 functions** above CCN 8 in **128 of 521 files**
 (previously 230 in 134 of 478); its highest CCN fell from **138 to 72**.
 `TrainingSettings.tsx` (72) and `useBranchColors.ts` (70) lead the remaining
 report-only hotspots. This maintenance closes no audit finding; the live queue
-remains **57 open** and **4 parked**. The v0.8.18 notes were updated.
+remains **57 open** and **4 parked**. The v0.8.19 notes were updated.
 
 ### 2026-09-09 - frontend complexity workflow
 
@@ -590,7 +670,7 @@ error; the probes were removed. ESLint, the scoped complexity gate, workflow
 YAML checks, **1,642 frontend tests**, production build and bundle-size checks
 passed. The full report exited successfully with 230 warnings and no errors.
 Vite reported circular and empty vendor chunks during the successful build.
-The v0.8.18 note was updated. This CI addition closes no audit finding, so the
+The v0.8.19 note was updated. This CI addition closes no audit finding, so the
 live queue remains unchanged at **57 open** and **4 parked** rows.
 
 ### 2026-09-09 - OC-172 follow-up: sklearn bridge complexity gate

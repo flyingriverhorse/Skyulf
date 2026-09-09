@@ -65,7 +65,7 @@ than a mechanical CCN threshold. Multiple Astra 6 agents are authorized.
   finding after verification.
 - [x] **CI and documentation:** extend `complexity:check` and workflow scope
   comments for clean entries/helpers. Update this record, tracker and concise
-  v0.8.18 release notes. Change the open queue only for actual finding closures.
+  v0.8.19 release notes. Change the open queue only for actual finding closures.
 - [x] **Integration:** run full Vitest, ESLint, complexity check/report, build,
   size check and Playwright; inspect source and generated asset scope.
 
@@ -122,7 +122,7 @@ npm.cmd run test:e2e -- --workers=2
   Independent review confirmed state/retry/chart lifetimes and controls.
 - OC-218: red3 failed/36 passed; green39 passed, including eight component-to-
   converter cases. Nullish seed fallback preserves zero. Independent review
-  passed; closed tracker row/evidence and v0.8.18 note added, queue restored to
+  passed; closed tracker row/evidence and v0.8.19 note added, queue restored to
   57 open/4 parked. 32 comparisons confirmed equivalent optional-time patches.
 - Final review: no actionable introduced issues; five public interfaces
   unchanged and all99 helper imports resolve. Different owners reviewed scopes.
@@ -150,6 +150,6 @@ comparison above predates this follow-up.
 - Threshold browser spec: three passed, including real-page Preview/Save,
   disable/re-enable, job switching, reload and Clear with stateful API mocks.
 - Independent review found no actionable introduced issue. OC-219 filed before
-  repair and closed with evidence; v0.8.18 and user-guide instructions updated.
+  repair and closed with evidence; v0.8.19 and user-guide instructions updated.
 - Final delivery checks after OC-219: all 99 browser tests pass, production build
   passes, and all 11 bundle budgets pass (main 317.3 KiB gzip / 325 KiB).

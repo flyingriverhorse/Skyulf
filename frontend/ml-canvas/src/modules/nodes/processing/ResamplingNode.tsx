@@ -1,16 +1,13 @@
-import { ValidationField } from '../../../components/shared/ValidationField';
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { NodeDefinition, ValidationResult } from '../../../core/types/nodes';
-import { Activity, ChevronDown, ChevronUp } from 'lucide-react';
+import { Activity } from 'lucide-react';
 import { useGraphStore } from '../../../core/store/useGraphStore';
-import { RecommendationsPanel } from '../../../components/panels/RecommendationsPanel';
 import { useRecommendations } from '../../../core/hooks/useRecommendations';
-import { Recommendation, ColumnProfile } from '../../../core/api/client';
-import { useUpstreamData } from '../../../core/hooks/useUpstreamData';
-import { useDatasetSchema } from '../../../core/hooks/useDatasetSchema';
-import { useUpstreamDroppedColumns } from '../../../core/hooks/useUpstreamDroppedColumns';
-import { parseIntSafe } from '../../../core/utils/numberInput';
+import { Recommendation } from '../../../core/api/client';
 import { useIsWideContainer } from '../../../core/hooks/useIsWideContainer';
+
+import { useResamplingData } from './resampling/useResamplingData';
+import { GeneralSettings, MethodSettings, ResamplingRecommendations } from './resampling/ResamplingFields';
 
 // --- Types ---
 
@@ -109,47 +106,7 @@ const ResamplingSettings: React.FC<{ config: ResamplingConfig; onChange: (c: Res
   const [containerRef, isWide] = useIsWideContainer(400);
   const [showRecommendations, setShowRecommendations] = useState(true);
 
-  // Upstream Data for Target Column Suggestion
-    const upstreamDataRaw = useUpstreamData(nodeId || '') as unknown;
-    const upstreamData: Record<string, unknown>[] = Array.isArray(upstreamDataRaw)
-        ? (upstreamDataRaw.filter(Boolean) as Record<string, unknown>[])
-        : [];
-
-    const datasetId = upstreamData.find((d) => typeof d.datasetId === 'string')?.datasetId as
-        | string
-        | undefined;
-  const { data: schema } = useDatasetSchema(datasetId);
-  const droppedUpstream = useUpstreamDroppedColumns(nodeId);
-
-  // Try to find a target column from upstream nodes configuration
-    const upstreamTarget = upstreamData.find((d) => {
-        const cfg = d.config;
-        if (!cfg || typeof cfg !== 'object') return false;
-        const target = (cfg as Record<string, unknown>).target_column;
-        return typeof target === 'string' && target.trim().length > 0;
-    });
-    const targetColumn = upstreamTarget
-        ? (((upstreamTarget.config as Record<string, unknown>).target_column as string) ?? undefined)
-        : undefined;
-
-  // Auto-fill target column if empty and available in schema or upstream
-  useEffect(() => {
-      if (!config.target_column) {
-          if (upstreamTarget && targetColumn) {
-               onChange({ ...config, target_column: targetColumn });
-          } else if (schema?.columns) {
-               // Simple heuristic: check for 'target' or 'class' or column_type
-               const potentialTarget = Object.values(schema.columns).find((c: ColumnProfile) =>
-                   c.name.toLowerCase() === 'target' ||
-                   c.name.toLowerCase() === 'class' ||
-                   c.column_type === 'target'
-               );
-               if (potentialTarget) {
-                   onChange({ ...config, target_column: potentialTarget.name });
-               }
-          }
-      }
-    }, [schema, upstreamTarget, targetColumn, config.target_column, config, onChange]);
+  const data = useResamplingData(nodeId, config, onChange);
 
   // Recommendations
   const recommendations = useRecommendations(nodeId || '', {
@@ -186,282 +143,16 @@ const ResamplingSettings: React.FC<{ config: ResamplingConfig; onChange: (c: Res
         {/* Left Column (Main Settings) */}
         <div className={`space-y-4 ${isWide ? 'overflow-y-auto pr-2' : 'shrink-0'}`}>
 
-            <div className="space-y-2">
-                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Resampling Type</span>
-                <select
-                  aria-label="Resampling Type"
-                    className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 p-2 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                    value={config.type}
-                    onChange={(e) => { handleChange('type', e.target.value as ResamplingConfig['type']); }}
-                >
-                    <option value="oversampling">Oversampling (Minority)</option>
-                    <option value="undersampling">Undersampling (Majority)</option>
-                </select>
-            </div>
-
-            <div className="space-y-2">
-                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Method</span>
-                <select
-                  aria-label="Method"
-                    className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 p-2 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                    value={config.method}
-                    onChange={(e) => { handleChange('method', e.target.value); }}
-                >
-                    {config.type === 'oversampling' ? (
-                        <>
-                            <option value="random_over">Random Over Sampler</option>
-                            <option value="smote">SMOTE</option>
-                            <option value="adasyn">ADASYN</option>
-                            <option value="borderline_smote">Borderline SMOTE</option>
-                            <option value="svm_smote">SVM SMOTE</option>
-                            <option value="kmeans_smote">KMeans SMOTE</option>
-                            <option value="smote_tomek">SMOTE + Tomek</option>
-                        </>
-                    ) : (
-                        <>
-                            <option value="random_under_sampling">Random Under Sampling</option>
-                            <option value="nearmiss">NearMiss</option>
-                            <option value="tomek_links">Tomek Links</option>
-                            <option value="edited_nearest_neighbours">Edited Nearest Neighbours</option>
-                        </>
-                    )}
-                </select>
-                <p className="text-xs text-gray-500 dark:text-gray-400">
-                    {config.type === 'oversampling'
-                        ? 'Balance minority classes with duplicated or synthetic samples.'
-                        : 'Remove samples from the majority class.'}
-                </p>
-            </div>
-
-            <div className="space-y-2">
-                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Target Column</span>
-                <div className="relative">
-                    <ValidationField field="target_column">
-                      <input
-                        aria-label="Target Column"
-                          type="text"
-                          className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 p-2 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                          placeholder="e.g., target"
-                          value={config.target_column}
-                          onChange={(e) => { handleChange('target_column', e.target.value); }}
-                        list={`${id}-target-column-suggestions`}
-                      />
-                    </ValidationField>
-                    {schema?.columns && (
-                        <datalist id={`${id}-target-column-suggestions`}>
-                            {Object.values(schema.columns).filter((col: ColumnProfile) => !droppedUpstream.has(col.name)).map((col: ColumnProfile) => (
-                                <option key={col.name} value={col.name} />
-                            ))}
-                        </datalist>
-                    )}
-                </div>
-                <p className="text-xs text-gray-500 dark:text-gray-400">
-                    {upstreamTarget ? 'Auto-detected from upstream node.' : 'The column containing the class labels.'}
-                </p>
-            </div>
-
-            <div className="space-y-2">
-                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Sampling Strategy</span>
-                <select
-                  aria-label="Sampling Strategy"
-                    className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 p-2 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                    value={config.sampling_strategy}
-                    onChange={(e) => { handleChange('sampling_strategy', e.target.value); }}
-                >
-                    <option value="auto">Auto (Resample all classes but majority)</option>
-                    <option value="minority">Minority (Resample only minority class)</option>
-                    <option value="not minority">Not Minority (Resample all but minority)</option>
-                    <option value="not majority">Not Majority (Resample all but majority)</option>
-                    <option value="all">All (Resample all classes)</option>
-                </select>
-                <p className="text-xs text-gray-500 dark:text-gray-400">Defines which classes to resample.</p>
-            </div>
-
-            <div className="space-y-2">
-                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Random State</span>
-                <input
-                  aria-label="Random State"
-                    type="number"
-                    className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 p-2 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                    value={config.random_state}
-                    onChange={(e) => { handleChange('random_state', parseIntSafe(e.target.value, config.random_state)); }}
-                />
-            </div>
-
+            <GeneralSettings config={config} handleChange={handleChange} id={id} data={data} />
         </div>
 
         {/* Right Column (Advanced Params & Results) */}
         <div className={`space-y-4 ${isWide ? 'overflow-y-auto pl-2 border-l border-gray-100 dark:border-gray-700' : 'shrink-0 pt-4 border-t border-gray-100 dark:border-gray-700'}`}>
 
-            {/* Method Specific Params */}
-            {config.type === 'oversampling' && (
-                <>
-                    {['smote', 'adasyn', 'borderline_smote', 'svm_smote', 'kmeans_smote'].includes(config.method) && (
-                        <div className="space-y-2">
-                            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">k Neighbors</span>
-                            <ValidationField field="k_neighbors">
-                              <input
-                                aria-label="k Neighbors"
-                                  type="number"
-                                  className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 p-2 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                                  value={config.k_neighbors ?? 5}
-                                  onChange={(e) => { handleChange('k_neighbors', parseIntSafe(e.target.value, config.k_neighbors)); }}
-                              />
-                            </ValidationField>
-                        </div>
-                    )}
+            <MethodSettings config={config} handleChange={handleChange} />
 
-                    {['borderline_smote', 'svm_smote'].includes(config.method) && (
-                        <div className="space-y-2">
-                            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">m Neighbors</span>
-                            <input
-                              aria-label="m Neighbors"
-                                type="number"
-                                className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 p-2 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                                value={config.m_neighbors ?? 10}
-                                onChange={(e) => { handleChange('m_neighbors', parseIntSafe(e.target.value, config.m_neighbors)); }}
-                            />
-                        </div>
-                    )}
-
-                    {config.method === 'borderline_smote' && (
-                        <div className="space-y-2">
-                            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Kind</span>
-                            <select
-                              aria-label="Kind"
-                                className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 p-2 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                                value={config.kind ?? 'borderline-1'}
-                                onChange={(e) => { handleChange('kind', e.target.value); }}
-                            >
-                                <option value="borderline-1">Borderline-1</option>
-                                <option value="borderline-2">Borderline-2</option>
-                            </select>
-                        </div>
-                    )}
-
-                    {config.method === 'svm_smote' && (
-                        <div className="space-y-2">
-                            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Out Step</span>
-                            <input
-                              aria-label="Out Step"
-                                type="number"
-                                step="0.1"
-                                className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 p-2 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                                value={config.out_step ?? 0.5}
-                                onChange={(e) => { handleChange('out_step', Number.parseFloat(e.target.value)); }}
-                            />
-                        </div>
-                    )}
-
-                    {config.method === 'kmeans_smote' && (
-                        <>
-                            <div className="space-y-2">
-                                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Cluster Balance Threshold</span>
-                                <input
-                                  aria-label="Cluster Balance Threshold"
-                                    type="number"
-                                    step="0.1"
-                                    className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 p-2 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                                    value={config.cluster_balance_threshold ?? 0.1}
-                                    onChange={(e) => { handleChange('cluster_balance_threshold', Number.parseFloat(e.target.value)); }}
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Density Exponent</span>
-                                <input
-                                  aria-label="Density Exponent"
-                                    type="text"
-                                    className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 p-2 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                                    value={config.density_exponent ?? 'auto'}
-                                    onChange={(e) => { handleChange('density_exponent', e.target.value); }}
-                                />
-                            </div>
-                        </>
-                    )}
-                </>
-            )}
-
-            {config.type === 'undersampling' && config.method === 'random_under_sampling' && (
-                <div className="flex items-center justify-between p-3 border rounded-md bg-gray-50 dark:bg-gray-800 dark:border-gray-700">
-                    <div>
-                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300 block">Replacement</span>
-                        <span className="text-xs text-gray-500 dark:text-gray-400">Sample with replacement</span>
-                    </div>
-                    <input
-                      aria-label="Replacement"
-                        type="checkbox"
-                        className="h-4 w-4 rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500"
-                        checked={config.replacement ?? false}
-                        onChange={(e) => { handleChange('replacement', e.target.checked); }}
-                    />
-                </div>
-            )}
-
-            {config.type === 'undersampling' && config.method === 'nearmiss' && (
-                <div className="space-y-2">
-                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Version</span>
-                    <select
-                      aria-label="Version"
-                        className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 p-2 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                        value={config.version ?? 1}
-                        onChange={(e) => { handleChange('version', parseIntSafe(e.target.value, config.version)); }}
-                    >
-                        <option value="1">1</option>
-                        <option value="2">2</option>
-                        <option value="3">3</option>
-                    </select>
-                </div>
-            )}
-
-            {config.type === 'undersampling' && config.method === 'edited_nearest_neighbours' && (
-                <>
-                    <div className="space-y-2">
-                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">n Neighbors</span>
-                        <input
-                          aria-label="n Neighbors"
-                            type="number"
-                            className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 p-2 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                            value={config.n_neighbors ?? 3}
-                            onChange={(e) => { handleChange('n_neighbors', parseIntSafe(e.target.value, config.n_neighbors)); }}
-                        />
-                    </div>
-                    <div className="space-y-2">
-                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Selection Kind</span>
-                        <select
-                          aria-label="Selection Kind"
-                            className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 p-2 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                            value={config.kind_sel ?? 'all'}
-                            onChange={(e) => { handleChange('kind_sel', e.target.value); }}
-                        >
-                            <option value="all">All</option>
-                            <option value="mode">Mode</option>
-                        </select>
-                    </div>
-                </>
-            )}
-
-            {recommendations.length > 0 && (
-                <div className="mt-0 border rounded-md overflow-hidden border-gray-200 dark:border-gray-700">
-                    <button
-                        className="w-full flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                        onClick={() => { setShowRecommendations(!showRecommendations); }}
-                    >
-                        <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                            Recommendations ({recommendations.length})
-                        </span>
-                        {showRecommendations ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                    </button>
-
-                    {showRecommendations && (
-                        <div className="p-3 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700">
-                            <RecommendationsPanel
-                                recommendations={recommendations}
-                                onApply={handleApplyRecommendation}
-                            />
-                        </div>
-                    )}
-                </div>
-            )}
+            <ResamplingRecommendations recommendations={recommendations} showRecommendations={showRecommendations}
+              setShowRecommendations={setShowRecommendations} handleApplyRecommendation={handleApplyRecommendation} />
 
             {nodeId && <LastRunResults nodeId={nodeId} />}
         </div>

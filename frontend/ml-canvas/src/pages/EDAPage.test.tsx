@@ -1,7 +1,8 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, useLocation, useNavigate } from 'react-router-dom';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { ComponentProps } from 'react';
 
 import type { Dataset } from '../core/types/api';
 import type { EDAReport } from '../core/api/eda';
@@ -9,6 +10,13 @@ import { EDAService } from '../core/api/eda';
 import { DatasetService } from '../core/api/datasets';
 import { useEDAStore } from '../core/store/useEDAStore';
 import { EDAPage } from './EDAPage';
+import { edaKeys } from '../core/hooks/useEdaJobs';
+
+const observed = vi.hoisted(() => ({
+  dashboard: vi.fn(), decomposition: vi.fn(), history: vi.fn(),
+}));
+
+beforeEach(() => vi.clearAllMocks());
 
 const duplicateNamedDatasets: Dataset[] = [
   {
@@ -75,7 +83,7 @@ describe('EDAPage PII review', () => {
     vi.mocked(DatasetService.getUsable).mockResolvedValue(duplicateNamedDatasets);
     vi.mocked(EDAService.getHistory).mockResolvedValue([]);
     useEDAStore.getState().resetForDataset();
-    useEDAStore.setState({ selectedDataset: 101 });
+    useEDAStore.setState({ selectedDataset: 101, taskType: '' });
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     return render(
       <QueryClientProvider client={client}>
@@ -143,12 +151,15 @@ vi.mock('../core/api/eda', async () => {
 });
 
 vi.mock('../components/eda/JobsHistoryModal', () => ({
-  JobsHistoryModal: () => null,
+  JobsHistoryModal: (props: ComponentProps<typeof import('../components/eda/JobsHistoryModal').JobsHistoryModal>) => {
+    observed.history(props);
+    return null;
+  },
 }));
 
 vi.mock('../components/shared', () => ({
   LoadingState: ({ message }: { message?: string }) => <div>{message}</div>,
-  ErrorState: ({ error }: { error: string }) => <div>{error}</div>,
+  ErrorState: ({ error, onRetry }: { error: string; onRetry: () => void }) => <div>{error}<button onClick={onRetry}>Retry loading</button></div>,
 }));
 
 vi.mock('../core/utils/chartUtils', () => ({
@@ -156,7 +167,10 @@ vi.mock('../core/utils/chartUtils', () => ({
   getTooltipContentStyle: vi.fn(() => ({})),
 }));
 
-vi.mock('../components/eda/tabs/DashboardTab', () => ({ DashboardTab: () => null }));
+vi.mock('../components/eda/tabs/DashboardTab', () => ({ DashboardTab: (props: unknown) => {
+  observed.dashboard(props);
+  return <input aria-label="Dashboard local state" defaultValue="" />;
+} }));
 vi.mock('../components/eda/tabs/InsightsTab', () => ({ InsightsTab: () => null }));
 vi.mock('../components/eda/tabs/PCATab', () => ({ PCATab: () => null }));
 vi.mock('../components/eda/tabs/GeospatialTab', () => ({ GeospatialTab: () => null }));
@@ -169,7 +183,206 @@ vi.mock('../components/eda/tabs/CorrelationsTab', () => ({ CorrelationsTab: () =
 vi.mock('../components/eda/tabs/SampleDataTab', () => ({ SampleDataTab: () => null }));
 vi.mock('../components/eda/tabs/CausalTab', () => ({ CausalTab: () => null }));
 vi.mock('../components/eda/tabs/RuleDiscoveryTab', () => ({ RuleDiscoveryTab: () => null }));
-vi.mock('../components/eda/tabs/DecompositionTab', () => ({ DecompositionTab: () => null }));
+vi.mock('../components/eda/tabs/DecompositionTab', () => ({ DecompositionTab: (props: unknown) => {
+  observed.decomposition(props);
+  return null;
+} }));
+
+describe('EDAPage analysis lifecycle', () => {
+  const completedReport: EDAReport = {
+    id: 30, status: 'COMPLETED', profile_data: {
+      row_count: 2, column_count: 2,
+      columns: {
+        age: { name: 'age', dtype: 'Numeric', missing_count: 0, missing_percentage: 0 },
+        income: { name: 'income', dtype: 'Numeric', missing_count: 0, missing_percentage: 0 },
+      },
+    },
+  };
+
+  beforeEach(() => {
+    useEDAStore.getState().resetForDataset();
+    useEDAStore.setState({ selectedDataset: 101, taskType: '' });
+    vi.mocked(DatasetService.getUsable).mockResolvedValue(duplicateNamedDatasets);
+    vi.mocked(EDAService.getLatestReport).mockResolvedValue(completedReport);
+    vi.mocked(EDAService.getHistory).mockResolvedValue([]);
+    vi.mocked(EDAService.analyze).mockResolvedValue({});
+    observed.dashboard.mockClear();
+    observed.decomposition.mockClear();
+    observed.history.mockClear();
+  });
+
+  function NavigationProbe() {
+    const location = useLocation();
+    const navigate = useNavigate();
+    return <><output aria-label="Current URL">{location.search}</output><button onClick={() => navigate(-1)}>Back dataset</button></>;
+  }
+
+  function renderPage(initialEntry = '/eda?dataset_id=101&keep=yes') {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
+    const view = render(<QueryClientProvider client={client}><MemoryRouter initialEntries={[initialEntry]}>
+      <EDAPage /><NavigationProbe />
+    </MemoryRouter></QueryClientProvider>);
+    return { ...view, client };
+  }
+
+  it('treats a missing report as setup and submits optional target and task without losing input focus', async () => {
+    // A 404 is an empty analysis slot, and editing setup must not remount its input.
+    vi.mocked(EDAService.getLatestReport).mockRejectedValue({ response: { status: 404 } });
+    renderPage();
+    const target = await screen.findByRole('textbox', { name: 'Target Column (Optional)' });
+    target.focus();
+    fireEvent.change(target, { target: { value: 'age' } });
+    fireEvent.change(screen.getAllByRole('combobox', { name: 'Task Type' })[1]!, { target: { value: 'Classification' } });
+    expect(screen.getByRole('textbox', { name: 'Target Column (Optional)' })).toBe(target);
+    expect(target).toHaveFocus();
+    fireEvent.click(screen.getByRole('button', { name: 'Run Analysis' }));
+    await waitFor(() => expect(EDAService.analyze).toHaveBeenCalledWith(101, 'age', [], [], 'Classification'));
+  });
+
+  it('keeps non-404 loading failures distinct and retries the report request', async () => {
+    // A server failure must not invite a new analysis as though no report exists.
+    vi.mocked(EDAService.getLatestReport).mockRejectedValueOnce({ response: { status: 500 } });
+    renderPage();
+    expect(await screen.findByText('Failed to load report')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Retry loading' }));
+    expect(await screen.findByRole('button', { name: 'PII Review' })).toBeInTheDocument();
+  });
+
+  it.each([
+    [{ status: 'PENDING' }, 'Analysis in progress...'],
+    [{ status: 'FAILED', error_message: 'worker stopped' }, 'Analysis Failed'],
+    [{ status: 'COMPLETED' }, 'No profile data'],
+  ])('keeps report status rendering for %j', async (report, message) => {
+    // Pending, failed and empty completed reports have different recovery paths.
+    vi.mocked(EDAService.getLatestReport).mockResolvedValue(report);
+    renderPage();
+    expect(await screen.findByText(message)).toBeInTheDocument();
+  });
+
+  it('retries rejected submissions with the applied payload and retains pending draft edits', async () => {
+    // Retry must reuse the failed payload even if unsubmitted drafts changed afterward.
+    vi.mocked(EDAService.analyze).mockRejectedValueOnce(new Error('queue unavailable'));
+    renderPage();
+    await screen.findByRole('button', { name: 'PII Review' });
+    const applied = [{ column: 'age', operator: '>=' as const, value: 0 }];
+    act(() => {
+      useEDAStore.getState().setFiltersApplied(applied);
+      useEDAStore.getState().setFiltersDraft([{ column: 'income', operator: '>' as const, value: 10 }]);
+      useEDAStore.getState().setExcludedApplied(['income']);
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Analyze' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('queue unavailable');
+    act(() => useEDAStore.getState().setExcludedApplied([]));
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+    await waitFor(() => expect(EDAService.analyze).toHaveBeenLastCalledWith(101, undefined, ['income'], applied, undefined));
+    expect(useEDAStore.getState().filtersDraft).toEqual([{ column: 'income', operator: '>', value: 10 }]);
+  });
+
+  it('filters draft exclusions for display without changing the cache or decomposition applied inputs', async () => {
+    // Chart filtering is immediate, while decomposition receives all columns and only applied filters.
+    const { client } = renderPage();
+    const local = await screen.findByRole('textbox', { name: 'Dashboard local state' });
+    fireEvent.change(local, { target: { value: 'retained' } });
+    const applied = [{ column: 'age', operator: '==' as const, value: 0 }];
+    act(() => {
+      useEDAStore.getState().toggleExclude('income', true);
+      useEDAStore.getState().setFiltersApplied(applied);
+    });
+    expect(observed.dashboard).toHaveBeenLastCalledWith(expect.objectContaining({ profile: expect.objectContaining({ columns: { age: completedReport.profile_data!.columns.age } }) }));
+    expect(client.getQueryData<EDAReport>(edaKeys.report(101))?.profile_data?.columns).toHaveProperty('income');
+    expect(screen.getByRole('textbox', { name: 'Dashboard local state' })).toBe(local);
+    expect(local).toHaveValue('retained');
+    fireEvent.click(screen.getByRole('button', { name: 'Decomposition' }));
+    expect(observed.decomposition).toHaveBeenLastCalledWith({ datasetId: 101, columns: ['age', 'income'], initialFilters: applied });
+  });
+
+  it('resets dataset-specific state while URL navigation preserves unrelated parameters', async () => {
+    // Back/forward and explicit deep links must drive the store even after previous page visits.
+    useEDAStore.setState({ selectedDataset: 202 });
+    renderPage();
+    await screen.findByRole('button', { name: 'PII Review' });
+    expect(useEDAStore.getState().selectedDataset).toBe(101);
+    act(() => {
+      useEDAStore.getState().setTargetCol('age');
+      useEDAStore.getState().setTaskType('Regression');
+      useEDAStore.getState().setScatter({ x: 'age', is3D: true });
+    });
+    fireEvent.change(screen.getByRole('combobox', { name: 'Dataset' }), { target: { value: '202' } });
+    await waitFor(() => expect(useEDAStore.getState().selectedDataset).toBe(202));
+    expect(screen.getByLabelText('Current URL')).toHaveTextContent('dataset_id=202&keep=yes');
+    expect(useEDAStore.getState()).toMatchObject({ targetCol: '', taskType: 'Regression', scatter: { x: '', is3D: false } });
+    fireEvent.click(screen.getByRole('button', { name: 'Back dataset' }));
+    await waitFor(() => expect(useEDAStore.getState().selectedDataset).toBe(101));
+  });
+
+  it('keeps a newer dataset displayed when an older report request resolves late', async () => {
+    // React Query dataset keys must prevent an old response from replacing the selected report.
+    let resolveFirst!: (report: EDAReport) => void;
+    vi.mocked(EDAService.getLatestReport).mockImplementation(datasetId => datasetId === 101
+      ? new Promise(resolve => { resolveFirst = resolve; })
+      : Promise.resolve({ ...completedReport, id: 202, profile_data: { ...completedReport.profile_data!, row_count: 202 } }));
+    const { client } = renderPage();
+    await waitFor(() => expect(EDAService.getLatestReport).toHaveBeenCalledWith(101));
+    await screen.findByRole('option', { name: 'Shared dataset (202)' });
+    fireEvent.change(screen.getByRole('combobox', { name: 'Dataset' }), { target: { value: '202' } });
+    await screen.findByRole('button', { name: 'PII Review' });
+    await act(async () => resolveFirst(completedReport));
+    expect(observed.dashboard).toHaveBeenLastCalledWith(expect.objectContaining({ profile: expect.objectContaining({ row_count: 202 }) }));
+    expect(client.getQueryData<EDAReport>(edaKeys.report(101))?.id).toBe(30);
+    expect(useEDAStore.getState().selectedDataset).toBe(202);
+  });
+
+  it('discloses an unavailable deep-linked dataset without substituting another selection', async () => {
+    // A requested but unavailable dataset must remain the query target and show a blank selector.
+    vi.mocked(EDAService.getLatestReport).mockRejectedValue({ response: { status: 404 } });
+    renderPage('/eda?dataset_id=999');
+    expect(await screen.findByRole('alert')).toHaveTextContent("Dataset #999 isn't available for analysis");
+    expect(screen.getByRole('combobox', { name: 'Dataset' })).toHaveValue('');
+    expect(useEDAStore.getState().selectedDataset).toBe(999);
+    expect(EDAService.getLatestReport).toHaveBeenCalledWith(999);
+  });
+
+  it.each(['constructor', 'toString', 'unknown-module'])('renders no tab content for an unrecognized stored tab %s', async activeTab => {
+    // Tab dispatch must ignore inherited object keys as well as ordinary unknown names.
+    renderPage();
+    await screen.findByRole('textbox', { name: 'Dashboard local state' });
+    act(() => useEDAStore.getState().setActiveTab(activeTab));
+    expect(screen.queryByRole('textbox', { name: 'Dashboard local state' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'PII Review' })).toBeInTheDocument();
+  });
+
+  it('hydrates target and exclusions by report ID while retaining drafts on same-report refresh', async () => {
+    // Polling the same report must not erase local exclusions on every response.
+    const { client } = renderPage();
+    await screen.findByRole('button', { name: 'PII Review' });
+    act(() => useEDAStore.getState().toggleExclude('income', true));
+    act(() => client.setQueryData(edaKeys.report(101), { ...completedReport, profile_data: { ...completedReport.profile_data, target_col: 'income', excluded_columns: ['age'] } }));
+    await waitFor(() => expect(observed.dashboard).toHaveBeenLastCalledWith(expect.objectContaining({ profile: expect.objectContaining({ target_col: 'income' }) })));
+    expect(useEDAStore.getState().excludedColsDraft).toEqual(['income']);
+    act(() => client.setQueryData(edaKeys.report(101), { ...completedReport, id: 31, profile_data: { ...completedReport.profile_data, target_col: 'income', excluded_columns: ['age'] } }));
+    await waitFor(() => expect(useEDAStore.getState()).toMatchObject({ targetCol: 'income', excludedColsDraft: ['age'], excludedColsApplied: ['age'] }));
+  });
+
+  it('loads saved reports into the current cache and preserves history modal fetch/select contracts', async () => {
+    // Recent targets and the modal share the displayed cache slot without changing report identity.
+    vi.mocked(EDAService.getHistory).mockResolvedValue([{ id: 41, status: 'COMPLETED', created_at: '2026-09-09T10:00:00Z', target_col: 'age' }]);
+    const saved = { ...completedReport, id: 41, profile_data: { ...completedReport.profile_data!, target_col: 'age', excluded_columns: ['income'] } };
+    vi.mocked(EDAService.getReport).mockResolvedValue(saved);
+    const { client } = renderPage();
+    fireEvent.click(await screen.findByRole('button', { name: 'age' }));
+    await waitFor(() => expect(client.getQueryData<EDAReport>(edaKeys.report(101))?.id).toBe(41));
+    expect(useEDAStore.getState().targetCol).toBe('age');
+    fireEvent.click(screen.getByRole('button', { name: 'History' }));
+    type HistoryProps = ComponentProps<typeof import('../components/eda/JobsHistoryModal').JobsHistoryModal>;
+    const props = observed.history.mock.lastCall![0] as HistoryProps;
+    expect(props).toMatchObject({ isOpen: true, datasetId: 101 });
+    vi.mocked(EDAService.getReport).mockResolvedValue({ status: 'COMPLETED' });
+    await expect(props.onFetchReport(99)).resolves.toEqual({ id: 99, status: 'COMPLETED' });
+    act(() => props.onSelect({ ...saved, id: 42 }));
+    expect(client.getQueryData<EDAReport>(edaKeys.report(101))?.id).toBe(42);
+    expect(useEDAStore.getState().excludedColsApplied).toEqual(['income']);
+  });
+});
 
 describe('EDAPage dataset selector', () => {
   it('shows distinguishable dataset labels when names collide and preserves the selected id', async () => {

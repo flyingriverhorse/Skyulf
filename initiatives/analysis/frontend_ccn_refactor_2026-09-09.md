@@ -26,7 +26,7 @@ the cleaned scope in the frontend CI complexity gate.
 - Baseline: clean tracked worktree; preserve existing `tmp_repro_artifacts/`.
 - Run existing characterization tests before and after refactoring. Add focused
   public-behavior coverage where extraction exposes a material test gap.
-- Update v0.8.18 and the tracker after each verified task. Do not commit or push.
+- Update v0.8.19 and the tracker after each verified task. Do not commit or push.
 
 ## Tasks and file map
 
