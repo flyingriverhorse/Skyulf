@@ -43,6 +43,7 @@ from backend.health.routes import router as health_router
 from backend.middleware.error_handler import ErrorHandlerMiddleware
 from backend.middleware.logging import LoggingMiddleware
 from backend.middleware.rate_limiter import limiter
+from backend.middleware.security_headers import SecurityHeadersMiddleware
 from backend.ml_pipeline.api import router as ml_pipeline_router
 from backend.ml_pipeline.deployment.api import router as deployment_router
 from backend.ml_pipeline.model_registry.api import router as model_registry_router
@@ -359,6 +360,10 @@ def _add_middleware(app: FastAPI, settings) -> None:
     # Custom middleware
     app.add_middleware(LoggingMiddleware)
     app.add_middleware(ErrorHandlerMiddleware)
+
+    security_headers = getattr(settings, "SECURITY_HEADERS", {})
+    if security_headers:
+        app.add_middleware(SecurityHeadersMiddleware, headers=security_headers)
 
     # add_middleware wraps, so the last one added is the outermost: CORS must
     # come last or error responses built by ErrorHandlerMiddleware reach the

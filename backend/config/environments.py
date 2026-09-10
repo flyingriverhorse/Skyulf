@@ -41,11 +41,16 @@ _PROD_SECURITY_HEADERS: dict[str, str] = {
     "X-Frame-Options": "DENY",
     "X-XSS-Protection": "1; mode=block",
     "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
+    # Canvas exports/maps and opt-in Swagger/ReDoc need these asset sources.
     "Content-Security-Policy": (
         "default-src 'self'; "
-        "script-src 'self' 'unsafe-inline' cdnjs.cloudflare.com; "
-        "style-src 'self' 'unsafe-inline' fonts.googleapis.com cdnjs.cloudflare.com; "
-        "font-src 'self' fonts.gstatic.com;"
+        "script-src 'self' 'unsafe-inline' cdnjs.cloudflare.com https://cdn.jsdelivr.net; "
+        "style-src 'self' 'unsafe-inline' fonts.googleapis.com cdnjs.cloudflare.com "
+        "https://cdn.jsdelivr.net; "
+        "font-src 'self' fonts.gstatic.com; "
+        "img-src 'self' data: blob: https://*.tile.openstreetmap.org "
+        "https://fastapi.tiangolo.com https://cdn.redoc.ly/redoc/logo-mini.svg; "
+        "worker-src 'self' blob:;"
     ),
 }
 
@@ -89,8 +94,8 @@ class ProductionSettings(Settings):
         """Apply the production overrides, then configure pandas and logging.
 
         ``DEBUG`` defaults to ``False`` and ``CORS_ORIGINS``/``ALLOWED_HOSTS`` to
-        the production hostnames. ``SECURITY_HEADERS`` is declared here and
-        nowhere else, and the two ML sizing fields exist only on this subclass
+        the production hostnames. Middleware applies ``SECURITY_HEADERS`` to
+        HTTP responses. The two ML sizing fields exist only on this subclass
         and ``TestingSettings`` — the base ``Settings`` defines none of the three,
         so they are absent entirely under ``DevelopmentSettings``.
         """

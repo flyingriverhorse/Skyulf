@@ -35,7 +35,7 @@ pass. Unlike the batches above these were verified by reading the call sites and
 grepping for consumers, **not** reproduced by execution. Each changes behaviour
 rather than documentation, so all four were filed open for a later session;
 OC-186 has since been fixed and pinned by a test (see the Log), leaving
-OC-184–185 open; OC-183 closed on 2026-09-10. Historical baseline counts remain unchanged.
+OC-185 parked; OC-183–184 closed on 2026-09-10. Historical baseline counts remain unchanged.
 
 **Remaining-source continuation (2026-09-06):** OC-187–206 add 20 executed
 findings (5 🟠 / 14 🟡 / 1 ⚪). As of 2026-09-09, sixteen are fixed —
@@ -163,6 +163,7 @@ uses, so a fixed finding stays where it was filed.
 | OC-158 | 🟡 | Sync/async JSON serializers disagree: sync nulls 8 of 15 legitimate strings (`"nan"`, `"NaT"`, `"<NA>"`, `"inf"`…), async nulls none; 603-line module production-dead but test-covered (`serialization.py:369,435-446`) | half day | ✅ fixed 2026-09-10 — remove string-based missing detection, preserve real missing scalars, and pin text parity through public serializer entry points. |
 | OC-169 | 🟡 | Uncaught request errors re-log raw messages and traceback chains, bypassing S3 call-site credential redaction (`middleware/error_handler.py:53-65`) | small | ✅ fixed 2026-09-10 — mask application request/error log surfaces and fallback-handler persistence; retain formatted diagnostics without raw `exc_info`. |
 | OC-183 | 🟠 | `SmartCatalog` ignores dotenv-only bucket configuration and disagrees with the documented settings name (`data/catalog.py:556`, `config/mixins/aws.py:12`) | small | ✅ fixed 2026-09-10 — read canonical `AWS_BUCKET_NAME` through Settings, accept legacy `S3_BUCKET_NAME`, and align the docs with tested source precedence. |
+| OC-184 | 🟠 | Production security headers are configured but never sent (`config/environments.py:84`, `main.py::_add_middleware`) | half day | ✅ fixed 2026-09-10 — apply the configured policy to application HTTP responses, preserving CORS/streaming and browser-tested Canvas/API-docs compatibility. |
 | OC-224 | 🟠 | Drift compared a transformed splitter reference with a raw upload, reporting severe drift for the same file | small | ✅ fixed 2026-09-10 — resolve the selected model's unique saved raw loader snapshot; the user's existing job now reports 0/4 drift and PSI 0 without retraining. |
 | OC-68 | 🟠 | Model alias map task-unaware — direct API caller silently trains the wrong estimator family (`_execution/engine/_node_runners.py:1157-1183`) | small | ✅ fixed 2026-09-07 — ambiguous aliases are task-aware and mismatched model/task combinations fail clearly |
 | OC-70 | 🟡 | Leakage validator checks for *a* splitter globally, not that *this* branch is protected (`_execution/_leakage_validation.py:189-267`) | small | ✅ fixed 2026-09-08 — every training branch now needs its own splitter or explicit CV; data-dependent ancestors on unprotected branches are reported |
@@ -364,6 +365,44 @@ respective fix logs; OC-167 closed with canonical artifact framing on 2026-09-09
 ---
 
 ## Log
+
+### 2026-09-10 - OC-184 fixed: send the configured production security headers
+
+The existing production header dictionary had no consumer. The initial
+integration regressions produced **7 failures / 4 passing controls** across
+normal/error, redirect, static, streaming and custom-policy responses.
+`SecurityHeadersMiddleware` now copies the configured map at startup and
+updates only `http.response.start`, preserving bodies and other ASGI scopes.
+It wraps the custom error middleware and sits inside outermost CORS. Empty
+policies and development/testing profiles retain their previous behavior;
+configured headers override conflicting endpoint values without collapsing
+unrelated repeated headers such as cookies.
+
+Applying the dormant CSP exposed real browser incompatibilities: Canvas PNG
+export failed with blocked data/blob images; ReDoc then reported blocked blob
+workers and its logo. The default policy now permits the actual chart/map
+and enabled Swagger/ReDoc sources: data/blob images, OpenStreetMap tiles,
+jsDelivr assets, the docs favicon, the specific ReDoc logo and blob workers.
+Existing inline script/style allowances remain; `unsafe-eval` was not added.
+
+Verification: **106 related backend tests pass**, including **15 security
+header regressions**, request-error redaction, configuration and infrastructure
+checks. Five existing dependency warnings remain. A local Chromium fixture
+served the **actual built Canvas assets** through the production middleware:
+Canvas boot, same-origin job WebSocket, real Plotly 3D rendering, PNG download,
+map tiles and loaded Swagger/ReDoc all pass with **zero CSP violations**.
+Browser fixture/scripts and result are under ignored
+`tmp_repro_artifacts/oc184_*` / `oc184-browser-result.txt`; generated
+`oc184-pca.png` confirms the export. No frontend source or bundle changed.
+
+The configuration guide explains policy replacement and scope. CORS preflight
+responses and fallback responses created by Starlette's outer server-error
+handler bypass the inner middleware; normal route errors consumed by Skyulf's
+error handler are covered. Release notes are under **v0.8.20**. OC-184 moves
+to the archive, leaving **53 open / 4 parked** findings.
+
+Repository Ruff/Ty, scoped formatting and `git diff --check` pass. Independent
+review found no material issue within the documented scope.
 
 ### 2026-09-10 - OC-183 fixed: resolve the default S3 bucket through Settings
 
