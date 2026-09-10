@@ -182,6 +182,10 @@ assumed match. The exact Codacy advisory is requested for a scoped follow-up.
 
 ## Dependency audit continuation
 
+This first pass reduced the npm result from 14 to 2 entries. The subsequent
+[Plotly peer follow-up](#plotly-peer-dependency-follow-up) resolves those two;
+the current installed-tree audit reports zero known vulnerable package entries.
+
 **Baseline:** `988b5a43` on branch `0820`, 2026-09-10. A fresh registry-backed
 `npm audit` reproduces **14 vulnerable package entries: 2 critical, 3 high,
 8 moderate and 1 low**. These include transitive and parent-package entries,
@@ -204,7 +208,7 @@ for its decoder. The main affected versions are:
 | nanoid (OC-214) | 3.3.17 | 3.3.18 |
 | postcss-selector-parser (OC-215) | 6.1.2 | 6.1.4 |
 
-Both the final lockfile audit and the post-install npm audit report **2 critical,
+Both the first-pass lockfile audit and the post-install npm audit report **2 critical,
 0 high, 0 moderate and 0 low** entries. Audit still exits 1 because the critical
 dependency finding below remains open. Independent review verified all **52**
 dependency/peer constraints referencing the updated packages and found no
@@ -264,7 +268,65 @@ and jsdom logging occurred in the passing unit run.
 
 OC-214 and OC-215 are closed in the audit archive; the live queue now contains
 **61 open / 4 parked** findings. The other audit priorities are unchanged.
-Release notes are under v0.8.19. Local evidence is under ignored
+Release notes are under v0.8.20. Local evidence is under ignored
 `tmp_repro_artifacts/frontend-deps-*` and `frontend-npm-audit-2026-09-10-*`;
 none is intended for version control. Codacy must rescan before its own
-lockfile finding can be confirmed closed or matched to the remaining advisory.
+lockfile finding can be confirmed closed or matched to an npm advisory.
+
+## Plotly peer dependency follow-up
+
+**2026-09-10, second pass:** the first-pass dependencies are now recorded in
+`b8bca3e2`. The remaining MapLibre advisory was brought in by full Plotly's
+automatic peer installation, while application rendering already used the
+official GL3D distribution through the React wrapper's factory.
+
+The dependency is now `"plotly.js": "npm:plotly.js-gl3d-dist-min@^3.5.0"`.
+This uses [documented npm alias syntax](https://docs.npmjs.com/cli/v11/using-npm/package-spec/#aliases)
+and the wrapper's [supported custom-bundle factory](https://github.com/plotly/react-plotly.js#customizing-the-plotlyjs-bundle).
+The installed GL3D **3.5.0 version, tarball URL and integrity are unchanged**.
+There is no forced MapLibre major override or dependency-scanner exclusion.
+
+The relevant file responsibilities are:
+
+| File | Change |
+|---|---|
+| `package.json` / `package-lock.json` | Satisfy the wrapper peer with the existing GL3D distribution; remove full Plotly's unused dependency tree. |
+| `src/core/plotly.ts` | Import the alias and continue sharing one instance between rendering and export. |
+| `vite.config.ts` | Group the alias and factory entry together; avoid the default wrapper's full-package import. |
+| `src/vite-env.d.ts` | Remove the obsolete slim-package declaration; use the existing Plotly types. |
+| `e2e/plotly-bundle.spec.ts` | Exercise real 3D traces, PNG export and return to 2D. |
+| `README.md` | Document the alias, factory requirement and future bundle changes. |
+
+Compared with the first pass, **253 lock entries are removed and none added**.
+The retained Plotly entry points to GL3D; nine other entries only change their
+development classification. Independent review checked **2,425 dependency
+references**, with no missing required dependency or semver violation.
+
+Fresh final verification:
+
+- Main-tree `npm audit`: **0 known vulnerable package entries**, exit 0;
+  MapLibre is absent from the lockfile and installed tree. Across both passes
+  the result is **14 -> 2 -> 0**. This reflects npm's package/advisory matching,
+  not a separate security audit of code embedded in prebuilt distributions.
+- Clean isolated `npm ci --ignore-scripts --no-audit --no-fund`: passed;
+  the lockfile hash matches the main tree, and `npm ls` confirms the React
+  wrapper uses the aliased GL3D peer without a second Plotly installation.
+- Full Vitest: **2,429 tests / 188 files passed**. ESLint, source-wide CCN 10,
+  explicit lint of the new browser test, TypeScript/build and all **11**
+  unchanged bundle budgets passed.
+- **18 Chromium tests passed** on a fresh development server, including the
+  four previously listed specs and the new Plotly regression. That regression
+  also passed before the alias change, preserving an observed working baseline.
+- The new regression additionally passed against the **built production
+  preview**, covering Vite chunking: 3D trace values match the fixture, the
+  downloaded PNG has the expected signature and 1200 x 880 dimensions, and
+  switching back to 2D restores the canvas. The exported production image was
+  visually checked and shows the expected axes and four points.
+- Production assets remain byte-identical to HEAD; the dependency change adds
+  no browser payload. Independent review found no blocking implementation issue.
+
+The Plotly/MapLibre npm follow-up is closed. The live audit queue remains
+**61 open / 4 parked**, and Codacy still needs to rescan before its separately
+reported lockfile finding can be confirmed closed. Local logs and isolated-install
+evidence are under ignored
+`tmp_repro_artifacts/plotly-peer-*`; release notes are under v0.8.20.

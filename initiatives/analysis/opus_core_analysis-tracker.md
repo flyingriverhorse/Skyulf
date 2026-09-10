@@ -358,7 +358,33 @@ respective fix logs; OC-167 closed with canonical artifact framing on 2026-09-09
 
 ## Log
 
+### 2026-09-10 - Frontend Plotly peer follow-up: npm audit reaches zero
+
+The [second dependency pass](frontend_static_analysis_review_2026-09-10.md#plotly-peer-dependency-follow-up)
+removes the two npm entries left by the compatible updates below. An npm alias
+installs the existing official GL3D distribution as `plotly.js`, satisfying the
+React wrapper's peer dependency while keeping its supported factory entry.
+GL3D stays at **3.5.0**, with identical tarball URL/integrity and production
+assets. The unused full-Plotly/MapLibre chain is removed: **253 fewer lock
+entries**, no new entries and no forced major overrides or scanner exclusions.
+
+Final main-tree `npm audit` exits 0 with **zero known vulnerable package
+entries**; this is package/advisory matching, not a security audit of embedded
+prebuilt code. Clean isolated `npm ci`, peer resolution, **2,429 Vitest tests**,
+lint, source CCN 10, TypeScript/build and all **11** bundle budgets pass.
+**18 Chromium tests** pass on a fresh development server, and the new 3D PCA /
+PNG export regression also passes against the production preview. Independent
+review found no blocking implementation issue.
+
+The previous entry records the intermediate 14-to-2 result; the current npm
+result is **14 -> 2 -> 0**. Codacy must rescan to establish its own finding's
+status. OC-214/215 remain closed; queue totals remain **61 open / 4 parked**.
+The frontend README documents the alias/factory contract. Release notes: v0.8.20.
+
 ### 2026-09-10 - OC-214/215 fixed: compatible frontend dependency updates
+
+This is the first-pass record; the follow-up above closes its remaining two
+npm entries.
 
 Continued the [scanner report](frontend_static_analysis_review_2026-09-10.md#dependency-audit-continuation)
 from `988b5a43` on `0820`. Fresh npm audit reproduced **14 affected package
@@ -392,7 +418,7 @@ See the scanner report for browser results and environment limitations.
 
 OC-214/215 move from the live queue to the archive: **61 open / 4 parked**.
 The remaining MapLibre item stays in the scanner follow-up; other audit IDs
-and parked/deferred priorities are unchanged. Release notes: v0.8.19.
+and parked/deferred priorities are unchanged. Release notes: v0.8.20.
 
 ### 2026-09-10 - Codacy follow-up: remove temporary verification files
 
