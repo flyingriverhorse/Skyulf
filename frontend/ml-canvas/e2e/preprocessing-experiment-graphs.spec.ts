@@ -104,6 +104,43 @@ for (const width of [1440, 1100]) {
     expect(params(ids.casting)).toMatchObject({ column_types: { age: 'int' } });
     expect(params(ids.binning)).toMatchObject({ columns: ['height'], strategy: 'custom', custom_bins: { height: [0, 20, 40] }, label_format: 'range', precision: 0 });
   });
+
+  test(`casting preserves assigned types when rules are full and after re-adding at ${width}px`, async ({ page }) => {
+    // Filling the picker and removing/re-adding one rule must preserve the other Preview types.
+    const ids = await prepare(page, width);
+    let submitted: { nodes: { node_id: string; params: Record<string, unknown> }[] } | undefined;
+    await page.route('**/api/pipeline/preview?*', route => {
+      submitted = route.request().postDataJSON() as typeof submitted;
+      return route.fulfill({ json: { pipeline_id: 'oc228-preview', status: 'success', node_results: {}, preview_data: {}, recommendations: [] } });
+    });
+    const settings = page.getByRole('tabpanel', { name: 'Settings', exact: true });
+    await settings.getByRole('checkbox', { name: 'age', exact: true }).check();
+    await selectNode(page, ids.binning);
+    await settings.getByRole('checkbox', { name: 'height', exact: true }).check();
+    await selectNode(page, ids.casting);
+    const add = settings.getByRole('button', { name: 'Add Casting Rule', exact: true });
+    await add.click();
+    await settings.getByRole('combobox', { name: 'Data type for age', exact: true }).selectOption('int');
+    await add.click();
+    await settings.getByRole('combobox', { name: 'Data type for height', exact: true }).selectOption('int64');
+    await add.click();
+    await settings.getByRole('combobox', { name: 'Data type for species', exact: true }).selectOption('string');
+    await expect(add).toBeDisabled();
+    await expect(settings.getByRole('combobox', { name: 'Data type for age', exact: true })).toHaveValue('int');
+    await expect(settings.getByRole('combobox', { name: 'Data type for height', exact: true })).toHaveValue('int64');
+
+    await settings.getByRole('button', { name: 'Remove casting rule for height', exact: true }).click();
+    await expect(add).toBeEnabled();
+    await add.focus();
+    await page.keyboard.press('Enter');
+    await expect(add).toBeDisabled();
+    await expect(settings.getByRole('combobox', { name: 'Data type for height', exact: true })).toHaveValue('float');
+    await expect(settings.getByRole('combobox', { name: 'Data type for age', exact: true })).toHaveValue('int');
+    await expect(settings.getByRole('combobox', { name: 'Data type for species', exact: true })).toHaveValue('string');
+    await page.getByRole('button', { name: 'Preview data', exact: true }).click();
+    await expect.poll(() => submitted?.nodes.find(node => node.node_id === ids.casting)?.params.column_types)
+      .toEqual({ age: 'int', species: 'string', height: 'float' });
+  });
 }
 
 test('canvas PNG and SVG exports download real rendered nodes', async ({ page }) => {

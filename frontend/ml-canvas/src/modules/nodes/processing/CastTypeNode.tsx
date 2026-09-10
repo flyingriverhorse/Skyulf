@@ -85,6 +85,7 @@ const CastTypeSettings: React.FC<{ config: CastTypeConfig; onChange: (c: CastTyp
   const { data: schema, isLoading } = useDatasetSchema(datasetId);
   const droppedUpstream = useUpstreamDroppedColumns(nodeId);
   const columns = schema ? Object.values(schema.columns).map(c => c.name).filter(n => !droppedUpstream.has(n)) : [];
+  const nextColumn = columns.find(c => !config.column_types[c]);
 
   const executionResult = useGraphStore((state) => state.executionResult);
   const nodeResult = nodeId ? executionResult?.node_results[nodeId] : null;
@@ -94,12 +95,10 @@ const CastTypeSettings: React.FC<{ config: CastTypeConfig; onChange: (c: CastTyp
   const [containerRef, isWide] = useIsWideContainer();
 
   const handleAdd = () => {
-    if (columns.length === 0) return;
-    // Default to first available column and float
-    const newCol = columns.find(c => !config.column_types[c]) ?? columns[0]!;
+    if (nextColumn === undefined) return;
     onChange({
       ...config,
-      column_types: { ...config.column_types, [newCol]: 'float' }
+      column_types: { ...config.column_types, [nextColumn]: 'float' }
     });
   };
 
@@ -136,7 +135,7 @@ const CastTypeSettings: React.FC<{ config: CastTypeConfig; onChange: (c: CastTyp
           <button
             aria-label="Add Casting Rule"
             onClick={handleAdd}
-            disabled={!datasetId || columns.length === 0}
+            disabled={!datasetId || nextColumn === undefined}
             className="p-1.5 action-primary rounded disabled:opacity-50 transition-colors"
             title="Add Casting Rule"
           >

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowDown, ArrowUp, Clock } from 'lucide-react';
 import { ModalShell } from './ModalShell';
 import { LoadingState } from './LoadingState';
@@ -47,6 +47,7 @@ export const NodeInspectorModal: React.FC<NodeInspectorModalProps> = ({
   origin,
   filters,
 }) => {
+  const requestGeneration = useRef(0);
   const [currentNodeId, setCurrentNodeId] = useState(nodeId);
   const [data, setData] = useState<NodeInspectorResponse | null>(null);
   const [loading, setLoading] = useState(false);
@@ -57,6 +58,8 @@ export const NodeInspectorModal: React.FC<NodeInspectorModalProps> = ({
   }, [isOpen, nodeId, target]);
 
   const fetchNode = useCallback(async () => {
+    const generation = requestGeneration.current + 1;
+    requestGeneration.current = generation;
     setLoading(true);
     setError(null);
     try {
@@ -64,18 +67,22 @@ export const NodeInspectorModal: React.FC<NodeInspectorModalProps> = ({
         target.kind === 'job'
           ? await monitoringApi.getJobNode(target.jobId, currentNodeId)
           : await monitoringApi.getPipelineRunNode(target.pipelineId, currentNodeId);
+      if (generation !== requestGeneration.current) return;
       setData(response);
     } catch (err) {
+      if (generation !== requestGeneration.current) return;
       setData(null);
       setError(err instanceof Error ? err.message : 'Failed to load node detail.');
     } finally {
-      setLoading(false);
+      if (generation === requestGeneration.current) setLoading(false);
     }
   }, [target, currentNodeId]);
 
   useEffect(() => {
     if (!isOpen) return;
     void fetchNode();
+    // Selection changes, close and unmount revoke every write from older requests.
+    return () => { requestGeneration.current++; };
   }, [isOpen, fetchNode]);
 
   const handleWalkTo = useCallback((neighbor: NodeNeighbor) => {

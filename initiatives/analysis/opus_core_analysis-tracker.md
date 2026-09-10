@@ -277,6 +277,8 @@ uses, so a fixed finding stays where it was filed.
 |---|---|---|---|---|
 | OC-214 | 🟠 | Frontend PostCSS retains vulnerable `nanoid@3.3.17` (CVE-2026-67213) | small | ✅ fixed 2026-09-10 — lockfile and installed tree use compatible 3.3.18; npm audit no longer reports the package, and frontend coverage/tests, lint, CCN and build pass. |
 | OC-215 | 🟡 | Frontend Tailwind/PostCSS retains vulnerable `postcss-selector-parser@6.1.2` (CVE-2026-9358) | small | ✅ fixed 2026-09-10 — both parent paths resolve to compatible 6.1.4; npm audit no longer reports the package, and frontend coverage/tests, lint, CCN and build pass. |
+| OC-228 | 🟡 | Add Casting Rule overwrites the first column's existing type with `float` when every available column already has a rule | small | ✅ fixed 2026-09-10 — Add is disabled and its handler returns when no unassigned usable column remains; unit and browser regressions preserve types and cover removal/re-addition and Preview payloads. |
+| OC-229 | 🟡 | A late inspector response replaces the details of a more recently selected node | small | ✅ fixed 2026-09-10 — request generations guard data, error and loading writes; cleanup invalidates old requests on selection changes, close and unmount, with unit/browser coverage of reordered responses and retries. |
 | OC-222 | ⚪ | Audit Log's loaded-page filter hint contradicts its server-side actor/kind/time filtering | small | ✅ fixed 2026-09-10 — the hint now explains full-history filtering before the page limit; API behavior is unchanged. |
 | OC-221 | 🟡 | Error Log applies an older search response after a newer response, displaying rows that disagree with the current search | small | ✅ fixed 2026-09-10 — request generations guard HTTP/pipeline results, errors and loading; refresh and effect cleanup invalidate obsolete work. |
 | OC-220 | 🟡 | Resampling Target Column native suggestions open away from the input in the user's browser | small | ✅ fixed 2026-09-09 — use an anchored editable listbox; docked/expanded browser geometry and keyboard selection are covered. |
@@ -357,6 +359,78 @@ respective fix logs; OC-167 closed with canonical artifact framing on 2026-09-09
 ---
 
 ## Log
+
+### 2026-09-10 - OC-229 fixed: obsolete inspector responses cannot replace current details
+
+Continued after OC-228 on `6e887335`, preserving its pending changes. The old
+inspector characterization expected the first response to replace the second;
+it now asserts the intended behavior. Before the production fix, the expanded
+modal suite had **9 expected failures / 8 passing controls**. Besides stale
+data, it reproduced obsolete error and loading writes, job-to-pipeline target
+changes, same-node close/reopen, stale retries and Strict Mode effect cleanup.
+
+`NodeInspectorModal.tsx` follows the existing Error Log generation pattern.
+Every fetch, including Retry, gets a new generation. Success, error and finally
+blocks may write only while that generation is current; effect cleanup
+invalidates it on selection change, close or unmount. HTTP methods and response
+contracts are unchanged. An old transport request may finish, but its result
+cannot change the current inspector. Existing node navigation, provenance,
+not-found behavior and current-request retries remain intact.
+
+Focused inspector/ModalShell verification passes **28 tests / 2 files**.
+The new `e2e/node-inspector-races.spec.ts` passes **4 Chromium scenarios** at
+1440px and 900px through the real Error Log node link. It holds a first
+opening's HTTP request, closes and reopens the same inspector, then releases
+the old success/error after current details are visible. It also verifies
+upstream navigation, a failed request followed by Retry, Escape and restored
+opener focus. Independent review found no blocking issue. Frontend lint,
+source-wide CCN 10 and explicit lint of the new browser test pass.
+
+Final combined-tree verification passes **2,440 tests / 188 files**,
+TypeScript/production build and all **11** unchanged bundle budgets. Production
+assets were rebuilt with both OC-228 and OC-229; the final browser rerun again
+passes all four inspector scenarios.
+
+The generation assignment uses the same explicit ref write as Error Log;
+ESLint's effect-ref check rejected the initial increment shorthand. No lint
+rule or complexity limit was relaxed. Local evidence is under ignored
+`tmp_repro_artifacts/oc229-*`. The platform walkthrough documents historical
+inspection and clarifies that OC-228 concerns the **+ icon beside Casting
+Rules**, whose tooltip is Add Casting Rule, rather than adding a canvas node.
+Release notes are under v0.8.20. OC-229 moves to the archive; the live queue
+is now **59 open / 4 parked**.
+
+### 2026-09-10 - OC-228 fixed: casting Add preserves existing rules
+
+On `6e887335`, the public settings reproduction changed `{ age: 'int' }` to
+`{ age: 'float' }` when Add was clicked with all available columns assigned.
+The old characterization test intentionally pinned that behavior during the
+CCN refactor; it is now a regression for the corrected contract. Before the
+production fix, **3 regressions failed / 48 existing tests passed**, including
+the exact unintended callback payload.
+
+`CastTypeNode.tsx` derives the next unassigned column from its existing
+schema/drop-filtered list. Both the handler and button use that value; there
+is no fallback to the first assigned column. Missing schema still disables
+Add, hidden saved rules remain intact, and removing a rule makes its column
+available again with the existing Float default.
+
+Focused settings/serialization/body-preview verification: **232 tests passed**.
+The full suite passes **2,431 tests / 188 files**. **5 Chromium scenarios** pass
+in `preprocessing-experiment-graphs.spec.ts`, including exhausted casting rules,
+removal and keyboard re-addition at 1440px and 1100px, plus the actual Preview
+payload `{ age: 'int', species: 'string', height: 'float' }`. The first browser
+attempt correctly blocked Preview because the new fixture left its neighboring
+replacement/binning nodes unconfigured; completing those settings through the
+real UI resolved the fixture failure. No production workaround was needed.
+
+Independent review found no blocking issue. Frontend lint and source-wide
+CCN 10 pass. TypeScript/production build and all **11** unchanged bundle budgets
+pass; rebuilt assets are included, with main entry `index-nNPBPCLt.js`.
+User instructions are documented in the platform walkthrough,
+and release notes are under v0.8.20. Local evidence is under ignored
+`tmp_repro_artifacts/oc228-*`. OC-228 moves to this archive; the live queue is
+now **60 open / 4 parked**, with the remaining priorities unchanged.
 
 ### 2026-09-10 - Frontend Plotly peer follow-up: npm audit reaches zero
 

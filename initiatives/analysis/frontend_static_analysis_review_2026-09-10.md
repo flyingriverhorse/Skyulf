@@ -330,3 +330,46 @@ The Plotly/MapLibre npm follow-up is closed. The live audit queue remains
 reported lockfile finding can be confirmed closed. Local logs and isolated-install
 evidence are under ignored
 `tmp_repro_artifacts/plotly-peer-*`; release notes are under v0.8.20.
+
+## Functional follow-up: OC-228 casting rules
+
+After the scanner/dependency work, the user selected OC-228 from the remaining
+frontend queue. Add previously replaced the first column's type with Float
+when every usable column already had a rule. The handler now returns without
+emitting a change and the button is disabled in that state. Removing a rule
+re-enables Add without altering other configured types.
+
+Here Add means the **+ icon beside Casting Rules** in an existing Cast Types
+node's settings; **Add Casting Rule** is its tooltip, not a visible text label
+or the action that adds a new node to the canvas. The walkthrough was clarified
+after the user's question about the wording.
+
+Three regressions failed against the original implementation. After the fix,
+**232 focused tests**, **2,431 full-suite tests / 188 files**, and **5 Chromium
+scenarios** passed. Browser checks cover 1440px/1100px, keyboard re-addition,
+preserved types and the real Preview payload. Lint, source CCN 10,
+TypeScript/production build and all **11** unchanged bundle budgets pass;
+rebuilt assets accompany the fix. Independent review found no blocking issue.
+This closes one functional finding,
+bringing the queue to **60 open / 4 parked**. See the
+[OC-228 fix log](opus_core_analysis-tracker.md#2026-09-10---oc-228-fixed-casting-add-preserves-existing-rules)
+for reproduction and verification details.
+
+## Functional follow-up: OC-229 inspector response ordering
+
+The next selected issue was an old Node Inspector request overwriting newer
+details. Request generations now guard data, error and loading updates;
+selection changes, closing and unmounting invalidate older work, while Retry
+starts a new generation. API and stored-run response contracts are unchanged.
+
+The original implementation failed **9 regressions** with **8 passing controls**.
+After the fix, **28 focused inspector/modal tests** and **4 Chromium scenarios**
+pass. Browser coverage uses actual Error Log links, reordered HTTP success/error
+responses across same-node close/reopen, upstream navigation, Retry and
+Escape/focus restoration at 1440px and 900px. Lint and source CCN 10 pass;
+the final full suite passes **2,440 tests / 188 files**, with TypeScript/build
+and all **11** unchanged bundle budgets passing. Rebuilt assets include both
+OC-228 and OC-229. Independent review found no blocking issue.
+The queue is now **59 open / 4 parked**.
+See the [OC-229 fix log](opus_core_analysis-tracker.md#2026-09-10---oc-229-fixed-obsolete-inspector-responses-cannot-replace-current-details)
+for details. The earlier OC-228 work is preserved in the same pending tree.
