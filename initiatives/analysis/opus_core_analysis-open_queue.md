@@ -15,7 +15,7 @@ file deliberately carries no history.
 per-area report files `00`–`18`).
 **Baseline:** commit `93d7719e` (master), audit run 2026-08-31 → 09-01 by 15
 parallel read-only agents (Claude Opus 5). 116 findings: 5 🔴 / 45 🟠 / 44 🟡 /
-22 ⚪, plus OC-160–221 filed by later reviews. OC-100 was retracted as a false
+22 ⚪, plus OC-160–224 filed by later reviews. OC-100 was retracted as a false
 positive and is not counted; the corrections pass stays in the archive.
 
 **Status key:** ⬜ open · 🟨 in progress · ✅ done · ⏭️ parked
@@ -154,12 +154,13 @@ closed that on 2026-09-07.
 ### Remaining — frontend
 
 The separate [frontend CCN backlog](frontend_ccn_remaining_2026-09-10.md) tracks
-112 functions in 80 files above the accepted limit of 10. The informational
+105 functions in 77 files above the accepted limit of 10. The informational
 report stays at 8; complexity candidates do not add to the audit finding counts.
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
 | OC-54 | 🟡 | `DebugNode` is dead code that would silently no-op if wired up (`nodes/DebugNode.tsx`) | small | ⬜ open |
+| OC-223 | 🟡 | Completing a pending drift disposition clears the newly typed note after switching to another alert | small | ⬜ open — original modal characterization submits on one alert, switches IDs, types a new note and resolves the old callback; the new note becomes empty. Review modal and parent request lifetimes together before repair. |
 | OC-56 | ⚪ | `useSchemaPreview` does not cancel in-flight requests on unmount (`hooks/useSchemaPreview.ts`) | small | ⬜ open |
 | OC-57 | ⚪ | `any`-typed chart props bypass type safety in EDA components (`modules/eda/`) | small | ⬜ open |
 | OC-214 | 🟠 | Frontend lockfile and installed PostCSS dependency retain `nanoid@3.3.17`, affected by CVE-2026-67213; the parent range permits the patched 3.3.18 release (`frontend/ml-canvas/package-lock.json`) | small | ⬜ open — dependency presence confirmed; application exploitability not established |
@@ -190,6 +191,118 @@ behaviour longer — the master report sequences it after the individual no-ops.
 **Sequencing:** steps 1–2 are additive — land without touching any node. Step 3's
 backend strictness goes behind a warn-only flag for one release (log every rejected
 key — also the fastest way to find drift the audit missed).
+
+---
+
+## Planned enhancement — DRIFT-01: raw-data and model-feature drift modes
+
+**Status:** ⬜ open — specification recorded at the user's request on 2026-09-10;
+deferred for a later implementation pass. This is a cross-layer enhancement,
+not a newly reproduced OC finding. It does not change the **58 open / 4 parked**
+audit counts. OC-224 remains fixed; OC-223 is a separate alert-note lifecycle bug.
+
+**Goal:** let the user upload one raw dataset and choose which representation
+to monitor. Both modes must compare the same preprocessing stage on each side.
+
+| Mode | Reference | Current data | Question answered |
+|---|---|---|---|
+| Raw data | Saved raw loader snapshot | Uploaded raw dataset | Has the incoming source distribution/schema changed? |
+| Model features | The selected raw reference passed through the frozen prediction preprocessing path | The raw upload passed through that same path | Have the features supplied to the model at prediction time changed? |
+
+**Current state:** OC-224 implements raw-source comparison using the selected
+model's unique saved loader snapshot. `DriftCalculator` itself is unchanged.
+The model-feature mode, mode selector and persisted mode/provenance fields
+described below do not exist yet.
+
+### Reference population and compatibility
+
+- Start with the same saved raw reference rows in both modes. For the reported
+  Iris job this is 150 source rows; the model card still reports its 120 training
+  rows. Preserve sampling if the loader originally sampled the source.
+- Keep representation (raw/model features) separate from population (loaded
+  source/training subset). A later training-only baseline requires reliable raw
+  training-row provenance. Do not reconstruct it from row counts, reset indexes
+  or split seeds after arbitrary filtering, reordering or branch merges.
+- Build the model-feature reference by applying the frozen prediction transform
+  to those reference rows. Do not reuse the old splitter snapshot, an arbitrary
+  intermediate frame or a SMOTE/resampled training matrix as an equivalent
+  reference. Record any legitimate row-count change and its reason.
+- Preserve existing raw-mode behavior and defaults. Existing jobs may enable
+  feature mode only when their source and fitted preprocessing artifacts are
+  sufficient and their replay is verified. Otherwise report the mode unavailable
+  with a clear reason; require retraining only when the required state is absent.
+- Historical checks must retain their original meaning. Pre-OC-224 checks may
+  have compared different stages, and graphless legacy baselines are unverified;
+  do not silently label those results as a verified raw or feature mode.
+
+### Implementation work
+
+- [ ] **Core: expose shared prediction-feature preparation.** Add a public,
+  in-memory API for obtaining the features actually passed to the estimator;
+  its name is to be decided. Reuse it for prediction and feature drift so target
+  handling, input validation, transformations, column order and dtype handling
+  cannot diverge. Keep `DriftCalculator(reference, current)` backward-compatible;
+  no database, filesystem or backend imports in `skyulf-core`.
+- [ ] **Replay: verify fitted pipelines and branch semantics.** Reuse training's
+  fitted scaler/encoder/selector state; never call `fit` on uploaded data.
+  Preserve prediction-time handling of splitters, resampling and row-dropping
+  operations. `_build_composite_feature_engineer` currently concatenates ancestor
+  steps; this alone does not prove exact replay of parallel branches or merges.
+  Verify equivalence before enabling that graph shape; unsupported shapes must
+  fail explicitly. Define column exclusions, including raw inputs used to create
+  derived features before being dropped; the current explicit-drop convention
+  is not complete feature lineage.
+- [ ] **Backend artifacts: save both references and their identity.** Persist
+  raw and prepared-feature snapshots, representation/population, row counts,
+  ordered schema and model/pipeline identity or fingerprint. These are proposed
+  metadata, not current artifact fields. Rebuild/invalidate the feature reference
+  when the fitted pipeline changes; never silently reuse another model's state.
+- [ ] **API and persistence: carry the selected mode end to end.** Extend drift
+  requests, responses, saved results and alert details with mode and reference
+  provenance. Scope history/trends and configurable thresholds by the appropriate
+  mode/reference so different representations are not compared as one series.
+  Add intentional migrations and a legacy/unknown interpretation for old rows.
+  Record parsing, preprocessing and missing-reference failures as failed checks,
+  not zero-drift successes; preserve existing alert lifecycle behavior.
+- [ ] **Frontend: add Raw data / Model features selection.** Accept a raw upload
+  in either mode, show which reference/population and row counts are in use, and
+  explain unavailable modes. Preserve the selected mode in results, history,
+  investigation links and CSV exports; do not require manual preprocessing.
+- [ ] **Documentation and delivery:** add backend/UI and standalone Core examples,
+  describe baseline selection and legacy limitations, and record concise release
+  notes when implemented. Update this item and the tracker after verified work.
+
+### Acceptance tests
+
+- [ ] Identical reference/upload rows yield no drift in both modes for supported
+  deterministic pipelines, including log transforms and fitted scaling/encoding.
+  Do not require exact zero when comparing different sampled populations.
+- [ ] Feature-mode preparation matches the matrix supplied by real prediction,
+  including names, order, values and dtypes; check linear and supported branched
+  graphs, fitted feature selection, unseen categories and generated features.
+- [ ] New uploads do not refit/mutate preprocessing, resplit data or synthesize
+  training rows. A large real shift remains detectable with the frozen transform;
+  missing/new raw columns and transformation failures remain visible.
+- [ ] Mode switching uses the correct reference, thresholds, history and export;
+  old responses cannot replace results for a newly selected mode/reference.
+- [ ] Retraining/pipeline changes cannot reuse stale feature references. Cover
+  old jobs, missing artifacts, graphless metadata, ambiguous sources, sampled
+  loaders and unsupported branch replay with explicit expected outcomes.
+- [ ] Standalone Core users can obtain prediction features and run both drift
+  comparisons without the backend. Existing Core calculator callers still work.
+
+**Starting points:** `backend/monitoring/drift_reference.py`,
+`backend/monitoring/router.py`, `backend/database/models.py`,
+`backend/ml_pipeline/_execution/engine/_feature_eng.py`,
+`backend/ml_pipeline/_execution/engine/_artifacts.py`,
+`backend/ml_pipeline/deployment/service.py`,
+`skyulf-core/skyulf/pipeline/_pipeline.py`,
+`skyulf-core/skyulf/preprocessing/pipeline.py`,
+`skyulf-core/skyulf/profiling/drift.py`,
+`frontend/ml-canvas/src/core/api/monitoring.ts`,
+`frontend/ml-canvas/src/pages/DataDriftPage.tsx` and `src/pages/drift/`.
+Relevant existing regressions: `tests/integration/test_drift_reference_space.py`
+and `tests/integration/test_drift_target_columns.py`.
 
 ---
 

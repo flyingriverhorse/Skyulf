@@ -158,6 +158,7 @@ uses, so a fixed finding stays where it was filed.
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
+| OC-224 | 🟠 | Drift compared a transformed splitter reference with a raw upload, reporting severe drift for the same file | small | ✅ fixed 2026-09-10 — resolve the selected model's unique saved raw loader snapshot; the user's existing job now reports 0/4 drift and PSI 0 without retraining. |
 | OC-68 | 🟠 | Model alias map task-unaware — direct API caller silently trains the wrong estimator family (`_execution/engine/_node_runners.py:1157-1183`) | small | ✅ fixed 2026-09-07 — ambiguous aliases are task-aware and mismatched model/task combinations fail clearly |
 | OC-70 | 🟡 | Leakage validator checks for *a* splitter globally, not that *this* branch is protected (`_execution/_leakage_validation.py:189-267`) | small | ✅ fixed 2026-09-08 — every training branch now needs its own splitter or explicit CV; data-dependent ancestors on unprotected branches are reported |
 | OC-145 | 🟡 | Crashed cross-validation returns the same `{}` sentinel as a disabled one — job reports success with missing `cv_*` metrics (`_node_runners.py:871-907`) | small | ✅ fixed 2026-09-08 — post-tuning CV exceptions now fail the training node and pipeline; regression coverage added |
@@ -274,6 +275,7 @@ uses, so a fixed finding stays where it was filed.
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
+| OC-222 | ⚪ | Audit Log's loaded-page filter hint contradicts its server-side actor/kind/time filtering | small | ✅ fixed 2026-09-10 — the hint now explains full-history filtering before the page limit; API behavior is unchanged. |
 | OC-221 | 🟡 | Error Log applies an older search response after a newer response, displaying rows that disagree with the current search | small | ✅ fixed 2026-09-10 — request generations guard HTTP/pipeline results, errors and loading; refresh and effect cleanup invalidate obsolete work. |
 | OC-220 | 🟡 | Resampling Target Column native suggestions open away from the input in the user's browser | small | ✅ fixed 2026-09-09 — use an anchored editable listbox; docked/expanded browser geometry and keyboard selection are covered. |
 | OC-55 | 🟡 | `tsc --noEmit` fails: `mermaid` declared but not installed (`frontend/ml-canvas/package.json`) | 1 line | ✅ verified stale 2026-09-06 — `mermaid@11.17.2` is in `dependencies`, in the lockfile, installed and lazy-imported into its own chunk; the exact CI `tsc --noEmit` exits 0, `npm run build` succeeds, and the 5 real-parser tests pass. No change needed |
@@ -353,6 +355,162 @@ respective fix logs; OC-167 closed with canonical artifact framing on 2026-09-09
 ---
 
 ## Log
+
+### 2026-09-10 - OC-224 fixed: compare raw uploads with saved raw source data
+
+`backend/monitoring/drift_reference.py` resolves the selected training node's
+ancestors from its saved graph and uses the unique loader's persisted snapshot.
+Shared-loader branches resolve to one source; unrelated graph branches cannot
+choose the baseline or exclude columns. The router excludes the target and
+explicit drop-column configurations symmetrically, without intersecting raw
+columns with encoded/derived model feature names. No upload fitting, pipeline
+replay, threshold change, model retraining or artifact rewrite is involved.
+
+The baseline contains the rows actually loaded, before preprocessing/splitting;
+sampled loaders retain their sample. It can include validation/test rows, so
+the user's model card remains 120 training rows while drift now compares
+**150 reference / 150 current rows**. Graphless legacy jobs keep their previous
+reference contract; its preprocessing stage cannot be independently established.
+Missing/ambiguous source metadata for a graph-backed job produces an explicit
+error and attempts to record a failed check rather than publishing drift scores.
+Explicit drops follow the existing bundle convention, not full feature lineage.
+
+TDD: **9 failed / 1 passed** before repair; **21 passed** after, including 11
+existing target regressions. New coverage includes actual engine training with
+log-before-split and shared branches, existing pandas/Polars source snapshots,
+real distribution/schema changes, encoded categorical raw inputs, unrelated
+branches, missing/ambiguous sources and graphless fallback. Wider relevant
+backend/Core suites pass **214 tests** (493 dependency/runtime warnings).
+Ruff check/format and scoped ty pass; the post-narrowing focused run again
+passes 21. An independent Astra review found no outstanding issues.
+
+The running local API was checked with job
+`bf22d1e1-f61a-4434-a89c-77662d42cfc9` and the user's original CSV:
+**HTTP 200, 0/4 drifted features, all four PSI values 0.0, no missing/new columns,
+severity none**. This created history alert **27**; previous results were not
+rewritten. Logs: `tmp_repro_artifacts/drift-reference-{red,green,integration,
+confirm,types}.log` and `tmp_repro_artifacts/drift-bf22-live-api.log`.
+
+The [drift guide](../../docs/user_guide/drift_monitoring.md) and v0.8.19 notes
+explain the raw-source contract and existing-job compatibility. OC-224 moves to
+the closed backend rows; queue returns to **58 open / 4 parked**. OC-223 stays
+open. The user approved this fix and the preceding frontend batch for a signed
+commit, including the deferred DRIFT-01 enhancement specification in the queue.
+
+### 2026-09-10 - OC-224 filed: drift reference/upload preprocessing mismatch
+
+The user trained `bf22d1e1-f61a-4434-a89c-77662d42cfc9` and checked the same
+Iris CSV. Reading its stored graph/reference and executing the real calculator
+reproduced PSI **8.30354, 8.32062, 5.77086, 3.18667** (mean **6.3954**), with
+all four features marked drifted. Reference: 120 rows; current: 150 rows.
+The graph applies `GeneralTransformation(method=log)` before the splitter.
+For SepalLengthCm, the saved reference mean is **1.91567**, versus raw **5.84333**.
+
+`_run_data_loader` initially saves a raw reference, but `_run_transformer`
+overwrites it with the splitter's already transformed training partition.
+`calculate_drift` parses the upload and compares it directly with that reference.
+This combines different preprocessing stages and predates the batch 6 frontend
+refactor. The saved graph also merges a dropped-Id branch and the log branch;
+the fix must not assume a single linear preprocessing chain.
+
+Evidence: `tmp_repro_artifacts/inspect_drift_bf22.py` and
+`tmp_repro_artifacts/drift-bf22-inspection.log`, using the job's stored artifacts
+and `uploads/data/3cfaca74-96d0-483b-bac5-76e5cde20057.csv`. No existing finding
+in the tracker/queue describes this mismatch. Filed open before repair;
+queue **59 open / 4 parked**. Scope: consistent reference/current data stages,
+existing-job compatibility, and preserved detection of real distribution/schema
+changes. Do not fit transformations on the upload or lower alert thresholds.
+
+### 2026-09-10 - frontend complexity refactor batch 6: verified
+
+Plan: [`frontend_ccn_refactor_batch6_2026-09-10.md`](frontend_ccn_refactor_batch6_2026-09-10.md).
+Baseline `534d1e94`, branch `0819`; the prior strict-10/report-8 policy and
+inventory are committed with DCO sign-off. Three independent Astra implementers
+and separate reviewers covered these scopes:
+
+| Scope | Previous maximum | Final maximum | Preserved behavior evidence |
+|---|---:|---:|---|
+| Audit Log and 6 helpers | 31 | 10 | 23 original/refactored page tests: server filters/facets, summaries, expansion, refresh and stale responses |
+| Drift alert modal and 5 helpers | 31 | 8 | 27 original modal tests / 36 related final tests: evidence, links, actions, promises and state lifetime |
+| Feature Generation and 12 helpers | 30 | 7 | 32 original settings tests / 102 related final tests: operations, columns, controlled updates, reveal, feedback and validation |
+
+All three pure extractions passed independent specification and quality review.
+The Audit page itself is now 6; two cohesive helpers remain at 10 intentionally.
+OC-222 was then repaired separately with red/green evidence and independent
+review (see below). OC-223 was reproduced on the original modal and remains
+open for a separate repair of modal and parent request lifetimes.
+
+Final integration: **157 Vitest files / 1,998 tests**, **111 Chromium tests**,
+normal ESLint, TypeScript/Vite production build and all **11 bundle budgets
+pass**. Main bundle: **320.1 KiB gzip / 325 KiB**. The six new browser cases
+exercise actual audit/drift pages at 1440px/900px and editable feature settings
+at 1440px/1100px, including keyboard focus and panel expansion. Routes are
+mocked; these checks do not establish live-backend integration. Logs:
+`tmp_repro_artifacts/ccn6-{vitest,lint,build,size,playwright}-final.log`.
+
+All selected source files and helpers pass scoped CCN 10. The source-wide
+strict gate still exits **1** on the remaining **105 functions / 77 files /
+maximum 32**, down from 112 functions / 80 files. The informational CCN 8
+report exits **0**, listing **167 functions / 109 files**, down from 172 / 110.
+The 62 functions at 9 or 10 are optional improvements, not strict violations.
+Evidence: `tmp_repro_artifacts/ccn6-{gate,report}-final.log`; the linked
+[remaining-work inventory](frontend_ccn_remaining_2026-09-10.md) is refreshed.
+
+Generated assets and concise v0.8.19 notes are updated. No backend, shared API,
+store, registry, dependency or lockfile change. Queue: **58 open / 4 parked**
+after closing OC-222 and filing OC-223; parked decisions are unchanged.
+The user completed frontend checks and subsequently requested a signed commit
+with the separately verified OC-224 drift correction.
+
+### 2026-09-10 - OC-222 fixed: explain full-history audit filtering
+
+After the extraction passed review, the stale loaded-page hint was replaced
+with: "Actor, action kind and time filters apply across the full history before
+the page limit." The paragraph and CSS are retained; only copy and its existing
+public-page assertion changed. The route builds history, applies actor/kind/date
+filters, reverses the matches and then caps the response, so the hint matches
+the current backend behavior.
+
+The corrected assertion first failed **1 of 23 tests**; all **23 then passed**.
+Scoped ESLint/CCN 10 and whitespace checks pass. Independent review confirmed
+the two-file diff, red/green logs and backend filtering order. Evidence:
+`tmp_repro_artifacts/ccn6-task-5-{red,green,eslint,diff-check}.log`.
+OC-222 moves to the closed frontend rows; OC-223 remains open. Release note:
+v0.8.19. No API behavior change.
+
+### 2026-09-10 - OC-223 filed during drift modal characterization
+
+The original modal at `534d1e94` clears its current note whenever a pending
+`onApplyDisposition` resolves truthy, even after `alertId` has changed. The test
+`retains asynchronous truthy-result semantics across an alert switch` submits
+`first` for one alert, rerenders with alert ID 8, types `second`, then resolves
+the old callback. The current note becomes empty. Original-source characterization
+passes **27 tests**, including this case; evidence:
+`tmp_repro_artifacts/ccn6-task-2-baseline-expanded-tests.log`.
+
+This predates the extraction and is preserved in its characterization, not
+introduced by the refactor. No duplicate was found in the tracker/open queue.
+The eventual fix should assess `useDriftAlertDetail` alongside modal note state:
+the parent also applies asynchronous responses without request ownership checks,
+but wider parent behavior has not yet been execution-reproduced in this finding.
+Filed open for a separate request-lifetime repair; queue **59 open / 4 parked**
+including the separately filed OC-222 wording defect.
+
+### 2026-09-10 - OC-222 filed during Audit Log characterization
+
+Original `AuditLogPage.tsx` at `534d1e94:495-496` says: "Filters apply only to
+the loaded page; the backend currently supports dataset and page limit only."
+The public-page test `states that filters span the whole history, not just the
+page` renders this hint alongside the full-history footer; original-source
+characterization passes **21 tests**. Other cases verify actor/kind/time arguments
+are sent. The real route `backend/ml_pipeline/_internal/_routers/pipelines_io.py`
+accepts these filters in `get_pipeline_audit_log`, confirming the hint is stale.
+
+Evidence: `tmp_repro_artifacts/ccn6-task-1-original-tests.log`, subsequently
+refreshed with **23 original-source tests** after adding two characterization
+cases. No duplicate was found in the tracker/open queue. Filed separately from
+the pure extraction; correct the hint after that review. Queue at filing:
+**58 open / 4 parked**.
 
 ### 2026-09-10 - frontend policy: strict CCN 10, informational CCN 8
 
