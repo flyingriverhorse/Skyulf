@@ -132,6 +132,15 @@ cp .env.example .env
 | `LOG_ROTATION_WHEN` | `midnight` | When to rotate (used with `LOG_ROTATION_TYPE=time`) |
 | `LOG_ROTATION_INTERVAL` | `1` | Rotation interval (used with `LOG_ROTATION_TYPE=time`) |
 
+Skyulf's request and uncaught-error logs mask recognized AWS credentials,
+signatures and named secret/password values. This includes request URLs,
+user-agent metadata, exception messages and complete traceback chains.
+Exception types, stack locations and request IDs remain available for
+debugging; raw exception objects are not attached to these log records.
+The generic exception handler also masks its diagnostic payload before
+recording a new error event. This applies to these application log paths;
+external server and third-party loggers have their own logging behavior.
+
 ---
 
 ## AWS / S3 (Optional)
@@ -143,8 +152,15 @@ cp .env.example .env
 | `AWS_SESSION_TOKEN` | *(unset)* | AWS session token (for temporary credentials) |
 | `AWS_DEFAULT_REGION` | `us-east-1` | AWS region |
 | `AWS_ENDPOINT_URL` | *(unset)* | Custom S3 endpoint (e.g. MinIO) |
-| `AWS_BUCKET_NAME` | *(unset)* | S3 bucket for uploads |
+| `AWS_BUCKET_NAME` | *(unset)* | Default S3 data bucket; legacy alias: `S3_BUCKET_NAME` |
 | `S3_ARTIFACT_BUCKET` | *(unset)* | S3 bucket for ML artifacts |
+
+`SmartCatalog` initializes its default S3 delegate from `AWS_BUCKET_NAME`,
+including values configured only in `.env`. The legacy `S3_BUCKET_NAME`
+alias works through the same settings model. Environment values override
+`.env`; if both names occur in the same source, `AWS_BUCKET_NAME` wins.
+An explicitly supplied S3 catalog takes precedence. With no bucket configured,
+local paths continue to use the filesystem catalog.
 
 ---
 

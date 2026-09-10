@@ -543,18 +543,17 @@ class SmartCatalog(DataCatalog):
             session: SQLAlchemy session used to resolve numeric ids to locations.
             fs_catalog: Filesystem delegate; defaults to one rooted at ``UPLOAD_DIR``.
             s3_catalog: S3 delegate. When omitted, one is built only if the
-                ``S3_BUCKET_NAME`` *process* environment variable is set. That read
-                goes through ``os.getenv`` rather than ``Settings``, so a bucket
-                configured solely in ``.env`` is not seen and S3 support stays off;
-                a missing ``s3fs`` is suppressed the same way.
+                ``AWS_BUCKET_NAME`` setting is populated from the environment
+                or ``.env``. The legacy ``S3_BUCKET_NAME`` alias is accepted by
+                Settings too. A missing ``s3fs`` keeps optional S3 support off.
         """
         self.session = session
         self.fs_catalog = fs_catalog or FileSystemCatalog()
         self.s3_catalog = s3_catalog
 
-        # Try to init S3 catalog from env if not provided
+        # Resolve through Settings so dotenv values and legacy aliases work.
         if not self.s3_catalog:
-            bucket = os.getenv("S3_BUCKET_NAME")
+            bucket = get_settings().AWS_BUCKET_NAME
             if bucket:
                 # s3fs not installed or configured
                 with contextlib.suppress(ImportError):

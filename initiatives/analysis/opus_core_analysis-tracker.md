@@ -35,7 +35,7 @@ pass. Unlike the batches above these were verified by reading the call sites and
 grepping for consumers, **not** reproduced by execution. Each changes behaviour
 rather than documentation, so all four were filed open for a later session;
 OC-186 has since been fixed and pinned by a test (see the Log), leaving
-OC-183–185 open. Historical baseline counts remain unchanged.
+OC-184–185 open; OC-183 closed on 2026-09-10. Historical baseline counts remain unchanged.
 
 **Remaining-source continuation (2026-09-06):** OC-187–206 add 20 executed
 findings (5 🟠 / 14 🟡 / 1 ⚪). As of 2026-09-09, sixteen are fixed —
@@ -160,6 +160,9 @@ uses, so a fixed finding stays where it was filed.
 |---|---|---|---|---|
 | OC-151 | 🟡 | Trial-buffer `clear_*` hooks documented but never called — 110.9 MB retained for process lifetime (`realtime/trial_buffer.py:56-59,103-106`) | small | ✅ fixed 2026-09-10 — execution cleanup releases both chart buffers; cancellation clears them after commit, and successful jobs retain persisted chart history. |
 | OC-156 | 🟡 | `roc_auc` threshold-tuning objective scores hard predictions — bit-identical to `balanced_accuracy` (`threshold_tuning_service.py:77-92`) | small | ✅ fixed 2026-09-10 — remove ROC AUC from new threshold preview/save requests and UI choices; preserve existing saved cutoffs and recommend Balanced Accuracy. |
+| OC-158 | 🟡 | Sync/async JSON serializers disagree: sync nulls 8 of 15 legitimate strings (`"nan"`, `"NaT"`, `"<NA>"`, `"inf"`…), async nulls none; 603-line module production-dead but test-covered (`serialization.py:369,435-446`) | half day | ✅ fixed 2026-09-10 — remove string-based missing detection, preserve real missing scalars, and pin text parity through public serializer entry points. |
+| OC-169 | 🟡 | Uncaught request errors re-log raw messages and traceback chains, bypassing S3 call-site credential redaction (`middleware/error_handler.py:53-65`) | small | ✅ fixed 2026-09-10 — mask application request/error log surfaces and fallback-handler persistence; retain formatted diagnostics without raw `exc_info`. |
+| OC-183 | 🟠 | `SmartCatalog` ignores dotenv-only bucket configuration and disagrees with the documented settings name (`data/catalog.py:556`, `config/mixins/aws.py:12`) | small | ✅ fixed 2026-09-10 — read canonical `AWS_BUCKET_NAME` through Settings, accept legacy `S3_BUCKET_NAME`, and align the docs with tested source precedence. |
 | OC-224 | 🟠 | Drift compared a transformed splitter reference with a raw upload, reporting severe drift for the same file | small | ✅ fixed 2026-09-10 — resolve the selected model's unique saved raw loader snapshot; the user's existing job now reports 0/4 drift and PSI 0 without retraining. |
 | OC-68 | 🟠 | Model alias map task-unaware — direct API caller silently trains the wrong estimator family (`_execution/engine/_node_runners.py:1157-1183`) | small | ✅ fixed 2026-09-07 — ambiguous aliases are task-aware and mismatched model/task combinations fail clearly |
 | OC-70 | 🟡 | Leakage validator checks for *a* splitter globally, not that *this* branch is protected (`_execution/_leakage_validation.py:189-267`) | small | ✅ fixed 2026-09-08 — every training branch now needs its own splitter or explicit CV; data-dependent ancestors on unprotected branches are reported |
@@ -361,6 +364,99 @@ respective fix logs; OC-167 closed with canonical artifact framing on 2026-09-09
 ---
 
 ## Log
+
+### 2026-09-10 - OC-183 fixed: resolve the default S3 bucket through Settings
+
+The raw `os.getenv("S3_BUCKET_NAME")` check ignored the Settings model's
+canonical `AWS_BUCKET_NAME` and all dotenv-only bucket configuration. New
+regressions produced **6 failures / 5 passing controls** before the fix.
+
+`AWS_BUCKET_NAME` remains the canonical field. Pydantic `AliasChoices`
+accepts the legacy `S3_BUCKET_NAME` name for existing configurations, and
+`SmartCatalog` reads the resolved Settings value. Real dotenv/environment
+tests pin both aliases, canonical precedence within a single source, and
+environment precedence over dotenv even when the sources use different
+aliases. Explicit catalog injection, local-only operation and optional-SDK
+fallback are preserved. Credentials and S3 provider selection are unchanged.
+
+Verification: **67 config/catalog/S3 tests pass**, including **11 new
+regressions**. No S3 service is contacted: tests load real Settings and
+replace the external catalog constructor. README and the backend
+configuration guide now agree on the bucket name and precedence; the README
+region example also uses the existing `AWS_DEFAULT_REGION` field. Release
+notes are under **v0.8.20**. The queue now has **54 open / 4 parked** findings.
+
+The final combined OC-158/169/183 check passes **286 tests**, including
+Polars catalog ingestion and existing S3 security regressions (two existing
+dependency warnings). Repository Ruff/Ty, scoped formatting and
+`git diff --check` pass. Independent review found no material issue.
+
+### 2026-09-10 - OC-169 fixed: keep request error logs redacted across wrappers
+
+The production middleware stack reproduced the reported bypass with direct
+exceptions, explicit causes, implicit context, groups, notes and source-line
+credentials. The real S3 connector's `ConnectionError` wrapper still exposed
+its cause. The adjacent `LoggingMiddleware` also wrote raw exception text and
+request URL/user-agent metadata; the generic exception handler retained raw
+logging/persistence and used ambient `format_exc()`. The initial HTTP/direct
+handler regressions produced **10 failures / 1 passing control**.
+
+Both application middleware layers now use the existing `redact_credentials`
+policy before constructing messages, arguments or structured extras.
+Tracebacks are formatted from the supplied exception, including the entire
+chain, then redacted. Ordinary log output contains that safe traceback;
+raw `exc_info` is omitted so a formatter cannot reconstruct the original.
+URL/user-agent redaction runs before request-start logging and applies to
+success and handled-error paths too. Request objects remain unchanged.
+The generic handler also redacts its route/message/traceback before passing
+them to `_record_error`, preserving type and status.
+
+Verification: **196 tests pass** across the new **13 integration cases**,
+existing S3 redaction, backend infrastructure, error monitoring, two backend
+coverage suites and the OC-158 serializer/settings suites. The new cases
+check formatted output and LogRecord fields, redacted source snippets and
+notes, S3 wrapping, 200/422/500 metadata, fallback calls outside an active
+exception, CORS, request IDs and normal response headers. Two existing
+dependency deprecation warnings remain. Repository Ruff/Ty, scoped formatting
+and `git diff --check` pass. Independent review found no material issue in the
+stated scope. The configuration guide and **v0.8.20** release
+notes describe the behavior. The queue now has **55 open / 4 parked** findings.
+
+Scope: the shared redactor's recognized formats are unchanged. This is not a
+global logging filter: third-party/server logging and other handled-error
+persistence paths are outside this fix. In particular, Starlette can re-raise
+after its outer generic handler; normal route errors consumed by the custom
+error middleware do not reach that server fallback.
+
+### 2026-09-10 - OC-158 fixed: preserve literal text in the sync JSON helper
+
+The sync serializer's early `str(obj)` comparison erased eight literal tokens
+and custom objects whose textual representation matched them. The async
+helper preserved the same text. The new regressions initially produced
+**11 failures / 18 passes**: eight token cases, both DataFrame export formats,
+and a custom category object failed; ordinary strings and real missing-value
+controls passed.
+
+Removed `_handle_special_string_values` and handle `pd.NA` / `pd.NaT` by
+identity alongside `None`. Existing numeric handlers retain real NaN/infinity
+cleanup. Text now passes unchanged through nested dictionaries/lists and
+DataFrame records/columns, matching the async helper for these inputs.
+The class docstring and serialization guide document this distinction; the
+obsolete direct-handler test explanation was corrected. No production file
+imports this module, so this closes a compatibility-helper defect without
+claiming a current HTTP response change. Broader serializer consolidation is
+outside this fix.
+
+Verification: **115 tests pass** across `test_serialization_values.py`,
+`test_serialization_extra.py`, `test_pagination_and_thresholds_settings.py` and
+`test_patch_coverage_backend.py`. Regressions cover all 15 text controls,
+nested values, both DataFrame orientations, a custom text fallback and 11
+actual missing/non-finite scalar values, including numpy and Decimal NaN.
+Strict JSON round trips use `allow_nan=False`. Scoped Ruff, formatting,
+repository Ty and `git diff --check` pass; the guide's example was executed
+successfully. Independent review found no material issue. Release notes are
+under **v0.8.20**. OC-158 moves to the archive,
+leaving **56 open / 4 parked** findings.
 
 ### 2026-09-10 - OC-156 fixed: stop offering ROC AUC as a threshold objective
 
