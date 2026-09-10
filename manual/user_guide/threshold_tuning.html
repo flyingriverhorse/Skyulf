@@ -1780,6 +1780,17 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#after-training-in-the-canvas" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        After training in the canvas
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#pipeline-usage" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3307,6 +3318,21 @@ you supply, evaluated on held-out validation data.</p>
   split and applies it in every subsequent prediction automatically (binary
   classifiers only). See <a href="#integrated-with-hyperparameter-tuning">Integrated with hyperparameter tuning</a>.</li>
 </ul>
+<h2 id="after-training-in-the-canvas">After training in the canvas</h2>
+<p>You can tune a completed classifier from <strong>Experiments → Model Evaluation →
+Threshold Tuning</strong>, even if <strong>Tune decision threshold</strong> was off during training.
+The evaluation must include class probabilities.</p>
+<ol>
+<li>Choose a metric and click <strong>Preview</strong> to calculate thresholds. This does not
+   save them or change predictions.</li>
+<li>Click <strong>Save</strong> to persist the thresholds and enable them for predictions.</li>
+<li>Use <strong>Use tuned thresholds at prediction time</strong> to turn the saved set off
+   or on. The switch stays disabled until a saved set exists.</li>
+<li><strong>Clear</strong> deletes the saved set and restores the default prediction rule.</li>
+</ol>
+<p>Preview uses validation data when available, otherwise the test split, as shown
+in the panel. No retraining is required. If training already saved thresholds,
+the panel loads that set and its enabled state automatically.</p>
 <h2 id="pipeline-usage">Pipeline usage</h2>
 <p>Tune against explicit, out-of-sample validation data — <strong>never</strong> the
 pipeline's internal train/test split. Carve the holdout out of the <strong>raw</strong>
