@@ -1,288 +1,27 @@
+import { validateOutlier } from './outlier/validation';
+import { OutlierRecommendations } from './outlier/OutlierRecommendations';
+import { OutlierFeedback } from './outlier/OutlierFeedback';
+import type { OutlierSettingsProps } from './outlier/types';
+import { OutlierControls } from './outlier/OutlierControls';
+import { useOutlierData } from './outlier/useOutlierData';
 import { ValidationField } from '../../../components/shared/ValidationField';
 import React from 'react';
 import { NodeDefinition } from '../../../core/types/nodes';
 import { Scissors } from 'lucide-react';
-import { useDatasetSchema } from '../../../core/hooks/useDatasetSchema';
-import { useGraphStore } from '../../../core/store/useGraphStore';
-import { getIncomers } from '@xyflow/react';
-import { useUpstreamDroppedColumns } from '../../../core/hooks/useUpstreamDroppedColumns';
-import { useRecommendations } from '../../../core/hooks/useRecommendations';
-import { RecommendationsPanel } from '../../../components/panels/RecommendationsPanel';
-import { Recommendation } from '../../../core/api/client';
 import { ColumnMultiSelect } from '../shared/ColumnMultiSelect';
 import { useIsWideContainer } from '../../../core/hooks/useIsWideContainer';
-import { getNodeMetricDetails } from '../../../core/utils/preprocessingMetrics';
 
-interface OutlierConfig {
-  method: 'iqr' | 'zscore' | 'winsorize' | 'elliptic_envelope';
-  columns: string[];
 
-  // IQR
-  multiplier?: number;
-
-  // Z-Score
-  threshold?: number;
-
-  // Winsorize
-  lower_percentile?: number;
-  upper_percentile?: number;
-
-  // Elliptic Envelope
-  contamination?: number;
-}
-
-const OutlierSettings: React.FC<{ config: OutlierConfig; onChange: (c: OutlierConfig) => void; nodeId?: string }> = ({
+const OutlierSettings: React.FC<OutlierSettingsProps> = ({
   config,
   onChange,
   nodeId,
 }) => {
-  // Recursive search for datasetId
-  const nodes = useGraphStore((state) => state.nodes);
-  const edges = useGraphStore((state) => state.edges);
-
-  const findUpstreamDatasetId = (currentNodeId: string): string | undefined => {
-    const visited = new Set<string>();
-    const queue = [currentNodeId];
-
-    while (queue.length > 0) {
-      const id = queue.shift();
-      if (!id) continue;
-      if (visited.has(id)) continue;
-      visited.add(id);
-
-      const node = nodes.find(n => n.id === id);
-      if (!node) continue;
-
-      // If this is NOT the current node, check if it has datasetId
-      if (id !== currentNodeId && node.data?.datasetId) {
-        return node.data.datasetId as string;
-      }
-
-      const incomers = getIncomers(node, nodes, edges);
-      for (const incomer of incomers) {
-        queue.push(incomer.id);
-      }
-    }
-    return undefined;
-  };
-
-  const datasetId = findUpstreamDatasetId(nodeId || '');
-  const { data: schema, isLoading } = useDatasetSchema(datasetId);
-  const droppedUpstream = useUpstreamDroppedColumns(nodeId);
-
-  const backendRecommendations = useRecommendations(nodeId || '', {
-    types: ['outlier_removal', 'cleaning'],
-    suggestedNodeTypes: ['OutlierRemoval', 'outlier'],
-    scope: 'column'
-  });
-
-  const executionResult = useGraphStore((state) => state.executionResult);
-  const nodeResult = nodeId ? executionResult?.node_results[nodeId] : null;
-  const metrics = getNodeMetricDetails(nodeResult?.metrics);
+  const { datasetId, isLoading, numericColumns, metrics, nodeResult, backendRecommendations } = useOutlierData(nodeId);
 
   // Responsive layout: switch to a 2-column layout once the panel is wider than 450px.
   const [containerRef, isWide] = useIsWideContainer();
 
-  // Filter for numeric columns only
-  const numericColumns = schema
-    ? Object.values(schema.columns)
-        .filter(c => ['int', 'float', 'number'].some(t => c.dtype.toLowerCase().includes(t)))
-        .filter(c => !droppedUpstream.has(c.name))
-        .map(c => c.name)
-    : [];
-
-  const renderFeedback = () => {
-    if (!metrics) return null;
-
-    // Check for rows removed (common for IQR, ZScore, Elliptic)
-    const rowsRemoved = metrics.rows_removed as number | undefined;
-    const rowsRemaining = metrics.rows_remaining as number | undefined;
-    const rowsTotal = metrics.rows_total as number | undefined ?? ((rowsRemoved ?? 0) + (rowsRemaining ?? 0));
-
-    // Check for bounds (IQR, Winsorize)
-    const bounds = metrics.bounds as Record<string, { lower: number, upper: number }> | undefined;
-
-    // Check for stats (ZScore)
-    const stats = metrics.stats as Record<string, { mean: number, std: number }> | undefined;
-
-    // Check for contamination (Elliptic Envelope)
-    const contamination = metrics.contamination as number | undefined;
-
-    // Check for warnings
-    const warnings = metrics.warnings as string[] | undefined;
-
-    // Check for values clipped (Winsorize)
-    const valuesClipped = metrics.values_clipped as number | undefined;
-
-    if (rowsRemoved === undefined && !bounds && !stats && contamination === undefined && !warnings && valuesClipped === undefined) return null;
-
-    const getTargetExplanation = () => {
-        switch (config.method) {
-            case 'iqr': return "Removes statistical outliers (IQR)";
-            case 'zscore': return "Removes deviations > 3σ";
-            case 'winsorize': return "Clips extreme values";
-            case 'elliptic_envelope': return "Detects multivariate anomalies";
-            default: return "";
-        }
-    };
-
-    return (
-      <div className="mt-4 p-3 bg-muted/50 rounded border text-xs space-y-3">
-        <div className="flex justify-between items-center">
-            <div className="font-medium text-muted-foreground">Execution Feedback</div>
-            <div className="text-[10px] text-primary/80 bg-primary/5 px-1.5 py-0.5 rounded border border-primary/10" title="Goal of the selected method">
-                {getTargetExplanation()}
-            </div>
-        </div>
-
-        {warnings && warnings.length > 0 && (
-          <div className="p-2 bg-yellow-50 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-400 rounded border border-yellow-200 dark:border-yellow-800">
-            <div className="font-medium mb-1">Warnings</div>
-            <ul className="list-disc list-inside space-y-0.5">
-              {warnings.map((w, i) => (
-                <li key={i} className="truncate" title={w}>{w}</li>
-              ))}
-            </ul>
-          </div>
-        )}
-
-        {config.method === 'winsorize' ? (
-             <div className="flex justify-between items-center p-2 bg-background rounded border">
-                <span className="text-muted-foreground">Values Clipped</span>
-                <div className="text-right">
-                    <span className="font-mono font-medium text-blue-600">{valuesClipped ?? 0}</span>
-                    <span className="text-[10px] text-muted-foreground block">
-                        (Replaced with bounds)
-                    </span>
-                </div>
-             </div>
-        ) : (
-            <div className="flex justify-between items-center p-2 bg-background rounded border">
-                <span className="text-muted-foreground">Rows Removed</span>
-                <div className="text-right">
-                <div className="flex items-center justify-end gap-1">
-                    <span className="font-mono font-medium text-destructive">{rowsRemoved ?? 0}</span>
-                    {rowsTotal > 0 && (
-                        <span className="text-[10px] text-muted-foreground">
-                            ({(((rowsRemoved ?? 0) / rowsTotal) * 100).toFixed(1)}%)
-                        </span>
-                    )}
-                </div>
-                {rowsRemaining !== undefined && (
-                    <span className="text-[10px] text-muted-foreground block">
-                        {rowsRemaining} remaining
-                    </span>
-                )}
-                </div>
-            </div>
-        )}
-
-        {contamination !== undefined && (
-           <div className="flex justify-between items-center p-2 bg-background rounded border">
-            <span className="text-muted-foreground">Contamination</span>
-            <span className="font-mono font-medium">{(contamination * 100).toFixed(1)}%</span>
-          </div>
-        )}
-
-        {bounds && (
-          <div>
-            <div className="font-medium text-muted-foreground mb-1">Calculated Bounds</div>
-            <div className="max-h-32 overflow-y-auto bg-background p-2 rounded border space-y-1">
-              {Object.entries(bounds).map(([col, bound]) => (
-                <div key={col} className="flex justify-between items-center border-b border-border/50 last:border-0 pb-1 last:pb-0">
-                  <span className="truncate max-w-[100px] font-medium" title={col}>{col}</span>
-                  <span className="font-mono text-[10px] text-muted-foreground">
-                    [{bound.lower.toFixed(2)}, {bound.upper.toFixed(2)}]
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {stats && (
-          <div>
-            <div className="font-medium text-muted-foreground mb-1">Z-Score Stats</div>
-            <div className="max-h-32 overflow-y-auto bg-background p-2 rounded border space-y-1">
-              {Object.entries(stats).map(([col, stat]) => (
-                <div key={col} className="flex justify-between items-center border-b border-border/50 last:border-0 pb-1 last:pb-0">
-                  <span className="truncate max-w-[100px] font-medium" title={col}>{col}</span>
-                  <span className="font-mono text-[10px] text-muted-foreground">
-                    μ={stat.mean.toFixed(2)}, σ={stat.std.toFixed(2)}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-    );
-  };
-
-  const renderRecommendations = () => {
-    // Combine backend recommendations with runtime feedback
-    const runtimeRecommendations: Recommendation[] = [];
-
-    if (nodeResult && metrics) {
-        const rowsRemoved = metrics.rows_removed as number | undefined;
-        const rowsTotal = metrics.rows_total as number | undefined;
-
-        // If rowsTotal is missing but we have rowsRemoved, we can still give some feedback
-        const effectiveRowsTotal = rowsTotal ?? (metrics[`${config.method === 'elliptic_envelope' ? 'EllipticEnvelope' : config.method === 'zscore' ? 'ZScore' : config.method === 'winsorize' ? 'Winsorize' : 'IQR'}_rows_total`] as number | undefined);
-
-        if (rowsRemoved !== undefined && effectiveRowsTotal !== undefined && effectiveRowsTotal > 0) {
-            const lossRatio = rowsRemoved / effectiveRowsTotal;
-            if (lossRatio > 0.2) {
-                runtimeRecommendations.push({
-                    rule_id: 'high_data_loss',
-                    type: 'warning',
-                    description: "High data loss (>20%).",
-                    reasoning: "Consider relaxing parameters (e.g., higher IQR multiplier or Z-Score threshold) or using Winsorization to clip values instead of removing rows.",
-                    suggested_node_type: 'OutlierRemoval',
-                    suggested_params: {},
-                    confidence: 1.0,
-                    target_columns: []
-                });
-            } else if (lossRatio === 0) {
-                if (config.method !== 'winsorize') {
-                    runtimeRecommendations.push({
-                        rule_id: 'no_outliers',
-                        type: 'info',
-                        description: "No outliers detected.",
-                        reasoning: "If you suspect outliers, try tightening the parameters (e.g., lower IQR multiplier).",
-                        suggested_node_type: 'OutlierRemoval',
-                        suggested_params: {},
-                        confidence: 1.0,
-                        target_columns: []
-                    });
-                }
-            }
-        }
-
-        if (config.method === 'elliptic_envelope') {
-            runtimeRecommendations.push({
-                rule_id: 'elliptic_stochastic',
-                type: 'info',
-                description: "Stochastic Method",
-                reasoning: "Elliptic Envelope is stochastic. Results may vary slightly between runs.",
-                suggested_node_type: 'OutlierRemoval',
-                suggested_params: {},
-                confidence: 1.0,
-                target_columns: []
-            });
-        }
-    }
-
-    const allRecommendations = [...backendRecommendations, ...runtimeRecommendations];
-
-    if (allRecommendations.length === 0) return null;
-
-    return (
-        <div className="mt-4">
-            <RecommendationsPanel recommendations={allRecommendations} />
-        </div>
-    );
-  };
 
   return (
     <div ref={containerRef} className={`flex flex-col h-full w-full bg-background ${isWide ? 'overflow-hidden' : 'overflow-y-auto'}`}>
@@ -300,111 +39,13 @@ const OutlierSettings: React.FC<{ config: OutlierConfig; onChange: (c: OutlierCo
 
         {/* Left Column: Settings */}
         <div className={`space-y-4 ${isWide ? 'overflow-y-auto pr-2' : 'shrink-0'}`}>
-          <div>
-            <span className="block text-sm font-medium mb-1">Method</span>
-            <select
-              aria-label="Method"
-              className="w-full p-2 border rounded bg-background text-sm"
-              value={config.method}
-              onChange={(e) => onChange({ ...config, method: e.target.value as OutlierConfig['method'] })}
-            >
-              <option value="iqr">IQR (Interquartile Range)</option>
-              <option value="zscore">Z-Score (Standard Deviation)</option>
-              <option value="winsorize">Winsorize (Clip Values)</option>
-              <option value="elliptic_envelope">Elliptic Envelope (Multivariate)</option>
-            </select>
-            <p className="text-[10px] text-muted-foreground mt-1">
-              {config.method === 'iqr' && 'Removes rows with values outside Q1/Q3 ± multiplier * IQR.'}
-              {config.method === 'zscore' && 'Removes rows with values more than N standard deviations from mean.'}
-              {config.method === 'winsorize' && 'Clips values to specified percentiles instead of removing rows.'}
-              {config.method === 'elliptic_envelope' && 'Fits a robust covariance estimate to detect outliers.'}
-            </p>
-          </div>
-
-          {/* IQR Params */}
-          {config.method === 'iqr' && (
-            <div className="space-y-2">
-              <span className="block text-sm font-medium">Multiplier</span>
-              <input
-                aria-label="Multiplier"
-                type="number"
-                step="0.1"
-                className="w-full p-2 border rounded bg-background text-sm"
-                value={config.multiplier ?? 1.5}
-                onChange={(e) => onChange({ ...config, multiplier: Number.parseFloat(e.target.value) })}
-              />
-              <p className="text-xs text-muted-foreground">Usually 1.5 for outliers, 3.0 for extreme outliers.</p>
-            </div>
-          )}
-
-          {/* Z-Score Params */}
-          {config.method === 'zscore' && (
-            <div className="space-y-2">
-              <span className="block text-sm font-medium">Threshold (Sigma)</span>
-              <input
-                aria-label="Threshold (Sigma)"
-                type="number"
-                step="0.1"
-                className="w-full p-2 border rounded bg-background text-sm"
-                value={config.threshold ?? 3.0}
-                onChange={(e) => onChange({ ...config, threshold: Number.parseFloat(e.target.value) })}
-              />
-              <p className="text-xs text-muted-foreground">Number of standard deviations to tolerate.</p>
-            </div>
-          )}
-
-          {/* Winsorize Params */}
-          {config.method === 'winsorize' && (
-            <div className="space-y-2">
-              <span className="block text-sm font-medium">Percentiles</span>
-              <div className="flex gap-2 items-center">
-                <div className="flex-1">
-                  <span className="text-[10px] text-muted-foreground">Lower</span>
-                  <input
-                    aria-label="Lower Percentile"
-                    type="number"
-                    className="w-full p-2 border rounded bg-background text-sm"
-                    value={config.lower_percentile ?? 5.0}
-                    onChange={(e) => onChange({ ...config, lower_percentile: Number.parseFloat(e.target.value) })}
-                  />
-                </div>
-                <div className="flex-1">
-                  <span className="text-[10px] text-muted-foreground">Upper</span>
-                  <input
-                    aria-label="Upper Percentile"
-                    type="number"
-                    className="w-full p-2 border rounded bg-background text-sm"
-                    value={config.upper_percentile ?? 95.0}
-                    onChange={(e) => onChange({ ...config, upper_percentile: Number.parseFloat(e.target.value) })}
-                  />
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Elliptic Envelope Params */}
-          {config.method === 'elliptic_envelope' && (
-            <div className="space-y-2">
-              <span className="block text-sm font-medium">Contamination</span>
-              <input
-                aria-label="Contamination"
-                type="number"
-                step="0.01"
-                min="0"
-                max="0.5"
-                className="w-full p-2 border rounded bg-background text-sm"
-                value={config.contamination ?? 0.01}
-                onChange={(e) => onChange({ ...config, contamination: Number.parseFloat(e.target.value) })}
-              />
-              <p className="text-xs text-muted-foreground">Expected proportion of outliers in the dataset.</p>
-            </div>
-          )}
+          <OutlierControls config={config} onChange={onChange} />
 
           {/* Feedback Section (Wide) */}
           {isWide && (
             <>
-                {renderFeedback()}
-                {renderRecommendations()}
+              {<OutlierFeedback config={config} metrics={metrics} />}
+              {<OutlierRecommendations config={config} metrics={metrics} hasNodeResult={Boolean(nodeResult)} backendRecommendations={backendRecommendations} />}
             </>
           )}
         </div>
@@ -427,10 +68,10 @@ const OutlierSettings: React.FC<{ config: OutlierConfig; onChange: (c: OutlierCo
 
         {/* Feedback Section (Narrow) */}
         {!isWide && (
-            <>
-                {renderFeedback()}
-                {renderRecommendations()}
-            </>
+          <>
+            {<OutlierFeedback config={config} metrics={metrics} />}
+            {<OutlierRecommendations config={config} metrics={metrics} hasNodeResult={Boolean(nodeResult)} backendRecommendations={backendRecommendations} />}
+          </>
         )}
 
       </div>
@@ -453,12 +94,7 @@ export const OutlierNode: NodeDefinition = {
     if (cols === 0) return method;
     return `${method} · ${cols} ${cols === 1 ? 'col' : 'cols'}`;
   },
-  validate: (config: OutlierConfig) => {
-    if (config.columns.length === 0) {
-      return { isValid: false, field: 'columns', message: 'Select at least one column.' };
-    }
-    return { isValid: true };
-  },
+  validate: validateOutlier,
   getDefaultConfig: () => ({
     method: 'iqr',
     columns: [],

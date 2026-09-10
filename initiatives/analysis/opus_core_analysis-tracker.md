@@ -356,6 +356,86 @@ respective fix logs; OC-167 closed with canonical artifact framing on 2026-09-09
 
 ## Log
 
+### 2026-09-10 - frontend complexity refactor batch 8: verified
+
+Committed the previously verified batch 7 with DCO sign-off as `6af9a600`, then
+continued on `0819` with three independent Astra 6 owners and separate reviews.
+The strict threshold remains 10 and the informational threshold remains 8.
+
+| Scope | Selected functions before -> after |
+|---|---|
+| Graph store | validation collector 17 -> 2; connection confirmation 32 -> 6; history equality 12 -> 6 |
+| Operational context | serialization 19 -> 5; reference parsing 28 -> 3; description 11 -> 2 |
+| Scaling / Outlier | settings 27 -> 9 / 26 -> 9; scaling feedback callback 19 -> 3; outlier feedback 22 -> 4 and recommendations 15 -> 5 |
+
+Every selected entry and extracted helper is at or below 10. The graph retains
+validation ordering, synchronous confirmation/cancellation and existing history
+semantics. Record codecs preserve identity types, optional values, query order
+and accessible descriptions. Settings preserve defaults, numeric/empty values,
+upstream column choice, feedback and recommendation ordering.
+
+Original-source characterization passed **63**, **81** and **50** tests before
+extraction; related final suites passed **355**, **138** and **129** tests.
+Independent review strengthened the dragging-data history test to keep node
+count fixed, and the Outlier traversal test to distinguish dataset IDs and
+breadth-first/equal-depth precedence. Their follow-up suites passed **59** and
+**52** tests. All three independent task reviews passed.
+
+Final verification: **2181 Vitest tests / 160 files**, normal ESLint, TypeScript
+noEmit, production build and all **11 bundle budgets** pass. The complete
+Chromium confirmation passed **122/122**. The new five browser cases cover
+native fan-in cancel/accept and undo/redo, encoded Jobs links through reload/back,
+and Scaling/Outlier method/parameter fields in real Preview requests at compact
+and desktop widths. After review, these five passed again with explicit checks
+for completed width transitions and one/two-column settings layouts; refreshed
+screenshots were inspected. Shared responsive behavior was not changed.
+
+**Browser diagnostic:** the first complete run passed 121 tests and timed out
+once before Add Dataset appeared in an unchanged validation-navigation test.
+Its screenshot showed a blank startup page. The unchanged navigation suite then
+passed **15/15** with traces, followed by the **122/122** complete confirmation.
+No root cause or product fix is claimed. Logs are under `tmp_repro_artifacts/`:
+`ccn8-browser-all.log`, `ccn8-browser-navigation-repeat.log`,
+`ccn8-browser-all-confirmation.log` and `ccn8-browser-review-final.log`.
+
+The measured strict backlog fell **98 -> 87 functions** and **73 -> 69 files**;
+maximum remains **32**. The informational report changed **166/111 -> 159/113**
+(functions/files), with **72** optional functions at 9/10. The global strict
+command still exits 1 for the remaining backlog; selected scopes pass.
+See [the inventory](frontend_ccn_remaining_2026-09-10.md) and
+[batch 8 plan](frontend_ccn_refactor_batch8_2026-09-10.md).
+
+Generated assets were rebuilt (`index-51eF5Jsl.js`); index entries and all 251
+relative built JS/CSS imports resolve. Concise notes are under v0.8.19; older
+release text is unchanged. The existing drag-end history gap was separately
+filed as OC-227 below, leaving **61 open / 4 parked**. OC-223/225/226 remain open;
+OC-71/72/73/185 stay parked and DRIFT-01 stays deferred. This new batch is
+verified; the user confirmed frontend checks and authorized its commit.
+
+### 2026-09-10 - OC-227 filed: completed node drags bypass undo history
+
+During batch 8, the original `useGraphStore.ts` at `6af9a600` passed the public
+characterization `currently ignores both in-progress drag positions and the
+drag-end transition`. After clearing history, the test sends positions `(10,20)`
+and `(30,40)` with `dragging: true`, then `(50,60)` with `dragging: false` through
+`onNodesChange`. The position changes, but `pastStates` remains empty. A later
+non-drag position update creates one entry; undo restores `(50,60)`, not the
+position before dragging.
+
+The equality rule ignores position differences whenever **either** node is
+dragging, so the transition ending a drag is suppressed too. FlowCanvas passes
+React Flow's changes directly to this action. Evidence is a public-store test,
+not a newly executed pointer-drag browser reproduction. Batch 8 preserves this
+behavior in `graphStore/historyEquality.ts`; it does not repair it silently.
+Original characterization: 63 tests passed; extracted graph/consumer set:
+355 tests passed. Logs: `tmp_repro_artifacts/batch8-task1-original-tests.log` and
+`tmp_repro_artifacts/batch8-task1-final-tests.log`.
+
+**Fix target:** retain one snapshot from before a drag and record the completed
+single/group movement once, with real-pointer undo/redo coverage. Avoid adding
+selection-only or per-frame history entries. Queue: **61 open / 4 parked**;
+OC-71/72/73/185 remain parked. This is separate from CCN simplification.
+
 ### 2026-09-10 - frontend complexity refactor batch 7: verified
 
 Plan: [`frontend_ccn_refactor_batch7_2026-09-10.md`](frontend_ccn_refactor_batch7_2026-09-10.md).

@@ -12,6 +12,9 @@
  * incomplete degrades to `null` (no reference) rather than a plausible guess.
  */
 
+import { RECORD_PARSERS, readText } from './operationalContext/recordParsers';
+import { recordIdentity, serializeRecord } from './operationalContext/recordIdentity';
+
 const PREFIX = 'oc.';
 const FILTER_PREFIX = 'oc.f.';
 
@@ -101,68 +104,13 @@ function isTimeRange(value: string): value is OperationalTimeRange {
   return (OPERATIONAL_TIME_RANGES as readonly string[]).includes(value);
 }
 
-/** Non-blank string field, or `null` when absent/whitespace-only. */
-function readText(params: URLSearchParams, key: string): string | null {
-  const raw = params.get(PREFIX + key);
-  if (raw === null) return null;
-  const trimmed = raw.trim();
-  return trimmed === '' ? null : trimmed;
-}
-
-/**
- * Integer field, or `null` when absent/malformed. Server ids are integers, so a
- * float or non-numeric value indicates a corrupted link, not a valid record.
- */
-function readInt(params: URLSearchParams, key: string): number | null {
-  const raw = readText(params, key);
-  if (raw === null) return null;
-  const parsed = Number(raw);
-  return Number.isInteger(parsed) ? parsed : null;
-}
-
 /** Serializes a context to a `?`-prefixed query string. Absent optionals are omitted entirely. */
 export function serializeOperationalContext(context: OperationalContext): string {
   const params = new URLSearchParams();
   const { ref } = context;
   params.set(`${PREFIX}kind`, ref.kind);
 
-  switch (ref.kind) {
-    case 'job':
-      params.set(`${PREFIX}jobId`, ref.jobId);
-      break;
-    case 'pipeline':
-      params.set(`${PREFIX}pipelineId`, ref.pipelineId);
-      break;
-    case 'node':
-      params.set(`${PREFIX}nodeId`, ref.nodeId);
-      if (ref.pipelineId !== undefined) params.set(`${PREFIX}pipelineId`, ref.pipelineId);
-      break;
-    case 'dataset':
-      params.set(`${PREFIX}datasetId`, ref.datasetId);
-      break;
-    case 'modelVersion':
-      params.set(`${PREFIX}jobId`, ref.jobId);
-      params.set(`${PREFIX}version`, ref.version);
-      break;
-    case 'deployment':
-      params.set(`${PREFIX}deploymentId`, String(ref.deploymentId));
-      break;
-    case 'driftCheck':
-      params.set(`${PREFIX}checkId`, String(ref.checkId));
-      if (ref.jobId !== undefined) params.set(`${PREFIX}jobId`, ref.jobId);
-      break;
-    case 'incident':
-      params.set(`${PREFIX}incidentId`, String(ref.incidentId));
-      break;
-    case 'auditEntry':
-      params.set(`${PREFIX}auditId`, String(ref.auditId));
-      if (ref.datasetId !== undefined) params.set(`${PREFIX}datasetId`, ref.datasetId);
-      break;
-    case 'slowNode':
-      params.set(`${PREFIX}stepType`, ref.stepType);
-      if (ref.nodeId !== undefined) params.set(`${PREFIX}nodeId`, ref.nodeId);
-      break;
-  }
+  serializeRecord(params, ref);
 
   if (context.origin !== undefined) params.set(`${PREFIX}origin`, context.origin);
   if (context.timeRange !== undefined) params.set(`${PREFIX}t`, context.timeRange);
@@ -177,58 +125,7 @@ export function serializeOperationalContext(context: OperationalContext): string
 function parseRef(params: URLSearchParams): OperationalRef | null {
   const kind = readText(params, 'kind');
   if (kind === null || !isRecordKind(kind)) return null;
-
-  switch (kind) {
-    case 'job': {
-      const jobId = readText(params, 'jobId');
-      return jobId === null ? null : { kind, jobId };
-    }
-    case 'pipeline': {
-      const pipelineId = readText(params, 'pipelineId');
-      return pipelineId === null ? null : { kind, pipelineId };
-    }
-    case 'node': {
-      const nodeId = readText(params, 'nodeId');
-      if (nodeId === null) return null;
-      const pipelineId = readText(params, 'pipelineId');
-      return pipelineId === null ? { kind, nodeId } : { kind, nodeId, pipelineId };
-    }
-    case 'dataset': {
-      const datasetId = readText(params, 'datasetId');
-      return datasetId === null ? null : { kind, datasetId };
-    }
-    case 'modelVersion': {
-      const jobId = readText(params, 'jobId');
-      const version = readText(params, 'version');
-      return jobId === null || version === null ? null : { kind, jobId, version };
-    }
-    case 'deployment': {
-      const deploymentId = readInt(params, 'deploymentId');
-      return deploymentId === null ? null : { kind, deploymentId };
-    }
-    case 'driftCheck': {
-      const checkId = readInt(params, 'checkId');
-      if (checkId === null) return null;
-      const jobId = readText(params, 'jobId');
-      return jobId === null ? { kind, checkId } : { kind, checkId, jobId };
-    }
-    case 'incident': {
-      const incidentId = readInt(params, 'incidentId');
-      return incidentId === null ? null : { kind, incidentId };
-    }
-    case 'auditEntry': {
-      const auditId = readInt(params, 'auditId');
-      if (auditId === null) return null;
-      const datasetId = readText(params, 'datasetId');
-      return datasetId === null ? { kind, auditId } : { kind, auditId, datasetId };
-    }
-    case 'slowNode': {
-      const stepType = readText(params, 'stepType');
-      if (stepType === null) return null;
-      const nodeId = readText(params, 'nodeId');
-      return nodeId === null ? { kind, stepType } : { kind, stepType, nodeId };
-    }
-  }
+  return RECORD_PARSERS[kind](params);
 }
 
 /**
@@ -275,26 +172,6 @@ export function buildRecordHref(context: OperationalContext): string {
 /** Human-readable name for a reference, used as accessible link text. */
 export function describeOperationalRef(ref: OperationalRef): string {
   const label = KIND_LABELS[ref.kind];
-  switch (ref.kind) {
-    case 'job':
-      return `${label} ${ref.jobId}`;
-    case 'pipeline':
-      return `${label} ${ref.pipelineId}`;
-    case 'node':
-      return `${label} ${ref.nodeId}`;
-    case 'dataset':
-      return `${label} ${ref.datasetId}`;
-    case 'modelVersion':
-      return `${label} ${ref.version} (job ${ref.jobId})`;
-    case 'deployment':
-      return `${label} ${ref.deploymentId}`;
-    case 'driftCheck':
-      return `${label} ${ref.checkId}`;
-    case 'incident':
-      return `${label} ${ref.incidentId}`;
-    case 'auditEntry':
-      return `${label} ${ref.auditId}`;
-    case 'slowNode':
-      return `${label} ${ref.stepType}`;
-  }
+  if (ref.kind === 'modelVersion') return `${label} ${ref.version} (job ${ref.jobId})`;
+  return `${label} ${recordIdentity(ref)[1]}`;
 }
