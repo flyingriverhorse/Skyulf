@@ -137,6 +137,9 @@ testingdb/
 .testingdb
 temp_test_artifacts*/
 
+# Local investigation scripts, reports and verification output
+/tmp_repro_artifacts/
+
 #Ignore vscode AI rules
 .github/instructions/
 

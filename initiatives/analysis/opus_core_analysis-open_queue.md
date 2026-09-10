@@ -165,6 +165,9 @@ complexity deltas. Local verification passes; external scanner confirmation is
 pending. No new application exploit was established, so OC counts are unchanged.
 The same report records the three job-log regex performance fixes, preserved
 highlighting and the passing 100,000-digit browser check; no OC row was closed.
+The subsequent Codacy artifact cleanup deletes the seven accidentally committed
+local verification files and excludes their directory from future scans.
+The separately reported lockfile issue still needs its exact advisory details.
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|

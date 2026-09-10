@@ -142,3 +142,40 @@ messages with many short tokens can retain quadratic total work. That separate
 algorithm was not changed. Lookbehind already exists elsewhere in the app;
 [MDN documents its browser support](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Regular_expressions/Lookbehind_assertion).
 This check used Chromium and does not establish support for older browsers.
+
+## Codacy temporary artifact follow-up
+
+Commit `6a9dbbe5` included seven local files from `tmp_repro_artifacts/`, and
+Codacy reported 21 findings in `verify_security_followup.py`: 15 assertion
+warnings, three subprocess warnings, and one each for list-comprehension style,
+missing docstring and import ordering. The script validates a particular pending
+diff using local report files and an exact asset hash. It is not reusable CI or
+application code; no production or workflow caller was found.
+
+The assertion warning is technically correct for Python optimized mode. The
+subprocess calls use argument lists (no shell), fixed Git arguments at the call
+sites and no externally supplied input. These findings do not establish 18
+application security defects. Their appearance exposed a repository hygiene
+mistake: temporary verification evidence was committed with the source changes.
+
+At the user's request, the seven files were deleted from disk and their removals
+staged in Git. The root `.gitignore` now ignores `/tmp_repro_artifacts/`, and
+`.codacy.yml` excludes that directory, consistent with the existing exclusions
+for `temp/` and local
+Ruff/ty checks. Production files, tests and dependency scanning remain in their
+existing scope. The verified behavior and performance results above remain the
+durable record; some referenced scripts/reports were deleted by this cleanup,
+and the remaining temporary logs are local evidence only.
+
+Verification confirmed all seven files are absent, none remain tracked, Git
+ignores future files in the directory, the Codacy YAML parses with only this
+additional exclusion, and staged/unstaged whitespace checks pass. Application,
+dependency and built asset files are unchanged; frontend tests were not rerun
+for this repository-only cleanup. Codacy must rescan the committed changes
+before its dashboard can confirm closure of the 21 artifact findings.
+
+The user also listed one issue in `frontend/ml-canvas/package-lock.json` without
+its message. A read-only npm audit completed and returned 14 vulnerable package
+entries (2 critical, 3 high, 8 moderate, 1 low); this is a separate tool/result,
+not confirmation of Codacy's one finding. No dependency was changed based on an
+assumed match. The exact Codacy advisory is requested for a scoped follow-up.

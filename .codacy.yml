@@ -5,3 +5,4 @@ exclude_paths:
   - "tests/**"
   - "skyulf-core/tests/**"
   - "temp/**"
+  - "tmp_repro_artifacts/**"

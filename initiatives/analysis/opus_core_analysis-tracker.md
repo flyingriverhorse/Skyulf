@@ -356,6 +356,31 @@ respective fix logs; OC-167 closed with canonical artifact framing on 2026-09-09
 
 ## Log
 
+### 2026-09-10 - Codacy follow-up: remove temporary verification files
+
+The user supplied 21 findings in `tmp_repro_artifacts/verify_security_followup.py`.
+Commit `6a9dbbe5` had included seven local investigation scripts/reports from
+that directory. The verifier checks one specific working-tree snapshot and
+depends on local logs; it is not an application or CI entry point. Python's
+optimized mode does remove its assertions, but this is a local verification
+script, not a production security control. Its Git calls use argument lists
+and fixed call sites; no user-controlled command execution was established.
+
+The user requested deletion, so all seven files were deleted and their removals
+staged. The directory was added to `.gitignore` and the root Codacy exclusions.
+Existing Ruff and ty configuration already excludes this temporary directory.
+The durable evidence summary remains in the
+[scanner report](frontend_static_analysis_review_2026-09-10.md#codacy-temporary-artifact-follow-up).
+No application code, tests, dependency versions or security rules were changed.
+Verification confirmed seven deleted/untracked files, matching Git ignore rules,
+valid Codacy YAML with only the new temporary exclusion, and clean diff checks.
+
+The separately reported `frontend/ml-canvas/package-lock.json` finding has no
+advisory details in the supplied output. A read-only npm audit reports 14 package
+entries, but those cannot be equated with the single Codacy issue. Its exact
+message/package/advisory is requested before selecting a dependency fix.
+Existing OC rows and the **63 open / 4 parked** queue are unchanged.
+
 ### 2026-09-10 - job-log numeric regex performance
 
 Reproduced the three reported super-linear numeric patterns in `JobLogs.tsx`:
@@ -376,7 +401,7 @@ inventory remains **133/96**; no production function was split.
 See the [scanner follow-up](frontend_static_analysis_review_2026-09-10.md#job-log-regex-performance-follow-up)
 for evidence and scope limits. External scanner status still needs a fresh scan.
 The existing OC queue remains **63 open / 4 parked**. Notes are under v0.8.19;
-this change and the preceding lookup follow-up are not yet committed.
+this change and the preceding lookup follow-up were committed in `6a9dbbe5`.
 
 ### 2026-09-10 - frontend scanner follow-up: explicit lookup registries
 
@@ -400,7 +425,7 @@ informational report stays **133/96** at CCN 8 and the strict backlog stays zero
 See the [review and metric explanation](frontend_static_analysis_review_2026-09-10.md).
 External scanner confirmation remains pending; no exemptions or limits changed.
 The queue remains **63 open / 4 parked**, with existing OC rows and DRIFT-01
-unchanged. Release notes are under v0.8.19; the follow-up is not yet committed.
+unchanged. Release notes are under v0.8.19; the follow-up was committed in `6a9dbbe5`.
 
 ### 2026-09-10 - frontend batch 11: complete the CCN 10 backlog
 
