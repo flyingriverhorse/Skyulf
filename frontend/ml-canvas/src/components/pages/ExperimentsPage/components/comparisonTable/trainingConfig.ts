@@ -20,28 +20,28 @@ function strategyParams(tuningConfig: Config | undefined): string {
   return '-';
 }
 
-const CV_VALUES: Record<string, (source: Config) => Scalar> = {
-  'CV Enabled': source => source.cv_enabled ? 'Yes' : 'No',
-  'CV Method': source => source.cv_enabled ? scalar(source.cv_type, 'Unknown') : '-',
-  'CV Folds': source => source.cv_enabled ? scalar(source.cv_folds) : '-',
-  'CV Shuffle': source => source.cv_enabled ? (source.cv_shuffle ? 'Yes' : 'No') : '-',
-  'CV Random State': source => source.cv_enabled ? scalar(source.cv_random_state) : '-',
-};
+const CV_VALUES = new Map<string, (source: Config) => Scalar>([
+  ['CV Enabled', source => source.cv_enabled ? 'Yes' : 'No'],
+  ['CV Method', source => source.cv_enabled ? scalar(source.cv_type, 'Unknown') : '-'],
+  ['CV Folds', source => source.cv_enabled ? scalar(source.cv_folds) : '-'],
+  ['CV Shuffle', source => source.cv_enabled ? (source.cv_shuffle ? 'Yes' : 'No') : '-'],
+  ['CV Random State', source => source.cv_enabled ? scalar(source.cv_random_state) : '-'],
+]);
 
-const TUNING_VALUES: Record<string, (source: Config | undefined) => Scalar> = {
-  'Strategy': source => scalar(source?.strategy ?? source?.search_strategy),
-  'Strategy Params': strategyParams,
-  'Metric': source => scalar(source?.metric),
-  'Trials': source => scalar(source?.n_trials),
-};
+const TUNING_VALUES = new Map<string, (source: Config | undefined) => Scalar>([
+  ['Strategy', source => scalar(source?.strategy ?? source?.search_strategy)],
+  ['Strategy Params', strategyParams],
+  ['Metric', source => scalar(source?.metric)],
+  ['Trials', source => scalar(source?.n_trials)],
+]);
 
 /** Tuning runs read CV settings inside tuning_config; basic runs use node settings. */
 export function trainingConfigValue(field: string, job: JobInfo, config: Config): Scalar {
   if (field === 'Target Column') return scalar(config.target_column ?? job.target_column);
   const tuningConfig = config.tuning_config as Config | undefined;
   const cvSource = hasTuningMetadata(job) && tuningConfig ? tuningConfig : config;
-  const cvValue = CV_VALUES[field];
+  const cvValue = CV_VALUES.get(field);
   if (cvValue) return cvValue(cvSource);
-  const tuningValue = TUNING_VALUES[field];
+  const tuningValue = TUNING_VALUES.get(field);
   return tuningValue ? tuningValue(tuningConfig) : '-';
 }

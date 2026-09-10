@@ -159,6 +159,13 @@ The informational report stays at 8, listing 133 optional CCN 9/10 functions in
 96 files. Complexity cleanup is complete under the accepted limit; the functional
 findings below remain open and their audit counts are unchanged.
 
+The [scanner follow-up](frontend_static_analysis_review_2026-09-10.md) replaces
+the four reported dynamic regex/object-lookup patterns and explains file-level
+complexity deltas. Local verification passes; external scanner confirmation is
+pending. No new application exploit was established, so OC counts are unchanged.
+The same report records the three job-log regex performance fixes, preserved
+highlighting and the passing 100,000-digit browser check; no OC row was closed.
+
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
 | OC-54 | 🟡 | `DebugNode` is dead code that would silently no-op if wired up (`nodes/DebugNode.tsx`) | small | ⬜ open |

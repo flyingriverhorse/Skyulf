@@ -96,10 +96,6 @@ const KIND_LABELS: Record<OperationalRecordKind, string> = {
   slowNode: 'Slow node',
 };
 
-function isRecordKind(value: string): value is OperationalRecordKind {
-  return (OPERATIONAL_RECORD_KINDS as readonly string[]).includes(value);
-}
-
 function isTimeRange(value: string): value is OperationalTimeRange {
   return (OPERATIONAL_TIME_RANGES as readonly string[]).includes(value);
 }
@@ -124,8 +120,9 @@ export function serializeOperationalContext(context: OperationalContext): string
 /** Builds the reference alone; `null` when the kind or its required ids are unusable. */
 function parseRef(params: URLSearchParams): OperationalRef | null {
   const kind = readText(params, 'kind');
-  if (kind === null || !isRecordKind(kind)) return null;
-  return RECORD_PARSERS[kind](params);
+  if (kind === null) return null;
+  const parser = RECORD_PARSERS.get(kind);
+  return parser ? parser(params) : null;
 }
 
 /**

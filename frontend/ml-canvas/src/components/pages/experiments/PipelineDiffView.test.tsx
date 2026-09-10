@@ -53,7 +53,7 @@ describe('PipelineDiffView characterization', () => {
     // Invalid selections must not start requests or show graph viewers.
     render(<PipelineDiffView jobs={jobs} />);
     expect(screen.getByText('Pick exactly two runs')).toBeInTheDocument();
-    expect(screen.getByText(new RegExp(`\\(${jobs.length} selected\\)`))).toBeInTheDocument();
+    expect(screen.getByText(`(${jobs.length} selected)`, { exact: false })).toBeInTheDocument();
     expect(jobsApi.getJob).not.toHaveBeenCalled();
     expect(screen.queryByTestId('graph')).not.toBeInTheDocument();
   });

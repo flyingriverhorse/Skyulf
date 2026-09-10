@@ -25,7 +25,7 @@ type RecordParsers = {
     Extract<OperationalRef, { kind: Kind }> | null;
 };
 
-export const RECORD_PARSERS: RecordParsers = {
+const recordParsers: RecordParsers = {
   job(params) {
     const jobId = readText(params, 'jobId');
     return jobId === null ? null : { kind: 'job', jobId };
@@ -76,3 +76,6 @@ export const RECORD_PARSERS: RecordParsers = {
     return nodeId === null ? { kind: 'slowNode', stepType } : { kind: 'slowNode', stepType, nodeId };
   },
 };
+
+/** Parser lookup contains only the explicitly registered record kinds. */
+export const RECORD_PARSERS = new Map(Object.entries(recordParsers));

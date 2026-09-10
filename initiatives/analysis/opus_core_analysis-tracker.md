@@ -356,6 +356,52 @@ respective fix logs; OC-167 closed with canonical artifact framing on 2026-09-09
 
 ## Log
 
+### 2026-09-10 - job-log numeric regex performance
+
+Reproduced the three reported super-linear numeric patterns in `JobLogs.tsx`:
+when a long digit run lacked a duration, percentage or decimal suffix, the
+unanchored expressions retried from each following digit. A fixed-width
+negative lookbehind before the first digit now prevents those redundant starts.
+Its placement after the optional minus preserves negative values following
+digits. Rule order, colors, log text and control behavior are unchanged.
+
+The 16,000-digit duration case measured **354.922 ms -> 0.555 ms** in the bounded
+local comparison; this is an illustrative sample, not a latency guarantee.
+Old/new full highlighting matched on **100,000** generated messages; independent
+review found no blocking issue. Focused tests **61/2**, full Vitest **2,429/188**,
+**7 Chromium tests** (including a 100,000-digit log), lint, strict CCN 10,
+TypeScript/build and all **11** bundle budgets passed. The informational CCN 8
+inventory remains **133/96**; no production function was split.
+
+See the [scanner follow-up](frontend_static_analysis_review_2026-09-10.md#job-log-regex-performance-follow-up)
+for evidence and scope limits. External scanner status still needs a fresh scan.
+The existing OC queue remains **63 open / 4 parked**. Notes are under v0.8.19;
+this change and the preceding lookup follow-up are not yet committed.
+
+### 2026-09-10 - frontend scanner follow-up: explicit lookup registries
+
+Reviewed the four reported dynamic-regex/callable-object warnings against
+`5a63fe55`. The test regex interpolated a static array length; operational
+URL parsing already checked a fixed kind whitelist; comparison rows supply
+fixed field labels. No application command-injection path was established.
+Direct helper calls with inherited names did reproduce invalid return values
+or exceptions, so CV/tuning lookups now use Map registries with the normal `-`
+fallback. Operational parser lookup also uses Map, retaining its mapped type
+and all ten parser bodies; the test uses a literal string matcher.
+
+Original regression selection: **107 passed / 4 expected new failures**;
+final **111/4** (tests/files) passed. Full Vitest **2,411/187**, normal ESLint,
+strict CCN 10, TypeScript/build, all **11** bundle budgets and **9 Chromium
+tests** passed. Independent review found no blocking issue. The largest
+functions in the three reported files remain **8, 3 and 10**; file-level
+complexity deltas do not represent individual function CCNs. The global
+informational report stays **133/96** at CCN 8 and the strict backlog stays zero.
+
+See the [review and metric explanation](frontend_static_analysis_review_2026-09-10.md).
+External scanner confirmation remains pending; no exemptions or limits changed.
+The queue remains **63 open / 4 parked**, with existing OC rows and DRIFT-01
+unchanged. Release notes are under v0.8.19; the follow-up is not yet committed.
+
 ### 2026-09-10 - frontend batch 11: complete the CCN 10 backlog
 
 Base `73c0b7e7` on `0819`. Three disjoint Astra 6 implementers handled execution/

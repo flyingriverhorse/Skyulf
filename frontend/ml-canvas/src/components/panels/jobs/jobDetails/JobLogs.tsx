@@ -113,19 +113,21 @@ const LOG_HIGHLIGHT_RULES: HighlightRule[] = [
     re: /\b(?:warning|warn|deprecated)\b/i,
     seg: m => [{ text: m[0], cls: 'text-yellow-400' }],
   },
+  // Numeric rules skip starts inside a digit run to avoid quadratic retries on missing suffixes.
+  // Keep the guard after -? so a minus following a digit still belongs to the token.
   // durations with units  e.g.  3.14s  250ms  0.05s
   {
-    re: /-?\d+(?:\.\d*)?(?:[eE][+-]?\d+)?\s*(?:ms|s)\b/,
+    re: /-?(?<!\d)\d+(?:\.\d*)?(?:[eE][+-]?\d+)?\s*(?:ms|s)\b/,
     seg: m => [{ text: m[0], cls: 'text-teal-400' }],
   },
   // percentages  e.g.  98.5%
   {
-    re: /-?\d+(?:\.\d*)?%/,
+    re: /-?(?<!\d)\d+(?:\.\d*)?%/,
     seg: m => [{ text: m[0], cls: 'text-emerald-400' }],
   },
   // floats (bare)
   {
-    re: /-?\d+\.\d+(?:[eE][+-]?\d+)?/,
+    re: /-?(?<!\d)\d+\.\d+(?:[eE][+-]?\d+)?/,
     seg: m => [{ text: m[0], cls: 'text-emerald-400' }],
   },
   // integers (bare — low priority to avoid clobbering the above)

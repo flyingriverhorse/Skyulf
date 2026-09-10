@@ -51,6 +51,30 @@ async function openJobs(page: Page) {
   await expect(page.getByRole('dialog', { name: 'Job History', exact: true })).toBeVisible();
 }
 
+test('long numeric log lines preserve highlighting and responsive controls', async ({ page }) => {
+  // A missing numeric suffix must not stall the real log view or prevent wrapping changes.
+  await prepare(page, 1440);
+  const digits = '7'.repeat(100_000);
+  const logs = [`${digits}!`, 'elapsed 3.14s score 98.5% delta -0.25'];
+  await page.route('**/api/pipeline/jobs?*', route => route.fulfill({ json: [
+    { ...baseJob, job_id: 'numeric-log-job', logs },
+  ] }));
+  await page.goto('/canvas');
+  await openJobs(page);
+  const drawer = page.getByRole('dialog', { name: 'Job History', exact: true });
+  await drawer.getByRole('button').filter({ hasText: 'numeric-log-job' }).click();
+  const details = page.getByRole('dialog').filter({ has: page.getByRole('heading', { name: /^Job Details/ }) });
+  await details.getByRole('button', { name: /Live Logs/ }).click();
+  const numericSpan = details.locator('td span.text-emerald-300');
+  await expect(numericSpan).toHaveText(digits);
+  await expect(details.getByText('3.14s', { exact: true })).toHaveClass('text-teal-400');
+  await expect(details.getByText('98.5%', { exact: true })).toHaveClass('text-emerald-400');
+  await expect(details.getByText('-0.25', { exact: true })).toHaveClass('text-emerald-400');
+  await details.getByTitle('No wrap', { exact: true }).click();
+  await expect(numericSpan.locator('..')).toHaveClass(/whitespace-pre(?:\s|$)/);
+  await expect(details.getByTitle('Wrap lines', { exact: true })).toBeVisible();
+});
+
 for (const width of [1440, 390]) {
   test(`app navigation keeps route, theme and keyboard access at ${width}px`, async ({ page }) => {
     // Moving between real pages must retain active links, a single bell and menu focus.

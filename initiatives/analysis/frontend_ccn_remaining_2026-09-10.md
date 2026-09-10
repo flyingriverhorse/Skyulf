@@ -1,6 +1,6 @@
 # Frontend CCN status and optional candidates
 
-**Measured:** 2026-09-10. **Base:** `73c0b7e7` on branch `0819` plus batch 11 changes.
+**Measured:** 2026-09-10. **Base:** `5a63fe55` on branch `0819` plus the static-analysis follow-up.
 **Scope:** all TypeScript/TSX under `frontend/ml-canvas/src`, using the
 repository ESLint configuration. **Required limit:** CCN <= 10 per function.
 
@@ -19,6 +19,8 @@ The separate [audit queue](opus_core_analysis-open_queue.md) still tracks
 functional findings and deferred work. Completing CCN cleanup does not close
 those findings. See the [final batch plan](frontend_ccn_refactor_batch11_2026-09-10.md)
 for preserved behavior and executed verification.
+The [static-analysis follow-up](frontend_static_analysis_review_2026-09-10.md)
+explains file-level deltas, lookup cleanup and job-log regex fixes; the counts remain unchanged.
 
 ## Reproduce and update
 
@@ -65,7 +67,7 @@ The maximum is the largest function CCN in that file, not a file-wide sum.
 | [src/core/utils/canvasPersistence.ts](../../frontend/ml-canvas/src/core/utils/canvasPersistence.ts) | 10 | 1 | L60:8 = **10** |
 | [src/core/utils/chartUtils.ts](../../frontend/ml-canvas/src/core/utils/chartUtils.ts) | 10 | 1 | L5:30 = **10** |
 | [src/core/utils/nodeSearch.ts](../../frontend/ml-canvas/src/core/utils/nodeSearch.ts) | 10 | 1 | L34:22 = **10** |
-| [src/core/utils/operationalContext.ts](../../frontend/ml-canvas/src/core/utils/operationalContext.ts) | 10 | 1 | L139:8 = **10** |
+| [src/core/utils/operationalContext.ts](../../frontend/ml-canvas/src/core/utils/operationalContext.ts) | 10 | 1 | L136:8 = **10** |
 | [src/core/utils/pipelineLeakageValidation.ts](../../frontend/ml-canvas/src/core/utils/pipelineLeakageValidation.ts) | 10 | 3 | L188:8 = **9**, L299:1 = **10**, L361:8 = **10** |
 | [src/core/utils/preprocessingSerializerAudit20260908.test.ts](../../frontend/ml-canvas/src/core/utils/preprocessingSerializerAudit20260908.test.ts) | 10 | 1 | L130:71 = **10** |
 | [src/modules/nodes/modeling/SegmentationSettings.tsx](../../frontend/ml-canvas/src/modules/nodes/modeling/SegmentationSettings.tsx) | 10 | 1 | L45:6 = **10** |
@@ -173,7 +175,7 @@ by their exact line and column. All functions below pass the required gate.
 | 10 | [src/core/utils/canvasPersistence.ts:60](../../frontend/ml-canvas/src/core/utils/canvasPersistence.ts#L60) | 8 | Function 'loadCanvasSnapshotDiagnostic' |
 | 10 | [src/core/utils/chartUtils.ts:5](../../frontend/ml-canvas/src/core/utils/chartUtils.ts#L5) | 30 | Async arrow function |
 | 10 | [src/core/utils/nodeSearch.ts:34](../../frontend/ml-canvas/src/core/utils/nodeSearch.ts#L34) | 22 | Arrow function |
-| 10 | [src/core/utils/operationalContext.ts:139](../../frontend/ml-canvas/src/core/utils/operationalContext.ts#L139) | 8 | Function 'parseOperationalContext' |
+| 10 | [src/core/utils/operationalContext.ts:136](../../frontend/ml-canvas/src/core/utils/operationalContext.ts#L136) | 8 | Function 'parseOperationalContext' |
 | 10 | [src/core/utils/pipelineLeakageValidation.ts:299](../../frontend/ml-canvas/src/core/utils/pipelineLeakageValidation.ts#L299) | 1 | Function 'isFixedOperation' |
 | 10 | [src/core/utils/pipelineLeakageValidation.ts:361](../../frontend/ml-canvas/src/core/utils/pipelineLeakageValidation.ts#L361) | 8 | Function 'findPreprocessingBeforeSplitIssues' |
 | 10 | [src/core/utils/preprocessingSerializerAudit20260908.test.ts:130](../../frontend/ml-canvas/src/core/utils/preprocessingSerializerAudit20260908.test.ts#L130) | 71 | Arrow function |

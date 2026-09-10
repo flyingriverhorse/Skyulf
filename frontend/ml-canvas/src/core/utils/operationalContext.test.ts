@@ -181,6 +181,13 @@ describe('operationalContext — exact public URL contract', () => {
 });
 
 describe('operationalContext — safe degradation', () => {
+  it.each(['__proto__', 'constructor', 'toString', 'hasOwnProperty'])(
+    'rejects an inherited object property as a record kind: %s', kind => {
+      // URL input may only select explicitly registered record parsers.
+      expect(parseOperationalContext(`?oc.kind=${kind}&oc.jobId=job-1`)).toBeNull();
+    },
+  );
+
   it('returns null when no context is present at all', () => {
     expect(parseOperationalContext('')).toBeNull();
     expect(parseOperationalContext('?unrelated=1')).toBeNull();
