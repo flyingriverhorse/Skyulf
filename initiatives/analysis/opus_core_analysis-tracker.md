@@ -356,6 +356,69 @@ respective fix logs; OC-167 closed with canonical artifact framing on 2026-09-09
 
 ## Log
 
+### 2026-09-10 - frontend batch 10: canvas inspection, data screens and analysis
+
+Base `c56d6cca` on `0819`. Three disjoint Astra 6 implementers simplified eight
+canvas/inspection entries, seven dataset/model screens and eight drift/analysis
+entries; the primary handled metric and ensemble formatting. All **34 selected
+violations across 24 original files** are removed, including the new port helper.
+Public contracts, state/effect ownership, DOM, callbacks, numeric fallbacks and
+submitted payloads are preserved. All four groups passed fresh independent spec
+and quality reviews; their final source/test diffs match the reviewed packages.
+See the [batch 10 plan](frontend_ccn_refactor_batch10_2026-09-10.md).
+
+Strict backlog: **56 -> 22 functions**, **44 -> 20 files**, **maximum 26 -> 24**.
+Informational CCN 8: **147/106 -> 139/101** (functions/files), with **117** optional
+functions at 9/10. Thresholds and source-wide scope are unchanged; strict exits 1
+for the remaining backlog while all selected entries/helpers pass 10. The
+[inventory](frontend_ccn_remaining_2026-09-10.md) was regenerated from both reports.
+
+Original/final characterization passed for every group: canvas **145 tests / 13
+files**, data **35/8**, analysis **39/10**, formatting and consumers **100/3**.
+Frozen-source full Vitest: **2,330 tests / 176 files**. Normal ESLint, explicit
+new-browser-test lint with `--no-ignore`, project `tsc --noEmit`, production build
+and all **11 bundle budgets** pass. `index-BjHkPcSK.js` and all **251** relative
+built imports resolve. Existing jsdom AggregateError stderr occurs in original
+consumer tests too; no executed Vitest test failed.
+
+Final complete Chromium run: **131 passed**, no failures or retries. Four new
+cases at 1440/1100px cover real dataset preview/profile conversion and reopen,
+drift upload payloads, histogram geometry, sort, filter, threshold re-evaluation
+and actual CSV download. HTTP is mocked; stores, controls and charts are real.
+Existing suites cover canvas connections, inspection, focus/resize, shortcuts,
+settings, model operations and chart navigation. Screenshots were inspected.
+The first full run had one blank-page timeout in an unchanged theme test; three
+unchanged diagnostic repeats and the final full run passed. Its cause remains
+unconfirmed; no production change or weaker assertion was made for that timeout.
+
+Concise release notes are under v0.8.19; older releases are unchanged. The existing
+inspector response race was filed separately as **OC-229**, leaving **63 open /
+4 parked**. OC-223/225/226/227/228 stay open, OC-71/72/73/185 stay parked and
+DRIFT-01 stays deferred. Final integration review is recorded in the plan;
+the user reported the frontend checks working and authorized the batch commit.
+
+### 2026-09-10 - OC-229 filed: an earlier inspector request replaces newer node details
+
+Batch 10 characterization reproduced this against original `c56d6cca`
+`NodeInspectorModal`: open node `first`, select `second`, resolve the second
+request and then the first. The modal replaces **Second response** with
+**First response** although the selection and canvas link identify the newer
+node. `fetchNode` writes data, errors and loading without a request identity
+guard; its original and final source at lines 59-78 is unchanged.
+
+Evidence: `frontend/ml-canvas/src/components/shared/NodeInspectorModal.test.tsx:99`,
+case `currently allows an earlier node response to replace a newer one`.
+Both original and refactored sources pass the same **145 tests / 13 files**;
+logs and original copies are under `tmp_repro_artifacts/ccn10-task1/`
+(`original-extended-tests.log`, `final-tests.log`). Independent review confirms
+that the race predates this refactor; no matching prior tracker item exists.
+
+Filed separately as **OC-229**, preserving behavior during CCN extraction.
+Guard success, error and loading updates by the current request and modal
+lifetime; cover reversed responses, retries, closing and node navigation.
+The queue is now **63 open / 4 parked**. OC-71/72/73/185 stay parked and
+DRIFT-01 remains deferred.
+
 ### 2026-09-10 - frontend batch 9: preprocessing, graph utilities and experiment charts
 
 Base `45c3f142` on `0819`. Three disjoint Astra 6 implementers handled ten

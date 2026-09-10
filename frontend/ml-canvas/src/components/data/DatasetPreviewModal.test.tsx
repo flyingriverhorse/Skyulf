@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { DatasetPreviewModal } from './DatasetPreviewModal';
 import { DatasetApiError, DatasetService } from '../../core/api/datasets';
@@ -33,6 +33,31 @@ beforeEach(() => {
 });
 
 describe('DatasetPreviewModal', () => {
+  it('ignores an older dataset response after switching datasets', async () => {
+    /** A slow sample request cannot replace the currently selected dataset. */
+    let finishOld!: (value: unknown[]) => void;
+    mockedDatasetService.getSample.mockReturnValueOnce(new Promise(resolve => { finishOld = resolve; })).mockResolvedValueOnce([{ value: 'new row' }]);
+    mockedDatasetService.getProfile.mockResolvedValue({ metrics: { row_count: 1, column_count: 1, missing_cells: 0, missing_percentage: 0 }, columns: [] });
+    const { rerender } = renderPreview();
+    rerender(<DatasetPreviewModal dataset={{ ...dataset, id: 'new', name: 'New dataset' }} isOpen onClose={vi.fn()} />);
+    await screen.findByText('new row');
+    await act(async () => { finishOld([{ value: 'old row' }]); });
+    expect(screen.queryByText('old row')).not.toBeInTheDocument();
+    expect(screen.getByText('new row')).toBeInTheDocument();
+  });
+
+  it('preserves null, false and zero sample cells while loading another 500 rows', async () => {
+    /** Sampling must retain falsy values and the original request-size progression. */
+    mockedDatasetService.getSample.mockResolvedValue([{ missing: null, enabled: false, count: 0 }]);
+    mockedDatasetService.getProfile.mockResolvedValue({ metrics: { row_count: 0, column_count: 3, missing_cells: 1, missing_percentage: 33 }, columns: [] });
+    renderPreview();
+    await screen.findByText('false');
+    expect(screen.getAllByRole('cell').map(cell => cell.textContent)).toEqual(['', 'false', '0']);
+    fireEvent.click(screen.getByRole('button', { name: 'Load More (+500 rows)' }));
+    await waitFor(() => expect(mockedDatasetService.getSample).toHaveBeenLastCalledWith('dataset-1', 600));
+    expect(mockedDatasetService.getProfile).toHaveBeenCalledTimes(2);
+  });
+
   it('keeps real zero metadata visible when the profile succeeds', async () => {
     mockedDatasetService.getSample.mockResolvedValueOnce([{ id: 1 }]);
     mockedDatasetService.getProfile.mockResolvedValueOnce({

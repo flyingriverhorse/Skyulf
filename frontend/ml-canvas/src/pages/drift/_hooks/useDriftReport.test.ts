@@ -70,6 +70,45 @@ describe('useDriftReport threshold re-evaluation', () => {
         vi.clearAllMocks();
     });
 
+    it('keeps zero thresholds, diagnostic fallback and non-finite metric comparisons', async () => {
+        /** Slider evaluation must preserve unknown flags, categorical PSI and KS diagnostic rules. */
+        const loaded = report({
+            category: column('category', [{ metric: 'psi_categorical', value: 0.1, threshold: 0.2, has_drift: false }]),
+            stat: column('stat', [
+                { metric: 'ks_statistic', value: 0.15, threshold: 0.1, has_drift: true },
+                { metric: 'ks_test_p_value', value: 0.9, threshold: 0.1, has_drift: false },
+                { metric: 'kl_divergence', value: NaN, threshold: 0.1, has_drift: true },
+                { metric: 'wasserstein_distance', value: Infinity, threshold: 0.1, has_drift: false },
+            ]),
+            legacy: column('legacy', [{ metric: 'ks_test_p_value', value: 0.01, threshold: 0.05, has_drift: true }]),
+        }, { threshold_version: 7, model_version: 'v2', severity: 'critical' });
+        const { result, rerender } = await loadReport(loaded);
+        rerender({ thresholds: { psi: 0, wasserstein: 0, kl: 0 } });
+        const evaluated = result.current.evaluatedReport!;
+        expect(evaluated.column_drifts.category!.drift_detected).toBe(true);
+        expect(evaluated.column_drifts.stat!.metrics.map(m => m.has_drift)).toEqual([true, true, false, true]);
+        expect(evaluated.column_drifts.legacy!.drift_detected).toBe(true);
+        expect(evaluated).toMatchObject({ threshold_version: 7, model_version: 'v2', severity: 'critical' });
+        expect(result.current.report).toBe(loaded);
+        expect(monitoringApi.calculateDrift).toHaveBeenCalledTimes(1);
+    });
+
+    it('retains the previous report through pending and failed requests', async () => {
+        /** A failed re-evaluation must retain the last successful report and reset loading. */
+        const loaded = report({});
+        const { result } = await loadReport(loaded);
+        let rejectRequest!: (reason: unknown) => void;
+        vi.mocked(monitoringApi.calculateDrift).mockImplementation(() => new Promise((_resolve, reject) => { rejectRequest = reject; }));
+        const file = new File(['a'], 'next.csv');
+        let pending!: Promise<DriftReport | null>;
+        act(() => { pending = result.current.calculate({ selectedJob: 'next', file, job: { job_id: 'next', dataset_name: 'sales', filename: 'ref.csv' }, thresholds: DEFAULTS }); });
+        expect(result.current.loading).toBe(true);
+        expect(result.current.report).toBe(loaded);
+        expect(monitoringApi.calculateDrift).toHaveBeenLastCalledWith('next', file, 'sales', DEFAULTS);
+        await act(async () => { rejectRequest({ response: { status: 404, data: { detail: '' } } }); await pending; });
+        expect(result.current).toMatchObject({ loading: false, errorKind: 'no_baseline', error: 'Failed to calculate drift.', report: loaded });
+    });
+
     it('decides wasserstein on the threshold-scale value, not the raw distance', async () => {
         // A large-scale column: 50 units of earth-mover distance is only 0.017
         // reference standard deviations, so the backend decided "no drift" and

@@ -21,6 +21,46 @@ interface PCATabProps {
     downloadChart: (elementId: string, filename: string, title?: string, subtitle?: string) => void;
 }
 
+/** Show the loadings of the components included in the selected projection. */
+function PCAComponents({ components, isPCA3D }: { components: PCAComponent[] | undefined; isPCA3D: boolean }) {
+    return (
+        <>
+            {components && components.length > 0 && (
+                <div className="mt-4">
+                     <h4 className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-3">Principal Component Composition</h4>
+                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {components
+                            .slice(0, isPCA3D ? 3 : 2)
+                            .map((comp) => (
+                            <div key={comp.component} className="bg-gray-50 dark:bg-gray-900/50 p-3 rounded-md border border-gray-200 dark:border-gray-700">
+                                <div className="flex justify-between items-center border-b border-gray-200 dark:border-gray-700 pb-2 mb-2">
+                                    <span className="font-semibold text-gray-800 dark:text-gray-200">{comp.component}</span>
+                                    <span className="text-xs bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 px-2 py-0.5 rounded-full">
+                                        {(comp.explained_variance_ratio * 100).toFixed(1)}% Var
+                                    </span>
+                                </div>
+                                <div className="space-y-1">
+                                    <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1">Top Loadings</p>
+                                    {Object.entries(comp.top_features || {}).map(([feature, weight], idx) => (
+                                        <div key={idx} className="flex justify-between text-xs items-center group">
+                                            <span className="text-gray-600 dark:text-gray-400 truncate mr-2 flex-1" title={feature}>
+                                                {feature}
+                                            </span>
+                                            <span className={`font-mono text-[10px] ${Number(weight) > 0 ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400'}`}>
+                                                {Number(weight) > 0 ? '+' : ''}{Number(weight).toFixed(3)}
+                                            </span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+        </>
+    );
+}
+
 export const PCATab: React.FC<PCATabProps> = ({ profile, isPCA3D, setIsPCA3D, downloadChart }) => {
     const canDownload = Array.isArray(profile.pca_data) && profile.pca_data.length > 0;
     const downloadHint = canDownload
@@ -131,38 +171,7 @@ export const PCATab: React.FC<PCATabProps> = ({ profile, isPCA3D, setIsPCA3D, do
                 </div>
 
                 {/* PCA Components Details */}
-                {profile.pca_components && profile.pca_components.length > 0 && (
-                    <div className="mt-4">
-                         <h4 className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-3">Principal Component Composition</h4>
-                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                            {profile.pca_components
-                                .slice(0, isPCA3D ? 3 : 2)
-                                .map((comp) => (
-                                <div key={comp.component} className="bg-gray-50 dark:bg-gray-900/50 p-3 rounded-md border border-gray-200 dark:border-gray-700">
-                                    <div className="flex justify-between items-center border-b border-gray-200 dark:border-gray-700 pb-2 mb-2">
-                                        <span className="font-semibold text-gray-800 dark:text-gray-200">{comp.component}</span>
-                                        <span className="text-xs bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 px-2 py-0.5 rounded-full">
-                                            {(comp.explained_variance_ratio * 100).toFixed(1)}% Var
-                                        </span>
-                                    </div>
-                                    <div className="space-y-1">
-                                        <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1">Top Loadings</p>
-                                        {Object.entries(comp.top_features || {}).map(([feature, weight], idx) => (
-                                            <div key={idx} className="flex justify-between text-xs items-center group">
-                                                <span className="text-gray-600 dark:text-gray-400 truncate mr-2 flex-1" title={feature}>
-                                                    {feature}
-                                                </span>
-                                                <span className={`font-mono text-[10px] ${Number(weight) > 0 ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400'}`}>
-                                                    {Number(weight) > 0 ? '+' : ''}{Number(weight).toFixed(3)}
-                                                </span>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                )}
+                <PCAComponents components={profile.pca_components} isPCA3D={isPCA3D} />
             </div>
 
             {/* Clustering Section */}

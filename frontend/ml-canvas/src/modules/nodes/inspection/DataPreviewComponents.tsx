@@ -38,10 +38,7 @@ const renderTable = (summary: unknown) => {
   const firstRow = asRecord(sample[0]) ?? {};
   const cols = Object.keys(firstRow);
 
-  const name = typeof s.name === 'string' ? s.name : 'Dataset';
-  const shape = Array.isArray(s.shape) ? s.shape : null;
-  const rows = shape && shape.length > 0 ? shape[0] : undefined;
-  const colsCount = shape && shape.length > 1 ? shape[1] : undefined;
+  const { name, rows, colsCount } = previewTableDimensions(s);
   // Cap visible rows so the panel stays compact; full row count is shown
   // in the header so users can tell the table is a sample.
   const visibleRows = sample.slice(0, 20);
@@ -228,121 +225,13 @@ export const DataPreviewSettings: React.FC<{ config: DataPreviewConfig; onChange
         {isRunning ? 'Running...' : 'Run Preview'}
       </button>
 
-      {jobIds.length > 0 && aggregateStatus !== 'completed' && (
-        <div className="text-xs text-muted-foreground flex items-center gap-2 p-2 bg-muted/30 rounded border border-border">
-          <span>Status:</span>
-          <span className={`ml-auto font-medium px-1.5 py-0.5 rounded text-[10px] ${
-            aggregateStatus === 'failed' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' :
-            'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
-          }`}>
-            {aggregateStatus}
-          </span>
-          {branchResults.length > 1 && (
-            <span className="text-[10px] opacity-80">
-              {branchResults.filter(b => b.job?.status === 'completed').length}/{branchResults.length} branches
-            </span>
-          )}
-        </div>
-      )}
+      <PreviewProgress jobIds={jobIds} aggregateStatus={aggregateStatus} branchResults={branchResults} />
 
       {/* Results Area */}
       {aggregateStatus !== 'idle' && rawResult && (
-        <div className="space-y-3 border-t border-border pt-4 animate-in fade-in slide-in-from-top-2 duration-300">
-            {/* Branch Tabs (multi-input previews only) */}
-            {branchResults.length > 1 && (
-              <div className="flex flex-wrap items-center gap-1 border-b border-border pb-1">
-                <GitBranch size={12} className="text-muted-foreground mr-1" />
-                {branchResults.map((b, idx) => {
-                  const isActive = activeBranch === b.label;
-                  const status = b.job?.status;
-                  return (
-                    <button
-                      key={b.label}
-                      onClick={() => { setActiveBranch(b.label); setActiveTab(null); }}
-                      className={`flex items-center gap-1.5 px-2 py-1 text-[10px] font-medium rounded-md border transition-colors ${
-                        isActive
-                          ? 'bg-background text-foreground border-border'
-                          : 'bg-muted/30 text-muted-foreground hover:bg-muted/50 border-transparent'
-                      }`}
-                      title={status ? `${b.label} — ${status}` : b.label}
-                    >
-                      <span
-                        className="inline-block w-2 h-2 rounded-full"
-                        style={{ backgroundColor: branchColors[idx] }}
-                      />
-                      {b.label}
-                      {status === 'failed' && <AlertCircle size={10} className="text-red-500" />}
-                      {status === 'completed' && <CheckCircle size={10} className="text-green-500" />}
-                      {status && status !== 'completed' && status !== 'failed' && (
-                        <Activity size={10} className="animate-spin" />
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-
-            {/* Operation Mode */}
-            <div className="text-[10px] bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300 p-2 rounded border border-blue-100 dark:border-blue-900/50">
-                <strong className="block mb-0.5">Operation Mode</strong>
-                {operationModeText || 'Unknown'}
-            </div>
-
-            {/* Split Tabs */}
-            {dataSummary && splitTabs.length > 0 && (
-                <div className="space-y-2">
-                    <div className="flex border-b border-border">
-                        {splitTabs.map((t) => (
-                          <button
-                            key={t}
-                            className={`text-[10px] px-3 py-1.5 border-b-2 transition-colors ${
-                              activeTab === t
-                                ? 'border-primary font-medium text-primary'
-                                : 'border-transparent text-muted-foreground hover:text-foreground'
-                            }`}
-                            onClick={() => { setActiveTab(t); }}
-                          >
-                            {t.charAt(0).toUpperCase() + t.slice(1)}
-                          </button>
-                        ))}
-                    </div>
-
-                    {activeTab && dataSummary[activeTab]
-                      ? renderTable(dataSummary[activeTab])
-                      : (
-                        <div className="text-xs text-muted-foreground p-4 text-center border border-dashed border-border rounded">
-                          No {activeTab ?? 'data'} available
-                        </div>
-                      )}
-                </div>
-            )}
-
-            {/* Per-branch failure surface */}
-            {activeJob?.status === 'failed' && (
-              <div className="text-[10px] bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-400 p-2 rounded border border-red-100 dark:border-red-900/50">
-                <strong className="block mb-0.5">Branch failed</strong>
-                <span className="font-mono whitespace-pre-wrap">{activeJob.error || 'Unknown error'}</span>
-              </div>
-            )}
-
-            {/* Transformations */}
-            {Array.isArray(resultRec?.applied_transformations) && resultRec.applied_transformations.length > 0 && (
-                <div className="pt-2 border-t border-border">
-                    <div className="text-[10px] font-semibold mb-2 text-foreground">Applied Steps</div>
-                    <div className="space-y-1.5">
-                  {(resultRec.applied_transformations as unknown[]).map((t: unknown, i: number) => (
-                            <div key={i} className="text-[10px] flex items-center gap-2 text-muted-foreground p-1.5 bg-muted/30 rounded border border-border">
-                                <span className="w-4 h-4 rounded-full bg-muted flex items-center justify-center text-[8px] font-medium text-foreground">{i+1}</span>
-                                <div className="flex flex-col">
-                        <span className="font-medium text-foreground">{String(asRecord(t)?.transformer_name ?? '')}</span>
-                        <span className="text-[9px] opacity-80">{String(asRecord(t)?.transformer_type ?? '')}</span>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            )}
-        </div>
+        <PreviewResults branchResults={branchResults} activeBranch={activeBranch} branchColors={branchColors}
+          setActiveBranch={setActiveBranch} setActiveTab={setActiveTab} operationModeText={operationModeText}
+          dataSummary={dataSummary} splitTabs={splitTabs} activeTab={activeTab} activeJob={activeJob} resultRec={resultRec} />
       )}
     </div>
   );
@@ -381,3 +270,150 @@ export const DataPreviewComponent: React.FC<{ data: DataPreviewConfig }> = ({ da
     </div>
   );
 };
+
+function previewTableDimensions(s: Record<string, unknown>) {
+  const name = typeof s.name === 'string' ? s.name : 'Dataset';
+  const shape = Array.isArray(s.shape) ? s.shape : null;
+  const rows = shape && shape.length > 0 ? shape[0] : undefined;
+  const colsCount = shape && shape.length > 1 ? shape[1] : undefined;
+  return { name, rows, colsCount };
+}
+
+type PreviewBranch = { label: string; jobId: string; job: JobInfo | undefined };
+type PreviewStatus = 'completed' | 'failed' | 'running' | 'idle';
+type PreviewSplitsProps = {
+  dataSummary: Record<string, unknown> | null; splitTabs: string[]; activeTab: string | null;
+  setActiveTab: (tab: string | null) => void;
+};
+
+function PreviewProgress({ jobIds, aggregateStatus, branchResults }: {
+  jobIds: string[]; aggregateStatus: PreviewStatus; branchResults: PreviewBranch[];
+}) {
+  return (jobIds.length > 0 && aggregateStatus !== 'completed' && (
+    <div className="text-xs text-muted-foreground flex items-center gap-2 p-2 bg-muted/30 rounded border border-border">
+      <span>Status:</span>
+      <span className={`ml-auto font-medium px-1.5 py-0.5 rounded text-[10px] ${aggregateStatus === 'failed' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' :
+          'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+        }`}>
+        {aggregateStatus}
+      </span>
+      {branchResults.length > 1 && (
+        <span className="text-[10px] opacity-80">
+          {branchResults.filter(b => b.job?.status === 'completed').length}/{branchResults.length} branches
+        </span>
+      )}
+    </div>
+  ));
+}
+
+function PreviewResults({ branchResults, activeBranch, branchColors, setActiveBranch, setActiveTab,
+  operationModeText, dataSummary, splitTabs, activeTab, activeJob, resultRec }: PreviewSplitsProps & {
+    branchResults: PreviewBranch[]; activeBranch: string | null; branchColors: string[];
+    setActiveBranch: (branch: string) => void; operationModeText: string | undefined;
+    activeJob: JobInfo | undefined; resultRec: Record<string, unknown> | null;
+  }) {
+  return (
+    <div className="space-y-3 border-t border-border pt-4 animate-in fade-in slide-in-from-top-2 duration-300">
+      {/* Branch Tabs (multi-input previews only) */}
+      {branchResults.length > 1 && (
+        <div className="flex flex-wrap items-center gap-1 border-b border-border pb-1">
+          <GitBranch size={12} className="text-muted-foreground mr-1" />
+          {branchResults.map((b, idx) => {
+            const isActive = activeBranch === b.label;
+            const status = b.job?.status;
+            return (
+              <button
+                key={b.label}
+                onClick={() => { setActiveBranch(b.label); setActiveTab(null); }}
+                className={`flex items-center gap-1.5 px-2 py-1 text-[10px] font-medium rounded-md border transition-colors ${isActive
+                    ? 'bg-background text-foreground border-border'
+                    : 'bg-muted/30 text-muted-foreground hover:bg-muted/50 border-transparent'
+                  }`}
+                title={status ? `${b.label} — ${status}` : b.label}
+              >
+                <span
+                  className="inline-block w-2 h-2 rounded-full"
+                  style={{ backgroundColor: branchColors[idx] }}
+                />
+                {b.label}
+                {status === 'failed' && <AlertCircle size={10} className="text-red-500" />}
+                {status === 'completed' && <CheckCircle size={10} className="text-green-500" />}
+                {status && status !== 'completed' && status !== 'failed' && (
+                  <Activity size={10} className="animate-spin" />
+                )}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Operation Mode */}
+      <div className="text-[10px] bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300 p-2 rounded border border-blue-100 dark:border-blue-900/50">
+        <strong className="block mb-0.5">Operation Mode</strong>
+        {operationModeText || 'Unknown'}
+      </div>
+
+      {/* Split Tabs */}
+      <PreviewSplits dataSummary={dataSummary} splitTabs={splitTabs} activeTab={activeTab} setActiveTab={setActiveTab} />
+
+      {/* Per-branch failure surface */}
+      {activeJob?.status === 'failed' && (
+        <div className="text-[10px] bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-400 p-2 rounded border border-red-100 dark:border-red-900/50">
+          <strong className="block mb-0.5">Branch failed</strong>
+          <span className="font-mono whitespace-pre-wrap">{activeJob.error || 'Unknown error'}</span>
+        </div>
+      )}
+
+      {/* Transformations */}
+      <PreviewTransformations resultRec={resultRec} />
+    </div>
+  );
+}
+
+function PreviewSplits({ dataSummary, splitTabs, activeTab, setActiveTab }: PreviewSplitsProps) {
+  return (dataSummary && splitTabs.length > 0 && (
+    <div className="space-y-2">
+      <div className="flex border-b border-border">
+        {splitTabs.map((t) => (
+          <button
+            key={t}
+            className={`text-[10px] px-3 py-1.5 border-b-2 transition-colors ${activeTab === t
+                ? 'border-primary font-medium text-primary'
+                : 'border-transparent text-muted-foreground hover:text-foreground'
+              }`}
+            onClick={() => { setActiveTab(t); }}
+          >
+            {t.charAt(0).toUpperCase() + t.slice(1)}
+          </button>
+        ))}
+      </div>
+
+      {activeTab && dataSummary[activeTab]
+        ? renderTable(dataSummary[activeTab])
+        : (
+          <div className="text-xs text-muted-foreground p-4 text-center border border-dashed border-border rounded">
+            No {activeTab ?? 'data'} available
+          </div>
+        )}
+    </div>
+  ));
+}
+
+function PreviewTransformations({ resultRec }: { resultRec: Record<string, unknown> | null }) {
+  return (Array.isArray(resultRec?.applied_transformations) && resultRec.applied_transformations.length > 0 && (
+    <div className="pt-2 border-t border-border">
+      <div className="text-[10px] font-semibold mb-2 text-foreground">Applied Steps</div>
+      <div className="space-y-1.5">
+        {(resultRec.applied_transformations as unknown[]).map((t: unknown, i: number) => (
+          <div key={i} className="text-[10px] flex items-center gap-2 text-muted-foreground p-1.5 bg-muted/30 rounded border border-border">
+            <span className="w-4 h-4 rounded-full bg-muted flex items-center justify-center text-[8px] font-medium text-foreground">{i + 1}</span>
+            <div className="flex flex-col">
+              <span className="font-medium text-foreground">{String(asRecord(t)?.transformer_name ?? '')}</span>
+              <span className="text-[9px] opacity-80">{String(asRecord(t)?.transformer_type ?? '')}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  ));
+}

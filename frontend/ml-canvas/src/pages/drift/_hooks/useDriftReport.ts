@@ -4,6 +4,8 @@ import {
     DriftReport,
     DriftThresholds,
     DriftJobOption,
+    type DriftMetric,
+    type ColumnDrift,
 } from '../../../core/api/monitoring';
 
 interface CalculateArgs {
@@ -11,6 +13,30 @@ interface CalculateArgs {
     file: File;
     job: DriftJobOption | undefined;
     thresholds: DriftThresholds;
+}
+
+/** Resolve only the adjustable metrics; unknown metrics retain the saved verdict. */
+function metricThreshold(metric: string, thresholds: DriftThresholds): number | undefined {
+    switch (metric) {
+        case 'psi':
+        case 'psi_categorical': return thresholds.psi;
+        case 'ks_statistic': return thresholds.ks;
+        case 'wasserstein_distance': return thresholds.wasserstein;
+        case 'kl_divergence': return thresholds.kl;
+        default: return undefined;
+    }
+}
+
+/** The diagnostic p-value follows the statistic when one is present. */
+function evaluateMetric(metric: DriftMetric, column: ColumnDrift, thresholds: DriftThresholds): DriftMetric {
+    let hasDrift = metric.has_drift;
+    const threshold = metricThreshold(metric.metric, thresholds);
+    if (threshold != null) hasDrift = metric.value > threshold;
+    if (metric.metric === 'ks_test_p_value') {
+        const statistic = column.metrics.find(item => item.metric === 'ks_statistic');
+        if (statistic != null) hasDrift = statistic.value > (thresholds.ks ?? statistic.threshold);
+    }
+    return { ...metric, has_drift: hasDrift };
 }
 
 /**
@@ -60,25 +86,7 @@ export function useDriftReport(thresholds: DriftThresholds) {
         const newDrifts: DriftReport['column_drifts'] = {};
         let driftedCount = 0;
         for (const [colName, col] of Object.entries(report.column_drifts)) {
-            const newMetrics = col.metrics.map(m => {
-                let hasDrift = m.has_drift;
-                // 'psi_categorical' is PSI computed on a category frequency
-                // distribution instead of numeric bins; it shares the same
-                // threshold as numeric PSI.
-                if ((m.metric === 'psi' || m.metric === 'psi_categorical') && t.psi != null)
-                    hasDrift = m.value > t.psi;
-                if (m.metric === 'ks_statistic' && t.ks != null) hasDrift = m.value > t.ks;
-                // The p-value rides along for diagnostics but never decides
-                // drift — it shrinks with sample size (see F-12).
-                if (m.metric === 'ks_test_p_value') {
-                    const stat = col.metrics.find(x => x.metric === 'ks_statistic');
-                    if (stat != null) hasDrift = stat.value > (t.ks ?? stat.threshold);
-                }
-                if (m.metric === 'wasserstein_distance' && t.wasserstein != null)
-                    hasDrift = m.value > t.wasserstein;
-                if (m.metric === 'kl_divergence' && t.kl != null) hasDrift = m.value > t.kl;
-                return { ...m, has_drift: hasDrift };
-            });
+            const newMetrics = col.metrics.map(m => evaluateMetric(m, col, t));
             const drifted = newMetrics.some(m => m.has_drift);
             if (drifted) driftedCount++;
             newDrifts[colName] = { ...col, metrics: newMetrics, drift_detected: drifted };

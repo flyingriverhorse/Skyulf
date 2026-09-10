@@ -25,16 +25,22 @@ interface IngestionRow {
 
 const ACTIVE_STATUSES = new Set(['pending', 'processing']);
 
+/** Preserves the message/error precedence for terminal ingestion failures. */
+const failureMessage = (dataset: Dataset, fallback: string): string => {
+  const ingestionStatus = dataset.source_metadata?.ingestion_status;
+  return ingestionStatus?.message || ingestionStatus?.error || fallback;
+};
+
 const toLifecycleMessage = (dataset: Dataset): string => {
   const ingestionStatus = dataset.source_metadata?.ingestion_status;
   const status = ingestionStatus?.status || 'completed';
 
   if (status === 'failed') {
-    return ingestionStatus?.message || ingestionStatus?.error || 'Ingestion failed';
+    return failureMessage(dataset, 'Ingestion failed');
   }
 
   if (status === 'cancelled') {
-    return ingestionStatus?.message || ingestionStatus?.error || 'Ingestion cancelled';
+    return failureMessage(dataset, 'Ingestion cancelled');
   }
 
   if (status === 'pending') {
@@ -103,10 +109,54 @@ export const IngestionJobsModal: React.FC<IngestionJobsModalProps> = ({ isOpen, 
   const activeJobs = jobs.filter((job) => ACTIVE_STATUSES.has(job.status));
   const historyJobs = jobs.filter((job) => !ACTIVE_STATUSES.has(job.status));
 
-  const renderJob = (job: IngestionRow) => {
+  const renderJobIcon = (job: IngestionRow) => {
+    const isFailed = job.status === 'failed';
+    const isCancelled = job.status === 'cancelled';
+    return (
+      job.status === 'processing' || job.status === 'pending' ? (
+        <Loader2 className="text-blue-500 animate-spin" size={20} aria-hidden="true" />
+      ) : isFailed ? (
+        <XCircle className="text-red-500" size={20} aria-hidden="true" />
+      ) : isCancelled ? (
+        <Ban className="text-slate-500" size={20} aria-hidden="true" />
+      ) : (
+        <CheckCircle className="text-green-500" size={20} aria-hidden="true" />
+      )
+    );
+  };
+
+  const renderJobStatus = (job: IngestionRow) => {
     const isActive = ACTIVE_STATUSES.has(job.status);
     const isFailed = job.status === 'failed';
     const isCancelled = job.status === 'cancelled';
+    return <>
+      {isActive ? (
+        <p role="status" aria-atomic="true" className="text-sm text-slate-600 dark:text-slate-400 mt-1">
+          {job.status === 'processing' ? 'Processing ingestion' : 'Queued for ingestion'}
+        </p>
+      ) : (
+        <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
+          Status: <span className="capitalize">{job.status}</span>
+        </p>
+      )}
+      {(isFailed || isCancelled) && (
+        <p
+          className={`text-sm mt-1 p-2 rounded ${isFailed
+              ? 'text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/10'
+              : 'text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-800'
+            }`}
+          role={isFailed ? 'alert' : 'status'}
+          aria-atomic="true"
+        >
+          {job.message}
+        </p>
+      )}
+    </>;
+  };
+
+  const renderJob = (job: IngestionRow) => {
+    const isActive = ACTIVE_STATUSES.has(job.status);
+    const isFailed = job.status === 'failed';
     const showCancel = isActive;
     const showRetry = isFailed && onRetry;
 
@@ -114,15 +164,7 @@ export const IngestionJobsModal: React.FC<IngestionJobsModalProps> = ({ isOpen, 
       <div className="pb-4">
         <div className="flex items-start gap-4 p-4 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
           <div className="mt-1">
-            {job.status === 'processing' || job.status === 'pending' ? (
-              <Loader2 className="text-blue-500 animate-spin" size={20} aria-hidden="true" />
-            ) : isFailed ? (
-              <XCircle className="text-red-500" size={20} aria-hidden="true" />
-            ) : isCancelled ? (
-              <Ban className="text-slate-500" size={20} aria-hidden="true" />
-            ) : (
-              <CheckCircle className="text-green-500" size={20} aria-hidden="true" />
-            )}
+            {renderJobIcon(job)}
           </div>
           <div className="flex-1">
             <div className="flex justify-between items-start">
@@ -132,28 +174,7 @@ export const IngestionJobsModal: React.FC<IngestionJobsModalProps> = ({ isOpen, 
                 {new Date(job.createdAt).toLocaleString()}
               </span>
             </div>
-            {isActive ? (
-              <p role="status" aria-atomic="true" className="text-sm text-slate-600 dark:text-slate-400 mt-1">
-                {job.status === 'processing' ? 'Processing ingestion' : 'Queued for ingestion'}
-              </p>
-            ) : (
-              <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
-                Status: <span className="capitalize">{job.status}</span>
-              </p>
-            )}
-            {(isFailed || isCancelled) && (
-              <p
-                className={`text-sm mt-1 p-2 rounded ${
-                  isFailed
-                    ? 'text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/10'
-                    : 'text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-800'
-                }`}
-                role={isFailed ? 'alert' : 'status'}
-                aria-atomic="true"
-              >
-                {job.message}
-              </p>
-            )}
+            {renderJobStatus(job)}
           </div>
           {showCancel && (
             <button

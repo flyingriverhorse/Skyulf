@@ -15,7 +15,7 @@ file deliberately carries no history.
 per-area report files `00`–`18`).
 **Baseline:** commit `93d7719e` (master), audit run 2026-08-31 → 09-01 by 15
 parallel read-only agents (Claude Opus 5). 116 findings: 5 🔴 / 45 🟠 / 44 🟡 /
-22 ⚪, plus OC-160–228 filed by later reviews. OC-100 was retracted as a false
+22 ⚪, plus OC-160–229 filed by later reviews. OC-100 was retracted as a false
 positive and is not counted; the corrections pass stays in the archive.
 
 **Status key:** ⬜ open · 🟨 in progress · ✅ done · ⏭️ parked
@@ -154,7 +154,7 @@ closed that on 2026-09-07.
 ### Remaining — frontend
 
 The separate [frontend CCN backlog](frontend_ccn_remaining_2026-09-10.md) tracks
-56 functions in 44 files above the accepted limit of 10. The informational
+22 functions in 20 files above the accepted limit of 10. The informational
 report stays at 8; complexity candidates do not add to the audit finding counts.
 
 | ID | Sev | Item | Effort | Status |
@@ -165,6 +165,7 @@ report stays at 8; complexity candidates do not add to the audit finding counts.
 | OC-226 | 🟡 | Late Segmentation hyperparameter definitions can restore an old model/reference column and call its old update callback after unmount | small | ⬜ open — original-source tests resolve defaults after newer config/model changes and observe the captured old config being emitted. Scope requests to the active model/settings lifetime and merge defaults into current config; cover reference edits, reversed responses and unmount. |
 | OC-227 | 🟡 | A completed node drag creates no undo entry because history ignores positions when either the previous or next node is dragging | small | ⬜ open — original public-store characterization sends two `dragging: true` positions followed by `dragging: false`; history stays empty. Capture one pre-drag snapshot and one completed move without recording each frame; cover single/group drags, undo/redo and selection-only changes. |
 | OC-228 | 🟡 | Add Casting Rule overwrites the first column's existing type with `float` when every available column already has a rule (`CastTypeNode.tsx:99-102,139`) | small | ⬜ open — original and final public settings tests start with schema `age` and `{ age: 'int' }`; clicking Add emits `{ age: 'float' }`. Disable/no-op Add when no unassigned column remains, preserve existing rules, and cover removal followed by adding again. |
+| OC-229 | 🟡 | A late inspector response replaces the details of a more recently selected node (`NodeInspectorModal.tsx:59-78`) | small | ⬜ open — original and final public modal tests select first then second, resolve second then first, and display First response under the newer selection. Guard success, error and loading updates by the active request/lifetime; cover reversed responses, retry, closing and node navigation. |
 | OC-56 | ⚪ | `useSchemaPreview` does not cancel in-flight requests on unmount (`hooks/useSchemaPreview.ts`) | small | ⬜ open |
 | OC-57 | ⚪ | `any`-typed chart props bypass type safety in EDA components (`modules/eda/`) | small | ⬜ open |
 | OC-214 | 🟠 | Frontend lockfile and installed PostCSS dependency retain `nanoid@3.3.17`, affected by CVE-2026-67213; the parent range permits the patched 3.3.18 release (`frontend/ml-canvas/package-lock.json`) | small | ⬜ open — dependency presence confirmed; application exploitability not established |
@@ -202,7 +203,7 @@ key — also the fastest way to find drift the audit missed).
 
 **Status:** ⬜ open — specification recorded at the user's request on 2026-09-10;
 deferred for a later implementation pass. This is a cross-layer enhancement,
-not a newly reproduced OC finding. It does not change the **62 open / 4 parked**
+not a newly reproduced OC finding. It does not change the **63 open / 4 parked**
 audit counts. OC-224 remains fixed; OC-223 is a separate alert-note lifecycle bug.
 
 **Goal:** let the user upload one raw dataset and choose which representation

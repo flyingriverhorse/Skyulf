@@ -28,6 +28,42 @@ interface BivariateTabProps {
     setIs3D: (value: boolean) => void;
 }
 
+/** Select the projection while preserving the missing-axis placeholder and 2D fallback. */
+function BivariatePlot({ profile, scatterX, scatterY, scatterZ, scatterColor, is3D }:
+    Pick<BivariateTabProps, 'profile' | 'scatterX' | 'scatterY' | 'scatterZ' | 'scatterColor' | 'is3D'>) {
+    return (
+        <>
+            {scatterX && scatterY ? (
+                is3D && scatterZ ? (
+                    <ThreeDScatterPlot
+                        data={(profile.sample_data ?? []) as ScatterPoint[]}
+                        xKey={scatterX}
+                        yKey={scatterY}
+                        zKey={scatterZ}
+                        labelKey={scatterColor || undefined}
+                        xLabel={scatterX}
+                        yLabel={scatterY}
+                        zLabel={scatterZ}
+                    />
+                ) : (
+                    <CanvasScatterPlot
+                        data={(profile.sample_data ?? []) as ScatterPoint[]}
+                        xKey={scatterX}
+                        yKey={scatterY}
+                        labelKey={scatterColor || undefined}
+                        xLabel={scatterX}
+                        yLabel={scatterY}
+                    />
+                )
+            ) : (
+                <div className="h-64 flex items-center justify-center bg-gray-50 dark:bg-gray-900 rounded text-gray-400 text-sm">
+                    Select X and Y variables to generate scatter plot.
+                </div>
+            )}
+        </>
+    );
+}
+
 export const BivariateTab: React.FC<BivariateTabProps> = ({
     profile,
     downloadChart,
@@ -176,33 +212,7 @@ export const BivariateTab: React.FC<BivariateTabProps> = ({
             </div>
 
             <div id="bivariate-chart">
-            {scatterX && scatterY ? (
-                is3D && scatterZ ? (
-                    <ThreeDScatterPlot
-                        data={(profile.sample_data ?? []) as ScatterPoint[]}
-                        xKey={scatterX}
-                        yKey={scatterY}
-                        zKey={scatterZ}
-                        labelKey={scatterColor || undefined}
-                        xLabel={scatterX}
-                        yLabel={scatterY}
-                        zLabel={scatterZ}
-                    />
-                ) : (
-                    <CanvasScatterPlot
-                        data={(profile.sample_data ?? []) as ScatterPoint[]}
-                        xKey={scatterX}
-                        yKey={scatterY}
-                        labelKey={scatterColor || undefined}
-                        xLabel={scatterX}
-                        yLabel={scatterY}
-                    />
-                )
-            ) : (
-                <div className="h-64 flex items-center justify-center bg-gray-50 dark:bg-gray-900 rounded text-gray-400 text-sm">
-                    Select X and Y variables to generate scatter plot.
-                </div>
-            )}
+                <BivariatePlot profile={profile} scatterX={scatterX} scatterY={scatterY} scatterZ={scatterZ} scatterColor={scatterColor} is3D={is3D} />
             </div>
 
             {scatterColor && legendEntries.length > 1 && <ChartLegend entries={legendEntries} />}

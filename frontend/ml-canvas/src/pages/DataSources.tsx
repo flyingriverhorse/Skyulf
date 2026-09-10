@@ -18,6 +18,18 @@ import {
 } from '../core/hooks/useDatasets';
 import { DatasetService } from '../core/api/datasets';
 
+/** Searches the displayed dataset identity and its format fallback. */
+function matchesDatasetSearch(d: Dataset, searchQuery: string): boolean {
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      const matchesName = d.name.toLowerCase().includes(q);
+      const matchesId = (d.source_id || d.id).toLowerCase().includes(q);
+      const matchesFormat = (d.format || 'csv').toLowerCase().includes(q);
+      if (!matchesName && !matchesId && !matchesFormat) return false;
+    }
+    return true;
+}
+
 export const DataSources: React.FC = () => {
   const navigate = useNavigate();
   const confirm = useConfirm();
@@ -73,17 +85,8 @@ export const DataSources: React.FC = () => {
     if (filterStatus !== 'all' && status !== filterStatus) return false;
     if (filterType !== 'all' && d.type !== filterType) return false;
     if (filterFormat !== 'all' && (d.format || 'csv') !== filterFormat) return false;
-    if (searchQuery) {
-      const q = searchQuery.toLowerCase();
-      const matchesName = d.name.toLowerCase().includes(q);
-      const matchesId = (d.source_id || d.id).toLowerCase().includes(q);
-      const matchesFormat = (d.format || 'csv').toLowerCase().includes(q);
-      if (!matchesName && !matchesId && !matchesFormat) return false;
-    }
-    return true;
+    return matchesDatasetSearch(d, searchQuery);
   });
-
-  const activeFilterCount = (filterType !== 'all' ? 1 : 0) + (filterFormat !== 'all' ? 1 : 0);
 
   const handleDelete = async (id: string) => {
     const ok = await confirm({
@@ -185,6 +188,301 @@ export const DataSources: React.FC = () => {
     );
   };
 
+  const renderDatasetActions = (d: Dataset) => (
+    <div className="flex items-center justify-end gap-2">
+      {(!d.source_metadata?.ingestion_status?.status || d.source_metadata?.ingestion_status?.status === 'completed') && (
+        <>
+          <button
+            onClick={() => { setPreviewDataset(d); }}
+            className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-md transition-colors"
+            title="Preview Dataset"
+            aria-label="Preview dataset"
+          >
+            <Eye size={16} />
+          </button>
+          <button
+            onClick={() => { handleUseInCanvas(d.id); }}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-md transition-colors"
+            title="Use in Canvas"
+          >
+            <Play size={16} />
+            Canvas
+          </button>
+          <button
+            onClick={() => { navigate(`/eda?dataset_id=${d.id}`); }}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-900/20 rounded-md transition-colors"
+            title="Analyze with EDA"
+          >
+            <BarChart2 size={16} />
+            EDA
+          </button>
+          <button
+            onClick={() => { void handleExport(d.id); }}
+            disabled={exportingIds.has(d.id)}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-md transition-colors disabled:opacity-50"
+            title="Download CSV"
+          >
+            {exportingIds.has(d.id) ? (
+              <div className="w-4 h-4 border-2 border-green-600 border-t-transparent rounded-full animate-spin" />
+            ) : (
+              <Download size={16} />
+            )}
+            CSV
+          </button>
+          <button
+            onClick={() => { setVersionsDataset(d); }}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/20 rounded-md transition-colors"
+            title="Pipeline versions for this dataset"
+            aria-label="View pipeline versions"
+          >
+            <FileClock size={16} />
+            Versions
+          </button>
+        </>
+      )}
+      {(d.source_metadata?.ingestion_status?.status === 'pending' || d.source_metadata?.ingestion_status?.status === 'processing') && (
+        <button
+          onClick={() => { void handleCancel(d.id); }}
+          disabled={cancellingId === d.id}
+          className="p-2 text-slate-400 hover:text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-900/20 rounded-md transition-colors disabled:opacity-50"
+          title="Cancel ingestion"
+          aria-label="Cancel ingestion"
+        >
+          {cancellingId === d.id ? (
+            <div className="w-4 h-4 border-2 border-orange-600 border-t-transparent rounded-full animate-spin" aria-hidden="true" />
+          ) : (
+            <XCircle size={16} aria-hidden="true" />
+          )}
+        </button>
+      )}
+      {d.source_metadata?.ingestion_status?.status === 'failed' && (
+        <button
+          onClick={() => { void handleRetry(d); }}
+          className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-md transition-colors"
+          aria-label="Retry ingestion"
+        >
+          <RefreshCw size={16} aria-hidden="true" />
+          Retry
+        </button>
+      )}
+      <button
+        onClick={() => { void handleDelete(d.id); }}
+        disabled={deletingId === d.id}
+        className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition-colors disabled:opacity-50"
+        title="Delete Dataset"
+        aria-label="Delete dataset"
+      >
+        {deletingId === d.id ? (
+          <div className="w-4 h-4 border-2 border-red-600 border-t-transparent rounded-full animate-spin" aria-hidden="true" />
+        ) : (
+          <Trash2 size={16} aria-hidden="true" />
+        )}
+      </button>
+    </div>
+  );
+
+  const renderFilterReset = () => (
+    (searchQuery || filterStatus !== 'all' || filterType !== 'all' || filterFormat !== 'all') && (
+      <button
+        onClick={() => { setSearchQuery(''); setFilterStatus('all'); setFilterType('all'); setFilterFormat('all'); }}
+        className="text-xs text-blue-600 dark:text-blue-400 hover:underline whitespace-nowrap"
+      >
+        Clear all
+      </button>
+    )
+  );
+
+  const renderFilters = () => {
+    const activeFilterCount = (filterType !== 'all' ? 1 : 0) + (filterFormat !== 'all' ? 1 : 0);
+
+    return (
+      <div className="flex flex-col gap-3 mb-4">
+        <div className="flex items-center gap-3">
+          <div className="relative flex-1 max-w-sm">
+            <Search size={16} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none z-10" />
+            <input
+              type="text"
+              aria-label="Search datasets"
+              placeholder="Search datasets..."
+              value={searchQuery}
+              onChange={e => { setSearchQuery(e.target.value); }}
+              className="w-full pl-8 pr-3 py-1.5 text-sm rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            />
+          </div>
+          <button
+            onClick={() => { setShowFilters(!showFilters); }}
+            className={`flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-md border transition-colors ${showFilters || filterType !== 'all'
+                ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300'
+                : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700'
+              }`}
+          >
+            <Filter size={14} />
+            Filters
+            {activeFilterCount > 0 && (
+              <span className="ml-1 w-5 h-5 flex items-center justify-center rounded-full bg-blue-600 text-white text-xs">{activeFilterCount}</span>
+            )}
+          </button>
+          {renderFilterReset()}
+        </div>
+
+        {showFilters && (
+          <div className="flex items-center gap-4 pl-1">
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">Type</span>
+              <select
+                value={filterType}
+                onChange={e => { setFilterType(e.target.value); }}
+                className="px-2 py-1 text-sm rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              >
+                <option value="all">All types</option>
+                {[...new Set(datasets.map(d => d.type))].map(t => (
+                  <option key={t} value={t}>{t}</option>
+                ))}
+              </select>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">Format</span>
+              <select
+                value={filterFormat}
+                onChange={e => { setFilterFormat(e.target.value); }}
+                className="px-2 py-1 text-sm rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              >
+                <option value="all">All formats</option>
+                {[...new Set(datasets.map(d => d.format || 'csv'))].map(f => (
+                  <option key={f} value={f}>{f.toUpperCase()}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+        )}
+
+        <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide">
+          {['all', 'completed', 'processing', 'failed', 'cancelled'].map(status => (
+            <button
+              key={status}
+              onClick={() => { setFilterStatus(status); }}
+              className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors whitespace-nowrap ${filterStatus === status
+                  ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
+                  : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700'
+                }`}
+            >
+              {status.charAt(0).toUpperCase() + status.slice(1)}
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
+  const renderDatasetIdentity = (d: Dataset) => (
+    <div className="flex items-center gap-3">
+      <div className="p-2 bg-blue-50 dark:bg-blue-900/20 rounded text-blue-600 dark:text-blue-400">
+        <FileText size={18} />
+      </div>
+      <div>
+        <div className="font-medium text-slate-900 dark:text-slate-100 flex items-center gap-2">
+          {d.name}
+          {getStatusBadge(d)}
+        </div>
+        {(getIngestionStatus(d) === 'failed' || getIngestionStatus(d) === 'cancelled') && (
+          <p
+            className={`mt-1 text-xs rounded px-2 py-1 ${getIngestionStatus(d) === 'failed'
+                ? 'text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/10'
+                : 'text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-800'
+              }`}
+          >
+            {getIngestionMessage(d)}
+          </p>
+        )}
+        <div className="text-xs text-slate-500 dark:text-slate-400 font-mono mt-0.5" title="Dataset ID">
+          {d.source_id || d.id}
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderDatasetTable = () => (
+    <div className="bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm text-left">
+          <thead className="text-xs text-slate-500 dark:text-slate-400 uppercase bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700">
+            <tr>
+              <th className="px-3 py-4 font-semibold">Dataset Name</th>
+              <th className="px-3 py-4 font-semibold">Type</th>
+              <th className="px-6 py-4 font-semibold">Format</th>
+              <th className="px-6 py-4 font-semibold">Size</th>
+              <th className="px-6 py-4 font-semibold">Created</th>
+              <th className="px-6 py-4 font-semibold text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-200 dark:divide-slate-700 bg-white dark:bg-slate-900">
+            {loading && datasets.length === 0 ? (
+              <tr>
+                <td colSpan={6}>
+                  <LoadingState message="Loading datasets..." />
+                </td>
+              </tr>
+            ) : filteredDatasets.length === 0 ? (
+              <tr>
+                <td colSpan={6}>
+                  {datasets.length === 0 ? (
+                    <EmptyState
+                      icon={<Database className="w-12 h-12 text-slate-300 dark:text-slate-600" />}
+                      title="No datasets found"
+                      description="Upload a dataset to get started with your analysis."
+                    />
+                  ) : (
+                    <EmptyState title="No datasets match your search or filters" />
+                  )}
+                </td>
+              </tr>
+            ) : (
+              filteredDatasets.map((d) => (
+                <tr key={d.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                  <td className="px-3 py-4">
+                    {renderDatasetIdentity(d)}
+                  </td>
+                  <td className="px-3 py-4">
+                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${d.type === 's3'
+                        ? 'bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-900/20 dark:text-orange-400 dark:border-orange-800'
+                        : d.type === 'file'
+                          ? 'bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700'
+                          : 'bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-900/20 dark:text-indigo-400 dark:border-indigo-800'
+                      }`}>
+                      {d.type === 'file' ? 'Upload' : d.type.toUpperCase()}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4">
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 uppercase border border-slate-200 dark:border-slate-700">
+                      {d.format || 'CSV'}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 text-slate-600 dark:text-slate-300">
+                    <div className="flex flex-col">
+                      <span className="font-medium">{formatBytes(d.size_bytes || 0)}</span>
+                      <span className="text-xs text-slate-500 dark:text-slate-400">
+                        {d.rows?.toLocaleString() || '-'} rows • {d.columns || '-'} cols
+                      </span>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 text-slate-600 dark:text-slate-300">
+                    <div className="flex items-center gap-2">
+                      <Calendar size={14} className="text-slate-500 dark:text-slate-400" />
+                      {new Date(d.created_at).toLocaleDateString()}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 text-right">
+                    {renderDatasetActions(d)}
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+
   return (
     <div className="p-8 space-y-6">
       <DatasetPreviewModal
@@ -261,284 +559,9 @@ export const DataSources: React.FC = () => {
         </div>
       )}
 
-      <div className="flex flex-col gap-3 mb-4">
-        <div className="flex items-center gap-3">
-          <div className="relative flex-1 max-w-sm">
-            <Search size={16} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none z-10" />
-            <input
-              type="text"
-              aria-label="Search datasets"
-              placeholder="Search datasets..."
-              value={searchQuery}
-              onChange={e => { setSearchQuery(e.target.value); }}
-              className="w-full pl-8 pr-3 py-1.5 text-sm rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500"
-            />
-          </div>
-          <button
-            onClick={() => { setShowFilters(!showFilters); }}
-            className={`flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-md border transition-colors ${
-              showFilters || filterType !== 'all'
-                ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300'
-                : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700'
-            }`}
-          >
-            <Filter size={14} />
-            Filters
-            {activeFilterCount > 0 && (
-              <span className="ml-1 w-5 h-5 flex items-center justify-center rounded-full bg-blue-600 text-white text-xs">{activeFilterCount}</span>
-            )}
-          </button>
-          {(searchQuery || filterStatus !== 'all' || filterType !== 'all' || filterFormat !== 'all') && (
-            <button
-              onClick={() => { setSearchQuery(''); setFilterStatus('all'); setFilterType('all'); setFilterFormat('all'); }}
-              className="text-xs text-blue-600 dark:text-blue-400 hover:underline whitespace-nowrap"
-            >
-              Clear all
-            </button>
-          )}
-        </div>
+      {renderFilters()}
 
-        {showFilters && (
-          <div className="flex items-center gap-4 pl-1">
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">Type</span>
-              <select
-                value={filterType}
-                onChange={e => { setFilterType(e.target.value); }}
-                className="px-2 py-1 text-sm rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
-              >
-                <option value="all">All types</option>
-                {[...new Set(datasets.map(d => d.type))].map(t => (
-                  <option key={t} value={t}>{t}</option>
-                ))}
-              </select>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">Format</span>
-              <select
-                value={filterFormat}
-                onChange={e => { setFilterFormat(e.target.value); }}
-                className="px-2 py-1 text-sm rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
-              >
-                <option value="all">All formats</option>
-                {[...new Set(datasets.map(d => d.format || 'csv'))].map(f => (
-                  <option key={f} value={f}>{f.toUpperCase()}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-        )}
-
-        <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide">
-          {['all', 'completed', 'processing', 'failed', 'cancelled'].map(status => (
-            <button
-              key={status}
-              onClick={() => { setFilterStatus(status); }}
-              className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors whitespace-nowrap ${
-                filterStatus === status
-                  ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
-                  : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700'
-              }`}
-            >
-              {status.charAt(0).toUpperCase() + status.slice(1)}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div className="bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm text-left">
-            <thead className="text-xs text-slate-500 dark:text-slate-400 uppercase bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700">
-              <tr>
-                <th className="px-3 py-4 font-semibold">Dataset Name</th>
-                <th className="px-3 py-4 font-semibold">Type</th>
-                <th className="px-6 py-4 font-semibold">Format</th>
-                <th className="px-6 py-4 font-semibold">Size</th>
-                <th className="px-6 py-4 font-semibold">Created</th>
-                <th className="px-6 py-4 font-semibold text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-200 dark:divide-slate-700 bg-white dark:bg-slate-900">
-              {loading && datasets.length === 0 ? (
-                <tr>
-                  <td colSpan={6}>
-                    <LoadingState message="Loading datasets..." />
-                  </td>
-                </tr>
-              ) : filteredDatasets.length === 0 ? (
-                <tr>
-                  <td colSpan={6}>
-                    {datasets.length === 0 ? (
-                      <EmptyState
-                        icon={<Database className="w-12 h-12 text-slate-300 dark:text-slate-600" />}
-                        title="No datasets found"
-                        description="Upload a dataset to get started with your analysis."
-                      />
-                    ) : (
-                      <EmptyState title="No datasets match your search or filters" />
-                    )}
-                  </td>
-                </tr>
-              ) : (
-                filteredDatasets.map((d) => (
-                  <tr key={d.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                    <td className="px-3 py-4">
-                      <div className="flex items-center gap-3">
-                        <div className="p-2 bg-blue-50 dark:bg-blue-900/20 rounded text-blue-600 dark:text-blue-400">
-                          <FileText size={18} />
-                        </div>
-                        <div>
-                          <div className="font-medium text-slate-900 dark:text-slate-100 flex items-center gap-2">
-                            {d.name}
-                            {getStatusBadge(d)}
-                          </div>
-                            {(getIngestionStatus(d) === 'failed' || getIngestionStatus(d) === 'cancelled') && (
-                              <p
-                                className={`mt-1 text-xs rounded px-2 py-1 ${
-                                  getIngestionStatus(d) === 'failed'
-                                    ? 'text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/10'
-                                    : 'text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-800'
-                                }`}
-                              >
-                                {getIngestionMessage(d)}
-                              </p>
-                            )}
-                            <div className="text-xs text-slate-500 dark:text-slate-400 font-mono mt-0.5" title="Dataset ID">
-                              {d.source_id || d.id}
-                            </div>
-                          </div>
-                        </div>
-                    </td>
-                    <td className="px-3 py-4">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${
-                        d.type === 's3'
-                          ? 'bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-900/20 dark:text-orange-400 dark:border-orange-800'
-                          : d.type === 'file'
-                          ? 'bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700'
-                          : 'bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-900/20 dark:text-indigo-400 dark:border-indigo-800'
-                      }`}>
-                        {d.type === 'file' ? 'Upload' : d.type.toUpperCase()}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 uppercase border border-slate-200 dark:border-slate-700">
-                        {d.format || 'CSV'}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-slate-600 dark:text-slate-300">
-                      <div className="flex flex-col">
-                        <span className="font-medium">{formatBytes(d.size_bytes || 0)}</span>
-                        <span className="text-xs text-slate-500 dark:text-slate-400">
-                          {d.rows?.toLocaleString() || '-'} rows • {d.columns || '-'} cols
-                        </span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-slate-600 dark:text-slate-300">
-                      <div className="flex items-center gap-2">
-                        <Calendar size={14} className="text-slate-500 dark:text-slate-400" />
-                        {new Date(d.created_at).toLocaleDateString()}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        {(!d.source_metadata?.ingestion_status?.status || d.source_metadata?.ingestion_status?.status === 'completed') && (
-                          <>
-                            <button
-                              onClick={() => { setPreviewDataset(d); }}
-                              className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-md transition-colors"
-                              title="Preview Dataset"
-                              aria-label="Preview dataset"
-                            >
-                              <Eye size={16} />
-                            </button>
-                            <button
-                              onClick={() => { handleUseInCanvas(d.id); }}
-                              className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-md transition-colors"
-                              title="Use in Canvas"
-                            >
-                              <Play size={16} />
-                              Canvas
-                            </button>
-                            <button
-                              onClick={() => { navigate(`/eda?dataset_id=${d.id}`); }}
-                              className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-900/20 rounded-md transition-colors"
-                              title="Analyze with EDA"
-                            >
-                              <BarChart2 size={16} />
-                              EDA
-                            </button>
-                            <button
-                              onClick={() => { void handleExport(d.id); }}
-                              disabled={exportingIds.has(d.id)}
-                              className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-md transition-colors disabled:opacity-50"
-                              title="Download CSV"
-                            >
-                              {exportingIds.has(d.id) ? (
-                                <div className="w-4 h-4 border-2 border-green-600 border-t-transparent rounded-full animate-spin" />
-                              ) : (
-                                <Download size={16} />
-                              )}
-                              CSV
-                            </button>
-                            <button
-                              onClick={() => { setVersionsDataset(d); }}
-                              className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/20 rounded-md transition-colors"
-                              title="Pipeline versions for this dataset"
-                              aria-label="View pipeline versions"
-                            >
-                              <FileClock size={16} />
-                              Versions
-                            </button>
-                          </>
-                        )}
-                        {(d.source_metadata?.ingestion_status?.status === 'pending' || d.source_metadata?.ingestion_status?.status === 'processing') && (
-                          <button
-                            onClick={() => { void handleCancel(d.id); }}
-                            disabled={cancellingId === d.id}
-                            className="p-2 text-slate-400 hover:text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-900/20 rounded-md transition-colors disabled:opacity-50"
-                            title="Cancel ingestion"
-                            aria-label="Cancel ingestion"
-                          >
-                            {cancellingId === d.id ? (
-                              <div className="w-4 h-4 border-2 border-orange-600 border-t-transparent rounded-full animate-spin" aria-hidden="true" />
-                            ) : (
-                              <XCircle size={16} aria-hidden="true" />
-                            )}
-                          </button>
-                        )}
-                        {d.source_metadata?.ingestion_status?.status === 'failed' && (
-                          <button
-                            onClick={() => { void handleRetry(d); }}
-                            className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-md transition-colors"
-                            aria-label="Retry ingestion"
-                          >
-                            <RefreshCw size={16} aria-hidden="true" />
-                            Retry
-                          </button>
-                        )}
-                        <button
-                          onClick={() => { void handleDelete(d.id); }}
-                          disabled={deletingId === d.id}
-                          className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition-colors disabled:opacity-50"
-                          title="Delete Dataset"
-                          aria-label="Delete dataset"
-                        >
-                          {deletingId === d.id ? (
-                            <div className="w-4 h-4 border-2 border-red-600 border-t-transparent rounded-full animate-spin" aria-hidden="true" />
-                          ) : (
-                            <Trash2 size={16} aria-hidden="true" />
-                          )}
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      {renderDatasetTable()}
     </div>
   );
 };

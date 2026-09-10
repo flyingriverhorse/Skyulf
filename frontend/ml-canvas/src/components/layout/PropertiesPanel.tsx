@@ -83,7 +83,7 @@ export const PropertiesPanel: React.FC = () => {
       aria-label="Node settings"
       style={selectedNode && !isPropertiesPanelExpanded ? { width: panelWidth } : undefined}
       className={`relative border-l bg-background shrink-0 overflow-hidden ${isResizing ? '' : 'transition-[width,opacity] duration-300 motion-reduce:transition-none'} ${
-        selectedNode ? (isPropertiesPanelExpanded ? `${expandedWidth} opacity-100` : 'opacity-100') : 'w-0 opacity-0'
+        panelVisibilityClass(Boolean(selectedNode), isPropertiesPanelExpanded, expandedWidth)
       }`}
     >
       {selectedNode && !isPropertiesPanelExpanded && (
@@ -340,59 +340,19 @@ const MergeStrategySection: React.FC<{ selectedNode: Node }> = ({ selectedNode }
   const updateNodeData = useGraphStore((state) => state.updateNodeData);
   const executionResult = useGraphStore((state) => state.executionResult);
 
-  const definitionType = selectedNode.data.definitionType as string;
-  const definition = registry.get(definitionType);
-  const canMerge = (definition?.inputs?.length ?? 0) > 0;
-  const incomingSourceCount = new Set(
-    edges.filter((e) => e.target === selectedNode.id).map((e) => e.source)
-  ).size;
-
-  // Auto-parallel terminals (data_preview) render each input in its own
-  // tab instead of merging columns, so the merge-strategy dropdown is
-  // meaningless for them. Sourced from `core/types/executionMode` so the
-  // canvas / engine / UI all agree on which types are auto-parallel.
-  const isAutoParallel = isAutoParallelType(definitionType);
-
-  // The Ensemble node's fan-in is one dataset edge plus N model-spec edges
-  // (base learners), not a column merge — so the "resolve overlapping columns"
-  // strategy is meaningless here. The pipeline converter separates these inputs
-  // by source type and never column-merges them.
-  const isEnsemble = definitionType === 'EnsembleNode';
-
-  // Modeling nodes expose an explicit Multi-Input Mode toggle (merge / parallel).
-  // When the user picks "parallel", merging is skipped at runtime, so the
-  // strategy dropdown would be misleading. Hide it in that case.
-  const isParallelMode = getExecutionMode(selectedNode.data) === 'parallel';
-
-  // Only expose the strategy when the node actually merges: multi-input
-  // node with 2+ distinct upstream sources, not an auto-parallel terminal,
-  // not an ensemble (model-spec fan-in), and not explicitly set to parallel.
-  if (!canMerge || incomingSourceCount < 2 || isAutoParallel || isEnsemble || isParallelMode) return null;
+  if (!nodeMergesColumns(selectedNode, edges)) return null;
 
   // Branches editing different columns have an unambiguous owner per column,
   // so the engine never needs a tiebreak and this setting would do nothing.
   // A run's `sibling_fan_in` advisory is authoritative (it diffs real values);
   // before the first run we fall back to a config-time prediction so the
   // control is discoverable while wiring, not only after a run.
-  const advisory = (executionResult?.merge_warnings ?? []).find(
-    (w) => w.kind === 'sibling_fan_in' && w.node_id === selectedNode.id
-  );
-  const predicted = advisory ? null : predictMergeConflict(selectedNode.id, nodes, edges);
-  if (!advisory && !predicted) return null;
-
-  const contestedColumns = advisory ? (advisory.overlap_columns ?? []) : predicted!.columns;
-  const contestingInputs = advisory ? (advisory.inputs ?? []) : predicted!.branchIds;
+  const conflict = mergeConflictDetails(selectedNode.id, nodes, edges, executionResult);
+  if (!conflict) return null;
+  const { advisory, columns: contestedColumns, inputs: contestingInputs } = conflict;
   const current = getMergeStrategy(selectedNode.data);
 
-  const labelOf = (nodeId: string) => {
-    const node = nodes.find((n) => n.id === nodeId);
-    return (node?.data.label as string | undefined) ?? nodeId;
-  };
-  const firstLabel = contestingInputs.length ? labelOf(contestingInputs[0]!) : 'the first branch';
-  const lastLabel = contestingInputs.length
-    ? labelOf(contestingInputs[contestingInputs.length - 1]!)
-    : 'the last branch';
-  const selectedLabel = (selectedNode.data.label as string | undefined) ?? selectedNode.id;
+  const { firstLabel, lastLabel, selectedLabel } = mergeBranchLabels(selectedNode, nodes, contestingInputs);
 
   return (
     <div className="border-t pt-4">
@@ -438,3 +398,67 @@ const MergeStrategySection: React.FC<{ selectedNode: Node }> = ({ selectedNode }
     </div>
   );
 };
+
+function panelVisibilityClass(hasSelection: boolean, expanded: boolean, expandedWidth: string) {
+  return hasSelection ? (expanded ? `${expandedWidth} opacity-100` : 'opacity-100') : 'w-0 opacity-0';
+}
+
+/** Match winner options to the first and last connected branch, including unnamed nodes. */
+function mergeBranchLabels(selectedNode: Node, nodes: Node[], contestingInputs: string[]) {
+  const labelOf = (nodeId: string) => {
+    const node = nodes.find((n) => n.id === nodeId);
+    return (node?.data.label as string | undefined) ?? nodeId;
+  };
+  const firstLabel = contestingInputs.length ? labelOf(contestingInputs[0]!) : 'the first branch';
+  const lastLabel = contestingInputs.length
+    ? labelOf(contestingInputs[contestingInputs.length - 1]!)
+    : 'the last branch';
+  const selectedLabel = (selectedNode.data.label as string | undefined) ?? selectedNode.id;
+  return { firstLabel, lastLabel, selectedLabel };
+}
+
+/** Exclude terminals and execution modes whose fan-in never merges columns. */
+function nodeMergesColumns(selectedNode: Node, edges: ReturnType<typeof useGraphStore.getState>['edges']) {
+  const definitionType = selectedNode.data.definitionType as string;
+  const definition = registry.get(definitionType);
+  const canMerge = (definition?.inputs?.length ?? 0) > 0;
+  const incomingSourceCount = new Set(
+    edges.filter((e) => e.target === selectedNode.id).map((e) => e.source)
+  ).size;
+
+  // Auto-parallel terminals (data_preview) render each input in its own
+  // tab instead of merging columns, so the merge-strategy dropdown is
+  // meaningless for them. Sourced from `core/types/executionMode` so the
+  // canvas / engine / UI all agree on which types are auto-parallel.
+  const isAutoParallel = isAutoParallelType(definitionType);
+
+  // The Ensemble node's fan-in is one dataset edge plus N model-spec edges
+  // (base learners), not a column merge — so the "resolve overlapping columns"
+  // strategy is meaningless here. The pipeline converter separates these inputs
+  // by source type and never column-merges them.
+  const isEnsemble = definitionType === 'EnsembleNode';
+
+  // Modeling nodes expose an explicit Multi-Input Mode toggle (merge / parallel).
+  // When the user picks "parallel", merging is skipped at runtime, so the
+  // strategy dropdown would be misleading. Hide it in that case.
+  const isParallelMode = getExecutionMode(selectedNode.data) === 'parallel';
+
+  // Only expose the strategy when the node actually merges: multi-input
+  // node with 2+ distinct upstream sources, not an auto-parallel terminal,
+  // not an ensemble (model-spec fan-in), and not explicitly set to parallel.
+  return canMerge && incomingSourceCount >= 2 && !isAutoParallel && !isEnsemble && !isParallelMode;
+}
+
+/** Runtime evidence takes precedence over the configuration-time prediction. */
+function mergeConflictDetails(nodeId: string, nodes: Node[], edges: ReturnType<typeof useGraphStore.getState>['edges'],
+  executionResult: ReturnType<typeof useGraphStore.getState>['executionResult']) {
+  const advisory = (executionResult?.merge_warnings ?? []).find(
+    (w) => w.kind === 'sibling_fan_in' && w.node_id === nodeId
+  );
+  const predicted = advisory ? null : predictMergeConflict(nodeId, nodes, edges);
+  if (!advisory && !predicted) return null;
+
+  const columns = advisory ? (advisory.overlap_columns ?? []) : predicted!.columns;
+  const inputs = advisory ? (advisory.inputs ?? []) : predicted!.branchIds;
+  return { advisory, columns, inputs };
+}

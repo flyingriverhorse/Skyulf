@@ -24,7 +24,7 @@ import {
     XAxis,
     YAxis,
 } from 'recharts';
-import type { ColumnDrift, DriftReport } from '../../core/api/monitoring';
+import type { ColumnDrift, DriftReport, DriftMetric } from '../../core/api/monitoring';
 import { MetricTooltip } from './MetricTooltip';
 import { Sparkline } from './Sparkline';
 import type { SortConfig } from './_hooks/useSortConfig';
@@ -73,6 +73,14 @@ const sortRows = (
         return sortConfig.dir === 'asc' ? cmp : -cmp;
     });
 };
+
+/** Apply the table's filter before sorting the remaining shared-column evidence. */
+function selectRows(report: DriftReport, showOnlyDrifted: boolean, sortConfig: SortConfig | null) {
+    let rows: ColumnDrift[] = Object.values(report.column_drifts);
+    if (showOnlyDrifted) rows = rows.filter(c => c.drift_detected);
+    if (sortConfig) rows = sortRows(rows, sortConfig, report.feature_importances);
+    return rows;
+}
 
 /** Renders the sort indicator icon for a column header. */
 const SortIcon: React.FC<{ active: boolean; dir: 'asc' | 'desc' | undefined }> = ({ active, dir }) => {
@@ -169,6 +177,144 @@ const RiskBadge: React.FC<{
     );
 };
 
+interface DriftRowProps {
+    col: ColumnDrift;
+    fi: DriftReport['feature_importances'];
+    isExpanded: boolean | undefined;
+    maxImportance: number;
+    toggleRow: (column: string) => void;
+    hasSparklines: boolean;
+    columnSparklines: Record<string, number[]>;
+    colSpan: number;
+}
+
+/** Format a metric verdict and, for Wasserstein, its original distance tooltip. */
+function MetricCell({ metric, showRawDistance = false }: { metric: DriftMetric | undefined; showRawDistance?: boolean }) {
+    const title = showRawDistance && metric?.raw_value != null
+        ? `Raw earth-mover distance: ${metric.raw_value.toFixed(4)} in column units`
+        : undefined;
+    return (
+        <td className={`px-6 py-4 whitespace-nowrap tabular-nums ${metric?.has_drift ? 'text-red-600 dark:text-red-400 font-bold' : ''}`} title={title}>
+            {metric?.value?.toFixed(4) ?? '—'}
+        </td>
+    );
+}
+
+/** Present the expanded statistical diagnostics, suggestions and distribution. */
+function DriftRowDetails({ col, ks, ksPValue }: { col: ColumnDrift; ks: DriftMetric | undefined; ksPValue: DriftMetric | undefined }) {
+    return (
+        <div className="flex flex-col gap-4">
+            {ks && (
+                <div className="text-xs text-gray-600 dark:text-slate-400">
+                    KS statistic{' '}
+                    <span className="font-semibold tabular-nums">
+                        {ks.value.toFixed(4)}
+                    </span>{' '}
+                    vs threshold {ks.threshold.toFixed(2)}
+                    {ksPValue && (
+                        <>
+                            {' '}· p-value{' '}
+                            <span className="tabular-nums">
+                                {ksPValue.value < 0.001
+                                    ? '< 0.001'
+                                    : ksPValue.value.toFixed(3)}
+                            </span>{' '}
+                            (diagnostic only — drift is decided on the statistic)
+                        </>
+                    )}
+                </div>
+            )}
+            {col.suggestions && col.suggestions.length > 0 && (
+                <div className="bg-yellow-50 dark:bg-yellow-900/20 p-3 rounded border border-yellow-200 dark:border-yellow-800">
+                    <div className="flex items-start gap-2">
+                        <Lightbulb
+                            size={16}
+                            className="mt-0.5 shrink-0 text-yellow-600 dark:text-yellow-400"
+                        />
+                        <ul className="list-disc list-inside text-sm text-yellow-800 dark:text-yellow-200">
+                            {col.suggestions.map((s, i) => (
+                                <li key={i}>{s}</li>
+                            ))}
+                        </ul>
+                    </div>
+                </div>
+            )}
+            {col.distribution && <DistributionChart distribution={col.distribution} />}
+        </div>
+    );
+}
+
+/** Render one shared column and the expansion controlled by the parent table. */
+function DriftRow({ col, fi, isExpanded, maxImportance, toggleRow, hasSparklines, columnSparklines, colSpan }: DriftRowProps) {
+    const wasserstein = col.metrics.find(m => m.metric === 'wasserstein_distance');
+    // Categorical columns report PSI as 'psi_categorical' (category-frequency
+    // based) instead of the numeric-binned 'psi'; treat them the same in the UI.
+    const psi = col.metrics.find(
+        m => m.metric === 'psi' || m.metric === 'psi_categorical',
+    );
+    const kl = col.metrics.find(m => m.metric === 'kl_divergence');
+    const ks = col.metrics.find(m => m.metric === 'ks_statistic');
+    const ksPValue = col.metrics.find(m => m.metric === 'ks_test_p_value');
+    const importance = fi?.[col.column];
+    const importanceRank = fi
+        ? Object.values(fi).filter(v => v > (importance ?? 0)).length + 1
+        : null;
+
+    return (
+        <>
+            <tr className={col.drift_detected ? 'bg-red-50 dark:bg-red-900/10' : ''}>
+                <td className="px-6 py-4 whitespace-nowrap font-medium">{col.column}</td>
+                <td className="px-6 py-4 whitespace-nowrap">
+                    {col.drift_detected ? (
+                        <span className="text-red-600 dark:text-red-400 flex items-center gap-1">
+                            <XCircle size={16} /> Drifted
+                        </span>
+                    ) : (
+                        <span className="text-green-600 dark:text-green-400 flex items-center gap-1">
+                            <CheckCircle size={16} /> Stable
+                        </span>
+                    )}
+                </td>
+                <MetricCell metric={wasserstein} showRawDistance />
+                <MetricCell metric={psi} />
+                <MetricCell metric={kl} />
+                <MetricCell metric={ks} />
+                {fi && (
+                    <td className="px-6 py-4 whitespace-nowrap">
+                        <RiskBadge
+                            importance={importance}
+                            rank={importanceRank}
+                            drifted={col.drift_detected}
+                            maxImportance={maxImportance}
+                        />
+                    </td>
+                )}
+                <td className="px-6 py-4 whitespace-nowrap">
+                    <button
+                        onClick={() => toggleRow(col.column)}
+                        className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 flex items-center gap-1 text-sm"
+                    >
+                        {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                        {isExpanded ? 'Hide' : 'Details'}
+                    </button>
+                </td>
+                {hasSparklines && (
+                    <td className="px-6 py-4 whitespace-nowrap">
+                        <Sparkline values={columnSparklines[col.column] ?? []} />
+                    </td>
+                )}
+            </tr>
+            {isExpanded && (
+                <tr>
+                    <td colSpan={colSpan} className="px-6 py-4 bg-gray-50 dark:bg-slate-900/50">
+                        <DriftRowDetails col={col} ks={ks} ksPValue={ksPValue} />
+                    </td>
+                </tr>
+            )}
+        </>
+    );
+}
+
 export const DriftTable: React.FC<DriftTableProps> = ({
     report,
     showOnlyDrifted,
@@ -200,9 +346,7 @@ export const DriftTable: React.FC<DriftTableProps> = ({
     const maxImportance = fi ? Math.max(...Object.values(fi)) : 0;
     const hasSparklines = Object.keys(columnSparklines).length > 0;
 
-    let rows: ColumnDrift[] = Object.values(report.column_drifts);
-    if (showOnlyDrifted) rows = rows.filter(c => c.drift_detected);
-    if (sortConfig) rows = sortRows(rows, sortConfig, fi);
+    const rows = selectRows(report, showOnlyDrifted, sortConfig);
 
     const colSpan = (fi ? 8 : 7) + (hasSparklines ? 1 : 0);
 
@@ -297,142 +441,11 @@ export const DriftTable: React.FC<DriftTableProps> = ({
                             </td>
                         </tr>
                     ) : (
-                        rows.map(col => {
-                            const wasserstein = col.metrics.find(m => m.metric === 'wasserstein_distance');
-                            // Categorical columns report PSI as 'psi_categorical' (category-frequency
-                            // based) instead of the numeric-binned 'psi'; treat them the same in the UI.
-                            const psi = col.metrics.find(
-                                m => m.metric === 'psi' || m.metric === 'psi_categorical',
-                            );
-                            const kl = col.metrics.find(m => m.metric === 'kl_divergence');
-                            const ks = col.metrics.find(m => m.metric === 'ks_statistic');
-                            const ksPValue = col.metrics.find(m => m.metric === 'ks_test_p_value');
-                            const isExpanded = expandedRows[col.column];
-                            const importance = fi?.[col.column];
-                            const importanceRank = fi
-                                ? Object.values(fi).filter(v => v > (importance ?? 0)).length + 1
-                                : null;
-
-                            return (
-                                <React.Fragment key={col.column}>
-                                    <tr className={col.drift_detected ? 'bg-red-50 dark:bg-red-900/10' : ''}>
-                                        <td className="px-6 py-4 whitespace-nowrap font-medium">{col.column}</td>
-                                        <td className="px-6 py-4 whitespace-nowrap">
-                                            {col.drift_detected ? (
-                                                <span className="text-red-600 dark:text-red-400 flex items-center gap-1">
-                                                    <XCircle size={16} /> Drifted
-                                                </span>
-                                            ) : (
-                                                <span className="text-green-600 dark:text-green-400 flex items-center gap-1">
-                                                    <CheckCircle size={16} /> Stable
-                                                </span>
-                                            )}
-                                        </td>
-                                        <td
-                                            className={`px-6 py-4 whitespace-nowrap tabular-nums ${
-                                                wasserstein?.has_drift ? 'text-red-600 dark:text-red-400 font-bold' : ''
-                                            }`}
-                                            title={
-                                                wasserstein?.raw_value != null
-                                                    ? `Raw earth-mover distance: ${wasserstein.raw_value.toFixed(4)} in column units`
-                                                    : undefined
-                                            }
-                                        >
-                                            {wasserstein?.value?.toFixed(4) ?? '—'}
-                                        </td>
-                                        <td
-                                            className={`px-6 py-4 whitespace-nowrap tabular-nums ${
-                                                psi?.has_drift ? 'text-red-600 dark:text-red-400 font-bold' : ''
-                                            }`}
-                                        >
-                                            {psi?.value?.toFixed(4) ?? '—'}
-                                        </td>
-                                        <td
-                                            className={`px-6 py-4 whitespace-nowrap tabular-nums ${
-                                                kl?.has_drift ? 'text-red-600 dark:text-red-400 font-bold' : ''
-                                            }`}
-                                        >
-                                            {kl?.value?.toFixed(4) ?? '—'}
-                                        </td>
-                                        <td
-                                            className={`px-6 py-4 whitespace-nowrap tabular-nums ${
-                                                ks?.has_drift ? 'text-red-600 dark:text-red-400 font-bold' : ''
-                                            }`}
-                                        >
-                                            {ks?.value?.toFixed(4) ?? '—'}
-                                        </td>
-                                        {fi && (
-                                            <td className="px-6 py-4 whitespace-nowrap">
-                                                <RiskBadge
-                                                    importance={importance}
-                                                    rank={importanceRank}
-                                                    drifted={col.drift_detected}
-                                                    maxImportance={maxImportance}
-                                                />
-                                            </td>
-                                        )}
-                                        <td className="px-6 py-4 whitespace-nowrap">
-                                            <button
-                                                onClick={() => toggleRow(col.column)}
-                                                className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 flex items-center gap-1 text-sm"
-                                            >
-                                                {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                                                {isExpanded ? 'Hide' : 'Details'}
-                                            </button>
-                                        </td>
-                                        {hasSparklines && (
-                                            <td className="px-6 py-4 whitespace-nowrap">
-                                                <Sparkline values={columnSparklines[col.column] ?? []} />
-                                            </td>
-                                        )}
-                                    </tr>
-                                    {isExpanded && (
-                                        <tr>
-                                            <td colSpan={colSpan} className="px-6 py-4 bg-gray-50 dark:bg-slate-900/50">
-                                                <div className="flex flex-col gap-4">
-                                                    {ks && (
-                                                        <div className="text-xs text-gray-600 dark:text-slate-400">
-                                                            KS statistic{' '}
-                                                            <span className="font-semibold tabular-nums">
-                                                                {ks.value.toFixed(4)}
-                                                            </span>{' '}
-                                                            vs threshold {ks.threshold.toFixed(2)}
-                                                            {ksPValue && (
-                                                                <>
-                                                                    {' '}· p-value{' '}
-                                                                    <span className="tabular-nums">
-                                                                        {ksPValue.value < 0.001
-                                                                            ? '< 0.001'
-                                                                            : ksPValue.value.toFixed(3)}
-                                                                    </span>{' '}
-                                                                    (diagnostic only — drift is decided on the statistic)
-                                                                </>
-                                                            )}
-                                                        </div>
-                                                    )}
-                                                    {col.suggestions && col.suggestions.length > 0 && (
-                                                        <div className="bg-yellow-50 dark:bg-yellow-900/20 p-3 rounded border border-yellow-200 dark:border-yellow-800">
-                                                            <div className="flex items-start gap-2">
-                                                                <Lightbulb
-                                                                    size={16}
-                                                                    className="mt-0.5 shrink-0 text-yellow-600 dark:text-yellow-400"
-                                                                />
-                                                                <ul className="list-disc list-inside text-sm text-yellow-800 dark:text-yellow-200">
-                                                                    {col.suggestions.map((s, i) => (
-                                                                        <li key={i}>{s}</li>
-                                                                    ))}
-                                                                </ul>
-                                                            </div>
-                                                        </div>
-                                                    )}
-                                                    {col.distribution && <DistributionChart distribution={col.distribution} />}
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    )}
-                                </React.Fragment>
-                            );
-                        })
+                        rows.map(col => (
+                            <DriftRow key={col.column} col={col} fi={fi} isExpanded={expandedRows[col.column]}
+                                maxImportance={maxImportance} toggleRow={toggleRow} hasSparklines={hasSparklines}
+                                columnSparklines={columnSparklines} colSpan={colSpan} />
+                        ))
                     )}
                 </tbody>
             </table>

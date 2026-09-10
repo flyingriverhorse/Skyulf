@@ -6,8 +6,8 @@ interface SummaryCardsProps {
     report: DriftReport;
 }
 
-/** Four headline metric cards: total cols, drifted, avg PSI, most drifted. */
-export const SummaryCards: React.FC<SummaryCardsProps> = ({ report }) => {
+/** Summarize measured feature verdicts separately from report-wide schema changes. */
+function summarizeReport(report: DriftReport) {
     const allCols: ColumnDrift[] = Object.values(report.column_drifts);
     const totalCols = allCols.length;
     // The report-wide count includes schema changes, which are shown separately.
@@ -25,6 +25,13 @@ export const SummaryCards: React.FC<SummaryCardsProps> = ({ report }) => {
 
     const driftedPct = totalCols > 0 ? Math.round((driftedCount / totalCols) * 100) : 0;
     const mostDriftedPsi = mostDrifted?.metrics.find(m => m.metric === 'psi')?.value ?? 0;
+
+    return { totalCols, driftedCount, avgPsi, mostDrifted, driftedPct, mostDriftedPsi };
+}
+
+/** Four headline metric cards: total cols, drifted, avg PSI, most drifted. */
+export const SummaryCards: React.FC<SummaryCardsProps> = ({ report }) => {
+    const { totalCols, driftedCount, avgPsi, mostDrifted, driftedPct, mostDriftedPsi } = summarizeReport(report);
 
     return (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">

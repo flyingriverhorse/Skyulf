@@ -144,32 +144,37 @@ export function useKeyboardShortcuts({
         return;
       }
 
-      if (mod && key === 'd') {
-        e.preventDefault();
-        if (getReadOnlyMode()) return;
-        useGraphStore.getState().duplicateSelectedNodes();
-        return;
-      }
-
-      if (mod && (e.key === 'Enter' || key === 'enter')) {
-        e.preventDefault();
-        if (getReadOnlyMode()) return;
-        window.dispatchEvent(new CustomEvent(RUN_PREVIEW_EVENT));
-        return;
-      }
-
-      // Ctrl/Cmd+K → open the command palette. Modifier-gated so plain
-      // `k` typed elsewhere stays a no-op. Read-only mode disables the
-      // palette since every action it offers is a graph mutation.
-      if (mod && key === 'k') {
-        e.preventDefault();
-        if (getReadOnlyMode()) return;
-        window.dispatchEvent(new CustomEvent(SHOW_PALETTE_EVENT));
-        return;
-      }
+      if (mod) handleModifiedShortcut(e, key);
     };
 
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [onToggleHelp, onCloseHelp]);
+}
+
+/** Dispatch graph-changing shortcuts after the layout-level help keys. */
+function handleModifiedShortcut(e: KeyboardEvent, key: string): void {
+  if (key === 'd') {
+    e.preventDefault();
+    if (getReadOnlyMode()) return;
+    useGraphStore.getState().duplicateSelectedNodes();
+    return;
+  }
+
+  if (e.key === 'Enter' || key === 'enter') {
+    e.preventDefault();
+    if (getReadOnlyMode()) return;
+    window.dispatchEvent(new CustomEvent(RUN_PREVIEW_EVENT));
+    return;
+  }
+
+  // Ctrl/Cmd+K → open the command palette. Modifier-gated so plain
+  // `k` typed elsewhere stays a no-op. Read-only mode disables the
+  // palette since every action it offers is a graph mutation.
+  if (key === 'k') {
+    e.preventDefault();
+    if (getReadOnlyMode()) return;
+    window.dispatchEvent(new CustomEvent(SHOW_PALETTE_EVENT));
+    return;
+  }
 }

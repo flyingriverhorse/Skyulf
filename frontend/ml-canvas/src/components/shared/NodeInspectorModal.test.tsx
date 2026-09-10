@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { act, render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 
@@ -74,6 +74,41 @@ describe('NodeInspectorModal', () => {
   beforeEach(() => {
     vi.mocked(monitoringApi.getJobNode).mockReset();
     vi.mocked(monitoringApi.getPipelineRunNode).mockReset();
+  });
+
+  it('uses pipeline-run requests and preserves zero values and repeated logs', async () => {
+    // Historical context must retain valid zero metadata and backend log ordering.
+    vi.mocked(monitoringApi.getPipelineRunNode).mockResolvedValue(baseResponse({
+      branch_index: 0, finished_at: 'unparsed timestamp',
+      node: { node_id: 'train-1', step_type: 'training', label: 'Zero time', params: {}, upstream: [], downstream: [], execution_seconds: 0 },
+      recent_logs: [{ level: 'warning', message: 'Repeated' }, { level: 'warning', message: 'Repeated' }] as NodeInspectorResponse['recent_logs'],
+    }));
+    const onClose = vi.fn();
+    render(<MemoryRouter><NodeInspectorModal isOpen onClose={onClose} target={{ kind: 'pipelineRun', pipelineId: 'pipe' }} nodeId="train-1" /></MemoryRouter>);
+    expect(await screen.findByText('Zero time')).toBeInTheDocument();
+    expect(monitoringApi.getPipelineRunNode).toHaveBeenCalledWith('pipe', 'train-1');
+    expect(screen.getByText('0')).toBeInTheDocument();
+    expect(screen.getByText('0.00s')).toBeInTheDocument();
+    expect(screen.getByText(/unparsed timestamp/)).toBeInTheDocument();
+    expect(screen.getByText('No parameters recorded.')).toBeInTheDocument();
+    expect(screen.getAllByText(/Repeated/)).toHaveLength(2);
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(onClose).toHaveBeenCalledOnce();
+  });
+
+  it('currently allows an earlier node response to replace a newer one', async () => {
+    // Pin the existing request race separately so this structural refactor cannot silently fix it.
+    let finishFirst!: (response: NodeInspectorResponse) => void;
+    vi.mocked(monitoringApi.getJobNode).mockImplementation((_job, id) => id === 'first'
+      ? new Promise(resolve => { finishFirst = resolve; })
+      : Promise.resolve(baseResponse({ node: { node_id: 'second', label: 'Second response', step_type: 'training', params: {}, upstream: [], downstream: [] } })));
+    const target = { kind: 'job', jobId: 'job-1' } as const;
+    const { rerender } = render(<MemoryRouter><NodeInspectorModal isOpen onClose={vi.fn()} target={target} nodeId="first" /></MemoryRouter>);
+    rerender(<MemoryRouter><NodeInspectorModal isOpen onClose={vi.fn()} target={target} nodeId="second" /></MemoryRouter>);
+    expect(await screen.findByText('Second response')).toBeInTheDocument();
+    await act(async () => { finishFirst(baseResponse({ node: { node_id: 'first', label: 'First response', step_type: 'training', params: {}, upstream: [], downstream: [] } })); });
+    expect(screen.getByText('First response')).toBeInTheDocument();
+    expect(screen.queryByText('Second response')).not.toBeInTheDocument();
   });
 
   it('shows a loading state while the node detail is being fetched', () => {

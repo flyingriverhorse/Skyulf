@@ -5,6 +5,7 @@ import {
   useKeyboardShortcuts,
   RUN_PREVIEW_EVENT,
   SHOW_SHORTCUTS_EVENT,
+  SHOW_PALETTE_EVENT,
 } from './useKeyboardShortcuts';
 import { useGraphStore } from '../store/useGraphStore';
 import { useViewStore } from '../store/useViewStore';
@@ -21,6 +22,43 @@ describe('useKeyboardShortcuts', () => {
     // assertions otherwise leak across tests.
     useGraphStore.setState({ nodes: [], edges: [] });
     useViewStore.getState().setPropertiesPanelExpanded(false);
+    useViewStore.setState({ readOnlyOverride: 'off' });
+  });
+
+  it('honors live read-only changes and modifier keys without retaining listeners after unmount', () => {
+    // A mounted layout must block mutations immediately when read-only is enabled.
+    const listener = vi.fn();
+    window.addEventListener(SHOW_PALETTE_EVENT, listener);
+    const { unmount } = renderHook(() => useKeyboardShortcuts({ onToggleHelp: vi.fn(), onCloseHelp: vi.fn() }));
+    const blocked = new KeyboardEvent('keydown', { key: 'K', metaKey: true, cancelable: true });
+    useViewStore.setState({ readOnlyOverride: 'on' });
+    window.dispatchEvent(blocked);
+    expect(blocked.defaultPrevented).toBe(true);
+    expect(listener).not.toHaveBeenCalled();
+    useViewStore.setState({ readOnlyOverride: 'off' });
+    fireEvent.keyDown(window, { key: 'K', metaKey: true, altKey: true });
+    expect(listener).toHaveBeenCalledOnce();
+    unmount();
+    fireEvent.keyDown(window, { key: 'k', ctrlKey: true });
+    window.removeEventListener(SHOW_PALETTE_EVENT, listener);
+    expect(listener).toHaveBeenCalledOnce();
+  });
+
+  it.each(['textarea', 'select', 'div'])('leaves Escape and help alone inside editable %s targets', (tag) => {
+    // Global Escape must not collapse settings while the user edits a form field.
+    const onCloseHelp = vi.fn();
+    const onToggleHelp = vi.fn();
+    useViewStore.getState().setPropertiesPanelExpanded(true);
+    renderHook(() => useKeyboardShortcuts({ onToggleHelp, onCloseHelp }));
+    const target = document.createElement(tag);
+    if (tag === 'div') Object.defineProperty(target, 'isContentEditable', { value: true });
+    document.body.appendChild(target);
+    fireEvent.keyDown(target, { key: 'Escape' });
+    fireEvent.keyDown(target, { key: '?' });
+    target.remove();
+    expect(onCloseHelp).not.toHaveBeenCalled();
+    expect(onToggleHelp).not.toHaveBeenCalled();
+    expect(useViewStore.getState().isPropertiesPanelExpanded).toBe(true);
   });
 
   it('Ctrl+D triggers duplicateSelectedNodes via the store', () => {

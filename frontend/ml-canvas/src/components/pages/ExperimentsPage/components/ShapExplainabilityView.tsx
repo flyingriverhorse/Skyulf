@@ -35,12 +35,52 @@ const SUB_TABS: { key: ShapSubView; label: string }[] = [
   { key: 'interaction', label: 'Interaction' },
 ];
 
+const SINGLE_RUN_VIEWS = {
+  beeswarm: ShapBeeswarmView,
+  dependence: ShapDependenceView,
+  waterfall: ShapWaterfallView,
+  force: ShapForceView,
+  interaction: ShapInteractionView,
+};
+
+/** Adapt all selected runs, including missing artifacts, to summary coverage entries. */
+function summaryEntries(entries: ShapExplanationEntry[]) {
+  return entries.map(j => ({
+    jobId: j.jobId,
+    pipeline_id: j.pipeline_id,
+    parent_pipeline_id: j.parent_pipeline_id ?? null,
+    modelType: j.modelType,
+    shapSummary: j.shapExplanation?.mean_abs_importance ?? null,
+  }));
+}
+
 const SUB_TAB_BASE = 'px-3 py-1.5 text-sm font-medium rounded-md transition-colors';
 const subTabClass = (active: boolean) => `${SUB_TAB_BASE} ${
   active
     ? 'bg-blue-600 text-white'
     : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
 }`;
+
+/** Label the runs with per-row SHAP artifacts available for the selected view. */
+function RunSelector({ jobsWithData, activeJob, onSelect }: {
+  jobsWithData: ShapExplanationEntry[];
+  activeJob: ShapExplanationEntry | undefined;
+  onSelect: (jobId: string) => void;
+}) {
+  return (
+    <select
+      className="ml-auto bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 text-sm rounded-lg p-2"
+      value={activeJob?.jobId ?? ''}
+      onChange={(e) => { onSelect(e.target.value); }}
+    >
+      {jobsWithData.map(j => (
+        <option key={j.jobId} value={j.jobId}>
+          {j.modelType !== 'unknown' ? j.modelType : 'model'} ({shortRunId(j)})
+        </option>
+      ))}
+    </select>
+  );
+}
 
 // Beeswarm/Dependence/Waterfall each explain a *single* run's predictions
 // (they need per-row SHAP values, which aren't meaningfully comparable
@@ -66,6 +106,7 @@ export const ShapExplainabilityView: React.FC<Props> = ({
   const activeJob = jobsWithData.find(j => j.jobId === selectedJobId) ?? jobsWithData[0];
 
   if (jobsWithData.length === 0) return null;
+  const SingleRunView = subView === 'summary' ? null : SINGLE_RUN_VIEWS[subView];
 
   return (
     <div className="space-y-4">
@@ -82,29 +123,13 @@ export const ShapExplainabilityView: React.FC<Props> = ({
           ))}
         </div>
         {subView !== 'summary' && jobsWithData.length > 1 && (
-          <select
-            className="ml-auto bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 text-sm rounded-lg p-2"
-            value={activeJob?.jobId ?? ''}
-            onChange={(e) => { setSelectedJobId(e.target.value); }}
-          >
-            {jobsWithData.map(j => (
-              <option key={j.jobId} value={j.jobId}>
-                {j.modelType !== 'unknown' ? j.modelType : 'model'} ({shortRunId(j)})
-              </option>
-            ))}
-          </select>
+          <RunSelector jobsWithData={jobsWithData} activeJob={activeJob} onSelect={setSelectedJobId} />
         )}
       </div>
 
       {subView === 'summary' && (
         <ShapSummaryView
-          shapSummaryByJob={shapExplanationByJob.map(j => ({
-            jobId: j.jobId,
-            pipeline_id: j.pipeline_id,
-            parent_pipeline_id: j.parent_pipeline_id ?? null,
-            modelType: j.modelType,
-            shapSummary: j.shapExplanation?.mean_abs_importance ?? null,
-          }))}
+          shapSummaryByJob={summaryEntries(shapExplanationByJob)}
           coverageInputs={coverageInputs}
           handleDownload={handleDownload}
           downloadingChart={downloadingChart}
@@ -112,8 +137,8 @@ export const ShapExplainabilityView: React.FC<Props> = ({
         />
       )}
 
-      {subView === 'beeswarm' && activeJob && (
-        <ShapBeeswarmView
+      {SingleRunView && activeJob && (
+        <SingleRunView
           jobId={activeJob.jobId}
           pipeline_id={activeJob.pipeline_id}
           parent_pipeline_id={activeJob.parent_pipeline_id ?? null}
@@ -125,57 +150,6 @@ export const ShapExplainabilityView: React.FC<Props> = ({
         />
       )}
 
-      {subView === 'dependence' && activeJob && (
-        <ShapDependenceView
-          jobId={activeJob.jobId}
-          pipeline_id={activeJob.pipeline_id}
-          parent_pipeline_id={activeJob.parent_pipeline_id ?? null}
-          modelType={activeJob.modelType}
-          shapExplanation={activeJob.shapExplanation}
-          handleDownload={handleDownload}
-          downloadingChart={downloadingChart}
-          doneChart={doneChart}
-        />
-      )}
-
-      {subView === 'waterfall' && activeJob && (
-        <ShapWaterfallView
-          jobId={activeJob.jobId}
-          pipeline_id={activeJob.pipeline_id}
-          parent_pipeline_id={activeJob.parent_pipeline_id ?? null}
-          modelType={activeJob.modelType}
-          shapExplanation={activeJob.shapExplanation}
-          handleDownload={handleDownload}
-          downloadingChart={downloadingChart}
-          doneChart={doneChart}
-        />
-      )}
-
-      {subView === 'force' && activeJob && (
-        <ShapForceView
-          jobId={activeJob.jobId}
-          pipeline_id={activeJob.pipeline_id}
-          parent_pipeline_id={activeJob.parent_pipeline_id ?? null}
-          modelType={activeJob.modelType}
-          shapExplanation={activeJob.shapExplanation}
-          handleDownload={handleDownload}
-          downloadingChart={downloadingChart}
-          doneChart={doneChart}
-        />
-      )}
-
-      {subView === 'interaction' && activeJob && (
-        <ShapInteractionView
-          jobId={activeJob.jobId}
-          pipeline_id={activeJob.pipeline_id}
-          parent_pipeline_id={activeJob.parent_pipeline_id ?? null}
-          modelType={activeJob.modelType}
-          shapExplanation={activeJob.shapExplanation}
-          handleDownload={handleDownload}
-          downloadingChart={downloadingChart}
-          doneChart={doneChart}
-        />
-      )}
     </div>
   );
 };

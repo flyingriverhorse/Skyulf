@@ -36,6 +36,15 @@ const METRIC_PREFIX_CONTEXT: Record<string, string> = {
   cv: 'Cross-validation mean —',
 };
 
+/** Separate split context from the metric key, including the CV mean suffix. */
+function getMetricContext(key: string): { prefix: string; stripped: string } {
+  if (key.startsWith('train_')) return { prefix: 'train', stripped: key.replace('train_', '') };
+  if (key.startsWith('test_')) return { prefix: 'test', stripped: key.replace('test_', '') };
+  if (key.startsWith('val_')) return { prefix: 'val', stripped: key.replace('val_', '') };
+  if (key.startsWith('cv_')) return { prefix: 'cv', stripped: key.replace('cv_', '').replace(/_mean$/, '') };
+  return { prefix: '', stripped: key };
+}
+
 /**
  * Returns a short human-readable description for a metric key such as
  * "test_f1_weighted", "cv_accuracy_mean", "cv_accuracy_std", "best_score".
@@ -52,13 +61,7 @@ export function getMetricDescription(key: string): string | undefined {
       : `Std deviation of ${base} across cross-validation folds. Lower = more consistent.`;
   }
 
-  let prefix = '';
-  let stripped = key;
-  if (key.startsWith('train_')) { prefix = 'train'; stripped = key.replace('train_', ''); }
-  else if (key.startsWith('test_')) { prefix = 'test'; stripped = key.replace('test_', ''); }
-  else if (key.startsWith('val_')) { prefix = 'val'; stripped = key.replace('val_', ''); }
-  else if (key.startsWith('cv_')) { prefix = 'cv'; stripped = key.replace('cv_', '').replace(/_mean$/, ''); }
-
+  const { prefix, stripped } = getMetricContext(key);
   const baseDesc = METRIC_BASE_DESCRIPTIONS[stripped];
   const ctx = METRIC_PREFIX_CONTEXT[prefix];
   if (baseDesc && ctx) return `${ctx} ${baseDesc}`;
@@ -262,6 +265,32 @@ export interface EnsembleSummary {
   isStacking: boolean;
 }
 
+/** Surface only the strategy's applicable options after a model switch. */
+function getEnsembleStrategyOptions(
+  bucket: Record<string, unknown>,
+  isStacking: boolean,
+  weights: number[] | undefined,
+): Pick<EnsembleSummary, 'voting' | 'passthrough' | 'weights'> {
+  return {
+    voting: !isStacking && typeof bucket.voting === 'string' ? bucket.voting : undefined,
+    passthrough: isStacking && typeof bucket.passthrough === 'boolean' ? bucket.passthrough : undefined,
+    weights: !isStacking ? weights : undefined,
+  };
+}
+
+/** A retained calibration method is displayed only while calibration is enabled. */
+function getEnsembleCalibrationOptions(
+  bucket: Record<string, unknown>,
+): Pick<EnsembleSummary, 'calibrateBaseModels' | 'calibrationMethod'> {
+  return {
+    calibrateBaseModels: bucket.calibrate_base_models === true ? true : undefined,
+    calibrationMethod:
+      bucket.calibrate_base_models === true && typeof bucket.calibration_method === 'string'
+        ? bucket.calibration_method
+        : undefined,
+  };
+}
+
 /**
  * Pull an ensemble's structural selection (base learners + meta settings) out of
  * a config bucket. The bucket is the nested `hyperparameters` map for basic
@@ -285,20 +314,9 @@ export const extractEnsembleSummary = (
   return {
     baseEstimators,
     finalEstimator: typeof bucket.final_estimator === 'string' ? bucket.final_estimator : undefined,
-    // ``voting`` and ``passthrough`` are mutually exclusive across the two
-    // strategies: voting models have no meta-learner CV/passthrough, stacking
-    // models have no voting rule. Only surface the key that applies so stale
-    // node-default values from the other strategy never leak into the UI.
-    voting: !isStacking && typeof bucket.voting === 'string' ? bucket.voting : undefined,
-    passthrough: isStacking && typeof bucket.passthrough === 'boolean' ? bucket.passthrough : undefined,
-    weights: !isStacking ? weights : undefined,
+    ...getEnsembleStrategyOptions(bucket, isStacking, weights),
     nJobs: typeof bucket.n_jobs === 'number' ? bucket.n_jobs : undefined,
-    // Calibration is classification-only; surface it when enabled.
-    calibrateBaseModels: bucket.calibrate_base_models === true ? true : undefined,
-    calibrationMethod:
-      bucket.calibrate_base_models === true && typeof bucket.calibration_method === 'string'
-        ? bucket.calibration_method
-        : undefined,
+    ...getEnsembleCalibrationOptions(bucket),
     isStacking,
   };
 };
