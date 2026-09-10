@@ -102,6 +102,132 @@ const INFO_TEXT: Record<Variant, string> = {
     'Stateless hashing vectorizer. Maps tokens to a fixed number of columns via a hash function — no vocabulary stored, so it scales to huge corpora and unseen tokens.',
 };
 
+type VectorizerPatch = (changes: Partial<AnyVectorizerConfig>) => void;
+
+function HashingParameters({ hashCfg, patch }: {
+  hashCfg: HashingVectorizerConfig;
+  patch: VectorizerPatch;
+}) {
+  return (
+    <>
+      <NumberField
+        label="Number of features (hash buckets)"
+        value={hashCfg.n_features ?? 1024}
+        min={2}
+        step={1}
+        onChange={(v) => patch({ n_features: v ?? 1024 } as Partial<HashingVectorizerConfig>)}
+        hint="Higher = fewer collisions, more columns. Powers of 2 recommended."
+      />
+      <div>
+        <label className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-1 block">
+          Normalization
+          <select
+            className="mt-1 w-full text-xs rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 p-1.5"
+            value={hashCfg.norm ?? 'l2'}
+            onChange={(e) =>
+              patch({ norm: e.target.value as HashingVectorizerConfig['norm'] } as Partial<HashingVectorizerConfig>)
+            }
+          >
+            <option value="l2">L2</option>
+            <option value="l1">L1</option>
+            <option value="none">None</option>
+          </select>
+        </label>
+      </div>
+      <Checkbox
+        label="Alternate sign"
+        checked={hashCfg.alternate_sign ?? true}
+        onChange={(v) =>
+          patch({ alternate_sign: v } as Partial<HashingVectorizerConfig>)
+        }
+        hint="Adds +/- signs to approximately preserve inner products."
+      />
+    </>
+  );
+}
+
+function VocabularyParameters({ config, variant, patch }: {
+  config: CountVectorizerConfig | TfidfVectorizerConfig;
+  variant: 'count' | 'tfidf';
+  patch: VectorizerPatch;
+}) {
+  const countCfg = config as CountVectorizerConfig;
+  const tfidfCfg = config as TfidfVectorizerConfig;
+  return (
+    <>
+      <NumberField
+        label="Max features"
+        value={countCfg.max_features ?? null}
+        placeholder="unlimited"
+        min={1}
+        step={1}
+        onChange={(v) => patch({ max_features: v } as Partial<CountVectorizerConfig>)}
+        hint="Keep only the top-N most frequent tokens. Empty = no limit."
+      />
+      <div className="grid grid-cols-2 gap-2">
+        <NumberField
+          label="Min document freq"
+          value={countCfg.min_df ?? 1}
+          min={1}
+          step={1}
+          onChange={(v) => patch({ min_df: v ?? 1 } as Partial<CountVectorizerConfig>)}
+          hint="Ignore rarer tokens."
+        />
+        <NumberField
+          label="Max document freq"
+          value={countCfg.max_df ?? 1.0}
+          min={0}
+          step={0.05}
+          onChange={(v) => patch({ max_df: v ?? 1.0 } as Partial<CountVectorizerConfig>)}
+          hint="Drop very common tokens (0–1 = ratio)."
+        />
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <NumberField
+          label="N-gram min"
+          value={countCfg.ngram_range?.[0] ?? 1}
+          min={1}
+          step={1}
+          onChange={(v) =>
+            patch({
+              ngram_range: [v ?? 1, countCfg.ngram_range?.[1] ?? 1],
+            } as Partial<CountVectorizerConfig>)
+          }
+        />
+        <NumberField
+          label="N-gram max"
+          value={countCfg.ngram_range?.[1] ?? 1}
+          min={1}
+          step={1}
+          onChange={(v) =>
+            patch({
+              ngram_range: [countCfg.ngram_range?.[0] ?? 1, v ?? 1],
+            } as Partial<CountVectorizerConfig>)
+          }
+        />
+      </div>
+      {variant === 'count' && (
+        <Checkbox
+          label="Binary counts"
+          checked={countCfg.binary ?? false}
+          onChange={(v) => patch({ binary: v } as Partial<CountVectorizerConfig>)}
+          hint="Use 1/0 presence instead of raw token counts."
+        />
+      )}
+      {variant === 'tfidf' && (
+        <Checkbox
+          label="Sublinear TF scaling"
+          checked={tfidfCfg.sublinear_tf ?? false}
+          onChange={(v) =>
+            patch({ sublinear_tf: v } as Partial<TfidfVectorizerConfig>)
+          }
+          hint="Replace term frequency tf with 1 + log(tf)."
+        />
+      )}
+    </>
+  );
+}
+
 const VectorizerSettings: React.FC<NodeSettingsProps<AnyVectorizerConfig> & { variant: Variant }> = ({
   config,
   onChange,
@@ -134,11 +260,6 @@ const VectorizerSettings: React.FC<NodeSettingsProps<AnyVectorizerConfig> & { va
         .filter((c) => !droppedUpstream.has(c.name))
         .map((c) => c.name)
     : [];
-
-  // Narrowed accessors with safe fallbacks (configs share the base shape).
-  const countCfg = config as CountVectorizerConfig;
-  const tfidfCfg = config as TfidfVectorizerConfig;
-  const hashCfg = config as HashingVectorizerConfig;
 
   const patch = (changes: Partial<AnyVectorizerConfig>) =>
     onChange({ ...config, ...changes } as AnyVectorizerConfig);
@@ -216,112 +337,9 @@ const VectorizerSettings: React.FC<NodeSettingsProps<AnyVectorizerConfig> & { va
           />
 
           {variant === 'hashing' ? (
-            <>
-              <NumberField
-                label="Number of features (hash buckets)"
-                value={hashCfg.n_features ?? 1024}
-                min={2}
-                step={1}
-                onChange={(v) => patch({ n_features: v ?? 1024 } as Partial<HashingVectorizerConfig>)}
-                hint="Higher = fewer collisions, more columns. Powers of 2 recommended."
-              />
-              <div>
-                <label className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-1 block">
-                  Normalization
-                  <select
-                    className="mt-1 w-full text-xs rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 p-1.5"
-                    value={hashCfg.norm ?? 'l2'}
-                    onChange={(e) =>
-                      patch({ norm: e.target.value as HashingVectorizerConfig['norm'] } as Partial<HashingVectorizerConfig>)
-                    }
-                  >
-                    <option value="l2">L2</option>
-                    <option value="l1">L1</option>
-                    <option value="none">None</option>
-                  </select>
-                </label>
-              </div>
-              <Checkbox
-                label="Alternate sign"
-                checked={hashCfg.alternate_sign ?? true}
-                onChange={(v) =>
-                  patch({ alternate_sign: v } as Partial<HashingVectorizerConfig>)
-                }
-                hint="Adds +/- signs to approximately preserve inner products."
-              />
-            </>
+            <HashingParameters hashCfg={config as HashingVectorizerConfig} patch={patch} />
           ) : (
-            <>
-              <NumberField
-                label="Max features"
-                value={countCfg.max_features ?? null}
-                placeholder="unlimited"
-                min={1}
-                step={1}
-                onChange={(v) => patch({ max_features: v } as Partial<CountVectorizerConfig>)}
-                hint="Keep only the top-N most frequent tokens. Empty = no limit."
-              />
-              <div className="grid grid-cols-2 gap-2">
-                <NumberField
-                  label="Min document freq"
-                  value={countCfg.min_df ?? 1}
-                  min={1}
-                  step={1}
-                  onChange={(v) => patch({ min_df: v ?? 1 } as Partial<CountVectorizerConfig>)}
-                  hint="Ignore rarer tokens."
-                />
-                <NumberField
-                  label="Max document freq"
-                  value={countCfg.max_df ?? 1.0}
-                  min={0}
-                  step={0.05}
-                  onChange={(v) => patch({ max_df: v ?? 1.0 } as Partial<CountVectorizerConfig>)}
-                  hint="Drop very common tokens (0–1 = ratio)."
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <NumberField
-                  label="N-gram min"
-                  value={countCfg.ngram_range?.[0] ?? 1}
-                  min={1}
-                  step={1}
-                  onChange={(v) =>
-                    patch({
-                      ngram_range: [v ?? 1, countCfg.ngram_range?.[1] ?? 1],
-                    } as Partial<CountVectorizerConfig>)
-                  }
-                />
-                <NumberField
-                  label="N-gram max"
-                  value={countCfg.ngram_range?.[1] ?? 1}
-                  min={1}
-                  step={1}
-                  onChange={(v) =>
-                    patch({
-                      ngram_range: [countCfg.ngram_range?.[0] ?? 1, v ?? 1],
-                    } as Partial<CountVectorizerConfig>)
-                  }
-                />
-              </div>
-              {variant === 'count' && (
-                <Checkbox
-                  label="Binary counts"
-                  checked={countCfg.binary ?? false}
-                  onChange={(v) => patch({ binary: v } as Partial<CountVectorizerConfig>)}
-                  hint="Use 1/0 presence instead of raw token counts."
-                />
-              )}
-              {variant === 'tfidf' && (
-                <Checkbox
-                  label="Sublinear TF scaling"
-                  checked={tfidfCfg.sublinear_tf ?? false}
-                  onChange={(v) =>
-                    patch({ sublinear_tf: v } as Partial<TfidfVectorizerConfig>)
-                  }
-                  hint="Replace term frequency tf with 1 + log(tf)."
-                />
-              )}
-            </>
+            <VocabularyParameters config={config as CountVectorizerConfig | TfidfVectorizerConfig} variant={variant} patch={patch} />
           )}
         </div>
       </div>

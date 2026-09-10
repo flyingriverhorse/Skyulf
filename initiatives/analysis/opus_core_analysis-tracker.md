@@ -148,6 +148,7 @@ uses, so a fixed finding stays where it was filed.
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
+| OC-219 | 🟡 | Threshold toggle accepts unsaved previews and returns HTTP 400; Save help incorrectly says saving leaves thresholds inactive | small | ✅ fixed 2026-09-09 — track saved state separately, disable the toggle until persistence, and explain that Save also enables predictions. |
 | OC-38 | ⚪ | Clustering metrics treat DBSCAN `-1` noise as a real cluster (`metrics.py:432-459`) | small | ✅ fixed 2026-09-07 — DBSCAN noise rows are excluded from cluster counts and quality scores; regression coverage added |
 | OC-146 | 🔴 | Binary `pr_auc` scored against wrong class on `{1,n}` labels — reports 0.32 vs true 0.97, no warning (`metrics.py:324-326`) | small | ✅ fixed 2026-09-05 |
 | OC-37 | 🟡 | Binary PR-AUC dropped for string-labeled classifiers (`metrics.py:324-327`) | small | ✅ fixed 2026-09-05 — same one-arg fix as OC-146 |
@@ -157,6 +158,7 @@ uses, so a fixed finding stays where it was filed.
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
+| OC-224 | 🟠 | Drift compared a transformed splitter reference with a raw upload, reporting severe drift for the same file | small | ✅ fixed 2026-09-10 — resolve the selected model's unique saved raw loader snapshot; the user's existing job now reports 0/4 drift and PSI 0 without retraining. |
 | OC-68 | 🟠 | Model alias map task-unaware — direct API caller silently trains the wrong estimator family (`_execution/engine/_node_runners.py:1157-1183`) | small | ✅ fixed 2026-09-07 — ambiguous aliases are task-aware and mismatched model/task combinations fail clearly |
 | OC-70 | 🟡 | Leakage validator checks for *a* splitter globally, not that *this* branch is protected (`_execution/_leakage_validation.py:189-267`) | small | ✅ fixed 2026-09-08 — every training branch now needs its own splitter or explicit CV; data-dependent ancestors on unprotected branches are reported |
 | OC-145 | 🟡 | Crashed cross-validation returns the same `{}` sentinel as a disabled one — job reports success with missing `cv_*` metrics (`_node_runners.py:871-907`) | small | ✅ fixed 2026-09-08 — post-tuning CV exceptions now fail the training node and pipeline; regression coverage added |
@@ -255,6 +257,7 @@ uses, so a fixed finding stays where it was filed.
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
+| OC-218 | 🟡 | Connected model CV seed `0` is replaced by the existing ensemble seed during frontend settings synchronization | small | ✅ fixed 2026-09-09 - explicit zero now survives synchronization and both fixed/tuned request conversion; missing seeds retain the ensemble default. |
 | OC-206 | ⚪ | Ensemble configuration resolution shallow-copies nested base-model parameters, so fitting mutates the caller's configuration (`modeling/ensemble.py:473,484`) | small | ✅ fixed 2026-09-09 - inner base-model parameter maps are copied before temporary overrides, preserving caller settings and later refits. |
 | OC-204 | 🟡 | `fit_predict` drops an embedded target during training but keeps it in held-out tuple features when explicit y is also supplied, causing prediction to fail (`modeling/base.py:317-324`) | small | ✅ fixed 2026-09-09 - held-out tuples use training target extraction, excluding embedded targets while preserving explicit-y precedence. |
 | OC-168 | 🟡 | Pipeline refitting retains decision thresholds from the previous model (`pipeline/_pipeline.py`) | small | ✅ fixed 2026-09-09 — fitting clears thresholds and requires fresh optimization for both unchanged and new class labels. |
@@ -272,6 +275,9 @@ uses, so a fixed finding stays where it was filed.
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
+| OC-222 | ⚪ | Audit Log's loaded-page filter hint contradicts its server-side actor/kind/time filtering | small | ✅ fixed 2026-09-10 — the hint now explains full-history filtering before the page limit; API behavior is unchanged. |
+| OC-221 | 🟡 | Error Log applies an older search response after a newer response, displaying rows that disagree with the current search | small | ✅ fixed 2026-09-10 — request generations guard HTTP/pipeline results, errors and loading; refresh and effect cleanup invalidate obsolete work. |
+| OC-220 | 🟡 | Resampling Target Column native suggestions open away from the input in the user's browser | small | ✅ fixed 2026-09-09 — use an anchored editable listbox; docked/expanded browser geometry and keyboard selection are covered. |
 | OC-55 | 🟡 | `tsc --noEmit` fails: `mermaid` declared but not installed (`frontend/ml-canvas/package.json`) | 1 line | ✅ verified stale 2026-09-06 — `mermaid@11.17.2` is in `dependencies`, in the lockfile, installed and lazy-imported into its own chunk; the exact CI `tsc --noEmit` exits 0, `npm run build` succeeds, and the 5 real-parser tests pass. No change needed |
 
 ---
@@ -349,6 +355,991 @@ respective fix logs; OC-167 closed with canonical artifact framing on 2026-09-09
 ---
 
 ## Log
+
+### 2026-09-10 - Codacy follow-up: remove temporary verification files
+
+The user supplied 21 findings in `tmp_repro_artifacts/verify_security_followup.py`.
+Commit `6a9dbbe5` had included seven local investigation scripts/reports from
+that directory. The verifier checks one specific working-tree snapshot and
+depends on local logs; it is not an application or CI entry point. Python's
+optimized mode does remove its assertions, but this is a local verification
+script, not a production security control. Its Git calls use argument lists
+and fixed call sites; no user-controlled command execution was established.
+
+The user requested deletion, so all seven files were deleted and their removals
+staged. The directory was added to `.gitignore` and the root Codacy exclusions.
+Existing Ruff and ty configuration already excludes this temporary directory.
+The durable evidence summary remains in the
+[scanner report](frontend_static_analysis_review_2026-09-10.md#codacy-temporary-artifact-follow-up).
+No application code, tests, dependency versions or security rules were changed.
+Verification confirmed seven deleted/untracked files, matching Git ignore rules,
+valid Codacy YAML with only the new temporary exclusion, and clean diff checks.
+
+The separately reported `frontend/ml-canvas/package-lock.json` finding has no
+advisory details in the supplied output. A read-only npm audit reports 14 package
+entries, but those cannot be equated with the single Codacy issue. Its exact
+message/package/advisory is requested before selecting a dependency fix.
+Existing OC rows and the **63 open / 4 parked** queue are unchanged.
+
+### 2026-09-10 - job-log numeric regex performance
+
+Reproduced the three reported super-linear numeric patterns in `JobLogs.tsx`:
+when a long digit run lacked a duration, percentage or decimal suffix, the
+unanchored expressions retried from each following digit. A fixed-width
+negative lookbehind before the first digit now prevents those redundant starts.
+Its placement after the optional minus preserves negative values following
+digits. Rule order, colors, log text and control behavior are unchanged.
+
+The 16,000-digit duration case measured **354.922 ms -> 0.555 ms** in the bounded
+local comparison; this is an illustrative sample, not a latency guarantee.
+Old/new full highlighting matched on **100,000** generated messages; independent
+review found no blocking issue. Focused tests **61/2**, full Vitest **2,429/188**,
+**7 Chromium tests** (including a 100,000-digit log), lint, strict CCN 10,
+TypeScript/build and all **11** bundle budgets passed. The informational CCN 8
+inventory remains **133/96**; no production function was split.
+
+See the [scanner follow-up](frontend_static_analysis_review_2026-09-10.md#job-log-regex-performance-follow-up)
+for evidence and scope limits. External scanner status still needs a fresh scan.
+The existing OC queue remains **63 open / 4 parked**. Notes are under v0.8.19;
+this change and the preceding lookup follow-up were committed in `6a9dbbe5`.
+
+### 2026-09-10 - frontend scanner follow-up: explicit lookup registries
+
+Reviewed the four reported dynamic-regex/callable-object warnings against
+`5a63fe55`. The test regex interpolated a static array length; operational
+URL parsing already checked a fixed kind whitelist; comparison rows supply
+fixed field labels. No application command-injection path was established.
+Direct helper calls with inherited names did reproduce invalid return values
+or exceptions, so CV/tuning lookups now use Map registries with the normal `-`
+fallback. Operational parser lookup also uses Map, retaining its mapped type
+and all ten parser bodies; the test uses a literal string matcher.
+
+Original regression selection: **107 passed / 4 expected new failures**;
+final **111/4** (tests/files) passed. Full Vitest **2,411/187**, normal ESLint,
+strict CCN 10, TypeScript/build, all **11** bundle budgets and **9 Chromium
+tests** passed. Independent review found no blocking issue. The largest
+functions in the three reported files remain **8, 3 and 10**; file-level
+complexity deltas do not represent individual function CCNs. The global
+informational report stays **133/96** at CCN 8 and the strict backlog stays zero.
+
+See the [review and metric explanation](frontend_static_analysis_review_2026-09-10.md).
+External scanner confirmation remains pending; no exemptions or limits changed.
+The queue remains **63 open / 4 parked**, with existing OC rows and DRIFT-01
+unchanged. Release notes are under v0.8.19; the follow-up was committed in `6a9dbbe5`.
+
+### 2026-09-10 - frontend batch 11: complete the CCN 10 backlog
+
+Base `73c0b7e7` on `0819`. Three disjoint Astra 6 implementers handled execution/
+tuning/evaluation hooks, Jobs/Experiments/monitoring screens and remaining node
+settings; the primary handled Navbar, notification details and ModalShell.
+All **22 remaining violations across 20 original production files** are removed.
+Extractions stay module-local, preserving public exports, defaults, state/effect/
+request ownership, callbacks, numeric policies and DOM semantics. Fresh independent
+spec and quality reviews passed for all four groups, with source/test diffs still
+matching their reviewed packages. See the [batch 11 plan](frontend_ccn_refactor_batch11_2026-09-10.md).
+
+The source-wide strict CCN 10 gate now **passes: 0 violations in 0 files**;
+the largest source function is **10**, down from 24. The informational CCN 8
+report remains unchanged in policy and lists **133 functions in 96 files**, all
+optional 9/10 candidates (previously 139/101). The [inventory](frontend_ccn_remaining_2026-09-10.md)
+records every optional function and its measured location. No thresholds,
+exemptions, dependencies, source scope or bundle budgets changed.
+
+Original/final characterization passed for each group: hooks **195 tests / 10
+files**, pages **245/29**, settings **330/15**, shell and consumers **34/4**.
+These selections overlap. Frozen-source full Vitest passed **2,402 tests / 186
+files**. Normal ESLint, explicit new-browser-test lint with `--no-ignore`, project
+`tsc --noEmit`, production build and all **11 bundle budgets** pass. Main bundle
+`index-B8ImxiHA.js` is **324.5 KiB gzip / 325 KiB budget**; all **251** relative
+built imports resolve. Expected error-path/jsdom stderr also occurs in original
+consumer tests; the full suite has no failed tests.
+
+The complete Chromium suite passed **133 tests**, without failures or retries.
+Two new cases exercise Count, TF-IDF and Hashing controls at 1440/1100px: actual
+schema filtering, independent node values, empty max features, panel expansion/
+collapse, selection round trips and submitted Preview payloads. HTTP is mocked;
+registry definitions, graph stores, controls and conversion are real. Expanded
+panel screenshots were inspected. Existing suites cover job and experiment
+navigation, training/tuning, thresholds, notifications, modals and accessibility.
+
+Release notes are under v0.8.19; v0.8.18 and earlier entries are unchanged.
+No additional functional finding was discovered or silently fixed. The audit
+queue remains **63 open / 4 parked**; OC-223/225/226/227/228/229 remain open,
+OC-71/72/73/185 stay parked, and DRIFT-01 stays deferred. Final integration
+review and the manual frontend checklist are recorded in the plan. The user
+authorized committing this verified batch on 2026-09-10.
+
+### 2026-09-10 - frontend batch 10: canvas inspection, data screens and analysis
+
+Base `c56d6cca` on `0819`. Three disjoint Astra 6 implementers simplified eight
+canvas/inspection entries, seven dataset/model screens and eight drift/analysis
+entries; the primary handled metric and ensemble formatting. All **34 selected
+violations across 24 original files** are removed, including the new port helper.
+Public contracts, state/effect ownership, DOM, callbacks, numeric fallbacks and
+submitted payloads are preserved. All four groups passed fresh independent spec
+and quality reviews; their final source/test diffs match the reviewed packages.
+See the [batch 10 plan](frontend_ccn_refactor_batch10_2026-09-10.md).
+
+Strict backlog: **56 -> 22 functions**, **44 -> 20 files**, **maximum 26 -> 24**.
+Informational CCN 8: **147/106 -> 139/101** (functions/files), with **117** optional
+functions at 9/10. Thresholds and source-wide scope are unchanged; strict exits 1
+for the remaining backlog while all selected entries/helpers pass 10. The
+[inventory](frontend_ccn_remaining_2026-09-10.md) was regenerated from both reports.
+
+Original/final characterization passed for every group: canvas **145 tests / 13
+files**, data **35/8**, analysis **39/10**, formatting and consumers **100/3**.
+Frozen-source full Vitest: **2,330 tests / 176 files**. Normal ESLint, explicit
+new-browser-test lint with `--no-ignore`, project `tsc --noEmit`, production build
+and all **11 bundle budgets** pass. `index-BjHkPcSK.js` and all **251** relative
+built imports resolve. Existing jsdom AggregateError stderr occurs in original
+consumer tests too; no executed Vitest test failed.
+
+Final complete Chromium run: **131 passed**, no failures or retries. Four new
+cases at 1440/1100px cover real dataset preview/profile conversion and reopen,
+drift upload payloads, histogram geometry, sort, filter, threshold re-evaluation
+and actual CSV download. HTTP is mocked; stores, controls and charts are real.
+Existing suites cover canvas connections, inspection, focus/resize, shortcuts,
+settings, model operations and chart navigation. Screenshots were inspected.
+The first full run had one blank-page timeout in an unchanged theme test; three
+unchanged diagnostic repeats and the final full run passed. Its cause remains
+unconfirmed; no production change or weaker assertion was made for that timeout.
+
+Concise release notes are under v0.8.19; older releases are unchanged. The existing
+inspector response race was filed separately as **OC-229**, leaving **63 open /
+4 parked**. OC-223/225/226/227/228 stay open, OC-71/72/73/185 stay parked and
+DRIFT-01 stays deferred. Final integration review is recorded in the plan;
+the user reported the frontend checks working and authorized the batch commit.
+
+### 2026-09-10 - OC-229 filed: an earlier inspector request replaces newer node details
+
+Batch 10 characterization reproduced this against original `c56d6cca`
+`NodeInspectorModal`: open node `first`, select `second`, resolve the second
+request and then the first. The modal replaces **Second response** with
+**First response** although the selection and canvas link identify the newer
+node. `fetchNode` writes data, errors and loading without a request identity
+guard; its original and final source at lines 59-78 is unchanged.
+
+Evidence: `frontend/ml-canvas/src/components/shared/NodeInspectorModal.test.tsx:99`,
+case `currently allows an earlier node response to replace a newer one`.
+Both original and refactored sources pass the same **145 tests / 13 files**;
+logs and original copies are under `tmp_repro_artifacts/ccn10-task1/`
+(`original-extended-tests.log`, `final-tests.log`). Independent review confirms
+that the race predates this refactor; no matching prior tracker item exists.
+
+Filed separately as **OC-229**, preserving behavior during CCN extraction.
+Guard success, error and loading updates by the current request and modal
+lifetime; cover reversed responses, retries, closing and node navigation.
+The queue is now **63 open / 4 parked**. OC-71/72/73/185 stay parked and
+DRIFT-01 remains deferred.
+
+### 2026-09-10 - frontend batch 9: preprocessing, graph utilities and experiment charts
+
+Base `45c3f142` on `0819`. Three disjoint Astra 6 implementers handled ten
+preprocessing settings entries, seven graph rule/diff/layout/export utilities,
+and seven experiment chart/summary entries; the primary handled VariableCard.
+All **31 original CCN violations in 25 files** are removed. Helpers retain
+cohesive responsibilities and the same public contracts, state ownership,
+numeric fallbacks, DOM and submitted payloads. All four task groups passed
+independent spec and quality review. See the
+[batch 9 plan](frontend_ccn_refactor_batch9_2026-09-10.md) for the exact scope.
+
+The measured strict backlog fell **87 -> 56 functions**, **69 -> 44 files**,
+and **maximum 32 -> 26**. Informational CCN 8 changed **159/113 -> 147/106**
+(functions/files), including **91** optional functions at 9/10. Thresholds and
+source-wide scope remain unchanged; global strict exits 1 for the remaining
+backlog while every selected entry/helper passes 10. The
+[inventory](frontend_ccn_remaining_2026-09-10.md) was regenerated from both reports.
+
+Original/final public characterization passed for every group. Final shared
+Vitest: **2,268 tests / 168 files**; normal ESLint, explicit new-browser-test
+lint, project `tsc --noEmit`, production build and all **11 size budgets** pass.
+Generated `index-BYpfjj1i.js` and all **251** relative built imports resolve.
+Existing jsdom AggregateError stderr also occurs in the original experiment
+suite; the executed suite has no failed tests. Complete Chromium integration:
+**127 passed**, with no failures or retries in the final run. Five new cases
+cover responsive settings/Preview payloads, real PNG/SVG file downloads,
+classification threshold and run/split changes, regression plots and cluster
+charts/tables. Plot assertions wait for visible, stable SVG geometry. Existing
+suites also cover connection rejection, leakage feedback and Pipeline Diff.
+The primary inspected settings and rendered-chart screenshots; final independent
+integration review passed. Browser tests use mocked HTTP endpoints, while
+production stores, controls and chart libraries remain real.
+
+Concise release notes are under v0.8.19; older releases are unchanged.
+VariableCard has no current production consumers and is verified through its
+public component tests, not an invented browser route. The existing casting
+overwrite was separately filed as OC-228 below, leaving **62 open / 4 parked**.
+OC-223/225/226/227 remain open; OC-71/72/73/185 stay parked and DRIFT-01 deferred.
+The user reported the frontend checks working and authorized the batch commit.
+
+### 2026-09-10 - OC-228 filed: adding a casting rule overwrites an existing rule
+
+Batch 9 characterization reproduced this against the original `45c3f142`
+`CastTypeNode` public settings: schema contains only `age`, its rule is `int`,
+and clicking **Add Casting Rule** emits `{ column_types: { age: 'float' } }`.
+The button is disabled only for an empty schema. When all columns are assigned,
+the unchanged add handler falls back to the first available column and replaces
+its type. The same test passes after extraction; independent review confirmed
+the original behavior and found no matching existing tracker item.
+
+Evidence: `InvalidValueReplacementNode.test.tsx`, case `preserves the existing
+cast add fallback when every column has a rule`; original 49 tests and final
+126 tests passed. Logs: `tmp_repro_artifacts/frontend_ccn_batch9_task1/`.
+This CCN refactor preserves the behavior and records it separately as **OC-228**.
+Fix by disabling/no-oping Add when no unassigned column remains; verify that
+removing a rule permits adding it again without changing other types.
+Queue becomes **62 open / 4 parked**; earlier parked work is unchanged.
+
+### 2026-09-10 - frontend complexity refactor batch 8: verified
+
+Committed the previously verified batch 7 with DCO sign-off as `6af9a600`, then
+continued on `0819` with three independent Astra 6 owners and separate reviews.
+The strict threshold remains 10 and the informational threshold remains 8.
+
+| Scope | Selected functions before -> after |
+|---|---|
+| Graph store | validation collector 17 -> 2; connection confirmation 32 -> 6; history equality 12 -> 6 |
+| Operational context | serialization 19 -> 5; reference parsing 28 -> 3; description 11 -> 2 |
+| Scaling / Outlier | settings 27 -> 9 / 26 -> 9; scaling feedback callback 19 -> 3; outlier feedback 22 -> 4 and recommendations 15 -> 5 |
+
+Every selected entry and extracted helper is at or below 10. The graph retains
+validation ordering, synchronous confirmation/cancellation and existing history
+semantics. Record codecs preserve identity types, optional values, query order
+and accessible descriptions. Settings preserve defaults, numeric/empty values,
+upstream column choice, feedback and recommendation ordering.
+
+Original-source characterization passed **63**, **81** and **50** tests before
+extraction; related final suites passed **355**, **138** and **129** tests.
+Independent review strengthened the dragging-data history test to keep node
+count fixed, and the Outlier traversal test to distinguish dataset IDs and
+breadth-first/equal-depth precedence. Their follow-up suites passed **59** and
+**52** tests. All three independent task reviews passed.
+
+Final verification: **2181 Vitest tests / 160 files**, normal ESLint, TypeScript
+noEmit, production build and all **11 bundle budgets** pass. The complete
+Chromium confirmation passed **122/122**. The new five browser cases cover
+native fan-in cancel/accept and undo/redo, encoded Jobs links through reload/back,
+and Scaling/Outlier method/parameter fields in real Preview requests at compact
+and desktop widths. After review, these five passed again with explicit checks
+for completed width transitions and one/two-column settings layouts; refreshed
+screenshots were inspected. Shared responsive behavior was not changed.
+
+**Browser diagnostic:** the first complete run passed 121 tests and timed out
+once before Add Dataset appeared in an unchanged validation-navigation test.
+Its screenshot showed a blank startup page. The unchanged navigation suite then
+passed **15/15** with traces, followed by the **122/122** complete confirmation.
+No root cause or product fix is claimed. Logs are under `tmp_repro_artifacts/`:
+`ccn8-browser-all.log`, `ccn8-browser-navigation-repeat.log`,
+`ccn8-browser-all-confirmation.log` and `ccn8-browser-review-final.log`.
+
+The measured strict backlog fell **98 -> 87 functions** and **73 -> 69 files**;
+maximum remains **32**. The informational report changed **166/111 -> 159/113**
+(functions/files), with **72** optional functions at 9/10. The global strict
+command still exits 1 for the remaining backlog; selected scopes pass.
+See [the inventory](frontend_ccn_remaining_2026-09-10.md) and
+[batch 8 plan](frontend_ccn_refactor_batch8_2026-09-10.md).
+
+Generated assets were rebuilt (`index-51eF5Jsl.js`); index entries and all 251
+relative built JS/CSS imports resolve. Concise notes are under v0.8.19; older
+release text is unchanged. The existing drag-end history gap was separately
+filed as OC-227 below, leaving **61 open / 4 parked**. OC-223/225/226 remain open;
+OC-71/72/73/185 stay parked and DRIFT-01 stays deferred. This new batch is
+verified; the user confirmed frontend checks and authorized its commit.
+
+### 2026-09-10 - OC-227 filed: completed node drags bypass undo history
+
+During batch 8, the original `useGraphStore.ts` at `6af9a600` passed the public
+characterization `currently ignores both in-progress drag positions and the
+drag-end transition`. After clearing history, the test sends positions `(10,20)`
+and `(30,40)` with `dragging: true`, then `(50,60)` with `dragging: false` through
+`onNodesChange`. The position changes, but `pastStates` remains empty. A later
+non-drag position update creates one entry; undo restores `(50,60)`, not the
+position before dragging.
+
+The equality rule ignores position differences whenever **either** node is
+dragging, so the transition ending a drag is suppressed too. FlowCanvas passes
+React Flow's changes directly to this action. Evidence is a public-store test,
+not a newly executed pointer-drag browser reproduction. Batch 8 preserves this
+behavior in `graphStore/historyEquality.ts`; it does not repair it silently.
+Original characterization: 63 tests passed; extracted graph/consumer set:
+355 tests passed. Logs: `tmp_repro_artifacts/batch8-task1-original-tests.log` and
+`tmp_repro_artifacts/batch8-task1-final-tests.log`.
+
+**Fix target:** retain one snapshot from before a drag and record the completed
+single/group movement once, with real-pointer undo/redo coverage. Avoid adding
+selection-only or per-frame history entries. Queue: **61 open / 4 parked**;
+OC-71/72/73/185 remain parked. This is separate from CCN simplification.
+
+### 2026-09-10 - frontend complexity refactor batch 7: verified
+
+Plan: [`frontend_ccn_refactor_batch7_2026-09-10.md`](frontend_ccn_refactor_batch7_2026-09-10.md).
+Prior batch 6, OC-224 and the deferred DRIFT-01 specification are signed commit
+`4a6db08e`; the user subsequently authorized this next batch's signed commit.
+
+Three independent Astra 6 owners characterized original behavior before
+extracting cohesive state/presentation; fresh independent reviewers approved
+each task for spec compliance and code quality. Entry CCN: Layout **29→5**,
+JobsDrawer **28→5**, JobCard **24→1**, SegmentationSettings **28→10**. Every
+entry/helper is <=10; readable 9/10 functions remain intact. State, effects,
+subscriptions, public props, labels, CSS, payloads and ordering are preserved.
+
+Original public tests: Layout **22**, JobsDrawer/JobCard **49**, Segmentation
+**29**. Integrated verification: **2,045 Vitest tests / 158 files**, normal
+ESLint, TypeScript/Vite build and all **11 bundle budgets** pass. Generated
+frontend assets are rebuilt. The strict all-source CCN10 gate intentionally
+still fails on **98 functions / 73 files / max32**, down from 105/77; the CCN8
+informational report passes with **166 functions / 111 files**, including 68
+optional functions at 9/10. The inventory is regenerated from both executed logs.
+
+The complete Chromium confirmation passes **117/117** with mocked HTTP and real
+UI/stores. The first four-worker run passed 116/117, with an unchecked threshold
+checkbox after a click in an unchanged test. That suite passed three focused
+repetitions (9/9), and the full two-worker confirmation passed without source
+changes. A delayed-defaults diagnostic did not reproduce the proposed cause;
+no threshold fix is claimed. Logs retain the initial failure and later evidence.
+New browser cases cover mobile/desktop navigation, Jobs filtering/details and
+compact/expanded Segmentation edits plus submission payloads; representative
+screenshots were visually inspected. Live training remains a user-side check.
+
+Two original defects found during characterization are recorded separately:
+OC-225 and OC-226 below. Queue: **60 open / 4 parked**. DRIFT-01 remains deferred;
+there are no new backend/Core/API/store/registry/dependency changes in this batch.
+Final independent integrated review reports PASS with no introduced regression
+or scope violation; the delivery audit confirms all 31 scoped text files, queue
+counts, generated entry references, preserved older notes and unchanged CCN policy.
+
+### 2026-09-10 - OC-226 filed: stale segmentation defaults overwrite newer config
+
+The original `SegmentationSettings.tsx` model effect captured the entire config
+and onChange callback, then called `onChange({ ...config, hyperparameters:
+defaults })` when its request settled. It had no active-request or unmount guard.
+The same logic now lives in `segmentationSettings/useSegmentationModels.ts`;
+batch 7 deliberately preserves it rather than mixing a concurrency fix into
+the extraction.
+
+Executed characterization before production edits: the same-model case changes
+reference_column from `old` to `new` and execution_mode from parallel to merge
+while defaults are pending; completion calls the original callback with the old
+values. The reversed-response case resolves a newer DBSCAN request, unmounts,
+then resolves the older K-Means request; the old callback emits K-Means defaults
+after the newer result. Both cases pass on original and extracted source in
+`SegmentationSettings.test.tsx` (`keeps the original callback and config...` and
+`retains out-of-order definitions...`). Logs:
+`tmp_repro_artifacts/ccn7-segmentation-original-tests.log` and
+`ccn7-segmentation-final-tests.log`.
+
+Fix target: default seeding must preserve current non-parameter edits, ignore
+superseded model requests, and avoid writes after settings unmount. Verify the
+controlled parent/graph outcome, not only a callback spy. Update these deliberate
+characterization assertions when implementing that separate fix. No matching
+queue finding existed; queue is now **60 open / 4 parked**. DRIFT-01 remains a
+deferred enhancement outside the audit counts.
+
+### 2026-09-10 - OC-225 filed: job detail loses its dialog name
+
+During batch 7's browser characterization, pressing Enter on a real JobCard
+opens the existing detail view, but the resulting `role="dialog"` has no
+accessible name. `JobsDrawer.tsx` at base `4a6db08e` references
+`aria-labelledby="jobs-drawer-title"` on the persistent panel; the referenced
+heading exists only in the unselected history branch. `jobs/jobDetails/JobHeader.tsx`
+also renders its Back action as an unlabeled icon-only button. Both conditions
+predate this refactor; no existing tracker/queue entry covered them.
+
+Evidence: `tmp_repro_artifacts/ccn7-browser-probe2.log` reproduced the missing
+named dialog at both 1440px and 1100px while the Job Details heading remained
+visible. Source inspection confirms the dangling label reference and unlabeled
+Back control. The browser scenario now locates the detail dialog by its heading
+to continue checking current behavior; that test does not claim accessibility
+is repaired. Keep the pure extraction unchanged and fix the dialog label plus
+Back name in a separate regression-covered change. Queue: **59 open / 4 parked**;
+OC-223 and the deferred DRIFT-01 enhancement retain their existing scope.
+
+### 2026-09-10 - OC-224 fixed: compare raw uploads with saved raw source data
+
+`backend/monitoring/drift_reference.py` resolves the selected training node's
+ancestors from its saved graph and uses the unique loader's persisted snapshot.
+Shared-loader branches resolve to one source; unrelated graph branches cannot
+choose the baseline or exclude columns. The router excludes the target and
+explicit drop-column configurations symmetrically, without intersecting raw
+columns with encoded/derived model feature names. No upload fitting, pipeline
+replay, threshold change, model retraining or artifact rewrite is involved.
+
+The baseline contains the rows actually loaded, before preprocessing/splitting;
+sampled loaders retain their sample. It can include validation/test rows, so
+the user's model card remains 120 training rows while drift now compares
+**150 reference / 150 current rows**. Graphless legacy jobs keep their previous
+reference contract; its preprocessing stage cannot be independently established.
+Missing/ambiguous source metadata for a graph-backed job produces an explicit
+error and attempts to record a failed check rather than publishing drift scores.
+Explicit drops follow the existing bundle convention, not full feature lineage.
+
+TDD: **9 failed / 1 passed** before repair; **21 passed** after, including 11
+existing target regressions. New coverage includes actual engine training with
+log-before-split and shared branches, existing pandas/Polars source snapshots,
+real distribution/schema changes, encoded categorical raw inputs, unrelated
+branches, missing/ambiguous sources and graphless fallback. Wider relevant
+backend/Core suites pass **214 tests** (493 dependency/runtime warnings).
+Ruff check/format and scoped ty pass; the post-narrowing focused run again
+passes 21. An independent Astra review found no outstanding issues.
+
+The running local API was checked with job
+`bf22d1e1-f61a-4434-a89c-77662d42cfc9` and the user's original CSV:
+**HTTP 200, 0/4 drifted features, all four PSI values 0.0, no missing/new columns,
+severity none**. This created history alert **27**; previous results were not
+rewritten. Logs: `tmp_repro_artifacts/drift-reference-{red,green,integration,
+confirm,types}.log` and `tmp_repro_artifacts/drift-bf22-live-api.log`.
+
+The [drift guide](../../docs/user_guide/drift_monitoring.md) and v0.8.19 notes
+explain the raw-source contract and existing-job compatibility. OC-224 moves to
+the closed backend rows; queue returns to **58 open / 4 parked**. OC-223 stays
+open. The user approved this fix and the preceding frontend batch for a signed
+commit, including the deferred DRIFT-01 enhancement specification in the queue.
+
+### 2026-09-10 - OC-224 filed: drift reference/upload preprocessing mismatch
+
+The user trained `bf22d1e1-f61a-4434-a89c-77662d42cfc9` and checked the same
+Iris CSV. Reading its stored graph/reference and executing the real calculator
+reproduced PSI **8.30354, 8.32062, 5.77086, 3.18667** (mean **6.3954**), with
+all four features marked drifted. Reference: 120 rows; current: 150 rows.
+The graph applies `GeneralTransformation(method=log)` before the splitter.
+For SepalLengthCm, the saved reference mean is **1.91567**, versus raw **5.84333**.
+
+`_run_data_loader` initially saves a raw reference, but `_run_transformer`
+overwrites it with the splitter's already transformed training partition.
+`calculate_drift` parses the upload and compares it directly with that reference.
+This combines different preprocessing stages and predates the batch 6 frontend
+refactor. The saved graph also merges a dropped-Id branch and the log branch;
+the fix must not assume a single linear preprocessing chain.
+
+Evidence: `tmp_repro_artifacts/inspect_drift_bf22.py` and
+`tmp_repro_artifacts/drift-bf22-inspection.log`, using the job's stored artifacts
+and `uploads/data/3cfaca74-96d0-483b-bac5-76e5cde20057.csv`. No existing finding
+in the tracker/queue describes this mismatch. Filed open before repair;
+queue **59 open / 4 parked**. Scope: consistent reference/current data stages,
+existing-job compatibility, and preserved detection of real distribution/schema
+changes. Do not fit transformations on the upload or lower alert thresholds.
+
+### 2026-09-10 - frontend complexity refactor batch 6: verified
+
+Plan: [`frontend_ccn_refactor_batch6_2026-09-10.md`](frontend_ccn_refactor_batch6_2026-09-10.md).
+Baseline `534d1e94`, branch `0819`; the prior strict-10/report-8 policy and
+inventory are committed with DCO sign-off. Three independent Astra implementers
+and separate reviewers covered these scopes:
+
+| Scope | Previous maximum | Final maximum | Preserved behavior evidence |
+|---|---:|---:|---|
+| Audit Log and 6 helpers | 31 | 10 | 23 original/refactored page tests: server filters/facets, summaries, expansion, refresh and stale responses |
+| Drift alert modal and 5 helpers | 31 | 8 | 27 original modal tests / 36 related final tests: evidence, links, actions, promises and state lifetime |
+| Feature Generation and 12 helpers | 30 | 7 | 32 original settings tests / 102 related final tests: operations, columns, controlled updates, reveal, feedback and validation |
+
+All three pure extractions passed independent specification and quality review.
+The Audit page itself is now 6; two cohesive helpers remain at 10 intentionally.
+OC-222 was then repaired separately with red/green evidence and independent
+review (see below). OC-223 was reproduced on the original modal and remains
+open for a separate repair of modal and parent request lifetimes.
+
+Final integration: **157 Vitest files / 1,998 tests**, **111 Chromium tests**,
+normal ESLint, TypeScript/Vite production build and all **11 bundle budgets
+pass**. Main bundle: **320.1 KiB gzip / 325 KiB**. The six new browser cases
+exercise actual audit/drift pages at 1440px/900px and editable feature settings
+at 1440px/1100px, including keyboard focus and panel expansion. Routes are
+mocked; these checks do not establish live-backend integration. Logs:
+`tmp_repro_artifacts/ccn6-{vitest,lint,build,size,playwright}-final.log`.
+
+All selected source files and helpers pass scoped CCN 10. The source-wide
+strict gate still exits **1** on the remaining **105 functions / 77 files /
+maximum 32**, down from 112 functions / 80 files. The informational CCN 8
+report exits **0**, listing **167 functions / 109 files**, down from 172 / 110.
+The 62 functions at 9 or 10 are optional improvements, not strict violations.
+Evidence: `tmp_repro_artifacts/ccn6-{gate,report}-final.log`; the linked
+[remaining-work inventory](frontend_ccn_remaining_2026-09-10.md) is refreshed.
+
+Generated assets and concise v0.8.19 notes are updated. No backend, shared API,
+store, registry, dependency or lockfile change. Queue: **58 open / 4 parked**
+after closing OC-222 and filing OC-223; parked decisions are unchanged.
+The user completed frontend checks and subsequently requested a signed commit
+with the separately verified OC-224 drift correction.
+
+### 2026-09-10 - OC-222 fixed: explain full-history audit filtering
+
+After the extraction passed review, the stale loaded-page hint was replaced
+with: "Actor, action kind and time filters apply across the full history before
+the page limit." The paragraph and CSS are retained; only copy and its existing
+public-page assertion changed. The route builds history, applies actor/kind/date
+filters, reverses the matches and then caps the response, so the hint matches
+the current backend behavior.
+
+The corrected assertion first failed **1 of 23 tests**; all **23 then passed**.
+Scoped ESLint/CCN 10 and whitespace checks pass. Independent review confirmed
+the two-file diff, red/green logs and backend filtering order. Evidence:
+`tmp_repro_artifacts/ccn6-task-5-{red,green,eslint,diff-check}.log`.
+OC-222 moves to the closed frontend rows; OC-223 remains open. Release note:
+v0.8.19. No API behavior change.
+
+### 2026-09-10 - OC-223 filed during drift modal characterization
+
+The original modal at `534d1e94` clears its current note whenever a pending
+`onApplyDisposition` resolves truthy, even after `alertId` has changed. The test
+`retains asynchronous truthy-result semantics across an alert switch` submits
+`first` for one alert, rerenders with alert ID 8, types `second`, then resolves
+the old callback. The current note becomes empty. Original-source characterization
+passes **27 tests**, including this case; evidence:
+`tmp_repro_artifacts/ccn6-task-2-baseline-expanded-tests.log`.
+
+This predates the extraction and is preserved in its characterization, not
+introduced by the refactor. No duplicate was found in the tracker/open queue.
+The eventual fix should assess `useDriftAlertDetail` alongside modal note state:
+the parent also applies asynchronous responses without request ownership checks,
+but wider parent behavior has not yet been execution-reproduced in this finding.
+Filed open for a separate request-lifetime repair; queue **59 open / 4 parked**
+including the separately filed OC-222 wording defect.
+
+### 2026-09-10 - OC-222 filed during Audit Log characterization
+
+Original `AuditLogPage.tsx` at `534d1e94:495-496` says: "Filters apply only to
+the loaded page; the backend currently supports dataset and page limit only."
+The public-page test `states that filters span the whole history, not just the
+page` renders this hint alongside the full-history footer; original-source
+characterization passes **21 tests**. Other cases verify actor/kind/time arguments
+are sent. The real route `backend/ml_pipeline/_internal/_routers/pipelines_io.py`
+accepts these filters in `get_pipeline_audit_log`, confirming the hint is stale.
+
+Evidence: `tmp_repro_artifacts/ccn6-task-1-original-tests.log`, subsequently
+refreshed with **23 original-source tests** after adding two characterization
+cases. No duplicate was found in the tracker/open queue. Filed separately from
+the pure extraction; correct the hint after that review. Queue at filing:
+**58 open / 4 parked**.
+
+### 2026-09-10 - frontend policy: strict CCN 10, informational CCN 8
+
+The accepted limit for subsequent frontend refactors is **CCN <= 10 per
+function**. `complexity:check` enforces 10 across all `src` TypeScript; the
+informational `complexity:report` stays at 8. No per-file exceptions or explicit
+scope list. This supersedes the earlier source-wide CCN 8 policy below.
+
+The strict command reports **112 errors in 80 files** (exit 1, maximum 32).
+The informational report lists **172 warnings in 110 files** (exit 0), including
+60 functions at CCN 9 or 10 that now pass the gate. This is a threshold change,
+not 60 additional code fixes. Remaining required work is recorded with source
+links, function labels and CCN values in
+[`frontend_ccn_remaining_2026-09-10.md`](frontend_ccn_remaining_2026-09-10.md).
+Prioritize complex responsibilities and the largest functions; avoid splitting
+readable code solely to lower a number.
+
+Normal ESLint and TypeScript/Vite build pass; production assets are unchanged.
+Evidence: `tmp_repro_artifacts/frontend-ccn10-{check,lint,build}-2026-09-10.log`
+and `frontend-ccn8-report-2026-09-10.log`. The workflow and v0.8.19 note match
+these thresholds. No runtime code or audit status changed; **57 open / 4 parked**.
+
+### 2026-09-10 - frontend CCN 8 gate expanded to all source files
+
+The user confirmed the batch 5 frontend checks, requested a signed commit, and
+chose source-wide enforcement while the remaining backlog is being addressed.
+`complexity:check` now runs
+`eslint src --ext ts,tsx --rule "complexity: [error, 8]" --max-warnings 0`.
+The explicit file/folder list is removed; new TypeScript files under `src` are
+automatically covered. The workflow retains the informational report and runs
+the same strict command, with no increased limit or baseline exemption.
+
+Verification: the new command exits **1 with 172 complexity errors**, as expected
+from the existing backlog in 110 files (maximum 32). This supersedes the scoped
+gate's passing status recorded below; the source-wide gate will fail until those
+violations are resolved. Normal ESLint and a fresh TypeScript/Vite build pass;
+the rebuilt main asset hash is unchanged. No runtime code changed in this
+follow-up. Evidence: `tmp_repro_artifacts/ccn-global-{check,lint,build}-2026-09-10.log`.
+The v0.8.19 CI note reflects the final policy; queue stays **57 open / 4 parked**.
+
+### 2026-09-10 - frontend complexity refactor batch 5: verified
+
+Plan: [`frontend_ccn_refactor_batch5_2026-09-09.md`](frontend_ccn_refactor_batch5_2026-09-09.md).
+Baseline `15aa043a`, branch `0819`; the removed CCN 10 exception is not restored.
+Independent Astra implementers and reviewers covered three separate scopes:
+
+| Scope | Previous maximum | Final maximum | Preserved behavior evidence |
+|---|---:|---:|---|
+| Comparison table and 11 helpers | 34 | 8 | 11 original/refactored public-component tests: scoring groups, ties, config precedence, graph alignment and expansion |
+| Pipeline diff and 5 helpers | 33 | 8 | 35 original/refactored related tests: snapshots, failures, cancellation, Swap, graph diff and labels |
+| Error Log and 10 helpers | 32 | 8 | 28 original/refactored page tests: filters, diagnostics, actions, export, links and asynchronous results |
+
+All three pure extractions passed independent spec/quality review. A separate
+OC-221 repair then increased Error Log coverage to 38 cases (see below); its
+independent review found no actionable issue. New actual-page browser coverage
+passed four cases against both original and extracted source at 1440px/900px,
+including keyboard Swap, focus retention, comparison folds and error filters.
+
+Final integration: **156 Vitest files / 1,926 tests**, **105 Chromium tests**,
+ESLint, strict CCN 8, TypeScript/Vite production build and all **11 bundle
+budgets pass**. Main bundle: **319.7 KiB gzip / 325 KiB**. Exact logs are under
+`tmp_repro_artifacts/ccn5-{vitest,lint,gate,build,size,playwright,report}-final.log`.
+Browser tests use mocked API routes; no live-backend integration claim is made.
+
+The full report falls from **181 functions / 113 files / maximum 34** to
+**172 functions / 110 files / maximum 32** above CCN 8. The three entries and
+all 26 helper modules are included in the strict gate without raised limits.
+Next active hotspots include `useGraphStore.confirmConnection` (32),
+`AuditLogPage`/`DriftAlertModal` (31) and `FeatureGenerationNode` (30).
+Unreferenced `VariableCard` (32) is not selected merely to reduce the report.
+
+Generated assets and concise v0.8.19 notes are updated. The v0.8.18 and older
+sections still match branch base `784649d9`. Queue: **57 open, 4 parked** after
+OC-221 closure; parked decisions remain unchanged. No backend, dependency or
+lockfile change. The user confirmed the frontend checks and requested a signed
+commit; the subsequent source-wide CCN policy change is recorded above.
+
+### 2026-09-10 - OC-221 fixed: retain the latest Error Log request
+
+After independent review of the behavior-preserving extraction, a separate fix
+adds request generations to `errorLog/useErrorLogPage.ts`. Every filter load and
+refresh supersedes older HTTP and pipeline requests. Success, rejection and
+loading settlement check the same generation; effect cleanup also invalidates
+pending work on filter change or unmount. HTTP results remain usable before
+pipeline logs arrive. Requests are not aborted, and API arguments are unchanged.
+
+The desired latest-request behavior failed **11 of 38 tests** against the reviewed
+extraction; all **38 now pass**. Coverage includes both completion orders, stale
+success/error/loading, same-filter refresh, delayed pipeline results/rejections
+and unmount. Independent Astra review found no actionable issue. Scoped ESLint,
+strict CCN 8 and project TypeScript pass; the hook's maximum remains 7.
+Evidence: `tmp_repro_artifacts/ccn5-task-5-{red,green,ccn,types,metrics}.log` and
+the batch 5 independent review. Full Vitest also passes **1,926 tests**.
+
+OC-221 moves from the live queue to the closed frontend rows above. The queue
+returns to **57 open and 4 parked**; OC-71/72/73/185 remain parked. Release note:
+v0.8.19. No backend changes.
+
+### 2026-09-09 - OC-221 filed during Error Log characterization
+
+The original `ErrorLogPage.tsx` at `15aa043a` applies every completed `load()`
+without checking whether its filter scope is still current. The new public-page
+test `retains the current completion-order behavior when searches overlap`
+starts searches `older` then `newer`, resolves the newer response first and the
+older one last, and observes `older result` while the input still says `newer`.
+It passes against original source, establishing this as a pre-existing defect.
+Pipeline results and loading/error state use the same unguarded completion style;
+a repair must cover stale completions without making HTTP results wait for logs.
+
+Filed separately from the behavior-preserving CCN extraction. At filing the queue
+had **58 open and 4 parked** findings, before the request-lifetime repair above.
+
+### 2026-09-09 - branch 0819 release-note placement corrected
+
+At the user's request, move all release notes added on branch `0819` since
+`784649d9` (the `0818` base), including OC-218/219/220 and the frontend CCN
+workflow/refactors, into v0.8.19. The v0.8.18 and older release contents match
+the branch base. Related tracker and frontend CCN plan references now point to
+v0.8.19. This documentation correction changes no implementation or queue status.
+
+### 2026-09-09 - OC-220 fixed: anchor Resampling target suggestions
+
+Replace native datalist rendering with `TargetColumnField`, using the existing
+Radix Popover dependency to anchor an editable listbox to the input. Matching
+suggestions retain upstream dropped-column filtering; selection still updates
+the same target setting and arbitrary column names remain editable. Keyboard
+selection, Escape dismissal, Tab and outside-click focus are preserved.
+
+Both new unit regressions went from red to green; all **119 related settings and
+accessibility tests** pass, including instance-local listbox IDs. Two Chromium
+regressions pass for docked/expanded settings: the list follows input position
+and width during viewport/panel resizing, with click and keyboard selection.
+Independent review found no behavioral defect; its test-fixture lint finding
+was corrected. The original native-popup offset remains user-reported, as
+documented in the filing; replacement geometry is verified in the browser.
+
+Full **1,869 unit tests** in 154 files, **101 Playwright tests**, ESLint, strict
+CCN 8, TypeScript/Vite build and all 11 size budgets pass.
+Main bundle: 318.9 KiB gzip / 325 KiB. Generated
+assets and the v0.8.19 release note are updated. OC-220 is closed; the live queue
+returns to **57 open and 4 parked**. No backend or dependency changes.
+
+### 2026-09-09 - OC-220 filed from Resampling manual feedback
+
+The user reports Target Column suggestions opening away from the input. Both
+baseline `63745ca3` and the extracted control use native input/datalist markup;
+the application has no DOM popup whose geometry follows the resizable settings
+panel. The exact native-popup offset is not observable through Playwright DOM
+geometry, so it is recorded as user-reported rather than locally reproduced.
+Two unit cases fail before adding an application listbox (**2 failed / 34 passed**),
+and docked/expanded browser cases fail because that listbox does not exist.
+The repair will anchor editable suggestions to the input and verify bounds after
+viewport/panel resizing, while preserving target values and dropped-column filtering.
+
+### 2026-09-09 - frontend complexity refactor batch 4: verified
+
+Plan and evidence:
+[`frontend_ccn_refactor_batch4_2026-09-09.md`](frontend_ccn_refactor_batch4_2026-09-09.md).
+Baseline `63745ca3` contains the signed batch 3 commit and OC-218/219 repairs.
+Three Astra 6 agents and the primary handled four independent scopes:
+
+- **Resampling:** settings 40 -> 7; two adjacent modules at most 8. All 34 new
+  characterization cases pass against original and extracted code; related
+  accessibility suite (117 tests) passes. Public config/defaults/validation/conversion,
+  upstream target synchronization, parser behavior and last-run results remain.
+- **EDA page:** page 30 -> 1, content renderer 40 -> 8; six modules at most 8.
+  All 19 cases pass original/extracted source. All 25 API/store/query-key
+  expressions are AST-equivalent; dataset URL selection, report polling,
+  filter application, history and tab data guards retain their behavior.
+- **Node inspection:** entry 38 -> 7; six modules at most 7. The 41 related
+  original/extracted tests and five browser scenarios pass. Receipt selection, focus,
+  Input/Output matching, complete-schema comparison and sample bounds remain.
+- **Imputation:** settings 35 -> 7; four modules at most 8. All 17 new cases pass
+  original/extracted source; 198 related tests pass. Public node definition,
+  validation, defaults and preview are unchanged; method controls, column
+  filtering, recommendation merging and execution feedback retain behavior.
+
+Each scope passed independent spec and code-quality review. Final integration:
+**1,867 unit tests** across 154 files, **99 Playwright tests**, full ESLint,
+expanded strict CCN 8 gate, TypeScript/Vite build and all 11 size budgets pass.
+Main: 318.2 KiB gzip / 325 KiB; EDA: 84.0 KiB / 140 KiB. Assets were rebuilt.
+Final whole-batch Astra review also passed with no actionable finding.
+CI now includes four more entry files and 18 helper modules; no limit or waiver
+changed. Global report: **183 warnings across 115 files, maximum 34**, versus
+189 / maximum 40 before this batch. Next largest: ComparisonTableView (34),
+PipelineDiffView (33), VariableCard/useGraphStore/ErrorLogPage (32).
+
+Release notes are under v0.8.19. This behavior-preserving maintenance closes no
+audit finding; the live queue stays **57 open and 4 parked**, including the
+unchanged parked OC-71/72/73/185 decisions. New batch 4 work is not committed.
+
+### 2026-09-09 - OC-219 fixed: require saved thresholds before toggling
+
+The evaluation hook now tracks saved-threshold availability separately from
+the preview and enabled flag, resetting per job and hydrating behind the
+existing stale-response guard. Successful Save sets availability and enables
+predictions; successful Clear resets both. Preview leaves availability alone,
+and a saved but disabled set can still be enabled again. The checkbox is
+disabled without a saved set, with inline Preview/Save guidance and a corrected
+Save tooltip. The user guide documents post-training tuning without retraining.
+
+Regression evidence: **6 failed / 22 passed** before repair, then **33 focused
+frontend tests passed**. The complete frontend suite passes **1,795 tests**;
+unchanged backend service/router suites pass **37 tests**. The threshold browser
+spec passes all **3 tests**, including real-page Save/Clear state transitions,
+disable/re-enable, job switching and reload with a stateful API fixture.
+Independent review found no introduced issue. Lint and the strict CCN gate pass.
+Final production build, all 11 bundle budgets and all **99 browser tests** pass.
+OC-219 is closed; the queue returns to **57 open and 4 parked**. Release note:
+v0.8.19. No backend persistence semantics changed.
+
+### 2026-09-09 - OC-219 filed from threshold tuning feedback
+
+The user reproduced a successful Preview followed by toggle HTTP 400:
+`Job has no saved tuned thresholds to toggle.` Backend service and route tests
+confirm Preview does not persist and Save both persists and enables. The UI
+allows the invalid toggle and its Save tooltip incorrectly promises inactivity.
+Two new UI cases reproduce the enabled checkbox with no saved set, before and
+after Preview; four hook cases also fail before saved-state tracking is added
+(**6 failed, 22 passed**). The behavior predates the batch 3 extraction. Filed
+in the live queue before production repair.
+
+### 2026-09-09 - frontend complexity refactor batch 3: verified
+
+Plan: [`frontend_ccn_refactor_batch3_2026-09-09.md`](frontend_ccn_refactor_batch3_2026-09-09.md).
+Baseline `abe5ea7d`: 204 functions above CCN 8 in 123 of 555 files.
+Three Astra 6 agents implemented separate Ensemble, EDA and Evaluation scopes;
+primary implemented Feature Selection and owned shared verification/delivery.
+Different owners reviewed each implementation and the final public interfaces.
+
+- Ensemble settings: entry-file maximum **52 -> 6**, five helper modules at
+  most **8**. The original 12 tests grew to **31** characterizations passing on
+  both original and extracted code; implementer/reviewer differential probes
+  matched **4,000** and **2,000** connected-model configurations respectively.
+  The separately filed OC-218 repair brought this suite to **39** passing tests.
+- EDA variable row: entry maximum **51 -> 7**; two helpers at most **7**.
+  EDA sidebar: **47 -> 4**; five helpers at most **7**. **34 tests** pass against
+  both original and extracted implementations. Independent review matched
+  **84 DOM comparisons** with shared chart/UI stubs. Numeric formatting,
+  export state, filter parsing, exclusions and navigation remain equivalent.
+- Feature Selection: settings component **46 -> 7**; five helper modules at
+  most **8**. The cohesive body preview remains **9** after merging equivalent
+  K-count cases. This entry stays report-only; its helper folder is gated.
+  **16 new** characterizations plus existing coverage passed **48 tests** on
+  original and extracted code; independent review passed **131** related tests.
+- Evaluation view: entry maximum **43 -> 1**; nine helper modules at most **8**.
+  **21 tests** pass, including five new original-passing characterizations.
+  Mutation lifetimes, retries, loading/error precedence, split selection and
+  threshold/chart props were checked against the original implementation.
+
+Final independent integration review found no introduced actionable issue:
+all five public interfaces are unchanged and **99 helper imports** resolve.
+The first full build found exact-optional-property and test typing errors;
+these were repaired without widening public contracts. OC-218 is the only
+intentional product behavior change in this batch and is documented separately.
+
+Final verification passed **1,788 Vitest tests** across 152 files (**76 new**),
+**98 Playwright tests**, full ESLint, the expanded strict CCN 8 gate,
+TypeScript/production build and all 11 bundle budgets. Main bundle:
+**317.3 KiB gzip / 325 KiB budget**; no limits raised. Browser tests stub backend
+HTTP and cover UI wiring; actual data/model execution remains a useful manual
+check. Existing jsdom diagnostics and vendor/proxy warnings remain.
+
+The global report now has **189 functions** above CCN 8 in **119 of 584 files**;
+highest CCN fell from **52 to 40**. All 26 new production helper modules are
+gated, alongside four entry files. Next report-only hotspots: `ResamplingNode`
+(**40**), `EDAPage` (**40**), `NodeInspectionPanel` (**38**), `ImputationNode`
+(**35**) and `ComparisonTableView` (**34**). Release notes are under v0.8.19.
+OC-218 was filed and fixed; the queue remains **57 open and 4 parked**.
+
+### 2026-09-09 - OC-218 fixed: preserve connected ensemble CV seed zero
+
+Reproduction against `abe5ea7d` and the initial extraction showed a connected
+seed of `0` becoming `42`. A separate executable probe enabled shuffled CV and
+confirmed both fixed and tuned parameter builders forwarded `42`; a source
+seed of `7` was forwarded correctly. The finding was recorded before repair.
+
+`ensembleSettings/connectedModels.ts` now uses a nullish fallback for
+`cv_random_state`, preserving zero and retaining the local seed only when the
+source value is absent. The existing synchronization characterization was
+updated, and eight cases exercise the real `convertEnsembleNode` fixed/tuned
+branches with seed `0`, seed `7`, and absent-source fallbacks to `42` and `0`.
+Before repair: **3 failed, 36 passed**. After repair and independent review:
+**39 passed**, strict CCN 8 lint and TypeScript passed.
+
+Type repairs preserve the public interface: an undefined time-column candidate
+is omitted (the prior comparison already discarded it), and the first model
+has an explicit guard. **32 comparisons** verified unchanged time-column patch
+semantics. Other connected-model defaults are unchanged. Parameter-only
+inspector synchronization is retained: the converter rereads wired model
+parameters, so the no-op does not establish a stale training-payload defect.
+
+The closed row moved here and its evidence left the live queue; it returns to
+**57 open and 4 parked** rows. The concise fix note is under v0.8.19.
+
+### 2026-09-09 - OC-218 filed during frontend ensemble review
+
+The original and extracted Ensemble settings both replace a connected model's
+CV seed `0` with the current ensemble seed (`42` in the reproduction). A
+separate executable probe with shuffled CV confirmed fixed and tuned parameter
+builders both forward `42`; a source seed of `7` is forwarded correctly.
+The truthiness fallback is the cause. Filed in the live queue before repair;
+the fix will preserve explicit zero and verify both submission modes.
+
+### 2026-09-09 - frontend complexity refactor batch 2: verified
+
+Plan: [`frontend_ccn_refactor_batch2_2026-09-09.md`](frontend_ccn_refactor_batch2_2026-09-09.md).
+Baseline `4bd55065`: 212 functions above CCN 8 across 128 of 521 files.
+The user authorized multiple Astra 6 agents for this batch; separate owners
+handle training settings, preview results, encoding and canvas edges, with
+primary-controlled branch coloring, integration and independent review.
+
+- Training settings: entry **72 -> 2**, extracted production helpers at most
+  **8**. Original 13 tests plus six new characterization cases pass both before
+  and after extraction (**19 tests**); model switches, target synchronization,
+  strategy boundaries, CV state, zero seeds and threshold options are covered.
+- Branch colors: entry **70 -> 1**, extracted production helpers at most **8**.
+  Original 10 tests plus four new characterization cases pass before and after
+  extraction (**14 tests**). A temporary differential probe compared ordered
+  edge maps for **2,000 varied graphs** against the original with no differences;
+  temporary test/reference files were removed. Path ordering, cycles, shared
+  edges, multi-handle grouping and target passthrough are preserved.
+- Preview results: entry **58 -> 8**, new presentation helpers at most **8**.
+  **21 focused tests** pass before and after extraction, covering branch/split
+  selection, totals, persistent panes/advisories, confirmation, read-only
+  navigation and keyboard resizing. Original hooks/effects remain in the entry.
+- Encoding settings: entry **58 -> 6**, extracted production helpers at most
+  **6**. **18 tests** pass against both original and final extracted code.
+  Coverage includes all seven methods, numeric zero/empty input behavior,
+  schema choices, recommendations, metrics and control state across switches.
+- Review caught and corrected an introduced encoding dispatch issue for imported
+  method names matching inherited object keys. `__proto__`, `constructor` and
+  `toString` reproduced three failures in the extraction; own-property guards
+  restore the original unsupported-method fallback. All four unknown-method
+  cases pass against the original and fixed code. No released audit issue is
+  introduced or closed by this review correction.
+
+- Canvas edges: entry **53 -> 2**, six new helpers at most **6**. Original nine
+  tests plus nine new characterizations pass before and after extraction
+  (**18 tests**), covering path thresholds, grouped split geometry, branch/merge
+  styling, hover cleanup, measured controls and stale/invalid measurement fallback.
+
+Three independent Astra 6 reviews found no further regressions. They ran
+**40**, **32** and **90** focused tests plus strict CCN 8 checks; UI literals,
+effect lifetimes, graph ordering, method dispatch, edge geometry and public
+contracts were inspected against the base. A type-only review observation was
+addressed: branch labels explicitly allow the existing nullable FlowCanvas value.
+
+Full verification passed **1,712 Vitest tests** across 149 files (**43 new
+behavior cases**), **98 Playwright tests**, full ESLint, the expanded strict
+CCN 8 gate, TypeScript/production build and all bundle budgets. Main bundle:
+**316.3 KiB gzip / 325 KiB budget**; no limits raised. Workflow/package scope,
+whitespace and removal of temporary differential/compiler outputs were checked.
+Existing diagnostic logs and circular/empty vendor-chunk warnings remain.
+The user also confirmed the frontend works after manual testing and requested
+a commit of this batch.
+
+The full report now has **204 functions** above CCN 8 in **123 of 555 files**
+(previously 212 in 128 of 521); its highest CCN fell from **72 to 52**.
+All five entries and 32 new production helper modules are enforced by CI.
+Next report-only hotspots: `EnsembleSettings.tsx` (**52**), `VariableRow.tsx`
+(**51**), `EDASidebar.tsx` (**47**), `FeatureSelectionNode.tsx` (**46**) and
+`EvaluationView.tsx` (**43**). The v0.8.19 notes were updated. No audit finding
+is closed by this maintenance; the live queue remains **57 open, 4 parked**.
+
+### 2026-09-09 - frontend complexity refactor batch: verified
+
+Plan: [`frontend_ccn_refactor_2026-09-09.md`](frontend_ccn_refactor_2026-09-09.md).
+The five measured hotspots are pipeline conversion, job details, the toolbar,
+canvas node cards and inference. Existing API payloads and UI behavior are the
+contract; extracted helpers are included in the CCN 8 target.
+
+- Pipeline conversion: main function **138 -> 6**, extracted helpers at most
+  **8**. Existing payload tests/snapshots plus six characterization cases pass
+  (**53 tests**). A temporary differential probe compared **1,345 payloads**
+  with HEAD across dispatch/default/ensemble/graph cases without differences;
+  temporary reference/probe files were removed.
+- Toolbar: main component **86 -> 7**, all toolbar helpers at most **8**.
+  **55 focused tests** pass, including eight new behavior cases; shortcuts,
+  read-only restrictions, menus, exports and submission guards are preserved.
+- Job details: main component **112 -> 5**, all extracted helpers at most **8**.
+  **43 focused tests** pass, including seven new characterization cases verified
+  against both versions. Chart/log state stays mounted across tab changes.
+- The first three areas pass **151 tests** together and a combined strict CCN 8
+  ESLint check. Existing jsdom network-error logging remains in job-detail tests.
+- Inference: main component **73 -> 1**, extracted helpers at most **8**.
+  **11 focused tests** pass, including three new cases verified before/after;
+  sample projection, schema acknowledgement and manual thresholds are covered.
+- Canvas cards: main component **75 -> 6**, extracted helpers at most **7**.
+  **21 focused tests** pass, covering telemetry, validation timing, branch
+  ordering/fallback labels and in-flight job summaries.
+- Three independent reviewers found no material regressions across all five
+  refactors. The strict frontend CI command now includes their entry files and
+  complete helper folders in addition to the original clean Core scope.
+
+Integration caught a main-bundle increase to **326.1 KiB gzip**, above the
+existing **325 KiB** limit. Inference now loads its code on first visit while
+remaining mounted across view switches. A new browser test failed on eager
+loading before the change and passed afterward, also checking unsaved schema
+acknowledgement. The final main bundle is **313.3 KiB** and inference is
+**13.7 KiB**, with a separate **20 KiB** budget. The loading change also passed
+independent review; no existing budget was raised.
+
+Final verification passed **1,669 Vitest tests** (147 files), **98 Playwright
+tests**, ESLint, the expanded CCN 8 gate, TypeScript/production build, all bundle
+budgets, workflow YAML checks and `git diff --check`. There are **27 new unit
+cases** and **one new browser case**. Existing jsdom diagnostic logs and Vite
+circular/empty vendor-chunk warnings remain. Production assets were rebuilt.
+
+The full report now has **212 functions** above CCN 8 in **128 of 521 files**
+(previously 230 in 134 of 478); its highest CCN fell from **138 to 72**.
+`TrainingSettings.tsx` (72) and `useBranchColors.ts` (70) lead the remaining
+report-only hotspots. This maintenance closes no audit finding; the live queue
+remains **57 open** and **4 parked**. The v0.8.19 notes were updated.
+
+### 2026-09-09 - frontend complexity workflow
+
+ESLint now enforces CCN 8 in `src/core/{api,constants,contexts,factories,perf,
+realtime,registry,theme,types}` through `npm run complexity:check`. The frontend
+CI gate runs this command before downstream build and browser-test jobs.
+`npm run complexity:report` reports all TypeScript/TSX sources without blocking
+CI on legacy complexity: the initial inventory found **230 functions** above
+CCN 8 in **134 of 478 files**. Other folders remain report-only until cleaned.
+
+Temporary TS and TSX probes verified that CCN 8 passes and CCN 9 exits with an
+error; the probes were removed. ESLint, the scoped complexity gate, workflow
+YAML checks, **1,642 frontend tests**, production build and bundle-size checks
+passed. The full report exited successfully with 230 warnings and no errors.
+Vite reported circular and empty vendor chunks during the successful build.
+The v0.8.19 note was updated. This CI addition closes no audit finding, so the
+live queue remains unchanged at **57 open** and **4 parked** rows.
 
 ### 2026-09-09 - OC-172 follow-up: sklearn bridge complexity gate
 

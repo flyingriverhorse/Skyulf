@@ -1,9 +1,26 @@
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { MergeWarning } from '../../../core/api/client';
 import { MergeWarningsBanner } from './MergeWarningsBanner';
 
 describe('MergeWarningsBanner', () => {
+  it('preserves warning duplicates and order and confirms exact ordered chain inputs', async () => {
+    // Advisory order and repeated nodes must survive rendering and the rewire action.
+    const warning = { kind: 'sibling_fan_in', node_id: 'merge', inputs: ['b', 'a'], overlap_columns: ['x'] } as MergeWarning;
+    const confirm = vi.fn().mockResolvedValueOnce(false).mockResolvedValueOnce(true);
+    const chainSiblings = vi.fn().mockReturnValue(true);
+    const { container } = render(<MergeWarningsBanner mergeWarnings={[warning, warning]}
+      mergeWarningsOpen setMergeWarningsOpen={vi.fn()} nodeLabelMap={{ merge: 'Merge', a: 'A', b: 'B' }}
+      confirm={confirm} chainSiblings={chainSiblings} />);
+    expect(container.querySelectorAll('.pl-5')).toHaveLength(2);
+    expect(screen.getByRole('button', { name: /2 merge advisories/ })).toHaveTextContent('Merge, Merge');
+    fireEvent.click(screen.getAllByRole('button', { name: 'Chain instead' })[0]!);
+    await waitFor(() => expect(confirm).toHaveBeenCalledOnce());
+    expect(chainSiblings).not.toHaveBeenCalled();
+    fireEvent.click(screen.getAllByRole('button', { name: 'Chain instead' })[1]!);
+    await waitFor(() => expect(chainSiblings).toHaveBeenCalledWith('merge', ['b', 'a']));
+    expect(confirm).toHaveBeenLastCalledWith(expect.objectContaining({ title: 'Rewire as a linear chain?', confirmLabel: 'Rewire' }));
+  });
   it('renders upstream drop reapplied warnings without fan-in misinformation', () => {
     const warning: MergeWarning = {
       node_id: 'missing-indicator',

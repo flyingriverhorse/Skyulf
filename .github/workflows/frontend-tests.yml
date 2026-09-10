@@ -1,6 +1,6 @@
 # © 2025 Murat Unsal — Skyulf Project
 #
-# Frontend test/build pipeline: lint, type-check, unit tests, bundle-size
+# Frontend test/build pipeline: lint, complexity, type-check, unit tests, bundle-size
 # budget, and Playwright e2e for the React/TypeScript ML Canvas app. Kept
 # separate from the Python workflows (pr_check.yml, backend-tests.yml,
 # skyulf-core-tests.yml) so frontend-only PRs aren't gated on Python checks
@@ -47,6 +47,17 @@ jobs:
 
       - name: Lint (ESLint)
         run: bash ../../.github/scripts/run_check.sh "ESLint" npm run lint
+        working-directory: frontend/ml-canvas
+
+      - name: Frontend complexity report (informational)
+        # Report CCN > 8 as improvement candidates; the strict gate below uses 10.
+        continue-on-error: true
+        run: npm run complexity:report
+        working-directory: frontend/ml-canvas
+
+      - name: Complexity gate (ESLint, CCN 10)
+        # All src TypeScript files are covered, including new files.
+        run: bash ../../.github/scripts/run_check.sh "ESLint complexity (CCN 10)" npm run complexity:check
         working-directory: frontend/ml-canvas
 
       - name: Type check (tsc)

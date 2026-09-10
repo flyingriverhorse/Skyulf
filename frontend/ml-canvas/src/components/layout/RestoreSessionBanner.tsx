@@ -14,6 +14,15 @@ import {
 import { FIT_VIEW_EVENT } from '../../core/hooks/useKeyboardShortcuts';
 import { clickableProps } from '../../core/utils/a11y';
 
+/** Format an autosave timestamp using coarse relative-time buckets. */
+export function getRelativeSaveTime(savedAt: string, now = Date.now()): string {
+  const minutesAgo = Math.max(0, Math.round((now - new Date(savedAt).getTime()) / 60000));
+  if (minutesAgo < 1) return 'just now';
+  if (minutesAgo < 60) return `${minutesAgo} min ago`;
+  if (minutesAgo < 60 * 24) return `${Math.round(minutesAgo / 60)} h ago`;
+  return `${Math.round(minutesAgo / (60 * 24))} d ago`;
+}
+
 /**
  * Recovery entry point that surfaces the autosaved canvas — or explains why
  * it can't be restored — whenever the user reopens the app with an empty
@@ -90,20 +99,7 @@ export const RestoreSessionBanner: React.FC = () => {
 
   if (!snapshot) return null;
 
-  // Format "5 minutes ago" without pulling in date-fns; coarse buckets
-  // are plenty for an autosave hint.
-  const minutesAgo = Math.max(
-    0,
-    Math.round((Date.now() - new Date(snapshot.savedAt).getTime()) / 60000),
-  );
-  const relative =
-    minutesAgo < 1
-      ? 'just now'
-      : minutesAgo < 60
-        ? `${minutesAgo} min ago`
-        : minutesAgo < 60 * 24
-          ? `${Math.round(minutesAgo / 60)} h ago`
-          : `${Math.round(minutesAgo / (60 * 24))} d ago`;
+  const relative = getRelativeSaveTime(snapshot.savedAt);
 
   return (
     <div

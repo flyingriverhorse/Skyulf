@@ -1,12 +1,14 @@
 {
   "name": "ml-canvas",
   "private": true,
-  "version": "0.8.17",
+  "version": "0.8.19",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
+    "complexity:check": "eslint src --ext ts,tsx --rule \"complexity: [error, 10]\" --max-warnings 0",
+    "complexity:report": "eslint src --ext ts,tsx --rule \"complexity: [warn, 8]\"",
     "size-check": "node scripts/check-bundle-size.mjs",
     "sync-version": "node scripts/sync-version.mjs",
     "check-version": "node scripts/sync-version.mjs --check",

@@ -1,5 +1,22 @@
 import { describe, it, expect } from 'vitest';
-import { getTaskForModelType, getJobTypeLabel, mapJobMetricToDropdown, groupJobsByScoringMetric } from './jobMeta';
+import { getTaskForModelType, getJobTypeLabel, mapJobMetricToDropdown, groupJobsByScoringMetric, getDisplayScore, getJobScoringMetric } from './jobMeta';
+
+describe('headline score precedence', () => {
+  it('keeps metric priority before split priority and accepts zero while skipping NaN', () => {
+    // A preferred training metric still outranks a different held-out metric.
+    expect(getDisplayScore({ job_type: 'training', result: { metrics: { test_f1_weighted: NaN, train_f1_weighted: 0, test_accuracy: 0.9 } } }, 'classification')).toEqual({ metric: 'f1_weighted', value: 0, split: 'train' });
+    expect(getDisplayScore({ job_type: 'training', result: { metrics: { test_r2: NaN, val_r2: -1, train_r2: 0.8 } } }, 'regression')).toEqual({ metric: 'r2', value: -1, split: 'val' });
+    expect(getDisplayScore({ job_type: 'training', result: { metrics: { train_n_clusters: 3 } } }, 'segmentation')).toBeNull();
+  });
+  it('retains nested and legacy metric fallbacks for zero-valued tuning results', () => {
+    // Completed and unfinished runs derive their scoring labels from different payloads.
+    expect(getJobScoringMetric({ result: { scoring_metric: 'accuracy', metrics: { scoring_metric: 'f1' } }, config: { tuning_config: { metric: 'recall' } } })).toBe('accuracy');
+    expect(getDisplayScore({ job_type: 'tuning', result: { best_score: 0, metrics: { scoring_metric: 'f1' } } }, 'classification')).toEqual({ metric: 'f1', value: 0, split: 'cv' });
+    expect(getDisplayScore({ job_type: 'tuning', result: { best_score: NaN } }, 'classification')).toBeNull();
+    expect(getJobScoringMetric({ config: { tuning_config: { metric: 'recall' } } })).toBe('recall');
+    expect(getDisplayScore({ job_type: 'training' }, 'other')).toBeNull();
+  });
+});
 
 const registryItems = [
   { id: 'voting_classifier', tags: ['requires_scaling', 'classification'] },

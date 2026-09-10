@@ -249,3 +249,66 @@ it('falls back to job_id when the response has no batch jobs', async () => {
   expect(useJobStore.getState().startPolling).toHaveBeenCalledOnce();
   expect(useJobStore.getState().setActiveParallelRun).not.toHaveBeenCalled();
 });
+
+/** Dataset resolution must preserve legacy field precedence without using the selected model's data. */
+it.each([
+  { data: { datasetId: 'direct', dataset_id: 'legacy', config: { datasetId: 'config' } }, expected: 'direct' },
+  { data: { datasetId: '', dataset_id: 'legacy', config: { dataset_id: 'config' } }, expected: 'config' },
+  { data: { config: { datasetId: '', dataset_id: 'legacy' }, params: { dataset_id: 'params' } }, expected: 'params' },
+])('resolves upstream dataset $expected with nullish field precedence', ({ data, expected }) => {
+  useGraphStore.setState({ nodes: [
+    { id: 'dataset', position: { x: 0, y: 0 }, data },
+    { id: 'model-a', position: { x: 1, y: 0 }, data: { datasetId: 'ignore-self' } },
+  ], edges: [{ id: 'edge', source: 'dataset', target: 'model-a' }] });
+  const { result } = renderHook(() => useTrainingNodeContext('model-a'));
+  expect(result.current.datasetId).toBe(expected);
+});
+
+/** Breadth-first graph order must win over edge order and terminate even with an upstream cycle. */
+it('resolves the nearest dataset in node order across a cyclic graph', () => {
+  useGraphStore.setState({ nodes: [
+    { id: 'model-a', position: { x: 0, y: 0 }, data: {} },
+    { id: 'first', position: { x: 0, y: 0 }, data: { dataset_id: 'first-dataset' } },
+    { id: 'second', position: { x: 0, y: 0 }, data: { dataset_id: 'second-dataset' } },
+    { id: 'middle', position: { x: 0, y: 0 }, data: {} },
+  ], edges: [
+    { id: '2', source: 'second', target: 'middle' }, { id: '1', source: 'first', target: 'middle' },
+    { id: 'm', source: 'middle', target: 'model-a' }, { id: 'cycle', source: 'model-a', target: 'middle' },
+  ] });
+  const { result } = renderHook(() => useTrainingNodeContext('model-a'));
+  expect(result.current.datasetId).toBe('first-dataset');
+});
+
+/** Submission feedback must be committed before polling and opening the chosen task history. */
+it('preserves parallel tuning payloads and store action order', async () => {
+  const order: string[] = [];
+  const setNodeSubmission = useJobStore.getState().setNodeSubmission;
+  const setInspectedRun = useJobStore.getState().setInspectedRun;
+  const cfg: PipelineConfigModel = { pipeline_id: 'full-graph', nodes: [
+    { node_id: 'model-a', step_type: 'training', inputs: [], params: { target_column: 'target' } },
+    { node_id: 'sibling', step_type: 'training', inputs: [], params: {} },
+  ] };
+  vi.mocked(convertGraphToPipelineConfig).mockReturnValue(cfg);
+  vi.mocked(jobsApi.runPipeline).mockResolvedValue({ ...response, job_ids: ['job-b', 'job-a'] });
+  useJobStore.setState({
+    setNodeSubmission: (id, value) => { order.push(value.pending ? 'pending' : 'accepted'); setNodeSubmission(id, value); },
+    startPolling: vi.fn(() => { order.push('poll'); }),
+    setActiveParallelRun: vi.fn(() => { order.push('parallel'); }),
+    setTab: vi.fn(() => { order.push('tab'); }),
+    setInspectedRun: (run) => { order.push('inspection'); setInspectedRun(run); },
+    toggleDrawer: vi.fn(() => { order.push('drawer'); }),
+  });
+  const { result } = renderHook(() => useTrainingNodeContext('model-a'));
+  try {
+    await act(async () => { await result.current.runJob('tuning', 'regression'); });
+    expect(jobsApi.runPipeline).toHaveBeenCalledExactlyOnceWith({ ...cfg, target_node_id: 'model-a', job_type: 'tuning' });
+    expect(warnAndBlockOnLeakage).toHaveBeenCalledExactlyOnceWith({ nodes: [cfg.nodes[0]] });
+    expect(result.current.runFeedback).toEqual({ label: 'Tuning — random forest classifier', jobIds: ['job-b', 'job-a'] });
+    expect(order).toEqual(['pending', 'accepted', 'poll', 'parallel', 'tab', 'inspection', 'drawer']);
+    expect(useJobStore.getState().setTab).toHaveBeenCalledWith('regression');
+    expect(useJobStore.getState().setActiveParallelRun).toHaveBeenCalledWith({ jobIds: ['job-b', 'job-a'], startedAt: expect.any(String) });
+    expect(toast.success).toHaveBeenCalledWith('Parallel execution started', '2 branches submitted.');
+  } finally {
+    useJobStore.setState({ setNodeSubmission, setInspectedRun });
+  }
+});

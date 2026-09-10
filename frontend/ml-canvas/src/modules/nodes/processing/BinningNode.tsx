@@ -53,6 +53,79 @@ const CustomBinInput: React.FC<{
   );
 };
 
+function BinningStrategyControls({
+  config,
+  onChange,
+  showInvalidBinCount,
+}: { config: BinningConfig; onChange: (config: BinningConfig) => void; showInvalidBinCount: boolean }) {
+  return (
+    <>
+      <div className="space-y-2">
+        <span className="block text-sm font-medium">Binning Strategy</span>
+        <select
+          aria-label="Binning Strategy"
+          className="w-full p-2 border rounded bg-background focus:ring-1 focus:ring-primary outline-none"
+          value={config.strategy}
+          onChange={(e) => onChange({ ...config, strategy: e.target.value as BinningConfig['strategy'] })}
+        >
+          <option value="equal_width">Equal Width (Uniform)</option>
+          <option value="equal_frequency">Equal Frequency (Quantile)</option>
+          <option value="kmeans">K-Means Clustering</option>
+          <option value="custom">Custom Edges</option>
+        </select>
+        <p className="text-[10px] text-muted-foreground">
+          {config.strategy === 'equal_width' && "Bins have equal width ranges."}
+          {config.strategy === 'equal_frequency' && "Bins have equal number of records."}
+          {config.strategy === 'kmeans' && "Bins based on K-Means clustering centers."}
+          {config.strategy === 'custom' && "Define specific bin edges for each column."}
+        </p>
+      </div>
+
+      {(config.strategy !== 'custom' || showInvalidBinCount) && (
+        <div className="space-y-2">
+          <span className="block text-sm font-medium">Number of Bins</span>
+          <ValidationField field="n_bins">
+            <input
+              aria-label="Number of Bins"
+              type="number"
+              min={2}
+              max={100}
+              className="w-full p-2 border rounded bg-background focus:ring-1 focus:ring-primary outline-none"
+              value={config.n_bins}
+              onChange={(e) => onChange({ ...config, n_bins: Number.parseInt(e.target.value) || 5 })}
+            />
+          </ValidationField>
+        </div>
+      )}
+
+      {config.strategy === 'custom' && (
+         <div className="space-y-2 border rounded p-2 bg-muted/10">
+           <span className="block text-xs font-medium">Custom Edges</span>
+           {config.columns.length === 0 ? (
+             <div className="text-xs text-muted-foreground">Select columns first.</div>
+           ) : (
+             <div className="space-y-2 max-h-40 overflow-y-auto">
+               {config.columns.map(col => (
+                 <div key={col} className="space-y-1">
+                   <label className="text-[10px] font-medium">{col}</label>
+                   <CustomBinInput
+                     column={col}
+                     value={config.custom_bins?.[col]}
+                     onChange={(edges) => onChange({
+                       ...config,
+                       custom_bins: { ...config.custom_bins, [col]: edges }
+                     })}
+                   />
+                 </div>
+               ))}
+             </div>
+           )}
+         </div>
+      )}
+    </>
+  );
+}
+
 const BinningSettings: React.FC<{ config: BinningConfig; onChange: (c: BinningConfig) => void; nodeId?: string }> = ({
   config,
   onChange,
@@ -90,68 +163,7 @@ const BinningSettings: React.FC<{ config: BinningConfig; onChange: (c: BinningCo
       <div className={`grid gap-4 ${isWide ? 'grid-cols-2' : 'grid-cols-1'}`}>
         {/* Left Column: Settings */}
         <div className="space-y-4">
-          <div className="space-y-2">
-            <span className="block text-sm font-medium">Binning Strategy</span>
-            <select
-              aria-label="Binning Strategy"
-              className="w-full p-2 border rounded bg-background focus:ring-1 focus:ring-primary outline-none"
-              value={config.strategy}
-              onChange={(e) => onChange({ ...config, strategy: e.target.value as BinningConfig['strategy'] })}
-            >
-              <option value="equal_width">Equal Width (Uniform)</option>
-              <option value="equal_frequency">Equal Frequency (Quantile)</option>
-              <option value="kmeans">K-Means Clustering</option>
-              <option value="custom">Custom Edges</option>
-            </select>
-            <p className="text-[10px] text-muted-foreground">
-              {config.strategy === 'equal_width' && "Bins have equal width ranges."}
-              {config.strategy === 'equal_frequency' && "Bins have equal number of records."}
-              {config.strategy === 'kmeans' && "Bins based on K-Means clustering centers."}
-              {config.strategy === 'custom' && "Define specific bin edges for each column."}
-            </p>
-          </div>
-
-          {(config.strategy !== 'custom' || showInvalidBinCount) && (
-            <div className="space-y-2">
-              <span className="block text-sm font-medium">Number of Bins</span>
-              <ValidationField field="n_bins">
-                <input
-                  aria-label="Number of Bins"
-                  type="number"
-                  min={2}
-                  max={100}
-                  className="w-full p-2 border rounded bg-background focus:ring-1 focus:ring-primary outline-none"
-                  value={config.n_bins}
-                  onChange={(e) => onChange({ ...config, n_bins: Number.parseInt(e.target.value) || 5 })}
-                />
-              </ValidationField>
-            </div>
-          )}
-
-          {config.strategy === 'custom' && (
-             <div className="space-y-2 border rounded p-2 bg-muted/10">
-               <span className="block text-xs font-medium">Custom Edges</span>
-               {config.columns.length === 0 ? (
-                 <div className="text-xs text-muted-foreground">Select columns first.</div>
-               ) : (
-                 <div className="space-y-2 max-h-40 overflow-y-auto">
-                   {config.columns.map(col => (
-                     <div key={col} className="space-y-1">
-                       <label className="text-[10px] font-medium">{col}</label>
-                       <CustomBinInput
-                         column={col}
-                         value={config.custom_bins?.[col]}
-                         onChange={(edges) => onChange({
-                           ...config,
-                           custom_bins: { ...config.custom_bins, [col]: edges }
-                         })}
-                       />
-                     </div>
-                   ))}
-                 </div>
-               )}
-             </div>
-          )}
+          <BinningStrategyControls config={config} onChange={onChange} showInvalidBinCount={showInvalidBinCount} />
 
           <div className="space-y-2">
             <span className="block text-sm font-medium">Label Format</span>

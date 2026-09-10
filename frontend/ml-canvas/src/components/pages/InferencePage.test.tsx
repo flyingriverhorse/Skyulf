@@ -253,6 +253,73 @@ const renderInferencePage = () =>
     </MemoryRouter>,
   );
 
+describe('InferencePage input and result contracts', () => {
+  /** Samples must retain only deployed features and zero-fill missing schema keys. */
+  it('projects dataset samples onto the deployment schema at the selected sample size', async () => {
+    mockedDeploymentApi.getActive.mockResolvedValue({
+      ...activeDeployment,
+      input_schema: [{ name: 'feature1', type: 'unknown' }, { name: 'feature2', type: 'unknown' }],
+    });
+    mockedJobsApi.getJob.mockResolvedValue({ ...job, dropped_columns: ['ignored'] });
+    renderInferencePage();
+    await waitFor(() => expect(screen.getByRole('button', { name: /^Sample$/ })).toBeEnabled());
+    mockedDatasetService.getSample.mockResolvedValue([
+      { feature1: 4, target: 1, ignored: 9, extra: 8 },
+      { feature1: 5, feature2: 6, target: 0 },
+    ]);
+    fireEvent.click(screen.getByRole('button', { name: '5' }));
+    fireEvent.click(screen.getByRole('button', { name: /^Sample$/ }));
+    await waitFor(() => expect(JSON.parse((screen.getByLabelText(/Input Data/) as HTMLTextAreaElement).value))
+      .toEqual([{ feature1: 4, feature2: 0 }, { feature1: 5, feature2: 6 }]));
+    expect(mockedDatasetService.getSample).toHaveBeenLastCalledWith('dataset-2', 5);
+  });
+
+  /** Keyboard submission must respect schema acknowledgement and reset it after edits. */
+  it('blocks missing fields until acknowledged and requires acknowledgement for a new violation', async () => {
+    mockedDeploymentApi.getActive.mockResolvedValue({
+      ...activeDeployment,
+      input_schema: [{ name: 'feature1', type: 'unknown' }, { name: 'feature2', type: 'unknown' }],
+    });
+    mockedDeploymentApi.predict.mockResolvedValue({ predictions: [7], model_version: 'v-1' });
+    renderInferencePage();
+    await screen.findByTitle('feature2 (unknown)');
+    const editor = screen.getByLabelText(/Input Data/);
+    fireEvent.change(editor, { target: { value: '[{"feature1": 4}]' } });
+    expect(screen.getByRole('button', { name: /Run Prediction/ })).toBeDisabled();
+    fireEvent.keyDown(editor, { key: 'Enter', ctrlKey: true });
+    expect(mockedDeploymentApi.predict).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByTestId('acknowledge-missing-fields'));
+    fireEvent.keyDown(editor, { key: 'Enter', ctrlKey: true });
+    await screen.findByTestId('run-provenance');
+    expect(mockedDeploymentApi.predict).toHaveBeenCalledWith([{ feature1: 4 }], null, expect.any(Object));
+    fireEvent.change(editor, { target: { value: '[{"feature2": 8}]' } });
+    expect(screen.getByTestId('acknowledge-missing-fields')).not.toBeChecked();
+    expect(screen.getByRole('button', { name: /Run Prediction/ })).toBeDisabled();
+  });
+
+  /** Manual threshold overrides and table view must describe the submitted payload. */
+  it('submits manual input with copied saved thresholds and shows the input beside its result', async () => {
+    mockedThresholdTuningApi.get.mockResolvedValue({
+      thresholds: { '1': 0.75 }, classes: [1], metric: 'f1', split_used: 'validation',
+      computed_at: null, source: 'training', enabled: true,
+    });
+    mockedDeploymentApi.predict.mockResolvedValue({ predictions: [3], model_version: 'v-1', thresholds_applied: { '1': 0.75 } });
+    renderInferencePage();
+    fireEvent.click(await screen.findByText('Advanced: override thresholds'));
+    fireEvent.click(await screen.findByRole('button', { name: /Copy into override editor/ }));
+    fireEvent.change(screen.getByLabelText(/Input Data/), { target: { value: '[{"feature1": 12}]' } });
+    fireEvent.click(screen.getByRole('button', { name: /Run Prediction/ }));
+    await screen.findByTestId('run-provenance');
+    expect(mockedDeploymentApi.predict).toHaveBeenCalledWith([{ feature1: 12 }], { '1': 0.75 }, expect.any(Object));
+    fireEvent.click(screen.getByRole('button', { name: /^Table$/ }));
+    expect(screen.getByRole('table')).toHaveTextContent('feature1');
+    expect(screen.getByRole('table')).toHaveTextContent('12');
+    expect(screen.getByRole('table')).toHaveTextContent('3');
+    expect(screen.getByTestId('run-provenance')).toHaveTextContent('ad-hoc override thresholds');
+    expect(localStorage.getItem('inferencePage:resultsView')).toBe('table');
+  });
+});
+
 describe('InferencePage run lifecycle (EXP-007)', () => {
   it('names the pending run, disables Run Prediction, and prevents a duplicate submission', async () => {
     const { impl, resolve } = deferredPredict();

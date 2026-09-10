@@ -114,6 +114,29 @@ afterEach(() => {
 });
 
 describe('NotificationCenter detail modal', () => {
+  it.each([
+    { node_id: null, node_type: null, hasId: false, hasType: false },
+    { node_id: 'node-zero', node_type: null, hasId: true, hasType: false },
+    { node_id: '', node_type: 'Scaler', hasId: false, hasType: true },
+    { node_id: 'node-one', node_type: 'Scaler', hasId: true, hasType: true },
+  ])('preserves optional node detail fields for $node_id / $node_type', ({ node_id, node_type, hasId, hasType }) => {
+    // Notifications with partial provenance must expose only the metadata the server supplied.
+    useNotificationsStore.getState().clear();
+    useNotificationsStore.getState().addMany([{ node_id, node_type, level: 'warning', logger: 'pipeline', message: 'Metadata warning' }]);
+    render(<MemoryRouter><NotificationCenter /><LocationProbe /></MemoryRouter>);
+    const bell = screen.getByRole('button', { name: 'Notifications (1)' });
+    fireEvent.click(bell);
+    expect(useNotificationsStore.getState().items[0]?.read).toBe(true);
+    fireEvent.click(screen.getByRole('button', { name: /Metadata warning/ }));
+    const modal = screen.getByRole('dialog', { name: `${node_type ?? 'Pipeline notification'} details` });
+    expect(within(modal).queryByText('Node ID') !== null).toBe(hasId);
+    expect(within(modal).queryByText('Node type') !== null).toBe(hasType);
+    expect(within(modal).getByText('Metadata warning')).toBeInTheDocument();
+    fireEvent.click(within(modal).getByRole('button', { name: 'View in Error Log' }));
+    expect(screen.getByTestId('location')).toHaveTextContent('/errors');
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
   it('focuses the modal on open, traps Tab, and returns focus to the bell button', async () => {
     render(
       <MemoryRouter>

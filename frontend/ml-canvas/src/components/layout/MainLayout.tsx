@@ -18,7 +18,10 @@ import {
   SHOW_SHORTCUTS_EVENT,
 } from '../../core/hooks/useKeyboardShortcuts';
 import { ExperimentsPage } from '../pages/ExperimentsPage';
-import { InferencePage } from '../pages/InferencePage';
+import { ErrorBoundary, PageSkeleton } from '../shared';
+
+// Load prediction tools on first visit, then retain their mounted state below.
+const InferencePage = React.lazy(() => import('../pages/InferencePage').then(module => ({ default: module.InferencePage })));
 
 export const MainLayout: React.FC = () => {
   const { activeView, isPropertiesPanelExpanded, resultsPanelHeight } = useViewStore();
@@ -123,7 +126,13 @@ export const MainLayout: React.FC = () => {
         {visitedViews.has('experiments') && <ExperimentsPage />}
       </div>
       <div style={{ display: activeView === 'inference' ? 'contents' : 'none' }}>
-        {visitedViews.has('inference') && <InferencePage />}
+        {visitedViews.has('inference') && (
+          <ErrorBoundary>
+            <React.Suspense fallback={<PageSkeleton />}>
+              <InferencePage />
+            </React.Suspense>
+          </ErrorBoundary>
+        )}
       </div>
       <ShortcutsOverlay
         open={showShortcuts}

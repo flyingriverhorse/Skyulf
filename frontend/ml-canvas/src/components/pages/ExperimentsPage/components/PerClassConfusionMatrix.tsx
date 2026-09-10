@@ -8,6 +8,7 @@
  */
 
 import React, { useMemo } from 'react';
+import { getClassRates, getVisibleSplits } from './perClassConfusionMatrix/matrixPresentation';
 import { Loader2, Check, Download } from 'lucide-react';
 import { InfoTooltip } from '../../../ui/InfoTooltip';
 import type { EvaluationSplit, EvaluationData } from '../types';
@@ -155,14 +156,7 @@ export const PerClassConfusionMatrix: React.FC<Props> = ({
                                         </div>
                                         <div id={splitId} className={`grid ${classes.length <= 4 ? 'grid-cols-2' : 'grid-cols-3'} gap-2`}>
                                             {classes.map((cls, clsIdx) => {
-                                                const tp = matrix[clsIdx]?.[clsIdx] ?? 0;
-                                                const fp = matrix.reduce((s, row, ri) => ri !== clsIdx ? s + (row[clsIdx] ?? 0) : s, 0);
-                                                const fn = (matrix[clsIdx] ?? []).reduce((s, v, ci) => ci !== clsIdx ? s + v : s, 0);
-                                                const total = matrix.flat().reduce((a, b) => a + b, 0);
-                                                const tn = total - tp - fp - fn;
-                                                const prec = (tp + fp) > 0 ? tp / (tp + fp) : 0;
-                                                const rec = (tp + fn) > 0 ? tp / (tp + fn) : 0;
-                                                const f1c = prec + rec > 0 ? (2 * prec * rec) / (prec + rec) : 0;
+                                                const { tp, fp, fn, tn, prec, rec, f1c } = getClassRates(matrix, clsIdx);
                                                 const isHighlighted = String(cls) === selectedRocClass;
                                                 const otherClasses = classes.filter((_, i) => i !== clsIdx);
                                                 // Binary: use actual other class name; multiclass: 'Others'
@@ -235,10 +229,7 @@ export const PerClassConfusionMatrix: React.FC<Props> = ({
                                 );
                             };
 
-                            const allSplitEntries = Object.entries(evaluationData.splits) as [string, EvaluationSplit][];
-                            const trainEntry = showTrainMetrics ? allSplitEntries.find(([n]) => n === 'train') : undefined;
-                            const testEntry  = showTestMetrics  ? allSplitEntries.find(([n]) => n === 'test')  : undefined;
-                            const valEntry   = showValMetrics   ? allSplitEntries.find(([n]) => n === 'validation') : undefined;
+                            const { trainEntry, testEntry, valEntry } = getVisibleSplits(evaluationData.splits, showTrainMetrics, showTestMetrics, showValMetrics);
                             const isBinary = (evaluationData.splits.train?.y_proba?.classes.length ?? 0) === 2;
                             const renderSplit = isBinary ? renderSplitBinary : renderSplitPerClass;
 

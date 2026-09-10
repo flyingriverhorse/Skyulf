@@ -87,6 +87,23 @@ function useSemanticStableGraph(nodes: Node[], edges: Edge[], flagsRevision: num
   }
   return ref.current;
 }
+/** Lift zoom controls above the visible results panel, or hide them when maximized. */
+function zoomControlsStyle(visible: boolean, expanded: boolean, maximized: boolean): React.CSSProperties {
+  return expanded && maximized && visible ? { display: 'none' } : {
+    marginBottom: visible ? expanded ? 'var(--results-panel-height, 384px)' : '40px' : '0px',
+  };
+}
+
+/** Fit-view keys must leave native form editing alone. */
+function isCanvasEditableTarget(target: EventTarget | null) {
+  const element = target as HTMLElement | null;
+  const tag = element?.tagName;
+  return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || element?.isContentEditable === true;
+}
+
+function hasVisibleResults(result: unknown, error: unknown, validationIssueCount: number, dismissed: boolean) {
+  return Boolean(result || error || validationIssueCount > 0) && !dismissed;
+}
 
 const FlowCanvasContent: React.FC = () => {
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
@@ -194,9 +211,7 @@ const FlowCanvasContent: React.FC = () => {
       .filter(issue => issue.category !== 'leakage').length,
     [semanticGraph],
   );
-  const resultsPanelVisible =
-    Boolean(executionResult || lastRunError || validationIssueCount > 0) &&
-    !isResultsPanelDismissed;
+  const resultsPanelVisible = hasVisibleResults(executionResult, lastRunError, validationIssueCount, isResultsPanelDismissed);
 
   // Mirror the per-edge Path label and the per-label color into the global
   // store so trainer cards and ResultsPanel can use the exact same letters
@@ -286,16 +301,7 @@ const FlowCanvasContent: React.FC = () => {
   // it doesn't fight with text input.
   useEffect(() => {
     const handler = (e: KeyboardEvent): void => {
-      const t = e.target as HTMLElement | null;
-      const tag = t?.tagName;
-      if (
-        tag === 'INPUT' ||
-        tag === 'TEXTAREA' ||
-        tag === 'SELECT' ||
-        t?.isContentEditable === true
-      ) {
-        return;
-      }
+      if (isCanvasEditableTarget(e.target)) return;
       const mod = e.ctrlKey || e.metaKey;
       const isPlainF = (e.key === 'f' || e.key === 'F') && !mod && !e.altKey;
       const isModZero = mod && e.key === '0';
@@ -488,19 +494,7 @@ const FlowCanvasContent: React.FC = () => {
         <ConnectionGuidance />
         <Controls
           position="bottom-left"
-          style={{
-            // Maximizing the panel covers the whole canvas, so the controls
-            // have nowhere to lift to — hide them instead of burying them.
-            ...(isResultsPanelExpanded && isResultsPanelMaximized && resultsPanelVisible
-              ? { display: 'none' }
-              : {
-                  marginBottom: resultsPanelVisible
-                    ? isResultsPanelExpanded
-                      ? 'var(--results-panel-height, 384px)'
-                      : '40px'
-                    : '0px',
-                }),
-          }}
+          style={zoomControlsStyle(resultsPanelVisible, isResultsPanelExpanded, isResultsPanelMaximized)}
         />
       </ReactFlow>
       </CanvasLeakageContext.Provider>

@@ -5,24 +5,10 @@
 import type { TaskType } from '../../../../core/types/taskType';
 import { isEnsembleModelType } from '../../../../core/utils/format';
 import type { ThresholdMetric } from './classificationCharts';
+import { isThresholdRate, getTuningDisplayScore, getJobScoringMetric } from './jobMeta/scorePolicy';
 export type { ThresholdMetric };
 
-/**
- * Extract the resolved scoring metric from a job's result (top-level or
- * nested in metrics), falling back to the tuning config's requested metric
- * when a job hasn't finished (or errored) before `scoring_metric` was
- * recorded onto the result.
- */
-export function getJobScoringMetric(job: { result?: Record<string, unknown> | null; config?: unknown }): string | undefined {
-  const r = job.result;
-  if (r?.scoring_metric) return r.scoring_metric as string;
-  const m = r?.metrics as Record<string, unknown> | undefined;
-  if (m?.scoring_metric) return m.scoring_metric as string;
-  const config = job.config as Record<string, unknown> | undefined;
-  const tuning = config?.tuning_config as Record<string, unknown> | undefined;
-  if (typeof tuning?.metric === 'string') return tuning.metric;
-  return undefined;
-}
+export { getJobScoringMetric } from './jobMeta/scorePolicy';
 
 /** One display row of a best_score comparison: a scoring metric and the
  *  positions (into the caller's jobs array) of the jobs scored with it. */
@@ -81,8 +67,8 @@ export function mapJobMetricToDropdown(scoringMetric: string | undefined): Thres
   if (m === 'accuracy') return 'accuracy';
   if (m === 'f1_weighted') return 'f1_weighted';
   if (m === 'f1') return 'f1';
-  if (m.startsWith('precision') && !m.includes('macro') && !m.includes('micro')) return 'precision';
-  if (m.startsWith('recall') && !m.includes('macro') && !m.includes('micro')) return 'recall';
+  if (isThresholdRate(m, 'precision')) return 'precision';
+  if (isThresholdRate(m, 'recall')) return 'recall';
   return 'f1_weighted';
 }
 
@@ -129,14 +115,7 @@ export function getDisplayScore(
   job: { job_type: string; result?: Record<string, unknown> | null; config?: unknown },
   task: ExperimentsTask,
 ): DisplayScore | null {
-  if (job.job_type === 'tuning') {
-    const best = (job.result as { best_score?: unknown } | undefined)?.best_score;
-    if (typeof best === 'number' && !Number.isNaN(best)) {
-      const scoring = getJobScoringMetric(job) || 'score';
-      return { metric: scoring, value: best, split: 'cv' };
-    }
-    return null;
-  }
+  if (job.job_type === 'tuning') return getTuningDisplayScore(job);
 
   const metrics = (job.result as { metrics?: Record<string, unknown> } | undefined)?.metrics;
   if (!metrics) return null;

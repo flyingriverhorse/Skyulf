@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, fireEvent, act } from '@testing-library/react';
-import { RestoreSessionBanner } from './RestoreSessionBanner';
+import { getRelativeSaveTime, RestoreSessionBanner } from './RestoreSessionBanner';
 import { useGraphStore } from '../../core/store/useGraphStore';
 import { saveCanvasSnapshot } from '../../core/utils/canvasPersistence';
 import { FIT_VIEW_EVENT } from '../../core/hooks/useKeyboardShortcuts';
@@ -16,6 +16,14 @@ describe('RestoreSessionBanner (CAN-003)', () => {
     window.localStorage.clear();
     useGraphStore.setState({ nodes: [], edges: [], executionResult: null });
     vi.restoreAllMocks();
+  });
+
+  it('formats autosave age using coarse time buckets', () => {
+    const now = Date.now();
+    expect(getRelativeSaveTime(new Date(now - 20_000).toISOString(), now)).toBe('just now');
+    expect(getRelativeSaveTime(new Date(now - 5 * 60_000).toISOString(), now)).toBe('5 min ago');
+    expect(getRelativeSaveTime(new Date(now - 2 * 60 * 60_000).toISOString(), now)).toBe('2 h ago');
+    expect(getRelativeSaveTime(new Date(now - 2 * 24 * 60 * 60_000).toISOString(), now)).toBe('2 d ago');
   });
 
   it('shows nothing when there is no autosave and no unavailable reason', () => {

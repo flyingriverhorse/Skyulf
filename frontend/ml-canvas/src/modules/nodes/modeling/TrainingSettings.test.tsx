@@ -1,4 +1,5 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
+import { useState } from 'react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { jobsApi } from '../../../core/api/jobs';
 import { registryApi } from '../../../core/api/registry';
@@ -48,6 +49,86 @@ beforeEach(() => {
 });
 
 afterEach(() => vi.unstubAllGlobals());
+
+/** Controlled updates exercise the same effect and focus lifetimes as the node inspector. */
+function SettingsHarness({ initial }: { initial: TrainingConfig }) {
+  const [value, setValue] = useState(initial);
+  return <TrainingSettings config={value} onChange={setValue} nodeId="model" />;
+}
+
+/** Basic training keeps a manual target while advanced tuning follows its upstream target. */
+it('preserves a manual basic target and synchronizes it on switching to tuning', async () => {
+  vi.mocked(useTrainingNodeContext).mockReturnValue(trainingContext({ upstreamTarget: 'upstream' }));
+  await act(async () => render(<SettingsHarness initial={config} />));
+  expect(screen.getByRole('textbox', { name: 'Target Column' })).toHaveValue('outcome');
+  await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Advanced (Tuning)' })));
+  expect(screen.getByRole('textbox', { name: 'Target Column' })).toHaveValue('upstream');
+});
+
+/** Editing a parameter must retain focus, and a model switch must load that model's defaults. */
+it('keeps customized inputs mounted and reinitializes customization on a model switch', async () => {
+  vi.mocked(jobsApi.getHyperparameters).mockImplementation(async model => model === 'ridge_regression'
+    ? [{ name: 'alpha', label: 'Alpha', type: 'number', default: 1 }]
+    : [{ name: 'depth', label: 'Depth', type: 'number', default: 3 }]);
+  await act(async () => render(<SettingsHarness initial={{ ...config, hyperparameters: { depth: 3 } }} />));
+  fireEvent.click(screen.getByRole('button', { name: 'Hyperparameters' }));
+  const depth = screen.getByRole('textbox', { name: 'Depth' });
+  depth.focus();
+  fireEvent.change(depth, { target: { value: '7' } });
+  fireEvent.blur(depth);
+  depth.focus();
+  expect(screen.getByRole('textbox', { name: 'Depth' })).toBe(depth);
+  expect(depth).toHaveFocus();
+  fireEvent.click(screen.getByRole('button', { name: 'Configuration' }));
+  await act(async () => fireEvent.change(screen.getByRole('combobox', { name: 'Model Type' }), { target: { value: 'ridge_regression' } }));
+  fireEvent.click(screen.getByRole('button', { name: 'Hyperparameters' }));
+  expect(screen.getByRole('checkbox', { name: 'Customize' })).toBeChecked();
+  expect(screen.getByRole('textbox', { name: 'Alpha' })).toHaveValue('1');
+});
+
+/** Only crossing the grid strategy boundary replaces search values, and strategy settings never leak across selections. */
+it('reloads search defaults only when changing strategy class and clears customized strategy params', async () => {
+  vi.mocked(jobsApi.getHyperparameters).mockResolvedValue([{ name: 'depth', label: 'Depth', type: 'number', default: 3 }]);
+  await act(async () => render(<SettingsHarness initial={{ ...config, run_mode: 'advanced', search_strategy: 'optuna', strategy_params: { sampler: 'random' } }} />));
+  expect(screen.getByText(/sampler: random/)).toBeVisible();
+  await act(async () => fireEvent.change(screen.getByRole('combobox', { name: 'Search Method' }), { target: { value: 'halving_random' } }));
+  expect(jobsApi.getDefaultSearchSpace).toHaveBeenCalledTimes(1);
+  expect(screen.getByText(/Using defaults/)).toBeVisible();
+  await act(async () => fireEvent.change(screen.getByRole('combobox', { name: 'Search Method' }), { target: { value: 'grid' } }));
+  expect(jobsApi.getDefaultSearchSpace).toHaveBeenLastCalledWith('random_forest_classifier', 'grid');
+  expect(jobsApi.getDefaultSearchSpace).toHaveBeenCalledTimes(2);
+  expect(screen.getByRole('spinbutton', { name: 'Trials' })).toBeDisabled();
+});
+
+/** CV expansion survives tab switches, temporal columns sort first, and a zero seed is preserved. */
+it('preserves CV controls across tabs and time-series selection', async () => {
+  vi.mocked(useTrainingNodeContext).mockReturnValue(trainingContext({ availableColumns: [
+    { name: 'amount', dtype: 'float64', missing_count: 0, missing_ratio: 0, unique_count: 2 },
+    { name: 'created', dtype: 'datetime64', missing_count: 0, missing_ratio: 0, unique_count: 2 },
+  ] }));
+  await act(async () => render(<SettingsHarness initial={{ ...config, cv_enabled: true, cv_random_state: 0 }} />));
+  fireEvent.click(screen.getByRole('button', { name: 'Cross Validation' }));
+  expect(screen.getByRole('spinbutton', { name: 'Fold Split Seed' })).toHaveValue(0);
+  fireEvent.click(screen.getByRole('button', { name: 'Hyperparameters' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Configuration' }));
+  expect(screen.getByRole('button', { name: 'Cross Validation' })).toHaveAttribute('aria-expanded', 'true');
+  fireEvent.change(screen.getByRole('combobox', { name: 'Method' }), { target: { value: 'time_series_split' } });
+  expect(screen.queryByRole('spinbutton', { name: 'Fold Split Seed' })).not.toBeInTheDocument();
+  const timeColumn = screen.getByRole('combobox', { name: 'Time Column (optional)' });
+  expect(Array.from(timeColumn.querySelectorAll('option'), option => option.value)).toEqual(['', 'created', 'amount']);
+});
+
+/** Threshold tuning belongs only to classifiers, with the supplied seed and checkbox value retained. */
+it.each([
+  { model_type: 'random_forest_classifier', visible: true },
+  { model_type: 'ridge_regression', visible: false },
+])('shows threshold tuning appropriately for $model_type', async ({ model_type, visible }) => {
+  await renderSettings({ run_mode: 'advanced', model_type, random_state: 0, tune_threshold: true });
+  expect(screen.getByRole('spinbutton', { name: 'Random State' })).toHaveValue(0);
+  const threshold = screen.queryByRole('checkbox', { name: 'Tune decision threshold' });
+  if (visible) expect(threshold).toBeChecked();
+  else expect(threshold).not.toBeInTheDocument();
+});
 
 /** Conditional hyperparameters need names even after changing settings sections. */
 it('labels basic hyperparameters and exposes the active training mode', async () => {

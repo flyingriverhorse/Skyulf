@@ -8,6 +8,8 @@
  */
 
 import React, { useMemo } from 'react';
+import { ResidualHistogram } from './regressionChartsForSplit/ResidualHistogram';
+import { getMeanBinIndex, getQQBounds } from './regressionChartsForSplit/chartBounds';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   ScatterChart, Scatter, Line, ReferenceLine, ComposedChart,
@@ -50,11 +52,7 @@ export const RegressionChartsForSplit: React.FC<Props> = ({
     () => getResidualHistogram(splitData.y_true as number[], splitData.y_pred as number[]),
     [splitData.y_true, splitData.y_pred],
   );
-  const meanBinLabel = hist
-    ? hist.bins.reduce((best, b, i) => (
-        Math.abs(Number.parseFloat(b.label) - hist.mean) < Math.abs(Number.parseFloat(hist.bins[best]!.label) - hist.mean) ? i : best
-      ), 0)
-    : 0;
+  const meanBinLabel = getMeanBinIndex(hist);
   const pct = useMemo(
     () => getErrorPercentiles(splitData.y_true as number[], splitData.y_pred as number[]),
     [splitData.y_true, splitData.y_pred],
@@ -67,8 +65,7 @@ export const RegressionChartsForSplit: React.FC<Props> = ({
     () => getQQData(splitData.y_true as number[], splitData.y_pred as number[]),
     [splitData.y_true, splitData.y_pred],
   );
-  const qqMin = qqData.length ? Math.min(...qqData.map(d => Math.min(d.theoretical, d.sample))) : 0;
-  const qqMax = qqData.length ? Math.max(...qqData.map(d => Math.max(d.theoretical, d.sample))) : 1;
+  const { qqMin, qqMax } = getQQBounds(qqData);
   const slData = useMemo(
     () => getScaleLocationData(splitData.y_true as number[], splitData.y_pred as number[]),
     [splitData.y_true, splitData.y_pred],
@@ -193,40 +190,7 @@ export const RegressionChartsForSplit: React.FC<Props> = ({
         </div>
       )}
 
-      {/* 3. Residual Histogram */}
-      {hist && (
-        <div className="h-[260px] relative group" id={`${splitName}-residual-hist`}>
-          {downloadBtn(`${splitName}-residual-hist`, `${splitName}_residual_histogram`)}
-          <h5 className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 text-center flex items-center justify-center gap-1">
-            Residual Distribution
-            <InfoTooltip text="Histogram of (Actual − Predicted). A bell-shaped distribution centred at 0 indicates unbiased predictions. A peak offset from 0 signals systematic over- or under-prediction." align="center" size="sm" />
-          </h5>
-          <ResponsiveContainer width="100%" height="88%">
-            <BarChart data={hist.bins} margin={{ top: 5, right: 20, bottom: 28, left: 30 }}>
-              <CartesianGrid strokeDasharray="3 3" opacity={0.15} />
-              <XAxis dataKey="label" tick={{ fontSize: 10 }} label={{ value: 'Residual (Actual − Predicted)', position: 'insideBottom', offset: -8, fontSize: 11, fill: '#9ca3af' }} />
-              <YAxis tick={{ fontSize: 10 }} label={{ value: 'Count', angle: -90, position: 'insideLeft', style: { textAnchor: 'middle' }, fontSize: 11, fill: '#9ca3af' }} />
-              <Tooltip
-                content={({ active, payload }) => {
-                  if (active && payload?.length) {
-                    const p = payload[0]!;
-                    return (
-                      <div className="bg-white dark:bg-gray-800 p-2 border border-gray-200 dark:border-gray-700 shadow-sm rounded text-xs">
-                        <p>Bin start: <span className="font-mono">{String(p.payload.label)}</span></p>
-                        <p>Count: <span className="font-mono font-semibold">{String(p.value)}</span></p>
-                      </div>
-                    );
-                  }
-                  return null;
-                }}
-              />
-              <ReferenceLine x={hist.bins.find(b => Number.parseFloat(b.label) >= 0)?.label ?? ''} stroke="#ef4444" strokeDasharray="3 3" strokeWidth={1.5} label={{ value: '0', position: 'top', fontSize: 10, fill: '#ef4444' }} />
-              <ReferenceLine x={hist.bins[meanBinLabel]?.label ?? ''} stroke="#f59e0b" strokeDasharray="4 2" strokeWidth={1.5} label={{ value: `\u03bc=${hist.mean.toFixed(2)}`, position: 'top', fontSize: 10, fill: '#f59e0b' }} />
-              <Bar dataKey="count" fill="#6ee7b7" fillOpacity={0.8} isAnimationActive={false} />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      )}
+      <ResidualHistogram hist={hist} meanBinLabel={meanBinLabel} splitName={splitName} downloadBtn={downloadBtn} />
 
       {/* 4. Q-Q Plot */}
       {qqData.length > 0 && (

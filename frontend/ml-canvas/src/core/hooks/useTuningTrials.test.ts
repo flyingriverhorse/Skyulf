@@ -263,6 +263,41 @@ describe('useTuningTrials', () => {
     expect(result.current.trial.points).toEqual([]);
     expect(result.current.trial.latest).toBeUndefined();
   });
+
+  /** Late snapshots merge by index, retain other live points, and preserve zero-valued metadata. */
+  it('merges a delayed snapshot over overlapping live trial and iteration points', async () => {
+    let resolveSnapshot!: (value: unknown) => void;
+    snapshotMock.mockReturnValueOnce(new Promise(resolve => { resolveSnapshot = resolve; }));
+    const { result } = renderHook(() => useTuningTrials(job()));
+    emit({ trial_number: 1, trial_total: 0, trial_score: 0.9, trial_metric: 'live' });
+    emit({ trial_number: 2, trial_score: 0.8 });
+    emitIteration({ iteration_number: 0, iteration_total: 0, iteration_score: 0, iteration_direction: 'maximize' });
+    expect(result.current.iteration.latest).toEqual({ trial: 0, total: 0 });
+    await act(async () => { resolveSnapshot({
+      metric: 'snapshot', trials: [{ trial: 1, total: 3, score: 0.5 }],
+      iteration_metric: '', iterations: [{ iteration: 0, total: 5, score: 0.2, metric: 'fallback', direction: 'maximize' }],
+    }); });
+    expect(result.current.trial.points).toEqual([
+      { trial: 1, score: 0.5, best: 0.5 }, { trial: 2, score: 0.8, best: 0.8 },
+    ]);
+    expect(result.current.trial.latest).toEqual({ trial: 1, total: 3 });
+    expect(result.current.trial.metric).toBe('snapshot');
+    expect(result.current.iteration).toEqual({
+      points: [{ trial: 0, score: 0.2, best: 0.2 }], latest: { trial: 0, total: 5 }, metric: '', direction: 'maximize',
+    });
+    expect(result.current.activeKind).toBe('iteration');
+  });
+
+  /** Old backfill responses must not refill the new job after its reset. */
+  it('ignores a previous job snapshot after switching jobs', async () => {
+    let resolveSnapshot!: (value: unknown) => void;
+    snapshotMock.mockReturnValueOnce(new Promise(resolve => { resolveSnapshot = resolve; }));
+    const { result, rerender } = renderHook(({ id }) => useTuningTrials(job({ job_id: id })), { initialProps: { id: 'job-1' } });
+    rerender({ id: 'job-2' });
+    await act(async () => { resolveSnapshot({ trials: [{ trial: 1, total: 2, score: 0.8 }], metric: 'old' }); });
+    expect(result.current.trial).toEqual({ points: [], latest: undefined, metric: undefined, direction: 'maximize' });
+    expect(result.current.activeKind).toBe('trial');
+  });
 });
 
 describe('buildIterationSeries', () => {

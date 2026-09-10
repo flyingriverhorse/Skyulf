@@ -61,4 +61,17 @@ describe('Dashboard', () => {
     expect(await screen.findByText('Recent Jobs')).toBeDefined();
     expect(screen.queryByText(/build your first pipeline/i)).toBeNull();
   });
+
+  it('shows missing statistics as dashes and counts both successful status spellings', async () => {
+    /** Missing counts must not hide the page or turn successful jobs into failures. */
+    mocks.get.mockResolvedValue({ data: { total_jobs: 4, data_sources: 1 } });
+    mocks.getJobs.mockResolvedValue(['succeeded', 'completed', 'failed', 'running'].map((status, i) => ({
+      job_id: `job-${i}`, status, model_type: '', created_at: '2026-08-20T10:00:00Z',
+    })));
+    renderDashboard();
+    expect(await screen.findByText('50%')).toBeInTheDocument();
+    expect(screen.getByText('0 Training, 0 Tuning')).toBeInTheDocument();
+    expect(screen.getAllByText('Unknown')).toHaveLength(4);
+    expect(screen.getByText('-')).toBeInTheDocument();
+  });
 });

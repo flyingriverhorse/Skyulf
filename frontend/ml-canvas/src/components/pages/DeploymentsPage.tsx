@@ -169,6 +169,74 @@ export const DeploymentsPage: React.FC = () => {
     }
   };
 
+  const renderActiveDeployment = () => (
+    activeDeployment ? (
+      <div
+        ref={isHighlighted(activeDeployment) ? (highlightRowRef as React.RefObject<HTMLDivElement>) : null}
+        className={`bg-white dark:bg-gray-800 rounded-xl border shadow-sm overflow-hidden ${isHighlighted(activeDeployment) ? 'border-blue-400 dark:border-blue-500 ring-2 ring-blue-200 dark:ring-blue-900' : 'border-green-200 dark:border-green-900'}`}
+      >
+        <div className="p-6 border-b border-gray-100 dark:border-gray-700 flex justify-between items-start">
+          <div className="flex items-start gap-4">
+            <div className="p-3 bg-green-100 dark:bg-green-900/30 rounded-lg">
+              <Box className="w-8 h-8 text-green-600 dark:text-green-400" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <h3 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
+                  {activeDeployment.model_type}
+                </h3>
+                <span className="px-2 py-0.5 bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 text-xs font-medium rounded-full flex items-center gap-1">
+                  <CheckCircle className="w-3 h-3" /> Active
+                </span>
+              </div>
+              <div className="mt-1">
+                <DeploymentLineage deployment={activeDeployment} />
+              </div>
+              <p className="text-xs text-gray-400 mt-2">
+                Deployed: {new Date(activeDeployment.created_at).toLocaleString()}
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => { void handleDeactivate(); }}
+            disabled={isDeactivating}
+            className="flex items-center gap-2 px-4 py-2 bg-red-50 hover:bg-red-100 text-red-600 dark:bg-red-900/20 dark:hover:bg-red-900/30 dark:text-red-400 rounded-lg transition-colors text-sm font-medium disabled:opacity-50"
+          >
+            {isDeactivating ? (
+              <div className="w-4 h-4 border-2 border-red-600 border-t-transparent rounded-full animate-spin" />
+            ) : (
+              <Power className="w-4 h-4" />
+            )}
+            Deactivate
+          </button>
+        </div>
+        {deactivateError && (
+          <div className="border-b border-gray-100 dark:border-gray-700">
+            <ErrorState
+              error={`Failed to deactivate ${describeDeployment(activeDeployment)}: ${deactivateError}`}
+              onRetry={() => runDeactivate(activeDeployment)}
+            />
+          </div>
+        )}
+        <div className="bg-gray-50 dark:bg-gray-900/50 p-4 text-xs font-mono text-gray-500 dark:text-gray-400 break-all">
+          Artifact URI: {activeDeployment.artifact_uri}
+        </div>
+      </div>
+    ) : isLoading ? (
+      <LoadingState message="Loading active deployment..." />
+    ) : (
+      <div className="bg-gray-50 dark:bg-gray-800/50 rounded-xl border border-dashed border-gray-300 dark:border-gray-700 p-8 text-center">
+        <div className="w-12 h-12 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-3">
+          <Power className="w-6 h-6 text-gray-400" />
+        </div>
+        <h3 className="text-gray-900 dark:text-gray-100 font-medium">No Active Model</h3>
+        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+          Deploy a model from the Experiments page to see it here.
+        </p>
+      </div>
+    )
+  );
+
   return (
     <div className="h-full flex flex-col bg-gray-50 dark:bg-gray-900 overflow-hidden">
       {/* Header */}
@@ -199,71 +267,7 @@ export const DeploymentsPage: React.FC = () => {
             Active Deployment
           </h2>
 
-          {activeDeployment ? (
-            <div
-              ref={isHighlighted(activeDeployment) ? (highlightRowRef as React.RefObject<HTMLDivElement>) : null}
-              className={`bg-white dark:bg-gray-800 rounded-xl border shadow-sm overflow-hidden ${isHighlighted(activeDeployment) ? 'border-blue-400 dark:border-blue-500 ring-2 ring-blue-200 dark:ring-blue-900' : 'border-green-200 dark:border-green-900'}`}
-            >
-              <div className="p-6 border-b border-gray-100 dark:border-gray-700 flex justify-between items-start">
-                <div className="flex items-start gap-4">
-                  <div className="p-3 bg-green-100 dark:bg-green-900/30 rounded-lg">
-                    <Box className="w-8 h-8 text-green-600 dark:text-green-400" />
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2 mb-1">
-                      <h3 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
-                        {activeDeployment.model_type}
-                      </h3>
-                      <span className="px-2 py-0.5 bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 text-xs font-medium rounded-full flex items-center gap-1">
-                        <CheckCircle className="w-3 h-3" /> Active
-                      </span>
-                    </div>
-                    <div className="mt-1">
-                      <DeploymentLineage deployment={activeDeployment} />
-                    </div>
-                    <p className="text-xs text-gray-400 mt-2">
-                      Deployed: {new Date(activeDeployment.created_at).toLocaleString()}
-                    </p>
-                  </div>
-                </div>
-                <button
-                  onClick={() => { void handleDeactivate(); }}
-                  disabled={isDeactivating}
-                  className="flex items-center gap-2 px-4 py-2 bg-red-50 hover:bg-red-100 text-red-600 dark:bg-red-900/20 dark:hover:bg-red-900/30 dark:text-red-400 rounded-lg transition-colors text-sm font-medium disabled:opacity-50"
-                >
-                  {isDeactivating ? (
-                    <div className="w-4 h-4 border-2 border-red-600 border-t-transparent rounded-full animate-spin" />
-                  ) : (
-                    <Power className="w-4 h-4" />
-                  )}
-                  Deactivate
-                </button>
-              </div>
-              {deactivateError && (
-                <div className="border-b border-gray-100 dark:border-gray-700">
-                  <ErrorState
-                    error={`Failed to deactivate ${describeDeployment(activeDeployment)}: ${deactivateError}`}
-                    onRetry={() => runDeactivate(activeDeployment)}
-                  />
-                </div>
-              )}
-              <div className="bg-gray-50 dark:bg-gray-900/50 p-4 text-xs font-mono text-gray-500 dark:text-gray-400 break-all">
-                Artifact URI: {activeDeployment.artifact_uri}
-              </div>
-            </div>
-          ) : isLoading ? (
-            <LoadingState message="Loading active deployment..." />
-          ) : (
-            <div className="bg-gray-50 dark:bg-gray-800/50 rounded-xl border border-dashed border-gray-300 dark:border-gray-700 p-8 text-center">
-              <div className="w-12 h-12 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-3">
-                <Power className="w-6 h-6 text-gray-400" />
-              </div>
-              <h3 className="text-gray-900 dark:text-gray-100 font-medium">No Active Model</h3>
-              <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                Deploy a model from the Experiments page to see it here.
-              </p>
-            </div>
-          )}
+          {renderActiveDeployment()}
         </section>
 
         {/* History Section */}

@@ -44,6 +44,154 @@ interface StrategySettingsModalProps {
     modelKey?: string | undefined;
 }
 
+interface StrategyControlsProps {
+    config: StrategyConfig;
+    setConfig: React.Dispatch<React.SetStateAction<StrategyConfig>>;
+    fieldId: string;
+}
+
+function HalvingControls({ config, setConfig, fieldId, strategy }: StrategyControlsProps & { strategy: string }) {
+    return (
+        <>
+            {strategy === 'halving_grid' && (
+                <div className="flex items-start gap-2 p-2.5 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-lg text-xs text-amber-700 dark:text-amber-400">
+                    <AlertTriangle className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+                    <span>
+                        <strong>halving_grid</strong> evaluates the full cartesian product of your search space across multiple halving rounds. Large grids can take many minutes — reduce candidate values in the <strong>Search Space</strong> section of the node, or switch to <strong>halving_random</strong>.
+                    </span>
+                </div>
+            )}
+            <div>
+                <div className="flex items-center gap-1.5 mb-1">
+                    <label htmlFor={`${fieldId}-factor`} className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                        Factor
+                    </label>
+                    <HelpTooltip placement="bottom-left" text="The rate at which candidate combinations are reduced in each iteration. For example, a factor of 3 means only the best 1/3 of candidates survive to the next round." />
+                </div>
+                <input
+                    type="number"
+                    min="2"
+                    id={`${fieldId}-factor`}
+                    value={config.factor ?? 3}
+                    onChange={(e) => setConfig({ ...config, factor: Number.parseInt(e.target.value, 10) })}
+                    className="w-full text-sm border-gray-300 dark:border-gray-600 rounded-lg p-2.5 bg-gray-50 dark:bg-gray-900 dark:text-white border focus:ring-2 focus:ring-blue-500"
+                />
+                <p className="text-xs text-gray-500 mt-1">Typical values are 2 or 3.</p>
+            </div>
+
+            <div>
+                <div className="flex items-center gap-1.5 mb-1">
+                    <label htmlFor={`${fieldId}-min_resources`} className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                        Min Resources
+                    </label>
+                    <HelpTooltip placement="bottom-left" text="'exhaust' automatically calculates the maximum resources to use. Alternatively, input an integer like 10 or 100 to set the starting budget explicitly." />
+                </div>
+                <input
+                    type="text"
+                    id={`${fieldId}-min_resources`}
+                    value={config.min_resources ?? 'exhaust'}
+                    onChange={(e) => setConfig({ ...config, min_resources: e.target.value })}
+                    className="w-full text-sm border-gray-300 dark:border-gray-600 rounded-lg p-2.5 bg-gray-50 dark:bg-gray-900 dark:text-white border focus:ring-2 focus:ring-blue-500"
+                    placeholder="e.g., 'exhaust', 'smallest', or an integer"
+                />
+                <p className="text-xs text-gray-500 mt-1">Starting budget for the first iteration.</p>
+            </div>
+
+            <div>
+                <div className="flex items-center gap-1.5 mb-1">
+                    <label htmlFor={`${fieldId}-resource`} className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                        Resource
+                    </label>
+                    <HelpTooltip placement="bottom-left" text="Determines how resources are limited during fast initial rounds. 'n_samples' limits the amount of training data used, while 'n_estimators' limits the number of trees in ensemble models." />
+                </div>
+                <select
+                    id={`${fieldId}-resource`}
+                    value={config.resource ?? 'n_samples'}
+                    onChange={(e) => setConfig({ ...config, resource: e.target.value })}
+                    className="w-full text-sm border-gray-300 dark:border-gray-600 rounded-lg p-2.5 bg-gray-50 dark:bg-gray-900 dark:text-white border focus:ring-2 focus:ring-blue-500"
+                >
+                    <option value="n_samples">n_samples (Rows of Data)</option>
+                    <option value="n_estimators">n_estimators (Trees)</option>
+                </select>
+                <p className="text-xs text-gray-500 mt-1">What defines the training budget.</p>
+            </div>
+        </>
+    );
+}
+
+function OptunaControls({ config, setConfig, fieldId, showCmaesWarning }: StrategyControlsProps & { showCmaesWarning: boolean }) {
+    return (
+        <>
+            <div>
+                <div className="flex items-center gap-1.5 mb-1">
+                    <label htmlFor={`${fieldId}-sampler`} className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                        Sampler
+                    </label>
+                    <HelpTooltip placement="bottom-left" text="TPE provides smart Bayesian learning based on past trials. Random is purely blind chance. CMA-ES is advanced evolutionary sampling meant for complex continuous search spaces." />
+                </div>
+                <select
+                    id={`${fieldId}-sampler`}
+                    value={config.sampler ?? 'tpe'}
+                    onChange={(e) => setConfig({ ...config, sampler: e.target.value as 'tpe' | 'random' | 'cmaes' })}
+                    className="w-full text-sm border-gray-300 dark:border-gray-600 rounded-lg p-2.5 bg-gray-50 dark:bg-gray-900 dark:text-white border focus:ring-2 focus:ring-blue-500"
+                >
+                    <option value="tpe">TPE (Bayesian Optimization)</option>
+                    <option value="random">Random Sampler</option>
+                    <option value="cmaes">CMA-ES</option>
+                </select>
+                <p className="text-xs text-gray-500 mt-1">Algorithm to suggest new parameters.</p>
+                {showCmaesWarning && config.sampler === 'cmaes' && (
+                    <div className="mt-2 flex items-start gap-2 p-2.5 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-lg text-xs text-amber-700 dark:text-amber-400">
+                        <AlertTriangle className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+                        <span>
+                            <strong>Partial CMA-ES coverage.</strong> This model has string or boolean parameters (e.g. solver, kernel, criterion) that CMA-ES cannot optimize — they will be sampled randomly. For full CMA-ES benefit, use <strong>XGBoost</strong> or <strong>Gradient Boosting</strong>. Alternatively, switch to <strong>TPE</strong> which handles mixed spaces natively.
+                        </span>
+                    </div>
+                )}
+            </div>
+
+            <div>
+                <div className="flex items-center gap-1.5 mb-1">
+                    <label htmlFor={`${fieldId}-pruner`} className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                        Pruner
+                    </label>
+                    <HelpTooltip placement="bottom-left" text="Median prunes trials worse than the median of previous runs. Hyperband is an aggressively fast early-stopping algorithm. None disables early stopping." />
+                </div>
+                <select
+                    id={`${fieldId}-pruner`}
+                    value={config.pruner ?? 'median'}
+                    onChange={(e) => setConfig({ ...config, pruner: e.target.value as 'median' | 'hyperband' | 'none' })}
+                    className="w-full text-sm border-gray-300 dark:border-gray-600 rounded-lg p-2.5 bg-gray-50 dark:bg-gray-900 dark:text-white border focus:ring-2 focus:ring-blue-500"
+                >
+                    <option value="median">Median Pruner</option>
+                    <option value="hyperband">Hyperband Pruner</option>
+                    <option value="none">None (No Pruning)</option>
+                </select>
+                <p className="text-xs text-gray-500 mt-1">Algorithm to kill bad trials early.</p>
+            </div>
+
+            <div>
+                <div className="flex items-center gap-1.5 mb-1">
+                    <label htmlFor={`${fieldId}-timeout`} className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                        Timeout (Seconds)
+                    </label>
+                    <HelpTooltip placement="bottom-left" text="Set a hard time limit for the entire Optuna study. Regardless of N-Trials, optimization will yield the best found parameters once time is up." />
+                </div>
+                <input
+                    type="number"
+                    min="1"
+                    id={`${fieldId}-timeout`}
+                    value={config.timeout ?? ''}
+                    onChange={(e) => setConfig({ ...config, timeout: e.target.value ? Number.parseInt(e.target.value, 10) : '' })}
+                    className="w-full text-sm border-gray-300 dark:border-gray-600 rounded-lg p-2.5 bg-gray-50 dark:bg-gray-900 dark:text-white border focus:ring-2 focus:ring-blue-500"
+                    placeholder="e.g. 300 (Optional)"
+                />
+                <p className="text-xs text-gray-500 mt-1">Stop tuning after X seconds.</p>
+            </div>
+        </>
+    );
+}
+
 export const StrategySettingsModal: React.FC<StrategySettingsModalProps> = ({
     isOpen,
     onClose,
@@ -122,143 +270,8 @@ export const StrategySettingsModal: React.FC<StrategySettingsModalProps> = ({
             }
         >
             <div className="p-5 space-y-4">
-                    {isHalving && (
-                        <>
-                            {strategy === 'halving_grid' && (
-                                <div className="flex items-start gap-2 p-2.5 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-lg text-xs text-amber-700 dark:text-amber-400">
-                                    <AlertTriangle className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
-                                    <span>
-                                        <strong>halving_grid</strong> evaluates the full cartesian product of your search space across multiple halving rounds. Large grids can take many minutes — reduce candidate values in the <strong>Search Space</strong> section of the node, or switch to <strong>halving_random</strong>.
-                                    </span>
-                                </div>
-                            )}
-                            <div>
-                                <div className="flex items-center gap-1.5 mb-1">
-                                    <label htmlFor={`${fieldId}-factor`} className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                                        Factor
-                                    </label>
-                                    <HelpTooltip placement="bottom-left" text="The rate at which candidate combinations are reduced in each iteration. For example, a factor of 3 means only the best 1/3 of candidates survive to the next round." />
-                                </div>
-                                <input
-                                    type="number"
-                                    min="2"
-                                    id={`${fieldId}-factor`}
-                                    value={config.factor ?? 3}
-                                    onChange={(e) => setConfig({ ...config, factor: Number.parseInt(e.target.value, 10) })}
-                                    className="w-full text-sm border-gray-300 dark:border-gray-600 rounded-lg p-2.5 bg-gray-50 dark:bg-gray-900 dark:text-white border focus:ring-2 focus:ring-blue-500"
-                                />
-                                <p className="text-xs text-gray-500 mt-1">Typical values are 2 or 3.</p>
-                            </div>
-
-                            <div>
-                                <div className="flex items-center gap-1.5 mb-1">
-                                    <label htmlFor={`${fieldId}-min_resources`} className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                                        Min Resources
-                                    </label>
-                                    <HelpTooltip placement="bottom-left" text="'exhaust' automatically calculates the maximum resources to use. Alternatively, input an integer like 10 or 100 to set the starting budget explicitly." />
-                                </div>
-                                <input
-                                    type="text"
-                                    id={`${fieldId}-min_resources`}
-                                    value={config.min_resources ?? 'exhaust'}
-                                    onChange={(e) => setConfig({ ...config, min_resources: e.target.value })}
-                                    className="w-full text-sm border-gray-300 dark:border-gray-600 rounded-lg p-2.5 bg-gray-50 dark:bg-gray-900 dark:text-white border focus:ring-2 focus:ring-blue-500"
-                                    placeholder="e.g., 'exhaust', 'smallest', or an integer"
-                                />
-                                <p className="text-xs text-gray-500 mt-1">Starting budget for the first iteration.</p>
-                            </div>
-
-                            <div>
-                                <div className="flex items-center gap-1.5 mb-1">
-                                    <label htmlFor={`${fieldId}-resource`} className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                                        Resource
-                                    </label>
-                                    <HelpTooltip placement="bottom-left" text="Determines how resources are limited during fast initial rounds. 'n_samples' limits the amount of training data used, while 'n_estimators' limits the number of trees in ensemble models." />
-                                </div>
-                                <select
-                                    id={`${fieldId}-resource`}
-                                    value={config.resource ?? 'n_samples'}
-                                    onChange={(e) => setConfig({ ...config, resource: e.target.value })}
-                                    className="w-full text-sm border-gray-300 dark:border-gray-600 rounded-lg p-2.5 bg-gray-50 dark:bg-gray-900 dark:text-white border focus:ring-2 focus:ring-blue-500"
-                                >
-                                    <option value="n_samples">n_samples (Rows of Data)</option>
-                                    <option value="n_estimators">n_estimators (Trees)</option>
-                                </select>
-                                <p className="text-xs text-gray-500 mt-1">What defines the training budget.</p>
-                            </div>
-                        </>
-                    )}
-
-                    {isOptuna && (
-                        <>
-                            <div>
-                                <div className="flex items-center gap-1.5 mb-1">
-                                    <label htmlFor={`${fieldId}-sampler`} className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                                        Sampler
-                                    </label>
-                                    <HelpTooltip placement="bottom-left" text="TPE provides smart Bayesian learning based on past trials. Random is purely blind chance. CMA-ES is advanced evolutionary sampling meant for complex continuous search spaces." />
-                                </div>
-                                <select
-                                    id={`${fieldId}-sampler`}
-                                    value={config.sampler ?? 'tpe'}
-                                    onChange={(e) => setConfig({ ...config, sampler: e.target.value as 'tpe' | 'random' | 'cmaes' })}
-                                    className="w-full text-sm border-gray-300 dark:border-gray-600 rounded-lg p-2.5 bg-gray-50 dark:bg-gray-900 dark:text-white border focus:ring-2 focus:ring-blue-500"
-                                >
-                                    <option value="tpe">TPE (Bayesian Optimization)</option>
-                                    <option value="random">Random Sampler</option>
-                                    <option value="cmaes">CMA-ES</option>
-                                </select>
-                                <p className="text-xs text-gray-500 mt-1">Algorithm to suggest new parameters.</p>
-                                {showCmaesWarning && config.sampler === 'cmaes' && (
-                                    <div className="mt-2 flex items-start gap-2 p-2.5 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-lg text-xs text-amber-700 dark:text-amber-400">
-                                        <AlertTriangle className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
-                                        <span>
-                                            <strong>Partial CMA-ES coverage.</strong> This model has string or boolean parameters (e.g. solver, kernel, criterion) that CMA-ES cannot optimize — they will be sampled randomly. For full CMA-ES benefit, use <strong>XGBoost</strong> or <strong>Gradient Boosting</strong>. Alternatively, switch to <strong>TPE</strong> which handles mixed spaces natively.
-                                        </span>
-                                    </div>
-                                )}
-                            </div>
-
-                            <div>
-                                <div className="flex items-center gap-1.5 mb-1">
-                                    <label htmlFor={`${fieldId}-pruner`} className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                                        Pruner
-                                    </label>
-                                    <HelpTooltip placement="bottom-left" text="Median prunes trials worse than the median of previous runs. Hyperband is an aggressively fast early-stopping algorithm. None disables early stopping." />
-                                </div>
-                                <select
-                                    id={`${fieldId}-pruner`}
-                                    value={config.pruner ?? 'median'}
-                                    onChange={(e) => setConfig({ ...config, pruner: e.target.value as 'median' | 'hyperband' | 'none' })}
-                                    className="w-full text-sm border-gray-300 dark:border-gray-600 rounded-lg p-2.5 bg-gray-50 dark:bg-gray-900 dark:text-white border focus:ring-2 focus:ring-blue-500"
-                                >
-                                    <option value="median">Median Pruner</option>
-                                    <option value="hyperband">Hyperband Pruner</option>
-                                    <option value="none">None (No Pruning)</option>
-                                </select>
-                                <p className="text-xs text-gray-500 mt-1">Algorithm to kill bad trials early.</p>
-                            </div>
-
-                            <div>
-                                <div className="flex items-center gap-1.5 mb-1">
-                                    <label htmlFor={`${fieldId}-timeout`} className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                                        Timeout (Seconds)
-                                    </label>
-                                    <HelpTooltip placement="bottom-left" text="Set a hard time limit for the entire Optuna study. Regardless of N-Trials, optimization will yield the best found parameters once time is up." />
-                                </div>
-                                <input
-                                    type="number"
-                                    min="1"
-                                    id={`${fieldId}-timeout`}
-                                    value={config.timeout ?? ''}
-                                    onChange={(e) => setConfig({ ...config, timeout: e.target.value ? Number.parseInt(e.target.value, 10) : '' })}
-                                    className="w-full text-sm border-gray-300 dark:border-gray-600 rounded-lg p-2.5 bg-gray-50 dark:bg-gray-900 dark:text-white border focus:ring-2 focus:ring-blue-500"
-                                    placeholder="e.g. 300 (Optional)"
-                                />
-                                <p className="text-xs text-gray-500 mt-1">Stop tuning after X seconds.</p>
-                            </div>
-                        </>
-                    )}
+                    {isHalving && <HalvingControls config={config} setConfig={setConfig} fieldId={fieldId} strategy={strategy} />}
+                    {isOptuna && <OptunaControls config={config} setConfig={setConfig} fieldId={fieldId} showCmaesWarning={showCmaesWarning} />}
                 </div>
         </ModalShell>
     );

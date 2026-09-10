@@ -19,6 +19,84 @@ interface PolynomialFeaturesConfig {
   isExpanded?: boolean;
 }
 
+function PolynomialFeaturesControls({
+  config,
+  updateConfig,
+}: { config: PolynomialFeaturesConfig; updateConfig: (updates: Partial<PolynomialFeaturesConfig>) => void }) {
+  return (
+    <div className="space-y-3">
+      <div className="space-y-1.5">
+        <span className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+          Degree
+          <div className="group relative">
+            <Info size={10} className="cursor-help" />
+            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 hidden group-hover:block w-48 p-2 bg-popover text-popover-foreground text-[10px] rounded border shadow-lg z-50">
+              The degree of the polynomial features. Default = 2.
+            </div>
+          </div>
+        </span>
+        <ValidationField field="degree">
+          <input
+            aria-label="Degree"
+            type="number"
+            min={2}
+            max={5}
+            className="w-full px-2 py-1.5 text-xs border rounded bg-background"
+            value={config.degree || 2}
+            onChange={(e) => updateConfig({ degree: Number.parseInt(e.target.value) || 2 })}
+          />
+        </ValidationField>
+      </div>
+
+      <div className="space-y-1.5">
+        <span className="text-xs font-medium text-muted-foreground">Output Prefix</span>
+        <input
+          aria-label="Output Prefix"
+          type="text"
+          className="w-full px-2 py-1.5 text-xs border rounded bg-background"
+          value={config.output_prefix || 'poly'}
+          onChange={(e) => updateConfig({ output_prefix: e.target.value })}
+        />
+      </div>
+
+      <div className="space-y-2 pt-1">
+        <label className="flex items-center gap-2 cursor-pointer">
+          <input
+            type="checkbox"
+            className="rounded border-muted"
+            checked={config.interaction_only || false}
+            onChange={(e) => updateConfig({ interaction_only: e.target.checked })}
+          />
+          <span className="text-xs">Interaction Only</span>
+        </label>
+        <p className="text-[10px] text-muted-foreground pl-5">
+          If true, only interaction features are produced: features that are products of at most degree distinct input features.
+        </p>
+
+        <label className="flex items-center gap-2 cursor-pointer">
+          <input
+            type="checkbox"
+            className="rounded border-muted"
+            checked={config.include_bias || false}
+            onChange={(e) => updateConfig({ include_bias: e.target.checked })}
+          />
+          <span className="text-xs">Include Bias</span>
+        </label>
+
+        <label className="flex items-center gap-2 cursor-pointer">
+          <input
+            type="checkbox"
+            className="rounded border-muted"
+            checked={config.include_input_features || false}
+            onChange={(e) => updateConfig({ include_input_features: e.target.checked })}
+          />
+          <span className="text-xs">Include Input Features</span>
+        </label>
+      </div>
+    </div>
+  );
+}
+
 export const PolynomialFeaturesNode: NodeDefinition = {
   type: 'PolynomialFeaturesNode',
   label: 'Polynomial Features',
@@ -102,76 +180,7 @@ export const PolynomialFeaturesNode: NodeDefinition = {
                 />
               </ValidationField>
 
-              <div className="space-y-3">
-                <div className="space-y-1.5">
-                  <span className="text-xs font-medium text-muted-foreground flex items-center gap-1">
-                    Degree
-                    <div className="group relative">
-                      <Info size={10} className="cursor-help" />
-                      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 hidden group-hover:block w-48 p-2 bg-popover text-popover-foreground text-[10px] rounded border shadow-lg z-50">
-                        The degree of the polynomial features. Default = 2.
-                      </div>
-                    </div>
-                  </span>
-                  <ValidationField field="degree">
-                    <input
-                      aria-label="Degree"
-                      type="number"
-                      min={2}
-                      max={5}
-                      className="w-full px-2 py-1.5 text-xs border rounded bg-background"
-                      value={config.degree || 2}
-                      onChange={(e) => updateConfig({ degree: Number.parseInt(e.target.value) || 2 })}
-                    />
-                  </ValidationField>
-                </div>
-
-                <div className="space-y-1.5">
-                  <span className="text-xs font-medium text-muted-foreground">Output Prefix</span>
-                  <input
-                    aria-label="Output Prefix"
-                    type="text"
-                    className="w-full px-2 py-1.5 text-xs border rounded bg-background"
-                    value={config.output_prefix || 'poly'}
-                    onChange={(e) => updateConfig({ output_prefix: e.target.value })}
-                  />
-                </div>
-
-                <div className="space-y-2 pt-1">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      className="rounded border-muted"
-                      checked={config.interaction_only || false}
-                      onChange={(e) => updateConfig({ interaction_only: e.target.checked })}
-                    />
-                    <span className="text-xs">Interaction Only</span>
-                  </label>
-                  <p className="text-[10px] text-muted-foreground pl-5">
-                    If true, only interaction features are produced: features that are products of at most degree distinct input features.
-                  </p>
-
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      className="rounded border-muted"
-                      checked={config.include_bias || false}
-                      onChange={(e) => updateConfig({ include_bias: e.target.checked })}
-                    />
-                    <span className="text-xs">Include Bias</span>
-                  </label>
-
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      className="rounded border-muted"
-                      checked={config.include_input_features || false}
-                      onChange={(e) => updateConfig({ include_input_features: e.target.checked })}
-                    />
-                    <span className="text-xs">Include Input Features</span>
-                  </label>
-                </div>
-              </div>
+              <PolynomialFeaturesControls config={config} updateConfig={updateConfig} />
             </div>
           )}
         </div>

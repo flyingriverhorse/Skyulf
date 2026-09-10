@@ -18,6 +18,50 @@ afterEach(() => {
 });
 
 describe('ModalShell', () => {
+  it('preserves header actions, explicit title IDs and footer placement', () => {
+    // Header extraction must keep the accessible name, action and close behavior on the same dialog.
+    const close = vi.fn();
+    const action = vi.fn();
+    const { rerender } = render(
+      <ModalShell isOpen onClose={close} title="My Modal" headerExtra={<button onClick={action}>Apply</button>} footer={<button>Footer</button>}>
+        <p>body</p>
+      </ModalShell>,
+    );
+    expect(screen.getByRole('dialog', { name: 'My Modal' })).toHaveAttribute('aria-labelledby', 'modal-title-my-modal');
+    fireEvent.click(screen.getByRole('button', { name: 'Apply' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+    expect(action).toHaveBeenCalledTimes(1);
+    expect(close).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('button', { name: 'Footer' }).parentElement?.previousElementSibling).toHaveTextContent('body');
+    rerender(<ModalShell isOpen onClose={close} title={<span>Rich title</span>} ariaLabelledBy="custom-title" hideCloseButton><p>body</p></ModalShell>);
+    expect(screen.getByRole('dialog', { name: 'Rich title' })).toHaveAttribute('aria-labelledby', 'custom-title');
+    expect(screen.queryByRole('button', { name: 'Close' })).toBeNull();
+    expect(screen.getByRole('heading')).toHaveAttribute('id', 'custom-title');
+  });
+
+  it('keeps an empty header hidden and a non-dismissible backdrop inert', () => {
+    // Content-only modals must not gain a header or an accidental dismissal after extraction.
+    const close = vi.fn();
+    render(<ModalShell isOpen onClose={close} title="" hideCloseButton dismissOnBackdrop={false} dismissOnEscape={false}><button>Body action</button></ModalShell>);
+    const dialog = screen.getByRole('dialog');
+    expect(screen.queryByRole('heading')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Close' })).toBeNull();
+    expect(dialog).toHaveAttribute('aria-labelledby', 'modal-title-');
+    fireEvent.click(dialog.parentElement!);
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(close).not.toHaveBeenCalled();
+  });
+
+  it('renders header extras without a title while keeping zero footer output', () => {
+    // React truthy conditions and an extra-only header must preserve the existing body structure.
+    render(<ModalShell isOpen onClose={() => {}} title={0} hideCloseButton headerExtra={<button>Extra</button>} footer={0}><p>Body</p></ModalShell>);
+    const dialog = screen.getByRole('dialog');
+    expect(dialog).not.toHaveAttribute('aria-labelledby');
+    expect(screen.queryByRole('heading')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Extra' })).toBeInTheDocument();
+    expect(dialog.lastChild?.textContent).toBe('0');
+  });
+
   it('renders nothing when closed', () => {
     render(
       <ModalShell isOpen={false} onClose={() => {}} title="Hidden">

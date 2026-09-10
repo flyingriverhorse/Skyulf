@@ -97,28 +97,7 @@ export const ModalShell: React.FC<ModalShellProps> = ({
         tabIndex={-1}
         className={`bg-white dark:bg-slate-900 rounded-xl shadow-2xl w-full ${sizeClass[size]} max-h-[85vh] flex flex-col border border-slate-200 dark:border-slate-700 animate-in fade-in zoom-in-95 duration-200 outline-none ${className ?? ''}`}
       >
-        {(title || !hideCloseButton || headerExtra) && (
-          <div className="flex items-center justify-between gap-3 p-6 border-b border-slate-200 dark:border-slate-700">
-            {title && (
-              <h2 id={titleId} className="text-xl font-bold text-slate-900 dark:text-slate-100 flex-1 truncate">
-                {title}
-              </h2>
-            )}
-            <div className="flex items-center gap-2">
-              {headerExtra}
-              {!hideCloseButton && (
-                <button
-                  onClick={onClose}
-                  className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors rounded focus-ring"
-                  aria-label="Close"
-                  type="button"
-                >
-                  <X size={24} />
-                </button>
-              )}
-            </div>
-          </div>
-        )}
+        <ModalHeader title={title} titleId={titleId} headerExtra={headerExtra} hideCloseButton={hideCloseButton} onClose={onClose} />
         <div className="flex-1 overflow-y-auto">{children}</div>
         {footer && (
           <div className="border-t border-slate-200 dark:border-slate-700 p-4">{footer}</div>
@@ -128,3 +107,36 @@ export const ModalShell: React.FC<ModalShellProps> = ({
     document.body,
   );
 };
+
+type ModalHeaderProps = Pick<ModalShellProps, 'title' | 'headerExtra' | 'onClose'> & {
+  titleId: string | undefined;
+  hideCloseButton: boolean;
+};
+
+/** Keep modal heading/actions separate from the portal, focus and dismissal lifecycle. */
+function ModalHeader({ title, titleId, headerExtra, hideCloseButton, onClose }: ModalHeaderProps) {
+  return <>
+    {(title || !hideCloseButton || headerExtra) && (
+      <div className="flex items-center justify-between gap-3 p-6 border-b border-slate-200 dark:border-slate-700">
+        {title && (
+          <h2 id={titleId} className="text-xl font-bold text-slate-900 dark:text-slate-100 flex-1 truncate">
+            {title}
+          </h2>
+        )}
+        <div className="flex items-center gap-2">
+          {headerExtra}
+          {!hideCloseButton && (
+            <button
+              onClick={onClose}
+              className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors rounded focus-ring"
+              aria-label="Close"
+              type="button"
+            >
+              <X size={24} />
+            </button>
+          )}
+        </div>
+      </div>
+    )}
+  </>;
+}

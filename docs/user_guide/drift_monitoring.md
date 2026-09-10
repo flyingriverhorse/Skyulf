@@ -8,6 +8,32 @@ Data drift occurs when the statistical properties of incoming (production) data 
 - As a scheduled health check in production pipelines.
 - After a data source change (new CSV, new API feed, schema migration).
 
+## Using the Data Drift Analysis page
+
+Upload raw data in the same format as the selected model's source dataset.
+Do not manually apply the pipeline's log transforms, scaling or encoding first.
+The page compares it with the raw loader snapshot saved during that job, before
+preprocessing and train/test splitting. It reads the saved snapshot rather than
+reloading a source file that may have changed since training.
+
+The reference contains the rows actually loaded: a sampled loader keeps its
+sample, while an unsampled loader keeps the complete loaded dataset. Consequently,
+a model trained on 120 of 150 rows can show **Ref: 150 rows** in drift analysis;
+the model card's 120 rows still describes its training partition.
+
+The target and columns explicitly named by upstream drop-column configurations
+are excluded on both sides. All other raw columns remain eligible, including
+categorical inputs that the model later encodes. Missing and new input columns
+still produce schema drift. Explicit drops follow the model bundle's exclusion
+convention; this is not a complete dependency analysis of generated features.
+
+Existing jobs with a saved execution graph and loader snapshot work without
+retraining. If that graph has multiple upstream source datasets or its saved
+source is unavailable, the analysis records a failed check rather than comparing
+the upload with a transformed reference. Legacy jobs without graph metadata
+retain their original saved reference; ensure that reference and upload use the
+same preprocessing stage.
+
 ## Quick example
 
 ```python

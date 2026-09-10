@@ -17,6 +17,80 @@ interface InvalidValueReplacementConfig {
 
 // --- Components ---
 
+function InvalidValueModeDescription({ mode }: { mode: InvalidValueReplacementConfig['mode'] }) {
+  return (
+    <>
+      {mode === 'negative_to_nan' && "Replaces all negative values (< 0) with NaN."}
+      {mode === 'zero_to_nan' && "Replaces all zero values (== 0) with NaN."}
+      {mode === 'percentage_bounds' && "Replaces values outside 0-100 range with NaN."}
+      {mode === 'age_bounds' && "Replaces values outside 0-120 range with NaN."}
+      {mode === 'custom_range' && "Replaces values outside the specified Min/Max range with NaN."}
+    </>
+  );
+}
+
+function InvalidValueControls({
+  config,
+  onChange,
+}: { config: InvalidValueReplacementConfig; onChange: (config: InvalidValueReplacementConfig) => void }) {
+  return (
+    <>
+      <div>
+        <span className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 block">
+          Replacement Mode
+        </span>
+        <select
+          aria-label="Replacement Mode"
+          className="w-full text-xs rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 p-2"
+          value={config.mode}
+          onChange={(e) => onChange({ ...config, mode: e.target.value as InvalidValueReplacementConfig['mode'] })}
+        >
+          <option value="negative_to_nan">Negative to NaN</option>
+          <option value="zero_to_nan">Zero to NaN</option>
+          <option value="percentage_bounds">Percentage Bounds (0-100)</option>
+          <option value="age_bounds">Age Bounds (0-120)</option>
+          <option value="custom_range">Custom Range</option>
+        </select>
+        <p className="text-[10px] text-gray-500 mt-1">
+          <InvalidValueModeDescription mode={config.mode} />
+        </p>
+      </div>
+
+      {(config.mode === 'custom_range' || config.mode === 'percentage_bounds' || config.mode === 'age_bounds') && (
+        <div className="grid grid-cols-2 gap-2">
+          <div>
+            <span className="text-[10px] text-gray-500 uppercase font-semibold">Min Value</span>
+            <ValidationField field="min_value">
+              <input
+                aria-label="Min Value"
+                type="number"
+                className="w-full text-xs rounded border border-gray-300 dark:border-gray-600 px-2 py-1.5"
+                placeholder={config.mode === 'percentage_bounds' ? '0' : 'Min'}
+                value={config.min_value ?? ''}
+                onChange={(e) => onChange({ ...config, min_value: e.target.value ? Number.parseFloat(e.target.value) : undefined })}
+              />
+            </ValidationField>
+          </div>
+          <div>
+            <span className="text-[10px] text-gray-500 uppercase font-semibold">Max Value</span>
+            <input
+              aria-label="Max Value"
+              type="number"
+              className="w-full text-xs rounded border border-gray-300 dark:border-gray-600 px-2 py-1.5"
+              placeholder={config.mode === 'percentage_bounds' ? '100' : 'Max'}
+              value={config.max_value ?? ''}
+              onChange={(e) => onChange({ ...config, max_value: e.target.value ? Number.parseFloat(e.target.value) : undefined })}
+            />
+          </div>
+          <p className="col-span-2 text-[10px] text-gray-500">
+            Values outside this range will be replaced with NaN.
+          </p>
+        </div>
+      )}
+    </>
+  );
+}
+
 const InvalidValueSettings: React.FC<{ config: InvalidValueReplacementConfig; onChange: (c: InvalidValueReplacementConfig) => void; nodeId?: string }> = ({
   config,
   onChange,
@@ -88,62 +162,7 @@ const InvalidValueSettings: React.FC<{ config: InvalidValueReplacementConfig; on
             )}
           </div>
 
-          <div>
-            <span className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 block">
-              Replacement Mode
-            </span>
-            <select
-              aria-label="Replacement Mode"
-              className="w-full text-xs rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 p-2"
-              value={config.mode}
-              onChange={(e) => onChange({ ...config, mode: e.target.value as InvalidValueReplacementConfig['mode'] })}
-            >
-              <option value="negative_to_nan">Negative to NaN</option>
-              <option value="zero_to_nan">Zero to NaN</option>
-              <option value="percentage_bounds">Percentage Bounds (0-100)</option>
-              <option value="age_bounds">Age Bounds (0-120)</option>
-              <option value="custom_range">Custom Range</option>
-            </select>
-            <p className="text-[10px] text-gray-500 mt-1">
-              {config.mode === 'negative_to_nan' && "Replaces all negative values (< 0) with NaN."}
-              {config.mode === 'zero_to_nan' && "Replaces all zero values (== 0) with NaN."}
-              {config.mode === 'percentage_bounds' && "Replaces values outside 0-100 range with NaN."}
-              {config.mode === 'age_bounds' && "Replaces values outside 0-120 range with NaN."}
-              {config.mode === 'custom_range' && "Replaces values outside the specified Min/Max range with NaN."}
-            </p>
-          </div>
-
-          {(config.mode === 'custom_range' || config.mode === 'percentage_bounds' || config.mode === 'age_bounds') && (
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <span className="text-[10px] text-gray-500 uppercase font-semibold">Min Value</span>
-                <ValidationField field="min_value">
-                  <input
-                    aria-label="Min Value"
-                    type="number"
-                    className="w-full text-xs rounded border border-gray-300 dark:border-gray-600 px-2 py-1.5"
-                    placeholder={config.mode === 'percentage_bounds' ? '0' : 'Min'}
-                    value={config.min_value ?? ''}
-                    onChange={(e) => onChange({ ...config, min_value: e.target.value ? Number.parseFloat(e.target.value) : undefined })}
-                  />
-                </ValidationField>
-              </div>
-              <div>
-                <span className="text-[10px] text-gray-500 uppercase font-semibold">Max Value</span>
-                <input
-                  aria-label="Max Value"
-                  type="number"
-                  className="w-full text-xs rounded border border-gray-300 dark:border-gray-600 px-2 py-1.5"
-                  placeholder={config.mode === 'percentage_bounds' ? '100' : 'Max'}
-                  value={config.max_value ?? ''}
-                  onChange={(e) => onChange({ ...config, max_value: e.target.value ? Number.parseFloat(e.target.value) : undefined })}
-                />
-              </div>
-              <p className="col-span-2 text-[10px] text-gray-500">
-                Values outside this range will be replaced with NaN.
-              </p>
-            </div>
-          )}
+          <InvalidValueControls config={config} onChange={onChange} />
         </div>
 
       </div>

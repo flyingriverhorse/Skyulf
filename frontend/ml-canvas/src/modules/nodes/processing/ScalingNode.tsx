@@ -1,114 +1,26 @@
+import { validateScaling } from './scaling/validation';
+import { ScalingFeedback } from './scaling/ScalingFeedback';
+import type { ScalingConfig, ScalingSettingsProps } from './scaling/types';
+import { ScalingControls } from './scaling/ScalingControls';
+import { useScalingData } from './scaling/useScalingData';
 import { ValidationField } from '../../../components/shared/ValidationField';
 import React from 'react';
 import { NodeDefinition } from '../../../core/types/nodes';
 import { Scaling } from 'lucide-react';
-import { useUpstreamData } from '../../../core/hooks/useUpstreamData';
-import { useDatasetSchema } from '../../../core/hooks/useDatasetSchema';
-import { useGraphStore } from '../../../core/store/useGraphStore';
-import { useUpstreamDroppedColumns } from '../../../core/hooks/useUpstreamDroppedColumns';
 import { ColumnMultiSelect } from '../shared/ColumnMultiSelect';
 import { useIsWideContainer } from '../../../core/hooks/useIsWideContainer';
-import { getNodeMetricDetails } from '../../../core/utils/preprocessingMetrics';
 
-interface ScalingConfig {
-  columns: string[];
-  method: 'standard' | 'minmax' | 'maxabs' | 'robust';
 
-  // Standard Scaler
-  with_mean?: boolean;
-  with_std?: boolean;
-
-  // MinMax Scaler
-  feature_range_min?: number;
-  feature_range_max?: number;
-
-  // Robust Scaler
-  quantile_range_min?: number;
-  quantile_range_max?: number;
-  with_centering?: boolean;
-  with_scaling?: boolean;
-}
-
-const ScalingSettings: React.FC<{ config: ScalingConfig; onChange: (c: ScalingConfig) => void; nodeId?: string }> = ({
+const ScalingSettings: React.FC<ScalingSettingsProps> = ({
   config,
   onChange,
   nodeId,
 }) => {
-  const upstreamData = useUpstreamData(nodeId || '');
-  const datasetId = upstreamData.find(d => d.datasetId)?.datasetId as string | undefined;
-  const { data: schema, isLoading } = useDatasetSchema(datasetId);
-  const droppedUpstream = useUpstreamDroppedColumns(nodeId);
-
-  const executionResult = useGraphStore((state) => state.executionResult);
-  const nodeResult = nodeId ? executionResult?.node_results[nodeId] : null;
-  const metrics = getNodeMetricDetails(nodeResult?.metrics);
+  const { datasetId, isLoading, numericColumns, metrics } = useScalingData(nodeId);
 
   // Responsive layout: switch to a 2-column layout once the panel is wider than 450px.
   const [containerRef, isWide] = useIsWideContainer();
 
-  // Filter for numeric columns only, as scaling only applies to them
-  const numericColumns = schema
-    ? Object.values(schema.columns)
-        .filter(c => ['int', 'float', 'number'].some(t => c.dtype.toLowerCase().includes(t)))
-        .filter(c => !droppedUpstream.has(c.name))
-        .map(c => c.name)
-    : [];
-
-  const renderFeedback = () => {
-    if (!metrics) return null;
-    const cols = metrics.columns as string[] | undefined;
-
-    if (!cols) return null;
-
-    const getTargetExplanation = () => {
-      switch (config.method) {
-        case 'standard': return "Target: μ ≈ 0, σ ≈ 1";
-        case 'minmax': return `Target: ${config.feature_range_min ?? 0} to ${config.feature_range_max ?? 1}`;
-        case 'robust': return "Target: Median ≈ 0, IQR ≈ 1";
-        case 'maxabs': return "Target: MaxAbs = 1";
-        default: return "";
-      }
-    };
-
-    return (
-      <div className="mt-4 p-3 bg-muted/50 rounded border text-xs space-y-2">
-        <div className="flex justify-between items-center">
-          <div className="font-medium text-muted-foreground">Scaling Statistics</div>
-          <div className="text-[10px] text-primary/80 bg-primary/5 px-1.5 py-0.5 rounded border border-primary/10" title="Values close to these targets indicate successful scaling.">
-             {getTargetExplanation()}
-          </div>
-        </div>
-        <div className="max-h-40 overflow-y-auto bg-background p-2 rounded border space-y-1">
-          {cols.map((col, idx) => {
-            let details = "";
-            if (config.method === 'standard') {
-               const mean = metrics.mean ? (metrics.mean as number[])[idx] : undefined;
-               const scale = metrics.scale ? (metrics.scale as number[])[idx] : undefined;
-               if (typeof mean === 'number') details = `μ=${mean.toFixed(2)}, σ=${typeof scale === 'number' ? scale.toFixed(2) : '-'}`;
-            } else if (config.method === 'minmax') {
-               const min = metrics.data_min ? (metrics.data_min as number[])[idx] : undefined;
-               const max = metrics.data_max ? (metrics.data_max as number[])[idx] : undefined;
-               if (typeof min === 'number') details = `Min=${min.toFixed(2)}, Max=${typeof max === 'number' ? max.toFixed(2) : '-'}`;
-            } else if (config.method === 'robust') {
-               const center = metrics.center ? (metrics.center as number[])[idx] : undefined;
-               const scale = metrics.scale ? (metrics.scale as number[])[idx] : undefined;
-               if (typeof center === 'number') details = `Med=${center.toFixed(2)}, IQR=${typeof scale === 'number' ? scale.toFixed(2) : '-'}`;
-            } else if (config.method === 'maxabs') {
-               const maxAbs = metrics.max_abs ? (metrics.max_abs as number[])[idx] : undefined;
-               if (typeof maxAbs === 'number') details = `MaxAbs=${maxAbs.toFixed(2)}`;
-            }
-
-            return (
-              <div key={col} className="flex justify-between items-center border-b border-border/50 last:border-0 pb-1 last:pb-0">
-                <span className="truncate max-w-[100px] font-medium" title={col}>{col}</span>
-                <span className="font-mono text-[10px] text-muted-foreground">{details}</span>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    );
-  };
 
   return (
     <div ref={containerRef} className={`flex flex-col h-full w-full bg-background ${isWide ? 'overflow-hidden' : 'overflow-y-auto'}`}>
@@ -126,125 +38,10 @@ const ScalingSettings: React.FC<{ config: ScalingConfig; onChange: (c: ScalingCo
 
         {/* Left Column: Settings */}
         <div className={`space-y-4 ${isWide ? 'overflow-y-auto pr-2' : 'shrink-0'}`}>
-          <div>
-            <span className="block text-sm font-medium mb-1">Scaling Method</span>
-            <select
-              aria-label="Scaling Method"
-              className="w-full p-2 border rounded bg-background text-sm"
-              value={config.method}
-              onChange={(e) => onChange({ ...config, method: e.target.value as ScalingConfig['method'] })}
-            >
-              <option value="standard">Standard Scaler (Z-Score)</option>
-              <option value="minmax">MinMax Scaler (0-1)</option>
-              <option value="maxabs">MaxAbs Scaler</option>
-              <option value="robust">Robust Scaler (Outlier Safe)</option>
-            </select>
-            <p className="text-[10px] text-muted-foreground mt-1">
-              {config.method === 'standard' && 'Centers data around 0 with unit variance.'}
-              {config.method === 'minmax' && 'Scales data to a fixed range [0, 1].'}
-              {config.method === 'maxabs' && 'Scales data by its maximum absolute value.'}
-              {config.method === 'robust' && 'Scales data using statistics that are robust to outliers.'}
-            </p>
-          </div>
-
-          {/* Standard Scaler Params */}
-          {config.method === 'standard' && (
-            <div className="space-y-2 border-t pt-2">
-              <label className="flex items-center gap-2 text-sm cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={config.with_mean ?? true}
-                  onChange={(e) => onChange({ ...config, with_mean: e.target.checked })}
-                  className="rounded border-gray-300 text-primary focus:ring-primary"
-                />
-                <span>Center Data (with_mean)</span>
-              </label>
-              <label className="flex items-center gap-2 text-sm cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={config.with_std ?? true}
-                  onChange={(e) => onChange({ ...config, with_std: e.target.checked })}
-                  className="rounded border-gray-300 text-primary focus:ring-primary"
-                />
-                <span>Scale Variance (with_std)</span>
-              </label>
-            </div>
-          )}
-
-          {/* MinMax Scaler Params */}
-          {config.method === 'minmax' && (
-            <div className="space-y-2 border-t pt-2">
-              <span className="block text-sm font-medium">Feature Range</span>
-              <div className="flex gap-2 items-center">
-                <input
-                  aria-label="Feature Range Minimum"
-                  type="number"
-                  className="w-full p-2 border rounded bg-background text-sm"
-                  placeholder="Min (0)"
-                  value={config.feature_range_min ?? 0}
-                  onChange={(e) => onChange({ ...config, feature_range_min: Number.parseFloat(e.target.value) })}
-                />
-                <span className="text-muted-foreground">-</span>
-                <input
-                  aria-label="Feature Range Maximum"
-                  type="number"
-                  className="w-full p-2 border rounded bg-background text-sm"
-                  placeholder="Max (1)"
-                  value={config.feature_range_max ?? 1}
-                  onChange={(e) => onChange({ ...config, feature_range_max: Number.parseFloat(e.target.value) })}
-                />
-              </div>
-            </div>
-          )}
-
-          {/* Robust Scaler Params */}
-          {config.method === 'robust' && (
-            <div className="space-y-2 border-t pt-2">
-              <span className="block text-sm font-medium">Quantile Range</span>
-              <div className="flex gap-2 items-center">
-                <input
-                  aria-label="Quantile Range Minimum"
-                  type="number"
-                  className="w-full p-2 border rounded bg-background text-sm"
-                  placeholder="Min (25.0)"
-                  value={config.quantile_range_min ?? 25.0}
-                  onChange={(e) => onChange({ ...config, quantile_range_min: Number.parseFloat(e.target.value) })}
-                />
-                <span className="text-muted-foreground">-</span>
-                <input
-                  aria-label="Quantile Range Maximum"
-                  type="number"
-                  className="w-full p-2 border rounded bg-background text-sm"
-                  placeholder="Max (75.0)"
-                  value={config.quantile_range_max ?? 75.0}
-                  onChange={(e) => onChange({ ...config, quantile_range_max: Number.parseFloat(e.target.value) })}
-                />
-              </div>
-              <div className="space-y-2 mt-2">
-                <label className="flex items-center gap-2 text-sm cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={config.with_centering ?? true}
-                    onChange={(e) => onChange({ ...config, with_centering: e.target.checked })}
-                    className="rounded border-gray-300 text-primary focus:ring-primary"
-                  />
-                  <span>Center Data (Median)</span>
-                </label>
-                <label className="flex items-center gap-2 text-sm cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={config.with_scaling ?? true}
-                    onChange={(e) => onChange({ ...config, with_scaling: e.target.checked })}
-                    className="rounded border-gray-300 text-primary focus:ring-primary"
-                  />
-                  <span>Scale Data (IQR)</span>
-                </label>
-              </div>
-            </div>
-          )}
+          <ScalingControls config={config} onChange={onChange} />
 
           {/* Feedback Section (Wide) */}
-          {isWide && renderFeedback()}
+          {isWide && <ScalingFeedback config={config} metrics={metrics} />}
         </div>
 
         {/* Right Column: Columns */}
@@ -264,7 +61,7 @@ const ScalingSettings: React.FC<{ config: ScalingConfig; onChange: (c: ScalingCo
         </div>
 
         {/* Feedback Section (Narrow) */}
-        {!isWide && renderFeedback()}
+        {!isWide && <ScalingFeedback config={config} metrics={metrics} />}
 
       </div>
     </div>
@@ -286,11 +83,7 @@ export const ScalingNode: NodeDefinition<ScalingConfig> = {
     if (cols === 0) return method;
     return `${method} · ${cols} ${cols === 1 ? 'col' : 'cols'}`;
   },
-  validate: (config) => ({
-    field: 'columns',
-    isValid: config.columns.length > 0,
-    message: config.columns.length === 0 ? 'Select at least one column' : undefined
-  }),
+  validate: validateScaling,
   getDefaultConfig: () => ({
     columns: [],
     method: 'standard',

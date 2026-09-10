@@ -131,6 +131,7 @@ describe('run identifier labels', () => {
       tuningPreview: null,
       tuningError: null,
       useTunedThresholds: false,
+      hasSavedThresholds: false,
       onPreviewThresholds: noop,
       onSaveThresholds: noop,
       onToggleThresholds: noop,

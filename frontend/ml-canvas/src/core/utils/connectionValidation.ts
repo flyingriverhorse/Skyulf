@@ -1,4 +1,5 @@
 import type { Connection, Edge, Node } from '@xyflow/react';
+import type { PortDefinition } from '../types/nodes';
 import { registry } from '../registry/NodeRegistry';
 import { splitOutputHandles } from './splitConnections';
 
@@ -58,23 +59,44 @@ export function connectionIssue(nodes: Node[], edges: Edge[], connection: Connec
   const sourceType = String(source.data.definitionType);
   const targetType = String(target.data.definitionType);
   if (isModelEndpointViolation(sourceType, targetType)) return MODEL_ENDPOINT_CONNECTION_MESSAGE;
-  const outputs = registry.get(sourceType)?.outputs ?? [];
-  const inputs = registry.get(targetType)?.inputs ?? [];
-  const output = connection.sourceHandle == null ? outputs[0] : outputs.find(port => port.id === connection.sourceHandle);
-  const input = connection.targetHandle == null ? inputs[0] : inputs.find(port => port.id === connection.targetHandle);
+  return portConnectionIssue(source, target, sourceType, targetType, edges, connection);
+}
+
+/** Resolve registered ports before checking split, type and duplicate policies. */
+function portConnectionIssue(
+  source: Node, target: Node, sourceType: string, targetType: string,
+  edges: Edge[], connection: Connection,
+): string | null {
+  const { outputs, inputs, output, input } = resolveConnectionPorts(sourceType, targetType, connection);
   if (!output || !input) return 'Choose an output and an input on registered nodes. Data sources have no input.';
   const splitHandles = splitOutputHandles(source);
   if (splitHandles.length && !splitHandles.includes(output.id)) {
     return 'Validation is disabled. Set Validation Size above zero, or connect from Train or Test.';
   }
+  const typeIssue = portTypeIssue(targetType, output, input);
+  if (typeIssue) return typeIssue;
+  if (edges.some(edge => edge.source === source.id && edge.target === target.id &&
+    (splitHandles.length > 0 || (edge.sourceHandle ?? outputs[0]?.id) === output.id) && (edge.targetHandle ?? inputs[0]?.id) === input.id)) {
+    return 'These ports are already connected. Choose another input or remove the existing connection.';
+  }
+  return null;
+}
+
+/** Keep null-handle fallback distinct from an explicitly invalid handle. */
+function resolveConnectionPorts(sourceType: string, targetType: string, connection: Connection) {
+  const outputs = registry.get(sourceType)?.outputs ?? [];
+  const inputs = registry.get(targetType)?.inputs ?? [];
+  const output = connection.sourceHandle == null ? outputs[0] : outputs.find(port => port.id === connection.sourceHandle);
+  const input = connection.targetHandle == null ? inputs[0] : inputs.find(port => port.id === connection.targetHandle);
+  return { outputs, inputs, output, input };
+}
+
+/** Enforce data compatibility while allowing model specs into an ensemble. */
+function portTypeIssue(targetType: string, output: PortDefinition, input: PortDefinition): string | null {
   // Ensemble's shared input accepts both datasets and model specs, including saved definitions.
   const ensembleModel = targetType === 'EnsembleNode' && output.type === 'model';
   if (!ensembleModel && output.type !== 'any' && input.type !== 'any' && output.type !== input.type) {
     return `${output.label} provides ${output.type}, but ${input.label} needs ${input.type}. Choose an input of the same kind.`;
-  }
-  if (edges.some(edge => edge.source === source.id && edge.target === target.id &&
-    (splitHandles.length > 0 || (edge.sourceHandle ?? outputs[0]?.id) === output.id) && (edge.targetHandle ?? inputs[0]?.id) === input.id)) {
-    return 'These ports are already connected. Choose another input or remove the existing connection.';
   }
   return null;
 }

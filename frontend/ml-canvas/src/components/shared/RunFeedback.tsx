@@ -1,21 +1,35 @@
 import { useJobStore } from '../../core/store/useJobStore';
+import type { JobInfo } from '../../core/api/jobs';
 import type { SubmittedRun } from '../../core/types/runFeedback';
 import type { TaskType } from '../../core/types/taskType';
+
+function formatRunJobCounts(counts: Map<string, number>): string {
+  return counts.size === 0 || (counts.size === 1 && counts.has('awaiting status'))
+    ? 'Awaiting status'
+    : [...counts].map(([status, count]) => `${count} ${status}`).join(' · ');
+}
+
+/** Summarise the statuses belonging to one submitted run. */
+export function summariseRunJobs(
+  jobIds: string[],
+  jobs: JobInfo[],
+  runJobs: Record<string, JobInfo>,
+): string {
+  const counts = new Map<string, number>();
+  for (const id of new Set(jobIds)) {
+    const status = (runJobs[id] ?? jobs.find(job => job.job_id === id))?.status;
+    const label = status === 'succeeded' ? 'completed' : status ?? 'awaiting status';
+    counts.set(label, (counts.get(label) ?? 0) + 1);
+  }
+  return formatRunJobCounts(counts);
+}
 
 /** Describe a submitted run using its own job IDs, including partial or missing results. */
 export function RunFeedback({ run, task, onOpen }: { run: SubmittedRun; task?: TaskType; onOpen?: () => void }) {
   const jobs = useJobStore(state => state.jobs);
   const runJobs = useJobStore(state => state.runJobs);
   const toggleDrawer = useJobStore(state => state.toggleDrawer);
-  const counts = new Map<string, number>();
-  for (const id of new Set(run.jobIds)) {
-    const status = (runJobs[id] ?? jobs.find(job => job.job_id === id))?.status;
-    const label = status === 'succeeded' ? 'completed' : status ?? 'awaiting status';
-    counts.set(label, (counts.get(label) ?? 0) + 1);
-  }
-  const summary = counts.size === 0 || (counts.size === 1 && counts.has('awaiting status'))
-    ? 'Awaiting status'
-    : [...counts].map(([status, count]) => `${count} ${status}`).join(' · ');
+  const summary = summariseRunJobs(run.jobIds, jobs, runJobs);
   return <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-xs">
     <p role="status" aria-atomic="true" className="min-w-0 break-words [overflow-wrap:anywhere] text-muted-foreground">
       {run.label}: {summary}

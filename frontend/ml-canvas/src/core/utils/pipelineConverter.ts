@@ -1,689 +1,78 @@
-import { Node, Edge } from '@xyflow/react';
-import { PipelineConfigModel, NodeConfigModel } from '../api/client';
+import type { Node, Edge } from '@xyflow/react';
+import type { PipelineConfigModel, NodeConfigModel } from '../api/client';
 import { v4 as uuidv4 } from 'uuid';
-import { StepType as BackendStepType } from '../constants/stepTypes';
 import { getMergeStrategy } from '../types/nodeData';
 import { registry } from '../registry/NodeRegistry';
+import { convertUnknownNode, preprocessingConverters } from './pipelineConversion/preprocessing';
+import { convertSegmentationNode, convertTrainingNode } from './pipelineConversion/training';
+import { convertEnsembleNode } from './pipelineConversion/ensemble';
+import { pruneToTerminalAncestors, removeSpecOnlyModels } from './pipelineConversion/graph';
+import type { ConvertedNode, NodeConverter } from './pipelineConversion/types';
 
-// Canvas node `definitionType`s that represent a trained-model spec. When one of
-// these feeds an Ensemble node it acts as a *base-learner spec provider* (Phase 2):
-// the ensemble reads its `model_type` + `hyperparameters` and re-fits it itself —
-// sklearn Voting/Stacking always refit their base estimators, so only the recipe
-// (not the fitted weights) is reused.
-const MODEL_SOURCE_TYPES = new Set([
-  'training',
-  'classification',
-  'regression',
-  'text_classification',
+// Task-scoped supervised nodes share the canonical backend training dispatch.
+const converters = new Map<string, NodeConverter>([
+  ...preprocessingConverters,
+  ['training', convertTrainingNode],
+  ['classification', convertTrainingNode],
+  ['regression', convertTrainingNode],
+  ['text_classification', convertTrainingNode],
+  ['SegmentationNode', convertSegmentationNode],
 ]);
 
-/**
- * `definitionType`s that share the unified `TrainingNode`'s fixed/tuned
- * `run_mode` dispatch (Phase 3 Part B, plan §0.6): the generic `TrainingNode`
- * plus the 3 task-scoped supervised nodes (Segmentation is unsupervised and
- * has no `run_mode` — see `SegmentationNode`). All submit the same
- * canonical `training` backend `step_type` — the task split is purely a
- * frontend/UX concern (model-list filtering), the backend doesn't need to
- * know which task node produced the job.
- */
-const RUN_MODE_TRAINING_TYPES = new Set<string>([
-  BackendStepType.TRAINING,
-  BackendStepType.CLASSIFICATION,
-  BackendStepType.REGRESSION,
-  BackendStepType.TEXT_CLASSIFICATION,
-]);
-
-// All definitionTypes that flow through the single shared fixed/tuned
-// training dispatch below: the generic TrainingNode plus the 3 task-scoped
-// supervised nodes.
-const ALL_TRAINING_DISPATCH_TYPES = RUN_MODE_TRAINING_TYPES;
-
-// Maps a full training-node `model_type` back to the short ensemble base-learner
-// key the core resolver understands. Mirrors `_BASE_KEY_TO_REGISTRY_*` in
-// `skyulf.modeling.hyperparameters._registry` (inverted). Unsupported model types
-// (xgboost, lightgbm, extra_trees, …) are intentionally absent — the ensemble core
-// only supports these base learners, so anything else is skipped.
-const ENSEMBLE_BASE_KEY_BY_MODEL_TYPE: Record<'classification' | 'regression', Record<string, string>> = {
-  classification: {
-    logistic_regression: 'logistic_regression',
-    random_forest_classifier: 'random_forest',
-    extra_trees_classifier: 'extra_trees',
-    gradient_boosting_classifier: 'gradient_boosting',
-    hist_gradient_boosting_classifier: 'hist_gradient_boosting',
-    adaboost_classifier: 'adaboost',
-    decision_tree_classifier: 'decision_tree',
-    gaussian_nb: 'gaussian_nb',
-    sgd_classifier: 'sgd_classifier',
-    svc: 'svc',
-    k_neighbors_classifier: 'knn',
-    xgboost_classifier: 'xgboost',
-    lgbm_classifier: 'lightgbm',
-  },
-  regression: {
-    linear_regression: 'linear_regression',
-    ridge_regression: 'ridge',
-    lasso_regression: 'lasso',
-    elasticnet_regression: 'elasticnet',
-    random_forest_regressor: 'random_forest',
-    extra_trees_regressor: 'extra_trees',
-    gradient_boosting_regressor: 'gradient_boosting',
-    hist_gradient_boosting_regressor: 'hist_gradient_boosting',
-    adaboost_regressor: 'adaboost',
-    decision_tree_regressor: 'decision_tree',
-    svr: 'svr',
-    k_neighbors_regressor: 'knn',
-    xgboost_regressor: 'xgboost',
-    lgbm_regressor: 'lightgbm',
-  },
-};
-
-const isModelSourceType = (defType: unknown): boolean =>
-  typeof defType === 'string' && MODEL_SOURCE_TYPES.has(defType);
-
-/** Resolve a connected model node's `model_type` to an ensemble base key, or null. */
-const resolveEnsembleBaseKey = (modelType: unknown, task: unknown): string | null => {
-  if (typeof modelType !== 'string') return null;
-  const t = task === 'regression' ? 'regression' : 'classification';
-  return ENSEMBLE_BASE_KEY_BY_MODEL_TYPE[t][modelType] ?? null;
-};
-
-interface WiredBaseSpec {
-  baseEstimators: string[];
-  baseParams: Record<string, Record<string, unknown>>;
-  modelSourceIds: Set<string>;
+function convertNode(node: Node, nodes: Node[], edges: Edge[]): ConvertedNode {
+  const incomingEdges = edges.filter(edge => edge.target === node.id);
+  // Split handles are visual edges from one logical backend input.
+  const inputs = Array.from(new Set(incomingEdges.map(edge => edge.source)));
+  if (node.data.definitionType === 'EnsembleNode') {
+    return convertEnsembleNode(node, nodes, edges, incomingEdges, inputs);
+  }
+  const convert = converters.get(node.data.definitionType as string) ?? convertUnknownNode;
+  return { ...convert(node), inputs };
 }
 
-/**
- * Collect base-learner specs from the model nodes wired into an ensemble's input.
- * Returns the resolved base keys, their per-model hyperparameters, and the set of
- * source node ids (so they can be excluded from the ensemble's data `inputs`).
- */
-const collectWiredBaseSpecs = (
-  nodes: Node[],
-  incomingEdges: Edge[],
-  task: unknown,
-): WiredBaseSpec => {
-  const baseEstimators: string[] = [];
-  const baseParams: Record<string, Record<string, unknown>> = {};
-  const modelSourceIds = new Set<string>();
+function displayName(data: Record<string, unknown>): string | undefined {
+  const userLabel = (data.label as string | undefined) || (data.title as string | undefined);
+  const type = data.definitionType as string | undefined;
+  // Preserve registry lookup even when a custom label takes precedence.
+  const registryLabel = type ? registry.get(type)?.label : undefined;
+  return userLabel || registryLabel;
+}
 
-  for (const edge of incomingEdges) {
-    const src = nodes.find((n) => n.id === edge.source);
-    if (!src || !isModelSourceType(src.data.definitionType)) continue;
-    modelSourceIds.add(src.id);
-    const key = resolveEnsembleBaseKey(src.data.model_type, task);
-    if (!key) continue;
-    if (!baseEstimators.includes(key)) baseEstimators.push(key);
-    const hp = src.data.hyperparameters;
-    if (hp && typeof hp === 'object' && Object.keys(hp as object).length > 0) {
-      baseParams[key] = hp as Record<string, unknown>;
-    }
-  }
+/** Attach canvas labels and non-default column-overlap policy to backend parameters. */
+function attachNodeMetadata(node: Node, params: Record<string, unknown>): Record<string, unknown> {
+  const strategy = getMergeStrategy(node.data);
+  const label = displayName(node.data);
+  const merged = { ...params };
+  if (strategy && strategy !== 'last_wins') merged._merge_strategy = strategy;
+  if (label) merged._display_name = label;
+  return merged;
+}
 
-  return { baseEstimators, baseParams, modelSourceIds };
-};
-
-/**
- * Fixed-mode training params shared by the unified `TrainingNode` and the
- * task-scoped Classification/Regression/Text Classification nodes when
- * their `run_mode` is `'basic'`.
- */
-const buildFixedTrainingParams = (data: Record<string, unknown>): Record<string, unknown> => ({
-    target_column: data.target_column,
-    model_type: data.model_type,
-    hyperparameters: data.hyperparameters,
-    cv_enabled: data.cv_enabled,
-    cv_folds: data.cv_folds,
-    cv_type: data.cv_type,
-    cv_shuffle: data.cv_shuffle,
-    cv_random_state: data.cv_random_state,
-    cv_time_column: data.cv_time_column,
-    execution_mode: data.execution_mode,
-});
-
-/**
- * The tuning-config fields common to every tuning-engine consumer (the plain
- * `tuning` node, the unified `TrainingNode`
- * in advanced mode, and `EnsembleNode`'s advanced mode). Callers add their
- * own structural fields on top (`search_space` for plain training nodes,
- * `base_estimators`/`final_estimator`/etc. for the ensemble).
- */
-const buildBaseTuningConfig = (data: Record<string, unknown>): Record<string, unknown> => ({
-    strategy: data.search_strategy,
-    strategy_params: data.strategy_params || {},
-    metric: data.metric,
-    n_trials: data.n_trials,
-    cv_enabled: data.cv_enabled,
-    cv_folds: data.cv_folds,
-    cv_type: data.cv_type,
-    cv_shuffle: data.cv_shuffle,
-    cv_random_state: data.cv_random_state,
-    cv_time_column: data.cv_time_column,
-    random_state: data.random_state,
-    tune_threshold: data.tune_threshold ?? false,
-});
-
+/** Traverse all dataset-rooted branches and serialize their backend node configurations. */
 export const convertGraphToPipelineConfig = (nodes: Node[], edges: Edge[]): PipelineConfigModel => {
-    const sortedNodes: NodeConfigModel[] = [];
-    const visited = new Set<string>();
-    const queue: string[] = [];
-
-    // Collect ALL dataset nodes so disconnected subgraphs are included
-    const datasetNodes = nodes.filter(n => n.data.definitionType === 'dataset_node');
-    const datasetId = datasetNodes[0]?.data.datasetId as string;
-
-    for (const ds of datasetNodes) {
-      queue.push(ds.id);
-    }
-
-    while (queue.length > 0) {
-      const nodeId = queue.shift();
-      if (!nodeId) continue;
-      if (visited.has(nodeId)) continue;
-      visited.add(nodeId);
-
-      const node = nodes.find(n => n.id === nodeId);
-      if (!node) continue;
-
-      let stepType = 'unknown';
-          let params: Record<string, unknown> = {};
-      const incomingEdges = edges.filter(e => e.target === nodeId);
-      // Deduplicate by source: multi-handle splitters (TrainTestSplitter has
-      // train/test/validation, FeatureTargetSplitter has X/y) emit several
-      // edges from the same source node into one downstream target.
-      // The backend treats each `inputs[]` entry as a distinct branch root,
-      // so duplicates cause partition_parallel_pipeline to spawn spurious
-      // sub-pipelines (“but should be ONE branch, not three”). Dedup here
-      // ensures the backend sees one logical input even though the canvas
-      // shows multiple visual edges from the splitter handles.
-      const inputs = Array.from(new Set(incomingEdges.map(e => e.source)));
-      // Data inputs actually emitted for this node. The Ensemble branch trims
-      // model-spec sources out of this list (Phase 2) so the backend only sees
-      // the dataset edge and never tries to load a model node as a Dataset.
-      let nodeInputs = inputs;
-
-      if (node.data.definitionType === 'dataset_node') {
-        stepType = BackendStepType.DATA_LOADER;
-        params = {
-            dataset_id: node.data.datasetId,
-        };
-      } else if (node.data.definitionType === 'imputation_node') {
-          const method = node.data.method || 'simple';
-          if (method === 'knn') {
-              stepType = 'KNNImputer';
-              params = {
-                  columns: node.data.columns,
-                  n_neighbors: node.data.n_neighbors,
-                  weights: node.data.weights
-              };
-          } else if (method === 'iterative') {
-              stepType = 'IterativeImputer';
-              params = {
-                  columns: node.data.columns,
-                  max_iter: node.data.max_iter,
-                  estimator: node.data.estimator,
-                  // Legacy graphs may lack the field entirely — omit it
-                  // instead of hardcoding a fallback so core's documented
-                  // default (IterativeImputerCalculator) is the single owner.
-                  ...(node.data.random_state != null
-                      ? { random_state: node.data.random_state }
-                      : {}),
-              };
-          } else {
-              stepType = 'SimpleImputer';
-              params = {
-                  columns: node.data.columns,
-                  strategy: node.data.strategy,
-                  fill_value: node.data.fill_value
-              };
-          }
-      } else if (node.data.definitionType === 'simple_imputer') {
-          stepType = 'SimpleImputer';
-          params = node.data || {};
-      } else if (node.data.definitionType === 'drop_missing_columns' || node.data.definitionType === 'DropMissingColumns') {
-          stepType = 'DropMissingColumns';
-          params = {
-            columns: node.data.columns || [],
-            missing_threshold: node.data.missing_threshold
-          };
-      } else if (node.data.definitionType === 'drop_missing_rows' || node.data.definitionType === 'DropMissingRows') {
-          stepType = 'DropMissingRows';
-          // UI semantics: "drop rows missing MORE than X%". A 0% threshold
-          // (or the checkbox) means "any missing" -> how="any".
-          const dropRowsData = node.data as { drop_if_any_missing?: boolean; missing_threshold?: number };
-          const dropAny = dropRowsData.drop_if_any_missing === true
-              || dropRowsData.missing_threshold == null
-              || dropRowsData.missing_threshold <= 0;
-          params = dropAny
-              ? { how: 'any' }
-              : { missing_threshold: dropRowsData.missing_threshold };
-      } else if (node.data.definitionType === 'deduplicate' || node.data.definitionType === 'Deduplicate') {
-          stepType = 'Deduplicate';
-          params = {
-            subset: node.data.subset,
-            keep: node.data.keep
-          };
-      } else if (node.data.definitionType === 'casting' || node.data.definitionType === 'Casting') {
-          stepType = 'Casting';
-          params = {
-            column_types: node.data.column_types
-          };
-      } else if (node.data.definitionType === 'MissingIndicator' || node.data.definitionType === 'missing_indicator') {
-          stepType = 'MissingIndicator';
-          params = {
-            columns: node.data.columns,
-            flag_suffix: node.data.flag_suffix
-          };
-      } else if (node.data.definitionType === 'scale_numeric_features') {
-                    const config: Record<string, unknown> =
-                        (node.data && typeof node.data === 'object') ? (node.data as Record<string, unknown>) : {};
-                    const method = config.method || 'standard';
-          if (method === 'minmax') stepType = 'MinMaxScaler';
-          else if (method === 'maxabs') stepType = 'MaxAbsScaler';
-          else if (method === 'robust') stepType = 'RobustScaler';
-          else stepType = 'StandardScaler';
-          params = { ...config };
-          // The canvas stores ranges as scalar fields; the backend expects tuple keys.
-          if (method === 'minmax') {
-            params.feature_range = [config.feature_range_min ?? 0, config.feature_range_max ?? 1];
-          } else if (method === 'robust') {
-            params.quantile_range = [config.quantile_range_min ?? 25, config.quantile_range_max ?? 75];
-          }
-      } else if (node.data.definitionType === 'encoding') {
-          const method = node.data.method;
-          if (method === 'onehot') stepType = 'OneHotEncoder';
-          else if (method === 'dummy') stepType = 'DummyEncoder';
-          else if (method === 'label') stepType = 'LabelEncoder';
-          else if (method === 'ordinal') stepType = 'OrdinalEncoder';
-          else if (method === 'target') stepType = 'TargetEncoder';
-          else if (method === 'hash') stepType = 'HashEncoder';
-          else if (method === 'woe') stepType = 'WOEEncoder';
-          else stepType = 'OneHotEncoder'; // Default
-
-          params = node.data;
-      } else if (node.data.definitionType === 'TrainTestSplitter') {
-          stepType = 'TrainTestSplitter';
-          params = node.data || {};
-      } else if (node.data.definitionType === 'label_encoding') {
-          stepType = 'LabelEncoder';
-          params = node.data || {};
-      } else if (node.data.definitionType === 'feature_target_split') {
-          stepType = 'feature_target_split';
-          params = node.data || {};
-      }  else if (node.data.definitionType === 'feature_selection') {
-          stepType = 'feature_selection';
-          params = node.data || {};
-      } else if (node.data.definitionType === 'outlier') {
-          const method = node.data.method || 'iqr';
-          if (method === 'iqr') stepType = 'IQR';
-          else if (method === 'zscore') stepType = 'ZScore';
-          else if (method === 'winsorize') stepType = 'Winsorize';
-          else if (method === 'elliptic_envelope') stepType = 'EllipticEnvelope';
-          else stepType = 'IQR';
-          params = node.data;
-      } else if (node.data.definitionType === 'TransformationNode') {
-          stepType = 'GeneralTransformation';
-
-          // Flatten transformations: { columns: ['a', 'b'], method: 'log' } -> [{ column: 'a', method: 'log' }, { column: 'b', method: 'log' }]
-          const rawTransformations = (node.data.transformations || []) as unknown[];
-          const flattenedTransformations = [];
-
-          for (const r of rawTransformations) {
-              const rule = r as Record<string, unknown>;
-              if (rule.columns && Array.isArray(rule.columns)) {
-                  for (const col of (rule.columns as string[])) {
-                      flattenedTransformations.push({
-                          column: col,
-                          method: rule.method,
-                          ...(rule.params as Record<string, unknown>)
-                      });
-                  }
-              }
-          }
-
-          params = { transformations: flattenedTransformations };
-      } else if (node.data.definitionType === 'BinningNode') {
-          stepType = 'GeneralBinning';
-          params = {
-              columns: node.data.columns,
-              strategy: node.data.strategy,
-              n_bins: node.data.n_bins,
-              label_format: node.data.label_format,
-              output_suffix: node.data.output_suffix,
-              drop_original: node.data.drop_original,
-              custom_bins: node.data.custom_bins, // For custom strategy
-              custom_labels: node.data.custom_labels, // For custom strategy
-              precision: node.data.precision
-          };
-      } else if (node.data.definitionType === 'ResamplingNode') {
-          const type = node.data.type || 'oversampling';
-          if (type === 'oversampling') {
-              stepType = 'Oversampling';
-          } else {
-              stepType = 'Undersampling';
-          }
-          params = node.data;
-      } else if (node.data.definitionType === 'FeatureGenerationNode') {
-          stepType = 'FeatureMath';
-          params = {
-              operations: node.data.operations
-          };
-      } else if (node.data.definitionType === 'PolynomialFeaturesNode') {
-          stepType = 'PolynomialFeatures';
-          params = {
-              columns: node.data.columns,
-              degree: node.data.degree,
-              interaction_only: node.data.interaction_only,
-              include_bias: node.data.include_bias,
-              output_prefix: node.data.output_prefix,
-              include_input_features: node.data.include_input_features
-          };
-      } else if (node.data.definitionType === 'FeatureInteractionNode') {
-          stepType = 'FeatureInteraction';
-          params = {
-              columns: node.data.columns,
-              degree: node.data.degree,
-              interaction_only: node.data.interaction_only,
-              include_bias: node.data.include_bias
-          };
-      } else if (node.data.definitionType === 'TimeSeriesNode') {
-          const method = node.data.method;
-          if (method === 'rolling') stepType = 'RollingAggregate';
-          else if (method === 'date') stepType = 'DateFeatures';
-          else stepType = 'LagFeatures';
-          params = node.data;
-      } else if (node.data.definitionType === 'TextCleaning') {
-          stepType = 'TextCleaning';
-          params = node.data;
-      } else if (
-          node.data.definitionType === 'count_vectorizer' ||
-          node.data.definitionType === 'tfidf_vectorizer' ||
-          node.data.definitionType === 'hashing_vectorizer' ||
-          node.data.definitionType === 'tokenizer' ||
-          node.data.definitionType === 'sentence_embedder'
-      ) {
-          // Text node ids map 1:1 to the skyulf-core NodeRegistry ids.
-          stepType = node.data.definitionType;
-          params = node.data;
-      } else if (node.data.definitionType === 'ValueReplacement' || node.data.definitionType === 'value_replacement') {
-          stepType = 'ValueReplacement';
-          params = node.data;
-      } else if (node.data.definitionType === 'AliasReplacement') {
-          stepType = 'AliasReplacement';
-          params = node.data;
-      } else if (node.data.definitionType === 'InvalidValueReplacement') {
-          stepType = 'InvalidValueReplacement';
-          params = node.data;
-      } else if (ALL_TRAINING_DISPATCH_TYPES.has(node.data.definitionType as string)) {
-          // The generic TrainingNode and the 3 task-scoped Classification/
-          // Regression/Text Classification nodes all dispatch through the
-          // same fixed/tuned param-building helpers and emit the canonical
-          // `training` step_type.
-          const isAdvanced = node.data.run_mode === 'advanced';
-          if (isAdvanced) {
-              stepType = BackendStepType.TRAINING;
-              params = {
-                  run_mode: 'tuned',
-                  target_column: node.data.target_column,
-                  algorithm: node.data.model_type,
-                  execution_mode: node.data.execution_mode,
-                  tuning_config: {
-                      ...buildBaseTuningConfig(node.data),
-                      search_space: node.data.search_space
-                  }
-              };
-          } else {
-              stepType = BackendStepType.TRAINING;
-              params = {
-                  run_mode: 'fixed',
-                  ...buildFixedTrainingParams(node.data)
-              };
-          }
-      } else if (node.data.definitionType === 'SegmentationNode') {
-          stepType = BackendStepType.TRAINING;
-          params = {
-              run_mode: 'fixed',
-              // No target_column — clustering is unsupervised. The backend
-              // treats an empty string as the "no target" sentinel.
-              target_column: '',
-              model_type: node.data.model_type,
-              hyperparameters: node.data.hyperparameters,
-              cv_enabled: false,
-              execution_mode: node.data.execution_mode,
-              // Optional column (e.g. species name) excluded from training
-              // but kept for post-hoc cluster interpretation — see
-              // `reference_crosstab` in the evaluation report.
-              reference_column: node.data.reference_column || undefined,
-          };
-      } else if (node.data.definitionType === 'EnsembleNode') {
-          // Phase 2: auto-detect base learners wired into the ensemble's input.
-          // Model nodes (training/tuning) connected here act as base-learner spec
-          // providers — their `model_type` + `hyperparameters` are read and the
-          // ensemble re-fits them. When any model node is wired, it OVERRIDES the
-          // in-node base-estimator selection; otherwise the in-node chips are used.
-          const wired = collectWiredBaseSpecs(nodes, incomingEdges, node.data.task);
-          const hasWired = wired.baseEstimators.length > 0;
-          const baseEstimators = hasWired ? wired.baseEstimators : node.data.base_estimators;
-          const baseEstimatorParams = hasWired
-              ? { ...(node.data.base_estimator_params as Record<string, unknown> | undefined ?? {}), ...wired.baseParams }
-              : node.data.base_estimator_params;
-          // Voting only: turn the per-model weight map into a list aligned to the
-          // resolved base estimators (sklearn `weights=`). Sent only when the user
-          // set at least one non-default weight, so equal weighting stays implicit.
-          const ensembleNJobs = node.data.n_jobs;
-          let votingWeights: number[] | undefined;
-          if (node.data.strategy === 'voting') {
-              const weightMap = node.data.weights as Record<string, number> | undefined;
-              const baseList = (baseEstimators as string[] | undefined) ?? [];
-              if (weightMap && baseList.length > 0 && baseList.some((k) => typeof weightMap[k] === 'number' && weightMap[k] !== 1)) {
-                  votingWeights = baseList.map((k) => (typeof weightMap[k] === 'number' ? weightMap[k] : 1));
-              }
-          }
-          // Classification only: wrap base classifiers in CalibratedClassifierCV.
-          // Sent only when enabled so regression/uncalibrated runs stay clean.
-          const calibrateBaseModels =
-              node.data.task === 'classification' && node.data.calibrate_base_models === true;
-          const calibrationMethod = calibrateBaseModels ? node.data.calibration_method : undefined;
-          const calibrationCv = calibrateBaseModels ? node.data.calibration_cv : undefined;
-          // Drop model-spec sources from the data inputs so the backend only
-          // receives the dataset edge (a model node is not a loadable Dataset).
-          if (wired.modelSourceIds.size > 0) {
-              const directData = inputs.filter(id => !wired.modelSourceIds.has(id));
-              if (directData.length > 0) {
-                  // The ensemble has its own dataset edge — use it as-is.
-                  nodeInputs = directData;
-              } else {
-                  // Common flow: split → model → ensemble (no direct data edge).
-                  // Base learners are spec-only, so the ensemble refits them on
-                  // its OWN data — inherit the data the wired models consume so
-                  // the pipeline still resolves a training dataset. Deduped, and
-                  // model-node sources are excluded to avoid loops.
-                  const inherited = new Set<string>();
-                  for (const mid of wired.modelSourceIds) {
-                      for (const e of edges.filter(ed => ed.target === mid)) {
-                          if (!wired.modelSourceIds.has(e.source)) inherited.add(e.source);
-                      }
-                  }
-                  nodeInputs = Array.from(inherited);
-              }
-          }
-
-          // Ensembles can run two ways. Basic training fits the meta-estimator
-          // with the chosen base learners as-is; advanced tuning runs the same
-          // ensemble through the hyperparameter search engine (the backend
-          // auto-builds a nested `<name>__<param>` space when none is sent).
-          if (node.data.run_mode === 'advanced') {
-              stepType = BackendStepType.TRAINING;
-              params = {
-                  run_mode: 'tuned',
-                  target_column: node.data.target_column,
-                  algorithm: node.data.model_type,
-                  execution_mode: node.data.execution_mode,
-                  tuning_config: {
-                      ...buildBaseTuningConfig(node.data),
-                      // Structural selection the backend resolves into the model.
-                      base_estimators: baseEstimators,
-                      final_estimator: node.data.final_estimator,
-                      voting: node.data.voting,
-                      cv: node.data.cv,
-                      passthrough: node.data.passthrough,
-                      weights: votingWeights,
-                      n_jobs: ensembleNJobs,
-                      calibrate_base_models: calibrateBaseModels || undefined,
-                      calibration_method: calibrationMethod,
-                      calibration_cv: calibrationCv,
-                      tune_base_models: node.data.tune_base_models,
-                      base_estimator_params: baseEstimatorParams,
-                      final_estimator_params: node.data.final_estimator_params,
-                  }
-              };
-          } else {
-              stepType = BackendStepType.TRAINING;
-              params = {
-                  run_mode: 'fixed',
-                  target_column: node.data.target_column,
-                  model_type: node.data.model_type,
-                  hyperparameters: {
-                      base_estimators: baseEstimators,
-                      voting: node.data.voting,
-                      final_estimator: node.data.final_estimator,
-                      cv: node.data.cv,
-                      passthrough: node.data.passthrough,
-                      weights: votingWeights,
-                      n_jobs: ensembleNJobs,
-                      calibrate_base_models: calibrateBaseModels || undefined,
-                      calibration_method: calibrationMethod,
-                      calibration_cv: calibrationCv,
-                      base_estimator_params: baseEstimatorParams,
-                      final_estimator_params: node.data.final_estimator_params
-                  },
-                  cv_enabled: node.data.cv_enabled,
-                  cv_folds: node.data.cv_folds,
-                  cv_type: node.data.cv_type,
-                  cv_shuffle: node.data.cv_shuffle,
-                  cv_random_state: node.data.cv_random_state,
-                  cv_time_column: node.data.cv_time_column,
-                  execution_mode: node.data.execution_mode
-              };
-          }
-      } else if (node.data.definitionType === 'data_preview') {
-          stepType = 'data_preview';
-          params = {};
-      } else {
-          console.warn(`Unknown node type: ${node.data.definitionType}`);
-          // Don't throw, just skip or use generic
-          stepType = 'Unknown';
-              params = (node.data && typeof node.data === 'object') ? (node.data as Record<string, unknown>) : {};
-      }
-
-      sortedNodes.push({
-        node_id: node.id,
-        step_type: stepType,
-        params: (() => {
-          // Attach per-node merge strategy (last_wins default) so the engine
-          // can switch column-overlap semantics when the user requests it.
-          // Kept under an underscore key to keep it separate from
-          // step-specific params.
-          const strat = getMergeStrategy(node.data);
-          // Resolve the canvas-displayed label so the backend can use it
-          // as the suffix for branch tabs (matches what the user sees on
-          // the canvas — e.g. "Encoding" rather than the raw step type
-          // "LabelEncoder").
-          const defType = node.data.definitionType as string | undefined;
-          const userLabel = (node.data.label as string | undefined) || (node.data.title as string | undefined);
-          const registryLabel = defType ? registry.get(defType)?.label : undefined;
-          const displayName = userLabel || registryLabel;
-          const merged: Record<string, unknown> = { ...params };
-          if (strat && strat !== 'last_wins') merged._merge_strategy = strat;
-          if (displayName) merged._display_name = displayName;
-          return merged;
-        })(),
-        inputs: nodeInputs
-      });
-
-      const outgoingEdges = edges.filter(e => e.source === nodeId);
-      outgoingEdges.forEach(e => queue.push(e.target));
-    }
-
-    // Phase 2: a model node wired ONLY into ensemble(s) is a base-learner spec
-    // provider, not a standalone trainer. The ensemble re-fits it from its spec,
-    // so drop its own training step to avoid double-training (and to keep the
-    // results tabs free of a redundant standalone model).
-    const ensembleIds = new Set(
-      nodes.filter(n => n.data.definitionType === 'EnsembleNode').map(n => n.id),
-    );
-    if (ensembleIds.size > 0) {
-      const specOnlyIds = new Set<string>();
-      for (const sn of sortedNodes) {
-        const src = nodes.find(n => n.id === sn.node_id);
-        if (!src || !isModelSourceType(src.data.definitionType)) continue;
-        const outs = edges.filter(e => e.source === sn.node_id);
-        if (outs.length > 0 && outs.every(e => ensembleIds.has(e.target))) {
-          specOnlyIds.add(sn.node_id);
-        }
-      }
-      for (let i = sortedNodes.length - 1; i >= 0; i--) {
-        const sn = sortedNodes[i];
-        if (sn && specOnlyIds.has(sn.node_id)) sortedNodes.splice(i, 1);
-      }
-    }
-
-    // Prune dead-end branches: reverse-walk from terminal/seed nodes,
-    // keep only ancestors. When no explicit terminals exist, infer from
-    // graph leaves so parallel preview branches survive.
-    const terminalTypes = new Set([
-      BackendStepType.TRAINING,
-      'data_preview',
-    ]);
-    let seeds = sortedNodes.filter(n => terminalTypes.has(n.step_type));
-
-    // Always treat data leaves (no downstream consumer) as additional seeds.
-    // This keeps preview-only branches alive when the canvas mixes a training
-    // pipeline with one or more dangling preprocessing chains — without this,
-    // Run Preview would silently drop the dangling branches and only show the
-    // training-fed ones in the results tabs.
-    if (sortedNodes.length > 1) {
-      const consumed = new Set<string>();
-      for (const node of sortedNodes) {
-        for (const id of node.inputs) consumed.add(id);
-      }
-      const leaves = sortedNodes.filter(n => !consumed.has(n.node_id));
-      // De-dupe: a node already in `seeds` (e.g. a training terminal) won't
-      // be added twice because the reverse-BFS short-circuits on `reachable`.
-      if (seeds.length === 0 && leaves.length > 1) {
-        seeds = leaves;
-      } else if (seeds.length > 0) {
-        const seedIds = new Set(seeds.map(n => n.node_id));
-        for (const leaf of leaves) {
-          if (!seedIds.has(leaf.node_id)) {
-            seeds.push(leaf);
-            seedIds.add(leaf.node_id);
-          }
-        }
-      }
-    }
-
-    let prunedNodes = sortedNodes;
-    if (seeds.length > 0) {
-      const reachable = new Set<string>();
-      const reverseQueue: string[] = seeds.map(n => n.node_id);
-      while (reverseQueue.length > 0) {
-        const nid = reverseQueue.shift()!;
-        if (reachable.has(nid)) continue;
-        reachable.add(nid);
-        const cfg = sortedNodes.find(n => n.node_id === nid);
-        if (cfg?.inputs) {
-          for (const inputId of cfg.inputs) {
-            reverseQueue.push(inputId);
-          }
-        }
-      }
-      prunedNodes = sortedNodes.filter(n => reachable.has(n.node_id));
-    }
-
-    return {
-      pipeline_id: `preview_${uuidv4()}`,
-      nodes: prunedNodes,
-      metadata: { dataset_source_id: datasetId }
-    };
+  const datasets = nodes.filter(node => node.data.definitionType === 'dataset_node');
+  const queue = datasets.map(node => node.id);
+  const visited = new Set<string>();
+  const configs: NodeConfigModel[] = [];
+  while (queue.length > 0) {
+    const id = queue.shift();
+    if (!id || visited.has(id)) continue;
+    visited.add(id);
+    const node = nodes.find(candidate => candidate.id === id);
+    if (!node) continue;
+    const converted = convertNode(node, nodes, edges);
+    configs.push({
+      node_id: node.id,
+      step_type: converted.stepType,
+      params: attachNodeMetadata(node, converted.params),
+      inputs: converted.inputs ?? [],
+    });
+    edges.filter(edge => edge.source === id).forEach(edge => queue.push(edge.target));
+  }
+  const executableNodes = removeSpecOnlyModels(configs, nodes, edges);
+  return {
+    pipeline_id: `preview_${uuidv4()}`,
+    nodes: pruneToTerminalAncestors(executableNodes),
+    metadata: { dataset_source_id: datasets[0]?.data.datasetId as string },
+  };
 };

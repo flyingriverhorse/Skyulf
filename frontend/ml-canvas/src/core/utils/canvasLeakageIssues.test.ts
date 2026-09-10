@@ -10,6 +10,13 @@ const edge = (id: string, source: string, target: string) => ({ id, source, targ
 describe('canvas leakage presentation', () => {
   beforeEach(resetLeakageFlags);
 
+  it('preserves edge order through shared ancestors and terminates cyclic canvas walks', () => {
+    // Highlight traversal must include both offending paths without following split outputs.
+    const nodes = [node('scale', 'StandardScaler'), node('merge', 'SimpleTransformation', ['scale']), node('split', 'TrainTestSplitter', ['merge'])];
+    const edges = [edge('second', 'merge', 'split'), edge('cycle', 'merge', 'scale'), edge('first', 'scale', 'merge'), edge('direct', 'scale', 'split'), edge('after', 'split', 'merge')];
+    expect(buildCanvasLeakageIssues(nodes, edges)[0]?.edgeIds).toEqual(['second', 'cycle', 'first', 'direct']);
+  });
+
   it('marks the offending path, not a sibling branch or downstream model', () => {
     const nodes = [
       node('load', 'data_loader'),

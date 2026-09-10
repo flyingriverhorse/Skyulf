@@ -98,149 +98,177 @@ export const NodeInspectorModal: React.FC<NodeInspectorModalProps> = ({
               </p>
             )}
 
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-              <div>
-                <div className="text-slate-500 dark:text-slate-400">Job</div>
-                <RecordLink recordRef={{ kind: 'job', jobId: data.job_id }} {...(origin !== undefined ? { origin } : {})} {...(filters !== undefined ? { filters } : {})} />
-              </div>
-              <div>
-                <div className="text-slate-500 dark:text-slate-400">Dataset</div>
-                <RecordLink
-                  recordRef={{ kind: 'dataset', datasetId: data.dataset_source_id }}
-                  label={data.dataset_name ?? data.dataset_source_id}
-                  {...(origin !== undefined ? { origin } : {})}
-                  {...(filters !== undefined ? { filters } : {})}
-                />
-              </div>
-              <div>
-                <div className="text-slate-500 dark:text-slate-400">Status</div>
-                <div className="font-medium text-slate-800 dark:text-slate-200 capitalize">{data.status}</div>
-              </div>
-              <div>
-                <div className="text-slate-500 dark:text-slate-400">Branch</div>
-                <div className="font-medium text-slate-800 dark:text-slate-200">
-                  {data.branch_index ?? '—'}
-                </div>
-              </div>
-            </div>
+            <InspectorMetadata data={data} origin={origin} filters={filters} />
 
-            {!data.node ? (
-              <EmptyState
-                title="Node not found in this job's executed graph"
-                description={`Node ${data.node_id} isn't present in the graph recorded for job ${data.job_id}. It may have been removed or renamed since this run.`}
-              />
-            ) : (
-              <div className="space-y-4">
-                <div>
-                  <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">
-                    {data.node.label}
-                  </h3>
-                  <p className="text-xs font-mono text-slate-500 dark:text-slate-400">
-                    {data.node.node_id} · {data.node.step_type}
-                  </p>
-                  {typeof data.node.execution_seconds === 'number' && (
-                    <p className="mt-1 text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1">
-                      <Clock size={12} aria-hidden="true" />
-                      {data.node.execution_seconds.toFixed(2)}s
-                      {data.node.execution_status ? ` · ${data.node.execution_status}` : ''}
-                    </p>
-                  )}
-                </div>
+            <InspectorNodeDetails data={data} handleWalkTo={handleWalkTo} />
 
-                <div>
-                  <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">
-                    Parameters
-                  </h4>
-                  {Object.keys(data.node.params).length === 0 ? (
-                    <p className="text-xs text-slate-400 italic">No parameters recorded.</p>
-                  ) : (
-                    <pre className="text-xs font-mono bg-slate-50 dark:bg-slate-800 rounded-lg p-3 overflow-auto max-h-40 whitespace-pre-wrap">
-                      {JSON.stringify(data.node.params, null, 2)}
-                    </pre>
-                  )}
-                </div>
+            <InspectorLogs data={data} />
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1 flex items-center gap-1">
-                      <ArrowUp size={12} aria-hidden="true" /> Upstream
-                    </h4>
-                    {data.node.upstream.length === 0 ? (
-                      <p className="text-xs text-slate-400 italic">None — this is a source node.</p>
-                    ) : (
-                      <ul className="space-y-1">
-                        {data.node.upstream.map((neighbor) => (
-                          <li key={neighbor.node_id}>
-                            <button
-                              type="button"
-                              onClick={() => { handleWalkTo(neighbor); }}
-                              className="text-xs text-blue-600 hover:underline dark:text-blue-400"
-                            >
-                              {neighbor.label} ({neighbor.node_id})
-                            </button>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
-                  <div>
-                    <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1 flex items-center gap-1">
-                      <ArrowDown size={12} aria-hidden="true" /> Downstream
-                    </h4>
-                    {data.node.downstream.length === 0 ? (
-                      <p className="text-xs text-slate-400 italic">None — this is a terminal node.</p>
-                    ) : (
-                      <ul className="space-y-1">
-                        {data.node.downstream.map((neighbor) => (
-                          <li key={neighbor.node_id}>
-                            <button
-                              type="button"
-                              onClick={() => { handleWalkTo(neighbor); }}
-                              className="text-xs text-blue-600 hover:underline dark:text-blue-400"
-                            >
-                              {neighbor.label} ({neighbor.node_id})
-                            </button>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {data.recent_logs.length > 0 && (
-              <div>
-                <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">
-                  Recent log entries
-                </h4>
-                <ul className="space-y-1">
-                  {data.recent_logs.map((log, index) => (
-                    <li key={index} className="text-xs text-slate-600 dark:text-slate-300">
-                      <span className="font-semibold uppercase">{log.level}</span>: {log.message}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            <div className="pt-2 border-t border-slate-100 dark:border-slate-700">
-              {data.can_open_in_canvas ? (
-                <RecordLink
-                  recordRef={{ kind: 'node', nodeId: currentNodeId, pipelineId: data.pipeline_id }}
-                  label="Open in Canvas"
-                  {...(origin !== undefined ? { origin } : {})}
-                  {...(filters !== undefined ? { filters } : {})}
-                />
-              ) : (
-                <p className="text-xs text-slate-400 italic">
-                  This run isn&apos;t a saved pipeline, so it can&apos;t be opened on the canvas.
-                </p>
-              )}
-            </div>
+            <InspectorCanvasLink data={data} currentNodeId={currentNodeId} origin={origin} filters={filters} />
           </>
         )}
       </div>
     </ModalShell>
   );
 };
+
+type InspectorContextProps = {
+  data: NodeInspectorResponse;
+  origin: string | undefined;
+  filters: Record<string, string> | undefined;
+};
+
+function InspectorMetadata({ data, origin, filters }: InspectorContextProps) {
+  return (
+    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+      <div>
+        <div className="text-slate-500 dark:text-slate-400">Job</div>
+        <RecordLink recordRef={{ kind: 'job', jobId: data.job_id }} {...(origin !== undefined ? { origin } : {})} {...(filters !== undefined ? { filters } : {})} />
+      </div>
+      <div>
+        <div className="text-slate-500 dark:text-slate-400">Dataset</div>
+        <RecordLink
+          recordRef={{ kind: 'dataset', datasetId: data.dataset_source_id }}
+          label={data.dataset_name ?? data.dataset_source_id}
+          {...(origin !== undefined ? { origin } : {})}
+          {...(filters !== undefined ? { filters } : {})}
+        />
+      </div>
+      <div>
+        <div className="text-slate-500 dark:text-slate-400">Status</div>
+        <div className="font-medium text-slate-800 dark:text-slate-200 capitalize">{data.status}</div>
+      </div>
+      <div>
+        <div className="text-slate-500 dark:text-slate-400">Branch</div>
+        <div className="font-medium text-slate-800 dark:text-slate-200">
+          {data.branch_index ?? '—'}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function InspectorNodeDetails({ data, handleWalkTo }: {
+  data: NodeInspectorResponse; handleWalkTo: (neighbor: NodeNeighbor) => void;
+}) {
+  return (!data.node ? (
+    <EmptyState
+      title="Node not found in this job's executed graph"
+      description={`Node ${data.node_id} isn't present in the graph recorded for job ${data.job_id}. It may have been removed or renamed since this run.`}
+    />
+  ) : (
+    <div className="space-y-4">
+      <div>
+        <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">
+          {data.node.label}
+        </h3>
+        <p className="text-xs font-mono text-slate-500 dark:text-slate-400">
+          {data.node.node_id} · {data.node.step_type}
+        </p>
+        {typeof data.node.execution_seconds === 'number' && (
+          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1">
+            <Clock size={12} aria-hidden="true" />
+            {data.node.execution_seconds.toFixed(2)}s
+            {data.node.execution_status ? ` · ${data.node.execution_status}` : ''}
+          </p>
+        )}
+      </div>
+
+      <div>
+        <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">
+          Parameters
+        </h4>
+        {Object.keys(data.node.params).length === 0 ? (
+          <p className="text-xs text-slate-400 italic">No parameters recorded.</p>
+        ) : (
+          <pre className="text-xs font-mono bg-slate-50 dark:bg-slate-800 rounded-lg p-3 overflow-auto max-h-40 whitespace-pre-wrap">
+            {JSON.stringify(data.node.params, null, 2)}
+          </pre>
+        )}
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1 flex items-center gap-1">
+            <ArrowUp size={12} aria-hidden="true" /> Upstream
+          </h4>
+          {data.node.upstream.length === 0 ? (
+            <p className="text-xs text-slate-400 italic">None — this is a source node.</p>
+          ) : (
+            <ul className="space-y-1">
+              {data.node.upstream.map((neighbor) => (
+                <li key={neighbor.node_id}>
+                  <button
+                    type="button"
+                    onClick={() => { handleWalkTo(neighbor); }}
+                    className="text-xs text-blue-600 hover:underline dark:text-blue-400"
+                  >
+                    {neighbor.label} ({neighbor.node_id})
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+        <div>
+          <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1 flex items-center gap-1">
+            <ArrowDown size={12} aria-hidden="true" /> Downstream
+          </h4>
+          {data.node.downstream.length === 0 ? (
+            <p className="text-xs text-slate-400 italic">None — this is a terminal node.</p>
+          ) : (
+            <ul className="space-y-1">
+              {data.node.downstream.map((neighbor) => (
+                <li key={neighbor.node_id}>
+                  <button
+                    type="button"
+                    onClick={() => { handleWalkTo(neighbor); }}
+                    className="text-xs text-blue-600 hover:underline dark:text-blue-400"
+                  >
+                    {neighbor.label} ({neighbor.node_id})
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
+    </div>
+  ));
+}
+
+function InspectorCanvasLink({ data, currentNodeId, origin, filters }: InspectorContextProps & { currentNodeId: string }) {
+  return (
+    <div className="pt-2 border-t border-slate-100 dark:border-slate-700">
+      {data.can_open_in_canvas ? (
+        <RecordLink
+          recordRef={{ kind: 'node', nodeId: currentNodeId, pipelineId: data.pipeline_id }}
+          label="Open in Canvas"
+          {...(origin !== undefined ? { origin } : {})}
+          {...(filters !== undefined ? { filters } : {})}
+        />
+      ) : (
+        <p className="text-xs text-slate-400 italic">
+          This run isn&apos;t a saved pipeline, so it can&apos;t be opened on the canvas.
+        </p>
+      )}
+    </div>
+  );
+}
+
+function InspectorLogs({ data }: { data: NodeInspectorResponse }) {
+  return (data.recent_logs.length > 0 && (
+    <div>
+      <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">
+        Recent log entries
+      </h4>
+      <ul className="space-y-1">
+        {data.recent_logs.map((log, index) => (
+          <li key={index} className="text-xs text-slate-600 dark:text-slate-300">
+            <span className="font-semibold uppercase">{log.level}</span>: {log.message}
+          </li>
+        ))}
+      </ul>
+    </div>
+  ));
+}

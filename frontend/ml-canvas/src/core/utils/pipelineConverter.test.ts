@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import type { Node, Edge } from '@xyflow/react';
 import { convertGraphToPipelineConfig } from './pipelineConverter';
 
@@ -13,6 +13,53 @@ const edge = (source: string, target: string): Edge => ({
   id: `${source}-${target}`,
   source,
   target,
+});
+
+describe('pipeline conversion boundaries', () => {
+  it('deduplicates split handles and terminates cycles without mutating the graph', () => {
+    // Multiple visual handles represent one backend input, even in a cyclic graph.
+    const nodes = [node('ds', 'dataset_node'), node('split', 'TrainTestSplitter'), node('preview', 'data_preview')];
+    const edges = [edge('ds', 'split'), edge('split', 'preview'),
+      { ...edge('split', 'preview'), id: 'second-handle', sourceHandle: 'test' }, edge('preview', 'split')];
+    const before = structuredClone({ nodes, edges });
+    const result = convertGraphToPipelineConfig(nodes, edges);
+    expect(result.nodes.map(entry => [entry.node_id, entry.inputs])).toEqual([
+      ['ds', []], ['split', ['ds', 'preview']], ['preview', ['split']],
+    ]);
+    expect({ nodes, edges }).toEqual(before);
+  });
+
+  it.each(['constructor', 'toString', '__proto__'])('keeps unknown type %s as an unknown step', (type) => {
+    // Dispatch tables must not accidentally resolve inherited object properties.
+    const warning = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const result = convertGraphToPipelineConfig([
+        node('ds', 'dataset_node'), node('custom', type, { custom: 0, label: 'My step' }),
+      ], [edge('ds', 'custom')]);
+      expect(result.nodes[1]).toMatchObject({ step_type: 'Unknown', params: { custom: 0, _display_name: 'My step' } });
+      expect(warning).toHaveBeenCalledWith(`Unknown node type: ${type}`);
+    } finally {
+      warning.mockRestore();
+    }
+  });
+
+  it.each(['basic', 'advanced'])('preserves ensemble weights and calibration in %s mode', (runMode) => {
+    // Both execution paths must use estimator ordering and retain explicit zero values.
+    const result = convertGraphToPipelineConfig([
+      node('ds', 'dataset_node'), node('ensemble', 'EnsembleNode', {
+        run_mode: runMode, task: 'classification', strategy: 'voting',
+        base_estimators: ['random_forest', 'logistic_regression'],
+        weights: { logistic_regression: 0 }, n_jobs: 0,
+        calibrate_base_models: true, calibration_method: 'isotonic', calibration_cv: 3,
+      }),
+    ], [edge('ds', 'ensemble')]);
+    const params = result.nodes[1]?.params;
+    const modelParams = runMode === 'advanced' ? params?.tuning_config : params?.hyperparameters;
+    expect(modelParams).toMatchObject({
+      base_estimators: ['random_forest', 'logistic_regression'], weights: [1, 0], n_jobs: 0,
+      calibrate_base_models: true, calibration_method: 'isotonic', calibration_cv: 3,
+    });
+  });
 });
 
 describe('convertGraphToPipelineConfig', () => {

@@ -9,6 +9,21 @@ export interface SearchSpaceInputProps {
     onChange: (values: unknown[]) => void;
 }
 
+function ExclusiveOptionsHint({ def }: { def: HyperparameterDef }) {
+    return (
+        <>
+            {def.exclusive_options && def.exclusive_options.length > 0 && (
+                <p className="mt-1 text-[10px] text-gray-400 italic">
+                    {def.options
+                        ?.filter(o => def.exclusive_options?.includes(o.value))
+                        .map(o => `"${o.label}"`)
+                        .join(', ')} can&apos;t be combined with other options here — selecting it clears the rest.
+                </p>
+            )}
+        </>
+    );
+}
+
 /**
  * Multi-value (search-space) input used by AdvancedTuningSettings.
  * Comma-separated entries get parsed/validated against the param's type.
@@ -134,14 +149,7 @@ export const SearchSpaceInput: React.FC<SearchSpaceInputProps> = ({ def, value, 
                         ))}
                     </div>
                 )}
-                {def.exclusive_options && def.exclusive_options.length > 0 && (
-                    <p className="mt-1 text-[10px] text-gray-400 italic">
-                        {def.options
-                            ?.filter(o => def.exclusive_options?.includes(o.value))
-                            .map(o => `"${o.label}"`)
-                            .join(', ')} can&apos;t be combined with other options here — selecting it clears the rest.
-                    </p>
-                )}
+                <ExclusiveOptionsHint def={def} />
             </div>
             {error && (
                 <p id={`${fieldId}-error`} role="alert" className="text-[10px] text-red-500 flex items-center gap-1">

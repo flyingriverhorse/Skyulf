@@ -19,6 +19,89 @@ interface DropColumnsConfig {
   missing_threshold?: number; // 0-100
 }
 
+function DropColumnsFeedback({ metrics }: { metrics: Record<string, unknown> | null }) {
+  return (
+    metrics && (metrics.dropped_columns_count !== undefined) && (
+      <div className="p-3 bg-muted/30 rounded-md border border-border">
+        <div className="flex items-center gap-2 mb-2 text-sm font-semibold text-primary">
+          <Activity size={14} />
+          <span>Last Run Results</span>
+        </div>
+        <div className="space-y-1 text-xs">
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">Columns Dropped:</span>
+            <span className="font-medium text-destructive">{String(metrics.dropped_columns_count)}</span>
+          </div>
+          {Array.isArray(metrics.dropped_columns) && metrics.dropped_columns.length > 0 && (
+            <div className="pt-1 border-t mt-1">
+              <span className="text-muted-foreground block mb-1">Dropped Names:</span>
+              <div className="flex flex-wrap gap-1">
+                {metrics.dropped_columns.map((col: unknown) => {
+                  const colKey = String(col);
+                  return (
+                    <span key={colKey} className="px-1.5 py-0.5 bg-background border rounded text-[10px] font-mono">
+                      {colKey}
+                    </span>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    )
+  );
+}
+
+function DropColumnsStatus({ datasetId, isLoading }: { datasetId: string | undefined; isLoading: boolean }) {
+  return (
+    <>
+      {!datasetId && (
+        <div className="p-2 bg-yellow-50 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-400 text-xs rounded border border-yellow-200 dark:border-yellow-800">
+          Connect a dataset node to see available columns.
+        </div>
+      )}
+
+      {isLoading && !!datasetId && (
+        <div className="text-xs text-muted-foreground animate-pulse">
+          Loading schema...
+        </div>
+      )}
+    </>
+  );
+}
+
+function MissingThresholdControl({
+  config,
+  onChange,
+}: { config: DropColumnsConfig; onChange: (config: DropColumnsConfig) => void }) {
+  return (
+    <div className="space-y-3 p-3 border rounded-md bg-muted/5">
+      <div className="flex items-center justify-between">
+        <div className="space-y-0.5">
+          <span className="text-sm font-medium text-foreground">Missing Value Threshold</span>
+          <p className="text-[10px] text-muted-foreground">
+            Drop columns with &gt;{config.missing_threshold ?? 0}% missing values
+          </p>
+        </div>
+        <span className="text-sm font-mono font-bold text-primary bg-primary/10 px-2 py-1 rounded">
+          {config.missing_threshold ?? 0}%
+        </span>
+      </div>
+      <input
+        aria-label="Missing Value Threshold"
+        type="range"
+        min="0"
+        max="100"
+        step="5"
+        value={config.missing_threshold ?? 0}
+        onChange={(e) => onChange({ ...config, missing_threshold: parseIntSafe(e.target.value, config.missing_threshold) })}
+        className="w-full h-2 bg-secondary rounded-lg appearance-none cursor-pointer accent-primary"
+      />
+    </div>
+  );
+}
+
 const DropColumnsSettings: React.FC<{ config: DropColumnsConfig; onChange: (c: DropColumnsConfig) => void; nodeId?: string }> = ({
   config,
   onChange,
@@ -57,17 +140,7 @@ const DropColumnsSettings: React.FC<{ config: DropColumnsConfig; onChange: (c: D
     <div ref={containerRef} className={`flex flex-col h-full w-full bg-background ${isWide ? 'overflow-hidden' : 'overflow-y-auto'}`}>
       {/* Top Status Bar (Always Visible) */}
       <div className="shrink-0 p-4 pb-0 space-y-2">
-        {!datasetId && (
-          <div className="p-2 bg-yellow-50 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-400 text-xs rounded border border-yellow-200 dark:border-yellow-800">
-            Connect a dataset node to see available columns.
-          </div>
-        )}
-
-        {isLoading && !!datasetId && (
-          <div className="text-xs text-muted-foreground animate-pulse">
-            Loading schema...
-          </div>
-        )}
+        <DropColumnsStatus datasetId={datasetId} isLoading={isLoading} />
       </div>
 
       {/* Main Content Area - Responsive Grid/Flex */}
@@ -86,60 +159,10 @@ const DropColumnsSettings: React.FC<{ config: DropColumnsConfig; onChange: (c: D
           )}
 
           {/* Threshold Section */}
-          <div className="space-y-3 p-3 border rounded-md bg-muted/5">
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <span className="text-sm font-medium text-foreground">Missing Value Threshold</span>
-                <p className="text-[10px] text-muted-foreground">
-                  Drop columns with &gt;{config.missing_threshold ?? 0}% missing values
-                </p>
-              </div>
-              <span className="text-sm font-mono font-bold text-primary bg-primary/10 px-2 py-1 rounded">
-                {config.missing_threshold ?? 0}%
-              </span>
-            </div>
-            <input
-              aria-label="Missing Value Threshold"
-              type="range"
-              min="0"
-              max="100"
-              step="5"
-              value={config.missing_threshold ?? 0}
-              onChange={(e) => onChange({ ...config, missing_threshold: parseIntSafe(e.target.value, config.missing_threshold) })}
-              className="w-full h-2 bg-secondary rounded-lg appearance-none cursor-pointer accent-primary"
-            />
-          </div>
+          <MissingThresholdControl config={config} onChange={onChange} />
 
           {/* Feedback Section */}
-          {metrics && (metrics.dropped_columns_count !== undefined) && (
-            <div className="p-3 bg-muted/30 rounded-md border border-border">
-              <div className="flex items-center gap-2 mb-2 text-sm font-semibold text-primary">
-                <Activity size={14} />
-                <span>Last Run Results</span>
-              </div>
-              <div className="space-y-1 text-xs">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Columns Dropped:</span>
-                  <span className="font-medium text-destructive">{String(metrics.dropped_columns_count)}</span>
-                </div>
-                {Array.isArray(metrics.dropped_columns) && metrics.dropped_columns.length > 0 && (
-                  <div className="pt-1 border-t mt-1">
-                    <span className="text-muted-foreground block mb-1">Dropped Names:</span>
-                    <div className="flex flex-wrap gap-1">
-                      {metrics.dropped_columns.map((col: unknown) => {
-                        const colKey = String(col);
-                        return (
-                          <span key={colKey} className="px-1.5 py-0.5 bg-background border rounded text-[10px] font-mono">
-                            {colKey}
-                          </span>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
+          <DropColumnsFeedback metrics={metrics} />
         </div>
 
         {/* Right Column (Column List) */}

@@ -12,8 +12,52 @@ import { jobsApi } from '../api/jobs';
 import { toast } from '../toast';
 import type { TaskType } from '../types/taskType';
 import type { NodeSubmission } from '../types/runFeedback';
+import type { PipelineConfigModel } from '../api/client';
 
 type JobType = 'training' | 'tuning';
+
+/** Keep legacy dataset locations in their established data/config/params order. */
+function readDatasetId(node: Node): string | undefined {
+  const data = node.data as Record<string, unknown> | undefined;
+  const fromData = (data?.datasetId ?? data?.dataset_id) as string | undefined;
+  if (fromData) return fromData;
+  const cfg = data?.config as Record<string, unknown> | undefined;
+  const fromCfg = (cfg?.datasetId ?? cfg?.dataset_id) as string | undefined;
+  if (fromCfg) return fromCfg;
+  const params = data?.params as Record<string, unknown> | undefined;
+  return (params?.datasetId ?? params?.dataset_id) as string | undefined;
+}
+
+/** Select target ancestors for leakage checks without pruning the submission graph. */
+function selectTargetNodes(cfg: PipelineConfigModel, nodeId: string) {
+  const nodesById = new Map(cfg.nodes.map(configNode => [configNode.node_id, configNode]));
+  const selectedNodeIds = new Set<string>();
+  const pendingNodeIds = [nodeId];
+  while (pendingNodeIds.length > 0) {
+    const currentId = pendingNodeIds.pop()!;
+    if (selectedNodeIds.has(currentId)) continue;
+    selectedNodeIds.add(currentId);
+    pendingNodeIds.push(...(nodesById.get(currentId)?.inputs ?? []));
+  }
+  return cfg.nodes.filter(configNode => selectedNodeIds.has(configNode.node_id));
+}
+
+/** Share the action label between persistent feedback and submission notifications. */
+function jobTypeLabel(jobType: JobType): string {
+  return jobType === 'tuning' ? 'Tuning' : 'Training';
+}
+
+/** Use the model identifier before the display label in persistent run feedback. */
+function submissionLabel(node: Node, jobType: JobType): string {
+  const modelName = String(node.data.model_type || node.data.label || 'selected model').replace(/_/g, ' ');
+  return `${jobTypeLabel(jobType)} — ${modelName}`;
+}
+
+/** Prefer actionable leakage details over transport failures and the generic retry message. */
+function submissionErrorMessage(error: unknown, leakageMessage: string | null): string {
+  return leakageMessage ?? (error instanceof Error && error.message
+    ? error.message : 'Check your connection and settings, then try again.');
+}
 
 /**
  * Walk upstream (multi-hop) to find the dataset id feeding a training-style
@@ -36,15 +80,8 @@ function findUpstreamDatasetId(
     if (!node) continue;
 
     if (id !== nodeId) {
-      const data = node.data as Record<string, unknown> | undefined;
-      const fromData = (data?.datasetId ?? data?.dataset_id) as string | undefined;
-      if (fromData) return fromData;
-      const cfg = data?.config as Record<string, unknown> | undefined;
-      const fromCfg = (cfg?.datasetId ?? cfg?.dataset_id) as string | undefined;
-      if (fromCfg) return fromCfg;
-      const params = data?.params as Record<string, unknown> | undefined;
-      const fromParams = (params?.datasetId ?? params?.dataset_id) as string | undefined;
-      if (fromParams) return fromParams;
+      const datasetId = readDatasetId(node);
+      if (datasetId) return datasetId;
     }
 
     for (const inc of getIncomers(node, nodes, edges)) queue.push(inc.id);
@@ -83,8 +120,7 @@ export function useTrainingNodeContext(nodeId: string | undefined) {
       if (!nodeId || useJobStore.getState().nodeSubmissions[nodeId]?.pending) return;
       const node = nodes.find(item => item.id === nodeId);
       if (!node) return;
-      const modelName = String(node.data.model_type || node.data.label || 'selected model').replace(/_/g, ' ');
-      const label = `${jobType === 'tuning' ? 'Tuning' : 'Training'} — ${modelName}`;
+      const label = submissionLabel(node, jobType);
       const update = (value: NodeSubmission) => useJobStore.getState().setNodeSubmission(nodeId, value);
       if (!datasetId) {
         update({ pending: false, run: null, message: `${label} blocked. Connect a dataset upstream and select a dataset.` });
@@ -96,16 +132,7 @@ export function useTrainingNodeContext(nodeId: string | undefined) {
       try {
         const cfg = convertGraphToPipelineConfig(nodes, edges);
         // Match backend target scoping while retaining the full graph for submission.
-        const nodesById = new Map(cfg.nodes.map(configNode => [configNode.node_id, configNode]));
-        const selectedNodeIds = new Set<string>();
-        const pendingNodeIds = [nodeId];
-        while (pendingNodeIds.length > 0) {
-          const currentId = pendingNodeIds.pop()!;
-          if (selectedNodeIds.has(currentId)) continue;
-          selectedNodeIds.add(currentId);
-          pendingNodeIds.push(...(nodesById.get(currentId)?.inputs ?? []));
-        }
-        const selectedNodes = cfg.nodes.filter(configNode => selectedNodeIds.has(configNode.node_id));
+        const selectedNodes = selectTargetNodes(cfg, nodeId);
         if (warnAndBlockOnLeakage({ nodes: selectedNodes })) {
           update({ pending: false, run: null, message: `${label} blocked. Move data-learning preprocessing after the train/test split.` });
           return;
@@ -123,7 +150,7 @@ export function useTrainingNodeContext(nodeId: string | undefined) {
           setActiveParallelRun({ jobIds: res.job_ids, startedAt: new Date().toISOString() });
           toast.success('Parallel execution started', `${count} branches submitted.`);
         } else {
-          toast.success(`${jobType === 'tuning' ? 'Tuning' : 'Training'} job submitted`);
+          toast.success(`${jobTypeLabel(jobType)} job submitted`);
         }
         setTab(task);
         useJobStore.getState().setInspectedRun(null);
@@ -132,8 +159,7 @@ export function useTrainingNodeContext(nodeId: string | undefined) {
         console.error('Failed to submit job:', error);
         const leakageMessage = getLeakageErrorMessage(error);
         if (leakageMessage) useViewStore.getState().setLeakageNotice({ message: leakageMessage, graphSignature });
-        const message = leakageMessage ?? (error instanceof Error && error.message
-          ? error.message : 'Check your connection and settings, then try again.');
+        const message = submissionErrorMessage(error, leakageMessage);
         update({ pending: false, run: null, message: `${label}: Submission failed. ${message}` });
         toast.error('Failed to submit job', message);
       }

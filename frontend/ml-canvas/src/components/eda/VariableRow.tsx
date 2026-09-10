@@ -4,22 +4,18 @@ import {
     ChevronDown,
     ChevronRight,
     Download,
-    Eye,
-    EyeOff,
     Loader2,
     Check
 } from 'lucide-react';
 import { clickableProps } from '../../core/utils/a11y';
-import { getDtypeBadgeClass } from '../../core/utils/dtypeVisuals';
-import { BarChart, Bar, ResponsiveContainer } from 'recharts';
 import { DistributionChart, type DistributionDatum } from './DistributionChart';
 import { Button } from '../ui/button';
-import { Badge } from '../ui/badge';
-import { InfoTooltip } from '../ui/InfoTooltip';
 import { toast } from '../../core/toast';
 import type { ColumnProfile } from '../../core/types/edaProfile';
+import { VariableSummary, VariableIdentity, VariableControls } from './variableRow/VariablePresentation';
+import { VariableStatistics } from './variableRow/VariableStatistics';
 
-interface VariableRowProps {
+export interface VariableRowProps {
     profile: ColumnProfile;
     isExpanded: boolean;
     onToggleExpand: () => void;
@@ -38,20 +34,6 @@ export const VariableRow: React.FC<VariableRowProps> = ({
 }) => {
     const chartRef = useRef<HTMLDivElement>(null);
     const [dlState, setDlState] = useState<'idle' | 'downloading' | 'done'>('idle');
-
-    // Mini histogram data for the collapsed-row preview.
-    type MiniDatum = { name: string; count: number };
-    let miniChartData: MiniDatum[] = [];
-    if (profile.histogram) {
-        miniChartData = profile.histogram.map((b) => ({ name: String(b.start), count: b.count }));
-    } else if (profile.categorical_stats?.top_k) {
-        miniChartData = profile.categorical_stats.top_k.slice(0, 10).map((k) => ({ name: String(k.value), count: k.count }));
-    }
-
-    // Fallback for mini chart data if not directly available in standard path
-    if (miniChartData.length === 0 && profile.dtype === 'Numeric' && profile.numeric_stats) {
-        // Can't really plot without histogram data
-    }
 
     const downloadChart = async () => {
         if (!chartRef.current) return;
@@ -88,58 +70,6 @@ export const VariableRow: React.FC<VariableRowProps> = ({
         }
     };
 
-    // Summary stats for the closed state row
-    const renderSummary = () => {
-        return (
-            <div className="flex items-center justify-between w-full pr-4">
-                <div className="flex gap-4 text-xs text-muted-foreground mr-auto">
-                    {profile.numeric_stats ? (
-                        <>
-                            <span>Mean: <span className="font-mono text-foreground">{profile.numeric_stats.mean?.toFixed(2)}</span></span>
-                            <span>Std: <span className="font-mono text-foreground">{profile.numeric_stats.std?.toFixed(2)}</span></span>
-                            <span>Min: <span className="font-mono text-foreground">{profile.numeric_stats.min?.toFixed(2)}</span></span>
-                            <span>Max: <span className="font-mono text-foreground">{profile.numeric_stats.max?.toFixed(2)}</span></span>
-                        </>
-                    ) : profile.categorical_stats ? (
-                        <>
-                            <span>Unique: <span className="font-mono text-foreground">{profile.categorical_stats.unique_count}</span></span>
-                            {profile.categorical_stats.top_k?.[0] && (
-                                <span>Top: <span className="font-mono text-foreground">{String(profile.categorical_stats.top_k[0].value).slice(0, 20)}</span></span>
-                            )}
-                        </>
-                    ) : null}
-
-                    {/* Normality / Status Indicators */}
-                    {profile.normality_test && profile.normality_test.is_normal && (
-                        <Badge variant="outline" className="text-[10px] h-4 text-purple-600 dark:text-purple-400 border-purple-200 dark:border-purple-800 bg-purple-50 dark:bg-purple-900/20">
-                            Normal Dist
-                        </Badge>
-                    )}
-                    {profile.normality_test && !profile.normality_test.is_normal && (
-                        <Badge variant="outline" className="text-[10px] h-4 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20">
-                            Not Normal
-                        </Badge>
-                    )}
-                </div>
-
-                {/* Mini Histogram */}
-                {miniChartData.length > 0 && (
-                    <div className="h-8 w-24 hidden sm:block opacity-70">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={miniChartData}>
-                                <Bar
-                                    dataKey="count"
-                                    fill={profile.dtype === 'Numeric' ? '#3b82f6' : profile.dtype === 'Categorical' ? '#8b5cf6' : '#10b981'}
-                                    radius={[1, 1, 0, 0]}
-                                />
-                            </BarChart>
-                        </ResponsiveContainer>
-                    </div>
-                )}
-            </div>
-        );
-    };
-
     return (
         <div className={`border rounded-lg mb-2 transition-all ${isExpanded ? 'border-primary/50 shadow-md bg-card/50' : 'border-border bg-card'}`}>
             <div
@@ -151,229 +81,19 @@ export const VariableRow: React.FC<VariableRowProps> = ({
                 </div>
 
                 <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                        <span className="font-medium text-sm truncate">{profile.name}</span>
-                        <Badge variant="outline" className={`text-[10px] h-5 px-1 ${getDtypeBadgeClass(profile.dtype)}`}>
-                            {profile.dtype}
-                        </Badge>
-                        {profile.is_unique && <Badge variant="secondary" className="text-[10px] h-5">ID</Badge>}
-                        {profile.is_constant && <Badge variant="destructive" className="text-[10px] h-5">Constant</Badge>}
-                    </div>
+                    <VariableIdentity profile={profile} />
 
-                    {!isExpanded && renderSummary()}
+                    {!isExpanded && <VariableSummary profile={profile} />}
                 </div>
 
-                <div className="flex items-center gap-4 px-2">
-                    {/* Missing Bar */}
-                    <div className="flex flex-col items-end w-24">
-                        <div className="flex items-center gap-1 mb-1">
-                            <span className="text-[10px] text-muted-foreground">
-                                {profile.missing_percentage > 0 ? `${profile.missing_percentage.toFixed(1)}% Missing` : '100% Present'}
-                            </span>
-                             <InfoTooltip text="Green bar indicates the percentage of valid (non-null) data. Full green means no missing values." align="end" size="sm" />
-                        </div>
-                        <div className="w-full h-1.5 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
-                            <div
-                                className={`h-full ${profile.missing_percentage > 0 ? 'bg-amber-400' : 'bg-green-500'}`}
-                                style={{ width: `${Math.max(100 - profile.missing_percentage, 0)}%` }}
-                            />
-                        </div>
-                    </div>
-
-                    <div className="h-8 w-[1px] bg-border mx-2" />
-
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-muted-foreground"
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            onToggleExclude(profile.name, !isExcluded);
-                        }}
-                        title={isExcluded ? "Include in analysis" : "Exclude from analysis"}
-                        aria-label={isExcluded ? "Include in analysis" : "Exclude from analysis"}
-                    >
-                        {isExcluded ? <EyeOff size={16} /> : <Eye size={16} />}
-                    </Button>
-                </div>
+                <VariableControls profile={profile} isExcluded={isExcluded} onToggleExclude={onToggleExclude} />
             </div>
 
             {isExpanded && (
                 <div className="p-4 border-t border-border bg-card/30 animate-in slide-in-from-top-2 duration-200">
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-stretch">
 
-                        {/* Stats Column */}
-                        <div className="space-y-4">
-                            <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Statistics</h4>
-                            <div className="bg-background rounded-md border p-3 text-sm space-y-2 font-mono">
-                                <div className="flex justify-between">
-                                    <span className="text-muted-foreground">Missing</span>
-                                    <span>{profile.missing_count} ({profile.missing_percentage.toFixed(2)}%)</span>
-                                </div>
-                                {profile.numeric_stats && (
-                                    <>
-                                        <div className="flex justify-between">
-                                            <span className="text-muted-foreground">Mean</span>
-                                            <span>{profile.numeric_stats.mean?.toFixed(4)}</span>
-                                        </div>
-                                        <div className="flex justify-between">
-                                            <span className="text-muted-foreground">Std Dev</span>
-                                            <span>{profile.numeric_stats.std?.toFixed(4)}</span>
-                                        </div>
-                                        {/* Added Variance */}
-                                        <div className="flex justify-between">
-                                            <span className="text-muted-foreground">Variance</span>
-                                            <span>{profile.numeric_stats.variance?.toFixed(4) || (Math.pow(profile.numeric_stats.std || 0, 2)).toFixed(4)}</span>
-                                        </div>
-                                        <div className="my-2 border-t border-dashed" />
-                                        <div className="flex justify-between">
-                                            <span className="text-muted-foreground">Min</span>
-                                            <span>{profile.numeric_stats.min?.toFixed(4)}</span>
-                                        </div>
-                                        <div className="flex justify-between">
-                                            <span className="text-muted-foreground">25% (Q1)</span>
-                                            <span>{profile.numeric_stats.q25?.toFixed(4)}</span>
-                                        </div>
-                                        <div className="flex justify-between">
-                                            <span className="text-muted-foreground">Median</span>
-                                            <span>{profile.numeric_stats.median?.toFixed(4)}</span>
-                                        </div>
-                                        <div className="flex justify-between">
-                                            <span className="text-muted-foreground">75% (Q3)</span>
-                                            <span>{profile.numeric_stats.q75?.toFixed(4)}</span>
-                                        </div>
-                                        <div className="flex justify-between">
-                                            <span className="text-muted-foreground">Max</span>
-                                            <span>{profile.numeric_stats.max?.toFixed(4)}</span>
-                                        </div>
-                                        <div className="my-2 border-t border-dashed" />
-                                        <div className="flex justify-between">
-                                            <span className="text-muted-foreground">Skewness</span>
-                                            <span>{profile.numeric_stats.skewness?.toFixed(4)}</span>
-                                        </div>
-                                        {profile.numeric_stats.skewness != null && (
-                                            <div className="text-[10px] text-muted-foreground pl-2">
-                                                {Math.abs(profile.numeric_stats.skewness) < 0.5 ? '↳ Symmetric' :
-                                                 Math.abs(profile.numeric_stats.skewness) < 1 ? '↳ Moderately Skewed' : '↳ Highly Skewed'}
-                                            </div>
-                                        )}
-                                        <div className="flex justify-between">
-                                            <span className="text-muted-foreground">Kurtosis</span>
-                                            <span>{profile.numeric_stats.kurtosis?.toFixed(4)}</span>
-                                        </div>
-                                        {profile.numeric_stats.kurtosis != null && (
-                                            <div className="text-[10px] text-muted-foreground pl-2">
-                                                {Math.abs(profile.numeric_stats.kurtosis) < 0.5 ? '↳ Mesokurtic (Normal-like)' :
-                                                 profile.numeric_stats.kurtosis > 0 ? '↳ Leptokurtic (Heavy Tails)' : '↳ Platykurtic (Light Tails)'}
-                                            </div>
-                                        )}
-                                        <div className="my-2 border-t border-dashed" />
-                                        {profile.numeric_stats.zeros_count != null && (
-                                            <div className="flex justify-between">
-                                                <span className="text-muted-foreground">Zeros</span>
-                                                <span>{profile.numeric_stats.zeros_count}</span>
-                                            </div>
-                                        )}
-                                        {profile.numeric_stats.negatives_count != null && (
-                                            <div className="flex justify-between">
-                                                <span className="text-muted-foreground">Negatives</span>
-                                                <span>{profile.numeric_stats.negatives_count}</span>
-                                            </div>
-                                        )}
-                                        {profile.vif != null && (
-                                            <div className="flex justify-between items-center">
-                                                <span className="text-muted-foreground flex items-center gap-1">
-                                                    VIF
-                                                    <InfoTooltip text="Variance Inflation Factor. VIF > 5 = high multicollinearity, VIF > 10 = severe." size="sm" />
-                                                </span>
-                                                <span className={profile.vif > 5 ? 'text-red-500 font-semibold' : profile.vif > 2 ? 'text-amber-500' : 'text-green-500'}>
-                                                    {profile.vif.toFixed(2)}
-                                                </span>
-                                            </div>
-                                        )}
-                                    </>
-                                )}
-                                {profile.text_stats && (
-                                    <>
-                                        <div className="flex justify-between">
-                                            <span className="text-muted-foreground">Avg Length</span>
-                                            <span>{profile.text_stats.avg_length?.toFixed(1)} chars</span>
-                                        </div>
-                                        <div className="flex justify-between">
-                                            <span className="text-muted-foreground">Min Length</span>
-                                            <span>{profile.text_stats.min_length}</span>
-                                        </div>
-                                        <div className="flex justify-between">
-                                            <span className="text-muted-foreground">Max Length</span>
-                                            <span>{profile.text_stats.max_length}</span>
-                                        </div>
-                                        {profile.text_stats.sentiment_distribution && (
-                                            <>
-                                                <div className="my-2 border-t border-dashed" />
-                                                <div className="text-xs font-semibold mb-1">Sentiment</div>
-                                                <div className="flex h-3 rounded-full overflow-hidden w-full bg-secondary">
-                                                    <div className="bg-green-500 h-full" style={{ width: `${(profile.text_stats.sentiment_distribution.positive || 0) * 100}%` }} title={`Positive: ${((profile.text_stats.sentiment_distribution.positive || 0) * 100).toFixed(1)}%`}></div>
-                                                    <div className="bg-gray-400 h-full" style={{ width: `${(profile.text_stats.sentiment_distribution.neutral || 0) * 100}%` }} title={`Neutral: ${((profile.text_stats.sentiment_distribution.neutral || 0) * 100).toFixed(1)}%`}></div>
-                                                    <div className="bg-red-500 h-full" style={{ width: `${(profile.text_stats.sentiment_distribution.negative || 0) * 100}%` }} title={`Negative: ${((profile.text_stats.sentiment_distribution.negative || 0) * 100).toFixed(1)}%`}></div>
-                                                </div>
-                                                <div className="flex justify-between text-[10px] text-muted-foreground mt-1 px-1">
-                                                    <span>Pos: {((profile.text_stats.sentiment_distribution.positive || 0) * 100).toFixed(0)}%</span>
-                                                    <span>Neu: {((profile.text_stats.sentiment_distribution.neutral || 0) * 100).toFixed(0)}%</span>
-                                                    <span>Neg: {((profile.text_stats.sentiment_distribution.negative || 0) * 100).toFixed(0)}%</span>
-                                                </div>
-                                            </>
-                                        )}
-                                        {profile.text_stats.common_words && profile.text_stats.common_words.length > 0 && (
-                                            <>
-                                                 <div className="my-2 border-t border-dashed" />
-                                                 <div className="text-xs font-semibold mb-1">Common Words</div>
-                                                 <div className="flex flex-wrap gap-1">
-                                                    {profile.text_stats.common_words.slice(0, 10).map((w, idx) => (
-                                                        <Badge key={idx} variant="secondary" className="text-[10px] h-4">
-                                                            {w.word ?? w.value} ({w.count})
-                                                        </Badge>
-                                                    ))}
-                                                 </div>
-                                            </>
-                                        )}
-                                    </>
-                                )}
-                                {profile.categorical_stats && (
-                                    <>
-                                        <div className="flex justify-between">
-                                            <span className="text-muted-foreground">Unique</span>
-                                            <span>{profile.categorical_stats.unique_count}</span>
-                                        </div>
-                                        <div className="flex justify-between">
-                                            <span className="text-muted-foreground">Mode</span>
-                                            <span className="truncate max-w-[100px]" title={String(profile.categorical_stats.top_k?.[0]?.value)}>
-                                                {String(profile.categorical_stats.top_k?.[0]?.value || '-')}
-                                            </span>
-                                        </div>
-                                        {profile.categorical_stats.rare_labels_count != null && (
-                                            <div className="flex justify-between">
-                                                <span className="text-muted-foreground">Rare Labels</span>
-                                                <span>{profile.categorical_stats.rare_labels_count}</span>
-                                            </div>
-                                        )}
-                                        {profile.categorical_stats.top_k && profile.categorical_stats.top_k.length > 0 && (
-                                            <>
-                                                <div className="my-2 border-t border-dashed" />
-                                                <div className="text-xs font-semibold mb-1">Top Categories</div>
-                                                <div className="space-y-1">
-                                                    {profile.categorical_stats.top_k.slice(0, 5).map((item, i) => (
-                                                        <div key={i} className="flex justify-between text-xs">
-                                                            <span className="truncate max-w-[120px]" title={String(item.value)}>{String(item.value)}</span>
-                                                            <span className="text-muted-foreground">{item.count}</span>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            </>
-                                        )}
-                                    </>
-                                )}
-                            </div>
-                        </div>
+                        <VariableStatistics profile={profile} />
 
                         {/* Distribution Chart Column */}
                         <div className="md:col-span-2 flex flex-col min-h-[300px]">

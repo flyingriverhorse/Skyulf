@@ -44,6 +44,22 @@ function formatRelativeTime(iso: string): string {
   return new Date(iso).toLocaleDateString();
 }
 
+/** Counts valid canvas nodes, retaining nullish definition/catalog/type precedence. */
+function countCanvasNodes(nodes: unknown[], bump: (label: string) => void): void {
+  for (const n of nodes) {
+    if (!n || typeof n !== 'object') continue;
+    const data = (n as { data?: unknown }).data;
+    const def =
+      data && typeof data === 'object'
+        ? (data as { definitionType?: unknown; catalogType?: unknown }).definitionType
+        ?? (data as { catalogType?: unknown }).catalogType
+        : undefined;
+    const type = (n as { type?: unknown }).type;
+    const label = String(def ?? type ?? 'unknown');
+    bump(label);
+  }
+}
+
 /** Build a "node type → count" breakdown from a stored graph. Tolerates
  *  both React Flow snapshot shape ({nodes:[{type,data:{definitionType}}]})
  *  and engine config shape (list of {step_type}). Returns up to 8 entries
@@ -56,18 +72,7 @@ function summariseGraph(graph: unknown): Array<[string, number]> {
   if (graph && typeof graph === 'object' && 'nodes' in (graph as Record<string, unknown>)) {
     const nodes = (graph as { nodes?: unknown }).nodes;
     if (Array.isArray(nodes)) {
-      for (const n of nodes) {
-        if (!n || typeof n !== 'object') continue;
-        const data = (n as { data?: unknown }).data;
-        const def =
-          data && typeof data === 'object'
-            ? (data as { definitionType?: unknown; catalogType?: unknown }).definitionType
-              ?? (data as { catalogType?: unknown }).catalogType
-            : undefined;
-        const type = (n as { type?: unknown }).type;
-        const label = String(def ?? type ?? 'unknown');
-        bump(label);
-      }
+      countCanvasNodes(nodes, bump);
     }
   } else if (Array.isArray(graph)) {
     for (const n of graph) {
@@ -199,51 +204,91 @@ export const PipelineVersionsModal: React.FC<PipelineVersionsModalProps> = ({
     onClose();
   };
 
-  return (
-    <ModalShell
-      isOpen={isOpen}
-      onClose={onClose}
-      size="3xl"
-      title={
-        <div className="flex items-center gap-2">
-          <FileClock className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-          <span>Pipeline Versions</span>
-          {datasetName && (
-            <span className="text-sm font-normal text-muted-foreground">
-              · {datasetName}
-            </span>
-          )}
-        </div>
-      }
-    >
-      {loading && (
-        <div className="flex items-center justify-center py-12">
-          <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
-        </div>
-      )}
-      {!loading && error && (
-        <div className="p-4 text-sm text-red-600 dark:text-red-400">
-          Failed to load versions: {error}
-        </div>
-      )}
-      {!loading && !error && versions.length === 0 && (
-        <div className="p-8 text-center text-sm text-muted-foreground">
-          <FileClock className="w-10 h-10 mx-auto mb-2 opacity-40" />
-          <p className="font-medium text-foreground/80 mb-1">No versions yet</p>
-          <p>
-            Saving a pipeline against this dataset stamps a version
-            automatically. They show up here for cross-device restore.
-          </p>
-        </div>
-      )}
-      {!loading && !error && versions.length > 0 && (
-        <div className="max-h-[70vh] flex flex-col border rounded-md overflow-hidden">
-          <VirtualList
-            items={versions}
-            getKey={(entry) => entry.id}
-            estimateSize={80}
-            className="flex-1 overflow-y-auto"
-            renderItem={(entry) => {
+  const renderVersionActions = (entry: PipelineVersionEntry) => (
+    <div className="flex items-center gap-0.5 flex-shrink-0">
+      <button
+        onClick={() => { void handleRestore(entry); }}
+        title="Restore this version"
+        aria-label="Restore version"
+        className="p-1.5 rounded hover:bg-blue-50 dark:hover:bg-blue-900/20 text-blue-600 dark:text-blue-400"
+      >
+        <Play className="w-3.5 h-3.5" />
+      </button>
+      <button
+        onClick={() =>
+          setDetailsId((cur) => (cur === entry.id ? null : entry.id))
+        }
+        title={detailsId === entry.id ? 'Hide details' : 'Show details'}
+        aria-label="Toggle version details"
+        aria-expanded={detailsId === entry.id}
+        className="p-1.5 rounded hover:bg-accent text-muted-foreground hover:text-foreground"
+      >
+        {detailsId === entry.id ? (
+          <ChevronUp className="w-3.5 h-3.5" />
+        ) : (
+          <Info className="w-3.5 h-3.5" />
+        )}
+      </button>
+      <button
+        onClick={() => { void handleTogglePin(entry); }}
+        title={entry.pinned ? 'Unpin' : 'Pin (exempt from cleanup)'}
+        aria-label={entry.pinned ? 'Unpin version' : 'Pin version'}
+        className="p-1.5 rounded hover:bg-amber-50 dark:hover:bg-amber-900/20 text-muted-foreground hover:text-amber-600"
+      >
+        {entry.pinned ? (
+          <PinOff className="w-3.5 h-3.5" />
+        ) : (
+          <Pin className="w-3.5 h-3.5" />
+        )}
+      </button>
+      <button
+        onClick={() => startEdit(entry)}
+        title="Edit name & note"
+        aria-label="Edit version"
+        className="p-1.5 rounded hover:bg-accent text-muted-foreground hover:text-foreground"
+      >
+        <Pencil className="w-3.5 h-3.5" />
+      </button>
+      <button
+        onClick={() => { void handleDelete(entry); }}
+        title="Delete version"
+        aria-label="Delete version"
+        className="p-1.5 rounded hover:bg-red-50 dark:hover:bg-red-900/20 text-muted-foreground hover:text-red-600 dark:hover:text-red-400"
+      >
+        <Trash2 className="w-3.5 h-3.5" />
+      </button>
+    </div>
+  );
+
+  const renderVersionsContent = () => <>
+    {loading && (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+      </div>
+    )}
+    {!loading && error && (
+      <div className="p-4 text-sm text-red-600 dark:text-red-400">
+        Failed to load versions: {error}
+      </div>
+    )}
+    {!loading && !error && versions.length === 0 && (
+      <div className="p-8 text-center text-sm text-muted-foreground">
+        <FileClock className="w-10 h-10 mx-auto mb-2 opacity-40" />
+        <p className="font-medium text-foreground/80 mb-1">No versions yet</p>
+        <p>
+          Saving a pipeline against this dataset stamps a version
+          automatically. They show up here for cross-device restore.
+        </p>
+      </div>
+    )}
+    {!loading && !error && versions.length > 0 && (
+      <div className="max-h-[70vh] flex flex-col border rounded-md overflow-hidden">
+        <VirtualList
+          items={versions}
+          getKey={(entry) => entry.id}
+          estimateSize={80}
+          className="flex-1 overflow-y-auto"
+          renderItem={(entry) => {
             const isEditing = editingId === entry.id;
             return (
               <div className="p-3 border-b last:border-b-0 hover:bg-accent/40 transition-colors">
@@ -323,59 +368,7 @@ export const PipelineVersionsModal: React.FC<PipelineVersionsModalProps> = ({
                         </span>
                       </div>
                     </div>
-                    <div className="flex items-center gap-0.5 flex-shrink-0">
-                      <button
-                        onClick={() => { void handleRestore(entry); }}
-                        title="Restore this version"
-                        aria-label="Restore version"
-                        className="p-1.5 rounded hover:bg-blue-50 dark:hover:bg-blue-900/20 text-blue-600 dark:text-blue-400"
-                      >
-                        <Play className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        onClick={() =>
-                          setDetailsId((cur) => (cur === entry.id ? null : entry.id))
-                        }
-                        title={detailsId === entry.id ? 'Hide details' : 'Show details'}
-                        aria-label="Toggle version details"
-                        aria-expanded={detailsId === entry.id}
-                        className="p-1.5 rounded hover:bg-accent text-muted-foreground hover:text-foreground"
-                      >
-                        {detailsId === entry.id ? (
-                          <ChevronUp className="w-3.5 h-3.5" />
-                        ) : (
-                          <Info className="w-3.5 h-3.5" />
-                        )}
-                      </button>
-                      <button
-                        onClick={() => { void handleTogglePin(entry); }}
-                        title={entry.pinned ? 'Unpin' : 'Pin (exempt from cleanup)'}
-                        aria-label={entry.pinned ? 'Unpin version' : 'Pin version'}
-                        className="p-1.5 rounded hover:bg-amber-50 dark:hover:bg-amber-900/20 text-muted-foreground hover:text-amber-600"
-                      >
-                        {entry.pinned ? (
-                          <PinOff className="w-3.5 h-3.5" />
-                        ) : (
-                          <Pin className="w-3.5 h-3.5" />
-                        )}
-                      </button>
-                      <button
-                        onClick={() => startEdit(entry)}
-                        title="Edit name & note"
-                        aria-label="Edit version"
-                        className="p-1.5 rounded hover:bg-accent text-muted-foreground hover:text-foreground"
-                      >
-                        <Pencil className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        onClick={() => { void handleDelete(entry); }}
-                        title="Delete version"
-                        aria-label="Delete version"
-                        className="p-1.5 rounded hover:bg-red-50 dark:hover:bg-red-900/20 text-muted-foreground hover:text-red-600 dark:hover:text-red-400"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
+                    {renderVersionActions(entry)}
                   </div>
                 )}
                 {detailsId === entry.id && !isEditing && (
@@ -431,10 +424,30 @@ export const PipelineVersionsModal: React.FC<PipelineVersionsModalProps> = ({
                 )}
               </div>
             );
-            }}
-          />
+          }}
+        />
+      </div>
+    )}
+  </>;
+
+  return (
+    <ModalShell
+      isOpen={isOpen}
+      onClose={onClose}
+      size="3xl"
+      title={
+        <div className="flex items-center gap-2">
+          <FileClock className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+          <span>Pipeline Versions</span>
+          {datasetName && (
+            <span className="text-sm font-normal text-muted-foreground">
+              · {datasetName}
+            </span>
+          )}
         </div>
-      )}
+      }
+    >
+      {renderVersionsContent()}
     </ModalShell>
   );
 };

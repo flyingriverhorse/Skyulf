@@ -103,15 +103,23 @@ describe('preprocessing settings accessible controls', () => {
     expect(onChange).toHaveBeenLastCalledWith({ ...config, replacements: config.replacements.slice(0, 2) });
   });
 
-  it('keeps resampling target suggestions local to their settings instance', () => {
-    // Two settings forms must not share a datalist ID or resolve suggestions from the other form.
+  it('keeps resampling target suggestions local to their settings instance', async () => {
+    // Two settings forms must not share a listbox ID or resolve suggestions from the other form.
     const definition = definitions.find(node => node.type === 'ResamplingNode')!;
     const Settings = definition.settings;
     const config = definition.getDefaultConfig();
     render(<><Settings config={config} onChange={() => {}} /><Settings config={config} onChange={() => {}} /></>);
     const controls = screen.getAllByRole('combobox', { name: 'Target Column' }) as HTMLInputElement[];
-    expect(controls[0]!.list).not.toBeNull();
-    expect(controls[1]!.list).not.toBe(controls[0]!.list);
+    fireEvent.focus(controls[0]!);
+    const firstList = await screen.findByRole('listbox');
+    expect(controls[0]).toHaveAttribute('aria-controls', firstList.id);
+    expect(controls[1]).not.toHaveAttribute('aria-controls');
+    fireEvent.keyDown(controls[0]!, { key: 'Escape' });
+    fireEvent.focus(controls[1]!);
+    const secondList = await screen.findByRole('listbox');
+    expect(controls[1]).toHaveAttribute('aria-controls', secondList.id);
+    expect(controls[0]).not.toHaveAttribute('aria-controls');
+    expect(secondList.id).not.toBe(firstList.id);
   });
 
   it.each([{ method: 'rolling', name: 'mean' }, { method: 'date', name: 'year' }])('exposes selected $method options', ({ method, name }) => {

@@ -10,6 +10,72 @@ interface JobSelectorProps {
     invalid?: boolean;
 }
 
+interface JobSelectorTriggerProps extends Pick<JobSelectorProps, 'selectedJob' | 'onSelect'> {
+    triggerRef: React.RefObject<HTMLButtonElement>;
+    open: boolean;
+    listboxId: string;
+    selectedJobData: DriftJobOption | undefined;
+    invalid: boolean | undefined;
+    onToggle: () => void;
+}
+
+/** Present the selected job and clear action while retaining the owner's focus ref. */
+function JobSelectorTrigger({ triggerRef, open, listboxId, invalid, selectedJob, selectedJobData, onSelect, onToggle }: JobSelectorTriggerProps) {
+    return (
+        <button
+            ref={triggerRef}
+            type="button"
+            aria-haspopup="listbox"
+            aria-expanded={open}
+            aria-controls={listboxId}
+            onClick={() => {
+                onToggle();
+            }}
+            className={`w-full flex items-center gap-2 px-3 py-2.5 border rounded-md text-sm transition-colors ${
+                invalid
+                    ? 'border-red-400 dark:border-red-500 hover:border-red-500'
+                    : selectedJob
+                        ? 'border-blue-300 dark:border-blue-700 bg-blue-50/50 dark:bg-blue-900/20'
+                        : 'border-gray-200 dark:border-slate-600 hover:border-gray-300 dark:hover:border-slate-500'
+            }`}
+            aria-describedby={invalid ? 'job-selector-error' : undefined}
+        >
+            <Database size={15} className="shrink-0 text-gray-400" />
+            <span className={`truncate ${selectedJob ? 'text-slate-800 dark:text-slate-200' : 'text-gray-400'}`}>
+                {selectedJobData
+                    ? `${selectedJobData.dataset_name}  (${selectedJobData.job_id.slice(0, 8)})`
+                    : 'Select reference model...'}
+            </span>
+            {selectedJob && (
+                <span
+                    role="button"
+                    tabIndex={0}
+                    aria-label="Clear selected reference model"
+                    title="Clear selection"
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        onSelect('');
+                    }}
+                    onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                            e.stopPropagation();
+                            e.preventDefault();
+                            onSelect('');
+                        }
+                    }}
+                    className="ml-auto shrink-0 p-0.5 rounded hover:bg-black/5 dark:hover:bg-white/10 text-gray-400 hover:text-gray-600 dark:hover:text-slate-300"
+                >
+                    <X size={13} />
+                </span>
+            )}
+            <ChevronDown
+                size={14}
+                className={`${selectedJob ? '' : 'ml-auto'} shrink-0 text-gray-400 transition-transform ${open ? 'rotate-180' : ''}`}
+            />
+        </button>
+    );
+}
+
 /**
  * Combobox that lists training jobs grouped by date. Acts as the "reference
  * model" picker for drift comparison. Self-contained: owns its own search
@@ -77,58 +143,11 @@ export const JobSelector: React.FC<JobSelectorProps> = ({ jobs, selectedJob, onS
 
     return (
         <div ref={dropdownRef} className="relative flex-1 min-w-0">
-            <button
-                ref={triggerRef}
-                type="button"
-                aria-haspopup="listbox"
-                aria-expanded={open}
-                aria-controls={listboxId}
-                onClick={() => {
-                    setOpen(!open);
-                    setSearchTerm('');
-                }}
-                className={`w-full flex items-center gap-2 px-3 py-2.5 border rounded-md text-sm transition-colors ${
-                    invalid
-                        ? 'border-red-400 dark:border-red-500 hover:border-red-500'
-                        : selectedJob
-                            ? 'border-blue-300 dark:border-blue-700 bg-blue-50/50 dark:bg-blue-900/20'
-                            : 'border-gray-200 dark:border-slate-600 hover:border-gray-300 dark:hover:border-slate-500'
-                }`}
-                aria-describedby={invalid ? 'job-selector-error' : undefined}
-            >
-                <Database size={15} className="shrink-0 text-gray-400" />
-                <span className={`truncate ${selectedJob ? 'text-slate-800 dark:text-slate-200' : 'text-gray-400'}`}>
-                    {selectedJobData
-                        ? `${selectedJobData.dataset_name}  (${selectedJobData.job_id.slice(0, 8)})`
-                        : 'Select reference model...'}
-                </span>
-                {selectedJob && (
-                    <span
-                        role="button"
-                        tabIndex={0}
-                        aria-label="Clear selected reference model"
-                        title="Clear selection"
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            onSelect('');
-                        }}
-                        onKeyDown={(e) => {
-                            if (e.key === 'Enter' || e.key === ' ') {
-                                e.stopPropagation();
-                                e.preventDefault();
-                                onSelect('');
-                            }
-                        }}
-                        className="ml-auto shrink-0 p-0.5 rounded hover:bg-black/5 dark:hover:bg-white/10 text-gray-400 hover:text-gray-600 dark:hover:text-slate-300"
-                    >
-                        <X size={13} />
-                    </span>
-                )}
-                <ChevronDown
-                    size={14}
-                    className={`${selectedJob ? '' : 'ml-auto'} shrink-0 text-gray-400 transition-transform ${open ? 'rotate-180' : ''}`}
-                />
-            </button>
+            <JobSelectorTrigger
+                triggerRef={triggerRef} open={open} listboxId={listboxId} invalid={invalid}
+                selectedJob={selectedJob} selectedJobData={selectedJobData} onSelect={onSelect}
+                onToggle={() => { setOpen(!open); setSearchTerm(''); }}
+            />
 
             {invalid && !selectedJob && (
                 <span id="job-selector-error" className="block mt-1 text-[11px] text-red-600 dark:text-red-400">Reference job is required.</span>

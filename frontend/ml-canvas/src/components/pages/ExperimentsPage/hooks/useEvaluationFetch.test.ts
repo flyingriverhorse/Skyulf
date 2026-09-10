@@ -34,7 +34,85 @@ const noSavedThresholds: SavedThresholdInfo = {
 
 const evalFor = (tag: string) => ({ tag }) as unknown as EvaluationData;
 
+const savedThresholds: SavedThresholdInfo = {
+  thresholds: { '0': 0.4, '1': 0.6 }, classes: [0, 1], metric: 'f1',
+  split_used: 'validation', computed_at: '2026-09-09T10:00:00Z', source: null, enabled: false,
+};
+
 describe('useEvaluationFetch', () => {
+  /** Evaluation errors still hydrate saved thresholds and must use the latest polled job metadata. */
+  it('keeps its fetch callback stable and hydrates thresholds after an evaluation failure', async () => {
+    const getEvaluation = vi.spyOn(apiClient, 'get').mockRejectedValue({ response: { data: { detail: '' } } });
+    const getSaved = vi.spyOn(thresholdTuningApi, 'get').mockResolvedValue({ ...savedThresholds, enabled: true });
+    const { result, rerender } = renderHook(({ jobs }) => useEvaluationFetch(jobs), { initialProps: { jobs: [makeJob('a', 'recall')] } });
+    const fetch = result.current.fetchEvaluationData;
+    rerender({ jobs: [makeJob('a', 'precision')] });
+    expect(result.current.fetchEvaluationData).toBe(fetch);
+    await act(async () => { await fetch('a'); });
+    expect(result.current.evalError).toBe('Failed to fetch evaluation data');
+    expect(result.current.evaluationData).toBeNull();
+    expect(result.current.selectedThresholdMetric).toBe('precision');
+    expect(result.current.isEvalLoading).toBe(false);
+    expect(result.current.hasSavedThresholds).toBe(true);
+    expect(result.current.useTunedThresholds).toBe(true);
+    expect(getSaved.mock.invocationCallOrder[0]).toBeGreaterThan(getEvaluation.mock.invocationCallOrder[0]!);
+  });
+
+  /** Partial saved payloads must not enable threshold controls. */
+  it.each([
+    { thresholds: null }, { classes: null }, { metric: '' }, { split_used: '' },
+  ])('ignores an incomplete saved threshold payload %j', async (missing) => {
+    vi.spyOn(apiClient, 'get').mockResolvedValue(okResponse(evalFor('A')));
+    vi.spyOn(thresholdTuningApi, 'get').mockResolvedValue({ ...savedThresholds, ...missing });
+    const { result } = renderHook(() => useEvaluationFetch([makeJob('a')]));
+    await act(async () => { await result.current.fetchEvaluationData('a'); });
+    expect(result.current.tuningPreview).toBeNull();
+    expect(result.current.hasSavedThresholds).toBe(false);
+    expect(result.current.useTunedThresholds).toBe(false);
+  });
+  it('distinguishes saved but disabled thresholds from an unsaved preview', async () => {
+    /** Turning a saved set off must preserve the ability to enable it again. */
+    vi.spyOn(apiClient, 'get').mockResolvedValue(okResponse(evalFor('A')));
+    vi.spyOn(thresholdTuningApi, 'get').mockResolvedValue(savedThresholds);
+    const { result } = renderHook(() => useEvaluationFetch([makeJob('a')]));
+    await act(async () => { await result.current.fetchEvaluationData('a'); });
+    expect(result.current.useTunedThresholds).toBe(false);
+    expect(result.current.hasSavedThresholds).toBe(true);
+  });
+
+  it.each(['empty', 'failed'])('resets saved state when the next job has %s thresholds', async (response) => {
+    /** A prior job's saved set must not unlock an invalid toggle for another job. */
+    vi.spyOn(apiClient, 'get').mockResolvedValue(okResponse(evalFor('A')));
+    const getSaved = vi.spyOn(thresholdTuningApi, 'get').mockResolvedValueOnce(savedThresholds);
+    if (response === 'empty') getSaved.mockResolvedValueOnce(noSavedThresholds);
+    else getSaved.mockRejectedValueOnce(new Error('Threshold load failed'));
+    const { result } = renderHook(() => useEvaluationFetch([makeJob('a'), makeJob('b')]));
+    await act(async () => { await result.current.fetchEvaluationData('a'); });
+    expect(result.current.hasSavedThresholds).toBe(true);
+    await act(async () => { await result.current.fetchEvaluationData('b'); });
+    expect(result.current.hasSavedThresholds).toBe(false);
+    expect(result.current.tuningPreview).toBeNull();
+    expect(result.current.useTunedThresholds).toBe(false);
+  });
+
+  it('ignores saved thresholds that arrive after another job was selected', async () => {
+    /** A late saved-set response must not re-enable the newer job's toggle. */
+    vi.spyOn(apiClient, 'get').mockResolvedValue(okResponse(evalFor('A')));
+    let resolveSaved!: (value: SavedThresholdInfo) => void;
+    const getSaved = vi.spyOn(thresholdTuningApi, 'get')
+      .mockImplementationOnce(() => new Promise(resolve => { resolveSaved = resolve; }))
+      .mockResolvedValueOnce(noSavedThresholds);
+    const { result } = renderHook(() => useEvaluationFetch([makeJob('a'), makeJob('b')]));
+    let loadA!: Promise<void>;
+    act(() => { loadA = result.current.fetchEvaluationData('a'); });
+    await waitFor(() => expect(getSaved).toHaveBeenCalledWith('a'));
+    await act(async () => { await result.current.fetchEvaluationData('b'); });
+    await act(async () => { resolveSaved(savedThresholds); await loadA; });
+    expect(result.current.evalJobId).toBe('b');
+    expect(result.current.hasSavedThresholds).toBe(false);
+    expect(result.current.tuningPreview).toBeNull();
+  });
+
   afterEach(() => {
     vi.restoreAllMocks();
   });

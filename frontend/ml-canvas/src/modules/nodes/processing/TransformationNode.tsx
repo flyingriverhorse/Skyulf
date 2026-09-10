@@ -49,6 +49,45 @@ const getMethodType = (method: string): 'power' | 'simple' => {
   return 'simple';
 };
 
+function TransformationParameters({ rule, idx, id, updateRule }: {
+  rule: TransformationRule;
+  idx: number;
+  id: string;
+  updateRule: (index: number, updates: Partial<TransformationRule>) => void;
+}) {
+  return (
+    <>
+      {(rule.method === 'yeo-johnson' || rule.method === 'box-cox') && (
+        // eslint-disable-next-line jsx-a11y/click-events-have-key-events,jsx-a11y/no-static-element-interactions -- stopPropagation wrapper, child controls handle their own keyboard input
+        <div className="flex items-center gap-2 pt-1" onClick={(e) => { e.stopPropagation(); }}>
+          <input
+            aria-label={`Standardize result for rule ${idx + 1}`}
+            type="checkbox"
+            id={`${id}-std-${idx}`}
+            checked={rule.params?.standardize !== false}
+            onChange={(e) => { updateRule(idx, { params: { ...rule.params, standardize: e.target.checked } }); }}
+          />
+          <label htmlFor={`${id}-std-${idx}`} className="text-xs text-muted-foreground">Standardize result</label>
+        </div>
+      )}
+
+      {rule.method === 'exponential' && (
+         // eslint-disable-next-line jsx-a11y/click-events-have-key-events,jsx-a11y/no-static-element-interactions -- stopPropagation wrapper, child controls handle their own keyboard input
+         <div className="flex flex-col gap-1 pt-1" onClick={(e) => { e.stopPropagation(); }}>
+           <span className="text-xs text-muted-foreground">Clip Threshold:</span>
+           <input
+             aria-label={`Clip Threshold for rule ${idx + 1}`}
+             type="number"
+             className="w-full p-1 border rounded text-xs"
+             value={rule.params?.clip_threshold || 700}
+             onChange={(e) => { updateRule(idx, { params: { ...rule.params, clip_threshold: Number.parseFloat(e.target.value) } }); }}
+           />
+         </div>
+      )}
+    </>
+  );
+}
+
 const TransformationSettings: React.FC<{ config: TransformationConfig; onChange: (c: TransformationConfig) => void; nodeId?: string }> = ({
   config: propConfig,
   onChange,
@@ -206,33 +245,7 @@ const TransformationSettings: React.FC<{ config: TransformationConfig; onChange:
                       </select>
                     </div>
 
-                    {(rule.method === 'yeo-johnson' || rule.method === 'box-cox') && (
-                      // eslint-disable-next-line jsx-a11y/click-events-have-key-events,jsx-a11y/no-static-element-interactions -- stopPropagation wrapper, child controls handle their own keyboard input
-                      <div className="flex items-center gap-2 pt-1" onClick={(e) => { e.stopPropagation(); }}>
-                        <input
-                          aria-label={`Standardize result for rule ${idx + 1}`}
-                          type="checkbox"
-                          id={`${id}-std-${idx}`}
-                          checked={rule.params?.standardize !== false}
-                          onChange={(e) => { updateRule(idx, { params: { ...rule.params, standardize: e.target.checked } }); }}
-                        />
-                        <label htmlFor={`${id}-std-${idx}`} className="text-xs text-muted-foreground">Standardize result</label>
-                      </div>
-                    )}
-
-                    {rule.method === 'exponential' && (
-                       // eslint-disable-next-line jsx-a11y/click-events-have-key-events,jsx-a11y/no-static-element-interactions -- stopPropagation wrapper, child controls handle their own keyboard input
-                       <div className="flex flex-col gap-1 pt-1" onClick={(e) => { e.stopPropagation(); }}>
-                         <span className="text-xs text-muted-foreground">Clip Threshold:</span>
-                         <input
-                           aria-label={`Clip Threshold for rule ${idx + 1}`}
-                           type="number"
-                           className="w-full p-1 border rounded text-xs"
-                           value={rule.params?.clip_threshold || 700}
-                           onChange={(e) => { updateRule(idx, { params: { ...rule.params, clip_threshold: Number.parseFloat(e.target.value) } }); }}
-                         />
-                       </div>
-                    )}
+                    <TransformationParameters rule={rule} idx={idx} id={id} updateRule={updateRule} />
                   </div>
 
                   {/* Right Column: Columns */}

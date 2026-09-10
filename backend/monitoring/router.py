@@ -42,6 +42,7 @@ from backend.ml_pipeline._execution.graph_utils import (
 )
 from backend.ml_pipeline._execution.utils import parse_branch_info, resolve_dataset_name
 from backend.ml_pipeline.constants import StepType
+from backend.monitoring.drift_reference import resolve_drift_reference
 from backend.utils import sanitize_for_log
 from skyulf.profiling.drift import DriftCalculator
 from skyulf.registry import NodeRegistry as SkyulfRegistry
@@ -523,8 +524,11 @@ async def calculate_drift(
     unparseable). ``dataset_name`` is optional and only used to prefer an exact
     reference-file match over a scan of the job's artifacts.
 
-    The job's target column is excluded from feature and schema drift on both
-    sides, including unnamed target columns in legacy splitter references.
+    For jobs with a saved execution graph, compare with the unique upstream
+    loader's raw snapshot, before preprocessing and splitting. These loaded rows
+    can include validation/test rows; sampled loaders remain sampled. Explicitly
+    dropped columns and the target are excluded on both sides. Graphless legacy
+    jobs retain their original reference, including normalization of unnamed targets.
 
     The response carries per-column drift metrics — PSI, KS, Wasserstein and KL —
     the columns missing from or new to the upload, and, when the job recorded them,
@@ -561,9 +565,6 @@ async def calculate_drift(
         )
         raise HTTPException(status_code=404, detail=f"Reference data not found for job {job_id}")
 
-    # 3. Load Reference Data
-    ref_df = _load_reference_dataframe(artifact_store, reference_key, job_id)
-
     # 3. Load Current Data
     curr_df = await _load_current_dataframe(file)
 
@@ -573,17 +574,18 @@ async def calculate_drift(
     db_jobs = await _fetch_drift_job_rows(db, [job_id])
     db_job = db_jobs.get(job_id)
     target_col = _extract_drift_target_column(db_job) if db_job is not None else None
-    if target_col:
-        ref_df = ref_df.drop([col for col in ("", target_col) if col in ref_df.columns])
-        if target_col in curr_df.columns:
-            curr_df = curr_df.drop(target_col)
-
     # 4. Calculate Drift
     custom_thresholds = _build_drift_thresholds(
         threshold_psi, threshold_ks, threshold_wasserstein, threshold_kl
     )
     effective_thresholds = _effective_drift_thresholds(custom_thresholds)
     try:
+        comparison_key, excluded = resolve_drift_reference(artifact_store, db_job, reference_key)
+        ref_df = _load_reference_dataframe(artifact_store, comparison_key, job_id)
+        ref_excluded = excluded | {"", target_col} if target_col else excluded
+        current_excluded = excluded | {target_col} if target_col else excluded
+        ref_df = ref_df.drop([col for col in ref_df.columns if col in ref_excluded])
+        curr_df = curr_df.drop([col for col in curr_df.columns if col in current_excluded])
         calculator = DriftCalculator(ref_df, curr_df)
         report = calculator.calculate_drift(thresholds=custom_thresholds or None)
     except Exception as exc:
@@ -597,6 +599,8 @@ async def calculate_drift(
             model_version=model_version,
             error_message=str(exc),
         )
+        if isinstance(exc, SkyulfException):
+            raise
         raise SkyulfException(message="Drift calculation failed") from None
 
     # 5. Pin the threshold version this check was evaluated against, then

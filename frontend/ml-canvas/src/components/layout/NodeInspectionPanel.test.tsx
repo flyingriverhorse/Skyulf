@@ -287,4 +287,79 @@ describe('NodeInspectionPanel', () => {
     expect(screen.queryByRole('combobox', { name: /Branch|Data path/ })).not.toBeInTheDocument();
     expect(screen.getByRole('cell', { name: '42' })).toBeVisible();
   });
+
+  it.each(['node', 'run'])('resets a prior selection when the %s changes without remounting its control', (change) => {
+    /** A new receipt must select its own first path without stealing keyboard focus. */
+    const second = branch('path-b', 'Second');
+    second.output.tables = [{ ...sample, rows: [{ score: 99 }] }];
+    inspection.branches = [branch(), second];
+    const { rerender } = render(<NodeInspectionPanel nodeId="selected" side="output" />);
+    const selector = screen.getByRole('combobox', { name: 'Data path' });
+    fireEvent.change(selector, { target: { value: 'path-b' } });
+    selector.focus();
+    if (change === 'run') inspection.runId = 'preview-run-2';
+    rerender(<NodeInspectionPanel nodeId={change === 'node' ? 'another' : 'selected'} side="output" />);
+    expect(screen.getByRole('combobox', { name: 'Data path' })).toBe(selector);
+    expect(selector).toHaveFocus();
+    expect(selector).toHaveValue('path-a');
+    expect(screen.getByRole('cell', { name: '42' })).toBeVisible();
+  });
+
+  it('prefers an exact port match over ambiguous plain identities and falls back after it disappears', () => {
+    /** Multiple plain ports share an identity, so only an exact selection is reliable. */
+    inspection.branches[0]!.output.tables = [
+      { ...sample, port: 'first', rows: [{ score: 11 }] },
+      { ...sample, port: 'second', rows: [{ score: 22 }] },
+    ];
+    const { rerender } = render(<NodeInspectionPanel nodeId="selected" side="output" />);
+    const selector = screen.getByRole('combobox', { name: 'Port and split' });
+    fireEvent.change(selector, { target: { value: '1' } });
+    expect(screen.getByRole('cell', { name: '22' })).toBeVisible();
+    inspection.branches[0]!.output.tables = [
+      { ...sample, port: 'replacement-a', rows: [{ score: 33 }] },
+      { ...sample, port: 'replacement-b', rows: [{ score: 44 }] },
+    ];
+    rerender(<NodeInspectionPanel nodeId="selected" side="output" />);
+    expect(selector).toHaveDisplayValue('replacement-a · unsplit');
+    expect(screen.getByRole('cell', { name: '33' })).toBeVisible();
+  });
+
+  it('bounds table choices to six and serializes object, zero and missing cell values', () => {
+    /** Inspection must keep bounded choices and preserve meaningful falsy sample values. */
+    inspection.branches[0]!.output.tables = Array.from({ length: 8 }, (_, index) => ({
+      ...sample, port: `port-${index}`, rows: [{ score: { value: 0 } }, { score: 0 }],
+    }));
+    render(<NodeInspectionPanel nodeId="selected" side="output" />);
+    expect(within(screen.getByRole('combobox', { name: 'Port and split' })).getAllByRole('option')).toHaveLength(6);
+    const table = screen.getByRole('table', { name: 'Measured output sample' });
+    expect(within(table).getByRole('cell', { name: '{"value":0}' })).toBeVisible();
+    expect(within(table).getByRole('cell', { name: '0' })).toBeVisible();
+    expect(within(table).getAllByRole('cell', { name: 'null' })).toHaveLength(2);
+  });
+
+  it('bounds predicted columns, marks unknown types, and explains an empty prediction', () => {
+    /** A predicted schema needs the same width limits even when no measurements exist. */
+    inspection.branches = [];
+    inspection.predictedSchema = { columns: Array.from({ length: 101 }, (_, index) => `p${index}`), dtypes: {} };
+    const { rerender } = render(<NodeInspectionPanel nodeId="selected" side="output" />);
+    const table = screen.getByRole('table', { name: 'Predicted output schema' });
+    expect(within(table).getAllByRole('row')).toHaveLength(101);
+    expect(within(table).getAllByRole('cell', { name: 'unknown' })).toHaveLength(100);
+    expect(screen.getByText('Showing 100 of 101 predicted columns.')).toBeVisible();
+    inspection.predictedSchema = { columns: [], dtypes: {} };
+    rerender(<NodeInspectionPanel nodeId="selected" side="output" />);
+    expect(screen.getByText('No output columns predicted.')).toBeVisible();
+  });
+
+  it('distinguishes an empty available capture from an unavailable side without a reason', () => {
+    /** An available empty table list must not be labeled a failed measurement. */
+    inspection.branches[0]!.output.tables = [];
+    const { rerender } = render(<NodeInspectionPanel nodeId="selected" side="output" />);
+    expect(screen.getByText('No tabular output was captured for this node.')).toBeVisible();
+    expect(screen.queryByText('Output unavailable')).not.toBeInTheDocument();
+    inspection.branches[0]!.output.status = 'unavailable';
+    rerender(<NodeInspectionPanel nodeId="selected" side="output" />);
+    expect(screen.getByText('Output unavailable')).toBeVisible();
+    expect(screen.getByText('No tabular output was captured for this node.')).toBeVisible();
+  });
 });

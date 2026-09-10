@@ -17,6 +17,71 @@ interface FeatureInteractionConfig {
   isExpanded?: boolean;
 }
 
+function FeatureInteractionControls({
+  config,
+  updateConfig,
+}: { config: FeatureInteractionConfig; updateConfig: (updates: Partial<FeatureInteractionConfig>) => void }) {
+  return (
+    <div className="space-y-3">
+      <div className="space-y-1.5">
+        <span className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+          Degree
+          <div className="group relative">
+            <Info size={10} className="cursor-help" />
+            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 hidden group-hover:block w-52 p-2 bg-popover text-popover-foreground text-[10px] rounded border shadow-lg z-50">
+              2 for pairwise interactions (e.g. a*b), 3 for three-way (a*b*c), 4 for four-way (a*b*c*d). Higher degrees grow combinatorially — use sparingly.
+            </div>
+          </div>
+        </span>
+        <ValidationField field="degree">
+          <select
+            aria-label="Degree"
+            className="w-full px-2 py-1.5 text-xs border rounded bg-background"
+            value={config.degree || 2}
+            onChange={(e) => {
+              const parsed = Number.parseInt(e.target.value);
+              const degree: 2 | 3 | 4 = parsed === 4 ? 4 : parsed === 3 ? 3 : 2;
+              updateConfig({ degree });
+            }}
+          >
+            <option value={2}>2 (pairwise)</option>
+            <option value={3}>3 (three-way)</option>
+            <option value={4}>4 (four-way)</option>
+          </select>
+        </ValidationField>
+      </div>
+
+      <div className="space-y-2 pt-1">
+        <label className="flex items-center gap-2 cursor-pointer">
+          <input
+            type="checkbox"
+            className="rounded border-muted"
+            checked={config.interaction_only ?? true}
+            onChange={(e) => updateConfig({ interaction_only: e.target.checked })}
+          />
+          <span className="text-xs">Interaction Only</span>
+        </label>
+        <p className="text-[10px] text-muted-foreground pl-5">
+          If true (default), skips self-products (e.g. a*a); only distinct-column combinations are generated.
+        </p>
+
+        <label className="flex items-center gap-2 cursor-pointer">
+          <input
+            type="checkbox"
+            className="rounded border-muted"
+            checked={config.include_bias || false}
+            onChange={(e) => updateConfig({ include_bias: e.target.checked })}
+          />
+          <span className="text-xs">Include Bias</span>
+        </label>
+        <p className="text-[10px] text-muted-foreground pl-5">
+          Adds a constant column of 1.0 (named &quot;interaction_bias&quot;), useful for some linear models.
+        </p>
+      </div>
+    </div>
+  );
+}
+
 export const FeatureInteractionNode: NodeDefinition = {
   type: 'FeatureInteractionNode',
   label: 'Feature Interaction',
@@ -98,63 +163,7 @@ export const FeatureInteractionNode: NodeDefinition = {
                 />
               </ValidationField>
 
-              <div className="space-y-3">
-                <div className="space-y-1.5">
-                  <span className="text-xs font-medium text-muted-foreground flex items-center gap-1">
-                    Degree
-                    <div className="group relative">
-                      <Info size={10} className="cursor-help" />
-                      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 hidden group-hover:block w-52 p-2 bg-popover text-popover-foreground text-[10px] rounded border shadow-lg z-50">
-                        2 for pairwise interactions (e.g. a*b), 3 for three-way (a*b*c), 4 for four-way (a*b*c*d). Higher degrees grow combinatorially — use sparingly.
-                      </div>
-                    </div>
-                  </span>
-                  <ValidationField field="degree">
-                    <select
-                      aria-label="Degree"
-                      className="w-full px-2 py-1.5 text-xs border rounded bg-background"
-                      value={config.degree || 2}
-                      onChange={(e) => {
-                        const parsed = Number.parseInt(e.target.value);
-                        const degree: 2 | 3 | 4 = parsed === 4 ? 4 : parsed === 3 ? 3 : 2;
-                        updateConfig({ degree });
-                      }}
-                    >
-                      <option value={2}>2 (pairwise)</option>
-                      <option value={3}>3 (three-way)</option>
-                      <option value={4}>4 (four-way)</option>
-                    </select>
-                  </ValidationField>
-                </div>
-
-                <div className="space-y-2 pt-1">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      className="rounded border-muted"
-                      checked={config.interaction_only ?? true}
-                      onChange={(e) => updateConfig({ interaction_only: e.target.checked })}
-                    />
-                    <span className="text-xs">Interaction Only</span>
-                  </label>
-                  <p className="text-[10px] text-muted-foreground pl-5">
-                    If true (default), skips self-products (e.g. a*a); only distinct-column combinations are generated.
-                  </p>
-
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      className="rounded border-muted"
-                      checked={config.include_bias || false}
-                      onChange={(e) => updateConfig({ include_bias: e.target.checked })}
-                    />
-                    <span className="text-xs">Include Bias</span>
-                  </label>
-                  <p className="text-[10px] text-muted-foreground pl-5">
-                    Adds a constant column of 1.0 (named &quot;interaction_bias&quot;), useful for some linear models.
-                  </p>
-                </div>
-              </div>
+              <FeatureInteractionControls config={config} updateConfig={updateConfig} />
             </div>
           )}
         </div>

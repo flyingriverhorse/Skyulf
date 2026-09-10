@@ -108,7 +108,6 @@ export function ColumnMultiSelect({
   const selectNone = () => { onChange(selected.filter((c) => !filtered.includes(c))); };
 
   const isPanel = variant === 'panel';
-  const showAllNoneButtons = isPanel && !single;
   const panelFillsHeight = isPanel && fillHeight;
 
   return (
@@ -116,39 +115,12 @@ export function ColumnMultiSelect({
       role="group"
       aria-label={accessibleName}
       className={`flex flex-col border rounded-md bg-background overflow-hidden ${
-        panelFillsHeight ? 'h-full min-h-[200px]' : isPanel ? 'min-h-[160px]' : ''
+        columnContainerHeight(panelFillsHeight, isPanel)
       } ${className}`}
     >
       <div className={`border-b bg-muted/30 flex flex-col gap-2 shrink-0 ${isPanel ? 'p-2' : 'p-1.5'}`}>
-        {(label ?? isPanel) && (
-          <div className="flex items-center justify-between">
-            {label && (
-              <span className="text-xs font-medium text-muted-foreground">
-                {label}{!single && ` (${selected.length})`}
-              </span>
-            )}
-            {showAllNoneButtons && (
-              <div className={`flex gap-1 ${label ? '' : 'ml-auto'}`}>
-                <button
-                  type="button"
-                  onClick={selectAll}
-                  aria-label={`Select all matching ${accessibleName}`}
-                  className="text-[10px] px-2 py-1 hover:bg-accent rounded text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  All
-                </button>
-                <button
-                  type="button"
-                  onClick={selectNone}
-                  aria-label={`Select none of the matching ${accessibleName}`}
-                  className="text-[10px] px-2 py-1 hover:bg-accent rounded text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  None
-                </button>
-              </div>
-            )}
-          </div>
-        )}
+        <SelectionHeader label={label} isPanel={isPanel} single={single} selectedCount={selected.length}
+          accessibleName={accessibleName} selectAll={selectAll} selectNone={selectNone} />
         <div className="relative">
           <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground pointer-events-none" />
           <input
@@ -163,37 +135,8 @@ export function ColumnMultiSelect({
       </div>
 
       <div className={`overflow-y-auto p-1 space-y-0.5 ${panelFillsHeight ? 'flex-1' : isPanel ? 'max-h-72' : 'max-h-40'}`}>
-        {isLoading ? (
-          <div className="text-xs text-muted-foreground italic p-8 text-center">Loading columns...</div>
-        ) : columns.length === 0 ? (
-          <div className="text-xs text-muted-foreground italic p-8 text-center">{emptyMessage}</div>
-        ) : filtered.length === 0 ? (
-          <div className="text-xs text-muted-foreground text-center py-8">
-            No columns match &quot;{searchTerm}&quot;
-          </div>
-        ) : (
-          filtered.map((col) => {
-            const isSelected = selected.includes(col);
-            const badge = renderItemBadge?.(col);
-            return (
-              <label
-                key={col}
-                className="flex items-center justify-between gap-2 text-xs px-2 py-1.5 rounded cursor-pointer select-none transition-colors hover:bg-accent/50"
-              >
-                <span className="flex items-center gap-2 overflow-hidden">
-                  <input
-                    type="checkbox"
-                    checked={isSelected}
-                    onChange={() => { toggle(col); }}
-                    className="rounded border-gray-300 text-primary focus:ring-primary w-3.5 h-3.5 shrink-0"
-                  />
-                  <span className="truncate font-mono" title={col}>{col}</span>
-                </span>
-                {badge}
-              </label>
-            );
-          })
-        )}
+        <ColumnItems columns={columns} filtered={filtered} selected={selected} searchTerm={searchTerm}
+          isLoading={isLoading} emptyMessage={emptyMessage} renderItemBadge={renderItemBadge} toggle={toggle} />
       </div>
 
       {!isPanel && showFooterCount && (
@@ -203,4 +146,82 @@ export function ColumnMultiSelect({
       )}
     </div>
   );
+}
+
+function columnContainerHeight(panelFillsHeight: boolean, isPanel: boolean) {
+  return panelFillsHeight ? 'h-full min-h-[200px]' : isPanel ? 'min-h-[160px]' : '';
+}
+
+function SelectionHeader({ label, isPanel, single, selectedCount, accessibleName, selectAll, selectNone }: {
+  label: string | undefined; isPanel: boolean; single: boolean; selectedCount: number;
+  accessibleName: string; selectAll: () => void; selectNone: () => void;
+}) {
+  const showAllNoneButtons = isPanel && !single;
+  return <>{(label ?? isPanel) && (
+    <div className="flex items-center justify-between">
+      {label && (
+        <span className="text-xs font-medium text-muted-foreground">
+          {label}{!single && ` (${selectedCount})`}
+        </span>
+      )}
+      {showAllNoneButtons && (
+        <div className={`flex gap-1 ${label ? '' : 'ml-auto'}`}>
+          <button
+            type="button"
+            onClick={selectAll}
+            aria-label={`Select all matching ${accessibleName}`}
+            className="text-[10px] px-2 py-1 hover:bg-accent rounded text-muted-foreground hover:text-foreground transition-colors"
+          >
+            All
+          </button>
+          <button
+            type="button"
+            onClick={selectNone}
+            aria-label={`Select none of the matching ${accessibleName}`}
+            className="text-[10px] px-2 py-1 hover:bg-accent rounded text-muted-foreground hover:text-foreground transition-colors"
+          >
+            None
+          </button>
+        </div>
+      )}
+    </div>
+  )}</>;
+}
+
+function ColumnItems({ columns, filtered, selected, searchTerm, isLoading, emptyMessage, renderItemBadge, toggle }: {
+  columns: string[]; filtered: string[]; selected: string[]; searchTerm: string;
+  isLoading: boolean; emptyMessage: string;
+  renderItemBadge: ColumnMultiSelectProps['renderItemBadge']; toggle: (column: string) => void;
+}) {
+  return (isLoading ? (
+    <div className="text-xs text-muted-foreground italic p-8 text-center">Loading columns...</div>
+  ) : columns.length === 0 ? (
+    <div className="text-xs text-muted-foreground italic p-8 text-center">{emptyMessage}</div>
+  ) : filtered.length === 0 ? (
+    <div className="text-xs text-muted-foreground text-center py-8">
+      No columns match &quot;{searchTerm}&quot;
+    </div>
+  ) : (
+    filtered.map((col) => {
+      const isSelected = selected.includes(col);
+      const badge = renderItemBadge?.(col);
+      return (
+        <label
+          key={col}
+          className="flex items-center justify-between gap-2 text-xs px-2 py-1.5 rounded cursor-pointer select-none transition-colors hover:bg-accent/50"
+        >
+          <span className="flex items-center gap-2 overflow-hidden">
+            <input
+              type="checkbox"
+              checked={isSelected}
+              onChange={() => { toggle(col); }}
+              className="rounded border-gray-300 text-primary focus:ring-primary w-3.5 h-3.5 shrink-0"
+            />
+            <span className="truncate font-mono" title={col}>{col}</span>
+          </span>
+          {badge}
+        </label>
+      );
+    })
+  ));
 }

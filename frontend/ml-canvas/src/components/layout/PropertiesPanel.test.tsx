@@ -236,6 +236,24 @@ describe('PropertiesPanel inspection tabs', () => {
     });
     useViewStore.setState({ validationFocusRequest: null });
     useNodeInspectionStore.setState({ receipt: null, isLoading: false, error: null });
+    useViewStore.setState({ isPropertiesPanelExpanded: false, propertiesPanelWidth: 400 });
+  });
+
+  it('keeps resize bounds and clears expansion and content when selection closes', () => {
+    // Collapsing and deselecting must retain the preferred width without leaving an editor visible.
+    render(<PropertiesPanel />);
+    const handle = screen.getByRole('separator', { name: 'Resize settings panel' });
+    expect(handle).toHaveAttribute('aria-valuemin', '320');
+    // The default ResizeObserver shim reports no width, so the reserved canvas bounds clamp to 320.
+    expect(handle).toHaveAttribute('aria-valuemax', '320');
+    fireEvent.keyDown(handle, { key: 'End' });
+    expect(useViewStore.getState().propertiesPanelWidth).toBe(320);
+    fireEvent.click(screen.getByRole('button', { name: 'Expand settings panel' }));
+    expect(screen.queryByRole('separator')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Close settings panel' }));
+    expect(useViewStore.getState().isPropertiesPanelExpanded).toBe(false);
+    expect(screen.queryByRole('tab')).not.toBeInTheDocument();
+    expect(screen.getByRole('complementary', { name: 'Node settings' })).toHaveClass('w-0', 'opacity-0');
   });
 
   it('keeps settings edits mounted while inspecting input and output', async () => {

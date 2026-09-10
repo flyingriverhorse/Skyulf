@@ -119,24 +119,7 @@ const NotificationDetailModal: React.FC<{
           </div>
 
           {/* Node info */}
-          {(item.node_id || item.node_type) && (
-            <div className="grid grid-cols-2 gap-3">
-              {item.node_type && (
-                <div>
-                  <p className="text-xs font-medium text-muted-foreground mb-1">Node type</p>
-                  <p className="text-sm font-mono bg-muted/50 rounded px-2 py-1">{item.node_type}</p>
-                </div>
-              )}
-              {item.node_id && (
-                <div>
-                  <p className="text-xs font-medium text-muted-foreground mb-1">Node ID</p>
-                  <p className="text-xs font-mono bg-muted/50 rounded px-2 py-1 truncate" title={item.node_id}>
-                    {item.node_id}
-                  </p>
-                </div>
-              )}
-            </div>
-          )}
+          <NotificationNodeInfo item={item} />
         </div>
 
         {/* Footer */}
@@ -345,3 +328,27 @@ export const NotificationCenter: React.FC = () => {
     </>
   );
 };
+
+/** Show the available node provenance without adding placeholders for missing fields. */
+function NotificationNodeInfo({ item }: { item: StoredNotification }) {
+  return <>
+    {(item.node_id || item.node_type) && (
+      <div className="grid grid-cols-2 gap-3">
+        {item.node_type && (
+          <div>
+            <p className="text-xs font-medium text-muted-foreground mb-1">Node type</p>
+            <p className="text-sm font-mono bg-muted/50 rounded px-2 py-1">{item.node_type}</p>
+          </div>
+        )}
+        {item.node_id && (
+          <div>
+            <p className="text-xs font-medium text-muted-foreground mb-1">Node ID</p>
+            <p className="text-xs font-mono bg-muted/50 rounded px-2 py-1 truncate" title={item.node_id}>
+              {item.node_id}
+            </p>
+          </div>
+        )}
+      </div>
+    )}
+  </>;
+}

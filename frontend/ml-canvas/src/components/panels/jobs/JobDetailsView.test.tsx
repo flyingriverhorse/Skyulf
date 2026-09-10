@@ -211,6 +211,105 @@ describe('JobDetailsView', () => {
     expect(screen.getByText('Something exploded')).toBeInTheDocument();
   });
 
+  it('preserves log wrapping and auto-scroll choices when switching tabs and copies the raw lines', async () => {
+    // Tab navigation must not reset log controls or replace the copied payload with highlighted text.
+    const logs = ['WARNING:trainer:loss=0.250', '[ERROR] training failed'];
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.assign(navigator, { clipboard: { writeText } });
+    renderDetails(makeJob({ logs }));
+    fireEvent.click(screen.getByRole('button', { name: /Live Logs/ }));
+    expect(screen.getByText('WARNING:trainer:')).toHaveClass('text-yellow-400');
+    expect(screen.getByText('0.250')).toHaveClass('text-emerald-400');
+    fireEvent.click(screen.getByTitle('No wrap'));
+    fireEvent.click(screen.getByTitle('Disable auto-scroll'));
+    fireEvent.click(screen.getByRole('button', { name: 'Overview' }));
+    fireEvent.click(screen.getByRole('button', { name: /Live Logs/ }));
+    expect(screen.getByTitle('Wrap lines')).toBeInTheDocument();
+    expect(screen.getByTitle('Enable auto-scroll')).toBeInTheDocument();
+    expect(screen.getByText('WARNING:trainer:').parentElement).toHaveClass('whitespace-pre');
+    await act(async () => { fireEvent.click(screen.getByTitle('Copy all logs')); });
+    expect(writeText).toHaveBeenCalledWith(logs.join('\n'));
+  });
+
+  it('prefers persisted tuning configuration over graph defaults and renders score and CV settings', () => {
+    // A historical run must display the submitted settings even if its graph carries different defaults.
+    renderDetails(makeJob({
+      job_type: 'tuning', status: 'completed',
+      graph: { nodes: [{ node_id: 'node-1', params: { tuning_config: { strategy: 'random' } } }] },
+      config: { tuning_config: { strategy: 'optuna', metric: 'accuracy', n_trials: 12, cv_enabled: true, cv_type: 'stratified', cv_folds: 4, cv_shuffle: true } },
+      result: { best_score: 0.875, best_params: { max_depth: 3 } },
+    }));
+    expect(screen.getByText('optuna')).toBeInTheDocument();
+    expect(screen.queryByText('random')).not.toBeInTheDocument();
+    expect(screen.getByText('sampler: tpe · pruner: median (defaults)')).toBeInTheDocument();
+    expect(screen.getByText('stratified')).toBeInTheDocument();
+    expect(screen.getByText('4')).toBeInTheDocument();
+    expect(screen.getByText('0.8750')).toBeInTheDocument();
+    expect(screen.getByText(/"max_depth": 3/)).toBeInTheDocument();
+  });
+
+  it('falls back to the matching graph node when the persisted tuning configuration is empty', () => {
+    // Legacy jobs retain their graph settings and strategy defaults when no submitted configuration was saved.
+    renderDetails(makeJob({
+      job_type: 'tuning', status: 'completed', config: { tuning_config: {} }, result: {},
+      graph: { nodes: [
+        { node_id: 'other-node', params: { tuning_config: { strategy: 'random' } } },
+        { node_id: 'node-1', params: { tuning_config: { search_strategy: 'halving_grid' } } },
+      ] },
+    }));
+    expect(screen.getByText('halving_grid')).toBeInTheDocument();
+    expect(screen.getByText('factor: 3 · resource: n_samples · min_resources: exhaust (defaults)')).toBeInTheDocument();
+    expect(screen.queryByText('CV Method:')).not.toBeInTheDocument();
+  });
+
+  it('preserves voting ensemble configuration and explicit strategy parameters', () => {
+    // Ensemble structure belongs to the submitted tuning config and must remain visible beside search settings.
+    renderDetails(makeJob({
+      job_type: 'tuning', status: 'completed', model_type: 'voting_classifier', graph: {}, result: {},
+      config: { tuning_config: {
+        strategy: 'optuna', strategy_params: { sampler: 'random', seed: 42 },
+        base_estimators: ['random_forest', 'logistic_regression'], voting: 'soft', weights: [2, 1],
+        n_jobs: -1, calibrate_base_models: true, calibration_method: 'isotonic',
+      } },
+    }));
+    expect(screen.getByText('sampler: random · seed: 42')).toBeInTheDocument();
+    expect(screen.getByText('Random Forest, Logistic Regression')).toBeInTheDocument();
+    expect(screen.getByText('Random Forest: 2, Logistic Regression: 1')).toBeInTheDocument();
+    expect(screen.getByText('soft')).toBeInTheDocument();
+    expect(screen.getByText('All cores')).toBeInTheDocument();
+    expect(screen.getByText('Isotonic')).toBeInTheDocument();
+    expect(screen.queryByText('Final Estimator:')).not.toBeInTheDocument();
+  });
+
+  it('preserves stacking-specific settings without showing stale voting configuration', () => {
+    // Mutually exclusive ensemble settings must not leak from graph defaults into the displayed run.
+    renderDetails(makeJob({
+      job_type: 'tuning', status: 'completed', model_type: 'stacking_regressor', graph: {}, result: {},
+      config: { tuning_config: {
+        base_estimators: ['random_forest'], final_estimator: 'ridge', passthrough: true,
+        voting: 'soft', weights: [1],
+      } },
+    }));
+    expect(screen.getByText('Ridge')).toBeInTheDocument();
+    expect(screen.getByText('Passthrough:').parentElement).toHaveTextContent('Yes');
+    expect(screen.queryByText('Voting:')).not.toBeInTheDocument();
+    expect(screen.queryByText('Model Weights:')).not.toBeInTheDocument();
+  });
+
+  it('shows the five most important features using nested result metrics before legacy values', () => {
+    // Extraction must preserve ranking, the five-feature limit, and the source precedence.
+    renderDetails(makeJob({ status: 'completed', result: {
+      feature_importances: { legacy: 1 },
+      metrics: { feature_importances: { sixth: 0.01, fifth: 0.1, fourth: 0.2, third: 0.3, second: 0.4, first: 0.5 } },
+    } }));
+    const first = screen.getByTitle('first');
+    const featureList = first.parentElement!.parentElement!;
+    expect(within(featureList).getAllByTitle(/first|second|third|fourth|fifth/).map((element) => element.textContent))
+      .toEqual(['first', 'second', 'third', 'fourth', 'fifth']);
+    expect(screen.queryByTitle('sixth')).not.toBeInTheDocument();
+    expect(screen.queryByTitle('legacy')).not.toBeInTheDocument();
+  });
+
   it('lets the user hide CV metrics in the results grid', () => {
     renderDetails(makeJob({
       job_type: 'training',
@@ -646,6 +745,32 @@ describe('JobDetailsView', () => {
       expect(screen.getByText('Tuning Trials')).toBeInTheDocument();
       expect(screen.queryByRole('button', { name: 'Trials' })).toBeNull();
       expect(screen.queryByRole('button', { name: 'Iterations' })).toBeNull();
+    });
+
+    it('preserves a pinned chart across tab switches and resets it for a different job', () => {
+      // Keeping chart state mounted preserves user choice, while a new run resumes automatic series selection.
+      const job = makeJob({
+        job_type: 'tuning', status: 'completed',
+        metrics: {
+          trials,
+          iterations: [
+            { iteration: 1, score: 0.6, metric: 'logloss', direction: 'minimize' },
+            { iteration: 2, score: 0.4, metric: 'logloss', direction: 'minimize' },
+          ],
+        } as unknown as Record<string, number>,
+      });
+      const onBack = vi.fn();
+      const onClose = vi.fn();
+      const { rerender } = render(<MemoryRouter><JobDetailsView job={job} onBack={onBack} onClose={onClose} /></MemoryRouter>);
+      fireEvent.click(screen.getByRole('button', { name: 'Trials' }));
+      fireEvent.click(screen.getByRole('button', { name: /Live Logs/ }));
+      fireEvent.click(screen.getByRole('button', { name: 'Overview' }));
+      expect(screen.getByRole('button', { name: 'Trials' })).toHaveAttribute('aria-pressed', 'true');
+      expect(screen.getByText('Tuning Trials')).toBeInTheDocument();
+
+      rerender(<MemoryRouter><JobDetailsView job={{ ...job, job_id: 'job-new-series' }} onBack={onBack} onClose={onClose} /></MemoryRouter>);
+      expect(screen.getByRole('button', { name: 'Iterations' })).toHaveAttribute('aria-pressed', 'true');
+      expect(screen.getByText('Boosting Iterations')).toBeInTheDocument();
     });
   });
 });

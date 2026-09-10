@@ -50,165 +50,181 @@ export const MergeWarningsBanner: React.FC<MergeWarningsBannerProps> = ({
     </button>
     {mergeWarningsOpen && (
       <div className="px-2 pb-2 space-y-1.5">
-        {mergeWarnings.map((w, idx) => {
-          // Row counts differed, so the engine stacked the branches instead of
-          // joining them. Without this branch the warning falls through to the
-          // fan-in default below, which claims all columns were kept and offers
-          // to rewire as a chain — both wrong for a merge that added rows.
-          if (w.kind === 'row_count_mismatch') {
-            const counts = w.row_counts ?? [];
-            const total = counts.reduce((n, c) => n + c, 0);
-            return (
-              <div key={idx} className="flex items-start gap-2 text-xs text-amber-900 dark:text-amber-200 pl-5">
-                <AlertTriangle className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
-                <div className="flex-1">
-                  <span className="font-medium">
-                    {nodeLabelMap[w.node_id] ?? w.node_id}
-                  </span>{' '}
-                  merged inputs with different row counts{w.part ? ` (${w.part})` : ''}:{' '}
-                  <span className="font-mono bg-amber-100 dark:bg-amber-900/40 px-1 rounded">
-                    {counts.join(' vs ')}
-                  </span>{' '}
-                  rows. They were stacked into{' '}
-                  <span className="font-mono font-semibold">{total}</span> rows instead of joined
-                  column-wise, so this merge added no features. If one branch filtered rows
-                  (outlier removal, deduplication), the rows it kept now appear more than once and
-                  are reweighted in training — move that step after the merge to keep one row per
-                  observation.
-                </div>
-              </div>
-            );
-          }
-          // Row-wise merge dropped non-shared columns: render a
-          // simpler advisory (no inputs / overlap to show).
-          if (w.kind === 'row_concat_drop') {
-            const dropped = w.dropped_columns ?? [];
-            return (
-              <div key={idx} className="flex items-start gap-2 text-xs text-amber-900 dark:text-amber-200 pl-5">
-                <AlertTriangle className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
-                <div className="flex-1">
-                  <span className="font-medium">
-                    {nodeLabelMap[w.node_id] ?? w.node_id}
-                  </span>{' '}
-                  row-wise merge{w.part ? ` (${w.part})` : ''} dropped{' '}
-                  {dropped.length} non-shared column
-                  {dropped.length === 1 ? '' : 's'}:{' '}
-                  <span className="font-mono bg-amber-100 dark:bg-amber-900/40 px-1 rounded">
-                    {dropped.slice(0, 6).join(', ')}
-                    {dropped.length > 6 ? `, +${dropped.length - 6} more` : ''}
-                  </span>
-                  . Only columns present in every input are kept when row counts differ.
-                </div>
-              </div>
-            );
-          }
-          // An upstream Drop Columns step is authoritative for the whole
-          // subgraph, so a sibling branch cannot resurrect what it removed.
-          // The backend `message` embeds the raw node_id, so the sentence is
-          // composed here from the friendly label instead.
-          if (w.kind === 'upstream_drop_reapplied') {
-            const dropped = w.dropped_columns ?? [];
-            return (
-              <div key={idx} className="flex items-start gap-2 text-xs text-amber-900 dark:text-amber-200 pl-5">
-                <AlertTriangle className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
-                <div className="flex-1">
-                  <span className="font-medium">
-                    {nodeLabelMap[w.node_id] ?? w.node_id}
-                  </span>{' '}
-                  merged a branch that reintroduced {dropped.length} column
-                  {dropped.length === 1 ? '' : 's'} removed by an upstream Drop Columns step:{' '}
-                  <span className="font-mono bg-amber-100 dark:bg-amber-900/40 px-1 rounded">
-                    {dropped.slice(0, 6).join(', ')}
-                    {dropped.length > 6 ? `, +${dropped.length - 6} more` : ''}
-                  </span>
-                  . They were dropped again, so any transform applied to them on that
-                  branch is discarded. Move the Drop Columns step after the merge to keep them.
-                </div>
-              </div>
-            );
-          }
-          const inputs = w.inputs ?? [];
-          const inputLabels = inputs.map((i) => nodeLabelMap[i] ?? i);
-          const winner = w.winner_input
-            ? (nodeLabelMap[w.winner_input] ?? w.winner_input)
-            : inputLabels[inputLabels.length - 1];
-          const overlap = w.overlap_columns ?? [];
-          const canAutoChain = overlap.length > 0 && inputs.length >= 2;
-          return (
-            <div key={idx} className="flex items-start gap-2 text-xs text-amber-900 dark:text-amber-200 pl-5">
-              <AlertTriangle className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
-              <div className="flex-1">
-                <span className="font-medium">
-                  {nodeLabelMap[w.node_id] ?? w.node_id}
-                </span>{' '}
-                merges {inputs.length} parallel branches:{' '}
-                {inputLabels.map((label, i) => (
-                  <span key={i}>
-                    <span className="font-mono bg-amber-100 dark:bg-amber-900/40 px-1 rounded">
-                      {label}
-                    </span>
-                    {i < inputLabels.length - 1 && ' + '}
-                  </span>
-                ))}
-                .{' '}
-                {overlap.length > 0 ? (
-                  <>
-                    {overlap.length} overlapping column
-                    {overlap.length === 1 ? '' : 's'}{' '}
-                    (<span className="font-mono">
-                      {overlap.slice(0, 4).join(', ')}
-                      {overlap.length > 4 ? `, +${overlap.length - 4} more` : ''}
-                    </span>){' '}
-                    take values from{' '}
-                    <span className="font-mono font-semibold">{winner}</span>;
-                    unique columns from the others are kept as-is.
-                  </>
-                ) : (
-                  <>
-                    No column overlap — all columns from all branches are kept.
-                  </>
-                )}{' '}
-                For sequential application, chain them instead.
-                {canAutoChain && (
-                  <div className="mt-1.5">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const consumerLabel = nodeLabelMap[w.node_id] ?? w.node_id;
-                        const chainStr = [...inputLabels, consumerLabel].join(' → ');
-                        void (async () => {
-                          const ok = await confirm({
-                            title: 'Rewire as a linear chain?',
-                            message: (
-                              <span>
-                                {chainStr}
-                                <br />
-                                <br />
-                                <span className="text-xs text-slate-500">Use Ctrl+Z to undo.</span>
-                              </span>
-                            ),
-                            confirmLabel: 'Rewire',
-                          });
-                          if (!ok) return;
-                          const success = chainSiblings(w.node_id, inputs);
-                          if (!success) {
-                            toast.error('Auto-chain failed', 'Re-run preview and try again.');
-                          }
-                        })();
-                      }}
-                      className="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-medium rounded border border-amber-400 dark:border-amber-600 bg-amber-100 dark:bg-amber-900/40 hover:bg-amber-200 dark:hover:bg-amber-900/60 text-amber-900 dark:text-amber-100 transition-colors"
-                      title="Rewire fan-in into a linear chain (no fan-in, no overwrite)"
-                    >
-                      <Wand2 className="w-3 h-3" />
-                      Chain instead
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
-          );
-        })}
+        {mergeWarnings.map((w, idx) => <WarningDetail key={idx} w={w} nodeLabelMap={nodeLabelMap} confirm={confirm} chainSiblings={chainSiblings} />)}
       </div>
     )}
   </div>
 );
+
+type WarningRowProps = { w: MergeWarning; nodeLabelMap: Record<string, string> };
+
+function WarningDetail({ w, nodeLabelMap, confirm, chainSiblings }: WarningRowProps & Pick<MergeWarningsBannerProps, 'confirm' | 'chainSiblings'>) {
+  // Row counts differed, so the engine stacked the branches instead of
+  // joining them. Without this branch the warning falls through to the
+  // fan-in default below, which claims all columns were kept and offers
+  // to rewire as a chain — both wrong for a merge that added rows.
+  if (w.kind === 'row_count_mismatch') return <RowCountWarning w={w} nodeLabelMap={nodeLabelMap} />;
+  // Row-wise merge dropped non-shared columns: render a
+  // simpler advisory (no inputs / overlap to show).
+  if (w.kind === 'row_concat_drop') return <RowConcatWarning w={w} nodeLabelMap={nodeLabelMap} />;
+  // An upstream Drop Columns step is authoritative for the whole
+  // subgraph, so a sibling branch cannot resurrect what it removed.
+  // The backend `message` embeds the raw node_id, so the sentence is
+  // composed here from the friendly label instead.
+  if (w.kind === 'upstream_drop_reapplied') return <UpstreamDropWarning w={w} nodeLabelMap={nodeLabelMap} />;
+  return <FanInWarning w={w} nodeLabelMap={nodeLabelMap} confirm={confirm} chainSiblings={chainSiblings} />;
+}
+
+function RowCountWarning({ w, nodeLabelMap }: WarningRowProps) {
+  const counts = w.row_counts ?? [];
+  const total = counts.reduce((n, c) => n + c, 0);
+  return (
+    <div className="flex items-start gap-2 text-xs text-amber-900 dark:text-amber-200 pl-5">
+      <AlertTriangle className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+      <div className="flex-1">
+        <span className="font-medium">
+          {nodeLabelMap[w.node_id] ?? w.node_id}
+        </span>{' '}
+        merged inputs with different row counts{w.part ? ` (${w.part})` : ''}:{' '}
+        <span className="font-mono bg-amber-100 dark:bg-amber-900/40 px-1 rounded">
+          {counts.join(' vs ')}
+        </span>{' '}
+        rows. They were stacked into{' '}
+        <span className="font-mono font-semibold">{total}</span> rows instead of joined
+        column-wise, so this merge added no features. If one branch filtered rows
+        (outlier removal, deduplication), the rows it kept now appear more than once and
+        are reweighted in training — move that step after the merge to keep one row per
+        observation.
+      </div>
+    </div>
+  );
+}
+
+function RowConcatWarning({ w, nodeLabelMap }: WarningRowProps) {
+  const dropped = w.dropped_columns ?? [];
+  return (
+    <div className="flex items-start gap-2 text-xs text-amber-900 dark:text-amber-200 pl-5">
+      <AlertTriangle className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+      <div className="flex-1">
+        <span className="font-medium">
+          {nodeLabelMap[w.node_id] ?? w.node_id}
+        </span>{' '}
+        row-wise merge{w.part ? ` (${w.part})` : ''} dropped{' '}
+        {dropped.length} non-shared column
+        {dropped.length === 1 ? '' : 's'}:{' '}
+        <span className="font-mono bg-amber-100 dark:bg-amber-900/40 px-1 rounded">
+          {dropped.slice(0, 6).join(', ')}
+          {dropped.length > 6 ? `, +${dropped.length - 6} more` : ''}
+        </span>
+        . Only columns present in every input are kept when row counts differ.
+      </div>
+    </div>
+  );
+}
+
+function UpstreamDropWarning({ w, nodeLabelMap }: WarningRowProps) {
+  const dropped = w.dropped_columns ?? [];
+  return (
+    <div className="flex items-start gap-2 text-xs text-amber-900 dark:text-amber-200 pl-5">
+      <AlertTriangle className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+      <div className="flex-1">
+        <span className="font-medium">
+          {nodeLabelMap[w.node_id] ?? w.node_id}
+        </span>{' '}
+        merged a branch that reintroduced {dropped.length} column
+        {dropped.length === 1 ? '' : 's'} removed by an upstream Drop Columns step:{' '}
+        <span className="font-mono bg-amber-100 dark:bg-amber-900/40 px-1 rounded">
+          {dropped.slice(0, 6).join(', ')}
+          {dropped.length > 6 ? `, +${dropped.length - 6} more` : ''}
+        </span>
+        . They were dropped again, so any transform applied to them on that
+        branch is discarded. Move the Drop Columns step after the merge to keep them.
+      </div>
+    </div>
+  );
+}
+
+function FanInWarning({ w, nodeLabelMap, confirm, chainSiblings }: WarningRowProps & Pick<MergeWarningsBannerProps, 'confirm' | 'chainSiblings'>) {
+  const inputs = w.inputs ?? [];
+  const inputLabels = inputs.map((i) => nodeLabelMap[i] ?? i);
+  const winner = mergeWinnerLabel(w, nodeLabelMap, inputLabels);
+  const overlap = w.overlap_columns ?? [];
+  const canAutoChain = overlap.length > 0 && inputs.length >= 2;
+  return (
+    <div className="flex items-start gap-2 text-xs text-amber-900 dark:text-amber-200 pl-5">
+      <AlertTriangle className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+      <div className="flex-1">
+        <span className="font-medium">
+          {nodeLabelMap[w.node_id] ?? w.node_id}
+        </span>{' '}
+        merges {inputs.length} parallel branches:{' '}
+        {inputLabels.map((label, i) => (
+          <span key={i}>
+            <span className="font-mono bg-amber-100 dark:bg-amber-900/40 px-1 rounded">
+              {label}
+            </span>
+            {i < inputLabels.length - 1 && ' + '}
+          </span>
+        ))}
+        .{' '}
+        {overlap.length > 0 ? (
+          <>
+            {overlap.length} overlapping column
+            {overlap.length === 1 ? '' : 's'}{' '}
+            (<span className="font-mono">
+              {overlap.slice(0, 4).join(', ')}
+              {overlap.length > 4 ? `, +${overlap.length - 4} more` : ''}
+            </span>){' '}
+            take values from{' '}
+            <span className="font-mono font-semibold">{winner}</span>;
+            unique columns from the others are kept as-is.
+          </>
+        ) : (
+          <>
+            No column overlap — all columns from all branches are kept.
+          </>
+        )}{' '}
+        For sequential application, chain them instead.
+        {canAutoChain && (
+          <div className="mt-1.5">
+            <button
+              type="button"
+              onClick={() => {
+                const consumerLabel = nodeLabelMap[w.node_id] ?? w.node_id;
+                const chainStr = [...inputLabels, consumerLabel].join(' → ');
+                void (async () => {
+                  const ok = await confirm({
+                    title: 'Rewire as a linear chain?',
+                    message: (
+                      <span>
+                        {chainStr}
+                        <br />
+                        <br />
+                        <span className="text-xs text-slate-500">Use Ctrl+Z to undo.</span>
+                      </span>
+                    ),
+                    confirmLabel: 'Rewire',
+                  });
+                  if (!ok) return;
+                  const success = chainSiblings(w.node_id, inputs);
+                  if (!success) {
+                    toast.error('Auto-chain failed', 'Re-run preview and try again.');
+                  }
+                })();
+              }}
+              className="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-medium rounded border border-amber-400 dark:border-amber-600 bg-amber-100 dark:bg-amber-900/40 hover:bg-amber-200 dark:hover:bg-amber-900/60 text-amber-900 dark:text-amber-100 transition-colors"
+              title="Rewire fan-in into a linear chain (no fan-in, no overwrite)"
+            >
+              <Wand2 className="w-3 h-3" />
+              Chain instead
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function mergeWinnerLabel(w: MergeWarning, nodeLabelMap: Record<string, string>, inputLabels: string[]) {
+  return w.winner_input ? (nodeLabelMap[w.winner_input] ?? w.winner_input) : inputLabels[inputLabels.length - 1];
+}

@@ -136,32 +136,7 @@ export const Dashboard: React.FC = () => {
         <GettingStarted />
       ) : (
       <>
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard
-          title="Total Jobs"
-          value={stats?.total_jobs ?? '-'}
-          icon={<Activity className="text-indigo-500" />}
-          subtext={`${stats?.training_jobs ?? 0} Training, ${stats?.tuning_jobs ?? 0} Tuning`}
-        />
-        <StatCard
-          title="Active Deployments"
-          value={stats?.active_deployments ?? '-'}
-          icon={<Server className="text-green-500" />}
-          color="text-green-600 dark:text-green-400"
-        />
-        <StatCard
-          title="Data Sources"
-          value={stats?.data_sources ?? '-'}
-          icon={<Database className="text-blue-500" />}
-        />
-        <StatCard
-          title="Success Rate"
-          value={jobs.length > 0 ? `${Math.round((jobs.filter(j => j.status === 'succeeded' || j.status === 'completed').length / jobs.length) * 100)}%` : '-'}
-          icon={<CheckCircle className="text-emerald-500" />}
-          subtext="Last 50 jobs"
-        />
-      </div>
+      <DashboardStats stats={stats} jobs={jobs} />
 
       {/* Charts Section */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -377,3 +352,40 @@ const GettingStarted = () => (
     </div>
   </div>
 );
+
+/** Summarizes workspace counts and the success rate of the fetched jobs. */
+function DashboardStats({
+  stats,
+  jobs,
+}: {
+  stats: SystemStats | null;
+  jobs: TrainingJobSummary[];
+}) {
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <StatCard
+        title="Total Jobs"
+        value={stats?.total_jobs ?? '-'}
+        icon={<Activity className="text-indigo-500" />}
+        subtext={`${stats?.training_jobs ?? 0} Training, ${stats?.tuning_jobs ?? 0} Tuning`}
+      />
+      <StatCard
+        title="Active Deployments"
+        value={stats?.active_deployments ?? '-'}
+        icon={<Server className="text-green-500" />}
+        color="text-green-600 dark:text-green-400"
+      />
+      <StatCard
+        title="Data Sources"
+        value={stats?.data_sources ?? '-'}
+        icon={<Database className="text-blue-500" />}
+      />
+      <StatCard
+        title="Success Rate"
+        value={jobs.length > 0 ? `${Math.round((jobs.filter(j => j.status === 'succeeded' || j.status === 'completed').length / jobs.length) * 100)}%` : '-'}
+        icon={<CheckCircle className="text-emerald-500" />}
+        subtext="Last 50 jobs"
+      />
+    </div>
+  );
+}

@@ -316,41 +316,17 @@ export const JobsPage: React.FC = () => {
     return true;
   });
 
-  const activeFilterCount = (statusFilter !== 'all' ? 1 : 0);
-
   // OPS-001: a selected job takes over the page as a full investigation
   // view (details/logs/recovery), instead of the previous drawer-only
   // experience. The list underneath is left mounted with its state intact.
   if (selectedJobId) {
-    return (
-      <div className="p-8 animate-in fade-in duration-500">
-        <div className="bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm h-[calc(100vh-8rem)] overflow-hidden">
-          {selectedJob ? (
-            <JobDetailsView
-              job={selectedJob}
-              onBack={handleBackFromDetails}
-              onClose={handleBackFromDetails}
-              origin="/jobs"
-              filters={listFilterSnapshot()}
-            />
-          ) : fallbackLoading ? (
-            <LoadingState message="Loading job details..." />
-          ) : (
-            <div className="p-6 space-y-4">
-              <ErrorState error={fallbackError ?? 'This job could not be found.'} />
-              <div className="flex justify-center">
-                <button
-                  onClick={handleBackFromDetails}
-                  className="text-sm text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 font-medium px-4 py-2 rounded-md hover:bg-indigo-50 dark:hover:bg-indigo-900/30 transition-colors"
-                >
-                  Back to Jobs
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-    );
+    return <JobInvestigation
+      selectedJob={selectedJob}
+      fallbackLoading={fallbackLoading}
+      fallbackError={fallbackError}
+      handleBackFromDetails={handleBackFromDetails}
+      listFilterSnapshot={listFilterSnapshot}
+    />;
   }
 
   return (
@@ -369,6 +345,151 @@ export const JobsPage: React.FC = () => {
         </button>
       </div>
 
+      <JobFilters
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        searchTerm={searchTerm}
+        setSearchTerm={setSearchTerm}
+        statusFilter={statusFilter}
+        setStatusFilter={setStatusFilter}
+        showFilters={showFilters}
+        setShowFilters={setShowFilters}
+        ensembleSubFilter={ensembleSubFilter}
+        setEnsembleSubFilter={setEnsembleSubFilter}
+        visibleJobs={visibleJobs}
+      />
+
+      <JobsTable
+        loading={loading}
+        filteredJobs={filteredJobs}
+        registryItems={registryItems}
+        listFilterSnapshot={listFilterSnapshot}
+        visibleHasMore={visibleHasMore}
+        handleLoadMore={handleLoadMore}
+      />
+    </div>
+  );
+};
+
+const TabButton = ({ active, onClick, icon, label }: { active: boolean; onClick: () => void; icon: React.ReactNode; label: string }) => (
+  <button
+    onClick={onClick}
+    className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all whitespace-nowrap ${
+      active
+        ? 'bg-indigo-600 text-white shadow-sm'
+        : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'
+    }`}
+  >
+    {icon}
+    {label}
+  </button>
+);
+
+const StatusBadge = ({ status }: { status: string }) => {
+  const styles = {
+    succeeded: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
+    completed: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
+    failed: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
+    running: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
+    pending: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400',
+    queued: 'bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-400',
+  };
+
+  const icons = {
+    succeeded: <CheckCircle size={14} />,
+    completed: <CheckCircle size={14} />,
+    failed: <XCircle size={14} />,
+    running: <Activity size={14} className="animate-pulse" />,
+    pending: <Clock size={14} />,
+    queued: <Clock size={14} />,
+  };
+
+  const key = status.toLowerCase() as keyof typeof styles;
+  const style = styles[key] || 'bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-400';
+  const icon = icons[key] || <Clock size={14} />;
+
+  return (
+    <span className={`px-2.5 py-1 inline-flex items-center gap-1.5 text-xs font-medium rounded-full ${style}`}>
+      {icon}
+      {status.charAt(0).toUpperCase() + status.slice(1)}
+    </span>
+  );
+};
+
+/** Shows the selected job or the pending and failed deep-link lookup states. */
+function JobInvestigation({
+  selectedJob,
+  fallbackLoading,
+  fallbackError,
+  handleBackFromDetails,
+  listFilterSnapshot,
+}: {
+  selectedJob: JobInfo | null;
+  fallbackLoading: boolean;
+  fallbackError: string | null;
+  handleBackFromDetails: () => void;
+  listFilterSnapshot: () => Record<string, string>;
+}) {
+  return (
+    <div className="p-8 animate-in fade-in duration-500">
+      <div className="bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm h-[calc(100vh-8rem)] overflow-hidden">
+        {selectedJob ? (
+          <JobDetailsView
+            job={selectedJob}
+            onBack={handleBackFromDetails}
+            onClose={handleBackFromDetails}
+            origin="/jobs"
+            filters={listFilterSnapshot()}
+          />
+        ) : fallbackLoading ? (
+          <LoadingState message="Loading job details..." />
+        ) : (
+          <div className="p-6 space-y-4">
+            <ErrorState error={fallbackError ?? 'This job could not be found.'} />
+            <div className="flex justify-center">
+              <button
+                onClick={handleBackFromDetails}
+                className="text-sm text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 font-medium px-4 py-2 rounded-md hover:bg-indigo-50 dark:hover:bg-indigo-900/30 transition-colors"
+              >
+                Back to Jobs
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** Groups task tabs, search and status controls around the current list filters. */
+function JobFilters({
+  activeTab,
+  setActiveTab,
+  searchTerm,
+  setSearchTerm,
+  statusFilter,
+  setStatusFilter,
+  showFilters,
+  setShowFilters,
+  ensembleSubFilter,
+  setEnsembleSubFilter,
+  visibleJobs,
+}: {
+  activeTab: TabType;
+  setActiveTab: (tab: TabType) => void;
+  searchTerm: string;
+  setSearchTerm: (value: string) => void;
+  statusFilter: string;
+  setStatusFilter: (value: string) => void;
+  showFilters: boolean;
+  setShowFilters: (value: boolean) => void;
+  ensembleSubFilter: 'all' | 'classification' | 'regression';
+  setEnsembleSubFilter: (value: 'all' | 'classification' | 'regression') => void;
+  visibleJobs: JobInfo[];
+}) {
+  const activeFilterCount = (statusFilter !== 'all' ? 1 : 0);
+  return (
+    <>
       {/* Tabs & Filters */}
       <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-white dark:bg-slate-800 p-4 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm">
         <div className="flex gap-2 overflow-x-auto w-full md:w-auto pb-2 md:pb-0">
@@ -448,122 +569,95 @@ export const JobsPage: React.FC = () => {
           </select>
         </div>
       )}
+    </>
+  );
+}
 
-      {/* Jobs Table */}
-      <div className="bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
-        {loading ? (
-          <LoadingState message="Loading jobs..." />
-        ) : filteredJobs.length === 0 ? (
-          <EmptyState title="No jobs found matching your criteria." />
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-700">
-              <thead className="bg-slate-50 dark:bg-slate-900/50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Status</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Job ID</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Type</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Details</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Duration</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Created At</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Actions</th>
+/** Presents the filtered page and returnable detail links with pagination. */
+function JobsTable({
+  loading,
+  filteredJobs,
+  registryItems,
+  listFilterSnapshot,
+  visibleHasMore,
+  handleLoadMore,
+}: {
+  loading: boolean;
+  filteredJobs: JobInfo[];
+  registryItems: RegistryItem[];
+  listFilterSnapshot: () => Record<string, string>;
+  visibleHasMore: boolean;
+  handleLoadMore: () => void;
+}) {
+  return (
+    <div className="bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
+      {loading ? (
+        <LoadingState message="Loading jobs..." />
+      ) : filteredJobs.length === 0 ? (
+        <EmptyState title="No jobs found matching your criteria." />
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-700">
+            <thead className="bg-slate-50 dark:bg-slate-900/50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Status</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Job ID</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Type</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Details</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Duration</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Created At</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="bg-white dark:bg-slate-800 divide-y divide-slate-200 dark:divide-slate-700">
+              {filteredJobs.map((job) => (
+                <tr key={job.job_id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <StatusBadge status={job.status} />
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-900 dark:text-slate-100">
+                    <span className="font-mono text-xs bg-slate-100 dark:bg-slate-700 px-2 py-1 rounded" title={job.job_id}>
+                      {job.job_id.substring(0, 8)}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500 dark:text-slate-400">
+                    {getJobTypeLabel(job, registryItems)}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500 dark:text-slate-400">
+                    {job.model_type || job.dataset_name || job.target_column || '-'}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500 dark:text-slate-400 font-mono">
+                    {formatDuration(job.start_time, job.end_time)}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500 dark:text-slate-400">
+                    {new Date(job.created_at).toLocaleDateString()} <span className="text-xs opacity-70">{new Date(job.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm">
+                    <RecordLink
+                      recordRef={{ kind: 'job', jobId: job.job_id }}
+                      origin="/jobs"
+                      filters={listFilterSnapshot()}
+                      label="View details"
+                    />
+                  </td>
                 </tr>
-              </thead>
-              <tbody className="bg-white dark:bg-slate-800 divide-y divide-slate-200 dark:divide-slate-700">
-                {filteredJobs.map((job) => (
-                  <tr key={job.job_id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <StatusBadge status={job.status} />
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-900 dark:text-slate-100">
-                      <span className="font-mono text-xs bg-slate-100 dark:bg-slate-700 px-2 py-1 rounded" title={job.job_id}>
-                        {job.job_id.substring(0, 8)}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500 dark:text-slate-400">
-                      {getJobTypeLabel(job, registryItems)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500 dark:text-slate-400">
-                      {job.model_type || job.dataset_name || job.target_column || '-'}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500 dark:text-slate-400 font-mono">
-                      {formatDuration(job.start_time, job.end_time)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500 dark:text-slate-400">
-                      {new Date(job.created_at).toLocaleDateString()} <span className="text-xs opacity-70">{new Date(job.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm">
-                      <RecordLink
-                        recordRef={{ kind: 'job', jobId: job.job_id }}
-                        origin="/jobs"
-                        filters={listFilterSnapshot()}
-                        label="View details"
-                      />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
 
-        {/* Load More Button */}
-        {!loading && visibleHasMore && filteredJobs.length > 0 && (
-          <div className="p-4 border-t border-slate-200 dark:border-slate-700 flex justify-center">
-            <button
-              onClick={handleLoadMore}
-              className="text-sm text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 font-medium flex items-center gap-1 px-4 py-2 rounded-md hover:bg-indigo-50 dark:hover:bg-indigo-900/30 transition-colors"
-            >
-              Load More
-            </button>
-          </div>
-        )}
-      </div>
+      {/* Load More Button */}
+      {!loading && visibleHasMore && filteredJobs.length > 0 && (
+        <div className="p-4 border-t border-slate-200 dark:border-slate-700 flex justify-center">
+          <button
+            onClick={handleLoadMore}
+            className="text-sm text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 font-medium flex items-center gap-1 px-4 py-2 rounded-md hover:bg-indigo-50 dark:hover:bg-indigo-900/30 transition-colors"
+          >
+            Load More
+          </button>
+        </div>
+      )}
     </div>
   );
-};
-
-const TabButton = ({ active, onClick, icon, label }: { active: boolean; onClick: () => void; icon: React.ReactNode; label: string }) => (
-  <button
-    onClick={onClick}
-    className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all whitespace-nowrap ${
-      active
-        ? 'bg-indigo-600 text-white shadow-sm'
-        : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'
-    }`}
-  >
-    {icon}
-    {label}
-  </button>
-);
-
-const StatusBadge = ({ status }: { status: string }) => {
-  const styles = {
-    succeeded: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
-    completed: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
-    failed: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
-    running: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
-    pending: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400',
-    queued: 'bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-400',
-  };
-
-  const icons = {
-    succeeded: <CheckCircle size={14} />,
-    completed: <CheckCircle size={14} />,
-    failed: <XCircle size={14} />,
-    running: <Activity size={14} className="animate-pulse" />,
-    pending: <Clock size={14} />,
-    queued: <Clock size={14} />,
-  };
-
-  const key = status.toLowerCase() as keyof typeof styles;
-  const style = styles[key] || 'bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-400';
-  const icon = icons[key] || <Clock size={14} />;
-
-  return (
-    <span className={`px-2.5 py-1 inline-flex items-center gap-1.5 text-xs font-medium rounded-full ${style}`}>
-      {icon}
-      {status.charAt(0).toUpperCase() + status.slice(1)}
-    </span>
-  );
-};
+}

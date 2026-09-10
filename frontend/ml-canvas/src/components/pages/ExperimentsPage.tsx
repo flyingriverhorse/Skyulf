@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useJobStore } from '../../core/store/useJobStore';
 import { Filter } from 'lucide-react';
+import type { JobInfo } from '../../core/api/jobs';
 import { useConfirm } from '../shared';
 import { toast } from '../../core/toast';
 import { toPng } from 'html-to-image';
@@ -79,6 +80,8 @@ export const ExperimentsPage: React.FC = () => {
     setSelectedTuningMetric,
     tuningPreview,
     setTuningPreview,
+    hasSavedThresholds,
+    setHasSavedThresholds,
     useTunedThresholds,
     setUseTunedThresholds,
     tuningError,
@@ -245,6 +248,7 @@ export const ExperimentsPage: React.FC = () => {
     setTuningError(null);
     try {
       await thresholdTuningApi.save(evalJobId, tuningPreview);
+      setHasSavedThresholds(true);
       setUseTunedThresholds(true);
     } catch (err: unknown) {
       console.error('Failed to save thresholds', err);
@@ -273,6 +277,7 @@ export const ExperimentsPage: React.FC = () => {
     setTuningError(null);
     try {
       await thresholdTuningApi.clear(evalJobId);
+      setHasSavedThresholds(false);
       setTuningPreview(null);
       setUseTunedThresholds(false);
     } catch (err: unknown) {
@@ -541,35 +546,13 @@ export const ExperimentsPage: React.FC = () => {
         setFilterType={setFilterType}
       />
 
-      {/* Selections survive filter changes by design, so any run the filter
-          hides is named here rather than silently driving the comparison. */}
-      {hiddenSelectedJobs.length > 0 && (
-        <div
-          role="status"
-          className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200"
-        >
-          <span className="font-medium">
-            {selectionSplit.visible.length} of {selectableRuns.length} selected runs visible
-          </span>
-          <span className="flex-1 min-w-[14rem]">
-            Still comparing {hiddenSelectedJobs.length} run
-            {hiddenSelectedJobs.length === 1 ? '' : 's'} hidden by the current filters:{' '}
-            {hiddenSelectedJobs.map(job => shortRunId(job)).join(', ')}
-          </span>
-          <button
-            onClick={() => { setFilterType('all'); setSelectedDatasetId('all'); }}
-            className="rounded-md border border-amber-300 px-2.5 py-1 font-medium hover:bg-amber-100 dark:border-amber-800 dark:hover:bg-amber-900/40"
-          >
-            Show all selected
-          </button>
-          <button
-            onClick={() => setSelectedJobIds(selectionSplit.visible)}
-            className="rounded-md border border-amber-300 px-2.5 py-1 font-medium hover:bg-amber-100 dark:border-amber-800 dark:hover:bg-amber-900/40"
-          >
-            Clear hidden
-          </button>
-        </div>
-      )}
+      <HiddenSelectionNotice
+        hiddenSelectedJobs={hiddenSelectedJobs}
+        visibleIds={selectionSplit.visible}
+        selectedCount={selectableRuns.length}
+        onShowAll={() => { setFilterType('all'); setSelectedDatasetId('all'); }}
+        onClearHidden={() => setSelectedJobIds(selectionSplit.visible)}
+      />
 
       <div className="flex-1 flex overflow-hidden">
         <JobListSidebar
@@ -679,6 +662,7 @@ export const ExperimentsPage: React.FC = () => {
                   tuningPreview={tuningPreview}
                   tuningError={tuningError}
                   useTunedThresholds={useTunedThresholds}
+                  hasSavedThresholds={hasSavedThresholds}
                   onPreviewThresholds={handlePreviewThresholds}
                   onSaveThresholds={handleSaveThresholds}
                   onToggleThresholds={handleToggleThresholds}
@@ -690,44 +674,17 @@ export const ExperimentsPage: React.FC = () => {
                 <PipelineDiffView jobs={selectedJobs} />
               )}
 
-              {activeView === 'diagram' && hasPipelineDiagram && (
-                <PipelineDiagramView jobs={selectedJobs} />
-              )}
-
-              {activeView === 'importance' && hasFeatureImportances && (
-                <FeatureImportanceView
-                  featureImportancesByJob={featureImportancesByJob}
-                  coverageInputs={featureImportanceCoverageInputs}
-                  handleDownload={handleDownload}
-                  downloadingChart={downloadingChart}
-                  doneChart={doneChart}
-                />
-              )}
-
-              {activeView === 'shap' && hasShapSummary && (
-                <ShapExplainabilityView
-                  shapExplanationByJob={shapExplanationByJob}
-                  coverageInputs={shapCoverageInputs}
-                  handleDownload={handleDownload}
-                  downloadingChart={downloadingChart}
-                  doneChart={doneChart}
-                />
-              )}
-
-              {activeView === 'segmentation' && hasSegmentation && (
-                <SegmentationView
-                  selectedJobIds={selectedJobIds}
-                  coverageEntries={segmentationCoverageEntries}
-                  evalJobId={evalJobId}
-                  fetchEvaluationData={fetchEvaluationData}
-                  isEvalLoading={isEvalLoading}
-                  evalError={evalError}
-                  evaluationData={evaluationData}
-                  handleDownload={handleDownload}
-                  downloadingChart={downloadingChart}
-                  doneChart={doneChart}
-                />
-              )}
+              <ArtifactComparisonViews
+                activeView={activeView}
+                hasPipelineDiagram={hasPipelineDiagram}
+                hasFeatureImportances={hasFeatureImportances}
+                hasShapSummary={hasShapSummary}
+                hasSegmentation={hasSegmentation}
+                diagramProps={{ jobs: selectedJobs }}
+                importanceProps={{ featureImportancesByJob, coverageInputs: featureImportanceCoverageInputs, handleDownload, downloadingChart, doneChart }}
+                shapProps={{ shapExplanationByJob, coverageInputs: shapCoverageInputs, handleDownload, downloadingChart, doneChart }}
+                segmentationProps={{ selectedJobIds, coverageEntries: segmentationCoverageEntries, evalJobId, fetchEvaluationData, isEvalLoading, evalError, evaluationData, handleDownload, downloadingChart, doneChart }}
+              />
             </div>
           )}
         </div>
@@ -735,3 +692,95 @@ export const ExperimentsPage: React.FC = () => {
     </div>
   );
 };
+
+/** Names selected runs hidden by filters and offers explicit selection actions. */
+function HiddenSelectionNotice({
+  hiddenSelectedJobs,
+  visibleIds,
+  selectedCount,
+  onShowAll,
+  onClearHidden,
+}: {
+  hiddenSelectedJobs: JobInfo[];
+  visibleIds: string[];
+  selectedCount: number;
+  onShowAll: () => void;
+  onClearHidden: () => void;
+}) {
+  return (
+    <>
+      {/* Selections survive filter changes by design, so any run the filter
+          hides is named here rather than silently driving the comparison. */}
+      {hiddenSelectedJobs.length > 0 && (
+        <div
+          role="status"
+          className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200"
+        >
+          <span className="font-medium">
+            {visibleIds.length} of {selectedCount} selected runs visible
+          </span>
+          <span className="flex-1 min-w-[14rem]">
+            Still comparing {hiddenSelectedJobs.length} run
+            {hiddenSelectedJobs.length === 1 ? '' : 's'} hidden by the current filters:{' '}
+            {hiddenSelectedJobs.map(job => shortRunId(job)).join(', ')}
+          </span>
+          <button
+            onClick={onShowAll}
+            className="rounded-md border border-amber-300 px-2.5 py-1 font-medium hover:bg-amber-100 dark:border-amber-800 dark:hover:bg-amber-900/40"
+          >
+            Show all selected
+          </button>
+          <button
+            onClick={onClearHidden}
+            className="rounded-md border border-amber-300 px-2.5 py-1 font-medium hover:bg-amber-100 dark:border-amber-800 dark:hover:bg-amber-900/40"
+          >
+            Clear hidden
+          </button>
+        </div>
+      )}
+    </>
+  );
+}
+
+/** Displays the active artifact view when selected runs provide that artifact. */
+function ArtifactComparisonViews({
+  activeView,
+  hasPipelineDiagram,
+  hasFeatureImportances,
+  hasShapSummary,
+  hasSegmentation,
+  diagramProps,
+  importanceProps,
+  shapProps,
+  segmentationProps,
+}: {
+  activeView: ExperimentsView;
+  hasPipelineDiagram: boolean;
+  hasFeatureImportances: boolean;
+  hasShapSummary: boolean;
+  hasSegmentation: boolean;
+  diagramProps: React.ComponentProps<typeof PipelineDiagramView>;
+  importanceProps: React.ComponentProps<typeof FeatureImportanceView>;
+  shapProps: React.ComponentProps<typeof ShapExplainabilityView>;
+  segmentationProps: React.ComponentProps<typeof SegmentationView>;
+}) {
+  return (
+    <>
+      {activeView === 'diagram' && hasPipelineDiagram && (
+        <PipelineDiagramView {...diagramProps} />
+      )}
+
+      {activeView === 'importance' && hasFeatureImportances && (
+        <FeatureImportanceView {...importanceProps} />
+      )}
+
+      {activeView === 'shap' && hasShapSummary && (
+        <ShapExplainabilityView {...shapProps} />
+      )}
+
+      {activeView === 'segmentation' && hasSegmentation && (
+        <SegmentationView {...segmentationProps} />
+      )}
+    </>
+  );
+}

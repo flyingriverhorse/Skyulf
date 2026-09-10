@@ -15,6 +15,10 @@ import {
   applyNodeChanges,
   applyEdgeChanges,
 } from '@xyflow/react';
+import { collectGraphValidationIssues } from './graphStore/validation';
+export { collectGraphValidationIssues } from './graphStore/validation';
+import { confirmConnection } from './graphStore/connectionPolicy';
+import { equalGraphHistory } from './graphStore/historyEquality';
 import { registry } from '../registry/NodeRegistry';
 import { PreviewResponse } from '../api/client';
 import type { NodeSummaryEntry } from '../api/jobs';
@@ -23,14 +27,9 @@ import {
   type ExecutionMode,
   getExecutionMode as readExecutionMode,
 } from '../types/executionMode';
-import { toast } from '../toast';
-import { convertGraphToPipelineConfig } from '../utils/pipelineConverter';
 import { getReadOnlyMode } from '../hooks/useReadOnlyMode';
-import { connectionIssue, MODEL_NODE_TYPES } from '../utils/connectionValidation';
 import { bundleConnection, normalizeSplitEdges } from '../utils/splitConnections';
 export { wouldCreateCycle, isModelEndpointViolation, MODEL_NODE_TYPES, CYCLE_CONNECTION_MESSAGE, MODEL_ENDPOINT_CONNECTION_MESSAGE } from '../utils/connectionValidation';
-import { findCycleIssues } from '../utils/pipelineCycleValidation';
-import { findPreprocessingBeforeSplitIssues } from '../utils/pipelineLeakageValidation';
 
 export interface GraphValidationIssue {
   field?: string | undefined;
@@ -156,276 +155,6 @@ interface GraphState {
       Array<{ field: string; column: string; upstream_node_id: string | null }>
     >,
   ) => void;
-}
-
-const prettifyDefinitionType = (definitionType: string): string =>
-  definitionType.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
-
-const getNodeLabel = (node: Node): string => {
-  const definition = registry.get(node.data.definitionType as string);
-  const data = (node.data ?? {}) as Record<string, unknown>;
-  return (
-    (typeof data.label === 'string' && data.label) ||
-    (typeof data.title === 'string' && data.title) ||
-    definition?.label ||
-    (typeof node.data.definitionType === 'string'
-      ? prettifyDefinitionType(node.data.definitionType as string)
-      : node.id)
-  );
-};
-
-/** Collects the blocking validation issues for a canvas graph. */
-export function collectGraphValidationIssues(nodes: Node[], edges: Edge[]): GraphValidationIssue[] {
-  const previewNodeIds = new Set(
-    nodes.filter((node) => node.data.definitionType === 'data_preview').map((node) => node.id),
-  );
-  const activeNodes = nodes.filter((node) => !previewNodeIds.has(node.id));
-  const activeEdges = edges.filter((edge) => !previewNodeIds.has(edge.source) && !previewNodeIds.has(edge.target));
-
-  const issues: GraphValidationIssue[] = [];
-
-  for (const node of activeNodes) {
-    const definition = registry.get(node.data.definitionType as string);
-    const label = getNodeLabel(node);
-
-    if (!definition) {
-      issues.push({
-        nodeId: node.id,
-        nodeLabel: label,
-        category: 'configuration',
-        message: `Refresh or re-add ${label} so the canvas knows how to validate it.`,
-      });
-      continue;
-    }
-
-    const validation = definition.validate(node.data);
-    if (!validation.isValid) {
-      issues.push({
-        nodeId: node.id,
-        nodeLabel: label,
-        category: 'configuration',
-        message: `Fix the ${label} settings before running preview${validation.message ? `: ${validation.message}` : '.'}`,
-        ...(validation.field ? { field: validation.field } : {}),
-      });
-    }
-
-    if (definition.inputs.length > 0) {
-      const hasInput = activeEdges.some((edge) => edge.target === node.id);
-      if (!hasInput) {
-        issues.push({
-          nodeId: node.id,
-          nodeLabel: label,
-          category: 'connection',
-          message: `Connect an upstream node to ${label} before running preview.`,
-        });
-      }
-    }
-
-    if (node.data.definitionType === 'dataset_node') {
-      const hasDatasetId = typeof (node.data as { datasetId?: unknown }).datasetId === 'string' &&
-        Boolean((node.data as { datasetId?: string }).datasetId);
-      const hasOutput = activeEdges.some((edge) => edge.source === node.id);
-      if (hasDatasetId && !hasOutput) {
-        issues.push({
-          nodeId: node.id,
-          nodeLabel: label,
-          category: 'connection',
-          message: 'Connect a downstream node to this Dataset before running preview.',
-        });
-      }
-    }
-  }
-
-  const pipelineConfig = convertGraphToPipelineConfig(activeNodes, activeEdges);
-  const leakageIssues = findPreprocessingBeforeSplitIssues(pipelineConfig.nodes);
-  for (const issue of leakageIssues) {
-    const node = activeNodes.find((candidate) => candidate.id === issue.nodeId);
-    const splitter = activeNodes.find((candidate) => candidate.id === issue.splitterNodeId);
-    if (!node || !splitter) continue;
-    issues.push({
-      nodeId: node.id,
-      nodeLabel: getNodeLabel(node),
-      category: 'leakage',
-      message: `Move ${getNodeLabel(node)} after ${getNodeLabel(splitter)} so it only fits on training data.`,
-    });
-  }
-
-  const cycleIssues = findCycleIssues(pipelineConfig.nodes);
-  for (const cycle of cycleIssues) {
-    const loopNodes = cycle.loopNodeIds
-      .map((id) => activeNodes.find((candidate) => candidate.id === id))
-      .filter((candidate): candidate is Node => Boolean(candidate));
-    if (loopNodes.length === 0) continue;
-    issues.push({
-      nodeId: loopNodes[0]!.id,
-      nodeLabel: getNodeLabel(loopNodes[0]!),
-      category: 'cycle',
-      message:
-        `Cycle detected: ${loopNodes.map((loopNode) => getNodeLabel(loopNode)).join(' -> ')} ` +
-        'feed back into each other. Remove one of these connections so the pipeline flows in one direction.',
-    });
-  }
-
-  return issues;
-}
-
-/** Preserve preflight confirmations for manual wiring and atomic next-step insertion. */
-function confirmConnection(connection: Connection, nodes: Node[], edges: Edge[]): boolean {
-  const issue = connectionIssue(nodes, edges, connection);
-  if (issue) {
-    toast.error('Invalid connection', issue);
-    return false;
-  }
-  const sourceNode = nodes.find((n) => n.id === connection.source);
-  const targetNode = nodes.find((n) => n.id === connection.target);
-
-  if (sourceNode && targetNode) {
-    const sourceType = sourceNode.data.definitionType as string;
-    const targetType = targetNode.data.definitionType as string;
-
-    // Warn: a model node from a DIFFERENT dataset lineage is wired into an
-    // ensemble. Base learners are spec-only (the ensemble refits them on its
-    // own data), so mixing models trained on unrelated datasets is almost
-    // always a wiring mistake — surface it before the edge is committed.
-    const modelSourceTypes = ['classification', 'regression', 'text_classification', 'SegmentationNode'];
-    if (targetType === 'EnsembleNode' && modelSourceTypes.includes(sourceType)) {
-      // Trace a node back to the dataset_node root(s) it derives from.
-      const rootsOf = (startId: string): Set<string> => {
-        const roots = new Set<string>();
-        const seen = new Set<string>();
-        const stack = [startId];
-        while (stack.length > 0) {
-          const cur = stack.pop()!;
-          if (seen.has(cur)) continue;
-          seen.add(cur);
-          const n = nodes.find((x) => x.id === cur);
-          if (n?.data.definitionType === 'dataset_node') {
-            roots.add(cur);
-            continue;
-          }
-          for (const e of edges.filter((ed) => ed.target === cur)) stack.push(e.source);
-        }
-        return roots;
-      };
-      const sourceRoots = rootsOf(connection.source!);
-      // Existing lineage of the ensemble = roots of everything already wired in.
-      const ensembleRoots = new Set<string>();
-      for (const e of edges.filter((ed) => ed.target === connection.target)) {
-        for (const r of rootsOf(e.source)) ensembleRoots.add(r);
-      }
-      const disjoint =
-        ensembleRoots.size > 0 &&
-        sourceRoots.size > 0 &&
-        ![...sourceRoots].some((r) => ensembleRoots.has(r));
-      if (disjoint) {
-        // window.confirm: see note above on sync onConnect contract.
-        const proceed = window.confirm(
-          'Warning: this model comes from a different dataset than the ensemble\'s ' +
-          'other inputs.\n\n' +
-          'The ensemble re-fits every base learner on a single dataset, so mixing ' +
-          'models trained on unrelated data is usually a wiring mistake.\n\n' +
-          'Click OK to connect anyway, or Cancel to abort.'
-        );
-        if (!proceed) return false;
-      }
-    }
-
-    // Warn: X/Y Split without prior Train-Test Split
-    if (sourceType === 'feature_target_split') {
-      let hasTrainTestSplit = targetNode.data.definitionType === 'TrainTestSplitter';
-
-      if (!hasTrainTestSplit) {
-        const queue = [sourceNode.id];
-        const visited = new Set<string>();
-
-        while (queue.length > 0) {
-          const currentId = queue.shift()!;
-          if (visited.has(currentId)) continue;
-          visited.add(currentId);
-
-          const currentNode = nodes.find((n) => n.id === currentId);
-          if (currentNode?.data.definitionType === 'TrainTestSplitter') {
-            hasTrainTestSplit = true;
-            break;
-          }
-
-          const parentEdges = edges.filter((e) => e.target === currentId);
-          for (const edge of parentEdges) {
-            queue.push(edge.source);
-          }
-        }
-      }
-
-      if (!hasTrainTestSplit) {
-        // window.confirm is intentional here: onConnect is a synchronous
-        // React Flow callback that must return before the edge is
-        // committed, so we can't await the async <ConfirmDialog>.
-        const proceed = window.confirm(
-          'Warning: X/Y Split without a prior Train-Test Split.\n\n' +
-          'This means 100% of data will be used (possible data leakage).\n\n' +
-          'Click OK to connect anyway, or Cancel to abort.'
-        );
-        if (!proceed) return false;
-      }
-    }
-
-    // Warn: multi-input on a training/tuning node — explain merge vs parallel.
-    // Count UNIQUE source nodes, not edges: multi-output splitters
-    // (train_test_split, feature_target_split) legitimately produce
-    // several edges from the same source (train/test/X/y handles)
-    // into one downstream node, and that's not fan-in — pipelineConverter
-    // dedupes by source id so the backend sees one logical input,
-    // and useBranchColors groups them into one branch color.
-    const existingInputs = edges.filter(e => e.target === connection.target);
-    const existingSources = new Set(existingInputs.map(e => e.source));
-    const isNewSource = connection.source != null && !existingSources.has(connection.source);
-    const uniqueSourceCount = existingSources.size + (isNewSource ? 1 : 0);
-    // Auto-parallel terminals (data_preview) split each input into its own
-    // tab instead of merging — no warning needed, no merge contract to
-    // confirm. Mirrors AUTO_PARALLEL_STEP_TYPES in backend graph_utils.py.
-    const autoParallelTypes = ['data_preview'];
-    if (autoParallelTypes.includes(targetType)) {
-      // Skip both confirms below; each input becomes its own preview tab.
-    } else if (targetType === 'EnsembleNode') {
-      // Ensemble nodes auto-detect their inputs (Phase 2): one dataset edge +
-      // N model-spec edges. The converter separates them by source type, so a
-      // fan-in here is NOT a column merge — suppress the merge confirm.
-    } else if (isNewSource && uniqueSourceCount >= 2 && MODEL_NODE_TYPES.includes(targetType)) {
-      // window.confirm: see note above on sync onConnect contract.
-      const proceed = window.confirm(
-        `This training node will receive ${uniqueSourceCount} inputs.\n\n` +
-        'You have two options:\n' +
-        '  • MERGE (default): Inputs are auto-merged into one dataset before training.\n' +
-        '  • PARALLEL: Each input runs as a separate experiment.\n' +
-        '    → To use parallel mode, connect each path to its OWN training node.\n\n' +
-        'Click OK to connect (merge mode), or Cancel to abort.'
-      );
-      if (!proceed) return false;
-    } else if (isNewSource && uniqueSourceCount >= 2 && !MODEL_NODE_TYPES.includes(targetType)) {
-      // Pre-flight lint for non-training nodes (audit issue #7).
-      // Non-training nodes auto-merge fan-in per column: each column is
-      // supplied by whichever branch actually changed it (see the engine's
-      // `_column_modifiers`). Only a column two branches BOTH rewrote to
-      // different values needs the merge strategy to break the tie, and
-      // that can only be known after a run — so this confirm states the
-      // union contract and defers the conflict report to the Results panel.
-      // window.confirm: see note above on sync onConnect contract.
-      const proceed = window.confirm(
-        `This node will receive ${uniqueSourceCount} inputs.\n\n` +
-        'Inputs are merged into one dataset. Each column keeps the value of ' +
-        'whichever branch changed it, so branches editing different columns ' +
-        'are combined without loss.\n\n' +
-        'If two branches change the SAME column to different values, one of ' +
-        'them is discarded. The run Results panel reports any such conflict ' +
-        'and lets you choose which branch wins.\n\n' +
-        'For strictly sequential transformations, chain the nodes linearly instead.\n\n' +
-        'Click OK to connect (merge), or Cancel to abort.'
-      );
-      if (!proceed) return false;
-    }
-  }
-
-  return true;
 }
 
 export const useGraphStore = create<GraphState>()(
@@ -649,24 +378,7 @@ export const useGraphStore = create<GraphState>()(
       // per pointer move; we only care about the committed final
       // position (when `dragging` flips to false). Same for plain
       // selection changes — toggling `selected` shouldn't be undoable.
-      equality: (prev, next) => {
-        if (prev.edges !== next.edges) return false;
-        if (prev.nodes === next.nodes) return true;
-        if (prev.nodes.length !== next.nodes.length) return false;
-        for (let i = 0; i < prev.nodes.length; i++) {
-          const a = prev.nodes[i]!;
-          const b = next.nodes[i]!;
-          if (a.id !== b.id) return false;
-          if (a.data !== b.data) return false;
-          if (a.type !== b.type) return false;
-          // Treat any node currently being dragged as equal to its
-          // previous state — only the drag-end commit creates a
-          // history entry.
-          if (a.dragging || b.dragging) continue;
-          if (a.position.x !== b.position.x || a.position.y !== b.position.y) return false;
-        }
-        return true;
-      },
+      equality: equalGraphHistory,
       limit: 100,
     },
   ),
