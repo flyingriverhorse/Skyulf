@@ -151,12 +151,8 @@ function stepTypeOf(node: Node | undefined): string | null {
   return null;
 }
 
-export function diffGraphs(
-  leftNodes: Node[],
-  leftEdges: Edge[],
-  rightNodes: Node[],
-  rightEdges: Edge[],
-): GraphDiff {
+/** Match stable ids before considering fallback candidates. */
+function pairNodesById(leftNodes: Node[], rightNodes: Node[]) {
   const leftById = new Map(leftNodes.map((n) => [n.id, n]));
   const rightById = new Map(rightNodes.map((n) => [n.id, n]));
 
@@ -176,17 +172,18 @@ export function diffGraphs(
     if (!leftById.has(id)) unmatchedRight.push(r);
   }
 
+  return { matched, unmatchedLeft, unmatchedRight };
+}
+
+/** Pair remaining step types in declaration order, preserving unmatched bucket order. */
+function pairNodes(leftNodes: Node[], rightNodes: Node[]) {
+  const { matched, unmatchedLeft, unmatchedRight } = pairNodesById(leftNodes, rightNodes);
+
   // Second pass: pair leftover nodes by `step_type` in declaration
   // order. Each persisted run uses fresh per-node uuids; pairing the
   // Nth "encoding" on the left with the Nth "encoding" on the right
   // lets us still detect that "the encoding step changed param X".
-  const leftByType = new Map<string, Node[]>();
-  for (const n of unmatchedLeft) {
-    const t = stepTypeOf(n);
-    if (!t) continue;
-    if (!leftByType.has(t)) leftByType.set(t, []);
-    leftByType.get(t)!.push(n);
-  }
+  const leftByType = groupNodesByStepType(unmatchedLeft);
   const stillUnmatchedRight: Node[] = [];
   for (const r of unmatchedRight) {
     const t = stepTypeOf(r);
@@ -204,6 +201,72 @@ export function diffGraphs(
       stillUnmatchedLeft.push(n);
     }
   }
+
+  return { matched, stillUnmatchedLeft, stillUnmatchedRight };
+}
+
+/** Keep type buckets in the order first encountered. */
+function groupNodesByStepType(unmatchedLeft: Node[]): Map<string, Node[]> {
+  const leftByType = new Map<string, Node[]>();
+  for (const n of unmatchedLeft) {
+    const t = stepTypeOf(n);
+    if (!t) continue;
+    if (!leftByType.has(t)) leftByType.set(t, []);
+    leftByType.get(t)!.push(n);
+  }
+  return leftByType;
+}
+
+/** Compare edge identities after translating baseline endpoints. */
+function diffEdges(leftEdges: Edge[], rightEdges: Edge[], leftIdToRightId: Map<string, string>) {
+  // Translate baseline edge endpoints onto candidate ids so the
+  // edge keys line up across runs that use different node uuids.
+  const remap = (id: string) => leftIdToRightId.get(id) ?? id;
+  const leftEdgesByKey = new Map(
+    leftEdges.map((e) => [
+      edgeKey({ ...e, source: remap(e.source), target: remap(e.target) } as Edge),
+      e,
+    ]),
+  );
+  const rightEdgesByKey = new Map(rightEdges.map((e) => [edgeKey(e), e]));
+  const allEdgeKeys = new Set<string>([...leftEdgesByKey.keys(), ...rightEdgesByKey.keys()]);
+
+  const edges = new Map<string, EdgeDiff>();
+  let edgesAdded = 0;
+  let edgesRemoved = 0;
+  let edgesUnchanged = 0;
+  for (const key of allEdgeKeys) {
+    const l = leftEdgesByKey.get(key);
+    const r = rightEdgesByKey.get(key);
+    const ref = r ?? l;
+    if (!ref) continue;
+    if (l && !r) {
+      edges.set(ref.id, { id: ref.id, status: 'removed', source: ref.source, target: ref.target });
+      edgesRemoved += 1;
+    } else if (!l && r) {
+      edges.set(ref.id, { id: ref.id, status: 'added', source: ref.source, target: ref.target });
+      edgesAdded += 1;
+    } else {
+      edges.set(ref.id, {
+        id: ref.id,
+        status: 'unchanged',
+        source: ref.source,
+        target: ref.target,
+      });
+      edgesUnchanged += 1;
+    }
+  }
+
+  return { edges, edgesAdded, edgesRemoved, edgesUnchanged };
+}
+
+export function diffGraphs(
+  leftNodes: Node[],
+  leftEdges: Edge[],
+  rightNodes: Node[],
+  rightEdges: Edge[],
+): GraphDiff {
+  const { matched, stillUnmatchedLeft, stillUnmatchedRight } = pairNodes(leftNodes, rightNodes);
 
   const nodes = new Map<string, NodeDiff>();
   let nodesAdded = 0;
@@ -264,43 +327,7 @@ export function diffGraphs(
     if (left.id !== right.id) leftIdToRightId.set(left.id, right.id);
   }
 
-  // Translate baseline edge endpoints onto candidate ids so the
-  // edge keys line up across runs that use different node uuids.
-  const remap = (id: string) => leftIdToRightId.get(id) ?? id;
-  const leftEdgesByKey = new Map(
-    leftEdges.map((e) => [
-      edgeKey({ ...e, source: remap(e.source), target: remap(e.target) } as Edge),
-      e,
-    ]),
-  );
-  const rightEdgesByKey = new Map(rightEdges.map((e) => [edgeKey(e), e]));
-  const allEdgeKeys = new Set<string>([...leftEdgesByKey.keys(), ...rightEdgesByKey.keys()]);
-
-  const edges = new Map<string, EdgeDiff>();
-  let edgesAdded = 0;
-  let edgesRemoved = 0;
-  let edgesUnchanged = 0;
-  for (const key of allEdgeKeys) {
-    const l = leftEdgesByKey.get(key);
-    const r = rightEdgesByKey.get(key);
-    const ref = r ?? l;
-    if (!ref) continue;
-    if (l && !r) {
-      edges.set(ref.id, { id: ref.id, status: 'removed', source: ref.source, target: ref.target });
-      edgesRemoved += 1;
-    } else if (!l && r) {
-      edges.set(ref.id, { id: ref.id, status: 'added', source: ref.source, target: ref.target });
-      edgesAdded += 1;
-    } else {
-      edges.set(ref.id, {
-        id: ref.id,
-        status: 'unchanged',
-        source: ref.source,
-        target: ref.target,
-      });
-      edgesUnchanged += 1;
-    }
-  }
+  const { edges, edgesAdded, edgesRemoved, edgesUnchanged } = diffEdges(leftEdges, rightEdges, leftIdToRightId);
 
   return {
     nodes,

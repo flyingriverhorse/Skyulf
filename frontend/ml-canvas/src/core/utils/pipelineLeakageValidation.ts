@@ -306,15 +306,29 @@ function isFixedOperation(
   if (stepType === 'CustomBinning') return Array.isArray(params.columns);
   if (stepType === 'Casting') return isFixedCasting(params);
   if (stepType === 'PolynomialFeatures' || stepType === 'PolynomialFeaturesNode') {
-    // The basis is fixed math; optional column discovery learns from the fitting rows.
-    return !params.auto_detect || (Array.isArray(params.columns) && params.columns.length > 0);
+    return isFixedPolynomial(params);
   }
   if (stepType === 'count_vectorizer' || stepType === 'tfidf_vectorizer') {
-    const columns = params.columns;
-    // Only graph target context can grant an exemption, never a node's own hint.
-    return columns == null || (Array.isArray(columns)
-      && (columns.length === 0 || (!!targetColumn && columns.every(column => column === targetColumn))));
+    return isTargetTextSelection(params, targetColumn);
   }
+  return isFixedRuleCollection(stepType, params);
+}
+
+/** Polynomial math is fixed unless fit must discover the selected columns. */
+function isFixedPolynomial(params: Record<string, unknown>): boolean {
+  return !params.auto_detect || (Array.isArray(params.columns) && params.columns.length > 0);
+}
+
+/** Text vectorizers do no feature fitting for empty or exclusively target selections. */
+function isTargetTextSelection(params: Record<string, unknown>, targetColumn: string | undefined): boolean {
+  const columns = params.columns;
+  // Only graph target context can grant an exemption, never a node's own hint.
+  return columns == null || (Array.isArray(columns)
+    && (columns.length === 0 || (!!targetColumn && columns.every(column => column === targetColumn))));
+}
+
+/** Recognize fixed transformation and feature-generation rule collections. */
+function isFixedRuleCollection(stepType: string, params: Record<string, unknown>): boolean {
   if (stepType === 'GeneralTransformation') {
     const rules = params.transformations ?? [];
     return Array.isArray(rules) && rules.every(rule =>
@@ -396,23 +410,9 @@ export function findPreprocessingBeforeSplitIssues(nodes: NodeConfigModel[]): Le
   for (const n of nodes) {
     if (!DATA_DEPENDENT_FIT_STEP_TYPES.has(n.step_type)) continue;
     if (protectedBySplit(n.node_id)) continue;
-    const relatedIds = new Set([n.node_id, ...collect(n.node_id)]);
-    const upstream = [...n.inputs];
-    const visited = new Set<string>();
-    while (upstream.length) {
-      const parentId = upstream.pop()!;
-      if (visited.has(parentId)) continue;
-      visited.add(parentId);
-      relatedIds.add(parentId);
-      upstream.push(...(nodesById.get(parentId)?.inputs ?? []));
-    }
+    const relatedIds = collectRelatedIds(n, collect(n.node_id), nodesById);
     const targetColumn = findTargetColumn(nodes, relatedIds);
-    if (isTargetOnlyEncoding(n.step_type, n.params, targetColumn)) continue;
-    if (isExplicitColumnDrop(n.step_type, n.params)) continue;
-    if (isConstantImputation(n.step_type, n.params)) continue;
-    if (isExplicitMissingIndicator(n.step_type, n.params)) continue;
-    if (isExplicitHashEncoding(n.step_type, n.params)) continue;
-    if (isFixedOperation(n.step_type, n.params, targetColumn)) continue;
+    if (isStatelessPreprocessing(n, targetColumn)) continue;
     const reachable = collect(n.node_id);
     const hitSplitter = [...splitterIds].find((id) => reachable.has(id));
     if (hitSplitter) {
@@ -444,4 +444,32 @@ export function warnAndBlockOnLeakage(pipelineConfig: Pick<PipelineConfigModel, 
   if (issues.length === 0) return false;
   toast.error('Data leakage risk detected', formatLeakageIssueMessage(issues[0]!));
   return true;
+}
+
+/** Include upstream lineage without borrowing target context from sibling branches. */
+function collectRelatedIds(
+  n: NodeConfigModel, descendants: Set<string>, nodesById: Map<string, NodeConfigModel>,
+): Set<string> {
+  const relatedIds = new Set([n.node_id, ...descendants]);
+  const upstream = [...n.inputs];
+  const visited = new Set<string>();
+  while (upstream.length) {
+    const parentId = upstream.pop()!;
+    if (visited.has(parentId)) continue;
+    visited.add(parentId);
+    relatedIds.add(parentId);
+    upstream.push(...(nodesById.get(parentId)?.inputs ?? []));
+  }
+  return relatedIds;
+}
+
+/** Apply existing stateless exceptions in their original precedence. */
+function isStatelessPreprocessing(n: NodeConfigModel, targetColumn: string | undefined): boolean {
+  if (isTargetOnlyEncoding(n.step_type, n.params, targetColumn)) return true;
+  if (isExplicitColumnDrop(n.step_type, n.params)) return true;
+  if (isConstantImputation(n.step_type, n.params)) return true;
+  if (isExplicitMissingIndicator(n.step_type, n.params)) return true;
+  if (isExplicitHashEncoding(n.step_type, n.params)) return true;
+  if (isFixedOperation(n.step_type, n.params, targetColumn)) return true;
+  return false;
 }

@@ -13,6 +13,33 @@ interface DropRowsConfig {
   missing_threshold?: number; // 0-100
 }
 
+function DropRowsFeedback({ metrics }: { metrics: Record<string, unknown> | null }) {
+  return (
+    metrics && (metrics.DropMissingRows_rows_removed !== undefined) && (
+      <div className="p-3 bg-muted/30 rounded-md border border-border">
+        <div className="flex items-center gap-2 mb-2 text-sm font-semibold text-primary">
+          <Activity size={14} />
+          <span>Last Run Results</span>
+        </div>
+        <div className="space-y-1 text-xs">
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">Rows Removed:</span>
+            <span className="font-medium text-destructive">{String(metrics.DropMissingRows_rows_removed)}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">Rows Remaining:</span>
+            <span className="font-medium">{String(metrics.DropMissingRows_rows_remaining)}</span>
+          </div>
+          <div className="flex justify-between pt-1 border-t">
+            <span className="text-muted-foreground">Total Rows:</span>
+            <span className="font-medium">{String(metrics.DropMissingRows_rows_total)}</span>
+          </div>
+        </div>
+      </div>
+    )
+  );
+}
+
 const DropRowsSettings: React.FC<{ config: DropRowsConfig; onChange: (c: DropRowsConfig) => void; nodeId?: string }> = ({
   config,
   onChange,
@@ -28,29 +55,6 @@ const DropRowsSettings: React.FC<{ config: DropRowsConfig; onChange: (c: DropRow
 
   // Responsive layout: switch to a 2-column layout once the panel is wider than 450px.
   const [containerRef, isWide] = useIsWideContainer();
-
-  const feedback = metrics && (metrics.DropMissingRows_rows_removed !== undefined) && (
-    <div className="p-3 bg-muted/30 rounded-md border border-border">
-      <div className="flex items-center gap-2 mb-2 text-sm font-semibold text-primary">
-        <Activity size={14} />
-        <span>Last Run Results</span>
-      </div>
-      <div className="space-y-1 text-xs">
-        <div className="flex justify-between">
-          <span className="text-muted-foreground">Rows Removed:</span>
-          <span className="font-medium text-destructive">{String(metrics.DropMissingRows_rows_removed)}</span>
-        </div>
-        <div className="flex justify-between">
-          <span className="text-muted-foreground">Rows Remaining:</span>
-          <span className="font-medium">{String(metrics.DropMissingRows_rows_remaining)}</span>
-        </div>
-        <div className="flex justify-between pt-1 border-t">
-          <span className="text-muted-foreground">Total Rows:</span>
-          <span className="font-medium">{String(metrics.DropMissingRows_rows_total)}</span>
-        </div>
-      </div>
-    </div>
-  );
 
   return (
     <div ref={containerRef} className="p-4 space-y-4 h-full overflow-y-auto">
@@ -106,7 +110,7 @@ const DropRowsSettings: React.FC<{ config: DropRowsConfig; onChange: (c: DropRow
         </div>
 
         {/* Feedback Section */}
-        {feedback}
+        <DropRowsFeedback metrics={metrics} />
       </div>
     </div>
   );

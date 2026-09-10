@@ -15,6 +15,29 @@ const e = (id: string, source: string, target: string): Edge => ({
 });
 
 describe('diffGraphs', () => {
+  it('pairs duplicate types in declaration order after stable ids and shares renamed entries', () => {
+    // Pair order and alias identity drive both diff canvases and the deduplicated changes list.
+    const left = [n('same', { definitionType: 'A' }), n('old1', { definitionType: 'B', z: 1 }), n('old2', { definitionType: 'B', z: 2 }), n('untyped'), n('gone', { definitionType: 'C' })];
+    const right = [n('new2', { definitionType: 'B', z: 2 }), n('same', { definitionType: 'A' }), n('new1', { definitionType: 'B', z: 1 })];
+    const original = structuredClone({ left, right });
+    const diff = diffGraphs(left, [], right, []);
+    expect([...diff.aliases]).toEqual([['old1', 'new2'], ['old2', 'new1']]);
+    expect([...diff.nodes.keys()]).toEqual(['same', 'new2', 'old1', 'new1', 'old2', 'gone', 'untyped']);
+    expect(diff.nodes.get('old1')).toBe(diff.nodes.get('new2'));
+    expect(diff.summary).toMatchObject({ nodesModified: 2, nodesRenamed: 2, nodesRemoved: 2 });
+    expect({ left, right }).toEqual(original);
+  });
+
+  it('keeps last duplicate ids and edge keys while preserving handle distinctions', () => {
+    // Map overwrite behavior affects persisted snapshots containing repeated records.
+    const left = [n('a', { value: 0 }), n('a', { value: 1 })];
+    const edges = [{ ...e('first', 'a', 'b'), sourceHandle: 'x' }, { ...e('last', 'a', 'b'), sourceHandle: 'x' }];
+    const diff = diffGraphs(left, edges, [n('a', { value: 1 })], [{ ...e('other', 'a', 'b'), sourceHandle: 'y' }]);
+    expect(diff.nodes.get('a')?.status).toBe('unchanged');
+    expect([...diff.edges.keys()]).toEqual(['last', 'other']);
+    expect(diff.summary).toMatchObject({ edgesRemoved: 1, edgesAdded: 1 });
+  });
+
   it('flags identical graphs as fully unchanged', () => {
     const left = [n('a', { method: 'mean' })];
     const right = [n('a', { method: 'mean' })];

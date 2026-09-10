@@ -30,6 +30,51 @@ const TARGET_TYPES = [
   { value: 'datetime', label: 'Datetime' },
 ];
 
+function CastTypeFeedback({ metrics }: { metrics: Record<string, unknown> | null }) {
+  return (
+    metrics && (metrics.cast_errors !== undefined || metrics.casted_columns_count !== undefined) && (
+      <div className="mt-4 p-3 bg-muted/30 rounded-md border border-border">
+        <div className="flex items-center gap-2 mb-2 text-sm font-semibold text-primary">
+          <Activity size={14} />
+          <span>Last Run Results</span>
+        </div>
+        <div className="space-y-1 text-xs">
+          {metrics.casted_columns_count !== undefined && (
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Columns Casted:</span>
+              <span className="font-medium">{String(metrics.casted_columns_count)}</span>
+            </div>
+          )}
+          {metrics.cast_errors !== undefined && (
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Errors Encountered:</span>
+              <span className="font-medium text-destructive">{String(metrics.cast_errors)}</span>
+            </div>
+          )}
+        </div>
+      </div>
+    )
+  );
+}
+
+function CastTypeStatus({ datasetId, isLoading }: { datasetId: string | undefined; isLoading: boolean }) {
+  return (
+    <>
+      {!datasetId && (
+        <div className="p-2 bg-yellow-50 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-400 text-xs rounded border border-yellow-200 dark:border-yellow-800">
+          Connect a dataset node to see available columns.
+        </div>
+      )}
+
+      {isLoading && !!datasetId && (
+        <div className="text-xs text-muted-foreground animate-pulse">
+          Loading schema...
+        </div>
+      )}
+    </>
+  );
+}
+
 const CastTypeSettings: React.FC<{ config: CastTypeConfig; onChange: (c: CastTypeConfig) => void; nodeId?: string }> = ({
   config,
   onChange,
@@ -83,17 +128,7 @@ const CastTypeSettings: React.FC<{ config: CastTypeConfig; onChange: (c: CastTyp
 
   return (
     <div ref={containerRef} className="p-4 space-y-4 h-full overflow-y-auto">
-      {!datasetId && (
-        <div className="p-2 bg-yellow-50 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-400 text-xs rounded border border-yellow-200 dark:border-yellow-800">
-          Connect a dataset node to see available columns.
-        </div>
-      )}
-
-      {isLoading && !!datasetId && (
-        <div className="text-xs text-muted-foreground animate-pulse">
-          Loading schema...
-        </div>
-      )}
+      <CastTypeStatus datasetId={datasetId} isLoading={isLoading} />
 
       <div className="space-y-2">
         <div className="flex items-center justify-between">
@@ -156,28 +191,7 @@ const CastTypeSettings: React.FC<{ config: CastTypeConfig; onChange: (c: CastTyp
       </div>
 
       {/* Feedback Section */}
-      {metrics && (metrics.cast_errors !== undefined || metrics.casted_columns_count !== undefined) && (
-        <div className="mt-4 p-3 bg-muted/30 rounded-md border border-border">
-          <div className="flex items-center gap-2 mb-2 text-sm font-semibold text-primary">
-            <Activity size={14} />
-            <span>Last Run Results</span>
-          </div>
-          <div className="space-y-1 text-xs">
-            {metrics.casted_columns_count !== undefined && (
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Columns Casted:</span>
-                <span className="font-medium">{String(metrics.casted_columns_count)}</span>
-              </div>
-            )}
-            {metrics.cast_errors !== undefined && (
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Errors Encountered:</span>
-                <span className="font-medium text-destructive">{String(metrics.cast_errors)}</span>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
+      <CastTypeFeedback metrics={metrics} />
     </div>
   );
 };

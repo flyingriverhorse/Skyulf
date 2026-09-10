@@ -5,6 +5,19 @@ import { connectionIssue } from './connectionValidation';
 
 beforeAll(() => { initializeRegistry(); });
 
+it('retains rejection precedence when endpoints, cycles and handles are invalid together', () => {
+  // Drag guidance and mutation rejection must give the same first actionable failure.
+  const source = node('model', 'classification');
+  const target = node('target', 'encoding');
+  const connection = { source: 'model', target: 'target', sourceHandle: 'missing', targetHandle: 'missing' };
+  const cycle = [{ id: 'back', source: 'target', target: 'model' }];
+  expect(connectionIssue([source], cycle, connection)).toBe('This node is no longer available. Choose an existing node.');
+  expect(connectionIssue([{ ...source, connectable: false }, target], cycle, connection)).toBe('Connections are disabled for this node. Choose another node.');
+  expect(connectionIssue([source, target], cycle, connection)).toBe('This connection would create a loop. Pipelines must flow in one direction — remove the backwards wire instead.');
+  expect(connectionIssue([source, target], [], connection)).toBe('Training nodes are the end of a pipeline: their output is a trained model, not data. Only an Ensemble can consume a model output — wire preprocessing or training from the dataset branch instead.');
+  expect(connectionIssue([node('model', 'imputation_node'), target], [], connection)).toBe('Choose an output and an input on registered nodes. Data sources have no input.');
+});
+
 /** Supply real registered types without requiring mounted canvas nodes. */
 function node(id: string, type: string): Node {
   return { id, position: { x: 0, y: 0 }, data: { definitionType: type } };

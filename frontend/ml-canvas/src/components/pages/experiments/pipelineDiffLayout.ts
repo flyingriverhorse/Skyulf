@@ -34,6 +34,18 @@ export interface SideGraph {
 export const NODE_W = 180;
 export const NODE_H = 64;
 
+/** Suppress statuses that cannot occur on the displayed side. */
+function statusForSide<T extends NodeDiffStatus>(
+  diff: { status: T } | undefined,
+  side: 'left' | 'right',
+): T | 'unchanged' {
+  if (!diff) return 'unchanged';
+  const status = diff.status;
+  if (status === 'added' && side === 'left') return 'unchanged';
+  if (status === 'removed' && side === 'right') return 'unchanged';
+  return status;
+}
+
 export function applyDiffStylingToSide(
   raw: SideGraph,
   diff: GraphDiff,
@@ -44,11 +56,7 @@ export function applyDiffStylingToSide(
     // On the left (baseline), `added` nodes don't exist; on the
     // right (candidate), `removed` nodes don't exist. The other
     // status flows through unchanged.
-    const status: NodeDiffStatus =
-      !d ? 'unchanged'
-      : d.status === 'added' && side === 'left' ? 'unchanged'
-      : d.status === 'removed' && side === 'right' ? 'unchanged'
-      : d.status;
+    const status = statusForSide(d, side);
     const data = (n.data ?? {}) as Record<string, unknown>;
     // Prefer the human-friendly step type (e.g. "training",
     // "outlier_handling") as the primary label and demote the raw
@@ -71,11 +79,7 @@ export function applyDiffStylingToSide(
   });
   const styledEdges: Edge[] = raw.edges.map((e) => {
     const d = diff.edges.get(e.id);
-    const status =
-      !d ? 'unchanged'
-      : d.status === 'added' && side === 'left' ? 'unchanged'
-      : d.status === 'removed' && side === 'right' ? 'unchanged'
-      : d.status;
+    const status = statusForSide(d, side);
     const stroke = edgeDiffStroke(status) ?? '#94a3b8';
     return {
       ...e,

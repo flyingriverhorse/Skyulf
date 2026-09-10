@@ -23,46 +23,15 @@ export interface CycleIssue {
  * each issue names only the loop itself.
  */
 export function findCycleIssues(nodes: NodeConfigModel[]): CycleIssue[] {
-  const known = new Set(nodes.map((n) => n.node_id));
-  const inputs = new Map<string, string[]>();
-  const children = new Map<string, string[]>();
-  for (const n of nodes) {
-    inputs.set(n.node_id, n.inputs.filter((id) => known.has(id)));
-    children.set(n.node_id, []);
-  }
-  const inDegree = new Map<string, number>();
-  for (const [nodeId, ups] of inputs) {
-    inDegree.set(nodeId, ups.length);
-    for (const up of ups) children.get(up)!.push(nodeId);
-  }
-
-  const ordered = new Set<string>();
-  const ready = [...inDegree.entries()].filter(([, deg]) => deg === 0).map(([id]) => id);
-  while (ready.length > 0) {
-    const nodeId = ready.shift()!;
-    ordered.add(nodeId);
-    for (const child of children.get(nodeId)!) {
-      const deg = inDegree.get(child)! - 1;
-      inDegree.set(child, deg);
-      if (deg === 0) ready.push(child);
-    }
-  }
+  const { known, inputs, children, inDegree } = indexCycleGraph(nodes);
+  const ordered = collectOrderedNodes(children, inDegree);
 
   const stuck = new Set([...known].filter((id) => !ordered.has(id)));
   const issues: CycleIssue[] = [];
   while (stuck.size > 0) {
     // Drop nodes with no stuck successor: they sit downstream of a loop,
     // not inside one. Repeat until stable.
-    let pruned = true;
-    while (pruned) {
-      pruned = false;
-      for (const nodeId of [...stuck]) {
-        if (!children.get(nodeId)!.some((child) => stuck.has(child))) {
-          stuck.delete(nodeId);
-          pruned = true;
-        }
-      }
-    }
+    pruneDownstreamNodes(stuck, children);
     if (stuck.size === 0) break;
 
     const loop = traceLoop(stuck, inputs);
@@ -85,5 +54,54 @@ function traceLoop(stuck: Set<string>, inputs: Map<string, string[]>): string[] 
     position.set(next, path.length);
     path.push(next);
     current = next;
+  }
+}
+
+/** Index known input edges without admitting missing nodes. */
+function indexCycleGraph(nodes: NodeConfigModel[]) {
+  const known = new Set(nodes.map((n) => n.node_id));
+  const inputs = new Map<string, string[]>();
+  const children = new Map<string, string[]>();
+  for (const n of nodes) {
+    inputs.set(n.node_id, n.inputs.filter((id) => known.has(id)));
+    children.set(n.node_id, []);
+  }
+  const inDegree = new Map<string, number>();
+  for (const [nodeId, ups] of inputs) {
+    inDegree.set(nodeId, ups.length);
+    for (const up of ups) children.get(up)!.push(nodeId);
+  }
+
+  return { known, inputs, children, inDegree };
+}
+
+/** Consume the ready queue in its original insertion order. */
+function collectOrderedNodes(children: Map<string, string[]>, inDegree: Map<string, number>) {
+  const ordered = new Set<string>();
+  const ready = [...inDegree.entries()].filter(([, deg]) => deg === 0).map(([id]) => id);
+  while (ready.length > 0) {
+    const nodeId = ready.shift()!;
+    ordered.add(nodeId);
+    for (const child of children.get(nodeId)!) {
+      const deg = inDegree.get(child)! - 1;
+      inDegree.set(child, deg);
+      if (deg === 0) ready.push(child);
+    }
+  }
+
+  return ordered;
+}
+
+/** Remove downstream-only nodes until no more can be pruned. */
+function pruneDownstreamNodes(stuck: Set<string>, children: Map<string, string[]>): void {
+  let pruned = true;
+  while (pruned) {
+    pruned = false;
+    for (const nodeId of [...stuck]) {
+      if (!children.get(nodeId)!.some((child) => stuck.has(child))) {
+        stuck.delete(nodeId);
+        pruned = true;
+      }
+    }
   }
 }

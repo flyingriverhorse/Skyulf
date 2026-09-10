@@ -1,9 +1,10 @@
 import React from 'react';
-import { BarChart, Bar, ResponsiveContainer } from 'recharts';
-import { AlertTriangle, Type, EyeOff, Eye } from 'lucide-react';
+import { Type, EyeOff, Eye } from 'lucide-react';
 import { clickableProps } from '../../core/utils/a11y';
-import { getDtypeIcon, getDtypeIconColorClass, getDtypeBadgeClass, getDtypeHexColor } from '../../core/utils/dtypeVisuals';
+import { getDtypeIcon, getDtypeIconColorClass, getDtypeBadgeClass } from '../../core/utils/dtypeVisuals';
 import type { ColumnProfile } from '../../core/types/edaProfile';
+import { getMiniChartData, MiniHistogram } from './variableCard/miniChart';
+import { VariableCardStatus } from './variableCard/VariableCardStatus';
 
 interface VariableCardProps {
   profile: ColumnProfile;
@@ -12,25 +13,38 @@ interface VariableCardProps {
   isExcluded?: boolean;
 }
 
+/** Toggle the controlled exclusion flag without opening the card's details. */
+function ExclusionButton({ name, isExcluded, onToggleExclude }: {
+  name: string;
+  isExcluded: boolean;
+  onToggleExclude: NonNullable<VariableCardProps['onToggleExclude']>;
+}) {
+  return (
+    <button
+      onClick={(e) => {
+        e.stopPropagation();
+        onToggleExclude(name, !isExcluded);
+      }}
+      className={`p-1 rounded transition-colors ml-auto ${
+        isExcluded
+          ? 'hover:bg-green-100 text-gray-400 hover:text-green-600 dark:hover:bg-green-900/30'
+          : 'hover:bg-red-100 text-gray-400 hover:text-red-500 dark:hover:bg-red-900/30'
+      }`}
+      title={isExcluded ? 'Include in analysis' : 'Exclude from analysis'}
+      aria-label={isExcluded ? 'Include in analysis' : 'Exclude from analysis'}
+    >
+      {isExcluded ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
+    </button>
+  );
+}
+
 export const VariableCard: React.FC<VariableCardProps> = ({ profile, onClick, onToggleExclude, isExcluded = false }) => {
   const DtypeIcon = getDtypeIcon(profile.dtype);
   const icon = isExcluded
     ? <Type className="w-4 h-4 text-gray-400" />
     : <DtypeIcon className={`w-4 h-4 ${getDtypeIconColorClass(profile.dtype)}`} />;
 
-  // Mini histogram data for the card preview.
-  type MiniDatum = { name: string; count: number };
-  let miniChartData: MiniDatum[] = [];
-
-  if (profile.dtype === 'Numeric' && profile.histogram) {
-      miniChartData = profile.histogram.map((b) => ({ name: b.start.toFixed(1), count: b.count }));
-  } else if (profile.dtype === 'Text' && profile.histogram) {
-      miniChartData = profile.histogram.map((b) => ({ name: b.start.toFixed(0), count: b.count }));
-  } else if (profile.dtype === 'DateTime' && profile.histogram) {
-      miniChartData = profile.histogram.map((b) => ({ name: new Date(b.start).toLocaleDateString(), count: b.count }));
-  } else if (profile.dtype === 'Categorical' && profile.categorical_stats?.top_k) {
-      miniChartData = profile.categorical_stats.top_k.slice(0, 5).map((k) => ({ name: String(k.value), count: k.count }));
-  }
+  const miniChartData = getMiniChartData(profile);
 
   return (
     <div
@@ -57,60 +71,14 @@ export const VariableCard: React.FC<VariableCardProps> = ({ profile, onClick, on
                 </span>
             )}
             {onToggleExclude && (
-                <button
-                    onClick={(e) => {
-                        e.stopPropagation();
-                        onToggleExclude(profile.name, !isExcluded);
-                    }}
-                    className={`p-1 rounded transition-colors ml-auto ${
-                        isExcluded
-                            ? 'hover:bg-green-100 text-gray-400 hover:text-green-600 dark:hover:bg-green-900/30'
-                            : 'hover:bg-red-100 text-gray-400 hover:text-red-500 dark:hover:bg-red-900/30'
-                    }`}
-                    title={isExcluded ? "Include in analysis" : "Exclude from analysis"}
-                    aria-label={isExcluded ? "Include in analysis" : "Exclude from analysis"}
-                >
-                    {isExcluded ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
-                </button>
+                <ExclusionButton name={profile.name} isExcluded={isExcluded} onToggleExclude={onToggleExclude} />
             )}
       </div>
 
       {!isExcluded && (
       <div className="flex justify-between items-end mt-auto">
-        <div className="text-xs text-gray-500 dark:text-gray-400 space-y-1">
-          {profile.missing_percentage > 0 && (
-            <div className="flex items-center text-amber-600">
-              <AlertTriangle className="w-3 h-3 mr-1" />
-              {profile.missing_percentage.toFixed(1)}% null
-            </div>
-          )}
-          {profile.is_unique && <div className="text-blue-500">Unique ID</div>}
-          {profile.is_constant && <div className="text-red-500">Constant</div>}
-          {profile.normality_test && profile.normality_test.is_normal && (
-             <div className="text-purple-600" title={`Normal Distribution (p=${profile.normality_test.p_value.toFixed(3)})`}>Normal Dist.</div>
-          )}
-          {profile.normality_test && !profile.normality_test.is_normal && (
-             <div className="text-amber-600" title={`Not Normal Distribution (p=${profile.normality_test.p_value.toFixed(3)})`}>Not Normal Dist.</div>
-          )}
-          {!profile.is_unique && !profile.is_constant && profile.missing_percentage === 0 && !profile.normality_test && (
-             <div className="text-green-600">Healthy</div>
-          )}
-        </div>
-
-        {/* Mini Chart */}
-        {miniChartData.length > 0 && (
-          <div className="h-12 w-24">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={miniChartData}>
-                <Bar
-                    dataKey="count"
-                    fill={getDtypeHexColor(profile.dtype)}
-                    radius={[2, 2, 0, 0]}
-                />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        )}
+        <VariableCardStatus profile={profile} />
+        <MiniHistogram data={miniChartData} dtype={profile.dtype} />
       </div>
       )}
       {isExcluded && (

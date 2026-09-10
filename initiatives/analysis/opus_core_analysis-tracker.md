@@ -356,6 +356,64 @@ respective fix logs; OC-167 closed with canonical artifact framing on 2026-09-09
 
 ## Log
 
+### 2026-09-10 - frontend batch 9: preprocessing, graph utilities and experiment charts
+
+Base `45c3f142` on `0819`. Three disjoint Astra 6 implementers handled ten
+preprocessing settings entries, seven graph rule/diff/layout/export utilities,
+and seven experiment chart/summary entries; the primary handled VariableCard.
+All **31 original CCN violations in 25 files** are removed. Helpers retain
+cohesive responsibilities and the same public contracts, state ownership,
+numeric fallbacks, DOM and submitted payloads. All four task groups passed
+independent spec and quality review. See the
+[batch 9 plan](frontend_ccn_refactor_batch9_2026-09-10.md) for the exact scope.
+
+The measured strict backlog fell **87 -> 56 functions**, **69 -> 44 files**,
+and **maximum 32 -> 26**. Informational CCN 8 changed **159/113 -> 147/106**
+(functions/files), including **91** optional functions at 9/10. Thresholds and
+source-wide scope remain unchanged; global strict exits 1 for the remaining
+backlog while every selected entry/helper passes 10. The
+[inventory](frontend_ccn_remaining_2026-09-10.md) was regenerated from both reports.
+
+Original/final public characterization passed for every group. Final shared
+Vitest: **2,268 tests / 168 files**; normal ESLint, explicit new-browser-test
+lint, project `tsc --noEmit`, production build and all **11 size budgets** pass.
+Generated `index-BYpfjj1i.js` and all **251** relative built imports resolve.
+Existing jsdom AggregateError stderr also occurs in the original experiment
+suite; the executed suite has no failed tests. Complete Chromium integration:
+**127 passed**, with no failures or retries in the final run. Five new cases
+cover responsive settings/Preview payloads, real PNG/SVG file downloads,
+classification threshold and run/split changes, regression plots and cluster
+charts/tables. Plot assertions wait for visible, stable SVG geometry. Existing
+suites also cover connection rejection, leakage feedback and Pipeline Diff.
+The primary inspected settings and rendered-chart screenshots; final independent
+integration review passed. Browser tests use mocked HTTP endpoints, while
+production stores, controls and chart libraries remain real.
+
+Concise release notes are under v0.8.19; older releases are unchanged.
+VariableCard has no current production consumers and is verified through its
+public component tests, not an invented browser route. The existing casting
+overwrite was separately filed as OC-228 below, leaving **62 open / 4 parked**.
+OC-223/225/226/227 remain open; OC-71/72/73/185 stay parked and DRIFT-01 deferred.
+The user reported the frontend checks working and authorized the batch commit.
+
+### 2026-09-10 - OC-228 filed: adding a casting rule overwrites an existing rule
+
+Batch 9 characterization reproduced this against the original `45c3f142`
+`CastTypeNode` public settings: schema contains only `age`, its rule is `int`,
+and clicking **Add Casting Rule** emits `{ column_types: { age: 'float' } }`.
+The button is disabled only for an empty schema. When all columns are assigned,
+the unchanged add handler falls back to the first available column and replaces
+its type. The same test passes after extraction; independent review confirmed
+the original behavior and found no matching existing tracker item.
+
+Evidence: `InvalidValueReplacementNode.test.tsx`, case `preserves the existing
+cast add fallback when every column has a rule`; original 49 tests and final
+126 tests passed. Logs: `tmp_repro_artifacts/frontend_ccn_batch9_task1/`.
+This CCN refactor preserves the behavior and records it separately as **OC-228**.
+Fix by disabling/no-oping Add when no unassigned column remains; verify that
+removing a rule permits adding it again without changing other types.
+Queue becomes **62 open / 4 parked**; earlier parked work is unchanged.
+
 ### 2026-09-10 - frontend complexity refactor batch 8: verified
 
 Committed the previously verified batch 7 with DCO sign-off as `6af9a600`, then

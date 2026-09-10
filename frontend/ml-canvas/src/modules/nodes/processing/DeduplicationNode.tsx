@@ -14,6 +14,33 @@ interface DeduplicationConfig {
   keep: 'first' | 'last' | 'none';
 }
 
+function DeduplicationFeedback({ metrics }: { metrics: Record<string, unknown> | null }) {
+  return (
+    metrics && (metrics.Deduplicate_rows_removed !== undefined) && (
+      <div className="p-3 bg-muted/30 rounded-md border border-border">
+        <div className="flex items-center gap-2 mb-2 text-sm font-semibold text-primary">
+          <Activity size={14} />
+          <span>Last Run Results</span>
+        </div>
+        <div className="space-y-1 text-xs">
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">Duplicates Removed:</span>
+            <span className="font-medium text-destructive">{String(metrics.Deduplicate_rows_removed)}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">Rows Remaining:</span>
+            <span className="font-medium">{String(metrics.Deduplicate_rows_remaining)}</span>
+          </div>
+          <div className="flex justify-between pt-1 border-t">
+            <span className="text-muted-foreground">Total Rows:</span>
+            <span className="font-medium">{String(metrics.Deduplicate_rows_total)}</span>
+          </div>
+        </div>
+      </div>
+    )
+  );
+}
+
 const DeduplicationSettings: React.FC<{ config: DeduplicationConfig; onChange: (c: DeduplicationConfig) => void; nodeId?: string }> = ({
   config,
   onChange,
@@ -75,28 +102,7 @@ const DeduplicationSettings: React.FC<{ config: DeduplicationConfig; onChange: (
           </div>
 
           {/* Feedback Section */}
-          {metrics && (metrics.Deduplicate_rows_removed !== undefined) && (
-            <div className="p-3 bg-muted/30 rounded-md border border-border">
-              <div className="flex items-center gap-2 mb-2 text-sm font-semibold text-primary">
-                <Activity size={14} />
-                <span>Last Run Results</span>
-              </div>
-              <div className="space-y-1 text-xs">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Duplicates Removed:</span>
-                  <span className="font-medium text-destructive">{String(metrics.Deduplicate_rows_removed)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Rows Remaining:</span>
-                  <span className="font-medium">{String(metrics.Deduplicate_rows_remaining)}</span>
-                </div>
-                <div className="flex justify-between pt-1 border-t">
-                  <span className="text-muted-foreground">Total Rows:</span>
-                  <span className="font-medium">{String(metrics.Deduplicate_rows_total)}</span>
-                </div>
-              </div>
-            </div>
-          )}
+          <DeduplicationFeedback metrics={metrics} />
         </div>
 
         {/* Right Column (Column List) */}

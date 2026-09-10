@@ -7,17 +7,7 @@ type CanvasEdge = Pick<Edge, 'id' | 'source' | 'target'>;
 
 /** Highlight only edges on a path from the offending learner to its row boundary. */
 function pathEdges(source: string, target: string, edges: readonly CanvasEdge[]): string[] {
-  const ancestors = new Set([target]);
-  const pending = [target];
-  while (pending.length) {
-    const id = pending.pop()!;
-    for (const edge of edges) {
-      if (edge.target === id && !ancestors.has(edge.source)) {
-        ancestors.add(edge.source);
-        pending.push(edge.source);
-      }
-    }
-  }
+  const ancestors = collectAncestors(target, edges);
   const reachable = new Set([source]);
   const queue = [source];
   while (queue.length) {
@@ -74,4 +64,20 @@ export function buildCanvasLeakageIssues(
     }
   }
   return issues;
+}
+
+/** Find potential path members by walking backward from the split. */
+function collectAncestors(target: string, edges: readonly CanvasEdge[]): Set<string> {
+  const ancestors = new Set([target]);
+  const pending = [target];
+  while (pending.length) {
+    const id = pending.pop()!;
+    for (const edge of edges) {
+      if (edge.target === id && !ancestors.has(edge.source)) {
+        ancestors.add(edge.source);
+        pending.push(edge.source);
+      }
+    }
+  }
+  return ancestors;
 }

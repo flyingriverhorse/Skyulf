@@ -7,6 +7,8 @@ import {
   findPreprocessingBeforeSplitIssues,
   formatLeakageIssueMessage,
   resetLeakageFlags,
+  getLeakageFlagsRevision,
+  subscribeLeakageFlags,
 } from './pipelineLeakageValidation';
 
 const node = (
@@ -266,6 +268,25 @@ describe('formatLeakageIssueMessage', () => {
 });
 
 describe('applyRegistryLeakageFlags', () => {
+  it('keeps exported sets and notifies subscribers in registration order after mutation', () => {
+    // Mounted subscribers retain the set references and observe the new revision and contents.
+    const fitSet = DATA_DEPENDENT_FIT_STEP_TYPES;
+    const splitSet = TRAIN_TEST_SPLIT_STEP_TYPES;
+    const revision = getLeakageFlagsRevision();
+    const events: unknown[] = [];
+    const first = subscribeLeakageFlags(() => events.push(['first', getLeakageFlagsRevision(), [...fitSet], [...splitSet]]));
+    const second = subscribeLeakageFlags(() => events.push(['second', getLeakageFlagsRevision()]));
+    try {
+      applyRegistryLeakageFlags([]);
+      expect(events).toEqual([]);
+      applyRegistryLeakageFlags([{ id: 'Learner', aliases: ['Alias'], learns_from_data: true }, { id: 'Boundary', is_splitter: true }]);
+      expect(events).toEqual([['first', revision + 1, ['Learner', 'Alias'], ['Boundary']], ['second', revision + 1]]);
+      expect(DATA_DEPENDENT_FIT_STEP_TYPES).toBe(fitSet);
+      expect(TRAIN_TEST_SPLIT_STEP_TYPES).toBe(splitSet);
+    } finally { first(); second(); }
+    resetLeakageFlags();
+    expect(events).toHaveLength(2);
+  });
   afterEach(() => {
     resetLeakageFlags();
   });

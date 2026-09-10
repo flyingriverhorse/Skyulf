@@ -53,14 +53,7 @@ function computeFitTransform(
   const nodes = vpEl.querySelectorAll<HTMLElement>(NODE_SELECTOR);
   if (nodes.length === 0) return null;
 
-  // Parse the current viewport transform produced by React Flow:
-  // "translate(vpXpx, vpYpx) scale(vpZoom)"
-  const ct = vpEl.style.transform;
-  const tMatch = ct.match(/translate\(([^,]+)px,\s*([^)]+)px\)/);
-  const sMatch = ct.match(/scale\(([^)]+)\)/);
-  const vpX = tMatch ? Number.parseFloat(tMatch[1] ?? '0') : 0;
-  const vpY = tMatch ? Number.parseFloat(tMatch[2] ?? '0') : 0;
-  const vpZoom = sMatch ? Number.parseFloat(sMatch[1] ?? '1') : 1;
+  const { vpX, vpY, vpZoom } = readViewportTransform(vpEl);
 
   const canvasRect = canvas.getBoundingClientRect();
 
@@ -162,4 +155,18 @@ export async function exportCanvasToSvg(
   } finally {
     if (fitTransform) vpEl.style.transform = originalTransform;
   }
+}
+
+/** Read React Flow translation and zoom with the existing omitted-part defaults. */
+function readViewportTransform(vpEl: HTMLElement) {
+  // Parse the current viewport transform produced by React Flow:
+  // "translate(vpXpx, vpYpx) scale(vpZoom)"
+  const ct = vpEl.style.transform;
+  const tMatch = ct.match(/translate\(([^,]+)px,\s*([^)]+)px\)/);
+  const sMatch = ct.match(/scale\(([^)]+)\)/);
+  const vpX = tMatch ? Number.parseFloat(tMatch[1] ?? '0') : 0;
+  const vpY = tMatch ? Number.parseFloat(tMatch[2] ?? '0') : 0;
+  const vpZoom = sMatch ? Number.parseFloat(sMatch[1] ?? '1') : 1;
+
+  return { vpX, vpY, vpZoom };
 }

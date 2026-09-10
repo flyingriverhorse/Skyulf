@@ -97,6 +97,52 @@ const CustomPairEditor: React.FC<{
   );
 };
 
+function AliasReplacementControls({
+  config,
+  onChange,
+}: { config: AliasReplacementConfig; onChange: (config: AliasReplacementConfig) => void }) {
+  return (
+    <>
+      <div>
+        <span className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 block">
+          Replacement Mode
+        </span>
+        <select
+          aria-label="Replacement Mode"
+          className="w-full text-xs rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 p-2"
+          value={config.mode}
+          onChange={(e) => onChange({ ...config, mode: e.target.value as AliasReplacementConfig['mode'] })}
+        >
+          <option value="custom">Custom Mapping</option>
+          <option value="canonicalize_country_codes">Canonicalize Country Codes</option>
+          <option value="normalize_boolean">Normalize Booleans (yes/no -&gt; True/False)</option>
+          <option value="punctuation">Remove Punctuation</option>
+        </select>
+        <p className="text-[10px] text-gray-500 mt-1">
+          {config.mode === 'custom' && "Define your own alias mappings below."}
+          {config.mode === 'canonicalize_country_codes' && "Standardizes country codes (e.g. 'USA', 'U.S.A.' -> 'US')."}
+          {config.mode === 'normalize_boolean' && "Converts 'yes', 'y', '1' to True and 'no', 'n', '0' to False."}
+          {config.mode === 'punctuation' && "Removes common punctuation characters from text."}
+        </p>
+      </div>
+
+      {config.mode === 'custom' && (
+        <div>
+          <span className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 block">
+            Custom Aliases
+          </span>
+          <ValidationField field="custom_pairs">
+            <CustomPairEditor
+              pairs={config.custom_pairs}
+              onChange={(pairs) => onChange({ ...config, custom_pairs: pairs })}
+            />
+          </ValidationField>
+        </div>
+      )}
+    </>
+  );
+}
+
 const AliasReplacementSettings: React.FC<{ config: AliasReplacementConfig; onChange: (c: AliasReplacementConfig) => void; nodeId?: string }> = ({
   config,
   onChange,
@@ -171,42 +217,7 @@ const AliasReplacementSettings: React.FC<{ config: AliasReplacementConfig; onCha
             )}
           </div>
 
-          <div>
-            <span className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 block">
-              Replacement Mode
-            </span>
-            <select
-              aria-label="Replacement Mode"
-              className="w-full text-xs rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 p-2"
-              value={config.mode}
-              onChange={(e) => onChange({ ...config, mode: e.target.value as AliasReplacementConfig['mode'] })}
-            >
-              <option value="custom">Custom Mapping</option>
-              <option value="canonicalize_country_codes">Canonicalize Country Codes</option>
-              <option value="normalize_boolean">Normalize Booleans (yes/no -&gt; True/False)</option>
-              <option value="punctuation">Remove Punctuation</option>
-            </select>
-            <p className="text-[10px] text-gray-500 mt-1">
-              {config.mode === 'custom' && "Define your own alias mappings below."}
-              {config.mode === 'canonicalize_country_codes' && "Standardizes country codes (e.g. 'USA', 'U.S.A.' -> 'US')."}
-              {config.mode === 'normalize_boolean' && "Converts 'yes', 'y', '1' to True and 'no', 'n', '0' to False."}
-              {config.mode === 'punctuation' && "Removes common punctuation characters from text."}
-            </p>
-          </div>
-
-          {config.mode === 'custom' && (
-            <div>
-              <span className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 block">
-                Custom Aliases
-              </span>
-              <ValidationField field="custom_pairs">
-                <CustomPairEditor
-                  pairs={config.custom_pairs}
-                  onChange={(pairs) => onChange({ ...config, custom_pairs: pairs })}
-                />
-              </ValidationField>
-            </div>
-          )}
+          <AliasReplacementControls config={config} onChange={onChange} />
         </div>
 
       </div>

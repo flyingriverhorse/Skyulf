@@ -8,6 +8,7 @@
  */
 
 import React, { useMemo } from 'react';
+import { getLiveMetrics } from './classificationChartsForSplit/liveMetrics';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   Line, ReferenceLine, ReferenceDot, ComposedChart, Area,
@@ -72,28 +73,7 @@ export const ClassificationChartsForSplit: React.FC<Props> = ({
                                                         const classes = thresholdClasses;
                                                         const matrix = thresholdMatrix;
 
-                                                        // Compute live OvR metrics for the selected class
-                                                        let liveMetrics: { accuracy: number; precision: number; recall: number; f1: number } | null = null;
-                                                        if (selectedRocClass && proba) {
-                                                            const labelList = proba.labels && proba.labels.length === proba.classes.length ? proba.labels : undefined;
-                                                            const posClassIdx = (labelList ?? proba.classes).findIndex(c => String(c) === selectedRocClass);
-                                                            if (posClassIdx !== -1) {
-                                                                const posVal = proba.classes[posClassIdx];
-                                                                const posMatrixIdx = classes.findIndex(c => String(c) === String(posVal));
-                                                                if (posMatrixIdx !== -1) {
-                                                                    const tp = matrix[posMatrixIdx]?.[posMatrixIdx] ?? 0;
-                                                                    const fp = matrix.reduce((s, row, ri) => ri !== posMatrixIdx ? s + (row[posMatrixIdx] ?? 0) : s, 0);
-                                                                    const fn = (matrix[posMatrixIdx] ?? []).reduce((s, v, ci) => ci !== posMatrixIdx ? s + v : s, 0);
-                                                                    const total = matrix.flat().reduce((a, b) => a + b, 0);
-                                                                    const tn = total - tp - fp - fn;
-                                                                    const accuracy = total > 0 ? (tp + tn) / total : 0;
-                                                                    const precision = (tp + fp) > 0 ? tp / (tp + fp) : 0;
-                                                                    const recall = (tp + fn) > 0 ? tp / (tp + fn) : 0;
-                                                                    const f1 = precision + recall > 0 ? (2 * precision * recall) / (precision + recall) : 0;
-                                                                    liveMetrics = { accuracy, precision, recall, f1 };
-                                                                }
-                                                            }
-                                                        }
+                                                        const liveMetrics = getLiveMetrics(proba, selectedRocClass, classes, matrix);
 
                                                         const cellSize = classes.length <= 3 ? 'w-20 h-16' : classes.length <= 5 ? 'w-14 h-12' : 'w-10 h-9';
                                                         const cellText = classes.length <= 5 ? 'text-xs' : 'text-[10px]';
