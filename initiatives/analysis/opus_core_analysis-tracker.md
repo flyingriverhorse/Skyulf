@@ -354,6 +354,27 @@ respective fix logs; OC-167 closed with canonical artifact framing on 2026-09-09
 
 ## Log
 
+### 2026-09-10 - frontend policy: strict CCN 10, informational CCN 8
+
+The accepted limit for subsequent frontend refactors is **CCN <= 10 per
+function**. `complexity:check` enforces 10 across all `src` TypeScript; the
+informational `complexity:report` stays at 8. No per-file exceptions or explicit
+scope list. This supersedes the earlier source-wide CCN 8 policy below.
+
+The strict command reports **112 errors in 80 files** (exit 1, maximum 32).
+The informational report lists **172 warnings in 110 files** (exit 0), including
+60 functions at CCN 9 or 10 that now pass the gate. This is a threshold change,
+not 60 additional code fixes. Remaining required work is recorded with source
+links, function labels and CCN values in
+[`frontend_ccn_remaining_2026-09-10.md`](frontend_ccn_remaining_2026-09-10.md).
+Prioritize complex responsibilities and the largest functions; avoid splitting
+readable code solely to lower a number.
+
+Normal ESLint and TypeScript/Vite build pass; production assets are unchanged.
+Evidence: `tmp_repro_artifacts/frontend-ccn10-{check,lint,build}-2026-09-10.log`
+and `frontend-ccn8-report-2026-09-10.log`. The workflow and v0.8.19 note match
+these thresholds. No runtime code or audit status changed; **57 open / 4 parked**.
+
 ### 2026-09-10 - frontend CCN 8 gate expanded to all source files
 
 The user confirmed the batch 5 frontend checks, requested a signed commit, and

@@ -153,6 +153,10 @@ closed that on 2026-09-07.
 
 ### Remaining — frontend
 
+The separate [frontend CCN backlog](frontend_ccn_remaining_2026-09-10.md) tracks
+112 functions in 80 files above the accepted limit of 10. The informational
+report stays at 8; complexity candidates do not add to the audit finding counts.
+
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
 | OC-54 | 🟡 | `DebugNode` is dead code that would silently no-op if wired up (`nodes/DebugNode.tsx`) | small | ⬜ open |

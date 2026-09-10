@@ -17,6 +17,10 @@ removing the CCN 10 exception commit. Use 8 as a readability target, with no
 metric-only splitting or renewed exception gate. Release notes belong to 0.8.19.
 Previous record: [batch 4](frontend_ccn_refactor_batch4_2026-09-09.md).
 
+This completed plan records the original CCN 8 target. The subsequent accepted
+policy is **strict CCN 10, informational CCN 8**; future refactors and remaining
+required work follow the [current inventory](frontend_ccn_remaining_2026-09-10.md).
+
 ## Global constraints
 
 - Baseline: `15aa043a`, branch `0819`, no tracked changes. Preserve temporary files.

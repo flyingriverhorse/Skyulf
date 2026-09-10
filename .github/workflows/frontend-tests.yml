@@ -50,14 +50,14 @@ jobs:
         working-directory: frontend/ml-canvas
 
       - name: Frontend complexity report (informational)
-        # Show every remaining hotspot before the strict source-wide gate.
+        # Report CCN > 8 as improvement candidates; the strict gate below uses 10.
         continue-on-error: true
         run: npm run complexity:report
         working-directory: frontend/ml-canvas
 
-      - name: Complexity gate (ESLint, CCN 8)
+      - name: Complexity gate (ESLint, CCN 10)
         # All src TypeScript files are covered, including new files.
-        run: bash ../../.github/scripts/run_check.sh "ESLint complexity (CCN 8)" npm run complexity:check
+        run: bash ../../.github/scripts/run_check.sh "ESLint complexity (CCN 10)" npm run complexity:check
         working-directory: frontend/ml-canvas
 
       - name: Type check (tsc)
