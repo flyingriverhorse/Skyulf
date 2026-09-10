@@ -356,6 +356,90 @@ respective fix logs; OC-167 closed with canonical artifact framing on 2026-09-09
 
 ## Log
 
+### 2026-09-10 - frontend complexity refactor batch 7: verified
+
+Plan: [`frontend_ccn_refactor_batch7_2026-09-10.md`](frontend_ccn_refactor_batch7_2026-09-10.md).
+Prior batch 6, OC-224 and the deferred DRIFT-01 specification are signed commit
+`4a6db08e`; the user subsequently authorized this next batch's signed commit.
+
+Three independent Astra 6 owners characterized original behavior before
+extracting cohesive state/presentation; fresh independent reviewers approved
+each task for spec compliance and code quality. Entry CCN: Layout **29→5**,
+JobsDrawer **28→5**, JobCard **24→1**, SegmentationSettings **28→10**. Every
+entry/helper is <=10; readable 9/10 functions remain intact. State, effects,
+subscriptions, public props, labels, CSS, payloads and ordering are preserved.
+
+Original public tests: Layout **22**, JobsDrawer/JobCard **49**, Segmentation
+**29**. Integrated verification: **2,045 Vitest tests / 158 files**, normal
+ESLint, TypeScript/Vite build and all **11 bundle budgets** pass. Generated
+frontend assets are rebuilt. The strict all-source CCN10 gate intentionally
+still fails on **98 functions / 73 files / max32**, down from 105/77; the CCN8
+informational report passes with **166 functions / 111 files**, including 68
+optional functions at 9/10. The inventory is regenerated from both executed logs.
+
+The complete Chromium confirmation passes **117/117** with mocked HTTP and real
+UI/stores. The first four-worker run passed 116/117, with an unchecked threshold
+checkbox after a click in an unchanged test. That suite passed three focused
+repetitions (9/9), and the full two-worker confirmation passed without source
+changes. A delayed-defaults diagnostic did not reproduce the proposed cause;
+no threshold fix is claimed. Logs retain the initial failure and later evidence.
+New browser cases cover mobile/desktop navigation, Jobs filtering/details and
+compact/expanded Segmentation edits plus submission payloads; representative
+screenshots were visually inspected. Live training remains a user-side check.
+
+Two original defects found during characterization are recorded separately:
+OC-225 and OC-226 below. Queue: **60 open / 4 parked**. DRIFT-01 remains deferred;
+there are no new backend/Core/API/store/registry/dependency changes in this batch.
+Final independent integrated review reports PASS with no introduced regression
+or scope violation; the delivery audit confirms all 31 scoped text files, queue
+counts, generated entry references, preserved older notes and unchanged CCN policy.
+
+### 2026-09-10 - OC-226 filed: stale segmentation defaults overwrite newer config
+
+The original `SegmentationSettings.tsx` model effect captured the entire config
+and onChange callback, then called `onChange({ ...config, hyperparameters:
+defaults })` when its request settled. It had no active-request or unmount guard.
+The same logic now lives in `segmentationSettings/useSegmentationModels.ts`;
+batch 7 deliberately preserves it rather than mixing a concurrency fix into
+the extraction.
+
+Executed characterization before production edits: the same-model case changes
+reference_column from `old` to `new` and execution_mode from parallel to merge
+while defaults are pending; completion calls the original callback with the old
+values. The reversed-response case resolves a newer DBSCAN request, unmounts,
+then resolves the older K-Means request; the old callback emits K-Means defaults
+after the newer result. Both cases pass on original and extracted source in
+`SegmentationSettings.test.tsx` (`keeps the original callback and config...` and
+`retains out-of-order definitions...`). Logs:
+`tmp_repro_artifacts/ccn7-segmentation-original-tests.log` and
+`ccn7-segmentation-final-tests.log`.
+
+Fix target: default seeding must preserve current non-parameter edits, ignore
+superseded model requests, and avoid writes after settings unmount. Verify the
+controlled parent/graph outcome, not only a callback spy. Update these deliberate
+characterization assertions when implementing that separate fix. No matching
+queue finding existed; queue is now **60 open / 4 parked**. DRIFT-01 remains a
+deferred enhancement outside the audit counts.
+
+### 2026-09-10 - OC-225 filed: job detail loses its dialog name
+
+During batch 7's browser characterization, pressing Enter on a real JobCard
+opens the existing detail view, but the resulting `role="dialog"` has no
+accessible name. `JobsDrawer.tsx` at base `4a6db08e` references
+`aria-labelledby="jobs-drawer-title"` on the persistent panel; the referenced
+heading exists only in the unselected history branch. `jobs/jobDetails/JobHeader.tsx`
+also renders its Back action as an unlabeled icon-only button. Both conditions
+predate this refactor; no existing tracker/queue entry covered them.
+
+Evidence: `tmp_repro_artifacts/ccn7-browser-probe2.log` reproduced the missing
+named dialog at both 1440px and 1100px while the Job Details heading remained
+visible. Source inspection confirms the dangling label reference and unlabeled
+Back control. The browser scenario now locates the detail dialog by its heading
+to continue checking current behavior; that test does not claim accessibility
+is repaired. Keep the pure extraction unchanged and fix the dialog label plus
+Back name in a separate regression-covered change. Queue: **59 open / 4 parked**;
+OC-223 and the deferred DRIFT-01 enhancement retain their existing scope.
+
 ### 2026-09-10 - OC-224 fixed: compare raw uploads with saved raw source data
 
 `backend/monitoring/drift_reference.py` resolves the selected training node's

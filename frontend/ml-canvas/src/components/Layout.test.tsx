@@ -1,5 +1,6 @@
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { renderToString } from 'react-dom/server';
+import { useState } from 'react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { monitoringApi } from '../core/api/monitoring';
@@ -35,14 +36,14 @@ afterEach(() => {
 });
 
 /** Render the real shell and notification center with a nested route outlet. */
-async function renderLayout(path = '/') {
+async function renderLayout(path = '/', content = <p>Current page content</p>) {
   let view!: ReturnType<typeof render>;
   await act(async () => {
     view = render(
       <MemoryRouter initialEntries={[path]}>
         <Routes>
           <Route element={<Layout />}>
-            <Route path="*" element={<p>Current page content</p>} />
+            <Route path="*" element={content} />
           </Route>
         </Routes>
       </MemoryRouter>,
@@ -50,6 +51,60 @@ async function renderLayout(path = '/') {
   });
   return view;
 }
+
+describe('Layout routes and content', () => {
+  it('keeps all route links in order and marks only exact routes active', async () => {
+    // Navigation destinations and active state must survive presentation extraction.
+    await renderLayout('/jobs');
+    const routes = [
+      ['Dashboard', '/'], ['Jobs', '/jobs'], ['EDA', '/eda'], ['Data Drift', '/drift'],
+      ['ML Canvas', '/canvas'], ['Data Sources', '/data'], ['Model Registry', '/registry'],
+      ['Deployments', '/deployments'], ['Error Log', '/errors'], ['Slow Nodes', '/slow-nodes'],
+      ['Audit Log', '/audit'],
+    ];
+    expect(screen.getAllByRole('link').map(link => [link.textContent, link.getAttribute('href')])).toEqual(routes);
+    expect(screen.getAllByRole('link').filter(link => link.hasAttribute('aria-current'))).toEqual([
+      screen.getByRole('link', { name: 'Jobs' }),
+    ]);
+    await act(async () => fireEvent.click(screen.getByRole('link', { name: 'Data Sources' })));
+    expect(screen.getByRole('link', { name: 'Jobs' })).not.toHaveAttribute('aria-current');
+    expect(screen.getByRole('link', { name: 'Data Sources' })).toHaveAttribute('aria-current', 'page');
+  });
+
+  it.each(['/canvas', '/eda'])('collapses the desktop rail on %s and expands it on mobile', async path => {
+    // The desktop rail retains accessible labels while mobile keeps full-width navigation.
+    const { container } = await renderLayout(path);
+    expect(container.querySelector('aside')).toHaveClass('w-16');
+    expect(screen.queryByText('Skyulf ML')).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Dashboard' })).toHaveAttribute('title', 'Dashboard');
+    expect(screen.getByRole('link', { name: 'Dashboard' })).toHaveTextContent('');
+    window.innerWidth = 390;
+    fireEvent.resize(window);
+    await act(async () => vi.advanceTimersByTime(32));
+    expect(screen.getByRole('dialog', { name: 'Navigation menu' })).toHaveClass('w-64', '-translate-x-full');
+    expect(screen.getByRole('dialog', { name: 'Navigation menu' })).toHaveAttribute('aria-modal', 'true');
+    expect(screen.getByRole('link', { name: 'Dashboard' })).not.toHaveAttribute('title');
+    expect(screen.getByRole('link', { name: 'Dashboard' })).toHaveTextContent('Dashboard');
+  });
+
+  it('keeps outlet state through navigation, theme, drawer, and viewport changes', async () => {
+    // Shell updates must not remount the active route content.
+    function StatefulPage() {
+      const [count, setCount] = useState(0);
+      return <button onClick={() => setCount(count + 1)}>Page count {count}</button>;
+    }
+    await renderLayout('/', <StatefulPage />);
+    fireEvent.click(screen.getByRole('button', { name: 'Page count 0' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Switch to dark mode' }));
+    await act(async () => fireEvent.click(screen.getByRole('link', { name: 'ML Canvas' })));
+    window.innerWidth = 390;
+    fireEvent.resize(window);
+    await act(async () => vi.advanceTimersByTime(32));
+    fireEvent.click(screen.getByRole('button', { name: 'Open navigation menu' }));
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(screen.getByRole('button', { name: 'Page count 1' })).toBeInTheDocument();
+  });
+});
 
 describe('Layout notification placement', () => {
   it.each([
@@ -132,6 +187,44 @@ describe('Layout mobile navigation', () => {
 });
 
 describe('Layout monitoring and theme', () => {
+  it('polls every five minutes and retains the previous badge after a failed refresh', async () => {
+    // Failed enrichment must not clear a previously visible unresolved-error signal.
+    vi.mocked(monitoringApi.getUnresolvedCount).mockResolvedValueOnce(2).mockRejectedValueOnce(new Error('offline')).mockResolvedValue(0);
+    await renderLayout();
+    expect(monitoringApi.getUnresolvedCount).toHaveBeenCalledTimes(1);
+    await act(async () => vi.advanceTimersByTime(299_999));
+    expect(monitoringApi.getUnresolvedCount).toHaveBeenCalledTimes(1);
+    await act(async () => vi.advanceTimersByTime(1));
+    expect(monitoringApi.getUnresolvedCount).toHaveBeenCalledTimes(2);
+    expect(screen.getByRole('link', { name: 'Error Log' }).querySelector('.bg-red-500')).not.toBeNull();
+    await act(async () => vi.advanceTimersByTime(300_000));
+    expect(monitoringApi.getUnresolvedCount).toHaveBeenCalledTimes(3);
+    expect(screen.getByRole('link', { name: 'Error Log' }).querySelector('.bg-red-500')).toBeNull();
+    expect(monitoringApi.getDriftStatus).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([{ hidden: true, path: '/' }, { hidden: false, path: '/errors' }])(
+    'suppresses the initial error request when hidden=$hidden on $path', async ({ hidden, path }) => {
+      // Suppression applies to the initial check as well as later interval ticks.
+      vi.spyOn(document, 'hidden', 'get').mockReturnValue(hidden);
+      await renderLayout(path);
+      await act(async () => vi.advanceTimersByTime(300_000));
+      expect(monitoringApi.getUnresolvedCount).not.toHaveBeenCalled();
+      expect(monitoringApi.getDriftStatus).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it('allows an in-flight error request to update the badge after navigating to errors', async () => {
+    // Route cleanup cancels polling but intentionally leaves the current request alive.
+    let resolveCount!: (value: number) => void;
+    vi.mocked(monitoringApi.getUnresolvedCount).mockReturnValue(new Promise(resolve => { resolveCount = resolve; }));
+    await renderLayout();
+    await act(async () => fireEvent.click(screen.getByRole('link', { name: 'Error Log' })));
+    await act(async () => resolveCount(2));
+    expect(monitoringApi.getUnresolvedCount).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('link', { name: 'Error Log' }).querySelector('.bg-red-500')).not.toBeNull();
+  });
+
   it.each([
     { critical: 1, drift: false, errors: 2, badge: true },
     { critical: 0, drift: true, errors: 0, badge: true },

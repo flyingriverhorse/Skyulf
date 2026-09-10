@@ -1,25 +1,15 @@
-import React, { useEffect, useState, useRef, useId } from 'react';
-import { ValidationField, useValidationReveal } from '../../../components/shared/ValidationField';
-import { Play, Loader2, Settings2, AlertCircle, ChevronDown, X } from 'lucide-react';
-import { jobsApi } from '../../../core/api/jobs';
-import { RegistryItem, registryApi } from '../../../core/api/registry';
+import React, { useState, useId } from 'react';
+import { useValidationReveal } from '../../../components/shared/ValidationField';
+import { X } from 'lucide-react';
 import { useIsWideContainer } from '../../../core/hooks/useIsWideContainer';
 import { useDatasetSchema } from '../../../core/hooks/useDatasetSchema';
 import { useGraphStore } from '../../../core/store/useGraphStore';
-import { useJobStore } from '../../../core/store/useJobStore';
-import { useViewStore } from '../../../core/store/useViewStore';
-import { convertGraphToPipelineConfig } from '../../../core/utils/pipelineConverter';
-import { warnAndBlockOnLeakage } from '../../../core/utils/pipelineLeakageValidation';
-import { getLeakageErrorMessage, graphSemanticSignature } from '../../../core/utils/leakageFeedback';
-import { getIncomers } from '@xyflow/react';
-import { HelpTooltip } from './components/HelpTooltip';
-import { HyperparameterInput } from './components/HyperparameterInput';
-import type { HyperparameterDef } from './components/types';
 import type { ExecutionMode } from '../../../core/types/executionMode';
-import { toast } from '../../../core/toast';
-import { RunFeedback } from '../../../components/shared/RunFeedback';
-import { TrainingActionFooter } from '../../../components/shared/TrainingActionFooter';
-import type { NodeSubmission } from '../../../core/types/runFeedback';
+import { findUpstreamDatasetId } from './segmentationSettings/upstreamDataset';
+import { useSegmentationModels } from './segmentationSettings/useSegmentationModels';
+import { useSegmentationSubmission } from './segmentationSettings/useSegmentationSubmission';
+import { SegmentationModelSection, SegmentationParametersSection } from './segmentationSettings/SegmentationSections';
+import { SegmentationActionFooter } from './segmentationSettings/SegmentationActionFooter';
 
 /** Config for the dedicated Segmentation (clustering) node.
  *
@@ -53,310 +43,33 @@ export const SegmentationSettings: React.FC<{
   onChange: (c: SegmentationConfig) => void;
   nodeId?: string;
 }> = ({ config, onChange, nodeId }) => {
-  const [hyperparameters, setHyperparameters] = useState<HyperparameterDef[]>([]);
-  const [isLoadingDefs, setIsLoadingDefs] = useState(false);
-  const feedback = useJobStore(state => nodeId ? state.nodeSubmissions[nodeId] : undefined);
-  const isSubmitting = feedback?.pending ?? false;
-  const submissionMessage = feedback?.message ?? '';
-  const runFeedback = feedback?.run;
   const runHelpId = useId();
   const fieldId = useId();
   const [showInfo, setShowInfo] = useState(() => !sessionStorage.getItem('hide_info_segmentation'));
-
-  const { toggleDrawer: toggleJobDrawer, setTab, setActiveParallelRun, startPolling } = useJobStore();
-
   const nodes = useGraphStore((state) => state.nodes);
   const edges = useGraphStore((state) => state.edges);
-
-  const findUpstreamDatasetId = (currentNodeId: string): string | undefined => {
-    const visited = new Set<string>();
-    const queue = [currentNodeId];
-
-    while (queue.length > 0) {
-      const id = queue.shift();
-      if (!id) continue;
-      if (visited.has(id)) continue;
-      visited.add(id);
-
-      const node = nodes.find(n => n.id === id);
-      if (!node) continue;
-
-      if (id !== currentNodeId) {
-        if (node.data?.datasetId) return node.data.datasetId as string;
-        if (node.data?.dataset_id) return node.data.dataset_id as string;
-
-        if (node.data?.config) {
-          const nodeConfig = node.data.config as Record<string, unknown>;
-          if (nodeConfig.datasetId) return nodeConfig.datasetId as string;
-          if (nodeConfig.dataset_id) return nodeConfig.dataset_id as string;
-        }
-
-        if (node.data?.params) {
-          const params = node.data.params as Record<string, unknown>;
-          if (params.datasetId) return params.datasetId as string;
-          if (params.dataset_id) return params.dataset_id as string;
-        }
-      }
-
-      const incomers = getIncomers(node, nodes, edges);
-      for (const incomer of incomers) {
-        queue.push(incomer.id);
-      }
-    }
-    return undefined;
-  };
-
-  const datasetId = findUpstreamDatasetId(nodeId || '');
+  const datasetId = findUpstreamDatasetId(nodeId || '', nodes, edges);
   const { data: schema } = useDatasetSchema(datasetId);
   const availableColumns = schema ? Object.values(schema.columns) : [];
-
   const [containerRef, isWide] = useIsWideContainer();
   const [activeTab, setActiveTab] = useState<'model' | 'params'>('model');
   useValidationReveal((field) => {
     if (field === 'model_type') setActiveTab('model');
   });
-  const [availableModels, setAvailableModels] = useState<RegistryItem[]>([]);
-  const [isLoadingModels, setIsLoadingModels] = useState(false);
   const [showScalingAlert, setShowScalingAlert] = useState(true);
+  const models = useSegmentationModels(config, onChange);
+  const submission = useSegmentationSubmission(config, nodeId, datasetId, nodes, edges);
 
-  const selectedModelItem = availableModels.find(m => m.id === config.model_type);
-  const requiresScaling = selectedModelItem?.tags?.includes('requires_scaling');
-
-  // Fetch clustering-tagged algorithms only.
-  useEffect(() => {
-    const fetchModels = async () => {
-      setIsLoadingModels(true);
-      try {
-        const nodes = await registryApi.getAllNodes();
-        const models = nodes.filter(n => {
-          const isModeling = n.category === 'Model' || n.category === 'Modeling';
-          const isClustering = n.tags?.includes('clustering') ?? false;
-          return isModeling && isClustering;
-        });
-        setAvailableModels(models);
-      } catch (error) {
-        console.error('Failed to fetch clustering models:', error);
-        setAvailableModels([
-          { id: 'kmeans', name: 'K-Means', category: 'Modeling', description: '', params: {}, tags: ['clustering'] },
-        ]);
-      } finally {
-        setIsLoadingModels(false);
-      }
-    };
-    fetchModels();
-  }, []);
-
-  const keepCustomizationOpen = useRef(false);
-
-  // Fetch hyperparameter definitions and always seed defaults — Segmentation
-  // has no "Customize" toggle, so params must be ready to show/edit as soon
-  // as the model type is known.
-  useEffect(() => {
-    if (config.model_type) {
-      setIsLoadingDefs(true);
-      jobsApi.getHyperparameters(config.model_type)
-        .then((defs) => {
-          const definitions = defs as HyperparameterDef[];
-          setHyperparameters(definitions);
-
-          if (keepCustomizationOpen.current || Object.keys(config.hyperparameters).length === 0) {
-            const defaults: Record<string, unknown> = {};
-            definitions.forEach(p => {
-              defaults[p.name] = p.default;
-            });
-            onChange({ ...config, hyperparameters: defaults });
-            keepCustomizationOpen.current = false;
-          }
-        })
-        .catch(console.error)
-        .finally(() => { setIsLoadingDefs(false); });
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [config.model_type]);
-
-  const handleTrain = async () => {
-    if (!nodeId || useJobStore.getState().nodeSubmissions[nodeId]?.pending) return;
-    if (!datasetId) {
-      toast.error('No dataset connected', 'Connect a dataset node upstream before starting training.');
-      return;
-    }
-    const update = (value: NodeSubmission) => useJobStore.getState().setNodeSubmission(nodeId, value);
-    const label = `Segmentation — ${config.model_type.replace(/_/g, ' ')}`;
-    useViewStore.getState().setLeakageNotice(null);
-    const graphSignature = graphSemanticSignature(nodes, edges);
-    update({ pending: true, run: null, message: `${label}: Submitting...` });
-    try {
-      const pipelineConfig = convertGraphToPipelineConfig(nodes, edges);
-      if (warnAndBlockOnLeakage(pipelineConfig)) {
-        update({ pending: false, run: null, message: `${label} blocked. Move data-learning preprocessing after the train/test split.` });
-        return;
-      }
-      const response = await jobsApi.runPipeline({
-        ...pipelineConfig,
-        target_node_id: nodeId,
-        job_type: 'training'
-      });
-      const jobCount = response.job_ids?.length || 1;
-      const run = { label, jobIds: response.job_ids?.length ? response.job_ids : [response.job_id] };
-      update({ pending: false, run, message: '' });
-      startPolling();
-      if (jobCount > 1) {
-        setActiveParallelRun({ jobIds: response.job_ids, startedAt: new Date().toISOString() });
-        toast.success('Parallel execution started', `${jobCount} branches submitted.`);
-      } else {
-        toast.success('Segmentation job submitted');
-      }
-      setTab('segmentation');
-      useJobStore.getState().setInspectedRun(null);
-      toggleJobDrawer(true);
-    } catch (error) {
-      console.error('Failed to submit segmentation job:', error);
-      const leakageMessage = getLeakageErrorMessage(error);
-      if (leakageMessage) useViewStore.getState().setLeakageNotice({ message: leakageMessage, graphSignature });
-      update({ pending: false, run: null, message: `${label}: Submission failed. ${leakageMessage ?? 'Check your connection and settings, then try again.'}` });
-      toast.error('Failed to submit segmentation job', leakageMessage ?? 'Check console for details.');
-    }
-  };
-
-  const ModelConfigSection = (
-    <div className="space-y-5 animate-in fade-in duration-300">
-      <div className="space-y-4">
-        <div className="space-y-1.5">
-          <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Model Configuration</span>
-          <div className="grid gap-3">
-            <ValidationField field="model_type">
-              <label htmlFor={`${fieldId}-model_type`} className="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Clustering Algorithm</label>
-              <div className="relative">
-                <select
-                  id={`${fieldId}-model_type`}
-                  value={config.model_type}
-                  onChange={(e) => {
-                    if (Object.keys(config.hyperparameters).length > 0) {
-                      keepCustomizationOpen.current = true;
-                    }
-                    onChange({ ...config, model_type: e.target.value, hyperparameters: {} });
-                  }}
-                  className="w-full appearance-none border border-gray-300 dark:border-gray-600 rounded-lg p-2.5 text-sm bg-white dark:bg-gray-800 dark:text-gray-100 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none transition-all"
-                  disabled={isLoadingModels}
-                >
-                  {availableModels.map(model => (
-                    <option key={model.id} value={model.id}>{model.name}</option>
-                  ))}
-                </select>
-                <ChevronDown className="absolute right-3 top-3 w-4 h-4 text-gray-400 pointer-events-none" />
-              </div>
-
-              {requiresScaling && (
-                <div className="mt-2 text-xs border border-blue-200 dark:border-blue-800 rounded-md bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 overflow-hidden transition-all">
-                  <button
-                    aria-expanded={showScalingAlert}
-                    onClick={() => setShowScalingAlert(!showScalingAlert)}
-                    className="w-full flex items-center justify-between p-2 hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors"
-                  >
-                    <div className="flex items-center gap-2 font-semibold">
-                      <AlertCircle className="w-3 h-3" />
-                      <span>Scale Your Data</span>
-                    </div>
-                    <ChevronDown className={`w-3 h-3 transition-transform ${showScalingAlert ? 'rotate-180' : ''}`} />
-                  </button>
-                  {showScalingAlert && (
-                    <div className="p-2 pt-0 opacity-90 animate-in slide-in-from-top-1 pl-7">
-                      This model performs best with scaled features. Consider adding a &quot;Feature Scaling&quot; node.
-                    </div>
-                  )}
-                </div>
-              )}
-            </ValidationField>
-
-            <div>
-              <div className="flex items-center gap-1.5 mb-1">
-                <label htmlFor={`${fieldId}-reference_column`} className="block text-xs font-medium text-gray-700 dark:text-gray-300">Reference Column (optional)</label>
-                <HelpTooltip text="A column with a known real-world label (e.g. a species/customer-type name) that you want excluded from clustering, but kept around afterward to see which cluster corresponds to which group — e.g. 'Cluster 0 is 92% setosa'. The model never sees this column." />
-              </div>
-              <div className="relative">
-                <select
-                  id={`${fieldId}-reference_column`}
-                  value={config.reference_column ?? ''}
-                  onChange={(e) => onChange({ ...config, reference_column: e.target.value || undefined })}
-                  className="w-full appearance-none border border-gray-300 dark:border-gray-600 rounded-lg p-2.5 text-sm bg-white dark:bg-gray-800 dark:text-gray-100 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none transition-all"
-                  disabled={availableColumns.length === 0}
-                >
-                  <option value="">None</option>
-                  {availableColumns.map((col) => (
-                    <option key={col.name} value={col.name}>{col.name}</option>
-                  ))}
-                </select>
-                <ChevronDown className="absolute right-3 top-3 w-4 h-4 text-gray-400 pointer-events-none" />
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-
-  const HyperparametersSection = (
-    <div className="space-y-4 animate-in fade-in duration-300">
-      <div className="flex items-center justify-between">
-        <h4 className="text-sm font-medium text-gray-900 dark:text-gray-100 flex items-center gap-2">
-          <Settings2 className="w-4 h-4 text-blue-500" />
-          Hyperparameters
-        </h4>
-      </div>
-
-      <div className="space-y-3">
-        {isLoadingDefs ? (
-          <div className="flex justify-center py-4">
-            <Loader2 className="w-5 h-5 animate-spin text-blue-500" />
-          </div>
-        ) : (
-          hyperparameters.map((param) => (
-            <div key={param.name} className="bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-lg p-3">
-              <div className="flex justify-between items-center mb-2">
-                <label htmlFor={`${fieldId}-param-${param.name}`} className="block text-xs font-medium text-gray-700 dark:text-gray-300">
-                  {param.label}
-                </label>
-                {param.description && <HelpTooltip text={param.description} />}
-              </div>
-              {param.type === 'select' ? (
-                <select
-                  id={`${fieldId}-param-${param.name}`}
-                  value={(config.hyperparameters[param.name] ?? param.default) as string | number | readonly string[] | undefined}
-                  onChange={(e) => onChange({
-                    ...config,
-                    hyperparameters: { ...config.hyperparameters, [param.name]: e.target.value }
-                  })}
-                  className="w-full border border-gray-300 dark:border-gray-600 rounded-lg p-2 text-sm bg-white dark:bg-gray-800 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
-                >
-                  {param.options?.map((opt: { label: string; value: unknown }) => (
-                    <option key={String(opt.value)} value={String(opt.value)}>{opt.label}</option>
-                  ))}
-                </select>
-              ) : (
-                <HyperparameterInput
-                  id={`${fieldId}-param-${param.name}`}
-                  type={param.type}
-                  value={config.hyperparameters[param.name] ?? param.default}
-                  onChange={(val) => onChange({
-                    ...config,
-                    hyperparameters: { ...config.hyperparameters, [param.name]: val }
-                  })}
-                  step={param.step}
-                  min={param.min}
-                  max={param.max}
-                />
-              )}
-            </div>
-          ))
-        )}
-        {hyperparameters.length === 0 && !isLoadingDefs && (
-          <p className="text-sm text-gray-500 dark:text-gray-400 italic text-center py-4">
-            No parameters available.
-          </p>
-        )}
-      </div>
-    </div>
-  );
+  const ModelConfigSection = <SegmentationModelSection
+    config={config} onChange={onChange} fieldId={fieldId} availableColumns={availableColumns}
+    availableModels={models.availableModels} isLoadingModels={models.isLoadingModels}
+    requiresScaling={models.requiresScaling} changeModel={models.changeModel}
+    showScalingAlert={showScalingAlert} setShowScalingAlert={setShowScalingAlert}
+  />;
+  const HyperparametersSection = <SegmentationParametersSection
+    config={config} onChange={onChange} fieldId={fieldId}
+    hyperparameters={models.hyperparameters} isLoadingDefs={models.isLoadingDefs}
+  />;
 
   return (
     <div className="flex flex-col h-full" ref={containerRef}>
@@ -417,26 +130,10 @@ export const SegmentationSettings: React.FC<{
         )}
       </div>
 
-      <TrainingActionFooter details={
-        <p id={runHelpId} className="text-xs text-center text-muted-foreground">
-          {!datasetId ? 'Connect a dataset node upstream and select a dataset to enable this action.'
-            : !config.model_type ? 'Choose a clustering algorithm to enable this action.'
-            : `Trains ${selectedModelItem?.name || config.model_type.replace(/_/g, ' ')} in the background without a target column.`}
-        </p>
-      }>
-        <button
-          type="button"
-          onClick={() => { void handleTrain(); }}
-          disabled={!datasetId || !config.model_type || isSubmitting}
-          aria-describedby={runHelpId}
-          className="w-full max-w-xs flex items-center justify-center gap-2 px-6 py-2.5 action-primary rounded-lg shadow-lg transition-all hover:shadow-xl hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-lg disabled:hover:translate-y-0 focus-ring"
-        >
-          {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4 fill-current" />}
-          <span className="text-sm font-semibold">{isSubmitting ? 'Submitting job...' : 'Train segmentation'}</span>
-        </button>
-        {submissionMessage && <p role="status" aria-atomic="true" className="text-xs text-center text-muted-foreground break-words">{submissionMessage}</p>}
-        {runFeedback && <RunFeedback run={runFeedback} task="segmentation" />}
-      </TrainingActionFooter>
+      <SegmentationActionFooter
+        runHelpId={runHelpId} datasetId={datasetId} config={config}
+        selectedModelItem={models.selectedModelItem} {...submission}
+      />
     </div>
   );
 };

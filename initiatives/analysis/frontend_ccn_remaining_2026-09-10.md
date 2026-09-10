@@ -1,21 +1,21 @@
 # Remaining frontend CCN violations
 
-**Measured:** 2026-09-10. **Base:** `534d1e94` on branch `0819` plus batch 6 changes.
+**Measured:** 2026-09-10. **Base:** `4a6db08e` on branch `0819` plus batch 7 changes.
 **Scope:** all TypeScript/TSX under `frontend/ml-canvas/src`, using the
 repository ESLint configuration. **Target:** CCN <= 10 per function.
-Source locations refer to the batch 6 working tree measured after its refactors.
+Source locations refer to the batch 7 working tree measured after its refactors.
 
-- **77 files** contain functions above the target.
-- **105 functions** exceed CCN 10.
+- **73 files** contain functions above the target.
+- **98 functions** exceed CCN 10.
 - **Highest CCN: 32.**
 - The source-wide strict gate currently fails on these violations.
 
 The accepted frontend limit is 10 for the strict check and subsequent
-refactors. The informational report stays at 8: it lists 167 functions in
-109 files, including 62 functions at CCN 9 or 10 that pass the strict gate.
-Those 62 remain optional improvement candidates and are omitted from the
-required backlog below. Batch 6 reduced strict violations from 112 in 80
-files to 105 in 77 files; informational violations fell from 172 to 167.
+refactors. The informational report stays at 8: it lists 166 functions in
+111 files, including 68 functions at CCN 9 or 10 that pass the strict gate.
+Those 68 remain optional improvement candidates and are omitted from the
+required backlog below. Batch 7 reduced strict violations from 105 in 77
+files to 98 in 73 files; informational violations changed from 167 to 166.
 
 This is a measured snapshot, not a list of confirmed bugs or a prescribed
 refactor order. Prefer cohesive simplification and relevant behavior checks;
@@ -45,10 +45,7 @@ The maximum is the largest function CCN in that file, not a file-wide sum.
 |---|---:|---:|---|
 | [src/components/eda/VariableCard.tsx](../../frontend/ml-canvas/src/components/eda/VariableCard.tsx) | 32 | 1 | L15:58 = **32** |
 | [src/core/store/useGraphStore.ts](../../frontend/ml-canvas/src/core/store/useGraphStore.ts) | 32 | 3 | L178:8 = **17**, L273:1 = **32**, L652:17 = **12** |
-| [src/components/Layout.tsx](../../frontend/ml-canvas/src/components/Layout.tsx) | 29 | 1 | L10:33 = **29** |
-| [src/components/panels/JobsDrawer.tsx](../../frontend/ml-canvas/src/components/panels/JobsDrawer.tsx) | 28 | 2 | L38:37 = **28**, L153:39 = **13** |
 | [src/core/utils/operationalContext.ts](../../frontend/ml-canvas/src/core/utils/operationalContext.ts) | 28 | 3 | L124:8 = **19**, L177:1 = **28**, L276:8 = **11** |
-| [src/modules/nodes/modeling/SegmentationSettings.tsx](../../frontend/ml-canvas/src/modules/nodes/modeling/SegmentationSettings.tsx) | 28 | 3 | L55:6 = **28**, L71:33 = **15**, L177:23 = **12** |
 | [src/core/utils/graphDiff.ts](../../frontend/ml-canvas/src/core/utils/graphDiff.ts) | 27 | 1 | L154:8 = **27** |
 | [src/modules/nodes/processing/ScalingNode.tsx](../../frontend/ml-canvas/src/modules/nodes/processing/ScalingNode.tsx) | 27 | 2 | L32:117 = **27**, L82:21 = **19** |
 | [src/components/canvas/ConnectionPort.tsx](../../frontend/ml-canvas/src/components/canvas/ConnectionPort.tsx) | 26 | 1 | L9:36 = **26** |
@@ -59,7 +56,6 @@ The maximum is the largest function CCN in that file, not a file-wide sum.
 | [src/components/pages/ExperimentsPage/components/SegmentationView.tsx](../../frontend/ml-canvas/src/components/pages/ExperimentsPage/components/SegmentationView.tsx) | 25 | 1 | L46:50 = **25** |
 | [src/pages/ModelRegistry.tsx](../../frontend/ml-canvas/src/pages/ModelRegistry.tsx) | 25 | 1 | L23:40 = **25** |
 | [src/pages/drift/DriftTable.tsx](../../frontend/ml-canvas/src/pages/drift/DriftTable.tsx) | 25 | 2 | L172:54 = **12**, L300:34 = **25** |
-| [src/components/panels/jobs/JobCard.tsx](../../frontend/ml-canvas/src/components/panels/jobs/JobCard.tsx) | 24 | 1 | L43:48 = **24** |
 | [src/modules/nodes/inspection/DataPreviewComponents.tsx](../../frontend/ml-canvas/src/modules/nodes/inspection/DataPreviewComponents.tsx) | 24 | 2 | L27:21 = **14**, L82:136 = **24** |
 | [src/pages/DataSources.tsx](../../frontend/ml-canvas/src/pages/DataSources.tsx) | 24 | 3 | L21:38 = **24**, L71:44 = **15**, L384:38 = **20** |
 | [src/pages/Jobs.tsx](../../frontend/ml-canvas/src/pages/Jobs.tsx) | 24 | 1 | L32:35 = **24** |
@@ -131,10 +127,7 @@ the surrounding component or callback assignment.
 |---:|---|---:|---|
 | 32 | [src/components/eda/VariableCard.tsx:15](../../frontend/ml-canvas/src/components/eda/VariableCard.tsx#L15) | 58 | Arrow function |
 | 32 | [src/core/store/useGraphStore.ts:273](../../frontend/ml-canvas/src/core/store/useGraphStore.ts#L273) | 1 | Function 'confirmConnection' |
-| 29 | [src/components/Layout.tsx:10](../../frontend/ml-canvas/src/components/Layout.tsx#L10) | 33 | Arrow function |
-| 28 | [src/components/panels/JobsDrawer.tsx:38](../../frontend/ml-canvas/src/components/panels/JobsDrawer.tsx#L38) | 37 | Arrow function |
 | 28 | [src/core/utils/operationalContext.ts:177](../../frontend/ml-canvas/src/core/utils/operationalContext.ts#L177) | 1 | Function 'parseRef' |
-| 28 | [src/modules/nodes/modeling/SegmentationSettings.tsx:55](../../frontend/ml-canvas/src/modules/nodes/modeling/SegmentationSettings.tsx#L55) | 6 | Arrow function |
 | 27 | [src/core/utils/graphDiff.ts:154](../../frontend/ml-canvas/src/core/utils/graphDiff.ts#L154) | 8 | Function 'diffGraphs' |
 | 27 | [src/modules/nodes/processing/ScalingNode.tsx:32](../../frontend/ml-canvas/src/modules/nodes/processing/ScalingNode.tsx#L32) | 117 | Arrow function |
 | 26 | [src/components/canvas/ConnectionPort.tsx:9](../../frontend/ml-canvas/src/components/canvas/ConnectionPort.tsx#L9) | 36 | Function 'ConnectionPort' |
@@ -145,7 +138,6 @@ the surrounding component or callback assignment.
 | 25 | [src/components/pages/ExperimentsPage/components/SegmentationView.tsx:46](../../frontend/ml-canvas/src/components/pages/ExperimentsPage/components/SegmentationView.tsx#L46) | 50 | Arrow function |
 | 25 | [src/pages/ModelRegistry.tsx:23](../../frontend/ml-canvas/src/pages/ModelRegistry.tsx#L23) | 40 | Arrow function |
 | 25 | [src/pages/drift/DriftTable.tsx:300](../../frontend/ml-canvas/src/pages/drift/DriftTable.tsx#L300) | 34 | Arrow function |
-| 24 | [src/components/panels/jobs/JobCard.tsx:43](../../frontend/ml-canvas/src/components/panels/jobs/JobCard.tsx#L43) | 48 | Arrow function |
 | 24 | [src/modules/nodes/inspection/DataPreviewComponents.tsx:82](../../frontend/ml-canvas/src/modules/nodes/inspection/DataPreviewComponents.tsx#L82) | 136 | Arrow function |
 | 24 | [src/pages/DataSources.tsx:21](../../frontend/ml-canvas/src/pages/DataSources.tsx#L21) | 38 | Arrow function |
 | 24 | [src/pages/Jobs.tsx:32](../../frontend/ml-canvas/src/pages/Jobs.tsx#L32) | 35 | Arrow function |
@@ -186,7 +178,6 @@ the surrounding component or callback assignment.
 | 15 | [src/components/eda/JobsHistoryModal.tsx:39](../../frontend/ml-canvas/src/components/eda/JobsHistoryModal.tsx#L39) | 66 | Arrow function |
 | 15 | [src/components/eda/JobsHistoryModal.tsx:147](../../frontend/ml-canvas/src/components/eda/JobsHistoryModal.tsx#L147) | 30 | Arrow function |
 | 15 | [src/components/pages/ExperimentsPage/hooks/useEvaluationFetch.ts:56](../../frontend/ml-canvas/src/components/pages/ExperimentsPage/hooks/useEvaluationFetch.ts#L56) | 43 | Async arrow function |
-| 15 | [src/modules/nodes/modeling/SegmentationSettings.tsx:71](../../frontend/ml-canvas/src/modules/nodes/modeling/SegmentationSettings.tsx#L71) | 33 | Arrow function |
 | 15 | [src/modules/nodes/processing/OutlierNode.tsx:222](../../frontend/ml-canvas/src/modules/nodes/processing/OutlierNode.tsx#L222) | 33 | Arrow function |
 | 15 | [src/pages/DataSources.tsx:71](../../frontend/ml-canvas/src/pages/DataSources.tsx#L71) | 44 | Arrow function |
 | 14 | [src/components/pages/DeploymentsPage.tsx:61](../../frontend/ml-canvas/src/components/pages/DeploymentsPage.tsx#L61) | 42 | Arrow function |
@@ -202,7 +193,6 @@ the surrounding component or callback assignment.
 | 13 | [src/components/pages/ExperimentsPage/components/PerClassConfusionMatrix.tsx:157](../../frontend/ml-canvas/src/components/pages/ExperimentsPage/components/PerClassConfusionMatrix.tsx#L157) | 58 | Arrow function |
 | 13 | [src/components/pages/ExperimentsPage/utils/classificationCharts.ts:220](../../frontend/ml-canvas/src/components/pages/ExperimentsPage/utils/classificationCharts.ts#L220) | 1 | Function 'binaryMetricValue' |
 | 13 | [src/components/pages/experiments/pipelineDiffLayout.ts:42](../../frontend/ml-canvas/src/components/pages/experiments/pipelineDiffLayout.ts#L42) | 45 | Arrow function |
-| 13 | [src/components/panels/JobsDrawer.tsx:153](../../frontend/ml-canvas/src/components/panels/JobsDrawer.tsx#L153) | 39 | Arrow function |
 | 13 | [src/core/hooks/useTuningTrials.ts:253](../../frontend/ml-canvas/src/core/hooks/useTuningTrials.ts#L253) | 51 | Arrow function |
 | 13 | [src/core/utils/pipelineCycleValidation.ts:25](../../frontend/ml-canvas/src/core/utils/pipelineCycleValidation.ts#L25) | 8 | Function 'findCycleIssues' |
 | 13 | [src/modules/nodes/processing/MissingIndicatorNode.tsx:17](../../frontend/ml-canvas/src/modules/nodes/processing/MissingIndicatorNode.tsx#L17) | 144 | Arrow function |
@@ -216,7 +206,6 @@ the surrounding component or callback assignment.
 | 12 | [src/core/store/useGraphStore.ts:652](../../frontend/ml-canvas/src/core/store/useGraphStore.ts#L652) | 17 | Method 'equality' |
 | 12 | [src/core/utils/canvasExport.ts:49](../../frontend/ml-canvas/src/core/utils/canvasExport.ts#L49) | 1 | Function 'computeFitTransform' |
 | 12 | [src/core/utils/format.ts:43](../../frontend/ml-canvas/src/core/utils/format.ts#L43) | 8 | Function 'getMetricDescription' |
-| 12 | [src/modules/nodes/modeling/SegmentationSettings.tsx:177](../../frontend/ml-canvas/src/modules/nodes/modeling/SegmentationSettings.tsx#L177) | 23 | Async arrow function |
 | 12 | [src/modules/nodes/processing/DeduplicationNode.tsx:17](../../frontend/ml-canvas/src/modules/nodes/processing/DeduplicationNode.tsx#L17) | 135 | Arrow function |
 | 12 | [src/modules/nodes/processing/DropRowsNode.tsx:16](../../frontend/ml-canvas/src/modules/nodes/processing/DropRowsNode.tsx#L16) | 120 | Arrow function |
 | 12 | [src/modules/nodes/processing/TimeSeriesNode.tsx:284](../../frontend/ml-canvas/src/modules/nodes/processing/TimeSeriesNode.tsx#L284) | 1 | Function 'validateTimeSeries' |
