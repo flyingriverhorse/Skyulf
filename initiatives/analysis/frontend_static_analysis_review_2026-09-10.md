@@ -179,3 +179,92 @@ its message. A read-only npm audit completed and returned 14 vulnerable package
 entries (2 critical, 3 high, 8 moderate, 1 low); this is a separate tool/result,
 not confirmation of Codacy's one finding. No dependency was changed based on an
 assumed match. The exact Codacy advisory is requested for a scoped follow-up.
+
+## Dependency audit continuation
+
+**Baseline:** `988b5a43` on branch `0820`, 2026-09-10. A fresh registry-backed
+`npm audit` reproduces **14 vulnerable package entries: 2 critical, 3 high,
+8 moderate and 1 low**. These include transitive and parent-package entries,
+not fourteen distinct application vulnerabilities. The Codacy lockfile advisory
+has not been supplied, so this remains an independently verified npm audit.
+
+The compatible update changes **27 existing lock entries**, without adding or
+removing packages. Vitest, its UI and coverage provider resolve together at
+4.1.11; the coverage provider retains its exact version pin. Other updates
+use existing parent dependency ranges, including query-string's updated range
+for its decoder. The main affected versions are:
+
+| Package or family | Before | After |
+|---|---|---|
+| Vitest, UI, coverage and internal packages | 4.1.9 | 4.1.11 |
+| Browserslist / baseline-browser-mapping | 4.28.1 / 2.10.37 | 4.28.9 / 2.11.21 |
+| query-string / decode-uri-component | 9.3.1 / 0.4.1 | 9.5.1 / 0.5.0 |
+| fflate | 0.8.2 | 0.8.3 |
+| js-yaml | 4.3.1 | 4.3.2 |
+| nanoid (OC-214) | 3.3.17 | 3.3.18 |
+| postcss-selector-parser (OC-215) | 6.1.2 | 6.1.4 |
+
+Both the final lockfile audit and the post-install npm audit report **2 critical,
+0 high, 0 moderate and 0 low** entries. Audit still exits 1 because the critical
+dependency finding below remains open. Independent review verified all **52**
+dependency/peer constraints referencing the updated packages and found no
+blocking or important issue.
+
+The two critical entries are one advisory reported for `maplibre-gl` and its
+parent `plotly.js`. The installed Plotly 3.3.1 requires MapLibre `^4.7.1`, while
+the advisory lists 6.4.1 as patched. Registry inspection of current Plotly 4.1.0
+still finds a `^5.24.0` requirement, so a latest-Plotly upgrade alone does not
+resolve the advisory. No forced MapLibre major override or Plotly downgrade
+is included in the compatible update scope.
+
+`src/core/plotly.ts` uses `plotly.js-gl3d-dist-min` through
+`react-plotly.js/factory`; the full Plotly package is installed to satisfy the
+wrapper's peer dependency. The reported sanitizer handles map attribution
+HTML, and no direct MapLibre import was found in application source. A temporary
+read-only build plugin recorded module metadata across **69 emitted chunks**:
+zero MapLibre modules and two full-Plotly module records, both with zero rendered
+bytes. Production artifacts are byte-identical to HEAD, including
+`index-BVvggaqQ.js` and `vendor-plotly-EQ6XkBLq.js`. These observations do not
+establish a reachable application exploit; the installed critical dependency
+finding remains open. Its follow-up needs an upstream compatible fix or a
+separately reviewed change to the unused full-Plotly peer dependency.
+
+Sources: [Vitest advisory](https://github.com/advisories/GHSA-82fw-gwwq-j7x9),
+[MapLibre advisory](https://github.com/advisories/GHSA-jrc7-96c5-q579),
+[nanoid advisory](https://github.com/advisories/GHSA-2v37-7h3g-55p8), and
+[selector-parser patch](https://github.com/postcss/postcss-selector-parser/releases/tag/6.1.3).
+
+Fresh verification:
+
+- Baseline and final full Vitest: **2,429 tests / 188 files passed**. The final
+  run used V8 coverage: statements 78.99%, branches 74.42%, functions 78.59%,
+  lines 79.96%; the HTML and LCOV reporters completed.
+- Normal ESLint, source-wide CCN 10, TypeScript/production build and all
+  **11** unchanged bundle budgets passed.
+- A clean `npm ci --ignore-scripts --no-audit --no-fund` installation in a
+  separate temporary directory passed with the same manifest and lockfile hash.
+  The main installed tree also resolves the updated versions successfully.
+- **17 Chromium tests passed** across `ccn10-inspection-data-analysis.spec.ts`,
+  `experiment-results-ccn.spec.ts`, `comparison-error-log.spec.ts` and
+  `layout-jobs-segmentation.spec.ts`, using a fresh Vite server on port 5187.
+  HTTP is mocked; data preview, chart interactions, filtering, keyboard
+  navigation and segmentation submission use the real frontend.
+- A production-preview run additionally passed 15 of those scenarios. The
+  remaining two require `window.__skyulfTest`, deliberately removed from
+  production, and passed in the final development-server run. The temporary
+  preview configuration initially needed an explicit frontend working directory.
+
+The first sandboxed Vitest attempt could not load the esbuild config because
+an ancestor directory was unreadable; rerunning with the required filesystem
+access passed. In-place `npm ci` was blocked by the user's running Vite server
+locking esbuild.exe. `npm install --ignore-scripts` completed the main tree,
+with cleanup warnings for locked old native files; the separate clean install
+verified reproducibility without stopping that server. Expected error-path
+and jsdom logging occurred in the passing unit run.
+
+OC-214 and OC-215 are closed in the audit archive; the live queue now contains
+**61 open / 4 parked** findings. The other audit priorities are unchanged.
+Release notes are under v0.8.19. Local evidence is under ignored
+`tmp_repro_artifacts/frontend-deps-*` and `frontend-npm-audit-2026-09-10-*`;
+none is intended for version control. Codacy must rescan before its own
+lockfile finding can be confirmed closed or matched to the remaining advisory.

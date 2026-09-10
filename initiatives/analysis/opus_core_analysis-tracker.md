@@ -275,6 +275,8 @@ uses, so a fixed finding stays where it was filed.
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
+| OC-214 | 🟠 | Frontend PostCSS retains vulnerable `nanoid@3.3.17` (CVE-2026-67213) | small | ✅ fixed 2026-09-10 — lockfile and installed tree use compatible 3.3.18; npm audit no longer reports the package, and frontend coverage/tests, lint, CCN and build pass. |
+| OC-215 | 🟡 | Frontend Tailwind/PostCSS retains vulnerable `postcss-selector-parser@6.1.2` (CVE-2026-9358) | small | ✅ fixed 2026-09-10 — both parent paths resolve to compatible 6.1.4; npm audit no longer reports the package, and frontend coverage/tests, lint, CCN and build pass. |
 | OC-222 | ⚪ | Audit Log's loaded-page filter hint contradicts its server-side actor/kind/time filtering | small | ✅ fixed 2026-09-10 — the hint now explains full-history filtering before the page limit; API behavior is unchanged. |
 | OC-221 | 🟡 | Error Log applies an older search response after a newer response, displaying rows that disagree with the current search | small | ✅ fixed 2026-09-10 — request generations guard HTTP/pipeline results, errors and loading; refresh and effect cleanup invalidate obsolete work. |
 | OC-220 | 🟡 | Resampling Target Column native suggestions open away from the input in the user's browser | small | ✅ fixed 2026-09-09 — use an anchored editable listbox; docked/expanded browser geometry and keyboard selection are covered. |
@@ -355,6 +357,42 @@ respective fix logs; OC-167 closed with canonical artifact framing on 2026-09-09
 ---
 
 ## Log
+
+### 2026-09-10 - OC-214/215 fixed: compatible frontend dependency updates
+
+Continued the [scanner report](frontend_static_analysis_review_2026-09-10.md#dependency-audit-continuation)
+from `988b5a43` on `0820`. Fresh npm audit reproduced **14 affected package
+entries**. Targeted compatible updates remove twelve entries; **2 critical
+entries remain**, representing the same MapLibre advisory and its Plotly parent.
+The exact Codacy lockfile advisory is still unavailable, so no Codacy closure
+or application exploitability is inferred from npm's result.
+
+OC-214 originally resolved `postcss@8.5.26 -> nanoid@3.3.17`; the parent range
+permits patched 3.3.18, now present in both the lockfile and installed tree.
+The original PostCSS call uses `nanoid/non-secure` with constant size 6, so
+the advisory's zero-size-generator condition was not established in that path.
+OC-215 originally resolved selector-parser 6.1.2 under Tailwind 3.4.18 and
+postcss-nested 6.2.0. Both ranges now resolve to 6.1.4, which includes the
+6.1.3 security fix. Neither package appears in the final npm audit.
+
+The update also aligns Vitest/UI/coverage at 4.1.11 and refreshes vulnerable
+Browserslist, baseline mapping, query-string/decoder, fflate and js-yaml.
+Only **27 existing lock entries** change; no packages are added or removed.
+Independent review verified all **52** dependency/peer constraints referencing
+changed entries and found no blocking or important issue.
+
+Verification: baseline and final **2,429 tests / 188 files passed**; the final
+run also exercised V8 coverage. ESLint, source-wide CCN 10, TypeScript/build and
+all **11** bundle budgets pass. A separate clean `npm ci --ignore-scripts`
+installation preserves the same lockfile hash. Production artifacts are
+unchanged; generated module evidence shows zero MapLibre modules and zero
+rendered bytes from the full Plotly package. The installed critical dependency
+remains open because patched MapLibre 6.4.1 exceeds Plotly's declared range.
+See the scanner report for browser results and environment limitations.
+
+OC-214/215 move from the live queue to the archive: **61 open / 4 parked**.
+The remaining MapLibre item stays in the scanner follow-up; other audit IDs
+and parked/deferred priorities are unchanged. Release notes: v0.8.19.
 
 ### 2026-09-10 - Codacy follow-up: remove temporary verification files
 
