@@ -145,64 +145,13 @@ export const JobsHistoryModal: React.FC<JobsHistoryModalProps> = ({ isOpen, onCl
             ) : (
               <div className="space-y-3">
                 {history.map((job) => (
-                  <div
+                  <HistoryRow
                     key={job.id}
-                    {...clickableProps(() => handleJobClick(job))}
-                    className="flex items-center justify-between p-4 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-blue-500 dark:hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 cursor-pointer transition-all group"
-                  >
-                    <div className="flex items-center gap-4">
-                      <div className={`p-2 rounded-full ${
-                        job.status === 'COMPLETED' ? 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400' :
-                        job.status === 'FAILED' ? 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400' :
-                        job.status === 'CANCELLED' ? 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400' :
-                        'bg-yellow-100 text-yellow-600 dark:bg-yellow-900/30 dark:text-yellow-400'
-                      }`}>
-                        {job.status === 'COMPLETED' ? <CheckCircle className="w-5 h-5" /> :
-                         job.status === 'FAILED' ? <AlertCircle className="w-5 h-5" /> :
-                         job.status === 'CANCELLED' ? <Ban className="w-5 h-5" /> :
-                         <Loader2 className="w-5 h-5 animate-spin" />}
-                      </div>
-                      <div>
-                        <div className="font-medium text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 flex items-center gap-2">
-                          Analysis #{job.id}
-                          <StatusBadge status={job.status ?? 'unknown'} />
-                        </div>
-                        <div className="text-sm text-gray-500 dark:text-gray-400">
-                          {job.created_at ? new Date(job.created_at).toLocaleString() : '—'}
-                        </div>
-                        {job.target_col && (
-                            <div className="text-xs text-gray-400 mt-1 flex items-center gap-1">
-                                <Play className="w-3 h-3" /> Target: {job.target_col}
-                                {job.task_type && (
-                                    <span className="ml-1 px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 rounded text-[10px]">
-                                        {job.task_type}
-                                    </span>
-                                )}
-                            </div>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="text-right flex items-center gap-4">
-                      {/* Cancel Button for Pending/Running Jobs */}
-                      {(job.status === 'PENDING' || job.status === 'STARTED' || job.status === 'RUNNING') && (
-                        <button
-                            onClick={(e) => handleCancel(e, job.id)}
-                            disabled={cancelling === job.id}
-                            className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-full transition-colors"
-                            title="Cancel Analysis"
-                        >
-                            {cancelling === job.id ? (
-                                <Loader2 className="w-4 h-4 animate-spin" />
-                            ) : (
-                                <Ban className="w-4 h-4" />
-                            )}
-                        </button>
-                      )}
-
-                      {/* Note: excluded_columns is not available in history list summary */}
-                    </div>
-                  </div>
+                    job={job}
+                    handleJobClick={handleJobClick}
+                    cancelling={cancelling}
+                    handleCancel={handleCancel}
+                  />
                 ))}
               </div>
             )
@@ -212,100 +161,205 @@ export const JobsHistoryModal: React.FC<JobsHistoryModalProps> = ({ isOpen, onCl
                 <p>Loading analysis details...</p>
             </div>
           ) : (
-            <div className="space-y-8">
-                {/* Overview Stats */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="bg-gray-50 dark:bg-gray-900/50 p-4 rounded-lg border border-gray-200 dark:border-gray-700">
-                        <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400 mb-1">
-                            <Database className="w-4 h-4" />
-                            <span className="text-xs uppercase font-medium">Rows</span>
-                        </div>
-                        <div className="text-2xl font-bold text-gray-900 dark:text-white">
-                            {selectedJob.profile_data?.row_count?.toLocaleString() || '-'}
-                        </div>
-                    </div>
-                    <div className="bg-gray-50 dark:bg-gray-900/50 p-4 rounded-lg border border-gray-200 dark:border-gray-700">
-                        <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400 mb-1">
-                            <Columns className="w-4 h-4" />
-                            <span className="text-xs uppercase font-medium">Columns</span>
-                        </div>
-                        <div className="text-2xl font-bold text-gray-900 dark:text-white">
-                            {selectedJob.profile_data?.column_count?.toLocaleString() || '-'}
-                        </div>
-                    </div>
-                    <div className="bg-gray-50 dark:bg-gray-900/50 p-4 rounded-lg border border-gray-200 dark:border-gray-700">
-                        <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400 mb-1">
-                            <FileText className="w-4 h-4" />
-                            <span className="text-xs uppercase font-medium">Missing Cells</span>
-                        </div>
-                        <div className="text-2xl font-bold text-gray-900 dark:text-white">
-                            {selectedJob.profile_data?.missing_cells_percentage?.toFixed(1)}%
-                        </div>
-                    </div>
-                </div>
-
-                {/* Excluded Columns */}
-                {selectedJob.profile_data?.excluded_columns && selectedJob.profile_data.excluded_columns.length > 0 && (
-                    <div>
-                        <h3 className="text-sm font-medium text-gray-900 dark:text-white mb-3 flex items-center gap-2">
-                            <EyeOff className="w-4 h-4 text-gray-500" />
-                            Excluded Columns ({selectedJob.profile_data.excluded_columns.length})
-                        </h3>
-                        <div className="flex flex-wrap gap-2">
-                            {selectedJob.profile_data.excluded_columns.map((col: string) => (
-                                <span key={col} className="px-2 py-1 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded text-sm line-through">
-                                    {col}
-                                </span>
-                            ))}
-                        </div>
-                    </div>
-                )}
-
-                {/* Variables List */}
-                <div>
-                    <h3 className="text-sm font-medium text-gray-900 dark:text-white mb-3">Variables Overview</h3>
-                    <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
-                        <table className="w-full text-sm text-left">
-                            <thead className="bg-gray-50 dark:bg-gray-900/50 text-gray-500 dark:text-gray-400">
-                                <tr>
-                                    <th className="px-4 py-3 font-medium">Name</th>
-                                    <th className="px-4 py-3 font-medium">Type</th>
-                                    <th className="px-4 py-3 font-medium">Missing</th>
-                                    <th className="px-4 py-3 font-medium">Distinct</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                                {selectedJob.profile_data?.columns && (Object.values(selectedJob.profile_data.columns) as ColumnProfile[]).map((v) => {
-                                    const DtypeIcon = getDtypeIcon(v.dtype);
-                                    return (
-                                    <tr key={v.name} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
-                                        <td className="px-4 py-3 font-medium text-gray-900 dark:text-white">{v.name}</td>
-                                        <td className="px-4 py-3">
-                                            <div className="flex items-center gap-2">
-                                                <DtypeIcon className={`w-4 h-4 ${getDtypeIconColorClass(v.dtype)}`} />
-                                                <span>{v.dtype}</span>
-                                            </div>
-                                        </td>
-                                        <td className="px-4 py-3">
-                                            {v.missing_percentage > 0 ? (
-                                                <span className="text-amber-600">{v.missing_percentage.toFixed(1)}%</span>
-                                            ) : (
-                                                <span className="text-green-600">0%</span>
-                                            )}
-                                        </td>
-                                        <td className="px-4 py-3 text-gray-500 dark:text-gray-400">
-                                            {v.categorical_stats?.unique_count || '-'}
-                                        </td>
-                                    </tr>
-                                    );
-                                })}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
+            <HistoryReportDetails selectedJob={selectedJob} />
           )}
       </div>
     </ModalShell>
   );
 };
+
+/** Keeps report selection and cancellation as separate row actions. */
+function HistoryRow({
+  job,
+  handleJobClick,
+  cancelling,
+  handleCancel,
+}: {
+  job: EdaHistoryJob;
+  handleJobClick: (job: EdaHistoryJob) => Promise<void>;
+  cancelling: number | null;
+  handleCancel: (event: React.MouseEvent, id: number) => Promise<void>;
+}) {
+  return (
+    <div
+      {...clickableProps(() => handleJobClick(job))}
+      className="flex items-center justify-between p-4 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-blue-500 dark:hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 cursor-pointer transition-all group"
+    >
+      <div className="flex items-center gap-4">
+        <HistoryStatusIcon status={job.status} />
+        <div>
+          <div className="font-medium text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 flex items-center gap-2">
+            Analysis #{job.id}
+            <StatusBadge status={job.status ?? 'unknown'} />
+          </div>
+          <div className="text-sm text-gray-500 dark:text-gray-400">
+            {job.created_at ? new Date(job.created_at).toLocaleString() : '—'}
+          </div>
+          {job.target_col && (
+              <div className="text-xs text-gray-400 mt-1 flex items-center gap-1">
+                  <Play className="w-3 h-3" /> Target: {job.target_col}
+                  {job.task_type && (
+                      <span className="ml-1 px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 rounded text-[10px]">
+                          {job.task_type}
+                      </span>
+                  )}
+              </div>
+          )}
+        </div>
+      </div>
+
+      <div className="text-right flex items-center gap-4">
+        {/* Cancel Button for Pending/Running Jobs */}
+        {(job.status === 'PENDING' || job.status === 'STARTED' || job.status === 'RUNNING') && (
+          <button
+              onClick={(e) => handleCancel(e, job.id)}
+              disabled={cancelling === job.id}
+              className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-full transition-colors"
+              title="Cancel Analysis"
+          >
+              {cancelling === job.id ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                  <Ban className="w-4 h-4" />
+              )}
+          </button>
+        )}
+
+        {/* Note: excluded_columns is not available in history list summary */}
+      </div>
+    </div>
+  );
+}
+
+/** Matches each analysis status to its history icon and color. */
+function HistoryStatusIcon({
+  status,
+}: {
+  status: string | undefined;
+}) {
+  return (
+    <div className={`p-2 rounded-full ${
+      status === 'COMPLETED' ? 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400' :
+      status === 'FAILED' ? 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400' :
+      status === 'CANCELLED' ? 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400' :
+      'bg-yellow-100 text-yellow-600 dark:bg-yellow-900/30 dark:text-yellow-400'
+    }`}>
+      {status === 'COMPLETED' ? <CheckCircle className="w-5 h-5" /> :
+       status === 'FAILED' ? <AlertCircle className="w-5 h-5" /> :
+       status === 'CANCELLED' ? <Ban className="w-5 h-5" /> :
+       <Loader2 className="w-5 h-5 animate-spin" />}
+    </div>
+  );
+}
+
+/** Presents the selected report statistics, exclusions and variable profiles. */
+function HistoryReportDetails({
+  selectedJob,
+}: {
+  selectedJob: EdaHistoryJob;
+}) {
+  return (
+    <div className="space-y-8">
+        <HistoryReportStats selectedJob={selectedJob} />
+
+        {/* Excluded Columns */}
+        {selectedJob.profile_data?.excluded_columns && selectedJob.profile_data.excluded_columns.length > 0 && (
+            <div>
+                <h3 className="text-sm font-medium text-gray-900 dark:text-white mb-3 flex items-center gap-2">
+                    <EyeOff className="w-4 h-4 text-gray-500" />
+                    Excluded Columns ({selectedJob.profile_data.excluded_columns.length})
+                </h3>
+                <div className="flex flex-wrap gap-2">
+                    {selectedJob.profile_data.excluded_columns.map((col: string) => (
+                        <span key={col} className="px-2 py-1 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded text-sm line-through">
+                            {col}
+                        </span>
+                    ))}
+                </div>
+            </div>
+        )}
+
+        {/* Variables List */}
+        <div>
+            <h3 className="text-sm font-medium text-gray-900 dark:text-white mb-3">Variables Overview</h3>
+            <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+                <table className="w-full text-sm text-left">
+                    <thead className="bg-gray-50 dark:bg-gray-900/50 text-gray-500 dark:text-gray-400">
+                        <tr>
+                            <th className="px-4 py-3 font-medium">Name</th>
+                            <th className="px-4 py-3 font-medium">Type</th>
+                            <th className="px-4 py-3 font-medium">Missing</th>
+                            <th className="px-4 py-3 font-medium">Distinct</th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                        {selectedJob.profile_data?.columns && (Object.values(selectedJob.profile_data.columns) as ColumnProfile[]).map((v) => {
+                            const DtypeIcon = getDtypeIcon(v.dtype);
+                            return (
+                            <tr key={v.name} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                                <td className="px-4 py-3 font-medium text-gray-900 dark:text-white">{v.name}</td>
+                                <td className="px-4 py-3">
+                                    <div className="flex items-center gap-2">
+                                        <DtypeIcon className={`w-4 h-4 ${getDtypeIconColorClass(v.dtype)}`} />
+                                        <span>{v.dtype}</span>
+                                    </div>
+                                </td>
+                                <td className="px-4 py-3">
+                                    {v.missing_percentage > 0 ? (
+                                        <span className="text-amber-600">{v.missing_percentage.toFixed(1)}%</span>
+                                    ) : (
+                                        <span className="text-green-600">0%</span>
+                                    )}
+                                </td>
+                                <td className="px-4 py-3 text-gray-500 dark:text-gray-400">
+                                    {v.categorical_stats?.unique_count || '-'}
+                                </td>
+                            </tr>
+                            );
+                        })}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+  );
+}
+
+/** Displays report totals with the existing missing-value formatting. */
+function HistoryReportStats({
+  selectedJob,
+}: {
+  selectedJob: EdaHistoryJob;
+}) {
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="bg-gray-50 dark:bg-gray-900/50 p-4 rounded-lg border border-gray-200 dark:border-gray-700">
+            <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400 mb-1">
+                <Database className="w-4 h-4" />
+                <span className="text-xs uppercase font-medium">Rows</span>
+            </div>
+            <div className="text-2xl font-bold text-gray-900 dark:text-white">
+                {selectedJob.profile_data?.row_count?.toLocaleString() || '-'}
+            </div>
+        </div>
+        <div className="bg-gray-50 dark:bg-gray-900/50 p-4 rounded-lg border border-gray-200 dark:border-gray-700">
+            <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400 mb-1">
+                <Columns className="w-4 h-4" />
+                <span className="text-xs uppercase font-medium">Columns</span>
+            </div>
+            <div className="text-2xl font-bold text-gray-900 dark:text-white">
+                {selectedJob.profile_data?.column_count?.toLocaleString() || '-'}
+            </div>
+        </div>
+        <div className="bg-gray-50 dark:bg-gray-900/50 p-4 rounded-lg border border-gray-200 dark:border-gray-700">
+            <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400 mb-1">
+                <FileText className="w-4 h-4" />
+                <span className="text-xs uppercase font-medium">Missing Cells</span>
+            </div>
+            <div className="text-2xl font-bold text-gray-900 dark:text-white">
+                {selectedJob.profile_data?.missing_cells_percentage?.toFixed(1)}%
+            </div>
+        </div>
+    </div>
+  );
+}

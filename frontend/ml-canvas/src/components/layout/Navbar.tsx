@@ -84,24 +84,7 @@ export const Navbar: React.FC = () => {
 
       <div className="flex items-center justify-self-end gap-1 md:gap-2">
         {showReadOnlyChip && (
-          <button
-            onClick={toggleReadOnly}
-            title={
-              readOnly
-                ? 'Read-only canvas (tablet view). Click to enable editing.'
-                : 'Editing enabled. Click to switch to read-only.'
-            }
-            aria-label={readOnly ? 'Read-only' : 'Editing'}
-            className={`flex shrink-0 items-center gap-1.5 px-1.5 md:px-2.5 py-1 rounded-md text-xs font-medium transition-colors border ${
-              readOnly
-                ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30 hover:bg-amber-500/20'
-                : 'bg-secondary/50 text-muted-foreground border-transparent hover:bg-secondary'
-            }`}
-            aria-pressed={readOnly}
-          >
-            {readOnly ? <Eye className="w-3.5 h-3.5" /> : <Pencil className="w-3.5 h-3.5" />}
-            <span className="hidden md:inline">{readOnly ? 'Read-only' : 'Editing'}</span>
-          </button>
+          <ReadOnlyToggle readOnly={readOnly} onToggle={toggleReadOnly} />
         )}
 
         <button
@@ -121,3 +104,27 @@ export const Navbar: React.FC = () => {
     </div>
   );
 };
+
+/** Present the canvas editing override without owning its viewport or store state. */
+function ReadOnlyToggle({ readOnly, onToggle }: { readOnly: boolean; onToggle: () => void }) {
+  return (
+    <button
+      onClick={onToggle}
+      title={
+        readOnly
+          ? 'Read-only canvas (tablet view). Click to enable editing.'
+          : 'Editing enabled. Click to switch to read-only.'
+      }
+      aria-label={readOnly ? 'Read-only' : 'Editing'}
+      className={`flex shrink-0 items-center gap-1.5 px-1.5 md:px-2.5 py-1 rounded-md text-xs font-medium transition-colors border ${
+        readOnly
+          ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30 hover:bg-amber-500/20'
+          : 'bg-secondary/50 text-muted-foreground border-transparent hover:bg-secondary'
+      }`}
+      aria-pressed={readOnly}
+    >
+      {readOnly ? <Eye className="w-3.5 h-3.5" /> : <Pencil className="w-3.5 h-3.5" />}
+      <span className="hidden md:inline">{readOnly ? 'Read-only' : 'Editing'}</span>
+    </button>
+  );
+}

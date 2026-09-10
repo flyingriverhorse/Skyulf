@@ -24,6 +24,17 @@ export const HyperparameterInput: React.FC<HyperparameterInputProps> = ({
         setLocalValue(value === null ? 'None' : value?.toString() ?? '');
     }, [value]);
 
+    const handleNumericBlur = (trimmed: string) => {
+        if (trimmed === '') return;
+        const num = Number(trimmed);
+        if (!Number.isNaN(num)) {
+            onChange(num);
+        } else {
+            // Revert if invalid
+            setLocalValue(value === null ? 'None' : value?.toString() ?? '');
+        }
+    };
+
     const handleBlur = () => {
         const trimmed = localValue.trim();
 
@@ -33,14 +44,7 @@ export const HyperparameterInput: React.FC<HyperparameterInputProps> = ({
         }
 
         if (type === 'number') {
-            if (trimmed === '') return;
-            const num = Number(trimmed);
-            if (!Number.isNaN(num)) {
-                onChange(num);
-            } else {
-                // Revert if invalid
-                setLocalValue(value === null ? 'None' : value?.toString() ?? '');
-            }
+            handleNumericBlur(trimmed);
         } else if (type === 'boolean') {
             if (trimmed.toLowerCase() === 'true') onChange(true);
             else if (trimmed.toLowerCase() === 'false') onChange(false);

@@ -61,6 +61,53 @@ export interface UseJobPollingResult {
   isPolling: boolean;
 }
 
+/** Summarize a fetch batch without retaining snapshots for jobs that failed to load. */
+function summarizeJobs(
+  ids: readonly string[],
+  results: (JobInfo | null)[],
+  failureCounts: Record<string, number>,
+) {
+  const jobs: Record<string, JobInfo> = {};
+  let anyFailed = false;
+  let anyGaveUp = false;
+  let allTerminal = true;
+  let allCompleted = true;
+  for (let i = 0; i < ids.length; i += 1) {
+    const result = results[i];
+    const id = ids[i]!;
+    if (!result) {
+      // Persistent failures eventually let stopOnTerminal settle the batch.
+      if ((failureCounts[id] ?? 0) >= MAX_CONSECUTIVE_FETCH_FAILURES) {
+        anyGaveUp = true;
+        allCompleted = false;
+        continue;
+      }
+      allTerminal = false;
+      allCompleted = false;
+      continue;
+    }
+    jobs[id] = result;
+    const status = result.status;
+    if (status === 'failed') anyFailed = true;
+    if (!isTerminalStatus(status)) {
+      allTerminal = false;
+      allCompleted = false;
+    } else if (status === 'failed' || status === 'cancelled') {
+      allCompleted = false;
+    }
+  }
+  return { jobs, anyFailed, anyGaveUp, allTerminal, allCompleted };
+}
+
+/** Failed jobs take precedence over exhausted requests and remaining active jobs. */
+function aggregateJobStatus(summary: ReturnType<typeof summarizeJobs>): UseJobPollingResult['aggregateStatus'] {
+  if (summary.anyFailed) return 'failed';
+  if (summary.anyGaveUp) return 'error';
+  if (summary.allCompleted && summary.allTerminal) return 'completed';
+  if (summary.allTerminal) return 'failed';
+  return 'running';
+}
+
 /**
  * Polls one-or-many backend jobs at a fixed cadence and exposes the
  * latest snapshots plus an aggregate status. Centralizes the
@@ -129,46 +176,11 @@ export function useJobPolling(
         );
         if (cancelled) return;
 
-        const next: Record<string, JobInfo> = {};
-        let anyFailed = false;
-        let anyGaveUp = false;
-        let allTerminal = true;
-        let allCompleted = true;
-        for (let i = 0; i < ids.length; i += 1) {
-          const result = results[i];
-          const id = ids[i]!;
-          if (!result) {
-            // A single persistently-failing job (e.g. deleted server-side)
-            // must not block `stopOnTerminal` forever — once it's failed
-            // MAX_CONSECUTIVE_FETCH_FAILURES times in a row, give up on it
-            // and let the aggregate settle instead of polling indefinitely.
-            if ((failureCountsRef.current[id] ?? 0) >= MAX_CONSECUTIVE_FETCH_FAILURES) {
-              anyGaveUp = true;
-              allCompleted = false;
-              continue;
-            }
-            allTerminal = false;
-            allCompleted = false;
-            continue;
-          }
-          next[id] = result;
-          const status = result.status;
-          if (status === 'failed') anyFailed = true;
-          if (!isTerminalStatus(status)) {
-            allTerminal = false;
-            allCompleted = false;
-          } else if (status === 'failed' || status === 'cancelled') {
-            allCompleted = false;
-          }
-        }
-        setJobs(next);
-        if (anyFailed) setAggregateStatus('failed');
-        else if (anyGaveUp) setAggregateStatus('error');
-        else if (allCompleted && allTerminal) setAggregateStatus('completed');
-        else if (allTerminal) setAggregateStatus('failed');
-        else setAggregateStatus('running');
+        const summary = summarizeJobs(ids, results, failureCountsRef.current);
+        setJobs(summary.jobs);
+        setAggregateStatus(aggregateJobStatus(summary));
 
-        if (stopOnTerminal && allTerminal && interval) {
+        if (stopOnTerminal && summary.allTerminal && interval) {
           clearInterval(interval);
           interval = null;
           setIsPolling(false);

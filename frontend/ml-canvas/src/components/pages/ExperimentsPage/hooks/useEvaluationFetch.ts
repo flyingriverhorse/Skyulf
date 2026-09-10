@@ -7,7 +7,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { apiClient } from '../../../../core/api/client';
-import { thresholdTuningApi, type ThresholdPreviewResult } from '../../../../core/api/thresholdTuning';
+import { thresholdTuningApi, type SavedThresholdInfo, type ThresholdPreviewResult } from '../../../../core/api/thresholdTuning';
 import type { JobInfo } from '../../../../core/api/jobs';
 import type { EvaluationData } from '../types';
 import { getJobScoringMetric, mapJobMetricToDropdown, type ThresholdMetric } from '../utils/jobMeta';
@@ -16,6 +16,23 @@ import { getJobScoringMetric, mapJobMetricToDropdown, type ThresholdMetric } fro
  * preview endpoint accepts — must stay in sync with the `<option>` list in
  * EvaluationView and `_SUPPORTED_METRICS` in threshold_tuning_service.py. */
 const TUNING_METRIC_OPTIONS = ['accuracy', 'f1', 'precision', 'recall', 'balanced_accuracy', 'roc_auc'];
+
+/** A saved set is usable only when every preview field is present and truthy. */
+function isCompleteThresholdSet(saved: SavedThresholdInfo): saved is SavedThresholdInfo & ThresholdPreviewResult {
+  return !!(saved.thresholds && saved.classes && saved.metric && saved.split_used);
+}
+
+/** Keep nonempty backend details and the established empty-detail fallback. */
+function evaluationErrorMessage(error: unknown): string {
+  return (error as { response?: { data?: { detail?: string } } }).response?.data?.detail
+    || 'Failed to fetch evaluation data';
+}
+
+/** Resolve the selected run's metric from the latest job list without making fetching reactive. */
+function thresholdMetricForJob(jobs: JobInfo[], jobId: string): ThresholdMetric {
+  const job = jobs.find(item => item.job_id === jobId);
+  return mapJobMetricToDropdown(job ? getJobScoringMetric(job) : undefined);
+}
 
 /**
  * Owns the evaluation data load for the active job plus the
@@ -67,8 +84,7 @@ export function useEvaluationFetch(jobs: JobInfo[]) {
     setEvalJobId(jobId);
     // Default the metric dropdown to this job's own scoring metric (not
     // always F1) — the user can still change it afterward for this job.
-    const job = jobsRef.current.find(j => j.job_id === jobId);
-    setSelectedThresholdMetric(mapJobMetricToDropdown(job ? getJobScoringMetric(job) : undefined));
+    setSelectedThresholdMetric(thresholdMetricForJob(jobsRef.current, jobId));
     // Reset threshold-tuning UI state — a preview/tuned-thresholds state
     // from a previously viewed job must not leak onto the newly selected
     // one (they're keyed per-job server-side too).
@@ -83,7 +99,7 @@ export function useEvaluationFetch(jobs: JobInfo[]) {
     } catch (err: unknown) {
       if (isStale()) return;
       console.error('Failed to fetch evaluation data', err);
-      setEvalError((err as { response?: { data?: { detail?: string } } }).response?.data?.detail || 'Failed to fetch evaluation data');
+      setEvalError(evaluationErrorMessage(err));
       setEvaluationData(null);
     } finally {
       if (!isStale()) {
@@ -98,7 +114,7 @@ export function useEvaluationFetch(jobs: JobInfo[]) {
     try {
       const saved = await thresholdTuningApi.get(jobId);
       if (isStale()) return;
-      if (saved.thresholds && saved.classes && saved.metric && saved.split_used) {
+      if (isCompleteThresholdSet(saved)) {
         setHasSavedThresholds(true);
         setTuningPreview({
           thresholds: saved.thresholds,

@@ -1,7 +1,8 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { renderHook, waitFor } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import { useJobPolling, isTerminalStatus } from './useJobPolling';
 import { jobsApi, JobInfo, JobStatus } from '../api/jobs';
+import { jobEventsSocket, type JobEvent } from '../realtime/jobEventsSocket';
 
 // Build a minimally-typed JobInfo. We only inspect `status` in this hook,
 // so the rest is set to defensible defaults that satisfy the type.
@@ -136,4 +137,62 @@ describe('useJobPolling', () => {
       expect(result.current.isPolling).toBe(false);
     });
   });
+});
+
+/** Socket invalidations must debounce, preserve HTTP snapshots, and stop after cleanup. */
+it('refetches tracked socket events and switches between safety-net and disconnected intervals', async () => {
+  vi.useFakeTimers();
+  let onEvent!: (event: JobEvent) => void;
+  let onStatus!: (connected: boolean) => void;
+  const unsubscribe = vi.fn();
+  const unsubscribeStatus = vi.fn();
+  vi.spyOn(jobEventsSocket, 'subscribe').mockImplementation(callback => { onEvent = callback; return unsubscribe; });
+  vi.spyOn(jobEventsSocket, 'onStatus').mockImplementation(callback => { onStatus = callback; return unsubscribeStatus; });
+  const getJob = vi.spyOn(jobsApi, 'getJob').mockResolvedValue(makeJob('a', 'running'));
+  const { result, unmount } = renderHook(() => useJobPolling(['a'], { intervalMs: 1000, skipInitialFetch: true }));
+  try {
+    expect(getJob).not.toHaveBeenCalled();
+    act(() => { onEvent({ event: 'status', job_id: 'other' }); onStatus(true); onStatus(true); });
+    act(() => { onEvent({ event: 'progress', job_id: 'a', progress: 90 }); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(250); });
+    expect(getJob).toHaveBeenCalledTimes(1);
+    expect(result.current.jobs.a).toEqual(makeJob('a', 'running'));
+    await act(async () => { await vi.advanceTimersByTimeAsync(1000); });
+    expect(getJob).toHaveBeenCalledTimes(1);
+    act(() => { onStatus(false); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(1000); });
+    expect(getJob).toHaveBeenCalledTimes(2);
+    act(() => { onEvent({ event: 'status', job_id: 'a' }); });
+    unmount();
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(getJob).toHaveBeenCalledTimes(2);
+    expect(unsubscribe).toHaveBeenCalledOnce();
+    expect(unsubscribeStatus).toHaveBeenCalledOnce();
+  } finally {
+    unmount();
+    vi.restoreAllMocks();
+    vi.useRealTimers();
+  }
+});
+
+/** A response for a previous target list must not replace the newly selected job. */
+it('ignores late HTTP results after switching targets and clears an empty selection', async () => {
+  vi.spyOn(jobEventsSocket, 'subscribe').mockReturnValue(() => {});
+  vi.spyOn(jobEventsSocket, 'onStatus').mockReturnValue(() => {});
+  let resolveA!: (job: JobInfo) => void;
+  vi.spyOn(jobsApi, 'getJob').mockReturnValueOnce(new Promise(resolve => { resolveA = resolve; }))
+    .mockResolvedValue(makeJob('b', 'completed'));
+  const { result, rerender, unmount } = renderHook(({ ids }) => useJobPolling(ids), { initialProps: { ids: ['a'] } });
+  try {
+    rerender({ ids: ['b'] });
+    await waitFor(() => expect(result.current.jobs).toEqual({ b: makeJob('b', 'completed') }));
+    await act(async () => { resolveA(makeJob('a', 'failed')); });
+    expect(result.current.aggregateStatus).toBe('completed');
+    expect(result.current.jobs).toEqual({ b: makeJob('b', 'completed') });
+    rerender({ ids: [] });
+    expect(result.current).toEqual({ jobs: {}, aggregateStatus: 'idle', isPolling: false });
+  } finally {
+    unmount();
+    vi.restoreAllMocks();
+  }
 });

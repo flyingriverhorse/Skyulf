@@ -281,16 +281,29 @@ function timeSeriesPreview(config: TimeSeriesConfig): string {
   return `${method} \u00b7 ${cols} ${cols === 1 ? 'col' : 'cols'}`;
 }
 
+function validateMethodSettings(config: TimeSeriesConfig): { isValid: boolean; message?: string; field?: string } {
+  switch (config.method) {
+    case 'lag':
+      return (config.lags?.length ?? 0) === 0
+        ? { isValid: false, field: 'lags', message: 'Provide at least one lag value' }
+        : { isValid: true };
+    case 'rolling':
+      return (config.aggregations?.length ?? 0) === 0
+        ? { isValid: false, field: 'aggregations', message: 'Select at least one aggregation' }
+        : { isValid: true };
+    case 'date':
+      return (config.features?.length ?? 0) === 0
+        ? { isValid: false, field: 'features', message: 'Select at least one calendar feature' }
+        : { isValid: true };
+    default:
+      return { isValid: true };
+  }
+}
+
 function validateTimeSeries(config: TimeSeriesConfig): { isValid: boolean; message?: string; field?: string } {
   if ((config.columns?.length ?? 0) === 0)
     return { isValid: false, field: 'columns', message: 'Select at least one column' };
-  if (config.method === 'lag' && (config.lags?.length ?? 0) === 0)
-    return { isValid: false, field: 'lags', message: 'Provide at least one lag value' };
-  if (config.method === 'rolling' && (config.aggregations?.length ?? 0) === 0)
-    return { isValid: false, field: 'aggregations', message: 'Select at least one aggregation' };
-  if (config.method === 'date' && (config.features?.length ?? 0) === 0)
-    return { isValid: false, field: 'features', message: 'Select at least one calendar feature' };
-  return { isValid: true };
+  return validateMethodSettings(config);
 }
 
 export const TimeSeriesNode: NodeDefinition<TimeSeriesConfig> = {

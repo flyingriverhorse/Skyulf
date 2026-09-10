@@ -242,36 +242,7 @@ export const SlowNodesPage: React.FC = () => {
                 </div>
             </div>
 
-            {/* Header stats */}
-            {data && (
-                <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
-                    <StatCard
-                        icon={<Layers className="w-4 h-4 text-blue-500" />}
-                        label="Step types"
-                        value={String(data.aggregates.length)}
-                    />
-                    <StatCard
-                        icon={<Hash className="w-4 h-4 text-blue-500" />}
-                        label="Node runs"
-                        value={data.total_node_runs.toLocaleString()}
-                    />
-                    <StatCard
-                        icon={<BarChart3 className="w-4 h-4 text-blue-500" />}
-                        label="Jobs scanned"
-                        value={data.total_jobs_scanned.toLocaleString()}
-                    />
-                    <StatCard
-                        icon={<Clock className="w-4 h-4 text-blue-500" />}
-                        label="Window"
-                        value={`${data.days} day${data.days === 1 ? '' : 's'}`}
-                    />
-                    <StatCard
-                        icon={<Timer className="w-4 h-4 text-blue-500" />}
-                        label="Unit"
-                        value={data.unit}
-                    />
-                </div>
-            )}
+            <SlowNodeStats data={data} />
 
             {error && (
                 <div className="mb-4 flex items-start gap-2 p-3 rounded border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 text-sm">
@@ -280,110 +251,13 @@ export const SlowNodesPage: React.FC = () => {
                 </div>
             )}
 
-            {sortedAggregates.length > 0 && (
-                <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4 mb-6">
-                    <div className="flex items-center gap-2 mb-3">
-                        <BarChart3 className="w-4 h-4 text-blue-500" />
-                        <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-200">
-                            Total time by step type
-                        </h2>
-                        <span className="text-[11px] text-gray-400">
-                            ({sortKey === 'total_seconds' ? 'sorted by total' : `sorted by ${sortKey.replace('_seconds', '')}`}
-                            , log scale — totals span orders of magnitude)
-                        </span>
-                    </div>
-                    <div className="h-56">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <BarChart
-                                data={sortedAggregates.map(a => ({
-                                    step_type: a.step_type,
-                                    // The bar height uses a value floored above zero (log
-                                    // scale is undefined at 0); the tooltip reads totalRaw
-                                    // so a floored bar never misreports its own total.
-                                    total: Math.max(
-                                        Number(a.total_seconds.toFixed(3)),
-                                        chartFloor,
-                                    ),
-                                    totalRaw: Number(a.total_seconds.toFixed(3)),
-                                    avg: Number(a.avg_seconds.toFixed(3)),
-                                    runs: a.count,
-                                }))}
-                                margin={{ top: 4, right: 8, left: 8, bottom: 28 }}
-                            >
-                                <CartesianGrid
-                                    strokeDasharray="3 3"
-                                    className="stroke-gray-200 dark:stroke-slate-700"
-                                    vertical={false}
-                                />
-                                <XAxis
-                                    dataKey="step_type"
-                                    tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 10 }}
-                                    angle={-25}
-                                    textAnchor="end"
-                                    interval={0}
-                                    height={50}
-                                />
-                                <YAxis
-                                    scale="log"
-                                    domain={[chartFloor, 'auto']}
-                                    allowDataOverflow
-                                    tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 10 }}
-                                    tickFormatter={(v: number) => formatSeconds(v)}
-                                    width={64}
-                                />
-                                <RechartsTooltip
-                                    contentStyle={{
-                                        backgroundColor: 'hsl(var(--popover))',
-                                        borderColor: 'hsl(var(--border))',
-                                        color: 'hsl(var(--popover-foreground))',
-                                        borderRadius: 6,
-                                        fontSize: 12,
-                                    }}
-                                    itemStyle={{ color: 'hsl(var(--popover-foreground))' }}
-                                    labelStyle={{ color: 'hsl(var(--muted-foreground))' }}
-                                    formatter={(value: number, name: string, entry) => {
-                                        if (name === 'runs') return [value, 'Runs'];
-                                        if (name === 'total') {
-                                            const raw = (entry?.payload as { totalRaw?: number } | undefined)
-                                                ?.totalRaw;
-                                            return [formatSeconds(raw ?? value), 'Total time'];
-                                        }
-                                        return [formatSeconds(value), 'Avg per run'];
-                                    }}
-                                />
-                                <Bar dataKey="total" radius={[3, 3, 0, 0]}>
-                                    {sortedAggregates.map((_, idx) => (
-                                        <Cell
-                                            key={`bar-${idx}`}
-                                            fill={BAR_COLORS[idx % BAR_COLORS.length]}
-                                        />
-                                    ))}
-                                </Bar>
-                            </BarChart>
-                        </ResponsiveContainer>
-                    </div>
-                    <ChartDataTable
-                        caption="Total time by step type — text/table alternative to the bar chart"
-                        filename={`slow-nodes-${data?.days ?? days}d`}
-                        columns={[
-                            { key: 'step_type', label: 'Step type' },
-                            { key: 'runs', label: 'Runs' },
-                            { key: 'total', label: 'Total (s)' },
-                            { key: 'avg', label: 'Avg (s)' },
-                            { key: 'p95', label: 'p95 (s)' },
-                            { key: 'max', label: 'Max (s)' },
-                        ]}
-                        rows={sortedAggregates.map(a => ({
-                            step_type: a.step_type,
-                            runs: a.count,
-                            total: Number(a.total_seconds.toFixed(3)),
-                            avg: Number(a.avg_seconds.toFixed(3)),
-                            p95: Number(a.p95_seconds.toFixed(3)),
-                            max: Number(a.max_seconds.toFixed(3)),
-                        }))}
-                    />
-                </div>
-            )}
+            <SlowNodeChart
+              sortedAggregates={sortedAggregates}
+              sortKey={sortKey}
+              chartFloor={chartFloor}
+              data={data}
+              days={days}
+            />
 
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
                 <div className="overflow-x-auto">
@@ -446,120 +320,14 @@ export const SlowNodesPage: React.FC = () => {
                                 </th>
                             </tr>
                         </thead>
-                        <tbody>
-                            {isLoading && !data ? (
-                                <tr>
-                                    <td
-                                        colSpan={8}
-                                        className="px-3 py-8 text-center text-gray-400 italic"
-                                    >
-                                        Loading…
-                                    </td>
-                                </tr>
-                            ) : sortedAggregates.length === 0 ? (
-                                <tr>
-                                    <td
-                                        colSpan={8}
-                                        className="px-3 py-8 text-center text-gray-400"
-                                    >
-                                        <div className="flex flex-col items-center gap-2">
-                                            <Timer className="w-8 h-8 opacity-40" />
-                                            <span className="italic">
-                                                No node-timing data in the last {days} day
-                                                {days === 1 ? '' : 's'}.
-                                            </span>
-                                            <span className="text-[11px] not-italic text-gray-500">
-                                                Pre-existing jobs are silently skipped — re-run a
-                                                pipeline to seed this view.
-                                            </span>
-                                        </div>
-                                    </td>
-                                </tr>
-                            ) : (
-                                sortedAggregates.map(agg => {
-                                    const sharePct = (agg.total_seconds / peakTotal) * 100;
-                                    return (
-                                        <tr
-                                            key={agg.step_type}
-                                            className="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50"
-                                        >
-                                            <td className="px-3 py-2">
-                                                <div className="font-mono font-medium text-gray-800 dark:text-gray-100">
-                                                    {agg.step_type}
-                                                </div>
-                                                <div className="text-[10px] text-gray-400">
-                                                    {agg.count.toLocaleString()} run{agg.count === 1 ? '' : 's'}
-                                                    {' · last '}{days} day{days === 1 ? '' : 's'}
-                                                    {agg.is_single_run && (
-                                                        <span className="ml-1 text-amber-600 dark:text-amber-400">
-                                                            (single run — not a trend)
-                                                        </span>
-                                                    )}
-                                                </div>
-                                                {agg.sample_node_id && (
-                                                    <div
-                                                        className="text-[10px] text-gray-400 truncate max-w-[260px] flex items-center gap-1"
-                                                        title={agg.sample_node_id}
-                                                    >
-                                                        {!agg.sample_is_representative && (
-                                                            <AlertTriangle
-                                                                className="w-3 h-3 text-amber-500 shrink-0"
-                                                                aria-label="Sample node is an outlier, not representative"
-                                                            />
-                                                        )}
-                                                        <span>
-                                                            {agg.sample_is_representative
-                                                                ? 'e.g. '
-                                                                : 'e.g. (outlier) '}
-                                                            {agg.sample_node_id}
-                                                        </span>
-                                                    </div>
-                                                )}
-                                            </td>
-                                            <td className="px-3 py-2 text-right tabular-nums text-gray-700 dark:text-gray-200">
-                                                {agg.count.toLocaleString()}
-                                            </td>
-                                            <td className="px-3 py-2 text-right tabular-nums font-medium text-gray-800 dark:text-gray-100">
-                                                {formatSeconds(agg.total_seconds)}
-                                            </td>
-                                            <td className="px-3 py-2 text-right tabular-nums text-gray-700 dark:text-gray-200">
-                                                {formatSeconds(agg.avg_seconds)}
-                                            </td>
-                                            <td className="px-3 py-2 text-right tabular-nums text-gray-700 dark:text-gray-200">
-                                                {formatSeconds(agg.p95_seconds)}
-                                            </td>
-                                            <td className="px-3 py-2 text-right tabular-nums text-gray-700 dark:text-gray-200">
-                                                {formatSeconds(agg.max_seconds)}
-                                            </td>
-                                            <td className="px-3 py-2 w-48">
-                                                <div className="flex items-center gap-2">
-                                                    <div className="flex-1 h-2 bg-gray-100 dark:bg-gray-700/50 rounded overflow-hidden">
-                                                        <div
-                                                            className="h-full bg-blue-500"
-                                                            style={{ width: `${sharePct}%` }}
-                                                        />
-                                                    </div>
-                                                    <span className="text-[10px] text-gray-400 tabular-nums w-10 text-right">
-                                                        {sharePct.toFixed(0)}%
-                                                    </span>
-                                                </div>
-                                            </td>
-                                            <td className="px-3 py-2">
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setInvestigateStep(agg.step_type)}
-                                                    className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline"
-                                                    aria-label={`Investigate ${agg.step_type} runs`}
-                                                >
-                                                    <Search className="w-3 h-3" aria-hidden="true" />
-                                                    Investigate
-                                                </button>
-                                            </td>
-                                        </tr>
-                                    );
-                                })
-                            )}
-                        </tbody>
+                        <SlowNodeRows
+                          isLoading={isLoading}
+                          data={data}
+                          sortedAggregates={sortedAggregates}
+                          days={days}
+                          peakTotal={peakTotal}
+                          setInvestigateStep={setInvestigateStep}
+                        />
                     </table>
                 </div>
             </div>
@@ -721,3 +489,303 @@ const SlowNodeInvestigationModal: React.FC<{
         </ModalShell>
     );
 };
+
+/** Shows the counts, window and unit reported by the telemetry response. */
+function SlowNodeStats({
+  data,
+}: {
+  data: SlowNodesResponse | null;
+}) {
+  return (
+    <>
+      {/* Header stats */}
+      {data && (
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
+              <StatCard
+                  icon={<Layers className="w-4 h-4 text-blue-500" />}
+                  label="Step types"
+                  value={String(data.aggregates.length)}
+              />
+              <StatCard
+                  icon={<Hash className="w-4 h-4 text-blue-500" />}
+                  label="Node runs"
+                  value={data.total_node_runs.toLocaleString()}
+              />
+              <StatCard
+                  icon={<BarChart3 className="w-4 h-4 text-blue-500" />}
+                  label="Jobs scanned"
+                  value={data.total_jobs_scanned.toLocaleString()}
+              />
+              <StatCard
+                  icon={<Clock className="w-4 h-4 text-blue-500" />}
+                  label="Window"
+                  value={`${data.days} day${data.days === 1 ? '' : 's'}`}
+              />
+              <StatCard
+                  icon={<Timer className="w-4 h-4 text-blue-500" />}
+                  label="Unit"
+                  value={data.unit}
+              />
+          </div>
+      )}
+    </>
+  );
+}
+
+/** Pairs the logarithmic timing chart with its raw-value table alternative. */
+function SlowNodeChart({
+  sortedAggregates,
+  sortKey,
+  chartFloor,
+  data,
+  days,
+}: {
+  sortedAggregates: SlowNodeAggregate[];
+  sortKey: SortKey;
+  chartFloor: number;
+  data: SlowNodesResponse | null;
+  days: number;
+}) {
+  return (
+    <>
+      {sortedAggregates.length > 0 && (
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4 mb-6">
+              <div className="flex items-center gap-2 mb-3">
+                  <BarChart3 className="w-4 h-4 text-blue-500" />
+                  <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-200">
+                      Total time by step type
+                  </h2>
+                  <span className="text-[11px] text-gray-400">
+                      ({sortKey === 'total_seconds' ? 'sorted by total' : `sorted by ${sortKey.replace('_seconds', '')}`}
+                      , log scale — totals span orders of magnitude)
+                  </span>
+              </div>
+              <div className="h-56">
+                  <ResponsiveContainer width="100%" height="100%">
+                      <BarChart
+                          data={sortedAggregates.map(a => ({
+                              step_type: a.step_type,
+                              // The bar height uses a value floored above zero (log
+                              // scale is undefined at 0); the tooltip reads totalRaw
+                              // so a floored bar never misreports its own total.
+                              total: Math.max(
+                                  Number(a.total_seconds.toFixed(3)),
+                                  chartFloor,
+                              ),
+                              totalRaw: Number(a.total_seconds.toFixed(3)),
+                              avg: Number(a.avg_seconds.toFixed(3)),
+                              runs: a.count,
+                          }))}
+                          margin={{ top: 4, right: 8, left: 8, bottom: 28 }}
+                      >
+                          <CartesianGrid
+                              strokeDasharray="3 3"
+                              className="stroke-gray-200 dark:stroke-slate-700"
+                              vertical={false}
+                          />
+                          <XAxis
+                              dataKey="step_type"
+                              tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 10 }}
+                              angle={-25}
+                              textAnchor="end"
+                              interval={0}
+                              height={50}
+                          />
+                          <YAxis
+                              scale="log"
+                              domain={[chartFloor, 'auto']}
+                              allowDataOverflow
+                              tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 10 }}
+                              tickFormatter={(v: number) => formatSeconds(v)}
+                              width={64}
+                          />
+                          <RechartsTooltip
+                              contentStyle={{
+                                  backgroundColor: 'hsl(var(--popover))',
+                                  borderColor: 'hsl(var(--border))',
+                                  color: 'hsl(var(--popover-foreground))',
+                                  borderRadius: 6,
+                                  fontSize: 12,
+                              }}
+                              itemStyle={{ color: 'hsl(var(--popover-foreground))' }}
+                              labelStyle={{ color: 'hsl(var(--muted-foreground))' }}
+                              formatter={(value: number, name: string, entry) => {
+                                  if (name === 'runs') return [value, 'Runs'];
+                                  if (name === 'total') {
+                                      const raw = (entry?.payload as { totalRaw?: number } | undefined)
+                                          ?.totalRaw;
+                                      return [formatSeconds(raw ?? value), 'Total time'];
+                                  }
+                                  return [formatSeconds(value), 'Avg per run'];
+                              }}
+                          />
+                          <Bar dataKey="total" radius={[3, 3, 0, 0]}>
+                              {sortedAggregates.map((_, idx) => (
+                                  <Cell
+                                      key={`bar-${idx}`}
+                                      fill={BAR_COLORS[idx % BAR_COLORS.length]}
+                                  />
+                              ))}
+                          </Bar>
+                      </BarChart>
+                  </ResponsiveContainer>
+              </div>
+              <ChartDataTable
+                  caption="Total time by step type — text/table alternative to the bar chart"
+                  filename={`slow-nodes-${data?.days ?? days}d`}
+                  columns={[
+                      { key: 'step_type', label: 'Step type' },
+                      { key: 'runs', label: 'Runs' },
+                      { key: 'total', label: 'Total (s)' },
+                      { key: 'avg', label: 'Avg (s)' },
+                      { key: 'p95', label: 'p95 (s)' },
+                      { key: 'max', label: 'Max (s)' },
+                  ]}
+                  rows={sortedAggregates.map(a => ({
+                      step_type: a.step_type,
+                      runs: a.count,
+                      total: Number(a.total_seconds.toFixed(3)),
+                      avg: Number(a.avg_seconds.toFixed(3)),
+                      p95: Number(a.p95_seconds.toFixed(3)),
+                      max: Number(a.max_seconds.toFixed(3)),
+                  }))}
+              />
+          </div>
+      )}
+    </>
+  );
+}
+
+/** Renders loading, empty and measured rows with their investigation actions. */
+function SlowNodeRows({
+  isLoading,
+  data,
+  sortedAggregates,
+  days,
+  peakTotal,
+  setInvestigateStep,
+}: {
+  isLoading: boolean;
+  data: SlowNodesResponse | null;
+  sortedAggregates: SlowNodeAggregate[];
+  days: number;
+  peakTotal: number;
+  setInvestigateStep: (step: string) => void;
+}) {
+  return (
+    <tbody>
+        {isLoading && !data ? (
+            <tr>
+                <td
+                    colSpan={8}
+                    className="px-3 py-8 text-center text-gray-400 italic"
+                >
+                    Loading…
+                </td>
+            </tr>
+        ) : sortedAggregates.length === 0 ? (
+            <tr>
+                <td
+                    colSpan={8}
+                    className="px-3 py-8 text-center text-gray-400"
+                >
+                    <div className="flex flex-col items-center gap-2">
+                        <Timer className="w-8 h-8 opacity-40" />
+                        <span className="italic">
+                            No node-timing data in the last {days} day
+                            {days === 1 ? '' : 's'}.
+                        </span>
+                        <span className="text-[11px] not-italic text-gray-500">
+                            Pre-existing jobs are silently skipped — re-run a
+                            pipeline to seed this view.
+                        </span>
+                    </div>
+                </td>
+            </tr>
+        ) : (
+            sortedAggregates.map(agg => {
+                const sharePct = (agg.total_seconds / peakTotal) * 100;
+                return (
+                    <tr
+                        key={agg.step_type}
+                        className="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50"
+                    >
+                        <td className="px-3 py-2">
+                            <div className="font-mono font-medium text-gray-800 dark:text-gray-100">
+                                {agg.step_type}
+                            </div>
+                            <div className="text-[10px] text-gray-400">
+                                {agg.count.toLocaleString()} run{agg.count === 1 ? '' : 's'}
+                                {' · last '}{days} day{days === 1 ? '' : 's'}
+                                {agg.is_single_run && (
+                                    <span className="ml-1 text-amber-600 dark:text-amber-400">
+                                        (single run — not a trend)
+                                    </span>
+                                )}
+                            </div>
+                            {agg.sample_node_id && (
+                                <div
+                                    className="text-[10px] text-gray-400 truncate max-w-[260px] flex items-center gap-1"
+                                    title={agg.sample_node_id}
+                                >
+                                    {!agg.sample_is_representative && (
+                                        <AlertTriangle
+                                            className="w-3 h-3 text-amber-500 shrink-0"
+                                            aria-label="Sample node is an outlier, not representative"
+                                        />
+                                    )}
+                                    <span>
+                                        {agg.sample_is_representative
+                                            ? 'e.g. '
+                                            : 'e.g. (outlier) '}
+                                        {agg.sample_node_id}
+                                    </span>
+                                </div>
+                            )}
+                        </td>
+                        <td className="px-3 py-2 text-right tabular-nums text-gray-700 dark:text-gray-200">
+                            {agg.count.toLocaleString()}
+                        </td>
+                        <td className="px-3 py-2 text-right tabular-nums font-medium text-gray-800 dark:text-gray-100">
+                            {formatSeconds(agg.total_seconds)}
+                        </td>
+                        <td className="px-3 py-2 text-right tabular-nums text-gray-700 dark:text-gray-200">
+                            {formatSeconds(agg.avg_seconds)}
+                        </td>
+                        <td className="px-3 py-2 text-right tabular-nums text-gray-700 dark:text-gray-200">
+                            {formatSeconds(agg.p95_seconds)}
+                        </td>
+                        <td className="px-3 py-2 text-right tabular-nums text-gray-700 dark:text-gray-200">
+                            {formatSeconds(agg.max_seconds)}
+                        </td>
+                        <td className="px-3 py-2 w-48">
+                            <div className="flex items-center gap-2">
+                                <div className="flex-1 h-2 bg-gray-100 dark:bg-gray-700/50 rounded overflow-hidden">
+                                    <div
+                                        className="h-full bg-blue-500"
+                                        style={{ width: `${sharePct}%` }}
+                                    />
+                                </div>
+                                <span className="text-[10px] text-gray-400 tabular-nums w-10 text-right">
+                                    {sharePct.toFixed(0)}%
+                                </span>
+                            </div>
+                        </td>
+                        <td className="px-3 py-2">
+                            <button
+                                type="button"
+                                onClick={() => setInvestigateStep(agg.step_type)}
+                                className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline"
+                                aria-label={`Investigate ${agg.step_type} runs`}
+                            >
+                                <Search className="w-3 h-3" aria-hidden="true" />
+                                Investigate
+                            </button>
+                        </td>
+                    </tr>
+                );
+            })
+        )}
+    </tbody>
+  );
+}

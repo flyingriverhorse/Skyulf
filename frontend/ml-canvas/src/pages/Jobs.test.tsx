@@ -64,11 +64,45 @@ function renderJobsPage(initialEntry = '/jobs') {
 
 describe('JobsPage', () => {
   beforeEach(() => {
+    vi.clearAllMocks();
     vi.mocked(registryApi.getAllNodes).mockResolvedValue([
       { id: 'random_forest', name: 'Random Forest', category: 'model', description: '', tags: ['classification'], params: {} },
     ]);
     vi.mocked(jobsApi.getEDAJobs).mockResolvedValue([]);
     vi.mocked(jobsApi.getIngestionJobs).mockResolvedValue([]);
+  });
+
+  it('reuses the task pool and independent ingestion cache across tab switches', async () => {
+    /** Tab navigation must not discard fetched rows or refetch populated pools. */
+    vi.mocked(jobsApi.getJobs).mockResolvedValue([makeJob({ job_id: 'task-row' })]);
+    vi.mocked(jobsApi.getIngestionJobs).mockResolvedValue([makeJob({ job_id: 'ingest-row', job_type: 'ingestion', dataset_name: 'Data' })]);
+    renderJobsPage();
+    expect(await screen.findByTitle('task-row')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Ingestion' }));
+    expect(await screen.findByTitle('ingest-row')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Classification' }));
+    expect(await screen.findByTitle('task-row')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Ingestion' }));
+    expect(await screen.findByTitle('ingest-row')).toBeInTheDocument();
+    expect(jobsApi.getJobs).toHaveBeenCalledExactlyOnceWith(25, 0);
+    expect(jobsApi.getIngestionJobs).toHaveBeenCalledExactlyOnceWith(25, 0);
+  });
+
+  it('appends the next task page and clears search and status together', async () => {
+    /** Pagination and filter clearing must expose the same accumulated pool. */
+    vi.mocked(jobsApi.getJobs).mockResolvedValueOnce(Array.from({ length: 25 }, (_, i) => makeJob({ job_id: `page-one-${i}` })))
+      .mockResolvedValueOnce([makeJob({ job_id: 'page-two', status: 'failed' })]);
+    renderJobsPage();
+    fireEvent.click(await screen.findByRole('button', { name: 'Load More' }));
+    expect(await screen.findByTitle('page-two')).toBeInTheDocument();
+    expect(jobsApi.getJobs).toHaveBeenLastCalledWith(25, 25);
+    fireEvent.change(screen.getByPlaceholderText('Search jobs...'), { target: { value: 'page-two' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Filters' }));
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'failed' } });
+    expect(screen.getAllByText('View details')).toHaveLength(1);
+    fireEvent.click(screen.getByRole('button', { name: 'Clear all' }));
+    expect(screen.getAllByText('View details')).toHaveLength(26);
+    expect(screen.queryByRole('button', { name: 'Load More' })).not.toBeInTheDocument();
   });
 
   it('renders a paginated multi-status job pool with a Details link per row', async () => {

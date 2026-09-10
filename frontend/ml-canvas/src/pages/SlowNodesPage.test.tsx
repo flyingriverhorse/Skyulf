@@ -91,6 +91,21 @@ describe('SlowNodesPage — aggregate provenance, drill-down, and return state',
     vi.mocked(monitoringApi.getSlowNodes).mockReset();
   });
 
+  it('changes actual row order by average while retaining zero durations', async () => {
+    /** Sort controls must reorder the measured rows without replacing zero values. */
+    vi.mocked(monitoringApi.getSlowNodes).mockResolvedValue(response([
+      aggregate({ step_type: 'total-first', total_seconds: 12, avg_seconds: 0 }),
+      aggregate({ step_type: 'average-first', total_seconds: 6, avg_seconds: 6 }),
+    ]));
+    renderPage();
+    await screen.findByText('total-first');
+    const table = screen.getByRole('table');
+    expect(within(table).getAllByRole('row')[1]).toHaveTextContent('total-first');
+    expect(within(table).getAllByRole('row')[1]).toHaveTextContent('0 ms');
+    fireEvent.click(screen.getByRole('button', { name: /sort by avg/i }));
+    expect(within(table).getAllByRole('row')[1]).toHaveTextContent('average-first');
+  });
+
   it('shows an explicit no-data state naming the window', async () => {
     vi.mocked(monitoringApi.getSlowNodes).mockResolvedValue(response([]));
     renderPage();

@@ -40,6 +40,36 @@ const savedThresholds: SavedThresholdInfo = {
 };
 
 describe('useEvaluationFetch', () => {
+  /** Evaluation errors still hydrate saved thresholds and must use the latest polled job metadata. */
+  it('keeps its fetch callback stable and hydrates thresholds after an evaluation failure', async () => {
+    const getEvaluation = vi.spyOn(apiClient, 'get').mockRejectedValue({ response: { data: { detail: '' } } });
+    const getSaved = vi.spyOn(thresholdTuningApi, 'get').mockResolvedValue({ ...savedThresholds, enabled: true });
+    const { result, rerender } = renderHook(({ jobs }) => useEvaluationFetch(jobs), { initialProps: { jobs: [makeJob('a', 'recall')] } });
+    const fetch = result.current.fetchEvaluationData;
+    rerender({ jobs: [makeJob('a', 'precision')] });
+    expect(result.current.fetchEvaluationData).toBe(fetch);
+    await act(async () => { await fetch('a'); });
+    expect(result.current.evalError).toBe('Failed to fetch evaluation data');
+    expect(result.current.evaluationData).toBeNull();
+    expect(result.current.selectedThresholdMetric).toBe('precision');
+    expect(result.current.isEvalLoading).toBe(false);
+    expect(result.current.hasSavedThresholds).toBe(true);
+    expect(result.current.useTunedThresholds).toBe(true);
+    expect(getSaved.mock.invocationCallOrder[0]).toBeGreaterThan(getEvaluation.mock.invocationCallOrder[0]!);
+  });
+
+  /** Partial saved payloads must not enable threshold controls. */
+  it.each([
+    { thresholds: null }, { classes: null }, { metric: '' }, { split_used: '' },
+  ])('ignores an incomplete saved threshold payload %j', async (missing) => {
+    vi.spyOn(apiClient, 'get').mockResolvedValue(okResponse(evalFor('A')));
+    vi.spyOn(thresholdTuningApi, 'get').mockResolvedValue({ ...savedThresholds, ...missing });
+    const { result } = renderHook(() => useEvaluationFetch([makeJob('a')]));
+    await act(async () => { await result.current.fetchEvaluationData('a'); });
+    expect(result.current.tuningPreview).toBeNull();
+    expect(result.current.hasSavedThresholds).toBe(false);
+    expect(result.current.useTunedThresholds).toBe(false);
+  });
   it('distinguishes saved but disabled thresholds from an unsaved preview', async () => {
     /** Turning a saved set off must preserve the ability to enable it again. */
     vi.spyOn(apiClient, 'get').mockResolvedValue(okResponse(evalFor('A')));

@@ -356,6 +356,48 @@ respective fix logs; OC-167 closed with canonical artifact framing on 2026-09-09
 
 ## Log
 
+### 2026-09-10 - frontend batch 11: complete the CCN 10 backlog
+
+Base `73c0b7e7` on `0819`. Three disjoint Astra 6 implementers handled execution/
+tuning/evaluation hooks, Jobs/Experiments/monitoring screens and remaining node
+settings; the primary handled Navbar, notification details and ModalShell.
+All **22 remaining violations across 20 original production files** are removed.
+Extractions stay module-local, preserving public exports, defaults, state/effect/
+request ownership, callbacks, numeric policies and DOM semantics. Fresh independent
+spec and quality reviews passed for all four groups, with source/test diffs still
+matching their reviewed packages. See the [batch 11 plan](frontend_ccn_refactor_batch11_2026-09-10.md).
+
+The source-wide strict CCN 10 gate now **passes: 0 violations in 0 files**;
+the largest source function is **10**, down from 24. The informational CCN 8
+report remains unchanged in policy and lists **133 functions in 96 files**, all
+optional 9/10 candidates (previously 139/101). The [inventory](frontend_ccn_remaining_2026-09-10.md)
+records every optional function and its measured location. No thresholds,
+exemptions, dependencies, source scope or bundle budgets changed.
+
+Original/final characterization passed for each group: hooks **195 tests / 10
+files**, pages **245/29**, settings **330/15**, shell and consumers **34/4**.
+These selections overlap. Frozen-source full Vitest passed **2,402 tests / 186
+files**. Normal ESLint, explicit new-browser-test lint with `--no-ignore`, project
+`tsc --noEmit`, production build and all **11 bundle budgets** pass. Main bundle
+`index-B8ImxiHA.js` is **324.5 KiB gzip / 325 KiB budget**; all **251** relative
+built imports resolve. Expected error-path/jsdom stderr also occurs in original
+consumer tests; the full suite has no failed tests.
+
+The complete Chromium suite passed **133 tests**, without failures or retries.
+Two new cases exercise Count, TF-IDF and Hashing controls at 1440/1100px: actual
+schema filtering, independent node values, empty max features, panel expansion/
+collapse, selection round trips and submitted Preview payloads. HTTP is mocked;
+registry definitions, graph stores, controls and conversion are real. Expanded
+panel screenshots were inspected. Existing suites cover job and experiment
+navigation, training/tuning, thresholds, notifications, modals and accessibility.
+
+Release notes are under v0.8.19; v0.8.18 and earlier entries are unchanged.
+No additional functional finding was discovered or silently fixed. The audit
+queue remains **63 open / 4 parked**; OC-223/225/226/227/228/229 remain open,
+OC-71/72/73/185 stay parked, and DRIFT-01 stays deferred. Final integration
+review and the manual frontend checklist are recorded in the plan. The user
+authorized committing this verified batch on 2026-09-10.
+
 ### 2026-09-10 - frontend batch 10: canvas inspection, data screens and analysis
 
 Base `c56d6cca` on `0819`. Three disjoint Astra 6 implementers simplified eight

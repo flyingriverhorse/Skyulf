@@ -153,9 +153,11 @@ closed that on 2026-09-07.
 
 ### Remaining — frontend
 
-The separate [frontend CCN backlog](frontend_ccn_remaining_2026-09-10.md) tracks
-22 functions in 20 files above the accepted limit of 10. The informational
-report stays at 8; complexity candidates do not add to the audit finding counts.
+The separate [frontend CCN inventory](frontend_ccn_remaining_2026-09-10.md) now
+has **0 functions in 0 files above CCN 10**: the source-wide strict gate passes.
+The informational report stays at 8, listing 133 optional CCN 9/10 functions in
+96 files. Complexity cleanup is complete under the accepted limit; the functional
+findings below remain open and their audit counts are unchanged.
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|

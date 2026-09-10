@@ -250,37 +250,40 @@ export function useTuningTrials(job: JobInfo | null | undefined): TuningSeriesSt
   // Live accumulation only while the job can still emit points.
   useEffect(() => {
     if (!jobId || terminal) return undefined;
+    const receiveTrial = (evt: JobEvent): void => {
+      if (!isFiniteScore(evt.trial_score)) return;
+      const score = evt.trial_score;
+      const trial = evt.trial_number;
+      setLiveTrialPoints((prev) =>
+        mergeTrialPoints(prev, [{ trial: trial ?? prev.length + 1, score }]),
+      );
+      if (trial !== undefined && evt.trial_total !== undefined) {
+        setLatestTrial({ trial, total: evt.trial_total });
+      }
+      if (evt.trial_metric) setTrialMetric(evt.trial_metric);
+      setLastEventKind('trial');
+    };
+    const receiveIteration = (evt: JobEvent): void => {
+      if (!isFiniteScore(evt.iteration_score)) return;
+      const score = evt.iteration_score;
+      const iteration = evt.iteration_number;
+      const direction: SeriesDirection = isMinimize(evt.iteration_direction)
+        ? 'minimize'
+        : 'maximize';
+      setIterationDirection(direction);
+      setLiveIterationPoints((prev) =>
+        mergePoints(prev, [{ trial: iteration ?? prev.length + 1, score }], direction),
+      );
+      if (iteration !== undefined && evt.iteration_total !== undefined) {
+        setLatestIteration({ trial: iteration, total: evt.iteration_total });
+      }
+      if (evt.iteration_metric) setIterationMetric(evt.iteration_metric);
+      setLastEventKind('iteration');
+    };
     const unsubscribe = jobEventsSocket.subscribe((evt: JobEvent) => {
       if (evt.job_id !== jobId) return;
-      if (evt.event === 'trial') {
-        if (!isFiniteScore(evt.trial_score)) return;
-        const score = evt.trial_score;
-        const trial = evt.trial_number;
-        setLiveTrialPoints((prev) =>
-          mergeTrialPoints(prev, [{ trial: trial ?? prev.length + 1, score }]),
-        );
-        if (trial !== undefined && evt.trial_total !== undefined) {
-          setLatestTrial({ trial, total: evt.trial_total });
-        }
-        if (evt.trial_metric) setTrialMetric(evt.trial_metric);
-        setLastEventKind('trial');
-      } else if (evt.event === 'iteration') {
-        if (!isFiniteScore(evt.iteration_score)) return;
-        const score = evt.iteration_score;
-        const iteration = evt.iteration_number;
-        const direction: SeriesDirection = isMinimize(evt.iteration_direction)
-          ? 'minimize'
-          : 'maximize';
-        setIterationDirection(direction);
-        setLiveIterationPoints((prev) =>
-          mergePoints(prev, [{ trial: iteration ?? prev.length + 1, score }], direction),
-        );
-        if (iteration !== undefined && evt.iteration_total !== undefined) {
-          setLatestIteration({ trial: iteration, total: evt.iteration_total });
-        }
-        if (evt.iteration_metric) setIterationMetric(evt.iteration_metric);
-        setLastEventKind('iteration');
-      }
+      if (evt.event === 'trial') receiveTrial(evt);
+      else if (evt.event === 'iteration') receiveIteration(evt);
     });
     return unsubscribe;
   }, [jobId, terminal]);
