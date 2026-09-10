@@ -1,7 +1,13 @@
 import { AlertTriangle, Loader2, RefreshCw } from 'lucide-react';
+import { THRESHOLD_TUNING_METRICS } from '../../../../../core/api/thresholdTuning';
 import { InfoTooltip } from '../../../../ui/InfoTooltip';
 import type { EvaluationViewProps } from './types';
 import type { ThresholdMutationState } from './useThresholdMutation';
+
+/** Unsupported saved metrics need a fresh preview before their cutoffs can be replaced. */
+function requiresSupportedPreview(preview: EvaluationViewProps['tuningPreview']): boolean {
+  return preview !== null && !THRESHOLD_TUNING_METRICS.includes(preview.metric);
+}
 
 /** Preview, save, enable and clear remain separate actions with shared busy feedback. */
 export function ThresholdTuningControls({
@@ -21,12 +27,14 @@ export function ThresholdTuningControls({
   thresholdMutationRetryLabel,
   handleRetryThresholdMutation,
 }: EvaluationViewProps & ThresholdMutationState) {
+  const needsSupportedPreview = requiresSupportedPreview(tuningPreview);
   return (
     <div className="flex flex-wrap items-center gap-x-4 gap-y-2 bg-white dark:bg-gray-800 px-4 py-3 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
       <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">Threshold Tuning</h4>
       <div className="flex items-center gap-2">
         <span className="text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">Metric:</span>
         <select
+          aria-label="Threshold tuning metric"
           className="bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 p-1.5"
           value={selectedTuningMetric}
           onChange={(e) => { onSelectedTuningMetricChange(e.target.value); }}
@@ -36,10 +44,9 @@ export function ThresholdTuningControls({
           <option value="precision">Precision</option>
           <option value="recall">Recall</option>
           <option value="balanced_accuracy">Balanced Accuracy</option>
-          <option value="roc_auc">ROC AUC</option>
         </select>
         <InfoTooltip
-          text="Which metric the optimizer maximizes when you click Preview. Uses your validation split if available, otherwise test."
+          text="Which class-prediction metric the optimizer maximizes when you click Preview. Uses validation if available, otherwise test. ROC AUC measures probability ranking and does not change with the decision threshold."
           align="center"
         />
       </div>
@@ -75,7 +82,7 @@ export function ThresholdTuningControls({
           <div className="flex items-center gap-1">
             <button
               onClick={() => { void runThresholdMutation('save', onSaveThresholds); }}
-              disabled={isThresholdMutationPending}
+              disabled={needsSupportedPreview || isThresholdMutationPending}
               className="px-3 py-1.5 rounded-lg text-sm font-medium action-secondary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Save
@@ -122,6 +129,11 @@ export function ThresholdTuningControls({
       {!hasSavedThresholds && (
         <p className="w-full text-xs text-gray-500 dark:text-gray-400">
           Preview thresholds, then Save to enable them for predictions.
+        </p>
+      )}
+      {needsSupportedPreview && (
+        <p className="w-full text-xs text-gray-500 dark:text-gray-400">
+          This saved set uses a metric unavailable for new tuning. Choose a metric and click Preview before saving a replacement.
         </p>
       )}
       {pendingThresholdMutationText && (

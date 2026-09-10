@@ -173,11 +173,12 @@ describe('useEvaluationFetch', () => {
     });
   });
 
-  it('hydrates the tuning panel from saved server-side thresholds', async () => {
+  it.each(['f1_weighted', 'roc_auc'])('hydrates saved %s thresholds without selecting an unsupported preview metric', async (savedMetric) => {
+    /** Legacy and training-only metrics must not blank the select or break the next Preview. */
     const saved: SavedThresholdInfo = {
       thresholds: { '0': 0.4, '1': 0.6 },
       classes: [0, 1],
-      metric: 'f1_weighted',
+      metric: savedMetric,
       split_used: 'test',
       computed_at: '2026-01-02T00:00:00Z',
       source: 'training',
@@ -204,7 +205,7 @@ describe('useEvaluationFetch', () => {
         source: 'training',
       });
     });
-    // f1_weighted is not a preview-endpoint metric — the dropdown keeps its
+    // Unsupported saved metrics keep the dropdown's
     // default instead of blanking out / failing the next Preview.
     expect(result.current.selectedTuningMetric).toBe('f1');
     expect(result.current.useTunedThresholds).toBe(true);

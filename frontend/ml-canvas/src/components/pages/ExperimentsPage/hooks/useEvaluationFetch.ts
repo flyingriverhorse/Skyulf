@@ -7,15 +7,10 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { apiClient } from '../../../../core/api/client';
-import { thresholdTuningApi, type SavedThresholdInfo, type ThresholdPreviewResult } from '../../../../core/api/thresholdTuning';
+import { THRESHOLD_TUNING_METRICS, thresholdTuningApi, type SavedThresholdInfo, type ThresholdPreviewResult } from '../../../../core/api/thresholdTuning';
 import type { JobInfo } from '../../../../core/api/jobs';
 import type { EvaluationData } from '../types';
 import { getJobScoringMetric, mapJobMetricToDropdown, type ThresholdMetric } from '../utils/jobMeta';
-
-/** Metric values the Threshold Tuning dropdown offers and the backend
- * preview endpoint accepts — must stay in sync with the `<option>` list in
- * EvaluationView and `_SUPPORTED_METRICS` in threshold_tuning_service.py. */
-const TUNING_METRIC_OPTIONS = ['accuracy', 'f1', 'precision', 'recall', 'balanced_accuracy', 'roc_auc'];
 
 /** A saved set is usable only when every preview field is present and truthy. */
 function isCompleteThresholdSet(saved: SavedThresholdInfo): saved is SavedThresholdInfo & ThresholdPreviewResult {
@@ -126,7 +121,7 @@ export function useEvaluationFetch(jobs: JobInfo[]) {
         // The dropdown only offers the metrics the preview endpoint
         // supports; seeded sets can carry others (e.g. f1_weighted), which
         // would blank the select and make the next Preview 400.
-        if (TUNING_METRIC_OPTIONS.includes(saved.metric)) {
+        if (THRESHOLD_TUNING_METRICS.includes(saved.metric)) {
           setSelectedTuningMetric(saved.metric);
         }
         setUseTunedThresholds(saved.enabled);

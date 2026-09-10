@@ -88,7 +88,7 @@ def _fake_evaluation_data() -> dict:
 
 
 def _fake_binary_evaluation_data() -> dict:
-    """Builds a raw (undecoded) 2-class evaluation payload for roc_auc coverage."""
+    """Builds a raw binary payload for threshold-metric coverage."""
     return {
         "job_id": "job-1",
         "problem_type": "classification",
@@ -216,8 +216,8 @@ async def test_preview_returns_thresholds_for_other_metrics(async_session, metri
 
 
 @pytest.mark.asyncio
-async def test_preview_roc_auc_works_for_binary_classification(async_session):
-    """preview() succeeds with roc_auc for a binary (2-class) job."""
+async def test_preview_balanced_accuracy_works_for_binary_classification(async_session):
+    """Binary jobs can optimize the explicitly named class-balanced objective."""
     await _insert_job(async_session, "job-1")
 
     with patch(
@@ -225,22 +225,18 @@ async def test_preview_roc_auc_works_for_binary_classification(async_session):
         "._load_raw_evaluation_data",
         new=AsyncMock(return_value=(_fake_binary_evaluation_data(), None)),
     ):
-        result = await ThresholdTuningService.preview(async_session, "job-1", metric="roc_auc")
+        result = await ThresholdTuningService.preview(
+            async_session, "job-1", metric="balanced_accuracy"
+        )
 
-    assert result["metric"] == "roc_auc"
+    assert result["metric"] == "balanced_accuracy"
     assert set(result["classes"]) == {0, 1}
     assert set(result["thresholds"].keys()) == {"0", "1"}
 
 
 @pytest.mark.asyncio
-async def test_preview_roc_auc_works_with_string_labels(async_session):
-    """preview() with roc_auc works when class labels are strings (F-34).
-
-    ``roc_auc_score`` requires numeric inputs, so raw string class labels
-    (e.g. "no"/"yes") raised a raw ``ValueError`` that the router did not
-    catch (HTTP 500). The scorer must map labels into 0/1 positive-indicator
-    space before scoring.
-    """
+async def test_preview_balanced_accuracy_works_with_string_labels(async_session):
+    """String labels retain a working class-balanced threshold objective."""
     await _insert_job(async_session, "job-1")
 
     with patch(
@@ -248,9 +244,11 @@ async def test_preview_roc_auc_works_with_string_labels(async_session):
         "._load_raw_evaluation_data",
         new=AsyncMock(return_value=(_fake_binary_string_evaluation_data(), None)),
     ):
-        result = await ThresholdTuningService.preview(async_session, "job-1", metric="roc_auc")
+        result = await ThresholdTuningService.preview(
+            async_session, "job-1", metric="balanced_accuracy"
+        )
 
-    assert result["metric"] == "roc_auc"
+    assert result["metric"] == "balanced_accuracy"
     assert set(result["classes"]) == {"no", "yes"}
     assert set(result["thresholds"].keys()) == {"no", "yes"}
     assert all(0.0 < v < 1.0 for v in result["thresholds"].values())
@@ -281,23 +279,26 @@ async def test_preview_recall_uses_positive_class_not_class_mixture(async_sessio
 
 
 @pytest.mark.asyncio
-async def test_preview_roc_auc_raises_threshold_tuning_error_for_multiclass(async_session):
-    """preview() raises ThresholdTuningError (not a raw ValueError) for roc_auc + 3+ classes.
-
-    optimize_thresholds() always scores hard, post-threshold class predictions
-    (never probability scores), and roc_auc_score() on discrete multiclass
-    labels raises ValueError internally (it needs a 2D probability matrix for
-    multi_class="ovr"/"ovo"), so this must be guarded against explicitly.
-    """
+@pytest.mark.parametrize(
+    "evaluation_data",
+    [
+        _fake_binary_evaluation_data(),
+        _fake_binary_string_evaluation_data(),
+        _fake_evaluation_data(),
+    ],
+    ids=["binary-numeric", "binary-string", "multiclass"],
+)
+async def test_preview_rejects_roc_auc_with_supported_alternative(async_session, evaluation_data):
+    """ROC AUC must never be presented as a threshold-dependent optimization metric."""
     await _insert_job(async_session, "job-1")
 
     with (
         patch(
             "backend.ml_pipeline._services.threshold_tuning_service.EvaluationService"
             "._load_raw_evaluation_data",
-            new=AsyncMock(return_value=(_fake_evaluation_data(), None)),
+            new=AsyncMock(return_value=(evaluation_data, None)),
         ),
-        pytest.raises(ThresholdTuningError),
+        pytest.raises(ThresholdTuningError, match="balanced_accuracy"),
     ):
         await ThresholdTuningService.preview(async_session, "job-1", metric="roc_auc")
 
@@ -471,6 +472,7 @@ async def test_save_toggle_clear_raise_for_missing_job(async_session):
         # preview() refuses unsupported metrics, so save() must too — otherwise
         # a hand-crafted payload persists a metric predict-time cannot honor.
         ({"0": 0.5, "1": 0.5}, [0, 1], "r2", "validation"),
+        ({"0": 0.5, "1": 0.5}, [0, 1], "roc_auc", "validation"),
         # Threshold keys must cover exactly the model's classes: predict-time
         # silently skips a set that doesn't, so garbage would persist invisibly.
         ({"0": 0.5}, [0, 1], "f1", "validation"),
@@ -529,3 +531,31 @@ async def test_save_accepts_preview_round_trip_payload(async_session):
         split_used=previewed["split_used"],
     )
     assert saved is True
+
+
+@pytest.mark.asyncio
+async def test_legacy_roc_auc_thresholds_remain_readable_and_toggleable(async_session):
+    """Removing the old objective must not discard a user's previously saved cutoffs."""
+    await _insert_job(async_session, "legacy-job")
+    job = await async_session.get(TrainingJob, "legacy-job")
+    assert job is not None
+    job.tuned_thresholds = {
+        "thresholds": {"0": 0.4, "1": 0.6},
+        "classes": [0, 1],
+        "metric": "roc_auc",
+        "split_used": "validation",
+    }
+    job.tuned_thresholds_enabled = True
+    await async_session.commit()
+
+    for enabled in (False, True):
+        await ThresholdTuningService.toggle(async_session, "legacy-job", enabled)
+        saved = await ThresholdTuningService.get_saved(async_session, "legacy-job")
+        assert saved["thresholds"] == {"0": 0.4, "1": 0.6}
+        assert saved["metric"] == "roc_auc"
+        assert saved["enabled"] is enabled
+
+    await ThresholdTuningService.clear(async_session, "legacy-job")
+    cleared = await ThresholdTuningService.get_saved(async_session, "legacy-job")
+    assert cleared["thresholds"] is None
+    assert cleared["enabled"] is False

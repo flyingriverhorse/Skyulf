@@ -25,6 +25,12 @@ You can tune a completed classifier from **Experiments → Model Evaluation →
 Threshold Tuning**, even if **Tune decision threshold** was off during training.
 The evaluation must include class probabilities.
 
+Available objectives are **Accuracy**, **F1**, **Precision**, **Recall**, and
+**Balanced Accuracy**. ROC AUC measures probability ranking, which a decision
+threshold does not change, so it is not a threshold-tuning objective. Choose
+Balanced Accuracy to balance recall across classes. ROC AUC remains available
+for model evaluation and hyperparameter search.
+
 1. Choose a metric and click **Preview** to calculate thresholds. This does not
    save them or change predictions.
 2. Click **Save** to persist the thresholds and enable them for predictions.
@@ -35,6 +41,13 @@ The evaluation must include class probabilities.
 Preview uses validation data when available, otherwise the test split, as shown
 in the panel. No retraining is required. If training already saved thresholds,
 the panel loads that set and its enabled state automatically.
+
+Previously saved thresholds marked `roc_auc` remain available to use, toggle,
+or clear. Their cutoffs are preserved. To replace them, choose a supported
+objective and run **Preview**, then **Save**. Save stays disabled for a loaded
+set whose metric is unavailable for new tuning until a supported preview succeeds.
+New preview/save API requests
+using `roc_auc` return HTTP 400 with a supported alternative.
 
 ## Pipeline usage
 

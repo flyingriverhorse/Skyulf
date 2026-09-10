@@ -132,6 +132,35 @@ async def test_toggle_endpoint_returns_400_when_no_saved_thresholds(async_sessio
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("action", ["preview", "save"])
+async def test_roc_auc_requests_return_actionable_400(async_session, client, action):
+    """Neither HTTP path may create new thresholds labelled with a ranking-only metric."""
+    await _insert_job(async_session, "job-1")
+    payload = {"metric": "roc_auc"}
+    if action == "save":
+        payload.update(thresholds={"0": 0.4, "1": 0.6}, classes=[0, 1], split_used="validation")
+    data = {
+        "splits": {
+            "validation": {
+                "y_true": [0, 1, 0, 1],
+                "y_proba": {"classes": ["0", "1"], "values": [[0.8, 0.2], [0.3, 0.7]] * 2},
+            }
+        }
+    }
+    with patch(
+        "backend.ml_pipeline._services.threshold_tuning_service.EvaluationService"
+        "._load_raw_evaluation_data",
+        new=AsyncMock(return_value=(data, None)),
+    ):
+        response = client.post(f"{BASE}/jobs/job-1/thresholds/{action}", json=payload)
+    assert response.status_code == 400
+    assert "balanced_accuracy" in response.json()["message"]
+    saved = client.get(f"{BASE}/jobs/job-1/thresholds").json()
+    assert saved["thresholds"] is None
+    assert saved["enabled"] is False
+
+
+@pytest.mark.asyncio
 async def test_full_threshold_tuning_http_flow(async_session, client):
     """Preview -> save -> toggle -> clear works end-to-end over real HTTP requests."""
     await _insert_job(async_session, "job-1")

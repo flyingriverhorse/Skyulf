@@ -137,8 +137,34 @@ List all training jobs with status and metrics.
 ### `GET /api/pipeline/jobs/{job_id}`
 Get detailed status, metrics, and logs for a specific job.
 
+### `GET /api/pipeline/jobs/{job_id}/trials`
+
+Get the process-local live chart history for a running job: `trials`, `metric`,
+`iterations`, and `iteration_metric`. This backfills points missed before
+connecting to the WebSocket. Buffers are bounded and may be evicted.
+
+Execution releases both buffers when it finishes, fails, or exits after
+cancellation. A successful cancellation also clears the local buffers after
+the database commit; any later points from a fitting thread are cleared when
+that execution exits. Completed-job charts use the saved `metrics.trials` and
+`metrics.iterations` returned by the job-details endpoint, so live-buffer
+cleanup does not remove their stored history.
+
 ### `POST /api/pipeline/jobs/{job_id}/cancel`
 Cancel a running or queued job.
+
+### Threshold tuning
+
+`POST /api/pipeline/jobs/{job_id}/thresholds/preview` computes thresholds;
+`POST /api/pipeline/jobs/{job_id}/thresholds/save` saves and enables them.
+Supported `metric` values are `accuracy`, `f1`, `precision`, `recall`, and
+`balanced_accuracy`. Both endpoints reject `roc_auc` with HTTP 400 because
+probability-ranking AUC does not depend on the decision threshold.
+
+Existing saved sets, including legacy `roc_auc` sets, can still be read via
+`GET /api/pipeline/jobs/{job_id}/thresholds`, enabled or disabled via
+`POST .../thresholds/toggle`, and removed via `DELETE .../thresholds`.
+See [Threshold Tuning](../user_guide/threshold_tuning.md) for the workflow.
 
 ### `POST /api/pipeline/jobs/{job_id}/promote`
 Mark a completed job as the "promoted winner" — sets the `promoted_at` timestamp.

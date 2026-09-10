@@ -158,6 +158,8 @@ uses, so a fixed finding stays where it was filed.
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
+| OC-151 | 🟡 | Trial-buffer `clear_*` hooks documented but never called — 110.9 MB retained for process lifetime (`realtime/trial_buffer.py:56-59,103-106`) | small | ✅ fixed 2026-09-10 — execution cleanup releases both chart buffers; cancellation clears them after commit, and successful jobs retain persisted chart history. |
+| OC-156 | 🟡 | `roc_auc` threshold-tuning objective scores hard predictions — bit-identical to `balanced_accuracy` (`threshold_tuning_service.py:77-92`) | small | ✅ fixed 2026-09-10 — remove ROC AUC from new threshold preview/save requests and UI choices; preserve existing saved cutoffs and recommend Balanced Accuracy. |
 | OC-224 | 🟠 | Drift compared a transformed splitter reference with a raw upload, reporting severe drift for the same file | small | ✅ fixed 2026-09-10 — resolve the selected model's unique saved raw loader snapshot; the user's existing job now reports 0/4 drift and PSI 0 without retraining. |
 | OC-68 | 🟠 | Model alias map task-unaware — direct API caller silently trains the wrong estimator family (`_execution/engine/_node_runners.py:1157-1183`) | small | ✅ fixed 2026-09-07 — ambiguous aliases are task-aware and mismatched model/task combinations fail clearly |
 | OC-70 | 🟡 | Leakage validator checks for *a* splitter globally, not that *this* branch is protected (`_execution/_leakage_validation.py:189-267`) | small | ✅ fixed 2026-09-08 — every training branch now needs its own splitter or explicit CV; data-dependent ancestors on unprotected branches are reported |
@@ -359,6 +361,85 @@ respective fix logs; OC-167 closed with canonical artifact framing on 2026-09-09
 ---
 
 ## Log
+
+### 2026-09-10 - OC-156 fixed: stop offering ROC AUC as a threshold objective
+
+The backend scored thresholded class labels with `roc_auc_score`, which is
+balanced accuracy for binary predictions, while the UI advertised ROC AUC.
+The actual probability-ranking score is independent of the decision cutoff.
+Before the fix, **6 backend regressions failed / 36 controls passed** and
+**2 frontend regressions failed / 33 controls passed**, including binary
+numeric/string labels, misleading multiclass guidance, both HTTP write paths,
+the metric dropdown and hydration of a legacy saved `roc_auc` set.
+
+New threshold preview/save requests now reject `roc_auc` with HTTP 400 and an
+explanation pointing to `balanced_accuracy`. The unused hard-label AUC scorer
+and binary-only exception are removed. Accuracy, F1, Precision, Recall and
+Balanced Accuracy remain supported. Model-evaluation and hyperparameter-search
+ROC AUC are unchanged; the core training-time threshold fallback already uses
+Balanced Accuracy and needs no change.
+
+The dropdown no longer offers ROC AUC, and saved legacy metadata cannot select
+it during hydration. Existing saved cutoffs can still be read, enabled,
+disabled or cleared. Their metadata and values are preserved; replacing them
+requires a new preview with a supported objective. Both the threshold user
+guide and API guide explain this compatibility policy. Release notes are under
+**v0.8.20**, alongside OC-151.
+
+Independent review identified an enabled Save button on legacy sets: although
+the dropdown showed F1, Save still posted the preserved `roc_auc` metadata.
+Two failing UI regressions confirmed it for `roc_auc` and training-only
+`f1_weighted`. Hydration and Save now share the supported-metric list; Save
+stays disabled with an instruction until a supported preview succeeds, while
+using or clearing the stored cutoffs remains available.
+
+Verification: **43 backend tests**, **43 focused frontend tests**, and the full
+**2,444 frontend tests / 188 files** pass. **5 Chromium scenarios** pass,
+including legacy thresholds and keyboard-selected Balanced Accuracy requests
+at 1440px and 390px, plus preview/save/toggle/reload/clear. The mobile fixture
+uses the existing Collapse Sidebar action before opening evaluation; no layout
+change or forced click was needed. Frontend lint and source-wide CCN 10,
+repository-wide Ruff and Ty, and changed Python formatting pass. The combined
+OC-151/156 backend check passes **159 tests** (15 dependency deprecation
+warnings). Follow-up independent review found no remaining issue. The live
+queue now contains **57 open / 4 parked** findings.
+
+Final TypeScript/production build and all **11** unchanged bundle budgets pass;
+rebuilt assets use main entry `index-C9Juv0Fp.js`. The build caught a test-only
+Playwright-style `exact` option in a Testing Library query; removing that option
+preserved exact string matching and the focused **43 tests** pass again.
+Explicit lint of the browser regression passes. Logs are under ignored
+`tmp_repro_artifacts/oc156-*-final.log`; `git diff --check` passes.
+
+### 2026-09-10 - OC-151 fixed: release finished-job chart buffers
+
+The cleanup hooks were still unused in production. Before the fix, the new
+real-SQLite lifecycle suite produced **18 expected failures / 2 passing
+controls**: successful, failed, raised-error and cancelled executions all
+retained live chart points, as did successful cancellation requests. The
+controls confirm that failed cancellation commits must preserve the buffers.
+
+`execute_pipeline` now clears trials and boosting iterations in its `finally`
+block, after result persistence or failure handling. Both the single-job and
+parallel-batch task entry points use this service. The shared cancellation
+manager clears local buffers only after its database commit; execution cleanup
+also removes points emitted by a fitting thread after cancellation. Unrelated
+active jobs and the existing LRU bounds are preserved. Storage remains
+process-local; this change does not add cross-process live history.
+
+The regression suite covers fixed/tuned jobs through both task entry points,
+all four outcomes, chart availability at the successful commit, persisted
+chart scores read from a new session, unrelated active-job buffers, and
+successful/failed cancellation commits. The focused backend run passes
+**116 tests** (two dependency deprecation warnings). The API guide and buffer
+docstrings describe cleanup and the completed-job metrics fallback; release
+notes are under v0.8.20. OC-151 moves from the live queue to the archive.
+
+Final verification: the same **116 tests** pass after documentation/test
+cleanup; repository-wide `ruff check .`, the full configured `ty check`
+scope, formatting of all five touched Python files, and `git diff --check`
+pass. Independent review found no correctness or regression issue. The live
+queue now contains **58 open / 4 parked** findings.
 
 ### 2026-09-10 - OC-229 fixed: obsolete inspector responses cannot replace current details
 

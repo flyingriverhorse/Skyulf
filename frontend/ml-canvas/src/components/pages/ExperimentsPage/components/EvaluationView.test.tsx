@@ -213,6 +213,31 @@ describe('EvaluationView — Threshold Slider / Threshold Tuning tabs', () => {
     expect(screen.getByText(/Click Preview above/)).toBeInTheDocument();
   });
 
+  it('offers class-prediction metrics for threshold tuning without ROC AUC', () => {
+    /** The optimizer must not promise to improve a threshold-independent ranking score. */
+    const props = baseProps({ activeTab: 'tuning' });
+    render(<EvaluationView {...props} />);
+    expect(screen.queryByRole('option', { name: 'ROC AUC' })).not.toBeInTheDocument();
+    fireEvent.change(screen.getByRole('combobox', { name: 'Threshold tuning metric' }), {
+      target: { value: 'balanced_accuracy' },
+    });
+    expect(props.onSelectedTuningMetricChange).toHaveBeenCalledWith('balanced_accuracy');
+  });
+
+  it.each(['roc_auc', 'f1_weighted'])('requires a supported preview before resaving a saved %s set', (metric) => {
+    /** An allowed dropdown value must not submit unsupported metadata from an old saved set. */
+    const props = baseProps({
+      activeTab: 'tuning', hasSavedThresholds: true, useTunedThresholds: true,
+      tuningPreview: { thresholds: { '0': 0.4, '1': 0.6 }, classes: [0, 1], metric, split_used: 'validation' },
+    });
+    const { rerender } = render(<EvaluationView {...props} />);
+    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
+    expect(screen.getByText(/click Preview before saving a replacement/)).toBeInTheDocument();
+    expect(screen.getByRole('checkbox', { name: 'Use tuned thresholds at prediction time' })).toBeEnabled();
+    rerender(<EvaluationView {...props} tuningPreview={{ ...props.tuningPreview!, metric: 'balanced_accuracy' }} />);
+    expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled();
+  });
+
   it('announces preview mutations as pending and disables the triggering control', async () => {
     let resolvePreview: (() => void) | undefined;
     const onPreviewThresholds = vi.fn(
