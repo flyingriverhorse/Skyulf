@@ -677,6 +677,12 @@ Learned params:
 
 - `candidate_columns`, `selected_columns`, `variances`, `threshold`, `drop_columns`
 
+If every candidate is constant, all-null or at/below the threshold, the fitted
+selection is empty. Applying it removes all candidate columns while preserving
+unselected columns and the target; `drop_columns=False` preserves the input.
+Prediction reuses this fitted selection even if incoming values now vary. If
+no model features remain, adjust the selection before a downstream training step.
+
 ### CorrelationThreshold
 
 Config:

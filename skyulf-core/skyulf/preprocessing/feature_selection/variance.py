@@ -2,6 +2,7 @@
 
 from typing import Any, cast
 
+import numpy as np
 from sklearn.feature_selection import VarianceThreshold
 
 from ...core.meta.decorators import node_meta
@@ -48,6 +49,8 @@ class VarianceThresholdCalculator(BaseCalculator):
         Binary and constant columns are kept as candidates rather than excluded
         up front, so the threshold itself decides their fate. Returns an empty
         artifact — a no-op passthrough — when no numeric column is resolved.
+        If no candidate clears the threshold, records an empty selection so
+        apply can remove all candidates while preserving other columns.
         """
         threshold = config.get("threshold", 0.0)
         drop_columns = config.get("drop_columns", True)
@@ -61,10 +64,20 @@ class VarianceThresholdCalculator(BaseCalculator):
             return cast(VarianceThresholdArtifact, {})
 
         selector = VarianceThreshold(threshold=threshold)
-        selector.fit(X_np)
-
-        support = selector.get_support()
-        selected_cols = [c for c, s in zip(cols, support, strict=True) if s]
+        try:
+            selector.fit(X_np)
+        except ValueError as exc:
+            # sklearn has computed variances but refuses an empty selection.
+            if not str(exc).startswith("No feature in X meets the variance threshold"):
+                raise
+            all_missing = np.isnan(np.asarray(X_np, dtype=np.float64)).all(axis=0)
+            if np.any(~np.isfinite(selector.variances_) & ~all_missing):
+                # Only all-missing columns may have an undefined variance.
+                raise
+            selected_cols = []
+        else:
+            support = selector.get_support()
+            selected_cols = [c for c, s in zip(cols, support, strict=True) if s]
         variances = (
             dict(zip(cols, selector.variances_.tolist(), strict=True))
             if hasattr(selector, "variances_")

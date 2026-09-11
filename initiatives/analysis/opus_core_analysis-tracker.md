@@ -225,6 +225,7 @@ uses, so a fixed finding stays where it was filed.
 | OC-25 | 🟠 | RFE "K" chosen in UI ignored by backend (`feature_selection/_common.py:236-240`) | small | ✅ fixed 2026-09-05 — closes OC-143 too |
 | OC-26 | 🟠 | `HashingVectorizer` UI "none" norm is an invalid sklearn value → crash (`hashing_vectorizer.py`) | small | ✅ fixed 2026-09-11 — normalize the Canvas value to Python `None`, preserving unnormalized token counts and existing L1/L2 behavior. |
 | OC-33 | 🟡 | `FeatureInteraction` cannot generate single-column self-products (`feature_generation/interaction.py`) | small | ✅ fixed 2026-09-11 — generate repeated-column combinations when `interaction_only=False`, including fewer columns than the degree; align Canvas validation. |
+| OC-32 | 🟡 | `VarianceThreshold` crashes when all candidates are constant (`feature_selection/variance.py`) | small | ✅ fixed 2026-09-11 — record an empty selection when every candidate fails the threshold, preserving candidate variances, replay and invalid-input errors. |
 | OC-27 | 🟠 | `GeneralTransformation` ignores the UI `standardize` toggle (`transformations/general.py`) | small | ✅ fixed 2026-09-11 — retain each power rule's standardization choice through fitting and replay; older artifacts keep their previous default. |
 | OC-28 | 🟠 | Box-Cox transform failures silently return untransformed data (`transformations/power.py:97-104`) | small | ✅ fixed 2026-09-06 — the silent path was the `valid_cols` filter, not the `except` (which has logged since the node was created); both engines now share `_fitted_columns_present`, which names the fitted columns the frame lacks, and fail-open is kept by decision. See the log entry |
 
@@ -369,6 +370,52 @@ respective fix logs; OC-167 closed with canonical artifact framing on 2026-09-09
 ---
 
 ## Log
+
+### 2026-09-11 - OC-32 fixed: variance selection may reject every candidate
+
+Committed the preceding OC-21/33 work as `5b39c28d` with DCO sign-off.
+Fresh combined verification passed **471 Core tests / 67 frontend tests**;
+all applicable pre-commit hooks passed, including Ruff, Ty and frontend lint.
+
+Revalidated OC-32 before changing production code: constant values `[7,7,7]`,
+all-NaN values and `[0,1,0]` with threshold `1` each raised sklearn's
+`No feature in X meets the variance threshold` error. The library had already
+computed variances, but the exception prevented an artifact from reaching the
+existing candidate-column removal logic.
+
+The calculator now handles only that specific no-feature error and records
+`selected_columns=[]` with the normal candidate list, threshold, drop flag and
+variance values. Non-finite computed variances are accepted only for entirely
+missing columns, preserving numerical overflow failures. Other input and
+configuration errors still propagate. Applying
+the artifact removes only candidate columns; unselected columns, target values
+and `drop_columns=False` behavior remain intact. Both facade aliases retain
+the fitted empty selection when prediction values later vary. If every model
+feature is removed, the user must adjust selection before downstream training.
+
+New regressions first reported **11 failures / 6 controls passed**. They cover
+constant and all-null candidates, exact-threshold equality, one-row inputs,
+duplicate indexes and target alignment, auto-selection of all numeric columns,
+both drop modes, both facade aliases and inference replay. Controls preserve
+errors for negative/NaN/text thresholds, infinite values, empty rows and
+explicitly selected non-numeric values.
+
+Independent review reproduced finite `[1e200,2e200]` overflowing its variance
+to infinity, and `[1e308]*4 + [-1e308]*4` overflowing to NaN, at threshold `1`.
+Both produce the same sklearn error prefix. Each additional regression failed
+before its correction. The guard checks whether a column actually has observed
+values, so computational overflow remains an error while all-missing columns
+can legitimately have undefined variance.
+
+Verification: **594 related tests pass** across the feature-selection, shared
+helper, leakage and registry-contract suites. The 32 warnings include four
+sklearn all-null warnings and three numerical warnings exposed by the new
+cases; those calculations remain visible. Repository Ruff/Ty, scoped
+formatting and `git diff --check` pass. User reference and changelog updated;
+the existing Canvas variance controls require no frontend change.
+Final independent review verified both overflow controls and found no remaining
+actionable issue.
+The live queue now contains **48 open / 4 parked** findings.
 
 ### 2026-09-11 - OC-33 fixed: self-products with fewer columns than the degree
 

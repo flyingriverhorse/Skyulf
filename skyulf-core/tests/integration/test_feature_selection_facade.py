@@ -43,6 +43,20 @@ _CALC = FeatureSelectionCalculator()
 _APPLIER = FeatureSelectionApplier()
 
 
+@pytest.mark.parametrize("method", ["variance", "variance_threshold"])
+def test_variance_facade_replays_empty_training_selection(method: str) -> None:
+    """Prediction must reuse the empty fitted selection even when its inputs now vary."""
+    training = pd.DataFrame({"a": [1.0, 1.0], "b": [2.0, 2.0], "label": ["x", "y"]})
+    params = dict(_CALC.fit(training, {"method": method, "threshold": 0.0}))
+    prediction = pd.DataFrame({"a": [1.0, 9.0], "b": [2.0, 8.0], "label": ["z", "w"]})
+
+    out = _APPLIER.apply(prediction, params)
+
+    assert params["selected_columns"] == []
+    assert params["candidate_columns"] == ["a", "b"]
+    pd.testing.assert_frame_equal(out, prediction[["label"]])
+
+
 def _unwrap_single_param(cases: list) -> list:
     """Unwrap 1-tuples produced by TestCaseLoader for single-parameter scenarios.
 
