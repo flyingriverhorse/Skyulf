@@ -88,7 +88,16 @@ def _build_count_artifact(
     )
 
     text = _join_text_columns(X, valid_cols)
-    vectorizer.fit(text)
+    try:
+        vectorizer.fit(text)
+    except ValueError as exc:
+        if not str(exc).startswith("empty vocabulary;"):
+            raise
+        logger.warning(
+            "Count Vectorizer found an empty vocabulary; input is unchanged. "
+            "Check the text, stop words and n-gram settings."
+        )
+        return {}
 
     feature_names: list[str] = vectorizer.get_feature_names_out().tolist()
     prefix = valid_cols[0] if len(valid_cols) == 1 else "_".join(valid_cols)
@@ -154,7 +163,8 @@ class CountVectorizerCalculator(BaseCalculator):
         """Narrow to the configured text columns and fit the vocabulary on their joined text.
 
         An empty or wholly-absent column selection yields an empty artifact so
-        the applier no-ops.
+        the applier no-ops. An empty vocabulary also yields an empty artifact
+        with a warning; source columns are retained even with ``drop_original``.
         """
         resolved = resolve_fit_text_columns(X, config, _y)
         if resolved is None:

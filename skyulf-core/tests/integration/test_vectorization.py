@@ -167,6 +167,75 @@ class TestNoOpPaths:
 # ==================== drop_original ====================
 
 
+@pytest.mark.parametrize("node", ["count_vectorizer", "tfidf_vectorizer"])
+class TestEmptyVocabulary:
+    """An unlearnable vocabulary must be a visible, non-destructive no-op."""
+
+    @pytest.mark.parametrize("drop_original", [False, True])
+    @pytest.mark.parametrize(
+        "texts,options",
+        [
+            (["", None, "  "], {}),
+            (["the and", "is of"], {"stop_words": "english"}),
+            (["a", "b b", "!"], {}),
+            (["alpha", "beta"], {"ngram_range": [2, 2]}),
+            ([], {}),
+        ],
+        ids=["blank", "stop-words", "no-tokens", "no-ngrams", "no-rows"],
+    )
+    def test_empty_vocabulary_warns_and_preserves_training_and_replay(
+        self,
+        node: str,
+        texts: list[str | None],
+        options: dict[str, Any],
+        drop_original: bool,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        """An empty vocabulary must preserve rows, targets and text in both drop modes."""
+        calculator_cls, applier_cls = _resolve(node)
+        frame = pd.DataFrame({"text": pd.array(texts, dtype="string"), "value": range(len(texts))})
+        frame.index = pd.Index([9] * len(texts))
+        original = frame.copy(deep=True)
+        y = pd.Series(range(len(texts)), index=frame.index, name="target")
+        with caplog.at_level(logging.WARNING, logger="skyulf"):
+            params = _fit(
+                calculator_cls,
+                (frame, y),
+                {"columns": ["text"], "drop_original": drop_original, **options},
+            )
+
+        assert params == {}
+        assert "empty vocabulary" in caplog.text.lower()
+        assert "unchanged" in caplog.text.lower()
+        out, y_out = applier_cls().apply((frame, y), params)
+        pd.testing.assert_frame_equal(out, original)
+        pd.testing.assert_frame_equal(frame, original)
+        pd.testing.assert_series_equal(y_out, y)
+
+        later = pd.DataFrame({"text": ["new usable vocabulary"], "value": [42]})
+        prediction = applier_cls().apply(later, params)
+        pd.testing.assert_frame_equal(prediction, later)
+
+    @pytest.mark.parametrize(
+        "options,error",
+        [
+            ({"min_df": -1}, "min_df"),
+            ({"ngram_range": [2, 1]}, "ngram_range"),
+            ({"stop_words": "invalid"}, "stop_words"),
+            ({"min_df": 2}, "After pruning"),
+            ({"min_df": 2, "max_df": 0.1}, "max_df corresponds"),
+        ],
+    )
+    def test_invalid_settings_and_frequency_pruning_still_raise(
+        self, node: str, options: dict[str, Any], error: str
+    ) -> None:
+        """Empty-vocabulary recovery must not swallow distinct parameter or pruning errors."""
+        calculator_cls, _ = _resolve(node)
+        frame = pd.DataFrame({"text": ["alpha beta", "gamma delta"]})
+        with pytest.raises(ValueError, match=error):
+            _fit(calculator_cls, frame, {"columns": ["text"], **options})
+
+
 class TestDropOriginal:
     @_parametrize(_DROP_ORIGINAL)
     def test_original_column_dropped(self, node: str, fit_extra: dict[str, Any]) -> None:

@@ -98,6 +98,20 @@ test_X = app.apply(test_df, art)
 The artifact stores both the vocabulary and the learned IDF weights, so test data is
 transformed with exactly the weights learned on train.
 
+### When there are no usable tokens
+
+Count and TF-IDF Vectorizers can find an empty vocabulary when the selected text
+is blank, missing, contains only stop words, or produces no tokens under the
+chosen n-gram settings. In that case, fitting emits a warning and returns an
+empty artifact. Applying it leaves the input unchanged, including the source
+text columns even when **Drop original** is enabled. Rows and targets are kept.
+Canvas displays the warning through its existing notification center.
+
+Later data also passes through unchanged with that artifact; prediction never
+learns a replacement vocabulary. Check the training text and token settings,
+then refit to generate numeric features. Invalid settings and frequency limits
+that remove every learned term (`min_df` / `max_df`) still raise an error.
+
 ---
 
 ## Hashing Vectorizer — no vocabulary needed

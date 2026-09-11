@@ -227,6 +227,7 @@ uses, so a fixed finding stays where it was filed.
 | OC-33 | 🟡 | `FeatureInteraction` cannot generate single-column self-products (`feature_generation/interaction.py`) | small | ✅ fixed 2026-09-11 — generate repeated-column combinations when `interaction_only=False`, including fewer columns than the degree; align Canvas validation. |
 | OC-32 | 🟡 | `VarianceThreshold` crashes when all candidates are constant (`feature_selection/variance.py`) | small | ✅ fixed 2026-09-11 — record an empty selection when every candidate fails the threshold, preserving candidate variances, replay and invalid-input errors. |
 | OC-31 | 🟡 | Frontend wrongly requires a target for unsupervised CorrelationThreshold (`FeatureSelectionNode.tsx`) | small | ✅ fixed 2026-09-11 — exempt correlation selection from target validation, retaining target requirements for all eight supervised methods. |
+| OC-34 | 🟡 | Count/TF-IDF vectorizers crash on empty or stop-word-only corpora (`vectorization/count_vectorizer.py`, `tfidf_vectorizer.py`) | small | ✅ fixed 2026-09-11 — warn and return an empty artifact for an empty vocabulary; preserve source data and replay, while other settings/pruning errors still raise. |
 | OC-27 | 🟠 | `GeneralTransformation` ignores the UI `standardize` toggle (`transformations/general.py`) | small | ✅ fixed 2026-09-11 — retain each power rule's standardization choice through fitting and replay; older artifacts keep their previous default. |
 | OC-28 | 🟠 | Box-Cox transform failures silently return untransformed data (`transformations/power.py:97-104`) | small | ✅ fixed 2026-09-06 — the silent path was the `valid_cols` filter, not the `except` (which has logged since the node was created); both engines now share `_fitted_columns_present`, which names the fitted columns the frame lacks, and fail-open is kept by decision. See the log entry |
 
@@ -371,6 +372,44 @@ respective fix logs; OC-167 closed with canonical artifact framing on 2026-09-09
 ---
 
 ## Log
+
+### 2026-09-11 - OC-34 fixed: empty text vocabularies warn and preserve input
+
+The preceding OC-31 work was committed as `f485ebdf`, with DCO sign-off,
+241 fresh focused frontend tests, the Canvas browser regression and all
+applicable hooks passing.
+
+Reproduced the current Count and TF-IDF failures before editing production
+code. Blank/missing text, English stop words, single-character/punctuation-only
+input, unavailable n-grams and zero-row corpora all raised sklearn's
+`empty vocabulary` error. The new Core regressions first reported **20 failures
+/ 10 controls passed**, and both real backend pipeline cases failed at the
+vectorizer. This confirms the reported issue at both calculator and engine level.
+
+Each builder now catches only the specific empty-vocabulary error, emits a
+warning with guidance to check text/stop words/n-grams, and returns `{}`.
+Existing appliers then preserve X, y, row order and source columns, including
+when `drop_original=True`. A saved empty artifact remains a no-op on later
+nonempty text, so prediction cannot learn a replacement vocabulary. Refit
+after correcting training text/settings to produce numeric features. Invalid
+parameters, contradictory frequency limits and pruning that removes all
+learned terms still raise their original errors.
+
+The backend regression runs the actual CSV loader and transformer through
+`PipelineEngine.run`, checks unchanged persisted data, a warning tagged with
+the correct node id/type, and replay through the saved pipeline artifact.
+The test selects pandas through the cached settings object used by the catalog;
+changing only the environment after settings initialization did not select it.
+
+Verification: **483 Core tests / 2 backend tests pass** across vectorization,
+encoding audit, registry-contract and leakage suites. The ten warnings in the
+broader contract run are existing sklearn/deprecation warnings. The existing
+frontend notification hook's **3 tests pass**; it already forwards node warnings
+to the notification center, so no frontend implementation change is needed.
+Repository Ruff/Ty, scoped formatting and `git diff --check` pass. Calculator
+docstrings, the Text & NLP guide and changelog are updated. Independent review
+found no actionable issue. The live queue now
+contains **46 open / 4 parked** findings.
 
 ### 2026-09-11 - OC-31 fixed: target-free correlation selection in Canvas
 
