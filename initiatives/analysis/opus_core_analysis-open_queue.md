@@ -15,7 +15,7 @@ file deliberately carries no history.
 per-area report files `00`–`18`).
 **Baseline:** commit `93d7719e` (master), audit run 2026-08-31 → 09-01 by 15
 parallel read-only agents (Claude Opus 5). 116 findings: 5 🔴 / 45 🟠 / 44 🟡 /
-22 ⚪, plus OC-160–234 filed by later reviews. OC-100 was retracted as a false
+22 ⚪, plus OC-160–246 filed by later reviews. OC-100 was retracted as a false
 positive and is not counted; the corrections pass stays in the archive.
 
 **Status key:** ⬜ open · 🟨 in progress · ✅ done · ⏭️ parked
@@ -109,6 +109,7 @@ closed that on 2026-09-07.
 | OC-50 | 🟡 | Binary targets miss class-balance advice or flip to regression by sample size (`recommendations.py:147-152`) | small | ⬜ open |
 | OC-51 | 🟡 | Transform advice can be mathematically invalid and self-contradictory (`recommendations.py:66-78,129-139`) | small | ⬜ open |
 
+
 ### Remaining — core / engines / pipeline
 
 | ID | Sev | Item | Effort | Status |
@@ -163,6 +164,7 @@ The separately reported lockfile issue still needs its exact advisory details.
 |---|---|---|---|---|
 | OC-80 | 🟡 | 3 weakest-covered modules untested exactly where silence is dangerous (`_sklearn_compat.py`, `value_replacement.py`, `config_validation.py`) | ~1 day | ⬜ open |
 | OC-213 | ⚪ | Leakage examples produce 22 ty diagnostics: 16 in the notebook and six in the Python script, caused by heterogeneous configuration inference and un-narrowed `SplitDataset` slots (`skyulf-core/examples/09_leakage_safety.ipynb`, `09_leakage_safety.py`) | small | ⬜ open — both examples execute successfully; type information needs correction |
+| OC-246 | 🟡 | Local-only full-inference smoke returns a passing result before inference when the current model artifact is a tuple; remaining checks only print success/failure (`tests/integration/test_full_inference_pipeline.py:180-187`) | small | ⬜ open — a path-only workspace probe prints “Model artifact is not a dict: class tuple” then passes without reaching inference; the original external-workspace script is unchanged and excluded from final EDA verification. See the EDA review's follow-up evidence. |
 
 ---
 

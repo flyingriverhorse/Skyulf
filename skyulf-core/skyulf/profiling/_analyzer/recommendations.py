@@ -205,8 +205,9 @@ class RecommendationsMixin(_AnalyzerState):
 
         counts_df = (
             self.lazy_df.select(target_col)
+            .rename({target_col: "value"})
             .drop_nulls()
-            .group_by(target_col)
+            .group_by("value")
             .len(name="count")
             .collect()
         )

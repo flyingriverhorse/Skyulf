@@ -3,6 +3,25 @@ import { describe, expect, it } from 'vitest';
 import { buildScatterLegendEntries, groupScatterPoints } from './scatterGrouping';
 
 describe('scatter label grouping', () => {
+  it('orders mixed-case and accented category labels alphabetically', () => {
+    // Letter case and accents must not move categories behind unrelated letters.
+    const points = ['zebra', 'Banana', 'apple', '\u00c9clair'].map((label, x) => ({ x, label }));
+
+    expect(groupScatterPoints(points, 'label').map((group) => group.label))
+      .toEqual(['apple', 'Banana', '\u00c9clair', 'zebra']);
+  });
+
+  it('keeps distinct Unicode spellings styled consistently when collation considers them equal', () => {
+    // Canonically equivalent labels stay distinct without assigning styles by input row order.
+    const points = ['\u00e9', 'e\u0301'].map((label, x) => ({ x, label }));
+    const original = buildScatterLegendEntries(groupScatterPoints(points, 'label'));
+    const reordered = buildScatterLegendEntries(groupScatterPoints([...points].reverse(), 'label'));
+
+    expect(original.map((entry) => entry.label)).toEqual(['e\u0301', '\u00e9']);
+    expect(reordered).toEqual(original);
+    expect(original[0]?.color).not.toBe(original[1]?.color);
+  });
+
   it('keeps category colors and shapes stable when rows are reordered or missing labels are added', () => {
     // Group identity must survive row order changes and unlabeled observations.
     const points = ['Gold', 'Silver', 'Bronze', '10', '2'].map((label, x) => ({ x, label }));

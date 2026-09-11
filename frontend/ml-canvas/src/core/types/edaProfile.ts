@@ -119,6 +119,15 @@ export interface EDAAlert {
   column?: string | null;
 }
 
+export interface CausalGraphData {
+  nodes: Array<{ id: string; label: string }>;
+  edges: Array<{ source: string; target: string; type: string }>;
+  /** Missing on saved reports created before selection metadata was recorded. */
+  selection_method?: 'all' | 'target_correlation' | 'variance' | null;
+}
+
+export type CausalTargetExclusionReason = 'categorical' | 'excluded' | 'unsupported';
+
 export interface EDAProfile {
   row_count: number;
   column_count: number;
@@ -134,6 +143,9 @@ export interface EDAProfile {
   vif?: Record<string, number> | null;
   /** Names of columns the user explicitly excluded from the analysis. */
   excluded_columns?: string[];
+  causal_graph?: CausalGraphData | null;
+  /** The same numeric eligibility rule applies to causal discovery and target Pearson values. */
+  causal_target_exclusion_reason?: CausalTargetExclusionReason | null;
   /** Catch-all for future fields not yet typed (PCA, clustering, geo, causal, target, timeseries, etc.). */
   [extra: string]: unknown;
 }

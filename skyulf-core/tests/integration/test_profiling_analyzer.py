@@ -413,8 +413,8 @@ def test_discover_causal_graph_runs_on_correlated_data() -> None:
     assert {n.id for n in graph.nodes} == {"a", "b", "c"}
 
 
-def test_discover_causal_graph_selects_top_correlated_with_target_hint() -> None:
-    """With >15 numeric cols and a 'target'-like name, keep target + top-14 |corr| cols."""
+def test_discover_causal_graph_selects_top_correlated_with_explicit_target() -> None:
+    """With >15 numeric cols, keep the chosen target and top-14 correlated features."""
     pytest.importorskip("causallearn")
     rng = np.random.default_rng(11)
     n = 60
@@ -424,7 +424,7 @@ def test_discover_causal_graph_selects_top_correlated_with_target_hint() -> None
     df = pl.DataFrame(data)
     analyzer = EDAAnalyzer(df)
 
-    graph = analyzer._discover_causal_graph(list(df.columns))
+    graph = analyzer._discover_causal_graph(list(df.columns), target_col="target")
 
     assert graph is not None
     node_ids = {n.id for n in graph.nodes}
@@ -432,8 +432,8 @@ def test_discover_causal_graph_selects_top_correlated_with_target_hint() -> None
     assert len(node_ids) == 15
 
 
-def test_discover_causal_graph_selects_highest_variance_without_target_hint() -> None:
-    """With >15 numeric cols and no target-like name, keep the 15 highest-variance cols."""
+def test_discover_causal_graph_selects_highest_variance_without_target() -> None:
+    """With >15 numeric cols and no target, keep the 15 highest-variance cols."""
     pytest.importorskip("causallearn")
     rng = np.random.default_rng(12)
     n = 60
@@ -451,6 +451,108 @@ def test_discover_causal_graph_selects_highest_variance_without_target_hint() ->
     assert len(node_ids) == 15
     # The lowest-variance column ("col_0") should have been dropped.
     assert "col_0" not in node_ids
+
+
+@pytest.mark.parametrize("reverse_order", [False, True])
+def test_build_causal_edges_preserves_real_library_direction(reverse_order: bool) -> None:
+    """Real causal-learn arrows must retain their direction for either node order."""
+    graph_class = pytest.importorskip("causallearn.graph.GeneralGraph").GeneralGraph
+    node_class = pytest.importorskip("causallearn.graph.GraphNode").GraphNode
+    cause, effect = node_class("cause"), node_class("effect")
+    nodes = [effect, cause] if reverse_order else [cause, effect]
+    graph = graph_class(nodes)
+    graph.add_directed_edge(cause, effect)
+    analyzer = EDAAnalyzer(pl.DataFrame({"cause": [1.0], "effect": [2.0]}))
+
+    edges = analyzer._build_causal_edges(graph.graph, [node.get_name() for node in nodes])
+
+    assert [(edge.source, edge.target, edge.type) for edge in edges] == [
+        ("cause", "effect", "directed")
+    ]
+
+
+def test_analyze_causal_collider_points_into_effect() -> None:
+    """Public analysis must preserve the real PC collider A -> C <- B."""
+    pytest.importorskip("causallearn")
+    rng = np.random.default_rng(117)
+    a, b = rng.normal(size=1200), rng.normal(size=1200)
+    c = a + b + rng.normal(scale=0.3, size=1200)
+    frame = pl.DataFrame({"A": a, "B": b, "C": c})
+    analyzer = EDAAnalyzer(frame)
+
+    profile = analyzer.analyze(target_col="C")
+
+    assert profile.causal_graph is not None
+    assert {(edge.source, edge.target, edge.type) for edge in profile.causal_graph.edges} == {
+        ("A", "C", "directed"),
+        ("B", "C", "directed"),
+    }
+    assert profile.causal_graph.selection_method == "all"
+    assert analyzer.df.equals(frame)
+
+
+@pytest.mark.parametrize("feature_name", ["label", "target_score"])
+def test_causal_column_cap_does_not_infer_target_from_feature_name(feature_name: str) -> None:
+    """A low-variance feature named like a target must not displace an eligible feature."""
+    rng = np.random.default_rng(901)
+    frame = pl.DataFrame(
+        {
+            **{f"feature_{i}": rng.normal(size=250) * 20 for i in range(15)},
+            feature_name: rng.normal(size=250) * 0.001,
+        }
+    )
+    analyzer = EDAAnalyzer(frame)
+    candidates = frame.columns
+
+    selected = analyzer._limit_columns_for_pc(candidates)
+
+    assert set(selected) == {f"feature_{i}" for i in range(15)}
+    assert candidates == frame.columns
+
+
+def test_discover_causal_graph_retains_low_variance_explicit_target() -> None:
+    """Wide graphs must retain the actual numeric target and its strongest predictor."""
+    pytest.importorskip("causallearn")
+    rng = np.random.default_rng(903)
+    latent = rng.normal(size=250)
+    frame = pl.DataFrame(
+        {
+            **{f"feature_{i}": rng.normal(size=250) * 20 for i in range(16)},
+            "signal": (latent + rng.normal(scale=0.05, size=250)) * 0.001,
+            "outcome": latent * 0.001,
+        }
+    )
+    analyzer = EDAAnalyzer(frame)
+
+    graph = analyzer._discover_causal_graph(frame.columns, target_col="outcome")
+
+    assert graph is not None
+    assert len(graph.nodes) == 15
+    assert {"outcome", "signal"} <= {node.id for node in graph.nodes}
+    assert graph.selection_method == "target_correlation"
+    assert analyzer.df.equals(frame)
+
+
+def test_discover_causal_graph_ignores_target_outside_candidates() -> None:
+    """Excluded targets must not be reintroduced when variance limits the feature set."""
+    pytest.importorskip("causallearn")
+    rng = np.random.default_rng(904)
+    frame = pl.DataFrame(
+        {
+            **{f"feature_{i}": rng.normal(size=150) * (i + 1) for i in range(16)},
+            "outcome": rng.normal(size=150),
+        }
+    )
+    analyzer = EDAAnalyzer(frame)
+    candidates = [f"feature_{i}" for i in range(16)]
+
+    graph = analyzer._discover_causal_graph(candidates, target_col="outcome")
+
+    assert graph is not None
+    assert len(graph.nodes) == 15
+    assert {node.id for node in graph.nodes} == {f"feature_{i}" for i in range(1, 16)}
+    assert graph.selection_method == "variance"
+    assert candidates == [f"feature_{i}" for i in range(16)]
 
 
 def test_discover_causal_graph_returns_none_when_causallearn_missing(monkeypatch) -> None:
@@ -481,14 +583,14 @@ def test_discover_causal_graph_maps_all_edge_endpoint_combinations(monkeypatch) 
     import skyulf.profiling._analyzer.causal as causal_module
 
     # causal-learn endpoint encoding: -1 = tail, 1 = arrowhead. Build a 4x4 adjacency
-    # matrix exercising every branch of the endpoint-to-edge-type mapping.
+    # matrix exercising every branch. [i, j] stores the endpoint at node i.
     adj = np.zeros((4, 4))
     # (a, b): directed a -> b
-    adj[1, 0] = -1
-    adj[0, 1] = 1
+    adj[0, 1] = -1
+    adj[1, 0] = 1
     # (a, c): reversed -> edge stored as c -> a
-    adj[2, 0] = 1
-    adj[0, 2] = -1
+    adj[0, 2] = 1
+    adj[2, 0] = -1
     # (a, d): no edge at all (both endpoints 0) -> skipped
     # (b, c): undirected
     adj[2, 1] = -1

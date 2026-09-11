@@ -240,6 +240,14 @@ uses, so a fixed finding stays where it was filed.
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
+| OC-235 | 🟠 | Directed causal edges are serialized backwards (`profiling/_analyzer/causal.py`) | small | ✅ fixed 2026-09-11 — preserve causal-learn endpoint order; real graph objects and public collider regressions verify both orientations. |
+| OC-236 | 🟠 | Nominal target codes feed Pearson/Fisher-Z as numeric magnitudes, making results depend on category order (`profiling/analyzer.py`) | design + medium | ✅ fixed 2026-09-11 — omit categorical targets from numeric analysis while preserving category associations; numeric task overrides and omission metadata are explicit. |
+| OC-237 | 🟡 | The causal graph cap guesses the target from column names and can omit the actual selection (`profiling/_analyzer/causal.py`) | small | ✅ fixed 2026-09-11 — retain the explicitly selected eligible numeric target and record all/target-correlation/variance selection. |
+| OC-238 | ⚪ | Temporary target names become public graph and matrix labels (`profiling/analyzer.py`) | small | ✅ fixed 2026-09-11 — no temporary nominal target codes are created; original feature identities remain intact and omitted targets are explained. |
+| OC-239 | 🟡 | An excluded target still drives rules and inferred task type (`profiling/analyzer.py`) | small | ✅ fixed 2026-09-11 — rule discovery requires an active target, including across repeated analysis; backend serialization regression verifies exclusion precedence. |
+| OC-240 | 🟡 | Target/grouping names collide with aggregation aliases, silently removing statistics (`profiling/_analyzer/target.py`) | small | ✅ fixed 2026-09-11 — isolate group keys from statistic names; test both target directions, nulls, constants and every affected alias. |
+| OC-241 | 🟠 | Sampled outlier offsets identify the wrong source rows (`profiling/_analyzer/multivariate.py`) | small | ✅ fixed 2026-09-11 — carry positions separately from model features and publish zero-based positions in the filtered input before sampling; scores and sampled rows remain unchanged. |
+| OC-245 | 🟡 | Target name `count` collides with recommendation class-count output and aborts public analysis (`profiling/_analyzer/recommendations.py:_target_class_counts`) | small | ✅ filed and fixed 2026-09-11 — isolate the group key; numeric/string labels, literal count categories, missing labels and imbalance ratios are covered. |
 | OC-49 | 🟡 | Valid partially-unlabelled PCA payloads crash plotting (`profiling/visualizer.py:716-737`) | small | ✅ fixed 2026-09-11 - render missing-label PCA points as a separate gray series; preserve every coordinate and omit the colorbar when all labels are absent. |
 | OC-52 | ⚪ | Categorical colour mapping is process-nondeterministic (`visualizer.py:710-713`) | small | ✅ fixed 2026-09-11 - sort the shared categorical label set for reproducible PCA and geospatial colors across row order and Python hash seeds. |
 | OC-191 | 🟡 | All-null and Polars Enum columns are classified as text and sent to string-only aggregates, aborting the whole profile (`profiling/analyzer.py`, `_analyzer/column.py`) | small | ✅ fixed 2026-09-11 - profile Null dtype as Unknown with missing-value reporting and native Enum as Categorical, preserving the rest of the report. |
@@ -299,6 +307,9 @@ uses, so a fixed finding stays where it was filed.
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
 | OC-234 | 🟡 | 3D scatter legends promise triangle/star markers that Plotly silently renders as circles (`chartMarkerShapes.ts`, `ThreeDScatterPlot.tsx`) | small | ✅ fixed 2026-09-11 - use five shapes supported by both scatter engines and render matching plus/X legend symbols; real browser regressions verify resolved Plotly markers. |
+| OC-242 | 🟠 | Causal graph ID sanitization merges distinct column names (`components/eda/CausalGraph.tsx`) | small | ✅ fixed 2026-09-11 — map original identities to distinct opaque IDs and preserve edge endpoints; Chromium covers spaces, punctuation, Unicode and prototype-like names. |
+| OC-243 | 🟡 | Bidirected causal edges render only one arrowhead (`components/eda/CausalGraph.tsx`) | small | ✅ fixed 2026-09-11 — render both endpoint markers for bidirected edges and retain directed/undirected behavior. |
+| OC-244 | 🟡 | Loading an empty historical graph preserves old results (`components/eda/CausalGraph.tsx`, `tabs/CausalTab.tsx`) | small | ✅ fixed 2026-09-11 — clear graph state and render an unavailable state with the current target explanation; desktop/mobile history regressions verify removal. |
 | OC-231 | ⚪ | EDA scatter and geospatial category colors depend on first appearance; reordering identical points changes the color of the same category (`scatterGrouping.ts:32-35`, `GeospatialTab.tsx:60-67`) | small | ✅ fixed 2026-09-11 - Sort observed category labels and share color metadata across 2D, 3D, map and legends; row reordering preserves category colors. |
 | OC-232 | 🟡 | Missing PCA/scatter labels are merged with genuine `Other` labels, making unlabeled and observed categories indistinguishable (`scatterGrouping.ts:22-23`) | small | ✅ fixed 2026-09-11 - Keep missing values in a neutral group with collision-safe captions, preserving every point and showing all-missing legends. |
 | OC-233 | 🟡 | Valid scatter labels such as `__proto__`, `constructor` and `toString` crash grouping because inherited object properties are treated as arrays (`scatterGrouping.ts:20-24`) | small | ✅ fixed 2026-09-11 - Use Map-backed grouping so prototype-named categories render normally without losing points or crashing. |
@@ -386,6 +397,97 @@ respective fix logs; OC-167 closed with canonical artifact framing on 2026-09-09
 ---
 
 ## Log
+
+### 2026-09-11 — Web EDA label sorting review
+
+The repeated scanner finding referred to the single bare `.sort()` in
+`scatterGrouping.ts`. It now uses `String.localeCompare` with the fixed `en`
+locale and a lexical tie-breaker for distinct Unicode spellings that collate
+equally. Mixed-case/accented labels sort alphabetically without making color
+and marker assignments depend on browser language or input row order.
+
+The mixed-case regression failed before the change; all **112 EDA component
+tests** and **6 desktop/mobile browser cases** now pass. The browser fixture's
+expected legend order was updated to the intended alphabetical order. Frontend
+lint/CCN, explicit browser-spec lint, TypeScript/Vite build, size budgets and
+diff checks pass. Docs and rebuilt assets are updated; OC counts are unchanged.
+
+### 2026-09-11 — OC-235–245 fixed: target semantics, causal graphs and profiling identity
+
+The user authorized all ten reviewed repairs with subagents. Three agents
+implemented causal conversion/selection, target aggregation/outlier provenance,
+and frontend graph rendering; the parent integrated categorical target
+eligibility, exclusions, schemas, backend payload coverage, documentation and
+the production build. Independent review found the adjacent recommendation
+`count` collision (OC-245), which was also reproduced and repaired.
+
+The resulting contract is documented in
+[`eda_target_causal_review_2026-09-11.md`](eda_target_causal_review_2026-09-11.md)
+and the EDA user guide. Categorical targets retain eta associations and original
+values; Pearson/Fisher-Z no longer treat arbitrary category codes as numeric
+measurements. Numeric target eligibility respects explicit task choice. New
+optional report metadata explains omissions, even without a graph, and the
+actual selection method; legacy fields remain readable. Both causal and
+correlation notices are reachable when no numeric matrix is available.
+
+Directed edges match the real PC output. Graph caps use the actual selected
+numeric target. Exclusions override rule discovery; aliases cannot overwrite
+group keys; outlier indices retain zero-based positions in the filtered input
+before sampling without changing the sampled model features or scores. Web
+graphs preserve distinct IDs, render both bidirected arrowheads, and remove
+old results when history loads an empty graph. Saved analyses must be rerun
+for numerical/result changes; reloading the UI applies rendering corrections.
+
+All repairs have failing-before/passing-after focused regressions. Final gates:
+**7,054 Core tests passed / 80 skipped** (cached NLP model in offline mode),
+**3,612 backend tests passed / 1 legacy test deselected**, **2,487 frontend
+tests passed**, and **8 Chromium desktop/mobile cases passed**. All ten Python
+snapshots passed. Repository Ruff, backend/Core Ty, changed Python formatting,
+frontend ESLint/CCN, production build, size budgets and diff checks passed.
+Commands and environmental limits are recorded in the linked review.
+No production changes were needed in the backend; its configuration and
+serialization path is covered by the new target-contract regression.
+
+The broad backend run also exposed test-environment limitations. Artifact
+routing now uses pytest's temporary directory instead of `/tmp/artifacts`.
+The separate local-only inference smoke (OC-246) is unchanged: its external
+workspace path is inaccessible in the sandbox, and a safe path-only probe
+showed it returning early on a tuple model artifact while claiming a pass.
+It is excluded from the final backend run and filed as a separate test repair,
+not counted as inference validation.
+
+OC-235–244 move out of the live queue, OC-245 is filed closed, and OC-246 is
+filed open: **38 open / 4 parked**. Historical baseline and parked items are
+unchanged. No commit was requested for this repair pass.
+
+### 2026-09-11 — OC-235–244 filed: EDA target and causal graph review
+
+The reported `species_encoded` node was reproduced with Iris. It is a
+temporary Core target representation surfaced as a public label; the source
+`species` column is unchanged. The bounded follow-up found **10 new issues
+(4 🟠 / 5 🟡 / 1 ⚪)**, recorded open with evidence in
+[`eda_target_causal_review_2026-09-11.md`](eda_target_causal_review_2026-09-11.md).
+
+Seven public `EDAAnalyzer.analyze` reproductions establish reversed causal
+arrows, arbitrary category-code-dependent Pearson/PC results, omission of the
+selected target under the graph cap, internal target labels, rules using an
+excluded target, target-name aggregation collisions, and incorrect sampled
+outlier row indices. The real causal-learn collider returns `A → C ← B`, while
+Skyulf emits `C → A` and `C → B`. The same Iris observations reordered by class
+change encoded-target Pearson from 0.9565 to 0.5804 and the PC graph from four
+to five edges; fixed-code and categorical-association controls remain stable.
+
+Three original-source Chromium probes reproduce colliding causal node IDs,
+one-ended bidirected edges, and stale graph state after loading an empty
+historical graph. These use mocked schema-supported report/history responses;
+the audit does not claim current PC regularly emits bidirected or empty graph
+payloads. Changing the target selector before Analyze was not filed as a bug.
+
+The existing three focused profiling suites still pass **83 tests / 41
+warnings** and miss these cases. Production source and committed tests were
+unchanged; only the review, live queue, and this log were updated. OC-235–244
+remain open, taking the live queue from **37 to 47 open / 4 parked**. Existing
+parked items and historical baseline counts are unchanged.
 
 ### 2026-09-11 - OC-234 fixed: matching scatter marker shapes and legends
 

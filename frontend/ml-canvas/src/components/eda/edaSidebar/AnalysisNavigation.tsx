@@ -48,7 +48,7 @@ function analysisGroups(profile: EDAProfile) {
         {
             title: "Multivariate Analysis",
             items: [
-                { id: 'correlations', label: 'Correlations', icon: GitMerge, show: !!(profile.correlations || profile.correlations_with_target) },
+                { id: 'correlations', label: 'Correlations', icon: GitMerge, show: !!(profile.correlations || profile.correlations_with_target || profile.causal_target_exclusion_reason) },
                 { id: 'bivariate', label: 'Bivariate', icon: ScatterChart, show: true },
                 { id: 'pca', label: 'PCA & Clusters', icon: Network, show: !!profile.pca_data || !!profile.clustering },
             ]
@@ -56,7 +56,7 @@ function analysisGroups(profile: EDAProfile) {
         {
             title: "Structure & Causal",
             items: [
-                { id: 'causal', label: 'Causal Graph', icon: Network, show: !!profile.causal_graph },
+                { id: 'causal', label: 'Causal Graph', icon: Network, show: !!(profile.causal_graph || profile.causal_target_exclusion_reason) },
                 { id: 'rules', label: 'Decision Tree', icon: GitBranch, show: !!profile.rule_tree },
                 { id: 'decomposition', label: 'Decomposition', icon: Split, show: true }, // Always show, handles its own empty state
             ]

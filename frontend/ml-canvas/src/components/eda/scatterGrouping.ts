@@ -8,6 +8,13 @@ interface ScatterGroup<T> extends ChartLegendEntry {
   points: T[];
 }
 
+/** Alphabetize consistently across browser locales, breaking ties between distinct Unicode spellings. */
+const compareLabels = (left: string, right: string): number => {
+  const alphabetical = left.localeCompare(right, 'en');
+  if (alphabetical !== 0 || left === right) return alphabetical;
+  return left < right ? -1 : 1;
+};
+
 /** Chooses a missing-label caption that cannot impersonate an observed category. */
 const missingGroupLabel = (labels: ReadonlySet<string>): string => {
   let label = 'Unlabeled';
@@ -42,7 +49,7 @@ export const groupScatterPoints = <T extends Record<string, unknown>>(
     groups.set(label, points);
   });
 
-  const labels = [...groups.keys()].filter((label): label is string => label !== null).sort();
+  const labels = [...groups.keys()].filter((label): label is string => label !== null).sort(compareLabels);
   const result: ScatterGroup<T>[] = labels.map((label, idx) => ({
     value: label, label, points: groups.get(label)!,
     color: CHART_SERIES_COLORS[idx % CHART_SERIES_COLORS.length]!,

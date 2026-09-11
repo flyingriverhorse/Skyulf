@@ -12,13 +12,10 @@ import {
     Position
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { Info } from 'lucide-react';
+import type { CausalGraphData } from '../../core/types/edaProfile';
 
 interface CausalGraphProps {
-    graph: {
-        nodes: { id: string; label: string }[];
-        edges: { source: string; target: string; type: string }[];
-    };
+    graph: CausalGraphData;
 }
 
 const nodeWidth = 150;
@@ -43,6 +40,14 @@ const getEdgeStrokeColor = (type: string): string => {
     const isDark = document.documentElement.classList.contains('dark');
     if (type === 'directed') return isDark ? '#9acbfa' : '#3b4bc4';
     return isDark ? '#abafb7' : '#6b6485';
+};
+
+/** Translate edge orientation to arrowheads at the corresponding endpoints. */
+const getEdgeMarkers = (type: string, color: string): Pick<Edge, 'markerStart' | 'markerEnd'> => {
+    const arrow = { type: MarkerType.ArrowClosed, color };
+    if (type === 'bidirected') return { markerStart: arrow, markerEnd: arrow };
+    if (type === 'directed') return { markerEnd: arrow };
+    return {};
 };
 
 export const CausalGraph: React.FC<CausalGraphProps> = ({ graph }) => {
@@ -114,39 +119,39 @@ export const CausalGraph: React.FC<CausalGraphProps> = ({ graph }) => {
     }, []);
 
     useEffect(() => {
-        if (!graph || !graph.nodes || graph.nodes.length === 0) return;
+        if (!graph || !graph.nodes || graph.nodes.length === 0) {
+            setNodes([]);
+            setEdges([]);
+            return;
+        }
 
-        // Sanitize IDs to ensure they are safe strings
-        const sanitizeId = (id: string) => id.replace(/[^a-zA-Z0-9-_]/g, '_');
+        // Keep arbitrary column names distinct while giving both graph libraries opaque IDs.
+        const nodeIds = new Map(graph.nodes.map((node, index) => [node.id, `causal-node-${index}`]));
 
-        const initialNodes: Node[] = graph.nodes.map(n => ({
-            id: sanitizeId(n.id),
+        const initialNodes: Node[] = graph.nodes.map((n, index) => ({
+            id: `causal-node-${index}`,
             data: { label: n.label },
             position: { x: 0, y: 0 },
             style: getNodeStyle(),
         }));
 
-        const initialEdges: Edge[] = graph.edges.map((e, i) => {
+        const initialEdges: Edge[] = graph.edges.flatMap((e, i) => {
+            const source = nodeIds.get(e.source);
+            const target = nodeIds.get(e.target);
+            if (source === undefined || target === undefined) return [];
             const stroke = getEdgeStrokeColor(e.type);
-            const endArrow = e.type === 'directed'
-                ? { type: MarkerType.ArrowClosed, color: stroke }
-                : null;
-            const startArrow = e.type === 'bidirected'
-                ? { type: MarkerType.ArrowClosed, color: stroke }
-                : null;
-            return {
+            return [{
                 id: `e${i}`,
-                source: sanitizeId(e.source),
-                target: sanitizeId(e.target),
+                source,
+                target,
                 animated: true,
                 type: 'default',
                 label: e.type === 'directed' ? 'causes' : (e.type === 'bidirected' ? 'confounded' : 'related'),
                 labelStyle: { fill: 'hsl(var(--foreground))', fontSize: 12 },
                 labelBgStyle: { fill: 'hsl(var(--card))' },
                 style: { stroke, strokeDasharray: e.type === 'directed' ? '0' : '5 5' },
-                ...(endArrow ? { markerEnd: endArrow } : {}),
-                ...(startArrow ? { markerStart: startArrow } : {}),
-            };
+                ...getEdgeMarkers(e.type, stroke),
+            }];
         });
 
         const layouted = getLayoutedElements(initialNodes, initialEdges);
@@ -170,10 +175,6 @@ export const CausalGraph: React.FC<CausalGraphProps> = ({ graph }) => {
                     <Controls className="dark:bg-gray-800 dark:text-white dark:border-gray-700" />
                 </ReactFlow>
             </div>
-            <p className="text-xs text-gray-500 dark:text-gray-400 italic flex items-center gap-1">
-                <Info className="w-3 h-3" />
-                To ensure fast performance, this graph displays the <strong>Target</strong> and the top <strong>14 features</strong> most correlated with it.
-            </p>
         </div>
     );
 };

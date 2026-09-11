@@ -7,7 +7,7 @@ test.use({ launchOptions: { args: ['--enable-unsafe-swiftshader'] } });
 
 const missingColor = '#6b7280';
 const missingLabel = 'Unlabeled (missing) 2';
-const categoryLabels = ['Other', 'Unlabeled', 'Unlabeled (missing)', '__proto__', 'constructor', 'toString'];
+const categoryLabels = ['__proto__', 'constructor', 'Other', 'toString', 'Unlabeled', 'Unlabeled (missing)'];
 const labels = ['toString', null, 'Other', '__proto__', 'Unlabeled', 'constructor', 'Unlabeled (missing)'];
 
 interface Point {

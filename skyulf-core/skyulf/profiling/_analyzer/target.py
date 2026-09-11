@@ -64,7 +64,7 @@ class TargetMixin(_AnalyzerState):
         if not ss_total:
             return 0.0
 
-        groups = pairs.group_by(target_col).agg(
+        groups = pairs.group_by(pl.col(target_col).alias("group")).agg(
             [pl.len().alias("n"), pl.col(col).mean().alias("mean")]
         )
 
@@ -133,7 +133,7 @@ class TargetMixin(_AnalyzerState):
             return None
 
         stats_df = self._compute_boxplot_stats(group_col, value_col)
-        category_plots = self._build_category_plots(stats_df, group_col)
+        category_plots = self._build_category_plots(stats_df, "group")
 
         if not category_plots:
             return None
@@ -148,9 +148,9 @@ class TargetMixin(_AnalyzerState):
         )
 
     def _compute_boxplot_stats(self, group_col: str, value_col: str) -> pl.DataFrame:
-        """Compute per-group min/q1/median/q3/max for the value column."""
+        """Compute box-plot stats with a fixed group key, isolating user column names."""
         return _collect(
-            self.lazy_df.group_by(group_col).agg(  # type: ignore[attr-defined]
+            self.lazy_df.group_by(pl.col(group_col).alias("group")).agg(  # type: ignore[attr-defined]
                 [
                     pl.col(value_col).cast(pl.Float64, strict=False).min().alias("min"),
                     pl.col(value_col)

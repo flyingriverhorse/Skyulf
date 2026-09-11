@@ -4,6 +4,18 @@ import { InfoTooltip } from '../../ui/InfoTooltip';
 import { Network, Download, Loader2, Check } from 'lucide-react';
 import { toPng } from 'html-to-image';
 import { toast } from '../../../core/toast';
+import type { CausalGraphData } from '../../../core/types/edaProfile';
+import { NumericTargetNotice } from '../NumericTargetNotice';
+
+/** Describe only the selection strategy recorded by the report that is being shown. */
+function selectionDescription(method: CausalGraphData['selection_method']) {
+    switch (method) {
+        case 'all': return 'This graph includes all eligible numeric variables; no feature cap was needed.';
+        case 'target_correlation': return 'This graph includes the selected numeric target and up to 14 numeric features with the strongest absolute Pearson correlations to it.';
+        case 'variance': return 'This graph includes up to 15 of the highest-variance numeric variables; no eligible numeric target was used for selection.';
+        default: return 'Causal discovery is limited to up to 15 numeric variables. Selection details were not recorded for this report.';
+    }
+}
 
 interface CausalTabProps {
     profile: any;
@@ -46,11 +58,14 @@ export const CausalTab: React.FC<CausalTabProps> = ({ profile }) => {
             });
     }, []);
 
-    if (!graph) {
+    const targetNotice = <NumericTargetNotice target={profile.target_col} reason={profile.causal_target_exclusion_reason} />;
+
+    if (!graph?.nodes?.length) {
         return (
             <div className="p-8 text-center text-gray-500">
                 <Network className="w-12 h-12 mx-auto mb-4 opacity-50" />
                 <p>No causal graph available. This might be because there are fewer than 2 numeric columns or the analysis failed.</p>
+                {targetNotice}
             </div>
         );
     }
@@ -76,9 +91,11 @@ export const CausalTab: React.FC<CausalTabProps> = ({ profile }) => {
                 <div className="mb-4 text-sm text-gray-600 dark:text-gray-400 bg-yellow-50 dark:bg-yellow-900/20 p-3 rounded border border-yellow-200 dark:border-yellow-800">
                     <strong>Disclaimer:</strong> This graph is inferred purely from observational data. Correlation does not imply causation. Use this as a hypothesis generation tool, not absolute truth.
                 </div>
+                {targetNotice}
                 <div id="causal-chart">
                     <CausalGraph graph={graph} />
                 </div>
+                <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">{selectionDescription(graph.selection_method)}</p>
             </div>
         </div>
     );

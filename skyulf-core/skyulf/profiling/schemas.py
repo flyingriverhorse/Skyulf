@@ -9,7 +9,7 @@ downstream JSON consumer ever has to parse a bare ``NaN`` token.
 
 import math
 from datetime import datetime
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, BeforeValidator, Field
 
@@ -116,6 +116,7 @@ class CausalGraph(BaseModel):
 
     nodes: list[CausalNode]
     edges: list[CausalEdge]
+    selection_method: Literal["all", "target_correlation", "variance"] | None = None
 
 
 class RuleNode(BaseModel):
@@ -408,6 +409,7 @@ class DatasetProfile(BaseModel):
     outliers: OutlierAnalysis | None = None
     clustering: ClusteringAnalysis | None = None
     causal_graph: CausalGraph | None = None
+    causal_target_exclusion_reason: Literal["categorical", "excluded", "unsupported"] | None = None
     rule_tree: RuleTree | None = None
     vif: dict[str, float] | None = None  # Variance Inflation Factor for numeric columns
 

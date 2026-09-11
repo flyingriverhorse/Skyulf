@@ -8,7 +8,7 @@ This module keeps only the orchestrator: ``EDAAnalyzer.__init__`` and
 """
 
 import logging
-from typing import Any
+from typing import Any, Literal
 
 import polars as pl
 
@@ -326,32 +326,29 @@ class EDAAnalyzer(
 
         return col_profiles, alerts, numeric_cols
 
-    def _encode_target_if_needed(
-        self, target_col: str | None, numeric_cols: list[str]
-    ) -> str | None:
-        """Encode string/boolean targets so they appear in causal graphs.
+    def _numeric_target_exclusion_reason(
+        self, target_col: str | None, semantic_types: dict[str, str], task_type: str | None
+    ) -> Literal["categorical", "excluded", "unsupported"] | None:
+        """Explain why a selected target cannot enter Pearson or Fisher-Z analysis.
 
-        `cast(pl.Categorical)` only accepts string-like columns directly; a
-        Boolean target (a common binary-classification target dtype) must
-        be cast to Utf8 first or polars raises InvalidOperationError.
+        Nominal labels are never converted into arbitrary numeric codes. An
+        explicit regression task may treat an existing numeric target as a
+        measurement; classification always treats its target as categorical.
         """
-        if not (target_col and target_col in self.columns and target_col not in numeric_cols):
+        if not target_col:
             return None
-
-        encoded_base = f"{target_col}_encoded"
-        encoded_target = encoded_base
-        suffix = 1
-        while encoded_target in self.df.columns:
-            encoded_target = f"{encoded_base}_{suffix}"
-            suffix += 1
-        target_expr = pl.col(target_col)
-        if self.df.schema[target_col] == pl.Boolean:  # type: ignore[attr-defined]
-            target_expr = target_expr.cast(pl.Utf8)
-        self.df = self.df.with_columns(
-            target_expr.cast(pl.Categorical).to_physical().alias(encoded_target)
-        )
-        self.lazy_df = self.df.lazy()
-        return encoded_target
+        if target_col not in self.columns:
+            return "excluded" if target_col in self.df.columns else "unsupported"
+        semantic_type = semantic_types[target_col]
+        if task_type == "Classification":
+            return "categorical"
+        if self.df.schema[target_col] in self._NUMERIC_DTYPES and (
+            semantic_type == "Numeric" or task_type == "Regression"
+        ):
+            return None
+        if semantic_type in ("Categorical", "Boolean"):
+            return "categorical"
+        return "unsupported"
 
     def _add_vif_alerts(self, vif_data: dict | None, alerts: list[Alert]) -> None:
         """Flag features with high/very-high variance inflation factor (multicollinearity)."""
@@ -382,15 +379,11 @@ class EDAAnalyzer(
         target_col: str | None,
         feature_cols: list[str],
         numeric_cols: list[str],
-        encoded_target_col: str | None,
     ):
-        """Compute the separate feature-vs-target correlation matrix, if applicable."""
+        """Compute Pearson correlations only for an eligible numeric target."""
         target_corr_cols: list[str] = []
-        if target_col:
-            if target_col in numeric_cols:
-                target_corr_cols = feature_cols + [target_col]
-            elif encoded_target_col:
-                target_corr_cols = feature_cols + [encoded_target_col]
+        if target_col is not None and target_col in numeric_cols:
+            target_corr_cols = feature_cols + [target_col]
         if len(target_corr_cols) >= 2:
             return calculate_correlations(self.lazy_df, target_corr_cols)
         return None
@@ -461,6 +454,7 @@ class EDAAnalyzer(
         feature_cols: list[str],
         numeric_cols: list[str],
         alerts: list[Alert],
+        task_type: str | None = None,
     ) -> tuple[dict[str, float], Any]:
         """Dispatch target-relationship analytics (correlations / interactions / leakage) by dtype."""
         target_correlations: dict[str, float] = {}
@@ -471,6 +465,10 @@ class EDAAnalyzer(
         target_semantic_type = self._get_semantic_type(  # pylint: disable=assignment-from-no-return
             self.df[target_col]
         )
+        if task_type == "Classification":
+            target_semantic_type = "Categorical"
+        elif task_type == "Regression" and target_col in numeric_cols:
+            target_semantic_type = "Numeric"
 
         if target_semantic_type == "Numeric":
             target_correlations, target_interactions = self._compute_numeric_target_analytics(
@@ -515,13 +513,10 @@ class EDAAnalyzer(
 
         return pca_data, pca_components, outliers, clustering
 
-    def _compute_causal_graph(self, numeric_cols: list[str], encoded_target_col: str | None):
-        """Run causal discovery, including the encoded target so it shows in the graph."""
-        causal_cols = numeric_cols.copy()
-        if encoded_target_col:
-            causal_cols.append(encoded_target_col)
-        if len(causal_cols) >= 2:
-            return self._discover_causal_graph(causal_cols)
+    def _compute_causal_graph(self, numeric_cols: list[str], target_col: str | None):
+        """Run Fisher-Z discovery on eligible numeric measurements, retaining the target."""
+        if len(numeric_cols) >= 2:
+            return self._discover_causal_graph(numeric_cols, target_col=target_col)
         return None
 
     def _compute_rule_tree(
@@ -530,7 +525,12 @@ class EDAAnalyzer(
         """Decision-tree surrogate rule discovery, plus the inferred task type."""
         rule_tree = None
         final_task_type = task_type
-        if SKLEARN_AVAILABLE and target_col and len(feature_cols) >= 1:
+        if (
+            SKLEARN_AVAILABLE
+            and target_col is not None
+            and target_col in self.columns
+            and len(feature_cols) >= 1
+        ):
             target_type = self._get_semantic_type(  # pylint: disable=assignment-from-no-return
                 self.df[target_col]
             )
@@ -587,82 +587,85 @@ class EDAAnalyzer(
             basic_stats, advanced_stats, semantic_types
         )
 
-        original_df, original_lazy_df = self.df, self.lazy_df
-        try:
-            encoded_target_col = self._encode_target_if_needed(target_col, numeric_cols)
+        target_exclusion_reason = self._numeric_target_exclusion_reason(
+            target_col, semantic_types, task_type
+        )
+        numeric_target = target_col if target_exclusion_reason is None else None
 
-            # Feature columns = numeric cols minus the target itself.
-            feature_cols = [c for c in numeric_cols if c != target_col]
+        # Feature columns = numeric cols minus the target itself.
+        feature_cols = [c for c in numeric_cols if c != target_col]
 
-            # 3. Correlations + VIF.
-            correlations = calculate_correlations(self.lazy_df, feature_cols)
+        # 3. Correlations + VIF.
+        correlations = calculate_correlations(self.lazy_df, feature_cols)
 
-            vif_data = self._calculate_vif(feature_cols)
-            self._add_vif_alerts(vif_data, alerts)
+        vif_data = self._calculate_vif(feature_cols)
+        self._add_vif_alerts(vif_data, alerts)
 
-            # 3a. Feature-vs-target correlations (separate matrix).
-            correlations_with_target = self._compute_target_correlation_matrix(
-                target_col, feature_cols, numeric_cols, encoded_target_col
-            )
+        # 3a. Feature-vs-target correlations (separate matrix).
+        correlations_with_target = self._compute_target_correlation_matrix(
+            numeric_target, feature_cols, numeric_cols
+        )
 
-            # 3b. Target-relationship analytics (correlations / interactions / leakage).
-            target_correlations, target_interactions = self._compute_target_relationship_analytics(
-                target_col, feature_cols, numeric_cols, alerts
-            )
+        # 3b. Target-relationship analytics (correlations / interactions / leakage).
+        target_correlations, target_interactions = self._compute_target_relationship_analytics(
+            target_col, feature_cols, numeric_cols, alerts, task_type
+        )
 
-            # 4. Frame-level alerts.
-            self._add_high_missing_alert(missing_pct, alerts)
+        # 4. Frame-level alerts.
+        self._add_high_missing_alert(missing_pct, alerts)
 
-            # 5. Sample (used for FE scatter plots).
-            sample_rows = stats_df.head(5000).to_dicts()
+        # 5. Sample (used for FE scatter plots).
+        sample_rows = stats_df.head(5000).to_dicts()
 
-            # 6. Multivariate.
-            pca_data, pca_components, outliers, clustering = self._compute_multivariate(
-                feature_cols, numeric_cols, target_col
-            )
+        # 6. Multivariate.
+        pca_data, pca_components, outliers, clustering = self._compute_multivariate(
+            feature_cols, numeric_cols, target_col
+        )
 
-            # 7-8. Geo + time series.
-            geospatial = self._analyze_geospatial(numeric_cols, target_col, lat_col, lon_col)
-            timeseries = self._analyze_timeseries(numeric_cols, target_col, date_col)
+        # 7-8. Geo + time series.
+        geospatial = self._analyze_geospatial(numeric_cols, target_col, lat_col, lon_col)
+        timeseries = self._analyze_timeseries(numeric_cols, target_col, date_col)
 
-            # 9. Causal discovery (include encoded target so it shows in the graph).
-            causal_graph = self._compute_causal_graph(numeric_cols, encoded_target_col)
+        # 9. Fisher-Z discovery excludes nominal variables, including numeric class codes.
+        causal_cols = [
+            col
+            for col in numeric_cols
+            if (col == numeric_target) or (col != target_col and semantic_types[col] == "Numeric")
+        ]
+        causal_graph = self._compute_causal_graph(causal_cols, numeric_target)
 
-            # 10. Rule discovery (decision-tree surrogate).
-            rule_tree, final_task_type = self._compute_rule_tree(
-                feature_cols, target_col, task_type
-            )
+        # 10. Rule discovery (decision-tree surrogate).
+        rule_tree, final_task_type = self._compute_rule_tree(feature_cols, target_col, task_type)
 
-            # 11. Recommendations.
-            recommendations = self._generate_recommendations(col_profiles, alerts, target_col)
+        # 11. Recommendations.
+        recommendations = self._generate_recommendations(col_profiles, alerts, target_col)
 
-            return DatasetProfile(
-                row_count=self.row_count,
-                column_count=len(self.columns),
-                duplicate_rows=duplicate_rows,
-                missing_cells_percentage=missing_pct,
-                memory_usage_mb=memory_usage,
-                columns=col_profiles,
-                correlations=correlations,
-                correlations_with_target=correlations_with_target,
-                alerts=alerts,
-                recommendations=recommendations,
-                sample_data=sample_rows,
-                target_col=target_col,
-                task_type=final_task_type,
-                target_correlations=target_correlations,
-                target_interactions=target_interactions,
-                pca_data=pca_data,
-                pca_components=pca_components,
-                outliers=outliers,
-                clustering=clustering,
-                causal_graph=causal_graph,
-                rule_tree=rule_tree,
-                vif=vif_data,
-                geospatial=geospatial,
-                timeseries=timeseries,
-                excluded_columns=excluded_columns,
-                active_filters=active_filters,
-            )
-        finally:
-            self.df, self.lazy_df = original_df, original_lazy_df
+        return DatasetProfile(
+            row_count=self.row_count,
+            column_count=len(self.columns),
+            duplicate_rows=duplicate_rows,
+            missing_cells_percentage=missing_pct,
+            memory_usage_mb=memory_usage,
+            columns=col_profiles,
+            correlations=correlations,
+            correlations_with_target=correlations_with_target,
+            alerts=alerts,
+            recommendations=recommendations,
+            sample_data=sample_rows,
+            target_col=target_col,
+            task_type=final_task_type,
+            target_correlations=target_correlations,
+            target_interactions=target_interactions,
+            pca_data=pca_data,
+            pca_components=pca_components,
+            outliers=outliers,
+            clustering=clustering,
+            causal_graph=causal_graph,
+            causal_target_exclusion_reason=target_exclusion_reason,
+            rule_tree=rule_tree,
+            vif=vif_data,
+            geospatial=geospatial,
+            timeseries=timeseries,
+            excluded_columns=excluded_columns,
+            active_filters=active_filters,
+        )
