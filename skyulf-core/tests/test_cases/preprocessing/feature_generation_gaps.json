@@ -90,12 +90,6 @@
           },
           "expected_columns": ["a"]
         },
-        "unknown_operation_type_is_skipped": {
-          "engine": "pandas",
-          "data": {"a": [1.0, 2.0]},
-          "operation": {"operation_type": "not_a_real_op"},
-          "expected_columns": ["a"]
-        },
         "malformed_operation_is_swallowed_without_raising": {
           "engine": "pandas",
           "data": {"a": [1.0, 2.0], "b": [3.0, 4.0]},

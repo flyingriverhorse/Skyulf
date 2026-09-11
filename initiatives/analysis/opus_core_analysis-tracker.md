@@ -193,6 +193,8 @@ uses, so a fixed finding stays where it was filed.
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
+| OC-142 | 🟠 | EDA correlation ratio η exceeds 1.0 with nulls; null-heavy columns rank as strongest association | small | ✅ fixed 2026-09-11 - use complete target-feature pairs for all group counts, means and sums of squares; preserve source rows and correct report ranking. |
+| OC-144 | ⚪ | Geo distance column named `_km` even when the unit is miles | small | ✅ fixed 2026-09-11 - resolve automatic names from the selected unit; preserve explicit configuration and saved artifact names. |
 | OC-143 | 🟠 | RFE ignores the UI's `k`, silently selecting half the features — **duplicate of OC-25**, same file and line; one fix retires both | small | ✅ fixed 2026-09-05 — with OC-25 |
 | OC-141 | ⚪ | `invalid_values` param declared in `node_meta` with zero consumers | 1 line | ✅ fixed 2026-09-06 — key deleted from `node_meta` after re-verifying zero consumers across all three layers and the `.ambr` snapshots, behaviour-neutral because `user_picked_no_columns` keys off `columns`. The other half of the divergence (the params the calculator really reads are still undeclared) is left to **R1 step 1**. See the log entry |
 
@@ -227,6 +229,7 @@ uses, so a fixed finding stays where it was filed.
 | OC-33 | 🟡 | `FeatureInteraction` cannot generate single-column self-products (`feature_generation/interaction.py`) | small | ✅ fixed 2026-09-11 — generate repeated-column combinations when `interaction_only=False`, including fewer columns than the degree; align Canvas validation. |
 | OC-32 | 🟡 | `VarianceThreshold` crashes when all candidates are constant (`feature_selection/variance.py`) | small | ✅ fixed 2026-09-11 — record an empty selection when every candidate fails the threshold, preserving candidate variances, replay and invalid-input errors. |
 | OC-31 | 🟡 | Frontend wrongly requires a target for unsupervised CorrelationThreshold (`FeatureSelectionNode.tsx`) | small | ✅ fixed 2026-09-11 — exempt correlation selection from target validation, retaining target requirements for all eight supervised methods. |
+| OC-29 | 🟡 | `FeatureGeneration` advertises `polynomial` but silently skips it (`feature_generation/_common.py:24-31`) | small | ✅ fixed 2026-09-11 - reject unsupported operation types during fit and replay; polynomial requests point to the separate PolynomialFeatures node. |
 | OC-34 | 🟡 | Count/TF-IDF vectorizers crash on empty or stop-word-only corpora (`vectorization/count_vectorizer.py`, `tfidf_vectorizer.py`) | small | ✅ fixed 2026-09-11 — warn and return an empty artifact for an empty vocabulary; preserve source data and replay, while other settings/pruning errors still raise. |
 | OC-27 | 🟠 | `GeneralTransformation` ignores the UI `standardize` toggle (`transformations/general.py`) | small | ✅ fixed 2026-09-11 — retain each power rule's standardization choice through fitting and replay; older artifacts keep their previous default. |
 | OC-28 | 🟠 | Box-Cox transform failures silently return untransformed data (`transformations/power.py:97-104`) | small | ✅ fixed 2026-09-06 — the silent path was the `valid_cols` filter, not the `except` (which has logged since the node was created); both engines now share `_fitted_columns_present`, which names the fitted columns the frame lacks, and fail-open is kept by decision. See the log entry |
@@ -372,6 +375,89 @@ respective fix logs; OC-167 closed with canonical artifact framing on 2026-09-09
 ---
 
 ## Log
+
+### 2026-09-11 - OC-142 fixed: complete-pair target association statistics
+
+Validated the current implementation before fixing it. A numeric feature with
+four observed values `[0, 2, 2, 4]` in two target groups has eta **0.707107**.
+Appending six missing feature values to one group inflated the reported score
+to **1.118034**, and sixty inflated it to **2.828427**. Null and NaN fixtures
+both reproduced this because the analyzer already normalizes NaN to null.
+Unlabeled rows also polluted the global mean and total sum of squares: adding
+two unlabeled outliers changed a perfectly separated feature from **1.0** to
+**0.577351**. The old null-target test only checked the broad [0, 1] bound and
+missed this incorrect value; it now asserts the analytical score.
+
+The selected target and feature are filtered to complete pairs once, and all
+group sizes, means and sums of squares use that same subset. Filtering is
+specific to each feature and leaves the analyzer's source frame unchanged.
+No complete pairs means the feature is omitted from associations; an observed
+constant feature still reports zero. Scores are corrected by consistent input
+rows, without clipping an inflated result to one.
+
+Red phase: **12 failures / 18 passes**, including two actual backend
+`_run_eda_analyzer` cases where the serialized report incorrectly ranked a
+sparse feature above a perfectly associated feature. Both Boolean and
+Categorical target reports now put `strong` (1.0) before `sparse` (0.707107),
+while retaining row counts and missing-value counts. Additional regressions
+cover empty/all-null/disjoint pairs, feature-specific missingness, unchanged
+source data, and complete-data controls.
+
+Verification: **168 tests pass**, spanning target associations, full analyzer,
+correlations/distributions, recommendations, exclusions, column-name handling,
+and backend EDA analyzer/task/API/router paths. The 47 warnings are existing
+deprecations, degenerate-statistic warnings and Windows CPU-discovery fallback.
+Repository Ruff/Ty, scoped formatting and `git diff --check` pass. Independent
+review found no actionable issue. Updated the calculation docstring, EDA user
+guide and changelog. The UI already uses the returned scores and ordering,
+so no frontend implementation change is needed. Saved EDA reports must be
+rerun to refresh their stored scores. The queue now contains **43 open /
+4 parked** findings.
+
+### 2026-09-11 - OC-144 and OC-29 fixed: distance names and supported feature operations
+
+Committed the preceding OC-34 fix as `2a64d449`, with DCO sign-off,
+**485 fresh tests** and all applicable pre-commit hooks passing.
+
+OC-144 was reproduced before changing production code: **16 failures / 8
+controls passed** across direct/default-metadata fits, missing/empty output
+names, and both existing engine paths. Distances were already calculated in
+the correct unit; their automatic names were wrong. A shared resolver now
+chooses `geo_distance_km` or `geo_distance_mi`, and the registry's empty default
+means automatic. Fitting saves the resolved name; direct apply uses the same
+fallback. Explicit names, including old miles artifacts named
+`geo_distance_km`, are preserved. The reference documents how to retain an old
+column name when refitting or update downstream references to the new name.
+
+Re-verification corrected part of the queue's earlier scope note: the existing
+miles-conversion test already supplies `geo_distance_mi` and correctly compares
+it with a kilometer baseline. The stale kilometer-name expectation was instead
+in the behavioral re-audit's unit matrix; its four miles cases now expect
+`geo_distance_mi`. Also, a module-level H3 `importorskip` was hiding all distance
+tests when the optional package was missing. An H3-only fixture now limits
+that skip to the two H3 test classes, keeping distance regressions executable.
+
+OC-29 was reproduced with **11 failures / 1 control passed**. The public
+allow-list advertised `polynomial`, while all three Feature Generation aliases
+accepted it and both appliers silently skipped it. Remove that advertised
+value and validate operation types at both public fit/apply boundaries, before
+running any operation. Polynomial requests receive an error directing callers
+to `PolynomialFeatures`; other unknown types list supported choices. Existing
+artifacts containing unsupported operations now fail explicitly too. Omitted
+operation types still default to arithmetic, and supported-operation failure
+handling is unchanged. The old unknown-operation no-op fixture was replaced
+by explicit error regressions. A real backend CSV-loader-to-feature-node run
+confirms the error reaches the failed node response without an output artifact.
+
+Verification: **628 Core / 2 backend tests pass**, including feature-generation,
+GeoDistance, registry-contract, leakage, behavioral replay and preprocessing
+pipeline suites. **11 optional H3 tests skip** because H3 is not installed;
+31 warnings are existing deprecations. Repository Ruff/Ty, scoped formatting
+and `git diff --check` pass. Calculator/applier docstrings, the preprocessing
+reference and changelog are updated. No frontend implementation change is
+needed: its Feature Generation choices already contain only supported types,
+and GeoDistance has no Canvas settings component. Independent review found
+no actionable issue. The live queue contains **44 open / 4 parked** findings.
 
 ### 2026-09-11 - OC-34 fixed: empty text vocabularies warn and preserve input
 

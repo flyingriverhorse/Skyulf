@@ -18,6 +18,7 @@ from skyulf.preprocessing.geo import (
     H3IndexApplier,
     H3IndexCalculator,
 )
+from skyulf.registry import NodeRegistry
 
 _geo_distance_validation_cases = TestCaseLoader("geo/geo_distance_validation").load()
 
@@ -110,6 +111,93 @@ class TestHaversineDistance:
 
         assert "dist" in result.columns
         assert "geo_distance_km" not in result.columns
+
+
+class TestGeoDistanceOutputNames:
+    """Automatic names identify the unit without renaming explicit saved outputs."""
+
+    @pytest.mark.parametrize("engine", ["pandas", "polars"])
+    @pytest.mark.parametrize(
+        ("options", "expected_name", "expected_distance"),
+        [
+            ({}, "geo_distance_km", _NYC_LAX_KM),
+            ({"unit": "mi"}, "geo_distance_mi", _NYC_LAX_KM * 0.6213711922),
+            (
+                {"unit": "mi", "output_column": ""},
+                "geo_distance_mi",
+                _NYC_LAX_KM * 0.6213711922,
+            ),
+        ],
+    )
+    @pytest.mark.parametrize("use_metadata", [False, True])
+    def test_automatic_name_matches_unit(
+        self, engine, options, expected_name, expected_distance, use_metadata
+    ) -> None:
+        """Direct and registry-default configurations must label miles as miles."""
+        original = _cities_df()
+        frame = original if engine == "pandas" else pl.from_pandas(original)
+        defaults = NodeRegistry.get_all_metadata()["GeoDistance"]["params"] if use_metadata else {}
+        config = {
+            **defaults,
+            "lat1_col": "lat1",
+            "lon1_col": "lon1",
+            "lat2_col": "lat2",
+            "lon2_col": "lon2",
+            **options,
+        }
+        artifact = GeoDistanceCalculator().fit(frame, config)
+        result = GeoDistanceApplier().apply(frame, artifact)
+        if engine == "polars":
+            result = result.to_pandas()
+
+        assert artifact["output_column"] == expected_name
+        assert list(result.columns) == [*original.columns, expected_name]
+        assert result[expected_name].iloc[0] == pytest.approx(expected_distance, rel=0.01)
+        pd.testing.assert_frame_equal(result[list(original.columns)], original)
+
+    @pytest.mark.parametrize("engine", ["pandas", "polars"])
+    @pytest.mark.parametrize("output_column", ["distance", "geo_distance_km"])
+    def test_explicit_miles_name_survives_fit_and_replay(self, engine, output_column) -> None:
+        """Custom names and old miles artifacts keep downstream column references valid."""
+        frame = _cities_df()
+        if engine == "polars":
+            frame = pl.from_pandas(frame)
+        params = {
+            "lat1_col": "lat1",
+            "lon1_col": "lon1",
+            "lat2_col": "lat2",
+            "lon2_col": "lon2",
+            "unit": "mi",
+            "output_column": output_column,
+        }
+        fitted = GeoDistanceCalculator().fit(frame, params)
+        for artifact in (params, fitted):
+            result = GeoDistanceApplier().apply(frame, artifact)
+            assert list(result.columns) == [*frame.columns, output_column]
+            assert result[output_column][0] == pytest.approx(_NYC_LAX_KM * 0.6213711922, rel=0.01)
+
+    @pytest.mark.parametrize("engine", ["pandas", "polars"])
+    @pytest.mark.parametrize("method", ["haversine", "euclidean"])
+    @pytest.mark.parametrize("output_options", [{}, {"output_column": ""}])
+    def test_apply_resolves_missing_output_name(self, engine, method, output_options) -> None:
+        """Direct applier callers receive the same unit-aware fallback as fitted nodes."""
+        frame = pd.DataFrame({"lat1": [0.0], "lon1": [0.0], "lat2": [0.0], "lon2": [1.0]})
+        if engine == "polars":
+            frame = pl.from_pandas(frame)
+        result = GeoDistanceApplier().apply(
+            frame,
+            {
+                "lat1_col": "lat1",
+                "lon1_col": "lon1",
+                "lat2_col": "lat2",
+                "lon2_col": "lon2",
+                "method": method,
+                "unit": "mi",
+                **output_options,
+            },
+        )
+        assert list(result.columns) == [*frame.columns, "geo_distance_mi"]
+        assert result["geo_distance_mi"][0] == pytest.approx(69.0934, rel=1e-5)
 
 
 class TestEuclideanDistance:
@@ -286,7 +374,10 @@ class TestRealShapedDataset:
         np.testing.assert_allclose(result.loc[ny_rows, "geo_distance_km"], 0.0, atol=1.0)
 
 
-h3 = pytest.importorskip("h3", reason="h3 is an optional dependency (pip install skyulf-core[geo])")
+@pytest.fixture(scope="module")
+def h3():
+    """Skip only H3 tests when its optional dependency is unavailable."""
+    return pytest.importorskip("h3", reason="h3 is an optional dependency")
 
 
 def _points_df() -> pd.DataFrame:
@@ -299,10 +390,11 @@ def _points_df() -> pd.DataFrame:
     )
 
 
+@pytest.mark.usefixtures("h3")
 class TestH3Index:
     """H3 index correctness, verified directly against the ``h3`` package."""
 
-    def test_matches_h3_latlng_to_cell(self) -> None:
+    def test_matches_h3_latlng_to_cell(self, h3) -> None:
         df = _points_df()
         calc = H3IndexCalculator()
         applier = H3IndexApplier()
@@ -370,7 +462,7 @@ class TestH3Index:
 
         assert result.schema["id"] == pl.Int64
 
-    def test_nan_coordinates_produce_none_instead_of_crashing(self) -> None:
+    def test_nan_coordinates_produce_none_instead_of_crashing(self, h3) -> None:
         """Regression test: a missing/NaN lat or lon must produce None for that
         row (consistent with GeoDistance's NaN-propagation policy), not crash
         the whole apply() as ``h3.latlng_to_cell`` does on invalid input.
@@ -391,6 +483,7 @@ class TestH3Index:
         assert result["h3_index"].iloc[2] is None
 
 
+@pytest.mark.usefixtures("h3")
 class TestH3IndexValidation:
     """Config validation errors."""
 

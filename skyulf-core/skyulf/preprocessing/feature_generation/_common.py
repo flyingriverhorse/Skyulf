@@ -27,7 +27,6 @@ FEATURE_MATH_ALLOWED_TYPES = {
     "similarity",
     "datetime_extract",
     "group_agg",
-    "polynomial",
 }
 ALLOWED_DATETIME_FEATURES = {
     "year",

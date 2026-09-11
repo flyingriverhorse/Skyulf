@@ -99,6 +99,18 @@ Skyulf automatically flags potential data quality issues:
 *   **Geospatial:** Automatically detects Lat/Lon columns and computes bounding boxes.
 *   **Time Series:** Detects seasonality and trends in datetime columns.
 
+For a categorical or Boolean target, feature association uses the correlation
+ratio (eta), where 0 means no difference between group means and 1 means no
+within-group variation. Each numeric feature is evaluated using only rows
+where both that feature and the target are present. Missing values in another
+feature do not affect its score, and this calculation does not remove rows
+from your dataset. Features with no complete pairs are omitted; constant
+observed features keep a score of 0. Rows missing either value contribute
+neither to group sizes nor to the sums of squares used in this calculation.
+
+Previously saved reports retain their recorded scores. Rerun EDA to refresh
+the association values and feature ranking after this correction.
+
 ### 4. Task Type Control
 By default, Skyulf automatically detects if your target is **Classification** (Categorical) or **Regression** (Numeric). However, you can override this behavior:
 

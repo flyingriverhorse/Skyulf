@@ -48,22 +48,24 @@ class TargetMixin(_AnalyzerState):
             return {}
 
     def _calculate_eta_for_column(self, target_col: str, col: str) -> float | None:
-        """Compute the correlation-ratio (η) association between `target_col` groups and `col`, or None to skip."""
-        global_mean = self.df[col].mean()  # type: ignore[attr-defined]
+        """Compute correlation ratio on complete target-feature pairs.
+
+        Group counts, means and sums of squares use the same observed rows
+        for this feature. Return None when no pairs remain, or zero when
+        the observed feature is constant; the source frame is unchanged.
+        """
+        pairs = self.df.select([target_col, col]).drop_nulls()  # type: ignore[attr-defined]
+        global_mean = pairs[col].mean()
         if global_mean is None:
             return None
 
-        ss_total = self.df.select(  # type: ignore[attr-defined]
-            ((pl.col(col) - global_mean) ** 2).sum()
-        ).item()
+        ss_total = pairs.select(((pl.col(col) - global_mean) ** 2).sum()).item()
 
         if not ss_total:
             return 0.0
 
-        groups = (
-            self.df.filter(pl.col(target_col).is_not_null())  # type: ignore[attr-defined]
-            .group_by(target_col)
-            .agg([pl.len().alias("n"), pl.col(col).mean().alias("mean")])
+        groups = pairs.group_by(target_col).agg(
+            [pl.len().alias("n"), pl.col(col).mean().alias("mean")]
         )
 
         ss_between = 0.0

@@ -616,6 +616,12 @@ Config:
 - `epsilon`: float (default 1e-9)
 - `allow_overwrite`: bool
 
+Supported `operation_type` values are `arithmetic` (the default), `ratio`,
+`similarity`, `datetime_extract`, and `group_agg`. Unsupported types raise
+`ValueError` during fitting and when replaying saved artifacts. In particular,
+`polynomial` is not a Feature Generation operation: use the separate
+[`PolynomialFeatures`](#polynomialfeatures) node for powers and interactions.
+
 Learned params:
 
 - `operations`, `epsilon`, `allow_overwrite`
@@ -637,7 +643,14 @@ Config:
 - `lon2_col`: str
 - `method`: str (`"haversine"` default, or `"euclidean"` for a cheap flat-plane approximation)
 - `unit`: str (`"km"` default, or `"mi"`)
-- `output_column`: str (default `"geo_distance_km"`)
+- `output_column`: str (default `""`, meaning automatic). Omit it or leave it
+  empty to use `"geo_distance_km"` for kilometers or `"geo_distance_mi"` for miles.
+
+The resolved name is stored during fitting and reused during inference.
+An explicit name always takes precedence, including names in existing saved
+artifacts. To retain an old miles pipeline that refers to `"geo_distance_km"`,
+set that name explicitly before refitting; otherwise update downstream column
+references to `"geo_distance_mi"`.
 
 Learned params:
 
