@@ -222,6 +222,7 @@ uses, so a fixed finding stays where it was filed.
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
+| OC-23 | 🟠 | Polars `ratio` flips the sign of near-zero negative denominators (`feature_generation/_polars_ops.py:97-112`) | small | ✅ fixed 2026-09-11 - preserve the sign when clamping a near-zero ratio denominator to epsilon on Polars, matching pandas. |
 | OC-211 | 🟡 | Pandas datetime features depend on prediction-batch composition: prepending a different valid date format makes the original rows' year/month/day missing in both `FeatureGeneration.datetime_extract` and `DateFeatures` (`feature_generation/_pandas_ops.py:179`, `time_series/date_features.py:64`) | small | ✅ already fixed - verified 2026-09-09: mixed-format batch companions preserve calendar features across both engines and aliases. |
 | OC-212 | 🟡 | Similarity generation silently omits its output column for duplicate pandas indexes: label-based `.at[i]` returns Series to a scalar helper and the operation exception is swallowed (`feature_generation/_common.py:137-139`) | small | ✅ fixed 2026-09-08 — similarity now reads and assigns by row position, preserving duplicate indexes and individual scores; see the Log entry. |
 | OC-25 | 🟠 | RFE "K" chosen in UI ignored by backend (`feature_selection/_common.py:236-240`) | small | ✅ fixed 2026-09-05 — closes OC-143 too |
@@ -238,6 +239,8 @@ uses, so a fixed finding stays where it was filed.
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
+| OC-191 | 🟡 | All-null and Polars Enum columns are classified as text and sent to string-only aggregates, aborting the whole profile (`profiling/analyzer.py`, `_analyzer/column.py`) | small | ✅ fixed 2026-09-11 - profile Null dtype as Unknown with missing-value reporting and native Enum as Categorical, preserving the rest of the report. |
+| OC-199 | 🟡 | Explicit latitude/longitude selections bypass `exclude_cols`, returning coordinates for columns excluded from the profile (`profiling/_analyzer/geo.py:58-59`) | small | ✅ fixed 2026-09-11 - resolve explicit coordinates only within the persistent active column selection; excluded coordinates omit geospatial output. |
 | OC-193 | 🟡 | A single missing timestamp removes time-series analysis at the 1,000-row resampling boundary: dynamic grouping receives null date keys and the exception is swallowed (`profiling/_analyzer/temporal.py:232,243`) | small | ✅ fixed 2026-09-09 - null timestamps are excluded from temporal calculations without changing the existing resampling threshold. |
 | OC-217 | 🟠 | Repeated profiling on one analyzer returns previously excluded columns in sample data and frame statistics because only newly excluded columns trigger the narrowed frame (`profiling/analyzer.py:analyze`) | small | ✅ fixed 2026-09-09 - persistent column exclusions remain effective for sample rows and frame statistics across repeated calls. |
 | OC-216 | 🟡 | Rule feature conditions include unrelated labels from Polars shared categorical dictionaries even when those labels never occur in the feature (`profiling/_analyzer/rules.py:_build_feature_matrix`) | small | ✅ fixed 2026-09-09 - feature-local codes and label lists exclude unrelated categories from displayed rule conditions. |
@@ -376,6 +379,75 @@ respective fix logs; OC-167 closed with canonical artifact framing on 2026-09-09
 ---
 
 ## Log
+
+### 2026-09-11 - OC-23, OC-191 and OC-199 fixed: ratios and profiling inputs
+
+Committed OC-74 as `acefc59f` with DCO sign-off, **337 Core tests / 3 backend
+registry tests passing**, two optional H3 skips and all applicable hooks
+passing. No push was performed. This continuation handles three independently
+reproduced findings.
+
+**OC-23:** the Polars ratio expression clamped every denominator with
+`abs(denominator) < epsilon` to positive epsilon. Negative near-zero sums
+therefore inverted the output sign. It now uses the denominator's sign, as
+the pandas path already does. Public calculator/applier regressions cover
+both engines, default/custom epsilon, positive and negative numerators,
+threshold boundaries, zero, normalized missing values, and multi-column sums.
+Red: **2 failures / 2 controls passed**. Focused feature-generation suites:
+**171 passed**. Saved epsilon settings and other operations are unchanged.
+
+**OC-191:** native Null and Enum fell through to Text and failed batched
+string-length aggregation, aborting the whole profile. The shared dtype
+resolver now maps Null to Unknown and native Enum to Categorical. Unknown
+retains counts, percentages, samples and high-missing alerts without invalid
+type-specific statistics. Typed all-null columns retain their known dtype.
+Red: **5 failures / 3 controls passed**. The focused analyzer/column suites
+pass **62 tests**. Tests also cover Enum category frequencies and classification
+target inference; an additional real backend analysis/JSON serialization test
+preserves both new profile cases for API consumers. The profile dtype field
+already accepts strings, and Canvas uses a fallback badge and optional stats,
+so no frontend implementation or request change is required.
+
+**OC-199:** explicit coordinate names bypassed the active selection and read
+excluded data from the analyzer's retained source frame. Resolution now
+requires each supplied coordinate to belong to `self.columns`, including
+partially explicit pairs. An excluded coordinate yields no geospatial section.
+Red: **6 failures / 6 controls passed**. Focused geo and repeated-exclusion
+suites pass **29 tests**, covering either/both exclusions, reuse of one analyzer,
+auto-detection and allowed custom numeric/string coordinate names.
+
+Combined verification: **574 Core tests / 59 backend tests pass** across all
+profiling and feature-generation modules and backend EDA helpers/routes.
+The 122 warnings come from existing numerical edge cases, optional visualization
+behavior, Windows CPU detection and library deprecations. Updated the EDA guide,
+feature-generation reference, schema comment, helper docstrings and changelog.
+Repository Ruff/Ty, scoped formatting and every applicable pre-commit hook
+pass; independent read-only review found no actionable issue.
+`git diff --check` is clean.
+
+During OC-23 verification, direct native Polars NaN input exposed a separate
+missing-value parity issue, now recorded as **OC-230** in the live queue with
+executed evidence. The finite-denominator sign fix does not claim to close it.
+After closing these three findings and filing OC-230, the live queue contains
+**40 open / 4 parked** findings. Existing parked work is untouched.
+
+Original executed evidence for the supplemental profiling findings:
+
+**OC-191 — unsupported string aggregation on valid dtypes.** Executed
+`EDAAnalyzer(pl.DataFrame({'x': [None,None]})).analyze()` raises
+`SchemaError: expected String, got null`; using
+`pl.Series(['a','b'], dtype=pl.Enum(['a','b']))` raises the equivalent Enum
+error. **Fix/verification target:** handle null-only columns and recognize or
+normalize Enum before text aggregates. OC-121 concerns preprocessing
+auto-selection; this finding concerns profiling aborting completely.
+
+**OC-199 — explicitly selected coordinates survive exclusion.** Executed
+`EDAAnalyzer(pl.DataFrame({'lat':[1.,2.,3.], 'lon':[10.,20.,30.],
+'x':[1.,2.,3.]})).analyze(exclude_cols=['lat','lon'],lat_col='lat',lon_col='lon')`.
+The result still contains all three coordinate pairs in
+`geospatial.sample_points`, plus their bounds and centroid, although the
+per-column profile excludes them. **Fix/verification target:** apply the
+exclusion policy consistently before explicit geospatial selection.
 
 ### 2026-09-11 - OC-74 fixed: ensemble-aware model discovery
 

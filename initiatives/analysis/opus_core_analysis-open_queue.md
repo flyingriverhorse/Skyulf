@@ -15,7 +15,7 @@ file deliberately carries no history.
 per-area report files `00`–`18`).
 **Baseline:** commit `93d7719e` (master), audit run 2026-08-31 → 09-01 by 15
 parallel read-only agents (Claude Opus 5). 116 findings: 5 🔴 / 45 🟠 / 44 🟡 /
-22 ⚪, plus OC-160–229 filed by later reviews. OC-100 was retracted as a false
+22 ⚪, plus OC-160–230 filed by later reviews. OC-100 was retracted as a false
 positive and is not counted; the corrections pass stays in the archive.
 
 **Status key:** ⬜ open · 🟨 in progress · ✅ done · ⏭️ parked
@@ -96,7 +96,7 @@ closed that on 2026-09-07.
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
-| OC-23 | 🟠 | Polars `ratio` flips the sign of near-zero negative denominators (`feature_generation/_polars_ops.py:97-112`) | small | ⬜ open |
+| OC-230 | 🟡 | Native Polars NaN inputs propagate through feature ratios while pandas treats them as missing (`feature_generation/_polars_ops.py:_polars_ratio`, `_pandas_ops.py:_pandas_ratio`) | small | ⬜ open |
 | OC-24 | 🟠 | Polars group aggregates treat null group keys differently from pandas (`_polars_ops.py:222-234`) | small | ⬜ open |
 | OC-30 | 🟡 | Datetime extraction ignores the UI output name, overwrites collisions (`_pandas_ops.py:173-184`) | small | ⬜ open |
 
@@ -104,9 +104,7 @@ closed that on 2026-09-07.
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
-| OC-191 | 🟡 | All-null and Polars Enum columns are classified as text and sent to string-only aggregates, aborting the whole profile (`profiling/analyzer.py`, `_analyzer/column.py`) | small | ⬜ open |
 | OC-192 | 🟡 | Decomposition's categorical null bucket displays as `Unknown`, but drilling into it filters for the literal string and silently loses the bucket's rows (`profiling/_analyzer/decomposition.py:71-76`) | small | ⬜ open |
-| OC-199 | 🟡 | Explicit latitude/longitude selections bypass `exclude_cols`, returning coordinates for columns excluded from the profile (`profiling/_analyzer/geo.py:58-59`) | small | ⬜ open |
 | OC-47 | 🟡 | Common-column dtype drift can silently disappear (`profiling/drift.py:136-153`) | small | ⬜ open |
 | OC-48 | 🟡 | Expectations pass vacuously on empty frames (`profiling/expect.py:92-209`) | small | ⬜ open |
 | OC-49 | 🟡 | Valid partially-unlabelled PCA payloads crash plotting (`profiling/visualizer.py:716-737`) | small | ⬜ open |
@@ -312,6 +310,22 @@ source read when the finding was filed, so they may have moved.
 Findings filed before 2026-09-05 — OC-169 and OC-178–182 among them — keep
 their reproduction detail in the archive's `## Log` entries instead.
 
+### 2026-09-11 - OC-230: native NaN ratio parity
+
+Reproduced through public `FeatureGenerationCalculator.fit` and
+`FeatureGenerationApplier.apply` while verifying OC-23. Select ratio inputs
+`input_columns=["n"]`, `secondary_columns=["d"]`, `output_column="r"` and use
+the default epsilon. On `{"n": [1.0], "d": [float("nan")]}`, a native pandas
+DataFrame produces approximately **1e9**, while a native Polars DataFrame
+produces **NaN**. Pandas' horizontal sum treats missing values as zero;
+Polars' sum preserves native NaN. Constructing the Polars frame with
+`pl.from_pandas` normalizes NaN to null and hides the difference.
+
+**Fix/verification target:** define and apply consistent missing-value
+semantics to native ratio inputs, with direct engine-native frames covering
+NaN numerators, denominators and sums. OC-23 addresses only the sign of
+finite near-zero denominators and does not close this separate behavior.
+
 ### 2026-09-08 — OC-213–215: Problems panel review
 
 Source: [the complete diagnostic disposition](problems_panel_review-2026-09-08.md),
@@ -372,22 +386,6 @@ reproduced `count` through public clustering evaluation. **Fix/verification
 target:** choose independent collision-safe names for cluster, reference and
 count columns. OC-161 concerns centroid features; this is the separate
 reference-label aggregation path.
-
-**OC-199 — explicitly selected coordinates survive exclusion.** Executed
-`EDAAnalyzer(pl.DataFrame({'lat':[1.,2.,3.], 'lon':[10.,20.,30.],
-'x':[1.,2.,3.]})).analyze(exclude_cols=['lat','lon'],lat_col='lat',lon_col='lon')`.
-The result still contains all three coordinate pairs in
-`geospatial.sample_points`, plus their bounds and centroid, although the
-per-column profile excludes them. **Fix/verification target:** apply the
-exclusion policy consistently before explicit geospatial selection.
-
-**OC-191 — unsupported string aggregation on valid dtypes.** Executed
-`EDAAnalyzer(pl.DataFrame({'x': [None,None]})).analyze()` raises
-`SchemaError: expected String, got null`; using
-`pl.Series(['a','b'], dtype=pl.Enum(['a','b']))` raises the equivalent Enum
-error. **Fix/verification target:** handle null-only columns and recognize or
-normalize Enum before text aggregates. OC-121 concerns preprocessing
-auto-selection; this finding concerns profiling aborting completely.
 
 **OC-192 — categorical null drill-down loses the selected group.** With
 `group=['a',None,'b']` and `v=[1,2,3]`, a decomposition sum split publishes an

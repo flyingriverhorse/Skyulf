@@ -622,6 +622,12 @@ Supported `operation_type` values are `arithmetic` (the default), `ratio`,
 `polynomial` is not a Feature Generation operation: use the separate
 [`PolynomialFeatures`](#polynomialfeatures) node for powers and interactions.
 
+For `ratio`, the denominator is the sum of the selected denominator columns.
+If its absolute value is below `epsilon`, it is replaced by `-epsilon` when
+negative and `+epsilon` otherwise (including zero). This preserves the ratio's
+sign on both engines; for example, `1 / -1e-12` with the default epsilon
+produces `-1e9`. The saved epsilon is reused when applying a fitted node.
+
 Learned params:
 
 - `operations`, `epsilon`, `allow_overwrite`

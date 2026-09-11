@@ -35,7 +35,12 @@ def _dtype_to_semantic_bucket(dtype: Any, ratio: float, n_unique: int) -> str:
     ``ratio`` is ``n_unique / row_count`` (0 when there are no rows).
     Low-cardinality ints (``ratio < 0.05`` and ``n_unique < 20``) and
     low-cardinality strings (``ratio < 0.05``) are treated as Categorical.
+    Native Categorical/Enum dtypes remain Categorical at any cardinality.
+    Null dtype has no inferable type, so Unknown preserves missing-value
+    reporting without dispatching to type-specific aggregates.
     """
+    if dtype == pl.Null:
+        return "Unknown"
     if dtype in (pl.Float32, pl.Float64):
         return "Numeric"
     if dtype in _INT_DTYPES:
@@ -46,7 +51,7 @@ def _dtype_to_semantic_bucket(dtype: Any, ratio: float, n_unique: int) -> str:
         return "DateTime"
     if dtype in (pl.Utf8, pl.String):
         return "Categorical" if ratio < 0.05 else "Text"
-    if str(dtype) == "Categorical":
+    if dtype in (pl.Categorical, pl.Enum):
         return "Categorical"
     return "Text"
 

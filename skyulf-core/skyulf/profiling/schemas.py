@@ -159,7 +159,7 @@ class ColumnProfile(BaseModel):
     """Everything the profiler determined about one column, grouped by its detected type."""
 
     name: str
-    dtype: str  # "Numeric", "Categorical", "Boolean", "DateTime", "Text"
+    dtype: str  # "Numeric", "Categorical", "Boolean", "DateTime", "Text", "Unknown"
     missing_count: int
     missing_percentage: float
 

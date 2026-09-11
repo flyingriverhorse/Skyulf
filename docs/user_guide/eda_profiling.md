@@ -76,6 +76,13 @@ The analyzer automatically detects column types (Numeric, Categorical, Date, Tex
 *   **Date:** Min/Max date, Range, Year/Month distribution.
 *   **Text:** Avg length, Common words, **Sentiment Analysis** (Positive/Neutral/Negative).
 
+Native Polars `Categorical` and `Enum` columns are profiled as categorical,
+including their value frequencies. A column with dtype `Null` (only missing
+values and no declared type) is reported as `Unknown`: its missing count,
+missing percentage and quality alerts remain available, while type-specific
+statistics are omitted. An all-null column with a declared type, such as
+`Float64`, retains that type's profile.
+
 ### 2. Smart Alerts
 Skyulf automatically flags potential data quality issues:
 *   **High Null Rate:** Columns with >50% missing values.
@@ -151,6 +158,12 @@ profile = analyzer.analyze(
     exclude_cols=["id", "timestamp"]
 )
 ```
+
+Column exclusions also apply to explicit `lat_col` and `lon_col` selections.
+If either selected coordinate is excluded, `profile.geospatial` is `None`,
+so its points, bounds and centroid are omitted. Exclusions persist when you
+reuse an analyzer; create a new `EDAAnalyzer(df)` to start with all columns
+again. Rerun saved analyses to refresh their stored reports after an update.
 
 ## Advanced Analysis Modules
 
