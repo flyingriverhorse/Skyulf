@@ -2002,6 +2002,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#backend-json-compatibility-helper" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Backend JSON compatibility helper
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -3344,6 +3355,24 @@ arbitrary code from a malicious file. Treat pipeline files like executables:</p>
 <li>Prefer <code>fingerprint()</code> comparisons over re-loading when you only need to
   verify identity.</li>
 </ul>
+<h2 id="backend-json-compatibility-helper">Backend JSON compatibility helper</h2>
+<p>Backend integrations that call
+<code>backend.data_ingestion.serialization.JSONSafeSerializer</code> directly retain
+literal strings such as <code>"nan"</code>, <code>"NaT"</code>, <code>"&lt;NA&gt;"</code> and <code>"inf"</code>. These remain
+category labels, matching the async helper's treatment of text. Actual missing
+scalars (<code>None</code>, <code>pd.NA</code>, <code>pd.NaT</code>) and non-finite Python floats become JSON
+<code>null</code> through the synchronous helper:</p>
+<pre><code class="language-python">import json
+
+from backend.data_ingestion.serialization import JSONSafeSerializer
+
+payload = {&quot;label&quot;: &quot;nan&quot;, &quot;measurement&quot;: float(&quot;nan&quot;)}
+cleaned = JSONSafeSerializer.clean_for_json(payload)
+print(json.dumps(cleaned, allow_nan=False))
+# {&quot;label&quot;: &quot;nan&quot;, &quot;measurement&quot;: null}
+</code></pre>
+<p>This backend utility is retained for compatibility; current HTTP routes do
+not call it. Pipeline persistence uses the separate pickle format above.</p>
 
 
 

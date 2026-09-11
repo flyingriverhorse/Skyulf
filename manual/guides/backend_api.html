@@ -884,10 +884,32 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#get-apipipelinejobsjob_idtrials" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /api/pipeline/jobs/{job_id}/trials
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#post-apipipelinejobsjob_idcancel" class="md-nav__link">
     <span class="md-ellipsis">
       
         POST /api/pipeline/jobs/{job_id}/cancel
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#threshold-tuning" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Threshold tuning
       
     </span>
   </a>
@@ -4327,8 +4349,28 @@ Returns <code>503</code> if the ML dependencies are broken.</p>
 <p>List all training jobs with status and metrics.</p>
 <h3 id="get-apipipelinejobsjob_id"><code>GET /api/pipeline/jobs/{job_id}</code></h3>
 <p>Get detailed status, metrics, and logs for a specific job.</p>
+<h3 id="get-apipipelinejobsjob_idtrials"><code>GET /api/pipeline/jobs/{job_id}/trials</code></h3>
+<p>Get the process-local live chart history for a running job: <code>trials</code>, <code>metric</code>,
+<code>iterations</code>, and <code>iteration_metric</code>. This backfills points missed before
+connecting to the WebSocket. Buffers are bounded and may be evicted.</p>
+<p>Execution releases both buffers when it finishes, fails, or exits after
+cancellation. A successful cancellation also clears the local buffers after
+the database commit; any later points from a fitting thread are cleared when
+that execution exits. Completed-job charts use the saved <code>metrics.trials</code> and
+<code>metrics.iterations</code> returned by the job-details endpoint, so live-buffer
+cleanup does not remove their stored history.</p>
 <h3 id="post-apipipelinejobsjob_idcancel"><code>POST /api/pipeline/jobs/{job_id}/cancel</code></h3>
 <p>Cancel a running or queued job.</p>
+<h3 id="threshold-tuning">Threshold tuning</h3>
+<p><code>POST /api/pipeline/jobs/{job_id}/thresholds/preview</code> computes thresholds;
+<code>POST /api/pipeline/jobs/{job_id}/thresholds/save</code> saves and enables them.
+Supported <code>metric</code> values are <code>accuracy</code>, <code>f1</code>, <code>precision</code>, <code>recall</code>, and
+<code>balanced_accuracy</code>. Both endpoints reject <code>roc_auc</code> with HTTP 400 because
+probability-ranking AUC does not depend on the decision threshold.</p>
+<p>Existing saved sets, including legacy <code>roc_auc</code> sets, can still be read via
+<code>GET /api/pipeline/jobs/{job_id}/thresholds</code>, enabled or disabled via
+<code>POST .../thresholds/toggle</code>, and removed via <code>DELETE .../thresholds</code>.
+See <a href="../user_guide/threshold_tuning.html">Threshold Tuning</a> for the workflow.</p>
 <h3 id="post-apipipelinejobsjob_idpromote"><code>POST /api/pipeline/jobs/{job_id}/promote</code></h3>
 <p>Mark a completed job as the "promoted winner" — sets the <code>promoted_at</code> timestamp.</p>
 <h3 id="delete-apipipelinejobsjob_idpromote"><code>DELETE /api/pipeline/jobs/{job_id}/promote</code></h3>

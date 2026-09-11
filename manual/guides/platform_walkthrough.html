@@ -651,6 +651,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#casting-rules" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Casting rules
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#recommended-pipeline-order" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -735,6 +746,23 @@
       
     </span>
   </a>
+  
+    <nav class="md-nav" aria-label="Step 5: Review results">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#inspecting-a-historical-node" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Inspecting a historical node
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -3561,6 +3589,15 @@ skyulf-core (ML engine)
 <li><strong>Add a modeling node</strong> at the end (e.g., <code>random_forest_classifier</code>).</li>
 <li>Optionally, toggle the modeling node's <strong>Advanced mode</strong> (<code>run_mode: "advanced"</code>) and configure the search strategy.</li>
 </ol>
+<h3 id="casting-rules">Casting rules</h3>
+<p>Select an existing <strong>Cast Types</strong> node to open its settings. The <strong>+</strong> icon
+beside <strong>Casting Rules</strong> adds a rule for the first available column without one
+and defaults its type to Float. Its hover tooltip is <strong>Add Casting Rule</strong>. This
+adds a rule inside the selected node; it does not add another node to the canvas.
+The icon button is disabled when all available columns already have rules.
+To change an existing type, use that rule's type selector. Removing a rule
+makes its column available to add again; other rules keep their selected types.
+Columns dropped upstream are excluded from the available choices.</p>
 <h3 id="recommended-pipeline-order">Recommended pipeline order:</h3>
 <pre><code>Dataset → TrainTestSplitter → Imputer → Encoder → Scaler → Model
 </code></pre>
@@ -3616,6 +3653,13 @@ skyulf-core (ML engine)
 <pre><code class="language-bash">curl http://127.0.0.1:8000/api/pipeline/jobs/{job_id}/evaluation
 </code></pre>
 <hr />
+<h3 id="inspecting-a-historical-node">Inspecting a historical node</h3>
+<p>Node links in <strong>Error Log</strong> and <strong>Slow Nodes</strong> open <strong>Node Inspector</strong> for the
+graph recorded by that run. Use its <strong>Upstream</strong> and <strong>Downstream</strong> buttons to
+inspect neighboring nodes. The displayed details, loading indicator and error
+belong to the current selection; delayed responses from an earlier selection
+or a closed inspector do not replace them. <strong>Retry</strong> reloads the selected node
+after a request fails.</p>
 <h2 id="step-5b-export-to-jupyter-notebook">Step 5b: Export to Jupyter Notebook</h2>
 <p><strong>From the canvas:</strong> Click the <strong>Export Notebook</strong> button (toolbar, top-right area) to download a ready-to-run <code>.ipynb</code> file for any completed or configured pipeline.</p>
 <p>Two export modes are available:</p>

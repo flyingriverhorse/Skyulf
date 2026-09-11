@@ -1642,6 +1642,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="TF-IDF Vectorizer — counts, but smarter">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#when-there-are-no-usable-tokens" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        When there are no usable tokens
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -3457,6 +3474,17 @@ test_X = app.apply(test_df, art)
 </code></pre>
 <p>The artifact stores both the vocabulary and the learned IDF weights, so test data is
 transformed with exactly the weights learned on train.</p>
+<h3 id="when-there-are-no-usable-tokens">When there are no usable tokens</h3>
+<p>Count and TF-IDF Vectorizers can find an empty vocabulary when the selected text
+is blank, missing, contains only stop words, or produces no tokens under the
+chosen n-gram settings. In that case, fitting emits a warning and returns an
+empty artifact. Applying it leaves the input unchanged, including the source
+text columns even when <strong>Drop original</strong> is enabled. Rows and targets are kept.
+Canvas displays the warning through its existing notification center.</p>
+<p>Later data also passes through unchanged with that artifact; prediction never
+learns a replacement vocabulary. Check the training text and token settings,
+then refit to generate numeric features. Invalid settings and frequency limits
+that remove every learned term (<code>min_df</code> / <code>max_df</code>) still raise an error.</p>
 <hr />
 <h2 id="hashing-vectorizer-no-vocabulary-needed">Hashing Vectorizer — no vocabulary needed</h2>
 <p>Both vectorizers above must <strong>store</strong> a vocabulary, which can be large and must be learned up
@@ -3473,6 +3501,9 @@ cfg = {&quot;columns&quot;: [&quot;text&quot;], &quot;n_features&quot;: 4096, &q
 art = HashingVectorizerCalculator().fit(train_df, cfg)   # no vocabulary learned
 train_X = HashingVectorizerApplier().apply(train_df, art)
 </code></pre>
+<p>Normalization defaults to <code>"l2"</code>; <code>"l1"</code> is also available. Choose <strong>None</strong> in the
+Canvas, or set <code>"norm": "none"</code> (Python <code>None</code> also works), to keep unnormalized
+hashed token counts.</p>
 <p>The trade-off: output columns are anonymous hash buckets (<code>text__hash__0 …</code>), so you lose the
 word ↔ column mapping, and different words can occasionally collide into the same bucket.</p>
 <p>!!! warning "Hashing + Multinomial Naive Bayes"

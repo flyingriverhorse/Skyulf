@@ -8662,16 +8662,7 @@ than raising, since a wide bag-of-words is a memory problem, not an error.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>skyulf-core/skyulf/preprocessing/vectorization/count_vectorizer.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">115</span>
-<span class="normal">116</span>
-<span class="normal">117</span>
-<span class="normal">118</span>
-<span class="normal">119</span>
-<span class="normal">120</span>
-<span class="normal">121</span>
-<span class="normal">122</span>
-<span class="normal">123</span>
-<span class="normal">124</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">124</span>
 <span class="normal">125</span>
 <span class="normal">126</span>
 <span class="normal">127</span>
@@ -8711,7 +8702,17 @@ than raising, since a wide bag-of-words is a memory problem, not an error.</p>
 <span class="normal">161</span>
 <span class="normal">162</span>
 <span class="normal">163</span>
-<span class="normal">164</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">"count_vectorizer"</span><span class="p">,</span> <span class="n">CountVectorizerApplier</span><span class="p">)</span>
+<span class="normal">164</span>
+<span class="normal">165</span>
+<span class="normal">166</span>
+<span class="normal">167</span>
+<span class="normal">168</span>
+<span class="normal">169</span>
+<span class="normal">170</span>
+<span class="normal">171</span>
+<span class="normal">172</span>
+<span class="normal">173</span>
+<span class="normal">174</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">"count_vectorizer"</span><span class="p">,</span> <span class="n">CountVectorizerApplier</span><span class="p">)</span>
 <span class="nd">@node_meta</span><span class="p">(</span>
     <span class="nb">id</span><span class="o">=</span><span class="s2">"count_vectorizer"</span><span class="p">,</span>
     <span class="n">name</span><span class="o">=</span><span class="s2">"Count Vectorizer"</span><span class="p">,</span>
@@ -8753,7 +8754,8 @@ than raising, since a wide bag-of-words is a memory problem, not an error.</p>
 <span class="w">        </span><span class="sd">"""Narrow to the configured text columns and fit the vocabulary on their joined text.</span>
 
 <span class="sd">        An empty or wholly-absent column selection yields an empty artifact so</span>
-<span class="sd">        the applier no-ops.</span>
+<span class="sd">        the applier no-ops. An empty vocabulary also yields an empty artifact</span>
+<span class="sd">        with a warning; source columns are retained even with ``drop_original``.</span>
 <span class="sd">        """</span>
         <span class="n">resolved</span> <span class="o">=</span> <span class="n">resolve_fit_text_columns</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">config</span><span class="p">,</span> <span class="n">_y</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">resolved</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
@@ -8790,29 +8792,32 @@ than raising, since a wide bag-of-words is a memory problem, not an error.</p>
 
         <p>Narrow to the configured text columns and fit the vocabulary on their joined text.</p>
 <p>An empty or wholly-absent column selection yields an empty artifact so
-the applier no-ops.</p>
+the applier no-ops. An empty vocabulary also yields an empty artifact
+with a warning; source columns are retained even with <code>drop_original</code>.</p>
 
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>skyulf-core/skyulf/preprocessing/vectorization/count_vectorizer.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">152</span>
-<span class="normal">153</span>
-<span class="normal">154</span>
-<span class="normal">155</span>
-<span class="normal">156</span>
-<span class="normal">157</span>
-<span class="normal">158</span>
-<span class="normal">159</span>
-<span class="normal">160</span>
-<span class="normal">161</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">161</span>
 <span class="normal">162</span>
 <span class="normal">163</span>
-<span class="normal">164</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@fit_method</span>
+<span class="normal">164</span>
+<span class="normal">165</span>
+<span class="normal">166</span>
+<span class="normal">167</span>
+<span class="normal">168</span>
+<span class="normal">169</span>
+<span class="normal">170</span>
+<span class="normal">171</span>
+<span class="normal">172</span>
+<span class="normal">173</span>
+<span class="normal">174</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@fit_method</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">fit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">_y</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">CountVectorizerArtifact</span><span class="p">:</span>  <span class="c1"># pylint: disable=arguments-differ</span>
 <span class="w">    </span><span class="sd">"""Narrow to the configured text columns and fit the vocabulary on their joined text.</span>
 
 <span class="sd">    An empty or wholly-absent column selection yields an empty artifact so</span>
-<span class="sd">    the applier no-ops.</span>
+<span class="sd">    the applier no-ops. An empty vocabulary also yields an empty artifact</span>
+<span class="sd">    with a warning; source columns are retained even with ``drop_original``.</span>
 <span class="sd">    """</span>
     <span class="n">resolved</span> <span class="o">=</span> <span class="n">resolve_fit_text_columns</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">config</span><span class="p">,</span> <span class="n">_y</span><span class="p">)</span>
     <span class="k">if</span> <span class="n">resolved</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
@@ -8842,10 +8847,10 @@ the applier no-ops.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>skyulf-core/skyulf/preprocessing/vectorization/count_vectorizer.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">147</span>
-<span class="normal">148</span>
-<span class="normal">149</span>
-<span class="normal">150</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">infer_output_schema</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">input_schema</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">156</span>
+<span class="normal">157</span>
+<span class="normal">158</span>
+<span class="normal">159</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">infer_output_schema</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">input_schema</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""Return ``None``: how many columns appear depends on the learned vocabulary."""</span>
     <span class="c1"># Vocabulary size is data-dependent — return None to signal unknown.</span>
     <span class="k">return</span> <span class="kc">None</span>
@@ -14107,23 +14112,7 @@ protocol shape.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>skyulf-core/skyulf/preprocessing/feature_generation/generation.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">19</span>
-<span class="normal">20</span>
-<span class="normal">21</span>
-<span class="normal">22</span>
-<span class="normal">23</span>
-<span class="normal">24</span>
-<span class="normal">25</span>
-<span class="normal">26</span>
-<span class="normal">27</span>
-<span class="normal">28</span>
-<span class="normal">29</span>
-<span class="normal">30</span>
-<span class="normal">31</span>
-<span class="normal">32</span>
-<span class="normal">33</span>
-<span class="normal">34</span>
-<span class="normal">35</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">35</span>
 <span class="normal">36</span>
 <span class="normal">37</span>
 <span class="normal">38</span>
@@ -14131,7 +14120,25 @@ protocol shape.</p>
 <span class="normal">40</span>
 <span class="normal">41</span>
 <span class="normal">42</span>
-<span class="normal">43</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">FeatureGenerationApplier</span><span class="p">(</span><span class="n">BaseApplier</span><span class="p">):</span>
+<span class="normal">43</span>
+<span class="normal">44</span>
+<span class="normal">45</span>
+<span class="normal">46</span>
+<span class="normal">47</span>
+<span class="normal">48</span>
+<span class="normal">49</span>
+<span class="normal">50</span>
+<span class="normal">51</span>
+<span class="normal">52</span>
+<span class="normal">53</span>
+<span class="normal">54</span>
+<span class="normal">55</span>
+<span class="normal">56</span>
+<span class="normal">57</span>
+<span class="normal">58</span>
+<span class="normal">59</span>
+<span class="normal">60</span>
+<span class="normal">61</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">FeatureGenerationApplier</span><span class="p">(</span><span class="n">BaseApplier</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""Append the columns described by a feature-generation artifact."""</span>
 
     <span class="nd">@apply_method</span>
@@ -14139,13 +14146,15 @@ protocol shape.</p>
 <span class="w">        </span><span class="sd">"""Evaluate each configured operation and append its output column to ``X``.</span>
 
 <span class="sd">        Operations run in order, so a later one can read a column an earlier one</span>
-<span class="sd">        created. A failing operation is logged and skipped rather than aborting</span>
-<span class="sd">        the node, and an output name that already exists is suffixed until</span>
+<span class="sd">        created. Unsupported operation types raise ``ValueError`` before any</span>
+<span class="sd">        operation runs. A failure inside a supported operation is logged and</span>
+<span class="sd">        skipped, and an output name that already exists is suffixed until</span>
 <span class="sd">        unique unless ``allow_overwrite`` says otherwise.</span>
 
 <span class="sd">        Group aggregates require training-fitted mappings. Legacy artifacts</span>
 <span class="sd">        lacking those mappings must be refitted before inference.</span>
 <span class="sd">        """</span>
+        <span class="n">_validate_operation_types</span><span class="p">(</span><span class="n">params</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"operations"</span><span class="p">,</span> <span class="p">[]))</span>
         <span class="k">if</span> <span class="nb">any</span><span class="p">(</span>
             <span class="n">op</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"operation_type"</span><span class="p">)</span> <span class="o">==</span> <span class="s2">"group_agg"</span> <span class="ow">and</span> <span class="s2">"group_agg_mapping"</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">op</span>
             <span class="k">for</span> <span class="n">op</span> <span class="ow">in</span> <span class="n">params</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"operations"</span><span class="p">,</span> <span class="p">[])</span>
@@ -14185,8 +14194,9 @@ protocol shape.</p>
 
         <p>Evaluate each configured operation and append its output column to <code>X</code>.</p>
 <p>Operations run in order, so a later one can read a column an earlier one
-created. A failing operation is logged and skipped rather than aborting
-the node, and an output name that already exists is suffixed until
+created. Unsupported operation types raise <code>ValueError</code> before any
+operation runs. A failure inside a supported operation is logged and
+skipped, and an output name that already exists is suffixed until
 unique unless <code>allow_overwrite</code> says otherwise.</p>
 <p>Group aggregates require training-fitted mappings. Legacy artifacts
 lacking those mappings must be refitted before inference.</p>
@@ -14194,39 +14204,43 @@ lacking those mappings must be refitted before inference.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>skyulf-core/skyulf/preprocessing/feature_generation/generation.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">22</span>
-<span class="normal">23</span>
-<span class="normal">24</span>
-<span class="normal">25</span>
-<span class="normal">26</span>
-<span class="normal">27</span>
-<span class="normal">28</span>
-<span class="normal">29</span>
-<span class="normal">30</span>
-<span class="normal">31</span>
-<span class="normal">32</span>
-<span class="normal">33</span>
-<span class="normal">34</span>
-<span class="normal">35</span>
-<span class="normal">36</span>
-<span class="normal">37</span>
-<span class="normal">38</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">38</span>
 <span class="normal">39</span>
 <span class="normal">40</span>
 <span class="normal">41</span>
 <span class="normal">42</span>
-<span class="normal">43</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@apply_method</span>
+<span class="normal">43</span>
+<span class="normal">44</span>
+<span class="normal">45</span>
+<span class="normal">46</span>
+<span class="normal">47</span>
+<span class="normal">48</span>
+<span class="normal">49</span>
+<span class="normal">50</span>
+<span class="normal">51</span>
+<span class="normal">52</span>
+<span class="normal">53</span>
+<span class="normal">54</span>
+<span class="normal">55</span>
+<span class="normal">56</span>
+<span class="normal">57</span>
+<span class="normal">58</span>
+<span class="normal">59</span>
+<span class="normal">60</span>
+<span class="normal">61</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@apply_method</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">apply</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">_y</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">params</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>  <span class="c1"># pylint: disable=arguments-differ</span>
 <span class="w">    </span><span class="sd">"""Evaluate each configured operation and append its output column to ``X``.</span>
 
 <span class="sd">    Operations run in order, so a later one can read a column an earlier one</span>
-<span class="sd">    created. A failing operation is logged and skipped rather than aborting</span>
-<span class="sd">    the node, and an output name that already exists is suffixed until</span>
+<span class="sd">    created. Unsupported operation types raise ``ValueError`` before any</span>
+<span class="sd">    operation runs. A failure inside a supported operation is logged and</span>
+<span class="sd">    skipped, and an output name that already exists is suffixed until</span>
 <span class="sd">    unique unless ``allow_overwrite`` says otherwise.</span>
 
 <span class="sd">    Group aggregates require training-fitted mappings. Legacy artifacts</span>
 <span class="sd">    lacking those mappings must be refitted before inference.</span>
 <span class="sd">    """</span>
+    <span class="n">_validate_operation_types</span><span class="p">(</span><span class="n">params</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"operations"</span><span class="p">,</span> <span class="p">[]))</span>
     <span class="k">if</span> <span class="nb">any</span><span class="p">(</span>
         <span class="n">op</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"operation_type"</span><span class="p">)</span> <span class="o">==</span> <span class="s2">"group_agg"</span> <span class="ow">and</span> <span class="s2">"group_agg_mapping"</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">op</span>
         <span class="k">for</span> <span class="n">op</span> <span class="ow">in</span> <span class="n">params</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"operations"</span><span class="p">,</span> <span class="p">[])</span>
@@ -14279,25 +14293,7 @@ lacking those mappings must be refitted before inference.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>skyulf-core/skyulf/preprocessing/feature_generation/generation.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 79</span>
-<span class="normal"> 80</span>
-<span class="normal"> 81</span>
-<span class="normal"> 82</span>
-<span class="normal"> 83</span>
-<span class="normal"> 84</span>
-<span class="normal"> 85</span>
-<span class="normal"> 86</span>
-<span class="normal"> 87</span>
-<span class="normal"> 88</span>
-<span class="normal"> 89</span>
-<span class="normal"> 90</span>
-<span class="normal"> 91</span>
-<span class="normal"> 92</span>
-<span class="normal"> 93</span>
-<span class="normal"> 94</span>
-<span class="normal"> 95</span>
-<span class="normal"> 96</span>
-<span class="normal"> 97</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 97</span>
 <span class="normal"> 98</span>
 <span class="normal"> 99</span>
 <span class="normal">100</span>
@@ -14324,7 +14320,28 @@ lacking those mappings must be refitted before inference.</p>
 <span class="normal">121</span>
 <span class="normal">122</span>
 <span class="normal">123</span>
-<span class="normal">124</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">"FeatureGeneration"</span><span class="p">,</span> <span class="n">FeatureGenerationApplier</span><span class="p">)</span>
+<span class="normal">124</span>
+<span class="normal">125</span>
+<span class="normal">126</span>
+<span class="normal">127</span>
+<span class="normal">128</span>
+<span class="normal">129</span>
+<span class="normal">130</span>
+<span class="normal">131</span>
+<span class="normal">132</span>
+<span class="normal">133</span>
+<span class="normal">134</span>
+<span class="normal">135</span>
+<span class="normal">136</span>
+<span class="normal">137</span>
+<span class="normal">138</span>
+<span class="normal">139</span>
+<span class="normal">140</span>
+<span class="normal">141</span>
+<span class="normal">142</span>
+<span class="normal">143</span>
+<span class="normal">144</span>
+<span class="normal">145</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">"FeatureGeneration"</span><span class="p">,</span> <span class="n">FeatureGenerationApplier</span><span class="p">)</span>
 <span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">"FeatureMath"</span><span class="p">,</span> <span class="n">FeatureGenerationApplier</span><span class="p">)</span>
 <span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">"FeatureGenerationNode"</span><span class="p">,</span> <span class="n">FeatureGenerationApplier</span><span class="p">)</span>
 <span class="nd">@node_meta</span><span class="p">(</span>
@@ -14351,7 +14368,10 @@ lacking those mappings must be refitted before inference.</p>
 <span class="sd">        an earlier generated column. Its saved mapping supplies held-out rows;</span>
 <span class="sd">        unknown keys stay missing, and no inference values are aggregated.</span>
 <span class="sd">        Configurations containing only row-local operations need no data fit.</span>
+<span class="sd">        Unsupported operation types raise ``ValueError``; polynomial expansion</span>
+<span class="sd">        belongs in the separate ``PolynomialFeatures`` node.</span>
 <span class="sd">        """</span>
+        <span class="n">_validate_operation_types</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"operations"</span><span class="p">,</span> <span class="p">[]))</span>
         <span class="n">params</span><span class="p">:</span> <span class="n">FeatureGenerationArtifact</span> <span class="o">=</span> <span class="p">{</span>
             <span class="s2">"type"</span><span class="p">:</span> <span class="s2">"feature_generation"</span><span class="p">,</span>
             <span class="s2">"operations"</span><span class="p">:</span> <span class="n">deepcopy</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"operations"</span><span class="p">,</span> <span class="p">[])),</span>
@@ -14401,30 +14421,14 @@ lacking those mappings must be refitted before inference.</p>
 <p>Operations execute in order while fitting so an aggregate can consume
 an earlier generated column. Its saved mapping supplies held-out rows;
 unknown keys stay missing, and no inference values are aggregated.
-Configurations containing only row-local operations need no data fit.</p>
+Configurations containing only row-local operations need no data fit.
+Unsupported operation types raise <code>ValueError</code>; polynomial expansion
+belongs in the separate <code>PolynomialFeatures</code> node.</p>
 
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>skyulf-core/skyulf/preprocessing/feature_generation/generation.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 93</span>
-<span class="normal"> 94</span>
-<span class="normal"> 95</span>
-<span class="normal"> 96</span>
-<span class="normal"> 97</span>
-<span class="normal"> 98</span>
-<span class="normal"> 99</span>
-<span class="normal">100</span>
-<span class="normal">101</span>
-<span class="normal">102</span>
-<span class="normal">103</span>
-<span class="normal">104</span>
-<span class="normal">105</span>
-<span class="normal">106</span>
-<span class="normal">107</span>
-<span class="normal">108</span>
-<span class="normal">109</span>
-<span class="normal">110</span>
-<span class="normal">111</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">111</span>
 <span class="normal">112</span>
 <span class="normal">113</span>
 <span class="normal">114</span>
@@ -14437,7 +14441,28 @@ Configurations containing only row-local operations need no data fit.</p>
 <span class="normal">121</span>
 <span class="normal">122</span>
 <span class="normal">123</span>
-<span class="normal">124</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@fit_method</span>
+<span class="normal">124</span>
+<span class="normal">125</span>
+<span class="normal">126</span>
+<span class="normal">127</span>
+<span class="normal">128</span>
+<span class="normal">129</span>
+<span class="normal">130</span>
+<span class="normal">131</span>
+<span class="normal">132</span>
+<span class="normal">133</span>
+<span class="normal">134</span>
+<span class="normal">135</span>
+<span class="normal">136</span>
+<span class="normal">137</span>
+<span class="normal">138</span>
+<span class="normal">139</span>
+<span class="normal">140</span>
+<span class="normal">141</span>
+<span class="normal">142</span>
+<span class="normal">143</span>
+<span class="normal">144</span>
+<span class="normal">145</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@fit_method</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">fit</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">X</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
@@ -14450,7 +14475,10 @@ Configurations containing only row-local operations need no data fit.</p>
 <span class="sd">    an earlier generated column. Its saved mapping supplies held-out rows;</span>
 <span class="sd">    unknown keys stay missing, and no inference values are aggregated.</span>
 <span class="sd">    Configurations containing only row-local operations need no data fit.</span>
+<span class="sd">    Unsupported operation types raise ``ValueError``; polynomial expansion</span>
+<span class="sd">    belongs in the separate ``PolynomialFeatures`` node.</span>
 <span class="sd">    """</span>
+    <span class="n">_validate_operation_types</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"operations"</span><span class="p">,</span> <span class="p">[]))</span>
     <span class="n">params</span><span class="p">:</span> <span class="n">FeatureGenerationArtifact</span> <span class="o">=</span> <span class="p">{</span>
         <span class="s2">"type"</span><span class="p">:</span> <span class="s2">"feature_generation"</span><span class="p">,</span>
         <span class="s2">"operations"</span><span class="p">:</span> <span class="n">deepcopy</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"operations"</span><span class="p">,</span> <span class="p">[])),</span>
@@ -14694,8 +14722,7 @@ generated the frame is returned unchanged.</p>
 <span class="normal">212</span>
 <span class="normal">213</span>
 <span class="normal">214</span>
-<span class="normal">215</span>
-<span class="normal">216</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">"FeatureInteraction"</span><span class="p">,</span> <span class="n">FeatureInteractionApplier</span><span class="p">)</span>
+<span class="normal">215</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">"FeatureInteraction"</span><span class="p">,</span> <span class="n">FeatureInteractionApplier</span><span class="p">)</span>
 <span class="nd">@node_meta</span><span class="p">(</span>
     <span class="nb">id</span><span class="o">=</span><span class="s2">"FeatureInteraction"</span><span class="p">,</span>
     <span class="n">name</span><span class="o">=</span><span class="s2">"Feature Interaction"</span><span class="p">,</span>
@@ -14715,9 +14742,10 @@ generated the frame is returned unchanged.</p>
 <span class="w">        </span><span class="sd">"""Validate the requested columns and degree, then enumerate the combinations.</span>
 
 <span class="sd">        Columns are sorted into the artifact so the generated names depend only</span>
-<span class="sd">        on the set of inputs, never on the order they were configured in. Fewer</span>
-<span class="sd">        columns than ``degree`` yields an empty combination list — an artifact</span>
-<span class="sd">        that generates nothing — rather than an error.</span>
+<span class="sd">        on the set of inputs, never on the order they were configured in.</span>
+<span class="sd">        With ``interaction_only=True``, fewer columns than ``degree`` yields</span>
+<span class="sd">        no products. With ``False``, one column is sufficient for self-products.</span>
+<span class="sd">        An empty selection yields no products; bias generation is independent.</span>
 
 <span class="sd">        Raises:</span>
 <span class="sd">            ValueError: If a configured column is missing or non-numeric, or if</span>
@@ -14733,9 +14761,7 @@ generated the frame is returned unchanged.</p>
         <span class="n">interaction_only</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"interaction_only"</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span>
         <span class="n">include_bias</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"include_bias"</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span>
 
-        <span class="n">combos</span> <span class="o">=</span> <span class="p">(</span>
-            <span class="n">_resolve_combinations</span><span class="p">(</span><span class="n">cols</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">interaction_only</span><span class="p">)</span> <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">cols</span><span class="p">)</span> <span class="o">&gt;=</span> <span class="n">degree</span> <span class="k">else</span> <span class="p">[]</span>
-        <span class="p">)</span>
+        <span class="n">combos</span> <span class="o">=</span> <span class="n">_resolve_combinations</span><span class="p">(</span><span class="n">cols</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">interaction_only</span><span class="p">)</span>
         <span class="n">feature_names</span> <span class="o">=</span> <span class="n">_build_interaction_feature_names</span><span class="p">(</span><span class="n">combos</span><span class="p">,</span> <span class="n">include_bias</span><span class="p">)</span>
 
         <span class="k">return</span> <span class="n">cast</span><span class="p">(</span>
@@ -14779,9 +14805,10 @@ generated the frame is returned unchanged.</p>
 
         <p>Validate the requested columns and degree, then enumerate the combinations.</p>
 <p>Columns are sorted into the artifact so the generated names depend only
-on the set of inputs, never on the order they were configured in. Fewer
-columns than <code>degree</code> yields an empty combination list — an artifact
-that generates nothing — rather than an error.</p>
+on the set of inputs, never on the order they were configured in.
+With <code>interaction_only=True</code>, fewer columns than <code>degree</code> yields
+no products. With <code>False</code>, one column is sufficient for self-products.
+An empty selection yields no products; bias generation is independent.</p>
 
 
 <p><span class="doc-section-title">Raises:</span></p>
@@ -14848,15 +14875,15 @@ that generates nothing — rather than an error.</p>
 <span class="normal">212</span>
 <span class="normal">213</span>
 <span class="normal">214</span>
-<span class="normal">215</span>
-<span class="normal">216</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@fit_method</span>
+<span class="normal">215</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@fit_method</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">fit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">_y</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">FeatureInteractionArtifact</span><span class="p">:</span>  <span class="c1"># pylint: disable=arguments-differ</span>
 <span class="w">    </span><span class="sd">"""Validate the requested columns and degree, then enumerate the combinations.</span>
 
 <span class="sd">    Columns are sorted into the artifact so the generated names depend only</span>
-<span class="sd">    on the set of inputs, never on the order they were configured in. Fewer</span>
-<span class="sd">    columns than ``degree`` yields an empty combination list — an artifact</span>
-<span class="sd">    that generates nothing — rather than an error.</span>
+<span class="sd">    on the set of inputs, never on the order they were configured in.</span>
+<span class="sd">    With ``interaction_only=True``, fewer columns than ``degree`` yields</span>
+<span class="sd">    no products. With ``False``, one column is sufficient for self-products.</span>
+<span class="sd">    An empty selection yields no products; bias generation is independent.</span>
 
 <span class="sd">    Raises:</span>
 <span class="sd">        ValueError: If a configured column is missing or non-numeric, or if</span>
@@ -14872,9 +14899,7 @@ that generates nothing — rather than an error.</p>
     <span class="n">interaction_only</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"interaction_only"</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span>
     <span class="n">include_bias</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"include_bias"</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span>
 
-    <span class="n">combos</span> <span class="o">=</span> <span class="p">(</span>
-        <span class="n">_resolve_combinations</span><span class="p">(</span><span class="n">cols</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">interaction_only</span><span class="p">)</span> <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">cols</span><span class="p">)</span> <span class="o">&gt;=</span> <span class="n">degree</span> <span class="k">else</span> <span class="p">[]</span>
-    <span class="p">)</span>
+    <span class="n">combos</span> <span class="o">=</span> <span class="n">_resolve_combinations</span><span class="p">(</span><span class="n">cols</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">interaction_only</span><span class="p">)</span>
     <span class="n">feature_names</span> <span class="o">=</span> <span class="n">_build_interaction_feature_names</span><span class="p">(</span><span class="n">combos</span><span class="p">,</span> <span class="n">include_bias</span><span class="p">)</span>
 
     <span class="k">return</span> <span class="n">cast</span><span class="p">(</span>
@@ -15432,6 +15457,9 @@ failing the node, so the artifact may cover fewer columns than requested.</p>
 
 
         <p>Resolve configured transformations, fitting lambdas for the power methods.</p>
+<p>Each power rule accepts <code>standardize</code> (default <code>True</code>). Set it to
+<code>False</code> to apply only the fitted Box-Cox or Yeo-Johnson transform.
+The artifact retains the choice for subsequent transforms.</p>
 
 
 
@@ -15442,9 +15470,7 @@ failing the node, so the artifact may cover fewer columns than requested.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>skyulf-core/skyulf/preprocessing/transformations/general.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">165</span>
-<span class="normal">166</span>
-<span class="normal">167</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">167</span>
 <span class="normal">168</span>
 <span class="normal">169</span>
 <span class="normal">170</span>
@@ -15509,7 +15535,16 @@ failing the node, so the artifact may cover fewer columns than requested.</p>
 <span class="normal">229</span>
 <span class="normal">230</span>
 <span class="normal">231</span>
-<span class="normal">232</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">"GeneralTransformation"</span><span class="p">,</span> <span class="n">GeneralTransformationApplier</span><span class="p">)</span>
+<span class="normal">232</span>
+<span class="normal">233</span>
+<span class="normal">234</span>
+<span class="normal">235</span>
+<span class="normal">236</span>
+<span class="normal">237</span>
+<span class="normal">238</span>
+<span class="normal">239</span>
+<span class="normal">240</span>
+<span class="normal">241</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">"GeneralTransformation"</span><span class="p">,</span> <span class="n">GeneralTransformationApplier</span><span class="p">)</span>
 <span class="nd">@node_meta</span><span class="p">(</span>
     <span class="nb">id</span><span class="o">=</span><span class="s2">"GeneralTransformation"</span><span class="p">,</span>
     <span class="n">name</span><span class="o">=</span><span class="s2">"General Transformation"</span><span class="p">,</span>
@@ -15519,7 +15554,12 @@ failing the node, so the artifact may cover fewer columns than requested.</p>
     <span class="n">learns_from_data</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
 <span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">GeneralTransformationCalculator</span><span class="p">(</span><span class="n">BaseCalculator</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">"""Resolve configured transformations, fitting lambdas for the power methods."""</span>
+<span class="w">    </span><span class="sd">"""Resolve configured transformations, fitting lambdas for the power methods.</span>
+
+<span class="sd">    Each power rule accepts ``standardize`` (default ``True``). Set it to</span>
+<span class="sd">    ``False`` to apply only the fitted Box-Cox or Yeo-Johnson transform.</span>
+<span class="sd">    The artifact retains the choice for subsequent transforms.</span>
+<span class="sd">    """</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">infer_output_schema</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span> <span class="n">input_schema</span><span class="p">:</span> <span class="n">SkyulfSchema</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span>
@@ -15563,7 +15603,9 @@ failing the node, so the artifact may cover fewer columns than requested.</p>
 
             <span class="k">if</span> <span class="n">method</span> <span class="ow">in</span> <span class="n">_POWER_METHODS</span><span class="p">:</span>
                 <span class="k">try</span><span class="p">:</span>
-                    <span class="n">extras</span> <span class="o">=</span> <span class="n">_fit_power_for_column</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">col</span><span class="p">,</span> <span class="n">method</span><span class="p">,</span> <span class="n">is_polars</span><span class="p">)</span>
+                    <span class="n">extras</span> <span class="o">=</span> <span class="n">_fit_power_for_column</span><span class="p">(</span>
+                        <span class="n">X</span><span class="p">,</span> <span class="n">col</span><span class="p">,</span> <span class="n">method</span><span class="p">,</span> <span class="n">is_polars</span><span class="p">,</span> <span class="n">standardize</span><span class="o">=</span><span class="n">item</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"standardize"</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span>
+                    <span class="p">)</span>
                 <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>  <span class="c1"># noqa: BLE001 - per-column fit failure is logged; column skipped</span>
                     <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Failed to fit </span><span class="si">{</span><span class="n">method</span><span class="si">}</span><span class="s2"> for column </span><span class="si">{</span><span class="n">col</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
                     <span class="k">continue</span>
@@ -15611,14 +15653,7 @@ values, and a per-column fit failure logs and skips that column.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>skyulf-core/skyulf/preprocessing/transformations/general.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">197</span>
-<span class="normal">198</span>
-<span class="normal">199</span>
-<span class="normal">200</span>
-<span class="normal">201</span>
-<span class="normal">202</span>
-<span class="normal">203</span>
-<span class="normal">204</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">204</span>
 <span class="normal">205</span>
 <span class="normal">206</span>
 <span class="normal">207</span>
@@ -15646,7 +15681,16 @@ values, and a per-column fit failure logs and skips that column.</p>
 <span class="normal">229</span>
 <span class="normal">230</span>
 <span class="normal">231</span>
-<span class="normal">232</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@fit_method</span>
+<span class="normal">232</span>
+<span class="normal">233</span>
+<span class="normal">234</span>
+<span class="normal">235</span>
+<span class="normal">236</span>
+<span class="normal">237</span>
+<span class="normal">238</span>
+<span class="normal">239</span>
+<span class="normal">240</span>
+<span class="normal">241</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@fit_method</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">fit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">_y</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">GeneralTransformationArtifact</span><span class="p">:</span>  <span class="c1"># pylint: disable=arguments-differ</span>
 <span class="w">    </span><span class="sd">"""Fit per-column power lambdas; pass simple ops through as configured.</span>
 
@@ -15668,7 +15712,9 @@ values, and a per-column fit failure logs and skips that column.</p>
 
         <span class="k">if</span> <span class="n">method</span> <span class="ow">in</span> <span class="n">_POWER_METHODS</span><span class="p">:</span>
             <span class="k">try</span><span class="p">:</span>
-                <span class="n">extras</span> <span class="o">=</span> <span class="n">_fit_power_for_column</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">col</span><span class="p">,</span> <span class="n">method</span><span class="p">,</span> <span class="n">is_polars</span><span class="p">)</span>
+                <span class="n">extras</span> <span class="o">=</span> <span class="n">_fit_power_for_column</span><span class="p">(</span>
+                    <span class="n">X</span><span class="p">,</span> <span class="n">col</span><span class="p">,</span> <span class="n">method</span><span class="p">,</span> <span class="n">is_polars</span><span class="p">,</span> <span class="n">standardize</span><span class="o">=</span><span class="n">item</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"standardize"</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span>
+                <span class="p">)</span>
             <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>  <span class="c1"># noqa: BLE001 - per-column fit failure is logged; column skipped</span>
                 <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Failed to fit </span><span class="si">{</span><span class="n">method</span><span class="si">}</span><span class="s2"> for column </span><span class="si">{</span><span class="n">col</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
                 <span class="k">continue</span>
@@ -15704,14 +15750,7 @@ values, and a per-column fit failure logs and skips that column.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>skyulf-core/skyulf/preprocessing/transformations/general.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">177</span>
-<span class="normal">178</span>
-<span class="normal">179</span>
-<span class="normal">180</span>
-<span class="normal">181</span>
-<span class="normal">182</span>
-<span class="normal">183</span>
-<span class="normal">184</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">184</span>
 <span class="normal">185</span>
 <span class="normal">186</span>
 <span class="normal">187</span>
@@ -15722,7 +15761,14 @@ values, and a per-column fit failure logs and skips that column.</p>
 <span class="normal">192</span>
 <span class="normal">193</span>
 <span class="normal">194</span>
-<span class="normal">195</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">infer_output_schema</span><span class="p">(</span>
+<span class="normal">195</span>
+<span class="normal">196</span>
+<span class="normal">197</span>
+<span class="normal">198</span>
+<span class="normal">199</span>
+<span class="normal">200</span>
+<span class="normal">201</span>
+<span class="normal">202</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">infer_output_schema</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span> <span class="n">input_schema</span><span class="p">:</span> <span class="n">SkyulfSchema</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">SkyulfSchema</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""Return updated dtypes for transformed numeric columns."""</span>
@@ -15783,15 +15829,15 @@ values, and a per-column fit failure logs and skips that column.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>skyulf-core/skyulf/preprocessing/geo/distance.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">136</span>
-<span class="normal">137</span>
-<span class="normal">138</span>
-<span class="normal">139</span>
-<span class="normal">140</span>
-<span class="normal">141</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">141</span>
 <span class="normal">142</span>
 <span class="normal">143</span>
-<span class="normal">144</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">GeoDistanceApplier</span><span class="p">(</span><span class="n">BaseApplier</span><span class="p">):</span>
+<span class="normal">144</span>
+<span class="normal">145</span>
+<span class="normal">146</span>
+<span class="normal">147</span>
+<span class="normal">148</span>
+<span class="normal">149</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">GeoDistanceApplier</span><span class="p">(</span><span class="n">BaseApplier</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""Append the configured pairwise distance as a new numeric column."""</span>
 
     <span class="nd">@apply_method</span>
@@ -15832,12 +15878,12 @@ values, and a per-column fit failure logs and skips that column.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>skyulf-core/skyulf/preprocessing/geo/distance.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">139</span>
-<span class="normal">140</span>
-<span class="normal">141</span>
-<span class="normal">142</span>
-<span class="normal">143</span>
-<span class="normal">144</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@apply_method</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">144</span>
+<span class="normal">145</span>
+<span class="normal">146</span>
+<span class="normal">147</span>
+<span class="normal">148</span>
+<span class="normal">149</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@apply_method</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">apply</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">_y</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">params</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>  <span class="c1"># pylint: disable=arguments-differ</span>
 <span class="w">    </span><span class="sd">"""Compute the distance column on the active engine; ``y`` passes through."""</span>
     <span class="k">return</span> <span class="n">apply_dual_engine</span><span class="p">(</span>
@@ -15885,12 +15931,7 @@ values, and a per-column fit failure logs and skips that column.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>skyulf-core/skyulf/preprocessing/geo/distance.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">147</span>
-<span class="normal">148</span>
-<span class="normal">149</span>
-<span class="normal">150</span>
-<span class="normal">151</span>
-<span class="normal">152</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">152</span>
 <span class="normal">153</span>
 <span class="normal">154</span>
 <span class="normal">155</span>
@@ -15937,7 +15978,17 @@ values, and a per-column fit failure logs and skips that column.</p>
 <span class="normal">196</span>
 <span class="normal">197</span>
 <span class="normal">198</span>
-<span class="normal">199</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">"GeoDistance"</span><span class="p">,</span> <span class="n">GeoDistanceApplier</span><span class="p">)</span>
+<span class="normal">199</span>
+<span class="normal">200</span>
+<span class="normal">201</span>
+<span class="normal">202</span>
+<span class="normal">203</span>
+<span class="normal">204</span>
+<span class="normal">205</span>
+<span class="normal">206</span>
+<span class="normal">207</span>
+<span class="normal">208</span>
+<span class="normal">209</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">"GeoDistance"</span><span class="p">,</span> <span class="n">GeoDistanceApplier</span><span class="p">)</span>
 <span class="nd">@node_meta</span><span class="p">(</span>
     <span class="nb">id</span><span class="o">=</span><span class="s2">"GeoDistance"</span><span class="p">,</span>
     <span class="n">name</span><span class="o">=</span><span class="s2">"Geo Distance"</span><span class="p">,</span>
@@ -15953,7 +16004,7 @@ values, and a per-column fit failure logs and skips that column.</p>
         <span class="s2">"lon2_col"</span><span class="p">:</span> <span class="s2">""</span><span class="p">,</span>
         <span class="s2">"method"</span><span class="p">:</span> <span class="s2">"haversine"</span><span class="p">,</span>
         <span class="s2">"unit"</span><span class="p">:</span> <span class="s2">"km"</span><span class="p">,</span>
-        <span class="s2">"output_column"</span><span class="p">:</span> <span class="s2">"geo_distance_km"</span><span class="p">,</span>
+        <span class="s2">"output_column"</span><span class="p">:</span> <span class="s2">""</span><span class="p">,</span>
     <span class="p">},</span>
     <span class="n">learns_from_data</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
 <span class="p">)</span>
@@ -15962,7 +16013,12 @@ values, and a per-column fit failure logs and skips that column.</p>
 
     <span class="nd">@fit_method</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">fit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">_y</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">GeoDistanceArtifact</span><span class="p">:</span>  <span class="c1"># pylint: disable=arguments-differ</span>
-<span class="w">        </span><span class="sd">"""Check the columns, method, and unit against the data, then record the config."""</span>
+<span class="w">        </span><span class="sd">"""Validate the distance config and resolve its output column name.</span>
+
+<span class="sd">        An omitted or empty ``output_column`` becomes ``geo_distance_km`` or</span>
+<span class="sd">        ``geo_distance_mi`` according to ``unit``. Explicit names are retained</span>
+<span class="sd">        in the artifact and reused during inference.</span>
+<span class="sd">        """</span>
         <span class="n">lat1_col</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"lat1_col"</span><span class="p">,</span> <span class="s2">""</span><span class="p">)</span>
         <span class="n">lon1_col</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"lon1_col"</span><span class="p">,</span> <span class="s2">""</span><span class="p">)</span>
         <span class="n">lat2_col</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"lat2_col"</span><span class="p">,</span> <span class="s2">""</span><span class="p">)</span>
@@ -15975,7 +16031,7 @@ values, and a per-column fit failure logs and skips that column.</p>
         <span class="n">unit</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"unit"</span><span class="p">,</span> <span class="s2">"km"</span><span class="p">)</span>
         <span class="n">_validate_geo_distance_method_unit</span><span class="p">(</span><span class="n">method</span><span class="p">,</span> <span class="n">unit</span><span class="p">)</span>
 
-        <span class="n">output_column</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"output_column"</span><span class="p">,</span> <span class="s2">"geo_distance_km"</span><span class="p">)</span>
+        <span class="n">output_column</span> <span class="o">=</span> <span class="n">_distance_output_column</span><span class="p">(</span><span class="n">config</span><span class="p">)</span>
 
         <span class="k">return</span> <span class="n">cast</span><span class="p">(</span>
             <span class="n">GeoDistanceArtifact</span><span class="p">,</span>
@@ -16017,17 +16073,15 @@ values, and a per-column fit failure logs and skips that column.</p>
 
     <div class="doc doc-contents ">
 
-        <p>Check the columns, method, and unit against the data, then record the config.</p>
+        <p>Validate the distance config and resolve its output column name.</p>
+<p>An omitted or empty <code>output_column</code> becomes <code>geo_distance_km</code> or
+<code>geo_distance_mi</code> according to <code>unit</code>. Explicit names are retained
+in the artifact and reused during inference.</p>
 
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>skyulf-core/skyulf/preprocessing/geo/distance.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">170</span>
-<span class="normal">171</span>
-<span class="normal">172</span>
-<span class="normal">173</span>
-<span class="normal">174</span>
-<span class="normal">175</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">175</span>
 <span class="normal">176</span>
 <span class="normal">177</span>
 <span class="normal">178</span>
@@ -16051,9 +16105,24 @@ values, and a per-column fit failure logs and skips that column.</p>
 <span class="normal">196</span>
 <span class="normal">197</span>
 <span class="normal">198</span>
-<span class="normal">199</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@fit_method</span>
+<span class="normal">199</span>
+<span class="normal">200</span>
+<span class="normal">201</span>
+<span class="normal">202</span>
+<span class="normal">203</span>
+<span class="normal">204</span>
+<span class="normal">205</span>
+<span class="normal">206</span>
+<span class="normal">207</span>
+<span class="normal">208</span>
+<span class="normal">209</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@fit_method</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">fit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">_y</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">GeoDistanceArtifact</span><span class="p">:</span>  <span class="c1"># pylint: disable=arguments-differ</span>
-<span class="w">    </span><span class="sd">"""Check the columns, method, and unit against the data, then record the config."""</span>
+<span class="w">    </span><span class="sd">"""Validate the distance config and resolve its output column name.</span>
+
+<span class="sd">    An omitted or empty ``output_column`` becomes ``geo_distance_km`` or</span>
+<span class="sd">    ``geo_distance_mi`` according to ``unit``. Explicit names are retained</span>
+<span class="sd">    in the artifact and reused during inference.</span>
+<span class="sd">    """</span>
     <span class="n">lat1_col</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"lat1_col"</span><span class="p">,</span> <span class="s2">""</span><span class="p">)</span>
     <span class="n">lon1_col</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"lon1_col"</span><span class="p">,</span> <span class="s2">""</span><span class="p">)</span>
     <span class="n">lat2_col</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"lat2_col"</span><span class="p">,</span> <span class="s2">""</span><span class="p">)</span>
@@ -16066,7 +16135,7 @@ values, and a per-column fit failure logs and skips that column.</p>
     <span class="n">unit</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"unit"</span><span class="p">,</span> <span class="s2">"km"</span><span class="p">)</span>
     <span class="n">_validate_geo_distance_method_unit</span><span class="p">(</span><span class="n">method</span><span class="p">,</span> <span class="n">unit</span><span class="p">)</span>
 
-    <span class="n">output_column</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"output_column"</span><span class="p">,</span> <span class="s2">"geo_distance_km"</span><span class="p">)</span>
+    <span class="n">output_column</span> <span class="o">=</span> <span class="n">_distance_output_column</span><span class="p">(</span><span class="n">config</span><span class="p">)</span>
 
     <span class="k">return</span> <span class="n">cast</span><span class="p">(</span>
         <span class="n">GeoDistanceArtifact</span><span class="p">,</span>
@@ -16558,6 +16627,8 @@ when a text column is not String dtype.</p>
 is fully reproducible from config and identical across runs — the property that
 makes it usable on streaming or very large corpora where building a vocabulary
 would not fit in memory.</p>
+<p>Normalization defaults to <code>"l2"</code>; <code>"l1"</code> selects L1 normalization.
+The Canvas value <code>"none"</code> and Python <code>None</code> both disable normalization.</p>
 
 
 
@@ -16568,9 +16639,7 @@ would not fit in memory.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>skyulf-core/skyulf/preprocessing/vectorization/hashing_vectorizer.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">104</span>
-<span class="normal">105</span>
-<span class="normal">106</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">106</span>
 <span class="normal">107</span>
 <span class="normal">108</span>
 <span class="normal">109</span>
@@ -16617,7 +16686,12 @@ would not fit in memory.</p>
 <span class="normal">150</span>
 <span class="normal">151</span>
 <span class="normal">152</span>
-<span class="normal">153</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">"hashing_vectorizer"</span><span class="p">,</span> <span class="n">HashingVectorizerApplier</span><span class="p">)</span>
+<span class="normal">153</span>
+<span class="normal">154</span>
+<span class="normal">155</span>
+<span class="normal">156</span>
+<span class="normal">157</span>
+<span class="normal">158</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">"hashing_vectorizer"</span><span class="p">,</span> <span class="n">HashingVectorizerApplier</span><span class="p">)</span>
 <span class="nd">@node_meta</span><span class="p">(</span>
     <span class="nb">id</span><span class="o">=</span><span class="s2">"hashing_vectorizer"</span><span class="p">,</span>
     <span class="n">name</span><span class="o">=</span><span class="s2">"Hashing Vectorizer"</span><span class="p">,</span>
@@ -16646,6 +16720,9 @@ would not fit in memory.</p>
 <span class="sd">    is fully reproducible from config and identical across runs — the property that</span>
 <span class="sd">    makes it usable on streaming or very large corpora where building a vocabulary</span>
 <span class="sd">    would not fit in memory.</span>
+
+<span class="sd">    Normalization defaults to ``"l2"``; ``"l1"`` selects L1 normalization.</span>
+<span class="sd">    The Canvas value ``"none"`` and Python ``None`` both disable normalization.</span>
 <span class="sd">    """</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">infer_output_schema</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">input_schema</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
@@ -16702,19 +16779,19 @@ wholly-absent selection yields an empty artifact so the applier no-ops.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>skyulf-core/skyulf/preprocessing/vectorization/hashing_vectorizer.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">141</span>
-<span class="normal">142</span>
-<span class="normal">143</span>
-<span class="normal">144</span>
-<span class="normal">145</span>
-<span class="normal">146</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">146</span>
 <span class="normal">147</span>
 <span class="normal">148</span>
 <span class="normal">149</span>
 <span class="normal">150</span>
 <span class="normal">151</span>
 <span class="normal">152</span>
-<span class="normal">153</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@fit_method</span>
+<span class="normal">153</span>
+<span class="normal">154</span>
+<span class="normal">155</span>
+<span class="normal">156</span>
+<span class="normal">157</span>
+<span class="normal">158</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@fit_method</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">fit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">_y</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">HashingVectorizerArtifact</span><span class="p">:</span>  <span class="c1"># pylint: disable=arguments-differ</span>
 <span class="w">    </span><span class="sd">"""Resolve the configured text columns and build the artifact without touching values.</span>
 
@@ -16749,11 +16826,11 @@ wholly-absent selection yields an empty artifact so the applier no-ops.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>skyulf-core/skyulf/preprocessing/vectorization/hashing_vectorizer.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">135</span>
-<span class="normal">136</span>
-<span class="normal">137</span>
-<span class="normal">138</span>
-<span class="normal">139</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">infer_output_schema</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">input_schema</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">140</span>
+<span class="normal">141</span>
+<span class="normal">142</span>
+<span class="normal">143</span>
+<span class="normal">144</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">infer_output_schema</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">input_schema</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""Return ``None``: the output width is fixed, the source columns are not known."""</span>
     <span class="c1"># n_features is fixed by config, but we still return None because the</span>
     <span class="c1"># source column list may not be known without seeing data.</span>
@@ -29004,16 +29081,7 @@ since it is a memory problem, not an error.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>skyulf-core/skyulf/preprocessing/vectorization/tfidf_vectorizer.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">109</span>
-<span class="normal">110</span>
-<span class="normal">111</span>
-<span class="normal">112</span>
-<span class="normal">113</span>
-<span class="normal">114</span>
-<span class="normal">115</span>
-<span class="normal">116</span>
-<span class="normal">117</span>
-<span class="normal">118</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">118</span>
 <span class="normal">119</span>
 <span class="normal">120</span>
 <span class="normal">121</span>
@@ -29052,7 +29120,17 @@ since it is a memory problem, not an error.</p>
 <span class="normal">154</span>
 <span class="normal">155</span>
 <span class="normal">156</span>
-<span class="normal">157</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">"tfidf_vectorizer"</span><span class="p">,</span> <span class="n">TfidfVectorizerApplier</span><span class="p">)</span>
+<span class="normal">157</span>
+<span class="normal">158</span>
+<span class="normal">159</span>
+<span class="normal">160</span>
+<span class="normal">161</span>
+<span class="normal">162</span>
+<span class="normal">163</span>
+<span class="normal">164</span>
+<span class="normal">165</span>
+<span class="normal">166</span>
+<span class="normal">167</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">"tfidf_vectorizer"</span><span class="p">,</span> <span class="n">TfidfVectorizerApplier</span><span class="p">)</span>
 <span class="nd">@node_meta</span><span class="p">(</span>
     <span class="nb">id</span><span class="o">=</span><span class="s2">"tfidf_vectorizer"</span><span class="p">,</span>
     <span class="n">name</span><span class="o">=</span><span class="s2">"TF-IDF Vectorizer"</span><span class="p">,</span>
@@ -29093,7 +29171,8 @@ since it is a memory problem, not an error.</p>
 <span class="w">        </span><span class="sd">"""Narrow to the configured text columns and fit the vocabulary on their joined text.</span>
 
 <span class="sd">        An empty or wholly-absent column selection yields an empty artifact so</span>
-<span class="sd">        the applier no-ops.</span>
+<span class="sd">        the applier no-ops. An empty vocabulary also yields an empty artifact</span>
+<span class="sd">        with a warning; source columns are retained even with ``drop_original``.</span>
 <span class="sd">        """</span>
         <span class="n">resolved</span> <span class="o">=</span> <span class="n">resolve_fit_text_columns</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">config</span><span class="p">,</span> <span class="n">_y</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">resolved</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
@@ -29130,29 +29209,32 @@ since it is a memory problem, not an error.</p>
 
         <p>Narrow to the configured text columns and fit the vocabulary on their joined text.</p>
 <p>An empty or wholly-absent column selection yields an empty artifact so
-the applier no-ops.</p>
+the applier no-ops. An empty vocabulary also yields an empty artifact
+with a warning; source columns are retained even with <code>drop_original</code>.</p>
 
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>skyulf-core/skyulf/preprocessing/vectorization/tfidf_vectorizer.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">145</span>
-<span class="normal">146</span>
-<span class="normal">147</span>
-<span class="normal">148</span>
-<span class="normal">149</span>
-<span class="normal">150</span>
-<span class="normal">151</span>
-<span class="normal">152</span>
-<span class="normal">153</span>
-<span class="normal">154</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">154</span>
 <span class="normal">155</span>
 <span class="normal">156</span>
-<span class="normal">157</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@fit_method</span>
+<span class="normal">157</span>
+<span class="normal">158</span>
+<span class="normal">159</span>
+<span class="normal">160</span>
+<span class="normal">161</span>
+<span class="normal">162</span>
+<span class="normal">163</span>
+<span class="normal">164</span>
+<span class="normal">165</span>
+<span class="normal">166</span>
+<span class="normal">167</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@fit_method</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">fit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">_y</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">TfidfVectorizerArtifact</span><span class="p">:</span>  <span class="c1"># pylint: disable=arguments-differ</span>
 <span class="w">    </span><span class="sd">"""Narrow to the configured text columns and fit the vocabulary on their joined text.</span>
 
 <span class="sd">    An empty or wholly-absent column selection yields an empty artifact so</span>
-<span class="sd">    the applier no-ops.</span>
+<span class="sd">    the applier no-ops. An empty vocabulary also yields an empty artifact</span>
+<span class="sd">    with a warning; source columns are retained even with ``drop_original``.</span>
 <span class="sd">    """</span>
     <span class="n">resolved</span> <span class="o">=</span> <span class="n">resolve_fit_text_columns</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">config</span><span class="p">,</span> <span class="n">_y</span><span class="p">)</span>
     <span class="k">if</span> <span class="n">resolved</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
@@ -29182,9 +29264,9 @@ the applier no-ops.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>skyulf-core/skyulf/preprocessing/vectorization/tfidf_vectorizer.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">141</span>
-<span class="normal">142</span>
-<span class="normal">143</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">infer_output_schema</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">input_schema</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">150</span>
+<span class="normal">151</span>
+<span class="normal">152</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">infer_output_schema</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">input_schema</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""Return ``None``: how many columns appear depends on the learned vocabulary."""</span>
     <span class="k">return</span> <span class="kc">None</span>
 </code></pre></div></td></tr></table></div>
@@ -30899,8 +30981,7 @@ to fall back on when no mapping survived.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>skyulf-core/skyulf/preprocessing/feature_selection/variance.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">17</span>
-<span class="normal">18</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">18</span>
 <span class="normal">19</span>
 <span class="normal">20</span>
 <span class="normal">21</span>
@@ -30911,7 +30992,8 @@ to fall back on when no mapping survived.</p>
 <span class="normal">26</span>
 <span class="normal">27</span>
 <span class="normal">28</span>
-<span class="normal">29</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">VarianceThresholdApplier</span><span class="p">(</span><span class="n">BaseApplier</span><span class="p">):</span>
+<span class="normal">29</span>
+<span class="normal">30</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">VarianceThresholdApplier</span><span class="p">(</span><span class="n">BaseApplier</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""Remove the columns a fitted variance threshold rejected."""</span>
 
     <span class="nd">@apply_method</span>
@@ -30958,8 +31040,7 @@ passes through untouched.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>skyulf-core/skyulf/preprocessing/feature_selection/variance.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">20</span>
-<span class="normal">21</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">21</span>
 <span class="normal">22</span>
 <span class="normal">23</span>
 <span class="normal">24</span>
@@ -30967,7 +31048,8 @@ passes through untouched.</p>
 <span class="normal">26</span>
 <span class="normal">27</span>
 <span class="normal">28</span>
-<span class="normal">29</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@apply_method</span>
+<span class="normal">29</span>
+<span class="normal">30</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@apply_method</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">apply</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">_y</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">params</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>  <span class="c1"># pylint: disable=arguments-differ</span>
 <span class="w">    </span><span class="sd">"""Drop ``candidate_columns - selected_columns`` from ``X``.</span>
 
@@ -31019,8 +31101,7 @@ passes through untouched.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>skyulf-core/skyulf/preprocessing/feature_selection/variance.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">32</span>
-<span class="normal">33</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">33</span>
 <span class="normal">34</span>
 <span class="normal">35</span>
 <span class="normal">36</span>
@@ -31070,7 +31151,20 @@ passes through untouched.</p>
 <span class="normal">80</span>
 <span class="normal">81</span>
 <span class="normal">82</span>
-<span class="normal">83</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">"VarianceThreshold"</span><span class="p">,</span> <span class="n">VarianceThresholdApplier</span><span class="p">)</span>
+<span class="normal">83</span>
+<span class="normal">84</span>
+<span class="normal">85</span>
+<span class="normal">86</span>
+<span class="normal">87</span>
+<span class="normal">88</span>
+<span class="normal">89</span>
+<span class="normal">90</span>
+<span class="normal">91</span>
+<span class="normal">92</span>
+<span class="normal">93</span>
+<span class="normal">94</span>
+<span class="normal">95</span>
+<span class="normal">96</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">"VarianceThreshold"</span><span class="p">,</span> <span class="n">VarianceThresholdApplier</span><span class="p">)</span>
 <span class="nd">@node_meta</span><span class="p">(</span>
     <span class="nb">id</span><span class="o">=</span><span class="s2">"VarianceThreshold"</span><span class="p">,</span>
     <span class="n">name</span><span class="o">=</span><span class="s2">"Variance Threshold"</span><span class="p">,</span>
@@ -31089,6 +31183,8 @@ passes through untouched.</p>
 <span class="sd">        Binary and constant columns are kept as candidates rather than excluded</span>
 <span class="sd">        up front, so the threshold itself decides their fate. Returns an empty</span>
 <span class="sd">        artifact — a no-op passthrough — when no numeric column is resolved.</span>
+<span class="sd">        If no candidate clears the threshold, records an empty selection so</span>
+<span class="sd">        apply can remove all candidates while preserving other columns.</span>
 <span class="sd">        """</span>
         <span class="n">threshold</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"threshold"</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">)</span>
         <span class="n">drop_columns</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"drop_columns"</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span>
@@ -31102,10 +31198,20 @@ passes through untouched.</p>
             <span class="k">return</span> <span class="n">cast</span><span class="p">(</span><span class="n">VarianceThresholdArtifact</span><span class="p">,</span> <span class="p">{})</span>
 
         <span class="n">selector</span> <span class="o">=</span> <span class="n">VarianceThreshold</span><span class="p">(</span><span class="n">threshold</span><span class="o">=</span><span class="n">threshold</span><span class="p">)</span>
-        <span class="n">selector</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X_np</span><span class="p">)</span>
-
-        <span class="n">support</span> <span class="o">=</span> <span class="n">selector</span><span class="o">.</span><span class="n">get_support</span><span class="p">()</span>
-        <span class="n">selected_cols</span> <span class="o">=</span> <span class="p">[</span><span class="n">c</span> <span class="k">for</span> <span class="n">c</span><span class="p">,</span> <span class="n">s</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">cols</span><span class="p">,</span> <span class="n">support</span><span class="p">,</span> <span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span> <span class="k">if</span> <span class="n">s</span><span class="p">]</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">selector</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X_np</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">ValueError</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
+            <span class="c1"># sklearn has computed variances but refuses an empty selection.</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="nb">str</span><span class="p">(</span><span class="n">exc</span><span class="p">)</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">"No feature in X meets the variance threshold"</span><span class="p">):</span>
+                <span class="k">raise</span>
+            <span class="n">all_missing</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">isnan</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">X_np</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">))</span><span class="o">.</span><span class="n">all</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">any</span><span class="p">(</span><span class="o">~</span><span class="n">np</span><span class="o">.</span><span class="n">isfinite</span><span class="p">(</span><span class="n">selector</span><span class="o">.</span><span class="n">variances_</span><span class="p">)</span> <span class="o">&amp;</span> <span class="o">~</span><span class="n">all_missing</span><span class="p">):</span>
+                <span class="c1"># Only all-missing columns may have an undefined variance.</span>
+                <span class="k">raise</span>
+            <span class="n">selected_cols</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">support</span> <span class="o">=</span> <span class="n">selector</span><span class="o">.</span><span class="n">get_support</span><span class="p">()</span>
+            <span class="n">selected_cols</span> <span class="o">=</span> <span class="p">[</span><span class="n">c</span> <span class="k">for</span> <span class="n">c</span><span class="p">,</span> <span class="n">s</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">cols</span><span class="p">,</span> <span class="n">support</span><span class="p">,</span> <span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span> <span class="k">if</span> <span class="n">s</span><span class="p">]</span>
         <span class="n">variances</span> <span class="o">=</span> <span class="p">(</span>
             <span class="nb">dict</span><span class="p">(</span><span class="nb">zip</span><span class="p">(</span><span class="n">cols</span><span class="p">,</span> <span class="n">selector</span><span class="o">.</span><span class="n">variances_</span><span class="o">.</span><span class="n">tolist</span><span class="p">(),</span> <span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span>
             <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">selector</span><span class="p">,</span> <span class="s2">"variances_"</span><span class="p">)</span>
@@ -31152,13 +31258,14 @@ passes through untouched.</p>
         <p>Record which numeric columns clear <code>config["threshold"]</code> variance.</p>
 <p>Binary and constant columns are kept as candidates rather than excluded
 up front, so the threshold itself decides their fate. Returns an empty
-artifact — a no-op passthrough — when no numeric column is resolved.</p>
+artifact — a no-op passthrough — when no numeric column is resolved.
+If no candidate clears the threshold, records an empty selection so
+apply can remove all candidates while preserving other columns.</p>
 
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>skyulf-core/skyulf/preprocessing/feature_selection/variance.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">44</span>
-<span class="normal">45</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">45</span>
 <span class="normal">46</span>
 <span class="normal">47</span>
 <span class="normal">48</span>
@@ -31196,13 +31303,28 @@ artifact — a no-op passthrough — when no numeric column is resolved.</p>
 <span class="normal">80</span>
 <span class="normal">81</span>
 <span class="normal">82</span>
-<span class="normal">83</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@fit_method</span>
+<span class="normal">83</span>
+<span class="normal">84</span>
+<span class="normal">85</span>
+<span class="normal">86</span>
+<span class="normal">87</span>
+<span class="normal">88</span>
+<span class="normal">89</span>
+<span class="normal">90</span>
+<span class="normal">91</span>
+<span class="normal">92</span>
+<span class="normal">93</span>
+<span class="normal">94</span>
+<span class="normal">95</span>
+<span class="normal">96</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@fit_method</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">fit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">_y</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">VarianceThresholdArtifact</span><span class="p">:</span>  <span class="c1"># pylint: disable=arguments-differ</span>
 <span class="w">    </span><span class="sd">"""Record which numeric columns clear ``config["threshold"]`` variance.</span>
 
 <span class="sd">    Binary and constant columns are kept as candidates rather than excluded</span>
 <span class="sd">    up front, so the threshold itself decides their fate. Returns an empty</span>
 <span class="sd">    artifact — a no-op passthrough — when no numeric column is resolved.</span>
+<span class="sd">    If no candidate clears the threshold, records an empty selection so</span>
+<span class="sd">    apply can remove all candidates while preserving other columns.</span>
 <span class="sd">    """</span>
     <span class="n">threshold</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"threshold"</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">)</span>
     <span class="n">drop_columns</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"drop_columns"</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span>
@@ -31216,10 +31338,20 @@ artifact — a no-op passthrough — when no numeric column is resolved.</p>
         <span class="k">return</span> <span class="n">cast</span><span class="p">(</span><span class="n">VarianceThresholdArtifact</span><span class="p">,</span> <span class="p">{})</span>
 
     <span class="n">selector</span> <span class="o">=</span> <span class="n">VarianceThreshold</span><span class="p">(</span><span class="n">threshold</span><span class="o">=</span><span class="n">threshold</span><span class="p">)</span>
-    <span class="n">selector</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X_np</span><span class="p">)</span>
-
-    <span class="n">support</span> <span class="o">=</span> <span class="n">selector</span><span class="o">.</span><span class="n">get_support</span><span class="p">()</span>
-    <span class="n">selected_cols</span> <span class="o">=</span> <span class="p">[</span><span class="n">c</span> <span class="k">for</span> <span class="n">c</span><span class="p">,</span> <span class="n">s</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">cols</span><span class="p">,</span> <span class="n">support</span><span class="p">,</span> <span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span> <span class="k">if</span> <span class="n">s</span><span class="p">]</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">selector</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X_np</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">ValueError</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
+        <span class="c1"># sklearn has computed variances but refuses an empty selection.</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">str</span><span class="p">(</span><span class="n">exc</span><span class="p">)</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">"No feature in X meets the variance threshold"</span><span class="p">):</span>
+            <span class="k">raise</span>
+        <span class="n">all_missing</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">isnan</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">X_np</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">))</span><span class="o">.</span><span class="n">all</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">any</span><span class="p">(</span><span class="o">~</span><span class="n">np</span><span class="o">.</span><span class="n">isfinite</span><span class="p">(</span><span class="n">selector</span><span class="o">.</span><span class="n">variances_</span><span class="p">)</span> <span class="o">&amp;</span> <span class="o">~</span><span class="n">all_missing</span><span class="p">):</span>
+            <span class="c1"># Only all-missing columns may have an undefined variance.</span>
+            <span class="k">raise</span>
+        <span class="n">selected_cols</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">support</span> <span class="o">=</span> <span class="n">selector</span><span class="o">.</span><span class="n">get_support</span><span class="p">()</span>
+        <span class="n">selected_cols</span> <span class="o">=</span> <span class="p">[</span><span class="n">c</span> <span class="k">for</span> <span class="n">c</span><span class="p">,</span> <span class="n">s</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">cols</span><span class="p">,</span> <span class="n">support</span><span class="p">,</span> <span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span> <span class="k">if</span> <span class="n">s</span><span class="p">]</span>
     <span class="n">variances</span> <span class="o">=</span> <span class="p">(</span>
         <span class="nb">dict</span><span class="p">(</span><span class="nb">zip</span><span class="p">(</span><span class="n">cols</span><span class="p">,</span> <span class="n">selector</span><span class="o">.</span><span class="n">variances_</span><span class="o">.</span><span class="n">tolist</span><span class="p">(),</span> <span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span>
         <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">selector</span><span class="p">,</span> <span class="s2">"variances_"</span><span class="p">)</span>

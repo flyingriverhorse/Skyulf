@@ -3652,6 +3652,9 @@ classes.</p>
 
 
         <p>Resolve configured transformations, fitting lambdas for the power methods.</p>
+<p>Each power rule accepts <code>standardize</code> (default <code>True</code>). Set it to
+<code>False</code> to apply only the fitted Box-Cox or Yeo-Johnson transform.
+The artifact retains the choice for subsequent transforms.</p>
 
 
 
@@ -3662,9 +3665,7 @@ classes.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>skyulf-core/skyulf/preprocessing/transformations/general.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">165</span>
-<span class="normal">166</span>
-<span class="normal">167</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">167</span>
 <span class="normal">168</span>
 <span class="normal">169</span>
 <span class="normal">170</span>
@@ -3729,7 +3730,16 @@ classes.</p>
 <span class="normal">229</span>
 <span class="normal">230</span>
 <span class="normal">231</span>
-<span class="normal">232</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">"GeneralTransformation"</span><span class="p">,</span> <span class="n">GeneralTransformationApplier</span><span class="p">)</span>
+<span class="normal">232</span>
+<span class="normal">233</span>
+<span class="normal">234</span>
+<span class="normal">235</span>
+<span class="normal">236</span>
+<span class="normal">237</span>
+<span class="normal">238</span>
+<span class="normal">239</span>
+<span class="normal">240</span>
+<span class="normal">241</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">"GeneralTransformation"</span><span class="p">,</span> <span class="n">GeneralTransformationApplier</span><span class="p">)</span>
 <span class="nd">@node_meta</span><span class="p">(</span>
     <span class="nb">id</span><span class="o">=</span><span class="s2">"GeneralTransformation"</span><span class="p">,</span>
     <span class="n">name</span><span class="o">=</span><span class="s2">"General Transformation"</span><span class="p">,</span>
@@ -3739,7 +3749,12 @@ classes.</p>
     <span class="n">learns_from_data</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
 <span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">GeneralTransformationCalculator</span><span class="p">(</span><span class="n">BaseCalculator</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">"""Resolve configured transformations, fitting lambdas for the power methods."""</span>
+<span class="w">    </span><span class="sd">"""Resolve configured transformations, fitting lambdas for the power methods.</span>
+
+<span class="sd">    Each power rule accepts ``standardize`` (default ``True``). Set it to</span>
+<span class="sd">    ``False`` to apply only the fitted Box-Cox or Yeo-Johnson transform.</span>
+<span class="sd">    The artifact retains the choice for subsequent transforms.</span>
+<span class="sd">    """</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">infer_output_schema</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span> <span class="n">input_schema</span><span class="p">:</span> <span class="n">SkyulfSchema</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span>
@@ -3783,7 +3798,9 @@ classes.</p>
 
             <span class="k">if</span> <span class="n">method</span> <span class="ow">in</span> <span class="n">_POWER_METHODS</span><span class="p">:</span>
                 <span class="k">try</span><span class="p">:</span>
-                    <span class="n">extras</span> <span class="o">=</span> <span class="n">_fit_power_for_column</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">col</span><span class="p">,</span> <span class="n">method</span><span class="p">,</span> <span class="n">is_polars</span><span class="p">)</span>
+                    <span class="n">extras</span> <span class="o">=</span> <span class="n">_fit_power_for_column</span><span class="p">(</span>
+                        <span class="n">X</span><span class="p">,</span> <span class="n">col</span><span class="p">,</span> <span class="n">method</span><span class="p">,</span> <span class="n">is_polars</span><span class="p">,</span> <span class="n">standardize</span><span class="o">=</span><span class="n">item</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"standardize"</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span>
+                    <span class="p">)</span>
                 <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>  <span class="c1"># noqa: BLE001 - per-column fit failure is logged; column skipped</span>
                     <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Failed to fit </span><span class="si">{</span><span class="n">method</span><span class="si">}</span><span class="s2"> for column </span><span class="si">{</span><span class="n">col</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
                     <span class="k">continue</span>
@@ -3831,14 +3848,7 @@ values, and a per-column fit failure logs and skips that column.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>skyulf-core/skyulf/preprocessing/transformations/general.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">197</span>
-<span class="normal">198</span>
-<span class="normal">199</span>
-<span class="normal">200</span>
-<span class="normal">201</span>
-<span class="normal">202</span>
-<span class="normal">203</span>
-<span class="normal">204</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">204</span>
 <span class="normal">205</span>
 <span class="normal">206</span>
 <span class="normal">207</span>
@@ -3866,7 +3876,16 @@ values, and a per-column fit failure logs and skips that column.</p>
 <span class="normal">229</span>
 <span class="normal">230</span>
 <span class="normal">231</span>
-<span class="normal">232</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@fit_method</span>
+<span class="normal">232</span>
+<span class="normal">233</span>
+<span class="normal">234</span>
+<span class="normal">235</span>
+<span class="normal">236</span>
+<span class="normal">237</span>
+<span class="normal">238</span>
+<span class="normal">239</span>
+<span class="normal">240</span>
+<span class="normal">241</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@fit_method</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">fit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">_y</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">GeneralTransformationArtifact</span><span class="p">:</span>  <span class="c1"># pylint: disable=arguments-differ</span>
 <span class="w">    </span><span class="sd">"""Fit per-column power lambdas; pass simple ops through as configured.</span>
 
@@ -3888,7 +3907,9 @@ values, and a per-column fit failure logs and skips that column.</p>
 
         <span class="k">if</span> <span class="n">method</span> <span class="ow">in</span> <span class="n">_POWER_METHODS</span><span class="p">:</span>
             <span class="k">try</span><span class="p">:</span>
-                <span class="n">extras</span> <span class="o">=</span> <span class="n">_fit_power_for_column</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">col</span><span class="p">,</span> <span class="n">method</span><span class="p">,</span> <span class="n">is_polars</span><span class="p">)</span>
+                <span class="n">extras</span> <span class="o">=</span> <span class="n">_fit_power_for_column</span><span class="p">(</span>
+                    <span class="n">X</span><span class="p">,</span> <span class="n">col</span><span class="p">,</span> <span class="n">method</span><span class="p">,</span> <span class="n">is_polars</span><span class="p">,</span> <span class="n">standardize</span><span class="o">=</span><span class="n">item</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"standardize"</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span>
+                <span class="p">)</span>
             <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>  <span class="c1"># noqa: BLE001 - per-column fit failure is logged; column skipped</span>
                 <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Failed to fit </span><span class="si">{</span><span class="n">method</span><span class="si">}</span><span class="s2"> for column </span><span class="si">{</span><span class="n">col</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
                 <span class="k">continue</span>
@@ -3924,14 +3945,7 @@ values, and a per-column fit failure logs and skips that column.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>skyulf-core/skyulf/preprocessing/transformations/general.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">177</span>
-<span class="normal">178</span>
-<span class="normal">179</span>
-<span class="normal">180</span>
-<span class="normal">181</span>
-<span class="normal">182</span>
-<span class="normal">183</span>
-<span class="normal">184</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">184</span>
 <span class="normal">185</span>
 <span class="normal">186</span>
 <span class="normal">187</span>
@@ -3942,7 +3956,14 @@ values, and a per-column fit failure logs and skips that column.</p>
 <span class="normal">192</span>
 <span class="normal">193</span>
 <span class="normal">194</span>
-<span class="normal">195</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">infer_output_schema</span><span class="p">(</span>
+<span class="normal">195</span>
+<span class="normal">196</span>
+<span class="normal">197</span>
+<span class="normal">198</span>
+<span class="normal">199</span>
+<span class="normal">200</span>
+<span class="normal">201</span>
+<span class="normal">202</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">infer_output_schema</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span> <span class="n">input_schema</span><span class="p">:</span> <span class="n">SkyulfSchema</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">SkyulfSchema</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""Return updated dtypes for transformed numeric columns."""</span>

@@ -3554,6 +3554,12 @@ Unknown categories fall back to the training prior. <code>WOEEncoder</code> uses
 mappings for training rows and the full-training mapping for held-out rows, with the
 configured unknown-category fallback, currently zero. These protections do not remove
 the need for the outer row boundary and CV preprocessing refits.</p>
+<p>WOE smoothing adds <code>regularization</code> (default <code>0.5</code>) to every observed category's
+count in each target class. Each class total therefore includes
+<code>regularization * number_of_observed_categories</code>; missing feature values count as
+a category. Cross-fitting uses only the categories in each training complement.
+The corrected WOE and Information Value calculations apply to new fits; existing
+saved mappings retain their values. Refit the pipeline to use the correction.</p>
 <p><code>LagFeatures</code> and <code>RollingAggregate</code> do not fit a distribution, but they depend on
 other rows. Use the correct time ordering, entity groups, prediction horizon and
 history protocol. A rolling aggregate includes the current row: a current-target

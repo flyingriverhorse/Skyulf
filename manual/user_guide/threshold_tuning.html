@@ -3322,6 +3322,11 @@ you supply, evaluated on held-out validation data.</p>
 <p>You can tune a completed classifier from <strong>Experiments → Model Evaluation →
 Threshold Tuning</strong>, even if <strong>Tune decision threshold</strong> was off during training.
 The evaluation must include class probabilities.</p>
+<p>Available objectives are <strong>Accuracy</strong>, <strong>F1</strong>, <strong>Precision</strong>, <strong>Recall</strong>, and
+<strong>Balanced Accuracy</strong>. ROC AUC measures probability ranking, which a decision
+threshold does not change, so it is not a threshold-tuning objective. Choose
+Balanced Accuracy to balance recall across classes. ROC AUC remains available
+for model evaluation and hyperparameter search.</p>
 <ol>
 <li>Choose a metric and click <strong>Preview</strong> to calculate thresholds. This does not
    save them or change predictions.</li>
@@ -3333,6 +3338,12 @@ The evaluation must include class probabilities.</p>
 <p>Preview uses validation data when available, otherwise the test split, as shown
 in the panel. No retraining is required. If training already saved thresholds,
 the panel loads that set and its enabled state automatically.</p>
+<p>Previously saved thresholds marked <code>roc_auc</code> remain available to use, toggle,
+or clear. Their cutoffs are preserved. To replace them, choose a supported
+objective and run <strong>Preview</strong>, then <strong>Save</strong>. Save stays disabled for a loaded
+set whose metric is unavailable for new tuning until a supported preview succeeds.
+New preview/save API requests
+using <code>roc_auc</code> return HTTP 400 with a supported alternative.</p>
 <h2 id="pipeline-usage">Pipeline usage</h2>
 <p>Tune against explicit, out-of-sample validation data — <strong>never</strong> the
 pipeline's internal train/test split. Carve the holdout out of the <strong>raw</strong>

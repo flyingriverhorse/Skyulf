@@ -3443,23 +3443,7 @@ constants for backward compatibility.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>skyulf-core/skyulf/preprocessing/feature_generation/generation.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">19</span>
-<span class="normal">20</span>
-<span class="normal">21</span>
-<span class="normal">22</span>
-<span class="normal">23</span>
-<span class="normal">24</span>
-<span class="normal">25</span>
-<span class="normal">26</span>
-<span class="normal">27</span>
-<span class="normal">28</span>
-<span class="normal">29</span>
-<span class="normal">30</span>
-<span class="normal">31</span>
-<span class="normal">32</span>
-<span class="normal">33</span>
-<span class="normal">34</span>
-<span class="normal">35</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">35</span>
 <span class="normal">36</span>
 <span class="normal">37</span>
 <span class="normal">38</span>
@@ -3467,7 +3451,25 @@ constants for backward compatibility.</p>
 <span class="normal">40</span>
 <span class="normal">41</span>
 <span class="normal">42</span>
-<span class="normal">43</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">FeatureGenerationApplier</span><span class="p">(</span><span class="n">BaseApplier</span><span class="p">):</span>
+<span class="normal">43</span>
+<span class="normal">44</span>
+<span class="normal">45</span>
+<span class="normal">46</span>
+<span class="normal">47</span>
+<span class="normal">48</span>
+<span class="normal">49</span>
+<span class="normal">50</span>
+<span class="normal">51</span>
+<span class="normal">52</span>
+<span class="normal">53</span>
+<span class="normal">54</span>
+<span class="normal">55</span>
+<span class="normal">56</span>
+<span class="normal">57</span>
+<span class="normal">58</span>
+<span class="normal">59</span>
+<span class="normal">60</span>
+<span class="normal">61</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">FeatureGenerationApplier</span><span class="p">(</span><span class="n">BaseApplier</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""Append the columns described by a feature-generation artifact."""</span>
 
     <span class="nd">@apply_method</span>
@@ -3475,13 +3477,15 @@ constants for backward compatibility.</p>
 <span class="w">        </span><span class="sd">"""Evaluate each configured operation and append its output column to ``X``.</span>
 
 <span class="sd">        Operations run in order, so a later one can read a column an earlier one</span>
-<span class="sd">        created. A failing operation is logged and skipped rather than aborting</span>
-<span class="sd">        the node, and an output name that already exists is suffixed until</span>
+<span class="sd">        created. Unsupported operation types raise ``ValueError`` before any</span>
+<span class="sd">        operation runs. A failure inside a supported operation is logged and</span>
+<span class="sd">        skipped, and an output name that already exists is suffixed until</span>
 <span class="sd">        unique unless ``allow_overwrite`` says otherwise.</span>
 
 <span class="sd">        Group aggregates require training-fitted mappings. Legacy artifacts</span>
 <span class="sd">        lacking those mappings must be refitted before inference.</span>
 <span class="sd">        """</span>
+        <span class="n">_validate_operation_types</span><span class="p">(</span><span class="n">params</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"operations"</span><span class="p">,</span> <span class="p">[]))</span>
         <span class="k">if</span> <span class="nb">any</span><span class="p">(</span>
             <span class="n">op</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"operation_type"</span><span class="p">)</span> <span class="o">==</span> <span class="s2">"group_agg"</span> <span class="ow">and</span> <span class="s2">"group_agg_mapping"</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">op</span>
             <span class="k">for</span> <span class="n">op</span> <span class="ow">in</span> <span class="n">params</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"operations"</span><span class="p">,</span> <span class="p">[])</span>
@@ -3521,8 +3525,9 @@ constants for backward compatibility.</p>
 
         <p>Evaluate each configured operation and append its output column to <code>X</code>.</p>
 <p>Operations run in order, so a later one can read a column an earlier one
-created. A failing operation is logged and skipped rather than aborting
-the node, and an output name that already exists is suffixed until
+created. Unsupported operation types raise <code>ValueError</code> before any
+operation runs. A failure inside a supported operation is logged and
+skipped, and an output name that already exists is suffixed until
 unique unless <code>allow_overwrite</code> says otherwise.</p>
 <p>Group aggregates require training-fitted mappings. Legacy artifacts
 lacking those mappings must be refitted before inference.</p>
@@ -3530,39 +3535,43 @@ lacking those mappings must be refitted before inference.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>skyulf-core/skyulf/preprocessing/feature_generation/generation.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">22</span>
-<span class="normal">23</span>
-<span class="normal">24</span>
-<span class="normal">25</span>
-<span class="normal">26</span>
-<span class="normal">27</span>
-<span class="normal">28</span>
-<span class="normal">29</span>
-<span class="normal">30</span>
-<span class="normal">31</span>
-<span class="normal">32</span>
-<span class="normal">33</span>
-<span class="normal">34</span>
-<span class="normal">35</span>
-<span class="normal">36</span>
-<span class="normal">37</span>
-<span class="normal">38</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">38</span>
 <span class="normal">39</span>
 <span class="normal">40</span>
 <span class="normal">41</span>
 <span class="normal">42</span>
-<span class="normal">43</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@apply_method</span>
+<span class="normal">43</span>
+<span class="normal">44</span>
+<span class="normal">45</span>
+<span class="normal">46</span>
+<span class="normal">47</span>
+<span class="normal">48</span>
+<span class="normal">49</span>
+<span class="normal">50</span>
+<span class="normal">51</span>
+<span class="normal">52</span>
+<span class="normal">53</span>
+<span class="normal">54</span>
+<span class="normal">55</span>
+<span class="normal">56</span>
+<span class="normal">57</span>
+<span class="normal">58</span>
+<span class="normal">59</span>
+<span class="normal">60</span>
+<span class="normal">61</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@apply_method</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">apply</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">_y</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">params</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>  <span class="c1"># pylint: disable=arguments-differ</span>
 <span class="w">    </span><span class="sd">"""Evaluate each configured operation and append its output column to ``X``.</span>
 
 <span class="sd">    Operations run in order, so a later one can read a column an earlier one</span>
-<span class="sd">    created. A failing operation is logged and skipped rather than aborting</span>
-<span class="sd">    the node, and an output name that already exists is suffixed until</span>
+<span class="sd">    created. Unsupported operation types raise ``ValueError`` before any</span>
+<span class="sd">    operation runs. A failure inside a supported operation is logged and</span>
+<span class="sd">    skipped, and an output name that already exists is suffixed until</span>
 <span class="sd">    unique unless ``allow_overwrite`` says otherwise.</span>
 
 <span class="sd">    Group aggregates require training-fitted mappings. Legacy artifacts</span>
 <span class="sd">    lacking those mappings must be refitted before inference.</span>
 <span class="sd">    """</span>
+    <span class="n">_validate_operation_types</span><span class="p">(</span><span class="n">params</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"operations"</span><span class="p">,</span> <span class="p">[]))</span>
     <span class="k">if</span> <span class="nb">any</span><span class="p">(</span>
         <span class="n">op</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"operation_type"</span><span class="p">)</span> <span class="o">==</span> <span class="s2">"group_agg"</span> <span class="ow">and</span> <span class="s2">"group_agg_mapping"</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">op</span>
         <span class="k">for</span> <span class="n">op</span> <span class="ow">in</span> <span class="n">params</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"operations"</span><span class="p">,</span> <span class="p">[])</span>
@@ -3615,25 +3624,7 @@ lacking those mappings must be refitted before inference.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>skyulf-core/skyulf/preprocessing/feature_generation/generation.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 79</span>
-<span class="normal"> 80</span>
-<span class="normal"> 81</span>
-<span class="normal"> 82</span>
-<span class="normal"> 83</span>
-<span class="normal"> 84</span>
-<span class="normal"> 85</span>
-<span class="normal"> 86</span>
-<span class="normal"> 87</span>
-<span class="normal"> 88</span>
-<span class="normal"> 89</span>
-<span class="normal"> 90</span>
-<span class="normal"> 91</span>
-<span class="normal"> 92</span>
-<span class="normal"> 93</span>
-<span class="normal"> 94</span>
-<span class="normal"> 95</span>
-<span class="normal"> 96</span>
-<span class="normal"> 97</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 97</span>
 <span class="normal"> 98</span>
 <span class="normal"> 99</span>
 <span class="normal">100</span>
@@ -3660,7 +3651,28 @@ lacking those mappings must be refitted before inference.</p>
 <span class="normal">121</span>
 <span class="normal">122</span>
 <span class="normal">123</span>
-<span class="normal">124</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">"FeatureGeneration"</span><span class="p">,</span> <span class="n">FeatureGenerationApplier</span><span class="p">)</span>
+<span class="normal">124</span>
+<span class="normal">125</span>
+<span class="normal">126</span>
+<span class="normal">127</span>
+<span class="normal">128</span>
+<span class="normal">129</span>
+<span class="normal">130</span>
+<span class="normal">131</span>
+<span class="normal">132</span>
+<span class="normal">133</span>
+<span class="normal">134</span>
+<span class="normal">135</span>
+<span class="normal">136</span>
+<span class="normal">137</span>
+<span class="normal">138</span>
+<span class="normal">139</span>
+<span class="normal">140</span>
+<span class="normal">141</span>
+<span class="normal">142</span>
+<span class="normal">143</span>
+<span class="normal">144</span>
+<span class="normal">145</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">"FeatureGeneration"</span><span class="p">,</span> <span class="n">FeatureGenerationApplier</span><span class="p">)</span>
 <span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">"FeatureMath"</span><span class="p">,</span> <span class="n">FeatureGenerationApplier</span><span class="p">)</span>
 <span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">"FeatureGenerationNode"</span><span class="p">,</span> <span class="n">FeatureGenerationApplier</span><span class="p">)</span>
 <span class="nd">@node_meta</span><span class="p">(</span>
@@ -3687,7 +3699,10 @@ lacking those mappings must be refitted before inference.</p>
 <span class="sd">        an earlier generated column. Its saved mapping supplies held-out rows;</span>
 <span class="sd">        unknown keys stay missing, and no inference values are aggregated.</span>
 <span class="sd">        Configurations containing only row-local operations need no data fit.</span>
+<span class="sd">        Unsupported operation types raise ``ValueError``; polynomial expansion</span>
+<span class="sd">        belongs in the separate ``PolynomialFeatures`` node.</span>
 <span class="sd">        """</span>
+        <span class="n">_validate_operation_types</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"operations"</span><span class="p">,</span> <span class="p">[]))</span>
         <span class="n">params</span><span class="p">:</span> <span class="n">FeatureGenerationArtifact</span> <span class="o">=</span> <span class="p">{</span>
             <span class="s2">"type"</span><span class="p">:</span> <span class="s2">"feature_generation"</span><span class="p">,</span>
             <span class="s2">"operations"</span><span class="p">:</span> <span class="n">deepcopy</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"operations"</span><span class="p">,</span> <span class="p">[])),</span>
@@ -3737,30 +3752,14 @@ lacking those mappings must be refitted before inference.</p>
 <p>Operations execute in order while fitting so an aggregate can consume
 an earlier generated column. Its saved mapping supplies held-out rows;
 unknown keys stay missing, and no inference values are aggregated.
-Configurations containing only row-local operations need no data fit.</p>
+Configurations containing only row-local operations need no data fit.
+Unsupported operation types raise <code>ValueError</code>; polynomial expansion
+belongs in the separate <code>PolynomialFeatures</code> node.</p>
 
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>skyulf-core/skyulf/preprocessing/feature_generation/generation.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 93</span>
-<span class="normal"> 94</span>
-<span class="normal"> 95</span>
-<span class="normal"> 96</span>
-<span class="normal"> 97</span>
-<span class="normal"> 98</span>
-<span class="normal"> 99</span>
-<span class="normal">100</span>
-<span class="normal">101</span>
-<span class="normal">102</span>
-<span class="normal">103</span>
-<span class="normal">104</span>
-<span class="normal">105</span>
-<span class="normal">106</span>
-<span class="normal">107</span>
-<span class="normal">108</span>
-<span class="normal">109</span>
-<span class="normal">110</span>
-<span class="normal">111</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">111</span>
 <span class="normal">112</span>
 <span class="normal">113</span>
 <span class="normal">114</span>
@@ -3773,7 +3772,28 @@ Configurations containing only row-local operations need no data fit.</p>
 <span class="normal">121</span>
 <span class="normal">122</span>
 <span class="normal">123</span>
-<span class="normal">124</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@fit_method</span>
+<span class="normal">124</span>
+<span class="normal">125</span>
+<span class="normal">126</span>
+<span class="normal">127</span>
+<span class="normal">128</span>
+<span class="normal">129</span>
+<span class="normal">130</span>
+<span class="normal">131</span>
+<span class="normal">132</span>
+<span class="normal">133</span>
+<span class="normal">134</span>
+<span class="normal">135</span>
+<span class="normal">136</span>
+<span class="normal">137</span>
+<span class="normal">138</span>
+<span class="normal">139</span>
+<span class="normal">140</span>
+<span class="normal">141</span>
+<span class="normal">142</span>
+<span class="normal">143</span>
+<span class="normal">144</span>
+<span class="normal">145</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@fit_method</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">fit</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">X</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
@@ -3786,7 +3806,10 @@ Configurations containing only row-local operations need no data fit.</p>
 <span class="sd">    an earlier generated column. Its saved mapping supplies held-out rows;</span>
 <span class="sd">    unknown keys stay missing, and no inference values are aggregated.</span>
 <span class="sd">    Configurations containing only row-local operations need no data fit.</span>
+<span class="sd">    Unsupported operation types raise ``ValueError``; polynomial expansion</span>
+<span class="sd">    belongs in the separate ``PolynomialFeatures`` node.</span>
 <span class="sd">    """</span>
+    <span class="n">_validate_operation_types</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"operations"</span><span class="p">,</span> <span class="p">[]))</span>
     <span class="n">params</span><span class="p">:</span> <span class="n">FeatureGenerationArtifact</span> <span class="o">=</span> <span class="p">{</span>
         <span class="s2">"type"</span><span class="p">:</span> <span class="s2">"feature_generation"</span><span class="p">,</span>
         <span class="s2">"operations"</span><span class="p">:</span> <span class="n">deepcopy</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"operations"</span><span class="p">,</span> <span class="p">[])),</span>
@@ -4030,8 +4053,7 @@ generated the frame is returned unchanged.</p>
 <span class="normal">212</span>
 <span class="normal">213</span>
 <span class="normal">214</span>
-<span class="normal">215</span>
-<span class="normal">216</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">"FeatureInteraction"</span><span class="p">,</span> <span class="n">FeatureInteractionApplier</span><span class="p">)</span>
+<span class="normal">215</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">"FeatureInteraction"</span><span class="p">,</span> <span class="n">FeatureInteractionApplier</span><span class="p">)</span>
 <span class="nd">@node_meta</span><span class="p">(</span>
     <span class="nb">id</span><span class="o">=</span><span class="s2">"FeatureInteraction"</span><span class="p">,</span>
     <span class="n">name</span><span class="o">=</span><span class="s2">"Feature Interaction"</span><span class="p">,</span>
@@ -4051,9 +4073,10 @@ generated the frame is returned unchanged.</p>
 <span class="w">        </span><span class="sd">"""Validate the requested columns and degree, then enumerate the combinations.</span>
 
 <span class="sd">        Columns are sorted into the artifact so the generated names depend only</span>
-<span class="sd">        on the set of inputs, never on the order they were configured in. Fewer</span>
-<span class="sd">        columns than ``degree`` yields an empty combination list — an artifact</span>
-<span class="sd">        that generates nothing — rather than an error.</span>
+<span class="sd">        on the set of inputs, never on the order they were configured in.</span>
+<span class="sd">        With ``interaction_only=True``, fewer columns than ``degree`` yields</span>
+<span class="sd">        no products. With ``False``, one column is sufficient for self-products.</span>
+<span class="sd">        An empty selection yields no products; bias generation is independent.</span>
 
 <span class="sd">        Raises:</span>
 <span class="sd">            ValueError: If a configured column is missing or non-numeric, or if</span>
@@ -4069,9 +4092,7 @@ generated the frame is returned unchanged.</p>
         <span class="n">interaction_only</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"interaction_only"</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span>
         <span class="n">include_bias</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"include_bias"</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span>
 
-        <span class="n">combos</span> <span class="o">=</span> <span class="p">(</span>
-            <span class="n">_resolve_combinations</span><span class="p">(</span><span class="n">cols</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">interaction_only</span><span class="p">)</span> <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">cols</span><span class="p">)</span> <span class="o">&gt;=</span> <span class="n">degree</span> <span class="k">else</span> <span class="p">[]</span>
-        <span class="p">)</span>
+        <span class="n">combos</span> <span class="o">=</span> <span class="n">_resolve_combinations</span><span class="p">(</span><span class="n">cols</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">interaction_only</span><span class="p">)</span>
         <span class="n">feature_names</span> <span class="o">=</span> <span class="n">_build_interaction_feature_names</span><span class="p">(</span><span class="n">combos</span><span class="p">,</span> <span class="n">include_bias</span><span class="p">)</span>
 
         <span class="k">return</span> <span class="n">cast</span><span class="p">(</span>
@@ -4115,9 +4136,10 @@ generated the frame is returned unchanged.</p>
 
         <p>Validate the requested columns and degree, then enumerate the combinations.</p>
 <p>Columns are sorted into the artifact so the generated names depend only
-on the set of inputs, never on the order they were configured in. Fewer
-columns than <code>degree</code> yields an empty combination list — an artifact
-that generates nothing — rather than an error.</p>
+on the set of inputs, never on the order they were configured in.
+With <code>interaction_only=True</code>, fewer columns than <code>degree</code> yields
+no products. With <code>False</code>, one column is sufficient for self-products.
+An empty selection yields no products; bias generation is independent.</p>
 
 
 <p><span class="doc-section-title">Raises:</span></p>
@@ -4184,15 +4206,15 @@ that generates nothing — rather than an error.</p>
 <span class="normal">212</span>
 <span class="normal">213</span>
 <span class="normal">214</span>
-<span class="normal">215</span>
-<span class="normal">216</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@fit_method</span>
+<span class="normal">215</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@fit_method</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">fit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">_y</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">FeatureInteractionArtifact</span><span class="p">:</span>  <span class="c1"># pylint: disable=arguments-differ</span>
 <span class="w">    </span><span class="sd">"""Validate the requested columns and degree, then enumerate the combinations.</span>
 
 <span class="sd">    Columns are sorted into the artifact so the generated names depend only</span>
-<span class="sd">    on the set of inputs, never on the order they were configured in. Fewer</span>
-<span class="sd">    columns than ``degree`` yields an empty combination list — an artifact</span>
-<span class="sd">    that generates nothing — rather than an error.</span>
+<span class="sd">    on the set of inputs, never on the order they were configured in.</span>
+<span class="sd">    With ``interaction_only=True``, fewer columns than ``degree`` yields</span>
+<span class="sd">    no products. With ``False``, one column is sufficient for self-products.</span>
+<span class="sd">    An empty selection yields no products; bias generation is independent.</span>
 
 <span class="sd">    Raises:</span>
 <span class="sd">        ValueError: If a configured column is missing or non-numeric, or if</span>
@@ -4208,9 +4230,7 @@ that generates nothing — rather than an error.</p>
     <span class="n">interaction_only</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"interaction_only"</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span>
     <span class="n">include_bias</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"include_bias"</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span>
 
-    <span class="n">combos</span> <span class="o">=</span> <span class="p">(</span>
-        <span class="n">_resolve_combinations</span><span class="p">(</span><span class="n">cols</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">interaction_only</span><span class="p">)</span> <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">cols</span><span class="p">)</span> <span class="o">&gt;=</span> <span class="n">degree</span> <span class="k">else</span> <span class="p">[]</span>
-    <span class="p">)</span>
+    <span class="n">combos</span> <span class="o">=</span> <span class="n">_resolve_combinations</span><span class="p">(</span><span class="n">cols</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">interaction_only</span><span class="p">)</span>
     <span class="n">feature_names</span> <span class="o">=</span> <span class="n">_build_interaction_feature_names</span><span class="p">(</span><span class="n">combos</span><span class="p">,</span> <span class="n">include_bias</span><span class="p">)</span>
 
     <span class="k">return</span> <span class="n">cast</span><span class="p">(</span>

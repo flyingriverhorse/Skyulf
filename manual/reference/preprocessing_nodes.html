@@ -4407,12 +4407,17 @@ advanced API and uses the explicit fit/apply calls supplied by the caller.</p>
 <h3 id="generaltransformation">GeneralTransformation</h3>
 <p>Config:</p>
 <ul>
-<li><code>transformations</code>: list of <code>{column, method, clip_threshold?}</code></li>
+<li><code>transformations</code>: list of <code>{column, method, standardize?, clip_threshold?}</code></li>
 <li>methods include power transforms (<code>box-cox</code>, <code>yeo-johnson</code>) and the simple methods</li>
+<li><code>standardize</code> defaults to <code>true</code> for each power rule. Set it to <code>false</code>
+    (clear <strong>Standardize result</strong> in the Canvas) to apply the power transform
+    without centering and scaling its output.</li>
 </ul>
 <p>Learned params:</p>
 <ul>
-<li><code>transformations</code> with fitted <code>lambdas</code>/<code>scaler_params</code> where applicable</li>
+<li><code>transformations</code> with fitted <code>lambdas</code>, the <code>standardize</code> choice and
+  <code>scaler_params</code> when standardization is enabled. Later transforms reuse these
+  training parameters; older artifacts without <code>standardize</code> default to <code>true</code>.</li>
 </ul>
 <h2 id="bucketing-binning">Bucketing (Binning)</h2>
 <h3 id="generalbinning">GeneralBinning</h3>
@@ -4501,6 +4506,10 @@ input column order.</p>
 <li><code>interaction_only</code>: bool (default True; skips self-products like <code>x1 * x1</code>)</li>
 <li><code>include_bias</code>: bool (default False; adds a constant <code>interaction_bias</code> column of 1.0)</li>
 </ul>
+<p>With <code>interaction_only=False</code> (clear <strong>Interaction Only</strong> in the Canvas), one
+column can generate its square, cube or fourth power. Two columns at degree 3
+generate <code>a*a*a</code>, <code>a*a*b</code>, <code>a*b*b</code> and <code>b*b*b</code>. With <code>interaction_only=True</code>,
+at least <code>degree</code> distinct columns are needed to generate products.</p>
 <p>Learned params:</p>
 <ul>
 <li><code>columns</code>, <code>degree</code>, <code>interaction_only</code>, <code>include_bias</code>, <code>combinations</code>, <code>feature_names</code></li>
@@ -4513,6 +4522,21 @@ input column order.</p>
 <li><code>epsilon</code>: float (default 1e-9)</li>
 <li><code>allow_overwrite</code>: bool</li>
 </ul>
+<p>Supported <code>operation_type</code> values are <code>arithmetic</code> (the default), <code>ratio</code>,
+<code>similarity</code>, <code>datetime_extract</code>, and <code>group_agg</code>. Unsupported types raise
+<code>ValueError</code> during fitting and when replaying saved artifacts. In particular,
+<code>polynomial</code> is not a Feature Generation operation: use the separate
+<a href="#polynomialfeatures"><code>PolynomialFeatures</code></a> node for powers and interactions.</p>
+<p>For <code>ratio</code>, the denominator is the sum of the selected denominator columns.
+If its absolute value is below <code>epsilon</code>, it is replaced by <code>-epsilon</code> when
+negative and <code>+epsilon</code> otherwise (including zero). This preserves the ratio's
+sign on both engines; for example, <code>1 / -1e-12</code> with the default epsilon
+produces <code>-1e9</code>. The saved epsilon is reused when applying a fitted node.</p>
+<p>Missing operands (<code>NaN</code> or null) contribute zero to each ratio sum on both
+engines. Other selected operands still contribute normally: <code>(NaN + 2) / 4</code>
+produces <code>0.5</code>. An entirely missing denominator uses positive epsilon, and an
+entirely missing numerator sums to zero. Source columns retain their values;
+this rule applies to the generated ratio.</p>
 <p>Learned params:</p>
 <ul>
 <li><code>operations</code>, <code>epsilon</code>, <code>allow_overwrite</code></li>
@@ -4531,8 +4555,14 @@ both the pandas and polars engines.</p>
 <li><code>lon2_col</code>: str</li>
 <li><code>method</code>: str (<code>"haversine"</code> default, or <code>"euclidean"</code> for a cheap flat-plane approximation)</li>
 <li><code>unit</code>: str (<code>"km"</code> default, or <code>"mi"</code>)</li>
-<li><code>output_column</code>: str (default <code>"geo_distance_km"</code>)</li>
+<li><code>output_column</code>: str (default <code>""</code>, meaning automatic). Omit it or leave it
+  empty to use <code>"geo_distance_km"</code> for kilometers or <code>"geo_distance_mi"</code> for miles.</li>
 </ul>
+<p>The resolved name is stored during fitting and reused during inference.
+An explicit name always takes precedence, including names in existing saved
+artifacts. To retain an old miles pipeline that refers to <code>"geo_distance_km"</code>,
+set that name explicitly before refitting; otherwise update downstream column
+references to <code>"geo_distance_mi"</code>.</p>
 <p>Learned params:</p>
 <ul>
 <li><code>lat1_col</code>, <code>lon1_col</code>, <code>lat2_col</code>, <code>lon2_col</code>, <code>method</code>, <code>unit</code>, <code>output_column</code></li>
@@ -4567,7 +4597,16 @@ the polars engine converts to pandas internally and back.</p>
 <ul>
 <li><code>candidate_columns</code>, <code>selected_columns</code>, <code>variances</code>, <code>threshold</code>, <code>drop_columns</code></li>
 </ul>
+<p>If every candidate is constant, all-null or at/below the threshold, the fitted
+selection is empty. Applying it removes all candidate columns while preserving
+unselected columns and the target; <code>drop_columns=False</code> preserves the input.
+Prediction reuses this fitted selection even if incoming values now vary. If
+no model features remain, adjust the selection before a downstream training step.</p>
 <h3 id="correlationthreshold">CorrelationThreshold</h3>
+<p>In the Canvas, choose <strong>Feature Selection &gt; Correlation Threshold</strong> to remove
+highly correlated input features without selecting a target column. This method
+compares features with each other; supervised selection methods still require a
+target.</p>
 <p>Config:</p>
 <ul>
 <li><code>threshold</code>: float (default 0.95)</li>
