@@ -70,7 +70,7 @@ export const FeatureSelectionNode: NodeDefinition<FeatureSelectionConfig> = {
     return method;
   },
   validate: (config) => {
-    if (config.method !== 'variance_threshold' && !config.target_column) {
+    if (config.method !== 'variance_threshold' && config.method !== 'correlation_threshold' && !config.target_column) {
       return { isValid: false, field: 'target_column', message: 'Target column is required for this method.' };
     }
     return { isValid: true };

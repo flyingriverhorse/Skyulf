@@ -685,6 +685,11 @@ no model features remain, adjust the selection before a downstream training step
 
 ### CorrelationThreshold
 
+In the Canvas, choose **Feature Selection > Correlation Threshold** to remove
+highly correlated input features without selecting a target column. This method
+compares features with each other; supervised selection methods still require a
+target.
+
 Config:
 
 - `threshold`: float (default 0.95)

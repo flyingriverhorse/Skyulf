@@ -226,6 +226,7 @@ uses, so a fixed finding stays where it was filed.
 | OC-26 | 🟠 | `HashingVectorizer` UI "none" norm is an invalid sklearn value → crash (`hashing_vectorizer.py`) | small | ✅ fixed 2026-09-11 — normalize the Canvas value to Python `None`, preserving unnormalized token counts and existing L1/L2 behavior. |
 | OC-33 | 🟡 | `FeatureInteraction` cannot generate single-column self-products (`feature_generation/interaction.py`) | small | ✅ fixed 2026-09-11 — generate repeated-column combinations when `interaction_only=False`, including fewer columns than the degree; align Canvas validation. |
 | OC-32 | 🟡 | `VarianceThreshold` crashes when all candidates are constant (`feature_selection/variance.py`) | small | ✅ fixed 2026-09-11 — record an empty selection when every candidate fails the threshold, preserving candidate variances, replay and invalid-input errors. |
+| OC-31 | 🟡 | Frontend wrongly requires a target for unsupervised CorrelationThreshold (`FeatureSelectionNode.tsx`) | small | ✅ fixed 2026-09-11 — exempt correlation selection from target validation, retaining target requirements for all eight supervised methods. |
 | OC-27 | 🟠 | `GeneralTransformation` ignores the UI `standardize` toggle (`transformations/general.py`) | small | ✅ fixed 2026-09-11 — retain each power rule's standardization choice through fitting and replay; older artifacts keep their previous default. |
 | OC-28 | 🟠 | Box-Cox transform failures silently return untransformed data (`transformations/power.py:97-104`) | small | ✅ fixed 2026-09-06 — the silent path was the `valid_cols` filter, not the `except` (which has logged since the node was created); both engines now share `_fitted_columns_present`, which names the fitted columns the frame lacks, and fail-open is kept by decision. See the log entry |
 
@@ -370,6 +371,37 @@ respective fix logs; OC-167 closed with canonical artifact framing on 2026-09-09
 ---
 
 ## Log
+
+### 2026-09-11 - OC-31 fixed: target-free correlation selection in Canvas
+
+Committed the preceding OC-32 work as `fc9dece3` with DCO sign-off, after
+**594 fresh Core tests** and all applicable pre-commit hooks passed.
+
+Revalidated the Core behavior and frontend rejection before editing production
+code. The public feature-selection facade, without a target, drops `b` from
+`a=[1,2,3,4]`, `b=[2,4,6,8]`, `other=[1,0,0,1]` at Pearson threshold `0.9`,
+preserving `a` and `other`. Canvas validation nevertheless required a target
+for correlation selection, while its settings panel correctly hid that field.
+
+The validator now exempts `correlation_threshold` alongside `variance_threshold`.
+The eight supervised selection methods still reject absent/empty targets and
+accept a configured target. The new regression first failed with the original
+target-required error; the other **25 tests passed**. An old assertion preserved
+the incorrect rejection, and a hidden-field test artificially requested that
+invalid target error for correlation; both obsolete expectations were removed.
+
+Verification: **241 focused tests pass**, covering settings, validation reveal
+and pipeline serialization. The new Playwright test passes keyboard method
+changes, disappearance of the target error/control, an actual Preview POST with
+the correlation settings and no `target_column`, mocked result rendering,
+mobile read-only layout, retained desktop settings and restoration of the
+supervised target requirement. Core numerical behavior was verified separately.
+
+All **2,461 frontend tests pass across 188 files**. Frontend lint, complexity,
+TypeScript/production build, all bundle-size budgets and `git diff --check`
+pass. Independent review found no actionable issue. Updated the user reference,
+changelog and generated `static/ml_canvas` assets. No backend/Core change is
+needed. The live queue now contains **47 open / 4 parked** findings.
 
 ### 2026-09-11 - OC-32 fixed: variance selection may reject every candidate
 
