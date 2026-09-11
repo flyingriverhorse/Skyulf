@@ -222,6 +222,8 @@ uses, so a fixed finding stays where it was filed.
 | OC-211 | 🟡 | Pandas datetime features depend on prediction-batch composition: prepending a different valid date format makes the original rows' year/month/day missing in both `FeatureGeneration.datetime_extract` and `DateFeatures` (`feature_generation/_pandas_ops.py:179`, `time_series/date_features.py:64`) | small | ✅ already fixed - verified 2026-09-09: mixed-format batch companions preserve calendar features across both engines and aliases. |
 | OC-212 | 🟡 | Similarity generation silently omits its output column for duplicate pandas indexes: label-based `.at[i]` returns Series to a scalar helper and the operation exception is swallowed (`feature_generation/_common.py:137-139`) | small | ✅ fixed 2026-09-08 — similarity now reads and assigns by row position, preserving duplicate indexes and individual scores; see the Log entry. |
 | OC-25 | 🟠 | RFE "K" chosen in UI ignored by backend (`feature_selection/_common.py:236-240`) | small | ✅ fixed 2026-09-05 — closes OC-143 too |
+| OC-26 | 🟠 | `HashingVectorizer` UI "none" norm is an invalid sklearn value → crash (`hashing_vectorizer.py`) | small | ✅ fixed 2026-09-11 — normalize the Canvas value to Python `None`, preserving unnormalized token counts and existing L1/L2 behavior. |
+| OC-27 | 🟠 | `GeneralTransformation` ignores the UI `standardize` toggle (`transformations/general.py`) | small | ✅ fixed 2026-09-11 — retain each power rule's standardization choice through fitting and replay; older artifacts keep their previous default. |
 | OC-28 | 🟠 | Box-Cox transform failures silently return untransformed data (`transformations/power.py:97-104`) | small | ✅ fixed 2026-09-06 — the silent path was the `valid_cols` filter, not the `except` (which has logged since the node was created); both engines now share `_fitted_columns_present`, which names the fitted columns the frame lacks, and fail-open is kept by decision. See the log entry |
 
 ### Remaining — profiling (outside the OC-39–46 cluster)
@@ -365,6 +367,85 @@ respective fix logs; OC-167 closed with canonical artifact framing on 2026-09-09
 ---
 
 ## Log
+
+### 2026-09-11 - OC-27 fixed: preserve each power rule's standardization setting
+
+Revalidated the current Canvas-to-Core path before changing code. The UI sends
+`standardize=False`, and the converter includes it in each flattened column
+rule. GeneralTransformation discarded that setting and hardcoded `True` when
+fitting and reconstructing PowerTransformer. On `[1, 2, 4, 8, 16]`, Box-Cox
+returned approximately `[-1.414, -0.707, 0, 0.707, 1.414]` instead of the
+requested unstandardized `[0, 0.693, 1.386, 2.079, 2.773]`. Yeo-Johnson likewise
+returned zero-mean, unit-standard-deviation output with the option disabled.
+
+The new regressions initially produced **2 failures / 2 passing controls**.
+For both methods, mixed column rules now compare `False`, `True` and omitted
+settings against independently fitted sklearn transformers on training and
+unseen data. Yeo-Johnson includes negative and zero inputs. The tests also
+check stored choices, absence of scaler statistics when disabled, duplicate
+held-out indexes and the output of historical artifacts without the flag.
+
+Fitting now passes each rule's setting into PowerTransformer and stores it
+beside the learned lambda. Both existing apply paths read the saved flag;
+missing flags still default to `True`, preserving previously saved artifacts.
+The calculator docstring and preprocessing reference explain the behavior;
+the release note is under **v0.8.20**. Frontend code already emits the setting
+correctly and needs no change.
+
+Verification: **182 related tests pass**, with one existing Polars polynomial
+concatenation deprecation warning. The four new regressions also pass after
+the final test lint adjustment. Related suite command:
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest `
+  skyulf-core/tests/integration/test_transformations_general.py `
+  skyulf-core/tests/integration/test_transformations_power_simple.py `
+  skyulf-core/tests/unit/test_feature_operation_leakage.py `
+  skyulf-core/tests/unit/test_artifact_shapes.py `
+  -q --tb=short --basetemp=.pytest-tmp-oc27-green -o cache_dir=.pytest-tmp-oc27-cache
+```
+
+Repository Ruff/Ty, scoped formatting and `git diff --check` pass. Independent
+review found no actionable issue in the change. OC-27 moves to the archive,
+leaving **51 open / 4 parked** findings.
+
+### 2026-09-11 - OC-26 fixed: honor Hashing Vectorizer's None normalization option
+
+Revalidated against the current code before changing production behavior.
+The Canvas emits `norm="none"`; artifact construction retained that string,
+and applying the artifact raised sklearn's `InvalidParameterError` in
+`normalize`. The existing `norm=None` unit test only inspected the artifact
+and never exercised the Canvas string or the resulting transformation.
+
+The new registry-based regression initially produced **1 failure / 5 passing
+controls**. A corpus with three `hello` and four `world` tokens must produce
+bucket counts `[3, 4]` with normalization disabled, `[3/7, 4/7]` for L1 and
+`[0.6, 0.8]` for L2. The test also covers Python `None`, the existing empty-string
+alias, omitted/default L2, an empty document and reuse of the fitted artifact.
+
+Artifact construction now translates only the Canvas string `"none"` to
+Python `None` before building sklearn's vectorizer. The shared constructor
+keeps the normalized value in both the artifact and vectorizer object.
+The user guide and calculator docstring explain the accepted values; the
+release note is under **v0.8.20**.
+
+Verification: **233 related tests pass**, with two existing unknown-category
+warnings from OneHotEncoder controls. Reproduce the test run with:
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest `
+  skyulf-core/tests/integration/test_vectorization.py `
+  skyulf-core/tests/unit/test_text_vectorization.py `
+  skyulf-core/tests/unit/test_vectorization_gaps.py `
+  skyulf-core/tests/integration/test_text_target_context.py `
+  skyulf-core/tests/unit/test_encoding_operation_leakage.py `
+  skyulf-core/tests/unit/test_encoding_text_deep_audit_20260908.py `
+  -q --basetemp=.pytest-tmp-oc26-green -o cache_dir=.pytest-tmp-oc26-cache
+```
+
+Repository Ruff/Ty, scoped formatting and `git diff --check` pass. Independent
+review found no actionable issue in the code, regression, guide or release
+note. OC-26 moves to the archive, leaving **52 open / 4 parked** findings.
 
 ### 2026-09-10 - OC-184 fixed: send the configured production security headers
 

@@ -484,12 +484,17 @@ Learned params:
 
 Config:
 
-- `transformations`: list of `{column, method, clip_threshold?}`
+- `transformations`: list of `{column, method, standardize?, clip_threshold?}`
   - methods include power transforms (`box-cox`, `yeo-johnson`) and the simple methods
+  - `standardize` defaults to `true` for each power rule. Set it to `false`
+    (clear **Standardize result** in the Canvas) to apply the power transform
+    without centering and scaling its output.
 
 Learned params:
 
-- `transformations` with fitted `lambdas`/`scaler_params` where applicable
+- `transformations` with fitted `lambdas`, the `standardize` choice and
+  `scaler_params` when standardization is enabled. Later transforms reuse these
+  training parameters; older artifacts without `standardize` default to `true`.
 
 ## Bucketing (Binning)
 

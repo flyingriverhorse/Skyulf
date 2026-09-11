@@ -119,6 +119,10 @@ art = HashingVectorizerCalculator().fit(train_df, cfg)   # no vocabulary learned
 train_X = HashingVectorizerApplier().apply(train_df, art)
 ```
 
+Normalization defaults to `"l2"`; `"l1"` is also available. Choose **None** in the
+Canvas, or set `"norm": "none"` (Python `None` also works), to keep unnormalized
+hashed token counts.
+
 The trade-off: output columns are anonymous hash buckets (`text__hash__0 …`), so you lose the
 word ↔ column mapping, and different words can occasionally collide into the same bucket.
 

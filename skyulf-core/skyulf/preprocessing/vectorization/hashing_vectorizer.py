@@ -69,6 +69,8 @@ def _build_hashing_artifact(
     """Build a fitted ``HashingVectorizer`` and its artifact dict from config."""
     n_features: int = int(config.get("n_features", _DEFAULT_N_FEATURES))
     norm: str | None = config.get("norm", "l2") or None
+    if norm == "none":
+        norm = None
     alternate_sign: bool = bool(config.get("alternate_sign", True))
     lowercase: bool = bool(config.get("lowercase", True))
     stop_words: str | None = config.get("stop_words") or None
@@ -130,6 +132,9 @@ class HashingVectorizerCalculator(BaseCalculator):
     is fully reproducible from config and identical across runs — the property that
     makes it usable on streaming or very large corpora where building a vocabulary
     would not fit in memory.
+
+    Normalization defaults to ``"l2"``; ``"l1"`` selects L1 normalization.
+    The Canvas value ``"none"`` and Python ``None`` both disable normalization.
     """
 
     def infer_output_schema(self, input_schema: Any, config: dict[str, Any]) -> None:

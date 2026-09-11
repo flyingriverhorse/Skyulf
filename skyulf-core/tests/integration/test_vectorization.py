@@ -291,6 +291,49 @@ class TestTfidfVectorizerEndToEnd:
 
 
 class TestHashingVectorizerEndToEnd:
+    @pytest.mark.parametrize(
+        ("norm_config", "expected_norm", "expected_counts"),
+        [
+            pytest.param({"norm": "none"}, None, [3.0, 4.0], id="canvas-none"),
+            pytest.param({"norm": None}, None, [3.0, 4.0], id="python-none"),
+            pytest.param({"norm": ""}, None, [3.0, 4.0], id="empty-string"),
+            pytest.param({"norm": "l1"}, "l1", [3 / 7, 4 / 7], id="l1"),
+            pytest.param({"norm": "l2"}, "l2", [0.6, 0.8], id="l2"),
+            pytest.param({}, "l2", [0.6, 0.8], id="default-l2"),
+        ],
+    )
+    def test_normalization_controls_applied_counts(
+        self,
+        norm_config: dict[str, Any],
+        expected_norm: str | None,
+        expected_counts: list[float],
+    ) -> None:
+        """Canvas None must preserve token counts through fit and later transforms."""
+        calculator_cls, applier_cls = _resolve("hashing_vectorizer")
+        corpus = pd.DataFrame({"text": ["hello hello hello world world world world", ""]})
+        params = _fit(
+            calculator_cls,
+            corpus,
+            {
+                "columns": ["text"],
+                "n_features": 16,
+                "alternate_sign": False,
+                "drop_original": True,
+                **norm_config,
+            },
+        )
+
+        fit_out = applier_cls().apply(corpus, params)
+        later_out = applier_cls().apply(corpus.copy(), params)
+
+        assert params["norm"] == expected_norm
+        assert fit_out.shape == (2, 16)
+        np.testing.assert_allclose(
+            np.sort(fit_out.iloc[0].to_numpy()), [0.0] * 14 + expected_counts
+        )
+        np.testing.assert_array_equal(fit_out.iloc[1].to_numpy(), np.zeros(16))
+        pd.testing.assert_frame_equal(later_out, fit_out)
+
     def test_stateless_fit_and_apply(self) -> None:
         calculator_cls, applier_cls = _resolve("hashing_vectorizer")
         corpus = _corpus()

@@ -12,6 +12,7 @@ import polars as pl
 import pytest
 from hypothesis import HealthCheck, assume, given, settings
 from hypothesis import strategies as st
+from sklearn.preprocessing import PowerTransformer
 from tests.utils.dataset_loader import load_sample_dataset
 from tests.utils.test_case_loader import TestCaseLoader
 
@@ -270,6 +271,76 @@ class TestApplySimpleOpsPandas:
 
 
 class TestApplyPowerTransforms:
+    @pytest.mark.parametrize("method", ["box-cox", "yeo-johnson"])
+    def test_per_column_standardization_survives_fit_and_replay(
+        self, calc: Any, appl: Any, method: str
+    ) -> None:
+        """Each power rule must preserve its scaling choice on training and unseen rows."""
+        train_values = [1.0, 2.0, 4.0, 8.0, 16.0]
+        heldout_values = [3.0, 32.0]
+        if method == "yeo-johnson":
+            train_values = [-4.0, -1.0, 0.0, 3.0, 16.0]
+            heldout_values = [-2.0, 32.0]
+        columns = ["unscaled", "scaled", "default"]
+        train = pd.DataFrame(dict.fromkeys(columns, train_values))
+        heldout = pd.DataFrame(dict.fromkeys(columns, heldout_values), index=[7, 7])
+        params = calc.fit(
+            train,
+            {
+                "transformations": [
+                    {"column": "unscaled", "method": method, "standardize": False},
+                    {"column": "scaled", "method": method, "standardize": True},
+                    {"column": "default", "method": method},
+                ]
+            },
+        )
+
+        train_out = appl.apply(train, params)
+        heldout_out = appl.apply(heldout, params)
+
+        for col, standardize in [("unscaled", False), ("scaled", True), ("default", True)]:
+            reference = PowerTransformer(method=method, standardize=standardize).fit(
+                train[[col]].to_numpy()
+            )
+            np.testing.assert_allclose(
+                train_out[col].to_numpy(),
+                reference.transform(train[[col]].to_numpy()).ravel(),
+            )
+            np.testing.assert_allclose(
+                heldout_out[col].to_numpy(),
+                reference.transform(heldout[[col]].to_numpy()).ravel(),
+            )
+        assert [item["standardize"] for item in params["transformations"]] == [
+            False,
+            True,
+            True,
+        ]
+        assert "scaler_params" not in params["transformations"][0]
+        assert heldout_out.index.tolist() == [7, 7]
+
+    @pytest.mark.parametrize(
+        ("method", "lambdas", "values"),
+        [("box-cox", [0.0], [1.0, np.exp(2.0)]), ("yeo-johnson", [1.0], [0.0, 2.0])],
+    )
+    def test_legacy_power_artifact_keeps_standardization(
+        self, appl: Any, method: str, lambdas: list[float], values: list[float]
+    ) -> None:
+        """Previously saved artifacts must still use their scaling statistics."""
+        artifact = {
+            "transformations": [
+                {
+                    "column": "x",
+                    "method": method,
+                    "lambdas": lambdas,
+                    "scaler_params": {"mean": [0.0], "scale": [2.0]},
+                }
+            ]
+        }
+
+        out = appl.apply(pd.DataFrame({"x": values}), artifact)
+
+        np.testing.assert_allclose(out["x"].to_numpy(), [0.0, 1.0])
+
     def test_yeo_johnson_full_flow(self, calc: Any, appl: Any, pos_df: pd.DataFrame) -> None:
         """yeo-johnson fit → apply returns same shape with all-finite values."""
         art = calc.fit(pos_df, {"transformations": [{"column": "a", "method": "yeo-johnson"}]})
