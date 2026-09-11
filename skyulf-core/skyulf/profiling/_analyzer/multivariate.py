@@ -313,17 +313,20 @@ class MultivariateMixin(_AnalyzerState):
             logger.warning(f"Error in clustering analysis: {e}")
             return None
 
-    def _sample_numeric_for_outliers(self, numeric_cols: list[str], limit: int):
-        """Select numeric columns for outlier detection, sampling rows if above the row limit."""
+    def _sample_numeric_for_outliers(
+        self, numeric_cols: list[str], limit: int
+    ) -> tuple[pl.DataFrame, pl.Series]:
+        """Sample numeric rows with their positions in the current filtered input."""
         row_count = self.df.height  # type: ignore[attr-defined]
+        row_positions = pl.Series(range(row_count))
+        df_numeric = self.df.select(numeric_cols)  # type: ignore[attr-defined]
         if row_count > limit:
             # Use a random (seeded) sample rather than the first N rows, matching
             # the sampling strategy used elsewhere in this module (PCA/clustering),
             # so ordering (e.g. by date) doesn't bias which rows get analyzed.
-            return self.df.select(numeric_cols).sample(  # type: ignore[attr-defined]
-                n=limit, with_replacement=False, seed=42
-            )
-        return self.df.select(numeric_cols)  # type: ignore[attr-defined]
+            row_positions = row_positions.sample(n=limit, with_replacement=False, seed=42)
+            df_numeric = df_numeric[row_positions]
+        return df_numeric, row_positions
 
     @staticmethod
     def _outlier_row_explanation(row_values, medians) -> list[dict]:
@@ -348,7 +351,7 @@ class MultivariateMixin(_AnalyzerState):
         return explanation
 
     def _top_outlier_points(
-        self, scored_indices, preds, df_numeric, top_k: int
+        self, scored_indices, preds, df_numeric, top_k: int, row_positions: pl.Series
     ) -> list[OutlierPoint]:
         """Build the top-K OutlierPoint entries with per-feature deviation explanations."""
         top_outliers = []
@@ -363,7 +366,7 @@ class MultivariateMixin(_AnalyzerState):
 
             top_outliers.append(
                 OutlierPoint(
-                    index=int(idx),
+                    index=int(row_positions[idx]),
                     values=row_values,
                     score=float(score),
                     explanation=explanation[:3],
@@ -372,10 +375,10 @@ class MultivariateMixin(_AnalyzerState):
         return top_outliers
 
     def _detect_outliers(self, numeric_cols: list[str]) -> OutlierAnalysis | None:
-        """Isolation-Forest outlier detection with per-feature deviation explanations."""
+        """Detect outliers with zero-based row positions in the current filtered input."""
         try:
             limit = 50000
-            df_numeric = self._sample_numeric_for_outliers(numeric_cols, limit)
+            df_numeric, row_positions = self._sample_numeric_for_outliers(numeric_cols, limit)
 
             X = self._impute_matrix_drop_empty(df_numeric)
 
@@ -394,7 +397,9 @@ class MultivariateMixin(_AnalyzerState):
             scored_indices.sort(key=lambda x: x[1])
 
             top_k = 20
-            top_outliers = self._top_outlier_points(scored_indices, preds, df_numeric, top_k)
+            top_outliers = self._top_outlier_points(
+                scored_indices, preds, df_numeric, top_k, row_positions
+            )
 
             return OutlierAnalysis(
                 method="IsolationForest",

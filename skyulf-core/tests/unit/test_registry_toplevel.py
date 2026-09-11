@@ -130,6 +130,34 @@ def test_list_nodes_filters_metadata_by_modeling_category(monkeypatch):
     assert NodeRegistry.list_models("Preprocessing") == []
 
 
+@pytest.mark.parametrize(
+    ("category", "expected_models", "expected_transformers"),
+    [
+        (None, ["model", "voting", "stacking"], ["preprocessor", "custom"]),
+        ("Modeling", ["model"], []),
+        ("Ensemble", ["voting", "stacking"], []),
+        ("Preprocessing", [], ["preprocessor"]),
+        ("Custom", [], ["custom"]),
+        ("Unknown", [], []),
+    ],
+)
+def test_model_and_transformer_categories_stay_disjoint(
+    monkeypatch, category, expected_models, expected_transformers
+):
+    """Ensembles belong only to model discovery, with exact category filters and stable order."""
+    metadata = {
+        "preprocessor": {"category": "Preprocessing"},
+        "model": {"category": "Modeling"},
+        "voting": {"category": "Ensemble"},
+        "custom": {"category": "Custom"},
+        "stacking": {"category": "Ensemble"},
+    }
+    monkeypatch.setattr(NodeRegistry, "get_all_metadata", classmethod(lambda cls: metadata))
+
+    assert NodeRegistry.list_models(category=category) == expected_models
+    assert NodeRegistry.list_transformers(category=category) == expected_transformers
+
+
 def test_node_registry_is_reexported_from_package_top_level():
     """NodeRegistry should be discoverable from the package's top-level namespace."""
     import skyulf

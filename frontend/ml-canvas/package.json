@@ -1,7 +1,7 @@
 {
   "name": "ml-canvas",
   "private": true,
-  "version": "0.8.19",
+  "version": "0.8.20",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -51,7 +51,7 @@
     "leaflet": "^1.9.4",
     "lucide-react": "^0.363.0",
     "mermaid": "^11.17.2",
-    "plotly.js-gl3d-dist-min": "^3.5.0",
+    "plotly.js": "npm:plotly.js-gl3d-dist-min@^3.5.0",
     "react": "^18.2.0",
     "react-chartjs-2": "^5.3.1",
     "react-dom": "^18.2.0",
@@ -84,8 +84,8 @@
     "@typescript-eslint/eslint-plugin": "^7.2.0",
     "@typescript-eslint/parser": "^7.2.0",
     "@vitejs/plugin-react": "^4.2.1",
-    "@vitest/coverage-v8": "4.1.9",
-    "@vitest/ui": "^4.1.0",
+    "@vitest/coverage-v8": "4.1.11",
+    "@vitest/ui": "^4.1.11",
     "autoprefixer": "^10.4.19",
     "eslint": "^8.57.0",
     "eslint-plugin-jsx-a11y": "^6.10.2",
@@ -97,6 +97,6 @@
     "tailwindcss": "^3.4.1",
     "typescript": "^5.2.2",
     "vite": "^6.4.3",
-    "vitest": "^4.1.0"
+    "vitest": "^4.1.11"
   }
 }

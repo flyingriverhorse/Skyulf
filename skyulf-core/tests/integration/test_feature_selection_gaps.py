@@ -449,6 +449,78 @@ def test_variance_threshold_no_candidate_columns_returns_empty() -> None:
     assert art == {}
 
 
+@pytest.mark.parametrize("drop_columns", [True, False])
+@pytest.mark.parametrize(
+    "values,threshold,expected_variance",
+    [
+        ([7.0, 7.0, 7.0], 0.0, 0.0),
+        ([np.nan, np.nan, np.nan], 0.0, np.nan),
+        ([0.0, 2.0, 0.0, 2.0], 1.0, 1.0),
+        ([3.0], 0.0, 0.0),
+    ],
+    ids=["constant", "all-null", "at-threshold", "one-row"],
+)
+def test_variance_threshold_records_empty_selection(
+    values: list[float], threshold: float, expected_variance: float, drop_columns: bool
+) -> None:
+    """Rejecting every candidate must preserve other columns, row identity and targets."""
+    df = pd.DataFrame(
+        {"candidate": values, "untouched": range(len(values)), "label": "keep"},
+        index=[9] * len(values),
+    )
+    original = df.copy(deep=True)
+    y = pd.Series(range(len(values)), index=df.index, name="target")
+    art = VarianceThresholdCalculator().fit(
+        (df, y),
+        {"columns": ["candidate"], "threshold": threshold, "drop_columns": drop_columns},
+    )
+
+    assert art["selected_columns"] == []
+    assert art["candidate_columns"] == ["candidate"]
+    assert art["threshold"] == threshold
+    np.testing.assert_allclose(art["variances"]["candidate"], expected_variance, equal_nan=True)
+    out, y_out = VarianceThresholdApplier().apply((df, y), art)
+    expected = original.drop(columns="candidate") if drop_columns else original
+    pd.testing.assert_frame_equal(out, expected)
+    pd.testing.assert_frame_equal(df, original)
+    pd.testing.assert_series_equal(y_out, y)
+
+
+def test_variance_threshold_can_drop_all_columns() -> None:
+    """Automatic selection may produce zero columns without losing pandas row indexes."""
+    df = pd.DataFrame({"a": [2.0, 2.0], "b": [5.0, 5.0]}, index=[8, 3])
+
+    art = VarianceThresholdCalculator().fit(df, {})
+    out = VarianceThresholdApplier().apply(df, art)
+
+    assert art["selected_columns"] == []
+    assert art["variances"] == {"a": 0.0, "b": 0.0}
+    pd.testing.assert_frame_equal(out, df.iloc[:, :0])
+
+
+@pytest.mark.parametrize(
+    "values,threshold,error",
+    [
+        ([7.0, 7.0], -1.0, "threshold"),
+        ([7.0, 7.0], np.nan, "threshold"),
+        ([7.0, 7.0], "invalid", "threshold"),
+        ([7.0, np.inf], 0.0, "infinity"),
+        ([1e200, 2e200], 1.0, "No feature in X meets"),
+        ([1e308] * 4 + [-1e308] * 4, 1.0, "No feature in X meets"),
+        ([], 0.0, "0 sample"),
+        (["bad", "data"], 0.0, "convert string"),
+    ],
+)
+def test_variance_threshold_keeps_invalid_input_errors(
+    values: list[Any], threshold: Any, error: str
+) -> None:
+    """Invalid inputs must not be mistaken for a valid selection that rejects all columns."""
+    with pytest.raises(ValueError, match=error):
+        VarianceThresholdCalculator().fit(
+            pd.DataFrame({"candidate": values}), {"columns": ["candidate"], "threshold": threshold}
+        )
+
+
 # ---------------------------------------------------------------------------
 # UnivariateSelection
 # ---------------------------------------------------------------------------

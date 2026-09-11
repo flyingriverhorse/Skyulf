@@ -352,7 +352,13 @@ class AsyncJSONSafeSerializer:
 
 
 class JSONSafeSerializer:
-    """Synchronous JSON-safe serializer for backward compatibility."""
+    """Synchronous JSON-safe serializer for backward compatibility.
+
+    Literal strings such as ``"nan"``, ``"NaT"`` and ``"inf"`` remain text,
+    matching the async serializer. Real pandas missing scalars and non-finite
+    floats become ``None``; an object's string representation is never used
+    to decide whether it is missing.
+    """
 
     _NOT_HANDLED = object()
 
@@ -362,7 +368,6 @@ class JSONSafeSerializer:
             cls._handle_none,
             cls._handle_pandas_object,
             cls._handle_numpy_like,
-            cls._handle_special_string_values,
             cls._handle_float_edge_cases,
             cls._handle_basic_types,
             cls._handle_dict,
@@ -390,7 +395,7 @@ class JSONSafeSerializer:
 
     @staticmethod
     def _handle_none(obj: Any) -> Any:
-        if obj is None:
+        if obj is None or obj is pd.NA or obj is pd.NaT:
             return None
         return JSONSafeSerializer._NOT_HANDLED
 
@@ -425,21 +430,6 @@ class JSONSafeSerializer:
             if hasattr(obj, "item"):
                 return obj.item()
             return str(obj)
-        return JSONSafeSerializer._NOT_HANDLED
-
-    @staticmethod
-    def _handle_special_string_values(obj: Any) -> Any:
-        if str(obj) in [
-            "nan",
-            "NaN",
-            "NaT",
-            "<NA>",
-            "inf",
-            "-inf",
-            "infinity",
-            "-infinity",
-        ]:
-            return None
         return JSONSafeSerializer._NOT_HANDLED
 
     @staticmethod

@@ -142,10 +142,10 @@ ROW_LOCAL_CASES = (
                 "method": method,
                 "unit": unit,
             },
-            "geo_distance_km",
+            output_column,
         )
         for method in ("haversine", "euclidean")
-        for unit in ("km", "mi")
+        for unit, output_column in (("km", "geo_distance_km"), ("mi", "geo_distance_mi"))
     ]
 )
 

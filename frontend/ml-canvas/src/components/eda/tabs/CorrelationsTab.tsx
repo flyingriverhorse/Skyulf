@@ -4,6 +4,7 @@ import { InfoTooltip } from '../../ui/InfoTooltip';
 import { CorrelationHeatmap } from '../CorrelationHeatmap';
 import { EmptyState } from '../../shared/EmptyState';
 import { getChartTheme } from '../constants';
+import { NumericTargetNotice } from '../NumericTargetNotice';
 
 interface CorrelationsTabProps {
     profile: any;
@@ -16,7 +17,10 @@ export const CorrelationsTab: React.FC<CorrelationsTabProps> = ({
     const [doneBtn, setDoneBtn] = useState<string | null>(null);
 
     if (!profile?.correlations) {
-        return <EmptyState icon={<BarChart2 className="w-12 h-12 text-slate-300 dark:text-slate-600" />} title="No Correlation Data" description="Not enough numeric columns to compute correlations." />;
+        return <>
+            <NumericTargetNotice target={profile?.target_col} reason={profile?.causal_target_exclusion_reason} />
+            <EmptyState icon={<BarChart2 className="w-12 h-12 text-slate-300 dark:text-slate-600" />} title="No Correlation Data" description="Not enough numeric columns to compute correlations." />
+        </>;
     }
     const downloadMatrix = async (data: any, titleText: string, filename: string) => {
         if (!data) return;
@@ -120,6 +124,7 @@ export const CorrelationsTab: React.FC<CorrelationsTabProps> = ({
 
     return (
         <div className="space-y-8">
+            <NumericTargetNotice target={profile.target_col} reason={profile.causal_target_exclusion_reason} />
             {/* 1. Feature Correlations (Multicollinearity) */}
             <div className="bg-white dark:bg-gray-800 p-6 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm">
                 <div className="flex justify-between items-center mb-4">

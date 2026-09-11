@@ -6,6 +6,7 @@ raising, so profiling stays usable without them.
 """
 
 from datetime import datetime
+from math import isfinite
 
 import polars as pl
 
@@ -718,34 +719,53 @@ class EDAVisualizer:
 
     @staticmethod
     def _label_color_map(labels):
-        """Build a mapping from unique non-null labels to sequential integer color codes."""
-        unique_labels = list({lbl for lbl in labels if lbl is not None})
+        """Assign stable color codes to sorted unique non-null labels."""
+        unique_labels = sorted({lbl for lbl in labels if lbl is not None})
         return {lbl: i for i, lbl in enumerate(unique_labels)}
 
     @staticmethod
     def _pca_color_values(labels):
-        """Convert PCA point labels to numeric color values, falling back to a categorical mapping."""
+        """Use finite numeric target values, otherwise assign categorical colors."""
         try:
-            return [float(lbl) for lbl in labels if lbl is not None]
+            numeric_values = [float(lbl) for lbl in labels if lbl is not None]
+            if all(isfinite(value) for value in numeric_values):
+                return numeric_values
         except (ValueError, TypeError):
-            label_map = EDAVisualizer._label_color_map(labels)
-            return [label_map.get(lbl, -1) for lbl in labels if lbl is not None]
+            pass
+        label_map = EDAVisualizer._label_color_map(labels)
+        return [label_map.get(lbl, -1) for lbl in labels if lbl is not None]
 
     def _plot_pca(self):
+        """Plot every PCA point, distinguishing missing labels from colored targets."""
         if not self.profile.pca_data:
             return
 
         import matplotlib.pyplot as plt  # ty: ignore[unresolved-import]  # noqa: PLC0415 - optional viz extra
 
-        x = [p.x for p in self.profile.pca_data]
-        y = [p.y for p in self.profile.pca_data]
-        labels = [p.label for p in self.profile.pca_data]
-
-        c_values = self._pca_color_values(labels)
+        labeled = [p for p in self.profile.pca_data if p.label is not None]
+        unlabeled = [p for p in self.profile.pca_data if p.label is None]
 
         plt.figure(figsize=(8, 6))
-        scatter = plt.scatter(x, y, c=c_values, cmap="viridis", alpha=0.8)
-        plt.colorbar(scatter, label="Target")
+        if labeled:
+            c_values = self._pca_color_values([p.label for p in labeled])
+            scatter = plt.scatter(
+                [p.x for p in labeled],
+                [p.y for p in labeled],
+                c=c_values,
+                cmap="viridis",
+                alpha=0.8,
+            )
+            plt.colorbar(scatter, label="Target")
+        if unlabeled:
+            plt.scatter(
+                [p.x for p in unlabeled],
+                [p.y for p in unlabeled],
+                color="gray",
+                marker="x",
+                alpha=0.8,
+                label="Unlabeled",
+            )
+            plt.legend()
         plt.title("PCA Projection (2D)")
         plt.xlabel("PC1")
         plt.ylabel("PC2")

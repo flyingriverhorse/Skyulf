@@ -109,3 +109,26 @@ arbitrary code from a malicious file. Treat pipeline files like executables:
   for its own jobs.
 - Prefer `fingerprint()` comparisons over re-loading when you only need to
   verify identity.
+
+## Backend JSON compatibility helper
+
+Backend integrations that call
+`backend.data_ingestion.serialization.JSONSafeSerializer` directly retain
+literal strings such as `"nan"`, `"NaT"`, `"<NA>"` and `"inf"`. These remain
+category labels, matching the async helper's treatment of text. Actual missing
+scalars (`None`, `pd.NA`, `pd.NaT`) and non-finite Python floats become JSON
+`null` through the synchronous helper:
+
+```python
+import json
+
+from backend.data_ingestion.serialization import JSONSafeSerializer
+
+payload = {"label": "nan", "measurement": float("nan")}
+cleaned = JSONSafeSerializer.clean_for_json(payload)
+print(json.dumps(cleaned, allow_nan=False))
+# {"label": "nan", "measurement": null}
+```
+
+This backend utility is retained for compatibility; current HTTP routes do
+not call it. Pipeline persistence uses the separate pickle format above.

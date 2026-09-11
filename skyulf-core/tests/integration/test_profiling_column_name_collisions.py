@@ -54,10 +54,10 @@ def test_categorical_drift_names_preserve_distribution_identity(column: str, shi
 
 @pytest.mark.parametrize("boolean_target", [False, True])
 @pytest.mark.parametrize("exclude_candidate", [False, True])
-def test_profile_target_encoding_preserves_real_features_across_repeated_analysis(
+def test_profile_nominal_target_preserves_real_features_across_repeated_analysis(
     boolean_target: bool, exclude_candidate: bool
 ) -> None:
-    """Target encoding must preserve occupied helper names and usable correlation matrices."""
+    """Nominal targets must preserve real encoded-name features and their correlation matrices."""
     rng = np.random.default_rng(190198)
     n_rows = 120
     frame = pl.DataFrame(
@@ -86,16 +86,12 @@ def test_profile_target_encoding_preserves_real_features_across_repeated_analysi
         assert profile.correlations is not None
         assert profile.correlations.columns == features
         np.testing.assert_allclose(profile.correlations.values, expected_correlations, atol=1e-12)
-        assert profile.correlations_with_target is not None
-        target_columns = profile.correlations_with_target.columns
-        assert len(target_columns) == len(features) + 1
-        assert len(set(target_columns)) == len(target_columns)
-        assert target_columns[:-1] == features
-        assert target_columns[-1] not in frame.columns
+        assert profile.correlations_with_target is None
+        assert profile.causal_target_exclusion_reason == "categorical"
 
 
 def test_profile_target_name_collision_keeps_causal_graph_available() -> None:
-    """A real encoded-name feature must coexist with the target in causal discovery."""
+    """Real encoded-name features must retain their identity when a nominal target is omitted."""
     pytest.importorskip("causallearn")
     rng = np.random.default_rng(198)
     frame = pl.DataFrame(
@@ -110,22 +106,22 @@ def test_profile_target_name_collision_keeps_causal_graph_available() -> None:
     profile = EDAAnalyzer(frame).analyze(target_col="target")
 
     assert profile.causal_graph is not None
-    assert profile.correlations_with_target is not None
+    assert profile.correlations is not None
+    assert profile.correlations_with_target is None
     node_names = [node.id for node in profile.causal_graph.nodes]
-    assert node_names == profile.correlations_with_target.columns
-    assert len(node_names) == 4
-    assert len(set(node_names)) == 4
+    assert node_names == profile.correlations.columns == ["x", "target_encoded", "target_encoded_1"]
+    assert len(set(node_names)) == 3
 
 
-def test_profile_target_encoding_restores_frame_when_analysis_fails(monkeypatch) -> None:
-    """A later analysis error must not retain encoded targets or overwrite source state."""
+def test_profile_nominal_target_preserves_frame_when_analysis_fails(monkeypatch) -> None:
+    """A later analysis error must not add target codes or overwrite source state."""
     frame = pl.DataFrame(
         {"x": [1.0, 2.0, 3.0], "target": ["left", "left", "right"], "target_encoded": [5, 7, 9]}
     )
     analyzer = EDAAnalyzer(frame)
 
     def fail_multivariate(*args, **kwargs):
-        """Simulate a downstream analytics failure after temporary target encoding."""
+        """Simulate a downstream analytics failure after target preparation."""
         raise RuntimeError("multivariate analysis failed")
 
     monkeypatch.setattr(analyzer, "_compute_multivariate", fail_multivariate)

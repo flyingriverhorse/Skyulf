@@ -44,7 +44,7 @@ def _apply_power_to_polars_col(X_out: Any, item: dict[str, Any]) -> Any:
     try:
         pt = build_pretrained_power_transformer(
             method=method,
-            standardize=True,
+            standardize=item.get("standardize", True),
             lambdas_arr=np.array(lambdas),
             scaler_params=item.get("scaler_params"),
         )
@@ -67,7 +67,7 @@ def _apply_power_to_pandas_col(df_out: Any, item: dict[str, Any]) -> Any:
     try:
         pt = build_pretrained_power_transformer(
             method=method,
-            standardize=True,
+            standardize=item.get("standardize", True),
             lambdas_arr=np.array(lambdas),
             scaler_params=item.get("scaler_params"),
         )
@@ -135,7 +135,9 @@ class GeneralTransformationApplier(BaseApplier):
         return df_out, _y
 
 
-def _fit_power_for_column(X: Any, col: str, method: str, is_polars: bool) -> dict[str, Any]:
+def _fit_power_for_column(
+    X: Any, col: str, method: str, is_polars: bool, standardize: bool = True
+) -> dict[str, Any]:
     """Fit a PowerTransformer for one column; return the per-column artifact dict."""
     if is_polars:
         col_values = X[col].to_numpy()
@@ -150,10 +152,10 @@ def _fit_power_for_column(X: Any, col: str, method: str, is_polars: bool) -> dic
         )
         return {}
 
-    pt = PowerTransformer(method=method, standardize=True)
+    pt = PowerTransformer(method=method, standardize=standardize)
     pt.fit(col_df)
 
-    fitted: dict[str, Any] = {"lambdas": pt.lambdas_.tolist()}
+    fitted: dict[str, Any] = {"lambdas": pt.lambdas_.tolist(), "standardize": standardize}
     if hasattr(pt, "_scaler") and pt._scaler:
         fitted["scaler_params"] = {
             "mean": pt._scaler.mean_.tolist() if pt._scaler.mean_ is not None else None,
@@ -172,7 +174,12 @@ def _fit_power_for_column(X: Any, col: str, method: str, is_polars: bool) -> dic
     learns_from_data=True,
 )
 class GeneralTransformationCalculator(BaseCalculator):
-    """Resolve configured transformations, fitting lambdas for the power methods."""
+    """Resolve configured transformations, fitting lambdas for the power methods.
+
+    Each power rule accepts ``standardize`` (default ``True``). Set it to
+    ``False`` to apply only the fitted Box-Cox or Yeo-Johnson transform.
+    The artifact retains the choice for subsequent transforms.
+    """
 
     def infer_output_schema(
         self, input_schema: SkyulfSchema, config: dict[str, Any]
@@ -216,7 +223,9 @@ class GeneralTransformationCalculator(BaseCalculator):
 
             if method in _POWER_METHODS:
                 try:
-                    extras = _fit_power_for_column(X, col, method, is_polars)
+                    extras = _fit_power_for_column(
+                        X, col, method, is_polars, standardize=item.get("standardize", True)
+                    )
                 except Exception as e:  # noqa: BLE001 - per-column fit failure is logged; column skipped
                     logger.warning(f"Failed to fit {method} for column {col}: {e}")
                     continue

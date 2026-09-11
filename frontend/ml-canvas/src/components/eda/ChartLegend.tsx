@@ -21,12 +21,6 @@ interface ChartLegendProps {
 const ShapeIcon: React.FC<{ shape: ChartMarkerShape; color: string }> = ({ shape, color }) => {
   const common = { width: 12, height: 12, 'aria-hidden': true as const };
   switch (shape) {
-    case 'triangle':
-      return (
-        <svg {...common} viewBox="0 0 12 12">
-          <polygon points="6,1 11,11 1,11" fill={color} />
-        </svg>
-      );
     case 'square':
       return (
         <svg {...common} viewBox="0 0 12 12">
@@ -39,13 +33,13 @@ const ShapeIcon: React.FC<{ shape: ChartMarkerShape; color: string }> = ({ shape
           <polygon points="6,0 12,6 6,12 0,6" fill={color} />
         </svg>
       );
-    case 'star':
+    case 'cross':
       return (
         <svg {...common} viewBox="0 0 12 12">
-          <polygon points="6,0 7.4,4.2 12,4.2 8.3,6.9 9.7,11.1 6,8.4 2.3,11.1 3.7,6.9 0,4.2 4.6,4.2" fill={color} />
+          <path d="M6 1 L6 11 M1 6 L11 6" stroke={color} strokeWidth={2} />
         </svg>
       );
-    case 'cross':
+    case 'x':
       return (
         <svg {...common} viewBox="0 0 12 12">
           <path d="M2 2 L10 10 M10 2 L2 10" stroke={color} strokeWidth={2} />

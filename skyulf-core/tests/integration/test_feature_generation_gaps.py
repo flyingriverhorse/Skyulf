@@ -498,11 +498,10 @@ def test_arithmetic_divide_by_only_constants() -> None:
 def test_feature_generation_noop_skips(
     engine: str, data: dict[str, list], operation: dict[str, Any], expected_columns: list
 ) -> None:
-    """Unresolvable/unknown/malformed ops must be skipped silently (no-op), on both engines.
+    """Unresolvable or malformed supported ops remain no-ops on both engines.
 
-    Covers: no columns/constants, unresolvable ratio/similarity pairs, unknown
-    operation types, and malformed ops (e.g. bad ``round_digits``) — none of
-    these should raise, and none should add an output column.
+    Covers no columns/constants, unresolvable ratio/similarity pairs and bad
+    ``round_digits``. Unsupported operation types have separate error tests.
     """
     df = pd.DataFrame(data)
     if engine == "polars":

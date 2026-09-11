@@ -2,6 +2,8 @@
 
 import numpy as np
 import polars as pl
+import pytest
+from polars.testing import assert_frame_equal
 from tests.utils.dataset_loader import load_sample_dataset
 
 from skyulf.profiling.analyzer import EDAAnalyzer
@@ -224,13 +226,67 @@ def test_calculate_eta_for_column_ignores_null_target_group() -> None:
     analyzer = EDAAnalyzer(df)
     eta = analyzer._calculate_eta_for_column("t", "x")
 
-    # With null rows excluded, "a" and "b" groups are perfectly separated
-    # from the (excluded) global mean of only the non-null rows, giving a
-    # well-defined eta in [0, 1]; without the fix, the extreme outlier
-    # null-target group would dominate ss_total/ss_between in a way that
-    # doesn't reflect the real x~t relationship.
-    assert eta is not None
-    assert 0.0 <= eta <= 1.0
+    # Missing target labels must affect neither the groups nor the global mean.
+    # The two observed classes have no within-class variation, so eta is 1.
+    assert eta == pytest.approx(1.0)
+
+
+@pytest.mark.parametrize("missing_value", [None, float("nan")], ids=["null", "nan"])
+@pytest.mark.parametrize("missing_rows", [0, 1, 6, 60])
+def test_eta_does_not_count_missing_features_as_group_members(missing_value, missing_rows) -> None:
+    """Adding unusable feature values cannot inflate a class's contribution to eta."""
+    frame = pl.DataFrame(
+        {
+            "target": ["a", "a", "b", "b"] + ["b"] * missing_rows,
+            "x": [0.0, 2.0, 2.0, 4.0] + [missing_value] * missing_rows,
+        }
+    )
+    eta = EDAAnalyzer(frame)._calculate_eta_for_column("target", "x")
+
+    # The four observed rows have between-class SS=4 and total SS=8.
+    assert eta == pytest.approx(2**-0.5)
+
+
+@pytest.mark.parametrize(
+    ("targets", "values"),
+    [
+        ([], []),
+        (["a", "b"], [None, None]),
+        ([None, None], [1.0, 2.0]),
+        (["a", "b", None], [None, None, 5.0]),
+    ],
+    ids=["empty", "no-features", "no-labels", "disjoint-missing"],
+)
+def test_eta_omits_features_without_complete_pairs(targets, values) -> None:
+    """No observed target-feature pairs must not be reported as zero association."""
+    frame = pl.DataFrame(
+        {"target": targets, "x": values}, schema={"target": pl.String, "x": pl.Float64}
+    )
+    analyzer = EDAAnalyzer(frame)
+
+    assert analyzer._calculate_eta_for_column("target", "x") is None
+    assert analyzer._calculate_categorical_target_associations("target", ["x"]) == {}
+
+
+def test_eta_uses_each_features_own_complete_pairs() -> None:
+    """Missing values in another feature must not discard valid pairs or change source rows."""
+    frame = pl.DataFrame(
+        {
+            "target": ["a", "a", "b", "b"] * 2,
+            "partial": [0.0, 2.0, 2.0, 4.0, None, None, None, None],
+            "perfect": [None, None, None, None, 0.0, 0.0, 2.0, 2.0],
+        }
+    )
+    analyzer = EDAAnalyzer(frame)
+    original = analyzer.df.clone()
+
+    associations = analyzer._calculate_categorical_target_associations(
+        "target", ["partial", "perfect"]
+    )
+
+    assert list(associations) == ["perfect", "partial"]
+    assert associations == pytest.approx({"perfect": 1.0, "partial": 2**-0.5})
+    assert_frame_equal(analyzer.df, original)
 
 
 class TestRealShapedDataset:

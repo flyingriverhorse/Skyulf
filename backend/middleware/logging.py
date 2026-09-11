@@ -12,11 +12,13 @@ from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.types import ASGIApp
 
+from backend.utils.logging_utils import redact_credentials, sanitize_for_log
+
 logger = logging.getLogger(__name__)
 
 
 class LoggingMiddleware(BaseHTTPMiddleware):
-    """Middleware to log HTTP requests and responses."""
+    """Log HTTP requests and responses with credential-redacted metadata."""
 
     def __init__(self, app: ASGIApp):
         """Wrap the downstream ASGI ``app`` so its requests pass through ``dispatch``.
@@ -44,9 +46,11 @@ class LoggingMiddleware(BaseHTTPMiddleware):
 
         # Extract request information
         method = request.method
-        url = str(request.url)
+        url = sanitize_for_log(redact_credentials(request.url))
         client_ip = request.client.host if request.client else "unknown"
-        user_agent = request.headers.get("user-agent", "unknown")
+        user_agent = sanitize_for_log(
+            redact_credentials(request.headers.get("user-agent", "unknown"))
+        )
         request_id = getattr(request.state, "request_id", "unknown")
 
         # Log incoming request (DEBUG only to reduce noise)
@@ -100,15 +104,16 @@ class LoggingMiddleware(BaseHTTPMiddleware):
             process_time = time.time() - start_time
 
             # Log error
+            safe_error = sanitize_for_log(redact_credentials(exc))
             logger.error(
-                f"Request failed: {method} {url} in {process_time:.3f}s - {exc}",
+                f"Request failed: {method} {url} in {process_time:.3f}s - {safe_error}",
                 extra={
                     "request_id": request_id,
                     "method": method,
                     "url": url,
                     "process_time": process_time,
                     "client_ip": client_ip,
-                    "error": str(exc),
+                    "error": safe_error,
                     "event_type": "request_error",
                 },
             )

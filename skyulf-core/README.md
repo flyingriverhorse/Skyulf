@@ -224,6 +224,12 @@ A few preprocessing nodes are `snake_case` exceptions: `feature_target_split`,
 `NodeRegistry.list_transformers()`/`.list_models()`. `"Split"` is a
 deprecated alias for `"TrainTestSplitter"`.
 
+`NodeRegistry.list_models()` includes both `Modeling` and `Ensemble` nodes.
+Use `category="Ensemble"` to list Voting/Stacking models only, or
+`category="Modeling"` for the other models. `list_transformers()` excludes
+both model categories and can filter by a preprocessing category such as
+`category="Text"`. Unknown categories return an empty list.
+
 ## Data leakage safety
 
 **Split before any data-dependent preprocessing.** Fitting an imputer, scaler,

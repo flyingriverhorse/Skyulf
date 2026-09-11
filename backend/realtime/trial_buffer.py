@@ -3,8 +3,11 @@
 The ``/ws/jobs`` socket is a live broadcast: a client that opens a running
 tuning job only sees trials emitted *after* it subscribed. This buffer
 records every published trial so the jobs API can hand a late opener the
-trials it missed (1..now); the persisted ``metrics.trials`` list takes over
-once the job is terminal.
+trials it missed (1..now). A successful run saves ``metrics.trials`` and
+``metrics.iterations`` before execution cleanup releases both buffers.
+Failed and cancelled executions also release their live history on exit;
+cancellation clears local buffers after its database commit, with execution
+cleanup removing any points emitted while the fitting thread was stopping.
 
 Bounded on purpose — this is chart backfill, not persistence: a fixed
 number of jobs, each with a fixed number of trials, evicted LRU.

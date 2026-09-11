@@ -94,6 +94,70 @@ class TestFourWayInteractions:
 class TestInteractionOnly:
     """``interaction_only`` must skip self-products."""
 
+    @pytest.mark.parametrize(
+        ("degree", "name", "expected"),
+        [
+            (2, "value_x_value", [4.0, 0.0, 9.0, np.nan]),
+            (3, "value_x_value_x_value", [-8.0, 0.0, 27.0, np.nan]),
+            (4, "value_x_value_x_value_x_value", [16.0, 0.0, 81.0, np.nan]),
+        ],
+    )
+    def test_single_column_self_products(
+        self, degree: int, name: str, expected: list[float]
+    ) -> None:
+        """Allow powers of one feature without losing rows, targets or missing values."""
+        df = pd.DataFrame({"value": [-2.0, 0.0, 3.0, np.nan]}, index=[7, 7, 3, 1])
+        y = pd.Series([10, 20, 30, 40], index=df.index, name="target")
+        params = FeatureInteractionCalculator().fit(
+            (df, y), {"columns": ["value"], "degree": degree, "interaction_only": False}
+        )
+
+        out, y_out = FeatureInteractionApplier().apply((df, y), params)
+
+        assert list(out.columns) == ["value", name]
+        assert params["feature_names"] == [name]
+        np.testing.assert_allclose(out[name].to_numpy(), expected)
+        pd.testing.assert_series_equal(out["value"], df["value"])
+        pd.testing.assert_series_equal(y_out, y)
+
+    def test_two_columns_generate_degree_three_self_products(self) -> None:
+        """Repeated inputs must support mixed products when degree exceeds column count."""
+        df = pd.DataFrame({"a": [2.0], "b": [3.0]})
+        params = FeatureInteractionCalculator().fit(
+            df, {"columns": ["b", "a"], "degree": 3, "interaction_only": False}
+        )
+
+        out = FeatureInteractionApplier().apply(df, params)
+
+        assert list(out.columns) == ["a", "b", "a_x_a_x_a", "a_x_a_x_b", "a_x_b_x_b", "b_x_b_x_b"]
+        np.testing.assert_allclose(out.iloc[0].to_numpy(), [2.0, 3.0, 8.0, 12.0, 18.0, 27.0])
+
+    @pytest.mark.parametrize(
+        ("columns", "degree", "interaction_only"),
+        [(["x1"], 2, True), (["x1", "x2"], 4, True), ([], 2, True), ([], 2, False)],
+    )
+    @pytest.mark.parametrize("include_bias", [False, True])
+    def test_insufficient_distinct_or_empty_columns_preserve_bias_option(
+        self, columns: list[str], degree: int, interaction_only: bool, include_bias: bool
+    ) -> None:
+        """An empty product set must still preserve inputs and the requested bias column."""
+        df = _sample_pandas_df()
+        params = FeatureInteractionCalculator().fit(
+            df,
+            {
+                "columns": columns,
+                "degree": degree,
+                "interaction_only": interaction_only,
+                "include_bias": include_bias,
+            },
+        )
+
+        out = FeatureInteractionApplier().apply(df, params)
+
+        assert params["combinations"] == []
+        expected = df.assign(interaction_bias=1.0) if include_bias else df
+        pd.testing.assert_frame_equal(out, expected)
+
     def test_interaction_only_skips_self_products(self) -> None:
         df = _sample_pandas_df()
         calc = FeatureInteractionCalculator()

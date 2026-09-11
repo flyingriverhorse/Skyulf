@@ -43,13 +43,18 @@ from backend.health.routes import router as health_router
 from backend.middleware.error_handler import ErrorHandlerMiddleware
 from backend.middleware.logging import LoggingMiddleware
 from backend.middleware.rate_limiter import limiter
+from backend.middleware.security_headers import SecurityHeadersMiddleware
 from backend.ml_pipeline.api import router as ml_pipeline_router
 from backend.ml_pipeline.deployment.api import router as deployment_router
 from backend.ml_pipeline.model_registry.api import router as model_registry_router
 from backend.monitoring.router import router as monitoring_router
 from backend.realtime import connection_manager
 from backend.realtime import router as realtime_router
-from backend.utils.logging_utils import setup_universal_logging
+from backend.utils.logging_utils import (
+    redact_credentials,
+    sanitize_for_log,
+    setup_universal_logging,
+)
 
 # Configure logging
 setup_universal_logging()
@@ -356,6 +361,10 @@ def _add_middleware(app: FastAPI, settings) -> None:
     app.add_middleware(LoggingMiddleware)
     app.add_middleware(ErrorHandlerMiddleware)
 
+    security_headers = getattr(settings, "SECURITY_HEADERS", {})
+    if security_headers:
+        app.add_middleware(SecurityHeadersMiddleware, headers=security_headers)
+
     # add_middleware wraps, so the last one added is the outermost: CORS must
     # come last or error responses built by ErrorHandlerMiddleware reach the
     # browser without Access-Control-Allow-Origin and get blocked there.
@@ -470,16 +479,18 @@ def _add_exception_handlers(app: FastAPI) -> None:
         from fastapi.responses import JSONResponse as _JSONResponse
 
         real_type = type(exc).__name__
-        real_message = str(exc)
-        real_traceback = _tb.format_exc()
-        logger.error(f"Unexpected error ({real_type}): {real_message}", exc_info=True)
-        # Record with full real exception metadata. Return a sanitised response
+        safe_message = sanitize_for_log(redact_credentials(exc))
+        safe_traceback = redact_credentials(
+            "".join(_tb.format_exception(type(exc), exc, exc.__traceback__))
+        )
+        logger.error("Unexpected error (%s): %s\n%s", real_type, safe_message, safe_traceback)
+        # Persist only redacted metadata. Return a sanitised response
         # directly to avoid double-recording through generic_http_exception_handler.
         await _record_error(
-            route=str(request.url.path),
+            route=sanitize_for_log(redact_credentials(request.url.path)),
             error_type=real_type,
-            message=real_message,
-            traceback=real_traceback,
+            message=safe_message,
+            traceback=safe_traceback,
             status_code=500,
         )
         return _JSONResponse(

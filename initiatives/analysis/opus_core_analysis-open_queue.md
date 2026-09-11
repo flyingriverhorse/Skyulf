@@ -15,7 +15,7 @@ file deliberately carries no history.
 per-area report files `00`–`18`).
 **Baseline:** commit `93d7719e` (master), audit run 2026-08-31 → 09-01 by 15
 parallel read-only agents (Claude Opus 5). 116 findings: 5 🔴 / 45 🟠 / 44 🟡 /
-22 ⚪, plus OC-160–229 filed by later reviews. OC-100 was retracted as a false
+22 ⚪, plus OC-160–246 filed by later reviews. OC-100 was retracted as a false
 positive and is not counted; the corrections pass stays in the archive.
 
 **Status key:** ⬜ open · 🟨 in progress · ✅ done · ⏭️ parked
@@ -54,12 +54,6 @@ closed that on 2026-09-07.
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
-| OC-151 | 🟡 | Trial-buffer `clear_*` hooks documented but never called — 110.9 MB retained for process lifetime (`realtime/trial_buffer.py:56-59,103-106`) | small | ⬜ open |
-| OC-156 | 🟡 | `roc_auc` threshold-tuning objective scores hard predictions — bit-identical to `balanced_accuracy` (`threshold_tuning_service.py:77-92`) | small | ⬜ open |
-| OC-158 | 🟡 | Sync/async JSON serializers disagree: sync nulls 8 of 15 legitimate strings (`"nan"`, `"NaT"`, `"<NA>"`, `"inf"`…), async nulls none; 603-line module production-dead but test-covered (`serialization.py:369,435-446`) | half day | ⬜ open |
-| OC-169 | 🟡 | Filed while fixing OC-150 — the global `ErrorHandlerMiddleware` logs `{exc}`, `traceback.format_exc()` **and** `exc_info=True` with no redaction, so any *uncaught* exception whose message or frames carry a credential leaks it to the log regardless of call-site scrubbing; the S3 paths now redact their own `logger.error` but still `raise ConnectionError(...) from e`, leaving `e` reachable from the chained traceback (`middleware/error_handler.py:53-65`) | small | ⬜ open |
-| OC-183 | 🟠 | `SmartCatalog` S3 auto-init is dead for `.env`-only config, and the two docs name different variables — **OC-130's root cause repeating**. `backend/data/catalog.py:556` reads `os.getenv("S3_BUCKET_NAME")`, but pydantic-settings loads the dotenv into the model and never exports it into `os.environ`, so a bucket configured only in `.env` is invisible and `s3_catalog` silently stays `None` (falling back to local disk with no error or warning). Worse, `S3_BUCKET_NAME` is **not a `Settings` field at all**: `config/mixins/aws.py:12` declares `AWS_BUCKET_NAME`, which is what `docs/guides/backend_configuration.md:146` documents, while `README.md:105` documents `S3_BUCKET_NAME` — so following the README sets a variable nothing reads. Needs a canonical-name decision before the one-line code fix | small | ⬜ open |
-| OC-184 | 🟠 | `ProductionSettings.SECURITY_HEADERS` is declared and never sent. `_PROD_SECURITY_HEADERS` (HSTS, `X-Frame-Options: DENY`, CSP, …) is assigned at `config/environments.py:84` and referenced nowhere else in the repo — no middleware reads it — so a production boot logs "Running in PRODUCTION mode with enhanced security" while emitting none of those headers. Fixing means adding a security-headers middleware in `main.py::_add_middleware`, where order is load-bearing (CORS must stay outermost), i.e. a behaviour change and not a config fix | half day | ⬜ open |
 | OC-185 | 🟡 | Authorization is stubbed in three mutually inconsistent pieces. `database/models.py:157 has_permission` is `return True  # Placeholder` with **zero callers**; `data_ingestion/dependencies.py:26,31 require_data_access`/`require_data_admin` are async no-ops wired to no route; and `data_ingestion/router.py:148,169` hardcode `user_id = 1` under an explicit `# KNOWN-GAP: Auth not implemented yet`, so every source belongs to one user and is visible to everyone. Nothing is exploitable *through* `has_permission` today precisely because nothing calls it — the risk is that the first caller gets an always-yes check shaped like a real API. Needs an authz decision before code | decision + ~1 week | ⏭️ parked — user requested pause |
 
 ### Remaining — direct-audit modules
@@ -81,8 +75,6 @@ closed that on 2026-09-07.
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
 | OC-140 | 🟠 | `InvalidValueReplacement` diverges across engines on non-numeric columns (pandas silently NaNs, polars raises) | small | ⬜ open |
-| OC-142 | 🟠 | EDA correlation ratio η exceeds 1.0 with nulls; null-heavy columns rank as strongest association | small | ⬜ open |
-| OC-144 | ⚪ | Geo distance column named `_km` even when the unit is miles | ~~1 line~~ **small, not 1 line** — scoped 2026-09-06 | ⬜ open — **not a one-liner; blast radius measured.** Four code sites (`geo/distance.py:83` pandas apply, `:112` polars apply, `:163` `node_meta` default, `:185` `fit`), **10** assertions in `tests/integration/test_geo_nodes.py` (incl. `:91`, which reads `result_km["geo_distance_km"]` while converting to miles — the mislabel the finding describes, baked into a test), and `docs/reference/preprocessing_nodes.md:630`. **The structural detail that decides the fix:** the two apply-path fallbacks are unreachable in the normal pipeline, because `fit` always writes `output_column` into the artifact — so the *declared* `node_meta` default is what really picks the name. `node_meta` params are a static dict and cannot be unit-dependent, so `f"geo_distance_{unit}"` has to be resolved in `fit` (declaring `""` = auto, or dropping the key), not patched at the four sites independently. Frontend impact is nil — all of `geo/` is UI-unreachable per OC-06 |
 
 ### Remaining — cross-cutting & packaging
 
@@ -99,36 +91,24 @@ closed that on 2026-09-07.
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
 | OC-18 | 🟡 | One-hot/dummy generated names can collide with existing columns (`encoding/one_hot.py:68-92`, `dummy.py:76-99`) | small | ⬜ open |
-| OC-21 | 🟡 | WOE additive smoothing not normalized over categories (`encoding/woe.py:130-145`) | small | ⬜ open |
 
 ### Remaining — feature generation / selection / vectorization / transformations
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
-| OC-23 | 🟠 | Polars `ratio` flips the sign of near-zero negative denominators (`feature_generation/_polars_ops.py:97-112`) | small | ⬜ open |
 | OC-24 | 🟠 | Polars group aggregates treat null group keys differently from pandas (`_polars_ops.py:222-234`) | small | ⬜ open |
-| OC-26 | 🟠 | `HashingVectorizer` UI "none" norm is an invalid sklearn value → crash (`hashing_vectorizer.py:59`) | small | ⬜ open |
-| OC-27 | 🟠 | `GeneralTransformation` ignores the UI `standardize` toggle (`transformations/general.py:34-39,138-139`) | small | ⬜ open |
-| OC-29 | 🟡 | `FeatureGeneration` advertises `polynomial` but silently skips it (`feature_generation/_common.py:24-31`) | small | ⬜ open |
 | OC-30 | 🟡 | Datetime extraction ignores the UI output name, overwrites collisions (`_pandas_ops.py:173-184`) | small | ⬜ open |
-| OC-31 | 🟡 | Frontend wrongly requires a target for unsupervised CorrelationThreshold (`FeatureSelectionNode.tsx:564-566`) | small | ⬜ open |
-| OC-32 | 🟡 | `VarianceThreshold` crashes when all candidates are constant (`feature_selection/variance.py:38-47`) | small | ⬜ open |
-| OC-33 | 🟡 | `FeatureInteraction` cannot generate single-column self-products (`feature_generation/interaction.py:173-178`) | small | ⬜ open |
-| OC-34 | 🟡 | Count/TF-IDF vectorizers crash on empty or stop-word-only corpora (`count_vectorizer.py:79-80`) | small | ⬜ open |
 
 ### Remaining — profiling (outside the OC-39–46 cluster)
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
-| OC-191 | 🟡 | All-null and Polars Enum columns are classified as text and sent to string-only aggregates, aborting the whole profile (`profiling/analyzer.py`, `_analyzer/column.py`) | small | ⬜ open |
 | OC-192 | 🟡 | Decomposition's categorical null bucket displays as `Unknown`, but drilling into it filters for the literal string and silently loses the bucket's rows (`profiling/_analyzer/decomposition.py:71-76`) | small | ⬜ open |
-| OC-199 | 🟡 | Explicit latitude/longitude selections bypass `exclude_cols`, returning coordinates for columns excluded from the profile (`profiling/_analyzer/geo.py:58-59`) | small | ⬜ open |
 | OC-47 | 🟡 | Common-column dtype drift can silently disappear (`profiling/drift.py:136-153`) | small | ⬜ open |
 | OC-48 | 🟡 | Expectations pass vacuously on empty frames (`profiling/expect.py:92-209`) | small | ⬜ open |
-| OC-49 | 🟡 | Valid partially-unlabelled PCA payloads crash plotting (`profiling/visualizer.py:716-737`) | small | ⬜ open |
 | OC-50 | 🟡 | Binary targets miss class-balance advice or flip to regression by sample size (`recommendations.py:147-152`) | small | ⬜ open |
 | OC-51 | 🟡 | Transform advice can be mathematically invalid and self-contradictory (`recommendations.py:66-78,129-139`) | small | ⬜ open |
-| OC-52 | ⚪ | Categorical colour mapping is process-nondeterministic (`visualizer.py:710-713`) | small | ⬜ open |
+
 
 ### Remaining — core / engines / pipeline
 
@@ -136,7 +116,6 @@ closed that on 2026-09-07.
 |---|---|---|---|---|
 | OC-64 | 🟠 | **F-14 only partially fixed** — engine registry global still an unlocked race (`engines/registry.py:60,86-91`) | small | ⬜ open |
 | OC-65 | 🟡 | polars `to_numpy()` zero-width "parity fix" does not achieve parity (`engines/polars_engine.py`) | small | ⬜ open |
-| OC-74 | 🟡 | `NodeRegistry.list_models()` hides all 4 Ensemble models; `category` arg dead (`registry.py:101-108`) | small | ⬜ open |
 
 ### Remaining — outliers / casting / binning / timeseries / geo
 
@@ -176,12 +155,8 @@ The separately reported lockfile issue still needs its exact advisory details.
 | OC-225 | 🟡 | Selecting a job removes the Jobs drawer's accessible name; the detail Back button is also unnamed | small | ⬜ open — the drawer keeps `aria-labelledby="jobs-drawer-title"` after its history heading unmounts. Keep a valid dialog label in both views and label the icon-only Back action; verify real-card keyboard navigation and screen-reader names. |
 | OC-226 | 🟡 | Late Segmentation hyperparameter definitions can restore an old model/reference column and call its old update callback after unmount | small | ⬜ open — original-source tests resolve defaults after newer config/model changes and observe the captured old config being emitted. Scope requests to the active model/settings lifetime and merge defaults into current config; cover reference edits, reversed responses and unmount. |
 | OC-227 | 🟡 | A completed node drag creates no undo entry because history ignores positions when either the previous or next node is dragging | small | ⬜ open — original public-store characterization sends two `dragging: true` positions followed by `dragging: false`; history stays empty. Capture one pre-drag snapshot and one completed move without recording each frame; cover single/group drags, undo/redo and selection-only changes. |
-| OC-228 | 🟡 | Add Casting Rule overwrites the first column's existing type with `float` when every available column already has a rule (`CastTypeNode.tsx:99-102,139`) | small | ⬜ open — original and final public settings tests start with schema `age` and `{ age: 'int' }`; clicking Add emits `{ age: 'float' }`. Disable/no-op Add when no unassigned column remains, preserve existing rules, and cover removal followed by adding again. |
-| OC-229 | 🟡 | A late inspector response replaces the details of a more recently selected node (`NodeInspectorModal.tsx:59-78`) | small | ⬜ open — original and final public modal tests select first then second, resolve second then first, and display First response under the newer selection. Guard success, error and loading updates by the active request/lifetime; cover reversed responses, retry, closing and node navigation. |
 | OC-56 | ⚪ | `useSchemaPreview` does not cancel in-flight requests on unmount (`hooks/useSchemaPreview.ts`) | small | ⬜ open |
 | OC-57 | ⚪ | `any`-typed chart props bypass type safety in EDA components (`modules/eda/`) | small | ⬜ open |
-| OC-214 | 🟠 | Frontend lockfile and installed PostCSS dependency retain `nanoid@3.3.17`, affected by CVE-2026-67213; the parent range permits the patched 3.3.18 release (`frontend/ml-canvas/package-lock.json`) | small | ⬜ open — dependency presence confirmed; application exploitability not established |
-| OC-215 | 🟡 | Frontend Tailwind/PostCSS dependencies retain `postcss-selector-parser@6.1.2`, affected by CVE-2026-9358; both parent ranges permit the patched 6.1.3 release (`frontend/ml-canvas/package-lock.json`) | small | ⬜ open — dependency presence confirmed; application exploitability not established |
 
 ### Remaining — tests / packaging / CI (outside the Ongoing tier)
 
@@ -189,6 +164,7 @@ The separately reported lockfile issue still needs its exact advisory details.
 |---|---|---|---|---|
 | OC-80 | 🟡 | 3 weakest-covered modules untested exactly where silence is dangerous (`_sklearn_compat.py`, `value_replacement.py`, `config_validation.py`) | ~1 day | ⬜ open |
 | OC-213 | ⚪ | Leakage examples produce 22 ty diagnostics: 16 in the notebook and six in the Python script, caused by heterogeneous configuration inference and un-narrowed `SplitDataset` slots (`skyulf-core/examples/09_leakage_safety.ipynb`, `09_leakage_safety.py`) | small | ⬜ open — both examples execute successfully; type information needs correction |
+| OC-246 | 🟡 | Local-only full-inference smoke returns a passing result before inference when the current model artifact is a tuple; remaining checks only print success/failure (`tests/integration/test_full_inference_pipeline.py:180-187`) | small | ⬜ open — a path-only workspace probe prints “Model artifact is not a dict: class tuple” then passes without reaching inference; the original external-workspace script is unchanged and excluded from final EDA verification. See the EDA review's follow-up evidence. |
 
 ---
 
@@ -339,6 +315,7 @@ Source: [the complete diagnostic disposition](problems_panel_review-2026-09-08.m
 against working tree `f12dde9f`. The repeated export contains 105 distinct
 file/rule/locations, including external type stubs, obsolete rules, and optional
 style suggestions. Only the actionable example/dependency findings are filed here.
+OC-214 and OC-215 are now closed in the archive; OC-213 remains open.
 
 **OC-213 — leakage examples have inaccurate inferred types.** Run
 `.venv\Scripts\python.exe -m ty check skyulf-core/examples/09_leakage_safety.ipynb
@@ -353,28 +330,6 @@ an example typing defect, not a reproduced training failure.
 named pandas partition variables, or narrow slot types explicitly. Preserve
 the general `SplitDataset` contract and the example assertions. Rerun the
 explicit example ty command and execute both examples.
-
-**OC-214 — vulnerable transitive nanoid version.** `npm ls nanoid --all` reports
-`postcss@8.5.26 -> nanoid@3.3.17`; the lockfile agrees. PostCSS's `^3.3.17` range
-allows 3.3.18, listed as patched in the
-[CVE-2026-67213 advisory](https://github.com/advisories/GHSA-2v37-7h3g-55p8).
-The advisory concerns zero-size custom generators. The inspected PostCSS call
-uses a constant size of 6 via `nanoid/non-secure`, so dependency presence alone
-does not establish an exploitable Skyulf path.
-**Fix/verification target:** update the compatible transitive patch version,
-inspect the lockfile diff, confirm the installed tree and vulnerability scan,
-and run frontend lint/tests/build.
-
-**OC-215 — vulnerable transitive selector-parser version.**
-`npm ls postcss-selector-parser --all` reports 6.1.2 under Tailwind 3.4.18 and
-its postcss-nested 6.2.0 dependency. The lockfile agrees; the recorded `^6.1.2`
-and `^6.1.1` ranges allow 6.1.3. The maintainer's
-[6.1.3 release](https://github.com/postcss/postcss-selector-parser/releases/tag/6.1.3)
-explicitly backports the CVE-2026-9358 recursion fix. No direct application
-import was found during this review; application exploitability is unproven.
-**Fix/verification target:** update the compatible transitive patch version,
-inspect the lockfile diff, confirm the installed tree and vulnerability scan,
-and run frontend lint/tests/build.
 
 ### 2026-09-06 — remaining-source continuation (findings added as verified)
 
@@ -414,22 +369,6 @@ reproduced `count` through public clustering evaluation. **Fix/verification
 target:** choose independent collision-safe names for cluster, reference and
 count columns. OC-161 concerns centroid features; this is the separate
 reference-label aggregation path.
-
-**OC-199 — explicitly selected coordinates survive exclusion.** Executed
-`EDAAnalyzer(pl.DataFrame({'lat':[1.,2.,3.], 'lon':[10.,20.,30.],
-'x':[1.,2.,3.]})).analyze(exclude_cols=['lat','lon'],lat_col='lat',lon_col='lon')`.
-The result still contains all three coordinate pairs in
-`geospatial.sample_points`, plus their bounds and centroid, although the
-per-column profile excludes them. **Fix/verification target:** apply the
-exclusion policy consistently before explicit geospatial selection.
-
-**OC-191 — unsupported string aggregation on valid dtypes.** Executed
-`EDAAnalyzer(pl.DataFrame({'x': [None,None]})).analyze()` raises
-`SchemaError: expected String, got null`; using
-`pl.Series(['a','b'], dtype=pl.Enum(['a','b']))` raises the equivalent Enum
-error. **Fix/verification target:** handle null-only columns and recognize or
-normalize Enum before text aggregates. OC-121 concerns preprocessing
-auto-selection; this finding concerns profiling aborting completely.
 
 **OC-192 — categorical null drill-down loses the selected group.** With
 `group=['a',None,'b']` and `v=[1,2,3]`, a decomposition sum split publishes an

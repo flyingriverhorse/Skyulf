@@ -1,9 +1,8 @@
 import React, { useMemo } from 'react';
 import { Plot } from '../../core/plotly';
-import { CHART_SERIES_COLORS } from '../../core/theme/chartTheme';
 import { useChartTheme } from '../../core/hooks/useChartTheme';
 import { groupScatterPoints } from './scatterGrouping';
-import { markerShapeForIndex, toPlotlyMarkerSymbol } from './chartMarkerShapes';
+import { toPlotlyMarkerSymbol } from './chartMarkerShapes';
 
 /** A single point for the 3-D scatter; values are looked up by `xKey/yKey/zKey/labelKey`. */
 export type ScatterPoint = Record<string, string | number | null | undefined>;
@@ -38,10 +37,8 @@ export const ThreeDScatterPlot: React.FC<ThreeDScatterPlotProps> = ({
   const traces: any[] = useMemo(() => {
     const groups = groupScatterPoints(data, labelKey);
 
-    return Object.keys(groups).map((label, idx) => {
-      const groupData = groups[label] ?? [];
-      const color = CHART_SERIES_COLORS[idx % CHART_SERIES_COLORS.length]!;
-      const symbol = toPlotlyMarkerSymbol(markerShapeForIndex(idx));
+    return groups.map(({ label, points: groupData, color, shape }) => {
+      const symbol = toPlotlyMarkerSymbol(shape);
       return {
         x: groupData.map((d) => d[xKey]),
         y: groupData.map((d) => d[yKey]),

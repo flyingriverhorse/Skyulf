@@ -145,17 +145,19 @@ def _is_null_mask(arr: np.ndarray) -> np.ndarray:
 def _column_woe(
     values: np.ndarray, y_bin: np.ndarray, reg: float
 ) -> tuple[dict[str, float], float]:
-    """Compute the WOE map and IV for a single categorical column."""
+    """Compute WOE and IV with additive smoothing over all observed categories."""
     total_pos = float(y_bin.sum())
     total_neg = float(len(y_bin) - total_pos)
+    categories = np.unique(values)
+    smoothing = reg * len(categories)
     mapping: dict[str, float] = {}
     iv = 0.0
-    for cat in np.unique(values):
+    for cat in categories:
         mask = values == cat
         pos = float(y_bin[mask].sum())
         neg = float(mask.sum() - pos)
-        dist_pos = (pos + reg) / (total_pos + reg)
-        dist_neg = (neg + reg) / (total_neg + reg)
+        dist_pos = (pos + reg) / (total_pos + smoothing)
+        dist_neg = (neg + reg) / (total_neg + smoothing)
         woe = math.log(dist_neg / dist_pos)
         mapping[str(cat)] = woe
         iv += (dist_neg - dist_pos) * woe
@@ -332,6 +334,11 @@ class WOEEncoderCalculator(BaseCalculator):
     engines through one narrow pandas boundary while ``apply`` stays in the
     caller's engine. ``fit_transform_train`` cross-fits the training rows so a
     row's own target never leaks into its encoding.
+
+    ``regularization`` adds a pseudocount to each observed category in each
+    target class. Class totals include ``regularization * n_categories`` so
+    both smoothed distributions sum to one. Missing feature values count as
+    a category; each cross-fitting complement uses its own observed categories.
     """
 
     @fit_method

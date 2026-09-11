@@ -484,12 +484,17 @@ Learned params:
 
 Config:
 
-- `transformations`: list of `{column, method, clip_threshold?}`
+- `transformations`: list of `{column, method, standardize?, clip_threshold?}`
   - methods include power transforms (`box-cox`, `yeo-johnson`) and the simple methods
+  - `standardize` defaults to `true` for each power rule. Set it to `false`
+    (clear **Standardize result** in the Canvas) to apply the power transform
+    without centering and scaling its output.
 
 Learned params:
 
-- `transformations` with fitted `lambdas`/`scaler_params` where applicable
+- `transformations` with fitted `lambdas`, the `standardize` choice and
+  `scaler_params` when standardization is enabled. Later transforms reuse these
+  training parameters; older artifacts without `standardize` default to `true`.
 
 ## Bucketing (Binning)
 
@@ -592,6 +597,11 @@ Config:
 - `interaction_only`: bool (default True; skips self-products like `x1 * x1`)
 - `include_bias`: bool (default False; adds a constant `interaction_bias` column of 1.0)
 
+With `interaction_only=False` (clear **Interaction Only** in the Canvas), one
+column can generate its square, cube or fourth power. Two columns at degree 3
+generate `a*a*a`, `a*a*b`, `a*b*b` and `b*b*b`. With `interaction_only=True`,
+at least `degree` distinct columns are needed to generate products.
+
 Learned params:
 
 - `columns`, `degree`, `interaction_only`, `include_bias`, `combinations`, `feature_names`
@@ -605,6 +615,24 @@ Config:
 - `operations`: list[dict]
 - `epsilon`: float (default 1e-9)
 - `allow_overwrite`: bool
+
+Supported `operation_type` values are `arithmetic` (the default), `ratio`,
+`similarity`, `datetime_extract`, and `group_agg`. Unsupported types raise
+`ValueError` during fitting and when replaying saved artifacts. In particular,
+`polynomial` is not a Feature Generation operation: use the separate
+[`PolynomialFeatures`](#polynomialfeatures) node for powers and interactions.
+
+For `ratio`, the denominator is the sum of the selected denominator columns.
+If its absolute value is below `epsilon`, it is replaced by `-epsilon` when
+negative and `+epsilon` otherwise (including zero). This preserves the ratio's
+sign on both engines; for example, `1 / -1e-12` with the default epsilon
+produces `-1e9`. The saved epsilon is reused when applying a fitted node.
+
+Missing operands (`NaN` or null) contribute zero to each ratio sum on both
+engines. Other selected operands still contribute normally: `(NaN + 2) / 4`
+produces `0.5`. An entirely missing denominator uses positive epsilon, and an
+entirely missing numerator sums to zero. Source columns retain their values;
+this rule applies to the generated ratio.
 
 Learned params:
 
@@ -627,7 +655,14 @@ Config:
 - `lon2_col`: str
 - `method`: str (`"haversine"` default, or `"euclidean"` for a cheap flat-plane approximation)
 - `unit`: str (`"km"` default, or `"mi"`)
-- `output_column`: str (default `"geo_distance_km"`)
+- `output_column`: str (default `""`, meaning automatic). Omit it or leave it
+  empty to use `"geo_distance_km"` for kilometers or `"geo_distance_mi"` for miles.
+
+The resolved name is stored during fitting and reused during inference.
+An explicit name always takes precedence, including names in existing saved
+artifacts. To retain an old miles pipeline that refers to `"geo_distance_km"`,
+set that name explicitly before refitting; otherwise update downstream column
+references to `"geo_distance_mi"`.
 
 Learned params:
 
@@ -667,7 +702,18 @@ Learned params:
 
 - `candidate_columns`, `selected_columns`, `variances`, `threshold`, `drop_columns`
 
+If every candidate is constant, all-null or at/below the threshold, the fitted
+selection is empty. Applying it removes all candidate columns while preserving
+unselected columns and the target; `drop_columns=False` preserves the input.
+Prediction reuses this fitted selection even if incoming values now vary. If
+no model features remain, adjust the selection before a downstream training step.
+
 ### CorrelationThreshold
+
+In the Canvas, choose **Feature Selection > Correlation Threshold** to remove
+highly correlated input features without selecting a target column. This method
+compares features with each other; supervised selection methods still require a
+target.
 
 Config:
 

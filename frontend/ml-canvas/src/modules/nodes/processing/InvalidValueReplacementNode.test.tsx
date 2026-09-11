@@ -181,15 +181,52 @@ describe('preprocessing public settings contracts', () => {
     fireEvent.click(screen.getByLabelText('Remove casting rule for age'));
     expect(view.onChange).toHaveBeenLastCalledWith({ ...view.config, column_types: { hidden: 'bool' } });
   });
-  it('preserves the existing cast add fallback when every column has a rule', () => {
-    // The original add action overwrites the first column when all options are already assigned.
+  it('preserves the existing cast type when every column has a rule', () => {
+    // Adding a rule must never silently replace an already configured type.
     fixtures.schema = { columns: { age: { name: 'age', dtype: 'int' } } };
     const view = mount(CastTypeNode, { column_types: { age: 'int' } });
     fireEvent.click(screen.getByLabelText('Add Casting Rule'));
-    expect(view.onChange).toHaveBeenLastCalledWith({ column_types: { age: 'float' } });
+    expect(view.onChange).not.toHaveBeenCalled();
+    expect(screen.getByLabelText('Data type for age')).toHaveValue('int');
+    expect(screen.getByLabelText('Add Casting Rule')).toBeDisabled();
     fixtures.schema = undefined;
     view.update();
     expect(screen.getByLabelText('Add Casting Rule')).toBeDisabled();
+  });
+  it('does not offer upstream dropped columns as new cast rules', () => {
+    // A dropped column must not keep Add enabled when all usable columns have rules.
+    fixtures.schema = { columns: {
+      age: { name: 'age', dtype: 'int' },
+      city: { name: 'city', dtype: 'object' },
+      removed: { name: 'removed', dtype: 'float' },
+    } };
+    const view = mount(CastTypeNode, { column_types: { age: 'int', city: 'string', hidden: 'bool' } });
+    fireEvent.click(screen.getByLabelText('Add Casting Rule'));
+    expect(view.onChange).not.toHaveBeenCalled();
+    expect(screen.getByLabelText('Add Casting Rule')).toBeDisabled();
+    expect(screen.getByLabelText('Data type for age')).toHaveValue('int');
+    expect(screen.getByLabelText('Data type for city')).toHaveValue('string');
+    expect(screen.getByLabelText('Data type for hidden')).toHaveValue('bool');
+  });
+  it('allows a removed cast rule to be added again without changing other types', () => {
+    // Add must follow the current config after removal and preserve unrelated saved rules.
+    fixtures.schema = { columns: {
+      age: { name: 'age', dtype: 'int' },
+      score: { name: 'score', dtype: 'float' },
+    } };
+    const view = mount(CastTypeNode, { column_types: { age: 'int', score: 'int64', hidden: 'bool' } });
+    expect(screen.getByLabelText('Add Casting Rule')).toBeDisabled();
+    fireEvent.click(screen.getByLabelText('Remove casting rule for age'));
+    expect(view.onChange).toHaveBeenLastCalledWith({ column_types: { score: 'int64', hidden: 'bool' } });
+    view.update(view.onChange.mock.lastCall![0]);
+    expect(screen.getByLabelText('Add Casting Rule')).toBeEnabled();
+    fireEvent.click(screen.getByLabelText('Add Casting Rule'));
+    expect(view.onChange).toHaveBeenLastCalledWith({ column_types: { score: 'int64', hidden: 'bool', age: 'float' } });
+    view.update(view.onChange.mock.lastCall![0]);
+    expect(screen.getByLabelText('Add Casting Rule')).toBeDisabled();
+    expect(screen.getByLabelText('Data type for age')).toHaveValue('float');
+    expect(screen.getByLabelText('Data type for score')).toHaveValue('int64');
+    expect(view.onChange).toHaveBeenCalledTimes(2);
   });
   it('preserves alias drafts on resize and retains custom mappings across modes', () => {
     // Local drafts and configured mappings have different lifetimes and must not be conflated.

@@ -1,10 +1,31 @@
 import { describe, expect, it } from 'vitest';
 import { EncodingNode } from './EncodingNode';
 import { FeatureGenerationNode } from './FeatureGenerationNode';
+import { FeatureInteractionNode } from './FeatureInteractionNode';
 import { TimeSeriesNode } from './TimeSeriesNode';
 import { TransformationNode } from './TransformationNode';
 
 describe('processing validation field targets', () => {
+  it.each([
+    { columns: ['value'], degree: 2 },
+    { columns: ['value'], degree: 3 },
+    { columns: ['value'], degree: 4 },
+    { columns: ['a', 'b'], degree: 3 },
+  ])('allows repeated-column products for $columns at degree $degree', (config) => {
+    // Self-products require one numeric input, even when the product degree is larger.
+    expect(FeatureInteractionNode.validate?.({ ...config, interaction_only: false })).toEqual({ isValid: true });
+  });
+
+  it.each([
+    { config: { columns: [], degree: 2, interaction_only: false }, field: 'columns' },
+    { config: { columns: ['value'], degree: 2, interaction_only: true }, field: 'columns' },
+    { config: { columns: ['value'], degree: 2 }, field: 'columns' },
+    { config: { columns: ['value'], degree: 5, interaction_only: false }, field: 'degree' },
+  ])('keeps invalid interaction settings directed to $field', ({ config, field }) => {
+    // Relaxing self-product validation must preserve empty, distinct-only and degree errors.
+    expect(FeatureInteractionNode.validate?.(config)).toMatchObject({ isValid: false, field });
+  });
+
   it('targets the specific invalid transformation row', () => {
     // A later invalid row must open its own column selector.
     const result = TransformationNode.validate?.({

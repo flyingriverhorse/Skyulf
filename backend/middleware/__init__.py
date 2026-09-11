@@ -1,4 +1,4 @@
-"""Middleware package: error handling, request logging and the shared rate limiter.
+"""Middleware for errors, request logs, security headers and rate limiting.
 
 © 2025 Murat Unsal — Skyulf Project
 

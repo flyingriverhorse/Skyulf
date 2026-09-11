@@ -59,7 +59,7 @@
     ]),
     'default': 0.0,
     'information_value': dict({
-      'city': 2.126096,
+      'city': 1.739533,
     }),
     'mappings': dict({
       'city': dict({

@@ -175,7 +175,7 @@ export const FeatureInteractionNode: NodeDefinition = {
     if (!data.columns || data.columns.length === 0) {
       return { isValid: false, field: 'columns', message: 'Select at least one input column.' };
     }
-    if (data.columns.length < (data.degree || 2)) {
+    if (data.interaction_only !== false && data.columns.length < (data.degree || 2)) {
       return { isValid: false, field: 'columns', message: `Select at least ${data.degree || 2} columns for degree ${data.degree || 2} interactions.` };
     }
     if (![2, 3, 4].includes(data.degree)) {

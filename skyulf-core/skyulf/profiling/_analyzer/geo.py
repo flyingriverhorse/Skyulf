@@ -54,7 +54,10 @@ class GeoMixin(_AnalyzerState):
     def _resolve_lat_lon_columns(
         self, lat_col: str | None, lon_col: str | None
     ) -> tuple[str | None, str | None]:
-        """Infer latitude/longitude column names from common aliases when not given."""
+        """Resolve latitude/longitude names within the active column selection."""
+        if (lat_col and lat_col not in self.columns) or (lon_col and lon_col not in self.columns):
+            return None, None
+
         if lat_col and lon_col:
             return lat_col, lon_col
 

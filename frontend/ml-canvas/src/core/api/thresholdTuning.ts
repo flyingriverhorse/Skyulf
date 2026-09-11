@@ -1,5 +1,8 @@
 import { apiClient } from './client';
 
+/** Class-prediction objectives accepted by the threshold preview/save endpoints. */
+export const THRESHOLD_TUNING_METRICS: readonly string[] = ['accuracy', 'f1', 'precision', 'recall', 'balanced_accuracy'];
+
 export interface ThresholdPreviewResult {
   thresholds: Record<string, number>;
   classes: number[];

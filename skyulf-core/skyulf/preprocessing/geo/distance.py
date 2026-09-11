@@ -33,6 +33,11 @@ def _radius_for_unit(unit: str) -> float:
     return _EARTH_RADIUS_KM if unit == "km" else _EARTH_RADIUS_KM * _KM_TO_MI
 
 
+def _distance_output_column(params: dict[str, Any]) -> str:
+    """Resolve automatic names by unit while retaining explicit artifact names."""
+    return params.get("output_column") or f"geo_distance_{params.get('unit', 'km')}"
+
+
 def _haversine_pandas(
     lat1: pd.Series, lon1: pd.Series, lat2: pd.Series, lon2: pd.Series, radius: float
 ) -> pd.Series:
@@ -80,7 +85,7 @@ def _geo_distance_apply_pandas(X: Any, _y: Any, params: dict[str, Any]) -> tuple
     distance = fn(X[lat1_col], X[lon1_col], X[lat2_col], X[lon2_col], radius)
 
     out = X.copy()
-    out[params.get("output_column", "geo_distance_km")] = distance
+    out[_distance_output_column(params)] = distance
     return out, _y
 
 
@@ -109,7 +114,7 @@ def _geo_distance_apply_polars(X: Any, _y: Any, params: dict[str, Any]) -> tuple
         y = lat2_r - lat1_r
         expr = radius * (x**2 + y**2).sqrt()
 
-    output_column = params.get("output_column", "geo_distance_km")
+    output_column = _distance_output_column(params)
     return X.with_columns(expr.alias(output_column)), _y
 
 
@@ -160,7 +165,7 @@ class GeoDistanceApplier(BaseApplier):
         "lon2_col": "",
         "method": "haversine",
         "unit": "km",
-        "output_column": "geo_distance_km",
+        "output_column": "",
     },
     learns_from_data=False,
 )
@@ -169,7 +174,12 @@ class GeoDistanceCalculator(BaseCalculator):
 
     @fit_method
     def fit(self, X: Any, _y: Any, config: dict[str, Any]) -> GeoDistanceArtifact:  # pylint: disable=arguments-differ
-        """Check the columns, method, and unit against the data, then record the config."""
+        """Validate the distance config and resolve its output column name.
+
+        An omitted or empty ``output_column`` becomes ``geo_distance_km`` or
+        ``geo_distance_mi`` according to ``unit``. Explicit names are retained
+        in the artifact and reused during inference.
+        """
         lat1_col = config.get("lat1_col", "")
         lon1_col = config.get("lon1_col", "")
         lat2_col = config.get("lat2_col", "")
@@ -182,7 +192,7 @@ class GeoDistanceCalculator(BaseCalculator):
         unit = config.get("unit", "km")
         _validate_geo_distance_method_unit(method, unit)
 
-        output_column = config.get("output_column", "geo_distance_km")
+        output_column = _distance_output_column(config)
 
         return cast(
             GeoDistanceArtifact,

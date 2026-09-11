@@ -138,6 +138,13 @@ mappings for training rows and the full-training mapping for held-out rows, with
 configured unknown-category fallback, currently zero. These protections do not remove
 the need for the outer row boundary and CV preprocessing refits.
 
+WOE smoothing adds `regularization` (default `0.5`) to every observed category's
+count in each target class. Each class total therefore includes
+`regularization * number_of_observed_categories`; missing feature values count as
+a category. Cross-fitting uses only the categories in each training complement.
+The corrected WOE and Information Value calculations apply to new fits; existing
+saved mappings retain their values. Refit the pipeline to use the correction.
+
 `LagFeatures` and `RollingAggregate` do not fit a distribution, but they depend on
 other rows. Use the correct time ordering, entity groups, prediction horizon and
 history protocol. A rolling aggregate includes the current row: a current-target

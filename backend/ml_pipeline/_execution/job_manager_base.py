@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session
 
 from backend.ml_pipeline._execution.schemas import JobStatus
+from backend.realtime.trial_buffer import clear_iterations, clear_trials
 
 
 class TrainingJobManagerBase:
@@ -99,6 +100,8 @@ class TrainingJobManagerBase:
             meta = (job.job_metadata or {}) if isinstance(job.job_metadata, dict) else {}
             TrainingJobManagerBase._revoke_celery_task(meta)
             await session.commit()
+            clear_trials(job_id)
+            clear_iterations(job_id)
             return True
         return False
 

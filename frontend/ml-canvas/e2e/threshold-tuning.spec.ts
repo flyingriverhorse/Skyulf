@@ -137,6 +137,9 @@ async function openThresholdEvaluation(page: Page) {
   await page.goto('/canvas');
   await page.getByRole('tab', { name: 'Experiments', exact: true }).click();
   await page.getByText('Threshold dataset 1', { exact: false }).click();
+  if ((page.viewportSize()?.width ?? 1440) < 768) {
+    await page.getByTitle('Collapse Sidebar').click();
+  }
   await page.getByRole('button', { name: 'Model Evaluation', exact: true }).click();
   await page.getByRole('button', { name: 'Threshold Tuning', exact: true }).click();
 }
@@ -188,3 +191,43 @@ test('evaluation distinguishes preview from saved thresholds through save, toggl
     'threshold-a:preview', 'threshold-a:save', 'threshold-a:toggle', 'threshold-a:toggle', 'threshold-a:clear',
   ]);
 });
+
+for (const width of [1440, 390]) {
+  test(`legacy ROC AUC thresholds preserve use and allow a supported preview at ${width}px`, async ({ page }) => {
+    // Saved cutoffs stay usable, while keyboard selection submits a real threshold objective.
+    await page.setViewportSize({ width, height: 1000 });
+    const { saved } = await mockThresholdLifecycle(page);
+    saved.set('threshold-a', {
+      ...PREVIEW_THRESHOLDS, metric: 'roc_auc', source: null,
+      computed_at: '2026-09-09T10:02:00Z', enabled: true,
+    });
+    let requestedMetric: string | undefined;
+    await page.route('**/api/pipeline/jobs/threshold-a/thresholds/preview', async route => {
+      requestedMetric = (route.request().postDataJSON() as { metric: string }).metric;
+      await route.fulfill({ json: { ...PREVIEW_THRESHOLDS, metric: 'balanced_accuracy' } });
+    });
+    await openThresholdEvaluation(page);
+    const metric = page.getByRole('combobox', { name: 'Threshold tuning metric' });
+    await expect(metric).toHaveValue('f1');
+    await expect(metric.getByRole('option', { name: 'ROC AUC' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
+    await expect(page.getByText(/click Preview before saving a replacement/)).toBeVisible();
+    const toggle = page.getByRole('checkbox', { name: 'Use tuned thresholds at prediction time' });
+    await expect(toggle).toBeChecked();
+    await toggle.click();
+    await expect(toggle).not.toBeChecked();
+    await expect(toggle).toBeEnabled();
+    await toggle.click();
+    await expect(toggle).toBeChecked();
+    await expect(toggle).toBeEnabled();
+    await metric.focus();
+    await page.keyboard.press('End');
+    await page.keyboard.press('Enter');
+    await expect(metric).toHaveValue('balanced_accuracy');
+    await page.getByRole('button', { name: 'Preview', exact: true }).click();
+    await expect.poll(() => requestedMetric).toBe('balanced_accuracy');
+    await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeEnabled();
+    expect(saved.get('threshold-a')?.metric).toBe('roc_auc');
+    expect(saved.get('threshold-a')?.enabled).toBe(true);
+  });
+}

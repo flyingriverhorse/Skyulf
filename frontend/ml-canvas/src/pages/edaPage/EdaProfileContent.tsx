@@ -171,7 +171,7 @@ const PROFILE_TABS = {
   },
   correlations: (props: ProfileTabProps) => {
     const { profile } = props;
-    return (!!profile.correlations || !!profile.correlations_with_target) && (
+    return (!!profile.correlations || !!profile.correlations_with_target || !!profile.causal_target_exclusion_reason) && (
       <CorrelationsTab
         profile={profile}
       />
@@ -179,9 +179,7 @@ const PROFILE_TABS = {
   },
   causal: (props: ProfileTabProps) => {
     const { profile } = props;
-    return !!profile.causal_graph && (
-      <CausalTab profile={profile} />
-    );
+    return <CausalTab profile={profile} />;
   },
   rules: (props: ProfileTabProps) => {
     const { profile } = props;

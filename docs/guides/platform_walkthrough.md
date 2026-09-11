@@ -102,6 +102,17 @@ This is the core of Skyulf. The canvas is a React Flow-based visual editor where
 5. **Add a modeling node** at the end (e.g., `random_forest_classifier`).
 6. Optionally, toggle the modeling node's **Advanced mode** (`run_mode: "advanced"`) and configure the search strategy.
 
+### Casting rules
+
+Select an existing **Cast Types** node to open its settings. The **+** icon
+beside **Casting Rules** adds a rule for the first available column without one
+and defaults its type to Float. Its hover tooltip is **Add Casting Rule**. This
+adds a rule inside the selected node; it does not add another node to the canvas.
+The icon button is disabled when all available columns already have rules.
+To change an existing type, use that rule's type selector. Removing a rule
+makes its column available to add again; other rules keep their selected types.
+Columns dropped upstream are excluded from the available choices.
+
 ### Recommended pipeline order:
 
 ```
@@ -175,6 +186,15 @@ curl http://127.0.0.1:8000/api/pipeline/jobs/{job_id}/evaluation
 ```
 
 ---
+
+### Inspecting a historical node
+
+Node links in **Error Log** and **Slow Nodes** open **Node Inspector** for the
+graph recorded by that run. Use its **Upstream** and **Downstream** buttons to
+inspect neighboring nodes. The displayed details, loading indicator and error
+belong to the current selection; delayed responses from an earlier selection
+or a closed inspector do not replace them. **Retry** reloads the selected node
+after a request fails.
 
 ## Step 5b: Export to Jupyter Notebook
 

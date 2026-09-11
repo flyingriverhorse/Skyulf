@@ -6,7 +6,8 @@ from backend.ml_pipeline.tasks import run_pipeline_task
 
 
 @pytest.mark.asyncio
-async def test_artifact_routing_logic():
+async def test_artifact_routing_logic(tmp_path):
+    """Source and override settings must select the intended artifact store."""
     # We will mock everything around the logic we want to test
 
     with (
@@ -34,7 +35,7 @@ async def test_artifact_routing_logic():
         settings.AWS_ACCESS_KEY_ID = "key"
         settings.AWS_SECRET_ACCESS_KEY = "secret"
         settings.AWS_DEFAULT_REGION = "us-east-1"
-        settings.TRAINING_ARTIFACT_DIR = "/tmp/artifacts"
+        settings.TRAINING_ARTIFACT_DIR = str(tmp_path)
         # Important: Explicitly set boolean flags to avoid MagicMock truthiness issues
         settings.SAVE_S3_ARTIFACTS_LOCALLY = False
         settings.UPLOAD_TO_S3_FOR_LOCAL_FILES = False

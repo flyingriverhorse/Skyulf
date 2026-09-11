@@ -187,8 +187,28 @@ describe('Feature Selection settings', () => {
     // Moving the form must preserve the registry contract and zero-valued summaries.
     expect(FeatureSelectionNode.getDefaultConfig()).toEqual({ method: 'select_k_best', k: 10 });
     expect(FeatureSelectionNode.validate({ method: 'variance_threshold' })).toEqual({ isValid: true });
-    expect(FeatureSelectionNode.validate({ method: 'correlation_threshold' })).toEqual({ isValid: false, field: 'target_column', message: 'Target column is required for this method.' });
     expect(FeatureSelectionNode.bodyPreview?.({ method: 'rfe', k: 0 })).toBe('rfe · k=0');
     expect(FeatureSelectionNode.bodyPreview?.({ method: 'variance_threshold', threshold: 0 })).toBe('variance_threshold · σ>0');
+  });
+});
+
+describe('Feature Selection target requirements', () => {
+  it.each(['variance_threshold', 'correlation_threshold'] as const)('allows %s without a target', (method) => {
+    // Unsupervised selection must remain usable on datasets without a target.
+    expect(FeatureSelectionNode.validate({ method })).toEqual({ isValid: true });
+    expect(FeatureSelectionNode.validate({ method, target_column: '' })).toEqual({ isValid: true });
+  });
+
+  it.each([
+    'select_k_best', 'select_percentile', 'select_fpr', 'select_fdr', 'select_fwe',
+    'generic_univariate_select', 'select_from_model', 'rfe',
+  ] as const)('still requires a target for %s', (method) => {
+    // Exempting unsupervised methods must not admit incomplete supervised settings.
+    for (const target_column of [undefined, '']) {
+      expect(FeatureSelectionNode.validate({ method, target_column })).toEqual({
+        isValid: false, field: 'target_column', message: 'Target column is required for this method.',
+      });
+    }
+    expect(FeatureSelectionNode.validate({ method, target_column: 'target' })).toEqual({ isValid: true });
   });
 });

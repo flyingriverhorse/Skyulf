@@ -96,13 +96,14 @@ def _polars_arith(op: dict[str, Any], existing: list[str], epsilon: float) -> An
 
 
 def _polars_ratio(op: dict[str, Any], existing: list[str], epsilon: float) -> Any | None:
+    """Sum ratio operands with null/NaN as zero and preserve the denominator's sign."""
     nums = [
-        pl.col(c).cast(pl.Float64).fill_null(0)
+        pl.col(c).cast(pl.Float64).fill_nan(0).fill_null(0)
         for c in op.get("input_columns", [])
         if c in existing
     ]
     dens = [
-        pl.col(c).cast(pl.Float64).fill_null(0)
+        pl.col(c).cast(pl.Float64).fill_nan(0).fill_null(0)
         for c in op.get("secondary_columns", [])
         if c in existing
     ]
@@ -110,7 +111,8 @@ def _polars_ratio(op: dict[str, Any], existing: list[str], epsilon: float) -> An
         return None
     num_sum = pl.sum_horizontal(nums)
     den_sum = pl.sum_horizontal(dens)
-    return num_sum / pl.when(den_sum.abs() < epsilon).then(epsilon).otherwise(den_sum)
+    signed_epsilon = pl.when(den_sum < 0).then(-epsilon).otherwise(epsilon)
+    return num_sum / pl.when(den_sum.abs() < epsilon).then(signed_epsilon).otherwise(den_sum)
 
 
 def _polars_similarity(op: dict[str, Any], existing: list[str], _eps: float) -> Any | None:

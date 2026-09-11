@@ -14,11 +14,13 @@ from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.types import ASGIApp
 
+from backend.utils.logging_utils import redact_credentials, sanitize_for_log
+
 logger = logging.getLogger(__name__)
 
 
 class ErrorHandlerMiddleware(BaseHTTPMiddleware):
-    """Middleware to handle uncaught exceptions and standardize error responses."""
+    """Return standard errors and log credential-redacted exception chains."""
 
     def __init__(self, app: ASGIApp):
         """Wrap the downstream ASGI ``app`` so its requests pass through ``dispatch``.
@@ -54,18 +56,24 @@ class ErrorHandlerMiddleware(BaseHTTPMiddleware):
 
             return cast(Response, response)
 
-        except Exception as exc:
-            # Log the error with full traceback
+        except Exception as exc:  # noqa: BLE001 - final HTTP error boundary, redacted and logged
+            # Redact the complete chain before it reaches any log formatter.
+            # Raw exc_info would let handlers render the original secrets again.
+            safe_traceback = redact_credentials(
+                "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))
+            )
             logger.error(
-                f"Unhandled exception in request {request_id}: {exc}",
+                "Unhandled exception in request %s: %s\n%s",
+                request_id,
+                sanitize_for_log(redact_credentials(exc)),
+                safe_traceback,
                 extra={
                     "request_id": request_id,
                     "method": request.method,
-                    "url": str(request.url),
+                    "url": sanitize_for_log(redact_credentials(request.url)),
                     "client": request.client.host if request.client else "unknown",
-                    "traceback": traceback.format_exc(),
+                    "traceback": safe_traceback,
                 },
-                exc_info=True,
             )
 
             # Return standardized error response

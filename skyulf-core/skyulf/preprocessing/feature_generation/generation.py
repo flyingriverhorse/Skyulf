@@ -5,15 +5,31 @@ from typing import Any, cast
 
 import pandas as pd
 
+from ..._validation import raise_invalid_choice
 from ...core.meta.decorators import node_meta
 from ...registry import NodeRegistry
 from .._artifacts import FeatureGenerationArtifact
 from .._helpers import select_then_to_pandas
 from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
 from ..dispatcher import apply_dual_engine
-from ._common import DEFAULT_EPSILON, _resolve_group_agg_cols
+from ._common import DEFAULT_EPSILON, FEATURE_MATH_ALLOWED_TYPES, _resolve_group_agg_cols
 from ._pandas_ops import _PANDAS_AGG_METHODS, _featgen_apply_pandas
 from ._polars_ops import _featgen_apply_polars
+
+
+def _validate_operation_types(operations: list[dict[str, Any]]) -> None:
+    """Reject unsupported operations before fitting or replaying an artifact."""
+    for op in operations:
+        op_type = op.get("operation_type", "arithmetic")
+        if op_type == "polynomial":
+            raise ValueError(
+                "FeatureGeneration does not support operation_type='polynomial'; "
+                "use the PolynomialFeatures node instead."
+            )
+        if op_type not in FEATURE_MATH_ALLOWED_TYPES:
+            raise_invalid_choice(
+                op_type, FEATURE_MATH_ALLOWED_TYPES, "FeatureGeneration operation_type"
+            )
 
 
 class FeatureGenerationApplier(BaseApplier):
@@ -24,13 +40,15 @@ class FeatureGenerationApplier(BaseApplier):
         """Evaluate each configured operation and append its output column to ``X``.
 
         Operations run in order, so a later one can read a column an earlier one
-        created. A failing operation is logged and skipped rather than aborting
-        the node, and an output name that already exists is suffixed until
+        created. Unsupported operation types raise ``ValueError`` before any
+        operation runs. A failure inside a supported operation is logged and
+        skipped, and an output name that already exists is suffixed until
         unique unless ``allow_overwrite`` says otherwise.
 
         Group aggregates require training-fitted mappings. Legacy artifacts
         lacking those mappings must be refitted before inference.
         """
+        _validate_operation_types(params.get("operations", []))
         if any(
             op.get("operation_type") == "group_agg" and "group_agg_mapping" not in op
             for op in params.get("operations", [])
@@ -103,7 +121,10 @@ class FeatureGenerationCalculator(BaseCalculator):
         an earlier generated column. Its saved mapping supplies held-out rows;
         unknown keys stay missing, and no inference values are aggregated.
         Configurations containing only row-local operations need no data fit.
+        Unsupported operation types raise ``ValueError``; polynomial expansion
+        belongs in the separate ``PolynomialFeatures`` node.
         """
+        _validate_operation_types(config.get("operations", []))
         params: FeatureGenerationArtifact = {
             "type": "feature_generation",
             "operations": deepcopy(config.get("operations", [])),

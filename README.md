@@ -101,13 +101,18 @@ To enable S3 integration for data and artifacts, add these to your `.env`:
 ```ini
 AWS_ACCESS_KEY_ID=your_key
 AWS_SECRET_ACCESS_KEY=your_secret
-AWS_REGION=us-east-1
-S3_BUCKET_NAME=your-bucket
+AWS_DEFAULT_REGION=us-east-1
+AWS_BUCKET_NAME=your-bucket
 # Optional: Upload local training artifacts to S3
 UPLOAD_TO_S3_FOR_LOCAL_FILES=true
 # Optional: Force local storage even for S3 data
 SAVE_S3_ARTIFACTS_LOCALLY=false
 ```
+
+`AWS_BUCKET_NAME` is the canonical default data-bucket setting and is read
+from `.env` or the process environment. The legacy `S3_BUCKET_NAME` name is
+also accepted. Environment values override `.env`; when both names are set
+in the same source, `AWS_BUCKET_NAME` takes precedence.
 
 ### With Docker Compose (Recommended)
 

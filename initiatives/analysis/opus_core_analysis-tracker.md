@@ -35,7 +35,7 @@ pass. Unlike the batches above these were verified by reading the call sites and
 grepping for consumers, **not** reproduced by execution. Each changes behaviour
 rather than documentation, so all four were filed open for a later session;
 OC-186 has since been fixed and pinned by a test (see the Log), leaving
-OC-183–185 open. Historical baseline counts remain unchanged.
+OC-185 parked; OC-183–184 closed on 2026-09-10. Historical baseline counts remain unchanged.
 
 **Remaining-source continuation (2026-09-06):** OC-187–206 add 20 executed
 findings (5 🟠 / 14 🟡 / 1 ⚪). As of 2026-09-09, sixteen are fixed —
@@ -158,6 +158,12 @@ uses, so a fixed finding stays where it was filed.
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
+| OC-151 | 🟡 | Trial-buffer `clear_*` hooks documented but never called — 110.9 MB retained for process lifetime (`realtime/trial_buffer.py:56-59,103-106`) | small | ✅ fixed 2026-09-10 — execution cleanup releases both chart buffers; cancellation clears them after commit, and successful jobs retain persisted chart history. |
+| OC-156 | 🟡 | `roc_auc` threshold-tuning objective scores hard predictions — bit-identical to `balanced_accuracy` (`threshold_tuning_service.py:77-92`) | small | ✅ fixed 2026-09-10 — remove ROC AUC from new threshold preview/save requests and UI choices; preserve existing saved cutoffs and recommend Balanced Accuracy. |
+| OC-158 | 🟡 | Sync/async JSON serializers disagree: sync nulls 8 of 15 legitimate strings (`"nan"`, `"NaT"`, `"<NA>"`, `"inf"`…), async nulls none; 603-line module production-dead but test-covered (`serialization.py:369,435-446`) | half day | ✅ fixed 2026-09-10 — remove string-based missing detection, preserve real missing scalars, and pin text parity through public serializer entry points. |
+| OC-169 | 🟡 | Uncaught request errors re-log raw messages and traceback chains, bypassing S3 call-site credential redaction (`middleware/error_handler.py:53-65`) | small | ✅ fixed 2026-09-10 — mask application request/error log surfaces and fallback-handler persistence; retain formatted diagnostics without raw `exc_info`. |
+| OC-183 | 🟠 | `SmartCatalog` ignores dotenv-only bucket configuration and disagrees with the documented settings name (`data/catalog.py:556`, `config/mixins/aws.py:12`) | small | ✅ fixed 2026-09-10 — read canonical `AWS_BUCKET_NAME` through Settings, accept legacy `S3_BUCKET_NAME`, and align the docs with tested source precedence. |
+| OC-184 | 🟠 | Production security headers are configured but never sent (`config/environments.py:84`, `main.py::_add_middleware`) | half day | ✅ fixed 2026-09-10 — apply the configured policy to application HTTP responses, preserving CORS/streaming and browser-tested Canvas/API-docs compatibility. |
 | OC-224 | 🟠 | Drift compared a transformed splitter reference with a raw upload, reporting severe drift for the same file | small | ✅ fixed 2026-09-10 — resolve the selected model's unique saved raw loader snapshot; the user's existing job now reports 0/4 drift and PSI 0 without retraining. |
 | OC-68 | 🟠 | Model alias map task-unaware — direct API caller silently trains the wrong estimator family (`_execution/engine/_node_runners.py:1157-1183`) | small | ✅ fixed 2026-09-07 — ambiguous aliases are task-aware and mismatched model/task combinations fail clearly |
 | OC-70 | 🟡 | Leakage validator checks for *a* splitter globally, not that *this* branch is protected (`_execution/_leakage_validation.py:189-267`) | small | ✅ fixed 2026-09-08 — every training branch now needs its own splitter or explicit CV; data-dependent ancestors on unprotected branches are reported |
@@ -187,6 +193,8 @@ uses, so a fixed finding stays where it was filed.
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
+| OC-142 | 🟠 | EDA correlation ratio η exceeds 1.0 with nulls; null-heavy columns rank as strongest association | small | ✅ fixed 2026-09-11 - use complete target-feature pairs for all group counts, means and sums of squares; preserve source rows and correct report ranking. |
+| OC-144 | ⚪ | Geo distance column named `_km` even when the unit is miles | small | ✅ fixed 2026-09-11 - resolve automatic names from the selected unit; preserve explicit configuration and saved artifact names. |
 | OC-143 | 🟠 | RFE ignores the UI's `k`, silently selecting half the features — **duplicate of OC-25**, same file and line; one fix retires both | small | ✅ fixed 2026-09-05 — with OC-25 |
 | OC-141 | ⚪ | `invalid_values` param declared in `node_meta` with zero consumers | 1 line | ✅ fixed 2026-09-06 — key deleted from `node_meta` after re-verifying zero consumers across all three layers and the `.ambr` snapshots, behaviour-neutral because `user_picked_no_columns` keys off `columns`. The other half of the divergence (the params the calculator really reads are still undeclared) is left to **R1 step 1**. See the log entry |
 
@@ -200,6 +208,7 @@ uses, so a fixed finding stays where it was filed.
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
+| OC-21 | 🟡 | WOE additive smoothing not normalized over categories (`encoding/woe.py`) | small | ✅ fixed 2026-09-11 — normalize class totals by all observed-category pseudocounts in full fits and training complements, correcting WOE/IV without rewriting saved mappings. |
 | OC-172 | 🟡 | `StandardScaler` crashes on mixed pandas nullable numeric columns containing `pd.NA`; native sklearn and equivalent Polars input succeed (`preprocessing/scaling/standard.py:144,154`, `engines/sklearn_bridge.py:52`) | small | ✅ fixed 2026-09-09 - nullable numeric missing sentinels become NumPy NaN without rounding observed integers; StandardScaler applies numeric arithmetic safely. |
 | OC-178 | 🟡 | `HashEncoder` hashes the same missing value into different buckets across Polars, pandas object, and pandas nullable string inputs, even with one shared fitted artifact (`preprocessing/encoding/hash.py:45,76`) | small | ✅ already fixed - verified 2026-09-09: one shared hash artifact gives identical missing-value buckets across pandas object/string and Polars. |
 | OC-171 | 🟡 | Pandas `SimpleImputer` silently excludes explicitly selected constant/binary numeric columns for mean/median, leaving missing values unfilled; Polars honors the selection (`preprocessing/imputation/simple.py:173-177`) | small | ✅ already fixed - verified 2026-09-09: explicit constant/binary mean and median imputation fills missing values in both engines. |
@@ -213,15 +222,36 @@ uses, so a fixed finding stays where it was filed.
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
+| OC-230 | 🟡 | Native Polars NaN inputs propagate through feature ratios while pandas treats them as missing (`feature_generation/_polars_ops.py:_polars_ratio`, `_pandas_ops.py:_pandas_ratio`) | small | ✅ fixed 2026-09-11 - normalize native NaN and null ratio operands to zero before summing, preserving other operands, input columns and signed epsilon. |
+| OC-23 | 🟠 | Polars `ratio` flips the sign of near-zero negative denominators (`feature_generation/_polars_ops.py:97-112`) | small | ✅ fixed 2026-09-11 - preserve the sign when clamping a near-zero ratio denominator to epsilon on Polars, matching pandas. |
 | OC-211 | 🟡 | Pandas datetime features depend on prediction-batch composition: prepending a different valid date format makes the original rows' year/month/day missing in both `FeatureGeneration.datetime_extract` and `DateFeatures` (`feature_generation/_pandas_ops.py:179`, `time_series/date_features.py:64`) | small | ✅ already fixed - verified 2026-09-09: mixed-format batch companions preserve calendar features across both engines and aliases. |
 | OC-212 | 🟡 | Similarity generation silently omits its output column for duplicate pandas indexes: label-based `.at[i]` returns Series to a scalar helper and the operation exception is swallowed (`feature_generation/_common.py:137-139`) | small | ✅ fixed 2026-09-08 — similarity now reads and assigns by row position, preserving duplicate indexes and individual scores; see the Log entry. |
 | OC-25 | 🟠 | RFE "K" chosen in UI ignored by backend (`feature_selection/_common.py:236-240`) | small | ✅ fixed 2026-09-05 — closes OC-143 too |
+| OC-26 | 🟠 | `HashingVectorizer` UI "none" norm is an invalid sklearn value → crash (`hashing_vectorizer.py`) | small | ✅ fixed 2026-09-11 — normalize the Canvas value to Python `None`, preserving unnormalized token counts and existing L1/L2 behavior. |
+| OC-33 | 🟡 | `FeatureInteraction` cannot generate single-column self-products (`feature_generation/interaction.py`) | small | ✅ fixed 2026-09-11 — generate repeated-column combinations when `interaction_only=False`, including fewer columns than the degree; align Canvas validation. |
+| OC-32 | 🟡 | `VarianceThreshold` crashes when all candidates are constant (`feature_selection/variance.py`) | small | ✅ fixed 2026-09-11 — record an empty selection when every candidate fails the threshold, preserving candidate variances, replay and invalid-input errors. |
+| OC-31 | 🟡 | Frontend wrongly requires a target for unsupervised CorrelationThreshold (`FeatureSelectionNode.tsx`) | small | ✅ fixed 2026-09-11 — exempt correlation selection from target validation, retaining target requirements for all eight supervised methods. |
+| OC-29 | 🟡 | `FeatureGeneration` advertises `polynomial` but silently skips it (`feature_generation/_common.py:24-31`) | small | ✅ fixed 2026-09-11 - reject unsupported operation types during fit and replay; polynomial requests point to the separate PolynomialFeatures node. |
+| OC-34 | 🟡 | Count/TF-IDF vectorizers crash on empty or stop-word-only corpora (`vectorization/count_vectorizer.py`, `tfidf_vectorizer.py`) | small | ✅ fixed 2026-09-11 — warn and return an empty artifact for an empty vocabulary; preserve source data and replay, while other settings/pruning errors still raise. |
+| OC-27 | 🟠 | `GeneralTransformation` ignores the UI `standardize` toggle (`transformations/general.py`) | small | ✅ fixed 2026-09-11 — retain each power rule's standardization choice through fitting and replay; older artifacts keep their previous default. |
 | OC-28 | 🟠 | Box-Cox transform failures silently return untransformed data (`transformations/power.py:97-104`) | small | ✅ fixed 2026-09-06 — the silent path was the `valid_cols` filter, not the `except` (which has logged since the node was created); both engines now share `_fitted_columns_present`, which names the fitted columns the frame lacks, and fail-open is kept by decision. See the log entry |
 
 ### Remaining — profiling (outside the OC-39–46 cluster)
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
+| OC-235 | 🟠 | Directed causal edges are serialized backwards (`profiling/_analyzer/causal.py`) | small | ✅ fixed 2026-09-11 — preserve causal-learn endpoint order; real graph objects and public collider regressions verify both orientations. |
+| OC-236 | 🟠 | Nominal target codes feed Pearson/Fisher-Z as numeric magnitudes, making results depend on category order (`profiling/analyzer.py`) | design + medium | ✅ fixed 2026-09-11 — omit categorical targets from numeric analysis while preserving category associations; numeric task overrides and omission metadata are explicit. |
+| OC-237 | 🟡 | The causal graph cap guesses the target from column names and can omit the actual selection (`profiling/_analyzer/causal.py`) | small | ✅ fixed 2026-09-11 — retain the explicitly selected eligible numeric target and record all/target-correlation/variance selection. |
+| OC-238 | ⚪ | Temporary target names become public graph and matrix labels (`profiling/analyzer.py`) | small | ✅ fixed 2026-09-11 — no temporary nominal target codes are created; original feature identities remain intact and omitted targets are explained. |
+| OC-239 | 🟡 | An excluded target still drives rules and inferred task type (`profiling/analyzer.py`) | small | ✅ fixed 2026-09-11 — rule discovery requires an active target, including across repeated analysis; backend serialization regression verifies exclusion precedence. |
+| OC-240 | 🟡 | Target/grouping names collide with aggregation aliases, silently removing statistics (`profiling/_analyzer/target.py`) | small | ✅ fixed 2026-09-11 — isolate group keys from statistic names; test both target directions, nulls, constants and every affected alias. |
+| OC-241 | 🟠 | Sampled outlier offsets identify the wrong source rows (`profiling/_analyzer/multivariate.py`) | small | ✅ fixed 2026-09-11 — carry positions separately from model features and publish zero-based positions in the filtered input before sampling; scores and sampled rows remain unchanged. |
+| OC-245 | 🟡 | Target name `count` collides with recommendation class-count output and aborts public analysis (`profiling/_analyzer/recommendations.py:_target_class_counts`) | small | ✅ filed and fixed 2026-09-11 — isolate the group key; numeric/string labels, literal count categories, missing labels and imbalance ratios are covered. |
+| OC-49 | 🟡 | Valid partially-unlabelled PCA payloads crash plotting (`profiling/visualizer.py:716-737`) | small | ✅ fixed 2026-09-11 - render missing-label PCA points as a separate gray series; preserve every coordinate and omit the colorbar when all labels are absent. |
+| OC-52 | ⚪ | Categorical colour mapping is process-nondeterministic (`visualizer.py:710-713`) | small | ✅ fixed 2026-09-11 - sort the shared categorical label set for reproducible PCA and geospatial colors across row order and Python hash seeds. |
+| OC-191 | 🟡 | All-null and Polars Enum columns are classified as text and sent to string-only aggregates, aborting the whole profile (`profiling/analyzer.py`, `_analyzer/column.py`) | small | ✅ fixed 2026-09-11 - profile Null dtype as Unknown with missing-value reporting and native Enum as Categorical, preserving the rest of the report. |
+| OC-199 | 🟡 | Explicit latitude/longitude selections bypass `exclude_cols`, returning coordinates for columns excluded from the profile (`profiling/_analyzer/geo.py:58-59`) | small | ✅ fixed 2026-09-11 - resolve explicit coordinates only within the persistent active column selection; excluded coordinates omit geospatial output. |
 | OC-193 | 🟡 | A single missing timestamp removes time-series analysis at the 1,000-row resampling boundary: dynamic grouping receives null date keys and the exception is swallowed (`profiling/_analyzer/temporal.py:232,243`) | small | ✅ fixed 2026-09-09 - null timestamps are excluded from temporal calculations without changing the existing resampling threshold. |
 | OC-217 | 🟠 | Repeated profiling on one analyzer returns previously excluded columns in sample data and frame statistics because only newly excluded columns trigger the narrowed frame (`profiling/analyzer.py:analyze`) | small | ✅ fixed 2026-09-09 - persistent column exclusions remain effective for sample rows and frame statistics across repeated calls. |
 | OC-216 | 🟡 | Rule feature conditions include unrelated labels from Polars shared categorical dictionaries even when those labels never occur in the feature (`profiling/_analyzer/rules.py:_build_feature_matrix`) | small | ✅ fixed 2026-09-09 - feature-local codes and label lists exclude unrelated categories from displayed rule conditions. |
@@ -234,6 +264,7 @@ uses, so a fixed finding stays where it was filed.
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
+| OC-74 | 🟡 | `NodeRegistry.list_models()` hides all 4 Ensemble models; `category` arg dead (`registry.py:101-108`) | small | ✅ fixed 2026-09-11 - include Modeling and Ensemble in model discovery and exclude both from transformer discovery; preserve exact category filters and registration order. |
 | OC-167 | 🟡 | Ambiguous string boundaries in artifact serialization give different fitted label encoders identical pipeline fingerprints, despite encoding the same input as 0 vs −1 (`pipeline/seal.py:52,64`) — distinct from OC-62's pointer instability | small | ✅ fixed 2026-09-09 - typed length framing and canonical unordered entries distinguish different fitted values deterministically. |
 | OC-63 | 🟠 | `artifact_digest` raises `RecursionError` instead of the documented `TypeError` on cyclic graphs (`pipeline/seal.py`) | small | ✅ fixed 2026-09-09 - active-path cycle detection raises TypeError and still accepts shared acyclic state. |
 | OC-170 | 🟡 | `validate_leakage_safety()` rejects registered stateless nodes before the split as unknown/data-dependent, including `TextCleaning`, `DateFeatures`, `Casting`, and `feature_target_split` (`leakage.py:140-156`) | small | ✅ already fixed - verified 2026-09-09: all four filed stateless nodes are accepted before a split. |
@@ -275,6 +306,17 @@ uses, so a fixed finding stays where it was filed.
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
+| OC-234 | 🟡 | 3D scatter legends promise triangle/star markers that Plotly silently renders as circles (`chartMarkerShapes.ts`, `ThreeDScatterPlot.tsx`) | small | ✅ fixed 2026-09-11 - use five shapes supported by both scatter engines and render matching plus/X legend symbols; real browser regressions verify resolved Plotly markers. |
+| OC-242 | 🟠 | Causal graph ID sanitization merges distinct column names (`components/eda/CausalGraph.tsx`) | small | ✅ fixed 2026-09-11 — map original identities to distinct opaque IDs and preserve edge endpoints; Chromium covers spaces, punctuation, Unicode and prototype-like names. |
+| OC-243 | 🟡 | Bidirected causal edges render only one arrowhead (`components/eda/CausalGraph.tsx`) | small | ✅ fixed 2026-09-11 — render both endpoint markers for bidirected edges and retain directed/undirected behavior. |
+| OC-244 | 🟡 | Loading an empty historical graph preserves old results (`components/eda/CausalGraph.tsx`, `tabs/CausalTab.tsx`) | small | ✅ fixed 2026-09-11 — clear graph state and render an unavailable state with the current target explanation; desktop/mobile history regressions verify removal. |
+| OC-231 | ⚪ | EDA scatter and geospatial category colors depend on first appearance; reordering identical points changes the color of the same category (`scatterGrouping.ts:32-35`, `GeospatialTab.tsx:60-67`) | small | ✅ fixed 2026-09-11 - Sort observed category labels and share color metadata across 2D, 3D, map and legends; row reordering preserves category colors. |
+| OC-232 | 🟡 | Missing PCA/scatter labels are merged with genuine `Other` labels, making unlabeled and observed categories indistinguishable (`scatterGrouping.ts:22-23`) | small | ✅ fixed 2026-09-11 - Keep missing values in a neutral group with collision-safe captions, preserving every point and showing all-missing legends. |
+| OC-233 | 🟡 | Valid scatter labels such as `__proto__`, `constructor` and `toString` crash grouping because inherited object properties are treated as arrays (`scatterGrouping.ts:20-24`) | small | ✅ fixed 2026-09-11 - Use Map-backed grouping so prototype-named categories render normally without losing points or crashing. |
+| OC-214 | 🟠 | Frontend PostCSS retains vulnerable `nanoid@3.3.17` (CVE-2026-67213) | small | ✅ fixed 2026-09-10 — lockfile and installed tree use compatible 3.3.18; npm audit no longer reports the package, and frontend coverage/tests, lint, CCN and build pass. |
+| OC-215 | 🟡 | Frontend Tailwind/PostCSS retains vulnerable `postcss-selector-parser@6.1.2` (CVE-2026-9358) | small | ✅ fixed 2026-09-10 — both parent paths resolve to compatible 6.1.4; npm audit no longer reports the package, and frontend coverage/tests, lint, CCN and build pass. |
+| OC-228 | 🟡 | Add Casting Rule overwrites the first column's existing type with `float` when every available column already has a rule | small | ✅ fixed 2026-09-10 — Add is disabled and its handler returns when no unassigned usable column remains; unit and browser regressions preserve types and cover removal/re-addition and Preview payloads. |
+| OC-229 | 🟡 | A late inspector response replaces the details of a more recently selected node | small | ✅ fixed 2026-09-10 — request generations guard data, error and loading writes; cleanup invalidates old requests on selection changes, close and unmount, with unit/browser coverage of reordered responses and retries. |
 | OC-222 | ⚪ | Audit Log's loaded-page filter hint contradicts its server-side actor/kind/time filtering | small | ✅ fixed 2026-09-10 — the hint now explains full-history filtering before the page limit; API behavior is unchanged. |
 | OC-221 | 🟡 | Error Log applies an older search response after a newer response, displaying rows that disagree with the current search | small | ✅ fixed 2026-09-10 — request generations guard HTTP/pipeline results, errors and loading; refresh and effect cleanup invalidate obsolete work. |
 | OC-220 | 🟡 | Resampling Target Column native suggestions open away from the input in the user's browser | small | ✅ fixed 2026-09-09 — use an anchored editable listbox; docked/expanded browser geometry and keyboard selection are covered. |
@@ -355,6 +397,1143 @@ respective fix logs; OC-167 closed with canonical artifact framing on 2026-09-09
 ---
 
 ## Log
+
+### 2026-09-11 — Web EDA label sorting review
+
+The repeated scanner finding referred to the single bare `.sort()` in
+`scatterGrouping.ts`. It now uses `String.localeCompare` with the fixed `en`
+locale and a lexical tie-breaker for distinct Unicode spellings that collate
+equally. Mixed-case/accented labels sort alphabetically without making color
+and marker assignments depend on browser language or input row order.
+
+The mixed-case regression failed before the change; all **112 EDA component
+tests** and **6 desktop/mobile browser cases** now pass. The browser fixture's
+expected legend order was updated to the intended alphabetical order. Frontend
+lint/CCN, explicit browser-spec lint, TypeScript/Vite build, size budgets and
+diff checks pass. Docs and rebuilt assets are updated; OC counts are unchanged.
+
+### 2026-09-11 — OC-235–245 fixed: target semantics, causal graphs and profiling identity
+
+The user authorized all ten reviewed repairs with subagents. Three agents
+implemented causal conversion/selection, target aggregation/outlier provenance,
+and frontend graph rendering; the parent integrated categorical target
+eligibility, exclusions, schemas, backend payload coverage, documentation and
+the production build. Independent review found the adjacent recommendation
+`count` collision (OC-245), which was also reproduced and repaired.
+
+The resulting contract is documented in
+[`eda_target_causal_review_2026-09-11.md`](eda_target_causal_review_2026-09-11.md)
+and the EDA user guide. Categorical targets retain eta associations and original
+values; Pearson/Fisher-Z no longer treat arbitrary category codes as numeric
+measurements. Numeric target eligibility respects explicit task choice. New
+optional report metadata explains omissions, even without a graph, and the
+actual selection method; legacy fields remain readable. Both causal and
+correlation notices are reachable when no numeric matrix is available.
+
+Directed edges match the real PC output. Graph caps use the actual selected
+numeric target. Exclusions override rule discovery; aliases cannot overwrite
+group keys; outlier indices retain zero-based positions in the filtered input
+before sampling without changing the sampled model features or scores. Web
+graphs preserve distinct IDs, render both bidirected arrowheads, and remove
+old results when history loads an empty graph. Saved analyses must be rerun
+for numerical/result changes; reloading the UI applies rendering corrections.
+
+All repairs have failing-before/passing-after focused regressions. Final gates:
+**7,054 Core tests passed / 80 skipped** (cached NLP model in offline mode),
+**3,612 backend tests passed / 1 legacy test deselected**, **2,487 frontend
+tests passed**, and **8 Chromium desktop/mobile cases passed**. All ten Python
+snapshots passed. Repository Ruff, backend/Core Ty, changed Python formatting,
+frontend ESLint/CCN, production build, size budgets and diff checks passed.
+Commands and environmental limits are recorded in the linked review.
+No production changes were needed in the backend; its configuration and
+serialization path is covered by the new target-contract regression.
+
+The broad backend run also exposed test-environment limitations. Artifact
+routing now uses pytest's temporary directory instead of `/tmp/artifacts`.
+The separate local-only inference smoke (OC-246) is unchanged: its external
+workspace path is inaccessible in the sandbox, and a safe path-only probe
+showed it returning early on a tuple model artifact while claiming a pass.
+It is excluded from the final backend run and filed as a separate test repair,
+not counted as inference validation.
+
+OC-235–244 move out of the live queue, OC-245 is filed closed, and OC-246 is
+filed open: **38 open / 4 parked**. Historical baseline and parked items are
+unchanged. No commit was requested for this repair pass.
+
+### 2026-09-11 — OC-235–244 filed: EDA target and causal graph review
+
+The reported `species_encoded` node was reproduced with Iris. It is a
+temporary Core target representation surfaced as a public label; the source
+`species` column is unchanged. The bounded follow-up found **10 new issues
+(4 🟠 / 5 🟡 / 1 ⚪)**, recorded open with evidence in
+[`eda_target_causal_review_2026-09-11.md`](eda_target_causal_review_2026-09-11.md).
+
+Seven public `EDAAnalyzer.analyze` reproductions establish reversed causal
+arrows, arbitrary category-code-dependent Pearson/PC results, omission of the
+selected target under the graph cap, internal target labels, rules using an
+excluded target, target-name aggregation collisions, and incorrect sampled
+outlier row indices. The real causal-learn collider returns `A → C ← B`, while
+Skyulf emits `C → A` and `C → B`. The same Iris observations reordered by class
+change encoded-target Pearson from 0.9565 to 0.5804 and the PC graph from four
+to five edges; fixed-code and categorical-association controls remain stable.
+
+Three original-source Chromium probes reproduce colliding causal node IDs,
+one-ended bidirected edges, and stale graph state after loading an empty
+historical graph. These use mocked schema-supported report/history responses;
+the audit does not claim current PC regularly emits bidirected or empty graph
+payloads. Changing the target selector before Analyze was not filed as a bug.
+
+The existing three focused profiling suites still pass **83 tests / 41
+warnings** and miss these cases. Production source and committed tests were
+unchanged; only the review, live queue, and this log were updated. OC-235–244
+remain open, taking the live queue from **37 to 47 open / 4 parked**. Existing
+parked items and historical baseline counts are unchanged.
+
+### 2026-09-11 - OC-234 fixed: matching scatter marker shapes and legends
+
+The user requested the separately filed 3D marker repair. Two new component
+regressions failed on the old shape cycle and diagonal cross legend. Four
+real-browser PCA cases also failed before source changes: on desktop and
+mobile, Plotly coerced triangle-up/star to circles, while the all-missing
+legend drew X for a resolved cross (+) marker.
+
+The shared cycle now uses circle, square, diamond, cross (+) and x. Chart.js
+maps these to circle/rect/rectRot/cross/crossRot; scatter3d accepts their common
+names unchanged. The legend draws the matching plus and diagonal X. The five
+shapes repeat for larger category sets. This shared configuration covers PCA
+and Bivariate in both dimensions, preserving category colors, row grouping
+and missing-value identity. Maps continue using their circle legend.
+
+Verification:
+
+- **99 focused EDA tests pass**, including both new regressions.
+- **2,476 frontend tests pass** across 190 files.
+- **7 browser tests pass**: the six desktop/mobile label cases plus the
+  existing real Plotly PNG export test. The strengthened checks compare
+  `_fullData[].marker.symbol` with requested symbols and the legend's actual
+  SVG geometry through 2D -> 3D -> 2D and reversed rows. All five symbols are
+  preserved; gray missing markers and their plus legend also match.
+- Lint, CCN10, TypeScript/Vite build, all eleven size limits and diff checks
+  pass. Production assets rebuilt at v0.8.20. Independent review found no
+  actionable issue and confirmed Chart.js marker geometry with a drawing probe.
+
+The EDA guide and v0.8.20 changelog describe the common marker cycle. OC-234
+moves to the closed rows; the live queue has **37 open / 4 parked** findings.
+
+Original pre-fix reproduction evidence, moved from the live queue:
+
+### 2026-09-11 - OC-234: Plotly 3D marker shapes differ from the legend
+
+Found while verifying OC-231-233 in the real EDA page. The existing shared
+adapter supplies triangle-up and star to scatter3d, but Plotly coerces both
+to circle. The external legend still shows a triangle/star. This predates
+the grouping changes; `chartMarkerShapes.ts` is unchanged by this fix batch.
+
+Executed `npm.cmd run test:e2e -- e2e/eda-label-groups.spec.ts --workers=1
+--reporter=line`: six tests pass for category colors, coordinates and label
+identity. The PCA cases also record requested `data[].marker.symbol` and
+resolved `_fullData[].marker.symbol` in `pca-marker-symbols.json` attachments.
+Both desktop and mobile record triangle-up -> circle for the real Unlabeled
+category and star -> circle for constructor. Circle, square, diamond and
+cross remain unchanged. These color/point tests do not claim symbol parity.
+
+Fix target: use renderer-supported shapes and align each chart's visible
+legend with its actual markers; pin resolved Plotly symbols as well as input
+trace props.
+
+### 2026-09-11 - v0.8.20 versions and OC-21 artifact snapshot correction
+
+The user supplied full-suite CI failures for the WOE artifact snapshot. The
+failure reproduced locally: the OC-21 normalization fix correctly returns
+IV `1.739533`, while the active unit snapshot still expected `2.126096`.
+For its x/y/z fixture, positive proportions are `[7, 3, 1] / 11` and negative
+proportions are `[1, 5, 5] / 11`; both sum to one. Independent calculation gives
+IV `1.7395330719636604`. The old denominator reproduces `2.1260959768444736`.
+
+The existing test now checks this hand-derived IV before comparing the whole
+artifact. Syrupy regenerated the active snapshot with `--snapshot-update`;
+the only snapshot change is the city IV scalar. WOE mappings and production
+calculation are unchanged. This closes the snapshot omission from the earlier
+OC-21 verification, which did not include `test_artifact_snapshots.py`.
+
+Root app/Core versions, the uv lock record and frontend package/lock mirrors
+are now **0.8.20**. Dependency payloads are unchanged. The local Core editable
+install was refreshed offline without dependencies; `skyulf.__version__`
+also reports **0.8.20**. Frontend assets were rebuilt from the current tree.
+
+Verification: **172 related tests pass**, including all three artifact
+snapshots; the snapshot module also passes from the `skyulf-core` directory.
+Scoped Ruff, format and Ty checks, version sync/check, production frontend
+build and all eleven bundle-size limits pass. Independent review found no
+actionable issue. Changelog updated; queue remains **38 open / 4 parked**.
+
+### 2026-09-11 - OC-231-233 fixed: web EDA category identity
+
+Shared grouping now uses Map keys with null reserved for missing values and
+sorted observed labels for repeatable color/shape assignment. Missing groups
+keep a neutral gray color and a collision-safe caption, including when real
+categories contain Other, Unlabeled or its missing suffix. 2D datasets, 3D
+traces and maps consume the same category color metadata. Colors are stable
+for the same observed category set; this is not a global category palette.
+
+All-missing PCA/scatter legends remain visible. Map legends use circles to
+match Leaflet markers and retain category colors beyond twenty groups, with
+the existing long-list filter. No-target maps preserve blue coordinate-only
+markers/popups. Chart.js receives the category color for fill and stroke, so
+missing crosses are actually gray. Raw table/CSV labels are preserved. The
+guide and changelog explain the behavior and reuse of existing saved profiles.
+
+Verification:
+
+- New helper tests first reproduced row-order color changes and prototype-key
+  crashes; component tests caught the old map color differences. Two review
+  regressions then reproduced a missing Chart.js stroke color and an unwanted
+  no-target map legend, and passed after correction.
+- Focused EDA suite: **97 tests passed**. Final full frontend suite:
+  **2,474 tests passed** across 190 files (`npm.cmd test -- --maxWorkers=4
+  --reporter=dot --silent`). Existing deliberate error-boundary traces remain.
+- Six new real-browser tests pass on desktop and mobile across PCA 2D/3D,
+  Leaflet points/popups, row reversal, missing/colliding labels and all-missing
+  targets (`npm.cmd run test:e2e -- e2e/eda-label-groups.spec.ts --workers=1
+  --reporter=line`). Unit regressions supplied the source-red evidence;
+  browser tests were first run after implementation.
+- Final lint, CCN10, TypeScript/Vite production build and bundle-size checks
+  pass. Generated `static/ml_canvas` assets were rebuilt. Read-only review
+  found no remaining scoped issue and verified the actual Chart.js stroke.
+
+The renderer-specific Plotly shape coercion found during browser validation
+is separately filed as OC-234; overall 2D/3D shape parity is not claimed.
+The live queue has **38 open / 4 parked** findings after these three closures
+and the new finding. No commit was requested for this frontend fix turn.
+
+Original pre-fix reproduction evidence, moved from the live queue:
+
+### 2026-09-11 - OC-231-233: frontend EDA label review
+
+Review requested after the OC-49/52 Python visualizer examples. These frontend
+charts consume profile JSON using Chart.js, Plotly and Leaflet; they do not
+use `EDAVisualizer.plot()`. Executed the current `CanvasScatterPlot`,
+`ThreeDScatterPlot`, `GeospatialTab` and shared grouping helpers through React
+server rendering, capturing chart-library props while keeping the actual
+component/grouping code. This is runtime payload validation, not a browser
+pixel/rendering check. Reproduction script:
+`tmp_repro_artifacts/frontend_eda_label_audit.cjs` (ignored local artifact).
+
+**Controls:** partial labels `["a",null,"b"]`, all-null labels, and text labels
+`["nan",null,"inf","-inf","1e309","1"]` retain all coordinates in both 2D
+Chart.js datasets and 3D Plotly traces. Labels are not converted into numeric
+colors, so the Python non-finite-color masking defect is not reproduced here.
+
+**OC-231:** render labels `["Gold","Silver","Bronze"]`, then reverse their
+order. Gold changes from `#8884d8` to `#ffc658` in scatter datasets. Reordering
+geospatial points produces the same color change. The palette index comes
+from first-seen group order. **Fix/verification target:** deterministic category
+identity for the same label set across row order, matching chart/legend colors
+and marker shapes; use the same rule for 2D, 3D and the map.
+
+**OC-232:** labels `[null,"Other","a"]` produce a single Other group with
+**2 points**, shared by both scatter engines and the legend. No coordinates
+are dropped, but missing and genuine category identity are conflated.
+**Fix/verification target:** keep missing labels separate from real strings,
+with an explicit missing-label presentation that cannot collide with an
+observed category of the same displayed name.
+
+**OC-233:** each label `__proto__`, `constructor` and `toString` throws
+`groups[label].push is not a function` through the current scatter component.
+The empty `{}` grouping object inherits these keys, and `??=` does not replace
+the non-null inherited value with an array. **Fix/verification target:** group
+arbitrary labels without prototype-key collisions and keep 2D/3D/legend
+consumers consistent. This is a reproduced rendering failure, not a claim of
+an application security exploit.
+
+### 2026-09-11 - OC-231-233 filed: frontend EDA needs separate label fixes
+
+The user asked whether the Python visualizer defects also affect frontend EDA.
+Runtime component/renderer-boundary probes confirmed three separate frontend
+findings, now open with reproduction evidence in the live queue: row-order
+color changes (OC-231), missing/Other category collision (OC-232), and
+prototype-named label crashes (OC-233).
+
+Partial/all-missing labels and numeric-looking text labels retain their point
+coordinates in both 2D and 3D chart payloads. Python and frontend rendering
+implementations are independent. The earlier "no Canvas change is required"
+statement applies only to integrating the Python correction; it was not a
+validated claim that frontend label handling had no defects. This review
+corrects that overbroad interpretation. No frontend implementation was changed
+in this review, and no browser pixel-level check is claimed.
+The existing OC-230/49/52 Python fixes remain valid and pending commit.
+The live queue is now **40 open / 4 parked** findings.
+
+### 2026-09-11 - OC-230, OC-49 and OC-52 fixed: missing ratios and plot labels
+
+Committed OC-23, OC-191 and OC-199 as `b28f90fc` with DCO sign-off after
+**574 Core / 59 backend tests passed** and all applicable hooks passed.
+No push was performed. Reproduced each item in the next three-finding batch
+before implementing its correction.
+
+**OC-230:** native Polars NaNs survived operand normalization and poisoned
+ratio sums, unlike pandas' existing missing-as-zero behavior. Normalize each
+ratio operand's NaN and null values to zero before summing. An observed value
+in another operand still contributes; signed epsilon clamping is unchanged.
+Direct native frames cover numerator/denominator NaNs, mixed/all-missing sums,
+negative small denominators, default/custom epsilon, integer/null-only inputs,
+infinity controls and unchanged source columns. Red: **2 failures / 6 controls
+passed**; both Polars cases had 9 incorrect rows out of 11. The new cases and
+OC-23 sign regressions then passed **12 tests**. No fitted artifact migration
+is needed; existing ratio artifacts use the corrected applier.
+
+**OC-49:** missing labels shortened the PCA color vector without shortening
+the coordinates. Real plotting reproduced the color/coordinate size error.
+PCA now renders labeled points with target colors and missing-label points as
+gray crosses with an Unlabeled legend. There is no numeric missing-label
+sentinel, so real labels such as -1 and 0 retain their existing meaning.
+All-missing labels produce a complete plot without a target colorbar.
+Independent review also reproduced masked points for valid text labels such
+as "nan" and "inf". Numeric colors now require finite conversions; otherwise
+the complete label set uses categorical colors. Four real-artist regressions
+failed before this correction, then passed, including "-inf" and "1e309";
+a finite-numeric scale control preserves continuous target coloring.
+
+**OC-52:** enumerating a set assigned different category codes across Python
+hash seeds. The shared helper now sorts the non-null category strings before
+enumerating, stabilizing PCA/geospatial colors for an unchanged category set
+regardless of row order or process. Changing the category set can still
+renumber codes; persistent category palettes are outside this fix.
+
+Visualizer red phase: **8 failures / 2 controls passed**, including actual Agg
+rendering and different PYTHONHASHSEED subprocesses. The final **15 new tests**
+exercise public `plot()` for eleven label combinations, inspect real artists
+for visible/unmasked coordinates and missing-label presentation, and cover
+both categorical consumers and subprocess stability. A mixed-label PCA image
+was also generated and visually checked. The existing visualizer tests remain
+unchanged and pass alongside these regressions.
+
+Combined verification: **597 Core tests pass**, covering all profiling and
+feature-generation test modules; 121 existing warnings concern numerical
+edge cases, library deprecations and the headless/Windows environment. Updated
+the EDA guide, Feature Generation reference, relevant docstrings and changelog.
+These are Python library behavior and plotting corrections; no Canvas change
+is required. Existing saved profiles can be replotted without rerunning EDA.
+Repository Ruff/Ty, scoped formatting, all applicable pre-commit hooks and
+`git diff --check` pass. Independent review confirmed the non-finite-label
+follow-up resolves its finding and reported no remaining actionable issues.
+The live queue now has **37 open / 4 parked** findings.
+
+Original pre-fix OC-230 reproduction, moved from the live queue:
+
+Reproduced through public `FeatureGenerationCalculator.fit` and
+`FeatureGenerationApplier.apply` while verifying OC-23. Select ratio inputs
+`input_columns=["n"]`, `secondary_columns=["d"]`, `output_column="r"` and use
+the default epsilon. On `{"n": [1.0], "d": [float("nan")]}`, a native pandas
+DataFrame produces approximately **1e9**, while a native Polars DataFrame
+produces **NaN**. Pandas' horizontal sum treats missing values as zero;
+Polars' sum preserves native NaN. Constructing the Polars frame with
+`pl.from_pandas` normalizes NaN to null and hides the difference.
+
+**Fix/verification target:** define and apply consistent missing-value
+semantics to native ratio inputs, with direct engine-native frames covering
+NaN numerators, denominators and sums. OC-23 addresses only the sign of
+finite near-zero denominators and does not close this separate behavior.
+
+### 2026-09-11 - OC-23, OC-191 and OC-199 fixed: ratios and profiling inputs
+
+Committed OC-74 as `acefc59f` with DCO sign-off, **337 Core tests / 3 backend
+registry tests passing**, two optional H3 skips and all applicable hooks
+passing. No push was performed. This continuation handles three independently
+reproduced findings.
+
+**OC-23:** the Polars ratio expression clamped every denominator with
+`abs(denominator) < epsilon` to positive epsilon. Negative near-zero sums
+therefore inverted the output sign. It now uses the denominator's sign, as
+the pandas path already does. Public calculator/applier regressions cover
+both engines, default/custom epsilon, positive and negative numerators,
+threshold boundaries, zero, normalized missing values, and multi-column sums.
+Red: **2 failures / 2 controls passed**. Focused feature-generation suites:
+**171 passed**. Saved epsilon settings and other operations are unchanged.
+
+**OC-191:** native Null and Enum fell through to Text and failed batched
+string-length aggregation, aborting the whole profile. The shared dtype
+resolver now maps Null to Unknown and native Enum to Categorical. Unknown
+retains counts, percentages, samples and high-missing alerts without invalid
+type-specific statistics. Typed all-null columns retain their known dtype.
+Red: **5 failures / 3 controls passed**. The focused analyzer/column suites
+pass **62 tests**. Tests also cover Enum category frequencies and classification
+target inference; an additional real backend analysis/JSON serialization test
+preserves both new profile cases for API consumers. The profile dtype field
+already accepts strings, and Canvas uses a fallback badge and optional stats,
+so no frontend implementation or request change is required.
+
+**OC-199:** explicit coordinate names bypassed the active selection and read
+excluded data from the analyzer's retained source frame. Resolution now
+requires each supplied coordinate to belong to `self.columns`, including
+partially explicit pairs. An excluded coordinate yields no geospatial section.
+Red: **6 failures / 6 controls passed**. Focused geo and repeated-exclusion
+suites pass **29 tests**, covering either/both exclusions, reuse of one analyzer,
+auto-detection and allowed custom numeric/string coordinate names.
+
+Combined verification: **574 Core tests / 59 backend tests pass** across all
+profiling and feature-generation modules and backend EDA helpers/routes.
+The 122 warnings come from existing numerical edge cases, optional visualization
+behavior, Windows CPU detection and library deprecations. Updated the EDA guide,
+feature-generation reference, schema comment, helper docstrings and changelog.
+Repository Ruff/Ty, scoped formatting and every applicable pre-commit hook
+pass; independent read-only review found no actionable issue.
+`git diff --check` is clean.
+
+During OC-23 verification, direct native Polars NaN input exposed a separate
+missing-value parity issue, now recorded as **OC-230** in the live queue with
+executed evidence. The finite-denominator sign fix does not claim to close it.
+After closing these three findings and filing OC-230, the live queue contains
+**40 open / 4 parked** findings. Existing parked work is untouched.
+
+Original executed evidence for the supplemental profiling findings:
+
+**OC-191 — unsupported string aggregation on valid dtypes.** Executed
+`EDAAnalyzer(pl.DataFrame({'x': [None,None]})).analyze()` raises
+`SchemaError: expected String, got null`; using
+`pl.Series(['a','b'], dtype=pl.Enum(['a','b']))` raises the equivalent Enum
+error. **Fix/verification target:** handle null-only columns and recognize or
+normalize Enum before text aggregates. OC-121 concerns preprocessing
+auto-selection; this finding concerns profiling aborting completely.
+
+**OC-199 — explicitly selected coordinates survive exclusion.** Executed
+`EDAAnalyzer(pl.DataFrame({'lat':[1.,2.,3.], 'lon':[10.,20.,30.],
+'x':[1.,2.,3.]})).analyze(exclude_cols=['lat','lon'],lat_col='lat',lon_col='lon')`.
+The result still contains all three coordinate pairs in
+`geospatial.sample_points`, plus their bounds and centroid, although the
+per-column profile excludes them. **Fix/verification target:** apply the
+exclusion policy consistently before explicit geospatial selection.
+
+### 2026-09-11 - OC-74 fixed: ensemble-aware model discovery
+
+Committed OC-29, OC-144 and OC-142 together as `23ea9a2d`, with DCO sign-off,
+**798 fresh tests passing / 11 optional H3 skips** and all applicable
+pre-commit hooks passing. No push was performed.
+
+Reproduced OC-74 against the real registered nodes before editing code:
+`voting_classifier`, `stacking_classifier`, `voting_regressor` and
+`stacking_regressor` were all registered but absent from `list_models()` and
+`list_models(category="Ensemble")`. All four were also incorrectly returned
+by `list_transformers()`. The category argument was not literally unused;
+the hardcoded Modeling check prevented it from selecting any Ensemble node.
+The actual backend `_build_node_registry()` already returned the four models
+because it uses `get_all_metadata()`, so the current Canvas is unaffected.
+
+A shared immutable set of model categories now defines complementary model
+and transformer lists. Unfiltered models include both Modeling and Ensemble;
+exact category filtering keeps those groups distinct. Transformer discovery
+excludes both, while custom non-model categories and unknown-category empty
+results retain their existing behavior. Node IDs, metadata and registration
+order are unchanged.
+
+Red phase: **6 failures / 5 controls passed**, using a category-filter matrix
+and all four real ensemble nodes. The two focused modules then passed all
+**52 tests**. Broader verification passes **337 Core tests / 3 backend registry
+API tests**, covering model discovery, ensemble fitting/prediction, existing
+classifiers, text-node listing and preprocessing registry/replay behavior.
+Two optional H3 tests skip; the 22 combined warnings are existing deprecations.
+Repository Ruff/Ty, scoped formatting and `git diff --check` pass. Independent
+review found no actionable issue. Updated the discovery docstrings, SDK README,
+modeling reference and changelog. No frontend implementation change is needed.
+The live queue now contains **42 open / 4 parked** findings.
+
+### 2026-09-11 - OC-142 fixed: complete-pair target association statistics
+
+Validated the current implementation before fixing it. A numeric feature with
+four observed values `[0, 2, 2, 4]` in two target groups has eta **0.707107**.
+Appending six missing feature values to one group inflated the reported score
+to **1.118034**, and sixty inflated it to **2.828427**. Null and NaN fixtures
+both reproduced this because the analyzer already normalizes NaN to null.
+Unlabeled rows also polluted the global mean and total sum of squares: adding
+two unlabeled outliers changed a perfectly separated feature from **1.0** to
+**0.577351**. The old null-target test only checked the broad [0, 1] bound and
+missed this incorrect value; it now asserts the analytical score.
+
+The selected target and feature are filtered to complete pairs once, and all
+group sizes, means and sums of squares use that same subset. Filtering is
+specific to each feature and leaves the analyzer's source frame unchanged.
+No complete pairs means the feature is omitted from associations; an observed
+constant feature still reports zero. Scores are corrected by consistent input
+rows, without clipping an inflated result to one.
+
+Red phase: **12 failures / 18 passes**, including two actual backend
+`_run_eda_analyzer` cases where the serialized report incorrectly ranked a
+sparse feature above a perfectly associated feature. Both Boolean and
+Categorical target reports now put `strong` (1.0) before `sparse` (0.707107),
+while retaining row counts and missing-value counts. Additional regressions
+cover empty/all-null/disjoint pairs, feature-specific missingness, unchanged
+source data, and complete-data controls.
+
+Verification: **168 tests pass**, spanning target associations, full analyzer,
+correlations/distributions, recommendations, exclusions, column-name handling,
+and backend EDA analyzer/task/API/router paths. The 47 warnings are existing
+deprecations, degenerate-statistic warnings and Windows CPU-discovery fallback.
+Repository Ruff/Ty, scoped formatting and `git diff --check` pass. Independent
+review found no actionable issue. Updated the calculation docstring, EDA user
+guide and changelog. The UI already uses the returned scores and ordering,
+so no frontend implementation change is needed. Saved EDA reports must be
+rerun to refresh their stored scores. The queue now contains **43 open /
+4 parked** findings.
+
+### 2026-09-11 - OC-144 and OC-29 fixed: distance names and supported feature operations
+
+Committed the preceding OC-34 fix as `2a64d449`, with DCO sign-off,
+**485 fresh tests** and all applicable pre-commit hooks passing.
+
+OC-144 was reproduced before changing production code: **16 failures / 8
+controls passed** across direct/default-metadata fits, missing/empty output
+names, and both existing engine paths. Distances were already calculated in
+the correct unit; their automatic names were wrong. A shared resolver now
+chooses `geo_distance_km` or `geo_distance_mi`, and the registry's empty default
+means automatic. Fitting saves the resolved name; direct apply uses the same
+fallback. Explicit names, including old miles artifacts named
+`geo_distance_km`, are preserved. The reference documents how to retain an old
+column name when refitting or update downstream references to the new name.
+
+Re-verification corrected part of the queue's earlier scope note: the existing
+miles-conversion test already supplies `geo_distance_mi` and correctly compares
+it with a kilometer baseline. The stale kilometer-name expectation was instead
+in the behavioral re-audit's unit matrix; its four miles cases now expect
+`geo_distance_mi`. Also, a module-level H3 `importorskip` was hiding all distance
+tests when the optional package was missing. An H3-only fixture now limits
+that skip to the two H3 test classes, keeping distance regressions executable.
+
+OC-29 was reproduced with **11 failures / 1 control passed**. The public
+allow-list advertised `polynomial`, while all three Feature Generation aliases
+accepted it and both appliers silently skipped it. Remove that advertised
+value and validate operation types at both public fit/apply boundaries, before
+running any operation. Polynomial requests receive an error directing callers
+to `PolynomialFeatures`; other unknown types list supported choices. Existing
+artifacts containing unsupported operations now fail explicitly too. Omitted
+operation types still default to arithmetic, and supported-operation failure
+handling is unchanged. The old unknown-operation no-op fixture was replaced
+by explicit error regressions. A real backend CSV-loader-to-feature-node run
+confirms the error reaches the failed node response without an output artifact.
+
+Verification: **628 Core / 2 backend tests pass**, including feature-generation,
+GeoDistance, registry-contract, leakage, behavioral replay and preprocessing
+pipeline suites. **11 optional H3 tests skip** because H3 is not installed;
+31 warnings are existing deprecations. Repository Ruff/Ty, scoped formatting
+and `git diff --check` pass. Calculator/applier docstrings, the preprocessing
+reference and changelog are updated. No frontend implementation change is
+needed: its Feature Generation choices already contain only supported types,
+and GeoDistance has no Canvas settings component. Independent review found
+no actionable issue. The live queue contains **44 open / 4 parked** findings.
+
+### 2026-09-11 - OC-34 fixed: empty text vocabularies warn and preserve input
+
+The preceding OC-31 work was committed as `f485ebdf`, with DCO sign-off,
+241 fresh focused frontend tests, the Canvas browser regression and all
+applicable hooks passing.
+
+Reproduced the current Count and TF-IDF failures before editing production
+code. Blank/missing text, English stop words, single-character/punctuation-only
+input, unavailable n-grams and zero-row corpora all raised sklearn's
+`empty vocabulary` error. The new Core regressions first reported **20 failures
+/ 10 controls passed**, and both real backend pipeline cases failed at the
+vectorizer. This confirms the reported issue at both calculator and engine level.
+
+Each builder now catches only the specific empty-vocabulary error, emits a
+warning with guidance to check text/stop words/n-grams, and returns `{}`.
+Existing appliers then preserve X, y, row order and source columns, including
+when `drop_original=True`. A saved empty artifact remains a no-op on later
+nonempty text, so prediction cannot learn a replacement vocabulary. Refit
+after correcting training text/settings to produce numeric features. Invalid
+parameters, contradictory frequency limits and pruning that removes all
+learned terms still raise their original errors.
+
+The backend regression runs the actual CSV loader and transformer through
+`PipelineEngine.run`, checks unchanged persisted data, a warning tagged with
+the correct node id/type, and replay through the saved pipeline artifact.
+The test selects pandas through the cached settings object used by the catalog;
+changing only the environment after settings initialization did not select it.
+
+Verification: **483 Core tests / 2 backend tests pass** across vectorization,
+encoding audit, registry-contract and leakage suites. The ten warnings in the
+broader contract run are existing sklearn/deprecation warnings. The existing
+frontend notification hook's **3 tests pass**; it already forwards node warnings
+to the notification center, so no frontend implementation change is needed.
+Repository Ruff/Ty, scoped formatting and `git diff --check` pass. Calculator
+docstrings, the Text & NLP guide and changelog are updated. Independent review
+found no actionable issue. The live queue now
+contains **46 open / 4 parked** findings.
+
+### 2026-09-11 - OC-31 fixed: target-free correlation selection in Canvas
+
+Committed the preceding OC-32 work as `fc9dece3` with DCO sign-off, after
+**594 fresh Core tests** and all applicable pre-commit hooks passed.
+
+Revalidated the Core behavior and frontend rejection before editing production
+code. The public feature-selection facade, without a target, drops `b` from
+`a=[1,2,3,4]`, `b=[2,4,6,8]`, `other=[1,0,0,1]` at Pearson threshold `0.9`,
+preserving `a` and `other`. Canvas validation nevertheless required a target
+for correlation selection, while its settings panel correctly hid that field.
+
+The validator now exempts `correlation_threshold` alongside `variance_threshold`.
+The eight supervised selection methods still reject absent/empty targets and
+accept a configured target. The new regression first failed with the original
+target-required error; the other **25 tests passed**. An old assertion preserved
+the incorrect rejection, and a hidden-field test artificially requested that
+invalid target error for correlation; both obsolete expectations were removed.
+
+Verification: **241 focused tests pass**, covering settings, validation reveal
+and pipeline serialization. The new Playwright test passes keyboard method
+changes, disappearance of the target error/control, an actual Preview POST with
+the correlation settings and no `target_column`, mocked result rendering,
+mobile read-only layout, retained desktop settings and restoration of the
+supervised target requirement. Core numerical behavior was verified separately.
+
+All **2,461 frontend tests pass across 188 files**. Frontend lint, complexity,
+TypeScript/production build, all bundle-size budgets and `git diff --check`
+pass. Independent review found no actionable issue. Updated the user reference,
+changelog and generated `static/ml_canvas` assets. No backend/Core change is
+needed. The live queue now contains **47 open / 4 parked** findings.
+
+### 2026-09-11 - OC-32 fixed: variance selection may reject every candidate
+
+Committed the preceding OC-21/33 work as `5b39c28d` with DCO sign-off.
+Fresh combined verification passed **471 Core tests / 67 frontend tests**;
+all applicable pre-commit hooks passed, including Ruff, Ty and frontend lint.
+
+Revalidated OC-32 before changing production code: constant values `[7,7,7]`,
+all-NaN values and `[0,1,0]` with threshold `1` each raised sklearn's
+`No feature in X meets the variance threshold` error. The library had already
+computed variances, but the exception prevented an artifact from reaching the
+existing candidate-column removal logic.
+
+The calculator now handles only that specific no-feature error and records
+`selected_columns=[]` with the normal candidate list, threshold, drop flag and
+variance values. Non-finite computed variances are accepted only for entirely
+missing columns, preserving numerical overflow failures. Other input and
+configuration errors still propagate. Applying
+the artifact removes only candidate columns; unselected columns, target values
+and `drop_columns=False` behavior remain intact. Both facade aliases retain
+the fitted empty selection when prediction values later vary. If every model
+feature is removed, the user must adjust selection before downstream training.
+
+New regressions first reported **11 failures / 6 controls passed**. They cover
+constant and all-null candidates, exact-threshold equality, one-row inputs,
+duplicate indexes and target alignment, auto-selection of all numeric columns,
+both drop modes, both facade aliases and inference replay. Controls preserve
+errors for negative/NaN/text thresholds, infinite values, empty rows and
+explicitly selected non-numeric values.
+
+Independent review reproduced finite `[1e200,2e200]` overflowing its variance
+to infinity, and `[1e308]*4 + [-1e308]*4` overflowing to NaN, at threshold `1`.
+Both produce the same sklearn error prefix. Each additional regression failed
+before its correction. The guard checks whether a column actually has observed
+values, so computational overflow remains an error while all-missing columns
+can legitimately have undefined variance.
+
+Verification: **594 related tests pass** across the feature-selection, shared
+helper, leakage and registry-contract suites. The 32 warnings include four
+sklearn all-null warnings and three numerical warnings exposed by the new
+cases; those calculations remain visible. Repository Ruff/Ty, scoped
+formatting and `git diff --check` pass. User reference and changelog updated;
+the existing Canvas variance controls require no frontend change.
+Final independent review verified both overflow controls and found no remaining
+actionable issue.
+The live queue now contains **48 open / 4 parked** findings.
+
+### 2026-09-11 - OC-33 fixed: self-products with fewer columns than the degree
+
+Revalidated in Core and Canvas before changing production code. Core skipped
+combination generation whenever the selected-column count was below the degree,
+even with `interaction_only=False`. Canvas independently rejected the same valid
+configuration. This affected single-column squares, cubes and fourth powers, as
+well as two-column degree-three products. The existing combination resolver
+already handles repeated columns correctly; fit now calls it directly. Canvas
+requires at least `degree` columns only when distinct-column interactions are
+enabled (including the existing omitted-setting default).
+
+The new Core regressions first reported **4 failures / 8 controls passed**.
+They pin hand-calculated powers and product names, missing values, duplicate
+indexes, target alignment, input preservation, empty selections and optional
+bias columns. Frontend regressions first reported **5 failures / 14 controls
+passed**, including an invalid degree whose error previously targeted columns.
+The related Core interaction, registry-contract and feature-operation leakage
+suites now pass **302 tests**, with nine existing warnings. Focused frontend
+validation and serialization checks pass **124 tests**.
+
+The new Playwright test passes through the actual Canvas control and Preview
+submission: keyboard toggling clears the validation issue, the request retains
+one column with degree four and `interaction_only=False`, and a mocked response
+renders the generated column. It also checks mobile read-only layout and retained
+settings after returning to desktop. Numerical results are covered by Core tests.
+
+Verification: **2,452 frontend tests pass across 188 files**, and the browser
+regression passes. Repository Ruff/Ty, scoped Python formatting, frontend lint,
+complexity, production build, bundle-size checks and `git diff --check` pass.
+Independent review found no actionable issue. The node reference, calculator
+docstrings, changelog and generated `static/ml_canvas` assets are updated.
+The live queue now contains **49 open / 4 parked** findings.
+
+### 2026-09-11 - OC-21 fixed: normalize WOE smoothing over observed categories
+
+Revalidated before changing production code. The effect is broader than the
+original report's "more than two categories": two equally sized categories,
+each with one positive and two negative targets, produced WOE `-0.076961`
+for both and IV `0.006841`, where both should be zero. Each category received
+a regularization pseudocount, but the class totals included only one such
+pseudocount, so neither class's category probabilities summed to one.
+
+`_column_woe` now adds `regularization * n_categories` to each class total.
+The shared calculation covers the full-training artifact and each training
+complement independently. Missing feature values count as an observed category;
+categories seen only in held-out rows do not inflate the training denominator
+and continue to receive the existing zero fallback. Stored mappings are applied
+unchanged, so existing fitted models retain their inference values; refit to
+use the corrected WOE/IV calculation.
+
+The seven new regressions all failed against the original code, while two
+existing controls passed. They cover two/three equally sized categories with
+identical target rates, two regularization values, hand-derived WOE and IV for
+an imbalanced three-category example (including a missing category), and the
+actual cross-fitting training hook with three categories per complement versus
+four globally, unseen categories and a single-class complement. Two existing
+test helpers copied the incorrect production formula; those expectations now
+use hand-derived literals, including the deterministic held-out-fold results.
+
+Verification: **169 related tests pass**, with two existing OneHotEncoder
+unknown-category warnings. Repository Ruff/Ty, scoped formatting and
+`git diff --check` pass. Related test command:
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest `
+  skyulf-core/tests/integration/test_encoding_woe.py `
+  skyulf-core/tests/integration/test_woe_and_calibration.py `
+  skyulf-core/tests/unit/test_encoding_operation_leakage.py `
+  skyulf-core/tests/unit/test_encoding_text_deep_audit_20260908.py `
+  -q --tb=short --basetemp=.pytest-tmp-oc21-green -o cache_dir=.pytest-tmp-oc21-cache
+```
+
+The calculator docstring and preprocessing placement guide explain the
+normalization and saved-artifact behavior; release notes are under **v0.8.20**.
+Independent review found no actionable issue. OC-21 moves to the archive,
+leaving **50 open / 4 parked** findings.
+
+### 2026-09-11 - OC-27 fixed: preserve each power rule's standardization setting
+
+Revalidated the current Canvas-to-Core path before changing code. The UI sends
+`standardize=False`, and the converter includes it in each flattened column
+rule. GeneralTransformation discarded that setting and hardcoded `True` when
+fitting and reconstructing PowerTransformer. On `[1, 2, 4, 8, 16]`, Box-Cox
+returned approximately `[-1.414, -0.707, 0, 0.707, 1.414]` instead of the
+requested unstandardized `[0, 0.693, 1.386, 2.079, 2.773]`. Yeo-Johnson likewise
+returned zero-mean, unit-standard-deviation output with the option disabled.
+
+The new regressions initially produced **2 failures / 2 passing controls**.
+For both methods, mixed column rules now compare `False`, `True` and omitted
+settings against independently fitted sklearn transformers on training and
+unseen data. Yeo-Johnson includes negative and zero inputs. The tests also
+check stored choices, absence of scaler statistics when disabled, duplicate
+held-out indexes and the output of historical artifacts without the flag.
+
+Fitting now passes each rule's setting into PowerTransformer and stores it
+beside the learned lambda. Both existing apply paths read the saved flag;
+missing flags still default to `True`, preserving previously saved artifacts.
+The calculator docstring and preprocessing reference explain the behavior;
+the release note is under **v0.8.20**. Frontend code already emits the setting
+correctly and needs no change.
+
+Verification: **182 related tests pass**, with one existing Polars polynomial
+concatenation deprecation warning. The four new regressions also pass after
+the final test lint adjustment. Related suite command:
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest `
+  skyulf-core/tests/integration/test_transformations_general.py `
+  skyulf-core/tests/integration/test_transformations_power_simple.py `
+  skyulf-core/tests/unit/test_feature_operation_leakage.py `
+  skyulf-core/tests/unit/test_artifact_shapes.py `
+  -q --tb=short --basetemp=.pytest-tmp-oc27-green -o cache_dir=.pytest-tmp-oc27-cache
+```
+
+Repository Ruff/Ty, scoped formatting and `git diff --check` pass. Independent
+review found no actionable issue in the change. OC-27 moves to the archive,
+leaving **51 open / 4 parked** findings.
+
+### 2026-09-11 - OC-26 fixed: honor Hashing Vectorizer's None normalization option
+
+Revalidated against the current code before changing production behavior.
+The Canvas emits `norm="none"`; artifact construction retained that string,
+and applying the artifact raised sklearn's `InvalidParameterError` in
+`normalize`. The existing `norm=None` unit test only inspected the artifact
+and never exercised the Canvas string or the resulting transformation.
+
+The new registry-based regression initially produced **1 failure / 5 passing
+controls**. A corpus with three `hello` and four `world` tokens must produce
+bucket counts `[3, 4]` with normalization disabled, `[3/7, 4/7]` for L1 and
+`[0.6, 0.8]` for L2. The test also covers Python `None`, the existing empty-string
+alias, omitted/default L2, an empty document and reuse of the fitted artifact.
+
+Artifact construction now translates only the Canvas string `"none"` to
+Python `None` before building sklearn's vectorizer. The shared constructor
+keeps the normalized value in both the artifact and vectorizer object.
+The user guide and calculator docstring explain the accepted values; the
+release note is under **v0.8.20**.
+
+Verification: **233 related tests pass**, with two existing unknown-category
+warnings from OneHotEncoder controls. Reproduce the test run with:
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest `
+  skyulf-core/tests/integration/test_vectorization.py `
+  skyulf-core/tests/unit/test_text_vectorization.py `
+  skyulf-core/tests/unit/test_vectorization_gaps.py `
+  skyulf-core/tests/integration/test_text_target_context.py `
+  skyulf-core/tests/unit/test_encoding_operation_leakage.py `
+  skyulf-core/tests/unit/test_encoding_text_deep_audit_20260908.py `
+  -q --basetemp=.pytest-tmp-oc26-green -o cache_dir=.pytest-tmp-oc26-cache
+```
+
+Repository Ruff/Ty, scoped formatting and `git diff --check` pass. Independent
+review found no actionable issue in the code, regression, guide or release
+note. OC-26 moves to the archive, leaving **52 open / 4 parked** findings.
+
+### 2026-09-10 - OC-184 fixed: send the configured production security headers
+
+The existing production header dictionary had no consumer. The initial
+integration regressions produced **7 failures / 4 passing controls** across
+normal/error, redirect, static, streaming and custom-policy responses.
+`SecurityHeadersMiddleware` now copies the configured map at startup and
+updates only `http.response.start`, preserving bodies and other ASGI scopes.
+It wraps the custom error middleware and sits inside outermost CORS. Empty
+policies and development/testing profiles retain their previous behavior;
+configured headers override conflicting endpoint values without collapsing
+unrelated repeated headers such as cookies.
+
+Applying the dormant CSP exposed real browser incompatibilities: Canvas PNG
+export failed with blocked data/blob images; ReDoc then reported blocked blob
+workers and its logo. The default policy now permits the actual chart/map
+and enabled Swagger/ReDoc sources: data/blob images, OpenStreetMap tiles,
+jsDelivr assets, the docs favicon, the specific ReDoc logo and blob workers.
+Existing inline script/style allowances remain; `unsafe-eval` was not added.
+
+Verification: **106 related backend tests pass**, including **15 security
+header regressions**, request-error redaction, configuration and infrastructure
+checks. Five existing dependency warnings remain. A local Chromium fixture
+served the **actual built Canvas assets** through the production middleware:
+Canvas boot, same-origin job WebSocket, real Plotly 3D rendering, PNG download,
+map tiles and loaded Swagger/ReDoc all pass with **zero CSP violations**.
+Browser fixture/scripts and result are under ignored
+`tmp_repro_artifacts/oc184_*` / `oc184-browser-result.txt`; generated
+`oc184-pca.png` confirms the export. No frontend source or bundle changed.
+
+The configuration guide explains policy replacement and scope. CORS preflight
+responses and fallback responses created by Starlette's outer server-error
+handler bypass the inner middleware; normal route errors consumed by Skyulf's
+error handler are covered. Release notes are under **v0.8.20**. OC-184 moves
+to the archive, leaving **53 open / 4 parked** findings.
+
+Repository Ruff/Ty, scoped formatting and `git diff --check` pass. Independent
+review found no material issue within the documented scope.
+
+### 2026-09-10 - OC-183 fixed: resolve the default S3 bucket through Settings
+
+The raw `os.getenv("S3_BUCKET_NAME")` check ignored the Settings model's
+canonical `AWS_BUCKET_NAME` and all dotenv-only bucket configuration. New
+regressions produced **6 failures / 5 passing controls** before the fix.
+
+`AWS_BUCKET_NAME` remains the canonical field. Pydantic `AliasChoices`
+accepts the legacy `S3_BUCKET_NAME` name for existing configurations, and
+`SmartCatalog` reads the resolved Settings value. Real dotenv/environment
+tests pin both aliases, canonical precedence within a single source, and
+environment precedence over dotenv even when the sources use different
+aliases. Explicit catalog injection, local-only operation and optional-SDK
+fallback are preserved. Credentials and S3 provider selection are unchanged.
+
+Verification: **67 config/catalog/S3 tests pass**, including **11 new
+regressions**. No S3 service is contacted: tests load real Settings and
+replace the external catalog constructor. README and the backend
+configuration guide now agree on the bucket name and precedence; the README
+region example also uses the existing `AWS_DEFAULT_REGION` field. Release
+notes are under **v0.8.20**. The queue now has **54 open / 4 parked** findings.
+
+The final combined OC-158/169/183 check passes **286 tests**, including
+Polars catalog ingestion and existing S3 security regressions (two existing
+dependency warnings). Repository Ruff/Ty, scoped formatting and
+`git diff --check` pass. Independent review found no material issue.
+
+### 2026-09-10 - OC-169 fixed: keep request error logs redacted across wrappers
+
+The production middleware stack reproduced the reported bypass with direct
+exceptions, explicit causes, implicit context, groups, notes and source-line
+credentials. The real S3 connector's `ConnectionError` wrapper still exposed
+its cause. The adjacent `LoggingMiddleware` also wrote raw exception text and
+request URL/user-agent metadata; the generic exception handler retained raw
+logging/persistence and used ambient `format_exc()`. The initial HTTP/direct
+handler regressions produced **10 failures / 1 passing control**.
+
+Both application middleware layers now use the existing `redact_credentials`
+policy before constructing messages, arguments or structured extras.
+Tracebacks are formatted from the supplied exception, including the entire
+chain, then redacted. Ordinary log output contains that safe traceback;
+raw `exc_info` is omitted so a formatter cannot reconstruct the original.
+URL/user-agent redaction runs before request-start logging and applies to
+success and handled-error paths too. Request objects remain unchanged.
+The generic handler also redacts its route/message/traceback before passing
+them to `_record_error`, preserving type and status.
+
+Verification: **196 tests pass** across the new **13 integration cases**,
+existing S3 redaction, backend infrastructure, error monitoring, two backend
+coverage suites and the OC-158 serializer/settings suites. The new cases
+check formatted output and LogRecord fields, redacted source snippets and
+notes, S3 wrapping, 200/422/500 metadata, fallback calls outside an active
+exception, CORS, request IDs and normal response headers. Two existing
+dependency deprecation warnings remain. Repository Ruff/Ty, scoped formatting
+and `git diff --check` pass. Independent review found no material issue in the
+stated scope. The configuration guide and **v0.8.20** release
+notes describe the behavior. The queue now has **55 open / 4 parked** findings.
+
+Scope: the shared redactor's recognized formats are unchanged. This is not a
+global logging filter: third-party/server logging and other handled-error
+persistence paths are outside this fix. In particular, Starlette can re-raise
+after its outer generic handler; normal route errors consumed by the custom
+error middleware do not reach that server fallback.
+
+### 2026-09-10 - OC-158 fixed: preserve literal text in the sync JSON helper
+
+The sync serializer's early `str(obj)` comparison erased eight literal tokens
+and custom objects whose textual representation matched them. The async
+helper preserved the same text. The new regressions initially produced
+**11 failures / 18 passes**: eight token cases, both DataFrame export formats,
+and a custom category object failed; ordinary strings and real missing-value
+controls passed.
+
+Removed `_handle_special_string_values` and handle `pd.NA` / `pd.NaT` by
+identity alongside `None`. Existing numeric handlers retain real NaN/infinity
+cleanup. Text now passes unchanged through nested dictionaries/lists and
+DataFrame records/columns, matching the async helper for these inputs.
+The class docstring and serialization guide document this distinction; the
+obsolete direct-handler test explanation was corrected. No production file
+imports this module, so this closes a compatibility-helper defect without
+claiming a current HTTP response change. Broader serializer consolidation is
+outside this fix.
+
+Verification: **115 tests pass** across `test_serialization_values.py`,
+`test_serialization_extra.py`, `test_pagination_and_thresholds_settings.py` and
+`test_patch_coverage_backend.py`. Regressions cover all 15 text controls,
+nested values, both DataFrame orientations, a custom text fallback and 11
+actual missing/non-finite scalar values, including numpy and Decimal NaN.
+Strict JSON round trips use `allow_nan=False`. Scoped Ruff, formatting,
+repository Ty and `git diff --check` pass; the guide's example was executed
+successfully. Independent review found no material issue. Release notes are
+under **v0.8.20**. OC-158 moves to the archive,
+leaving **56 open / 4 parked** findings.
+
+### 2026-09-10 - OC-156 fixed: stop offering ROC AUC as a threshold objective
+
+The backend scored thresholded class labels with `roc_auc_score`, which is
+balanced accuracy for binary predictions, while the UI advertised ROC AUC.
+The actual probability-ranking score is independent of the decision cutoff.
+Before the fix, **6 backend regressions failed / 36 controls passed** and
+**2 frontend regressions failed / 33 controls passed**, including binary
+numeric/string labels, misleading multiclass guidance, both HTTP write paths,
+the metric dropdown and hydration of a legacy saved `roc_auc` set.
+
+New threshold preview/save requests now reject `roc_auc` with HTTP 400 and an
+explanation pointing to `balanced_accuracy`. The unused hard-label AUC scorer
+and binary-only exception are removed. Accuracy, F1, Precision, Recall and
+Balanced Accuracy remain supported. Model-evaluation and hyperparameter-search
+ROC AUC are unchanged; the core training-time threshold fallback already uses
+Balanced Accuracy and needs no change.
+
+The dropdown no longer offers ROC AUC, and saved legacy metadata cannot select
+it during hydration. Existing saved cutoffs can still be read, enabled,
+disabled or cleared. Their metadata and values are preserved; replacing them
+requires a new preview with a supported objective. Both the threshold user
+guide and API guide explain this compatibility policy. Release notes are under
+**v0.8.20**, alongside OC-151.
+
+Independent review identified an enabled Save button on legacy sets: although
+the dropdown showed F1, Save still posted the preserved `roc_auc` metadata.
+Two failing UI regressions confirmed it for `roc_auc` and training-only
+`f1_weighted`. Hydration and Save now share the supported-metric list; Save
+stays disabled with an instruction until a supported preview succeeds, while
+using or clearing the stored cutoffs remains available.
+
+Verification: **43 backend tests**, **43 focused frontend tests**, and the full
+**2,444 frontend tests / 188 files** pass. **5 Chromium scenarios** pass,
+including legacy thresholds and keyboard-selected Balanced Accuracy requests
+at 1440px and 390px, plus preview/save/toggle/reload/clear. The mobile fixture
+uses the existing Collapse Sidebar action before opening evaluation; no layout
+change or forced click was needed. Frontend lint and source-wide CCN 10,
+repository-wide Ruff and Ty, and changed Python formatting pass. The combined
+OC-151/156 backend check passes **159 tests** (15 dependency deprecation
+warnings). Follow-up independent review found no remaining issue. The live
+queue now contains **57 open / 4 parked** findings.
+
+Final TypeScript/production build and all **11** unchanged bundle budgets pass;
+rebuilt assets use main entry `index-C9Juv0Fp.js`. The build caught a test-only
+Playwright-style `exact` option in a Testing Library query; removing that option
+preserved exact string matching and the focused **43 tests** pass again.
+Explicit lint of the browser regression passes. Logs are under ignored
+`tmp_repro_artifacts/oc156-*-final.log`; `git diff --check` passes.
+
+### 2026-09-10 - OC-151 fixed: release finished-job chart buffers
+
+The cleanup hooks were still unused in production. Before the fix, the new
+real-SQLite lifecycle suite produced **18 expected failures / 2 passing
+controls**: successful, failed, raised-error and cancelled executions all
+retained live chart points, as did successful cancellation requests. The
+controls confirm that failed cancellation commits must preserve the buffers.
+
+`execute_pipeline` now clears trials and boosting iterations in its `finally`
+block, after result persistence or failure handling. Both the single-job and
+parallel-batch task entry points use this service. The shared cancellation
+manager clears local buffers only after its database commit; execution cleanup
+also removes points emitted by a fitting thread after cancellation. Unrelated
+active jobs and the existing LRU bounds are preserved. Storage remains
+process-local; this change does not add cross-process live history.
+
+The regression suite covers fixed/tuned jobs through both task entry points,
+all four outcomes, chart availability at the successful commit, persisted
+chart scores read from a new session, unrelated active-job buffers, and
+successful/failed cancellation commits. The focused backend run passes
+**116 tests** (two dependency deprecation warnings). The API guide and buffer
+docstrings describe cleanup and the completed-job metrics fallback; release
+notes are under v0.8.20. OC-151 moves from the live queue to the archive.
+
+Final verification: the same **116 tests** pass after documentation/test
+cleanup; repository-wide `ruff check .`, the full configured `ty check`
+scope, formatting of all five touched Python files, and `git diff --check`
+pass. Independent review found no correctness or regression issue. The live
+queue now contains **58 open / 4 parked** findings.
+
+### 2026-09-10 - OC-229 fixed: obsolete inspector responses cannot replace current details
+
+Continued after OC-228 on `6e887335`, preserving its pending changes. The old
+inspector characterization expected the first response to replace the second;
+it now asserts the intended behavior. Before the production fix, the expanded
+modal suite had **9 expected failures / 8 passing controls**. Besides stale
+data, it reproduced obsolete error and loading writes, job-to-pipeline target
+changes, same-node close/reopen, stale retries and Strict Mode effect cleanup.
+
+`NodeInspectorModal.tsx` follows the existing Error Log generation pattern.
+Every fetch, including Retry, gets a new generation. Success, error and finally
+blocks may write only while that generation is current; effect cleanup
+invalidates it on selection change, close or unmount. HTTP methods and response
+contracts are unchanged. An old transport request may finish, but its result
+cannot change the current inspector. Existing node navigation, provenance,
+not-found behavior and current-request retries remain intact.
+
+Focused inspector/ModalShell verification passes **28 tests / 2 files**.
+The new `e2e/node-inspector-races.spec.ts` passes **4 Chromium scenarios** at
+1440px and 900px through the real Error Log node link. It holds a first
+opening's HTTP request, closes and reopens the same inspector, then releases
+the old success/error after current details are visible. It also verifies
+upstream navigation, a failed request followed by Retry, Escape and restored
+opener focus. Independent review found no blocking issue. Frontend lint,
+source-wide CCN 10 and explicit lint of the new browser test pass.
+
+Final combined-tree verification passes **2,440 tests / 188 files**,
+TypeScript/production build and all **11** unchanged bundle budgets. Production
+assets were rebuilt with both OC-228 and OC-229; the final browser rerun again
+passes all four inspector scenarios.
+
+The generation assignment uses the same explicit ref write as Error Log;
+ESLint's effect-ref check rejected the initial increment shorthand. No lint
+rule or complexity limit was relaxed. Local evidence is under ignored
+`tmp_repro_artifacts/oc229-*`. The platform walkthrough documents historical
+inspection and clarifies that OC-228 concerns the **+ icon beside Casting
+Rules**, whose tooltip is Add Casting Rule, rather than adding a canvas node.
+Release notes are under v0.8.20. OC-229 moves to the archive; the live queue
+is now **59 open / 4 parked**.
+
+### 2026-09-10 - OC-228 fixed: casting Add preserves existing rules
+
+On `6e887335`, the public settings reproduction changed `{ age: 'int' }` to
+`{ age: 'float' }` when Add was clicked with all available columns assigned.
+The old characterization test intentionally pinned that behavior during the
+CCN refactor; it is now a regression for the corrected contract. Before the
+production fix, **3 regressions failed / 48 existing tests passed**, including
+the exact unintended callback payload.
+
+`CastTypeNode.tsx` derives the next unassigned column from its existing
+schema/drop-filtered list. Both the handler and button use that value; there
+is no fallback to the first assigned column. Missing schema still disables
+Add, hidden saved rules remain intact, and removing a rule makes its column
+available again with the existing Float default.
+
+Focused settings/serialization/body-preview verification: **232 tests passed**.
+The full suite passes **2,431 tests / 188 files**. **5 Chromium scenarios** pass
+in `preprocessing-experiment-graphs.spec.ts`, including exhausted casting rules,
+removal and keyboard re-addition at 1440px and 1100px, plus the actual Preview
+payload `{ age: 'int', species: 'string', height: 'float' }`. The first browser
+attempt correctly blocked Preview because the new fixture left its neighboring
+replacement/binning nodes unconfigured; completing those settings through the
+real UI resolved the fixture failure. No production workaround was needed.
+
+Independent review found no blocking issue. Frontend lint and source-wide
+CCN 10 pass. TypeScript/production build and all **11** unchanged bundle budgets
+pass; rebuilt assets are included, with main entry `index-nNPBPCLt.js`.
+User instructions are documented in the platform walkthrough,
+and release notes are under v0.8.20. Local evidence is under ignored
+`tmp_repro_artifacts/oc228-*`. OC-228 moves to this archive; the live queue is
+now **60 open / 4 parked**, with the remaining priorities unchanged.
+
+### 2026-09-10 - Frontend Plotly peer follow-up: npm audit reaches zero
+
+The [second dependency pass](frontend_static_analysis_review_2026-09-10.md#plotly-peer-dependency-follow-up)
+removes the two npm entries left by the compatible updates below. An npm alias
+installs the existing official GL3D distribution as `plotly.js`, satisfying the
+React wrapper's peer dependency while keeping its supported factory entry.
+GL3D stays at **3.5.0**, with identical tarball URL/integrity and production
+assets. The unused full-Plotly/MapLibre chain is removed: **253 fewer lock
+entries**, no new entries and no forced major overrides or scanner exclusions.
+
+Final main-tree `npm audit` exits 0 with **zero known vulnerable package
+entries**; this is package/advisory matching, not a security audit of embedded
+prebuilt code. Clean isolated `npm ci`, peer resolution, **2,429 Vitest tests**,
+lint, source CCN 10, TypeScript/build and all **11** bundle budgets pass.
+**18 Chromium tests** pass on a fresh development server, and the new 3D PCA /
+PNG export regression also passes against the production preview. Independent
+review found no blocking implementation issue.
+
+The previous entry records the intermediate 14-to-2 result; the current npm
+result is **14 -> 2 -> 0**. Codacy must rescan to establish its own finding's
+status. OC-214/215 remain closed; queue totals remain **61 open / 4 parked**.
+The frontend README documents the alias/factory contract. Release notes: v0.8.20.
+
+### 2026-09-10 - OC-214/215 fixed: compatible frontend dependency updates
+
+This is the first-pass record; the follow-up above closes its remaining two
+npm entries.
+
+Continued the [scanner report](frontend_static_analysis_review_2026-09-10.md#dependency-audit-continuation)
+from `988b5a43` on `0820`. Fresh npm audit reproduced **14 affected package
+entries**. Targeted compatible updates remove twelve entries; **2 critical
+entries remain**, representing the same MapLibre advisory and its Plotly parent.
+The exact Codacy lockfile advisory is still unavailable, so no Codacy closure
+or application exploitability is inferred from npm's result.
+
+OC-214 originally resolved `postcss@8.5.26 -> nanoid@3.3.17`; the parent range
+permits patched 3.3.18, now present in both the lockfile and installed tree.
+The original PostCSS call uses `nanoid/non-secure` with constant size 6, so
+the advisory's zero-size-generator condition was not established in that path.
+OC-215 originally resolved selector-parser 6.1.2 under Tailwind 3.4.18 and
+postcss-nested 6.2.0. Both ranges now resolve to 6.1.4, which includes the
+6.1.3 security fix. Neither package appears in the final npm audit.
+
+The update also aligns Vitest/UI/coverage at 4.1.11 and refreshes vulnerable
+Browserslist, baseline mapping, query-string/decoder, fflate and js-yaml.
+Only **27 existing lock entries** change; no packages are added or removed.
+Independent review verified all **52** dependency/peer constraints referencing
+changed entries and found no blocking or important issue.
+
+Verification: baseline and final **2,429 tests / 188 files passed**; the final
+run also exercised V8 coverage. ESLint, source-wide CCN 10, TypeScript/build and
+all **11** bundle budgets pass. A separate clean `npm ci --ignore-scripts`
+installation preserves the same lockfile hash. Production artifacts are
+unchanged; generated module evidence shows zero MapLibre modules and zero
+rendered bytes from the full Plotly package. The installed critical dependency
+remains open because patched MapLibre 6.4.1 exceeds Plotly's declared range.
+See the scanner report for browser results and environment limitations.
+
+OC-214/215 move from the live queue to the archive: **61 open / 4 parked**.
+The remaining MapLibre item stays in the scanner follow-up; other audit IDs
+and parked/deferred priorities are unchanged. Release notes: v0.8.20.
 
 ### 2026-09-10 - Codacy follow-up: remove temporary verification files
 

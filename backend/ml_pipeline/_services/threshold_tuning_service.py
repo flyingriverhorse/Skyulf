@@ -18,7 +18,6 @@ from sklearn.metrics import (
     f1_score,
     precision_score,
     recall_score,
-    roc_auc_score,
 )
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -45,14 +44,25 @@ _STATIC_SCORERS: dict[str, Callable[[Any, Any], float]] = {
     "balanced_accuracy": lambda y_true, y_pred: balanced_accuracy_score(y_true, y_pred),
 }
 
-_SUPPORTED_METRICS: frozenset[str] = frozenset(_STATIC_SCORERS) | frozenset({"roc_auc"})
+_SUPPORTED_METRICS: frozenset[str] = frozenset(_STATIC_SCORERS)
+
+
+def _validate_metric(metric: str) -> None:
+    """Reject objectives that cannot be optimized by changing class predictions."""
+    if metric == "roc_auc":
+        raise ThresholdTuningError(
+            "roc_auc is independent of the decision threshold. "
+            "Use balanced_accuracy or another class-prediction metric for threshold tuning."
+        )
+    if metric not in _SUPPORTED_METRICS:
+        raise ThresholdTuningError(f"Unsupported metric: {metric}")
 
 
 def _build_scorer(metric: str, classes: list) -> Callable[[Any, Any], float]:
     """Build the per-request metric callable for ``metric``.
 
     Scorers are built per request instead of a static table because
-    label-dependent behavior (e.g. roc_auc's positive class) needs
+    label-dependent behavior (e.g. F1's positive class) needs
     ``classes``, which is only known once the evaluation data is loaded.
     """
     if metric in ("f1", "precision", "recall") and len(classes) == 2:
@@ -71,23 +81,6 @@ def _build_scorer(metric: str, classes: list) -> Callable[[Any, Any], float]:
         return lambda y_true, y_pred: recall_score(
             y_true, y_pred, average="binary", pos_label=pos_label, zero_division=0
         )
-
-    if metric == "roc_auc":
-        positive = classes[1]
-
-        def roc_auc(y_true: Any, y_pred: Any) -> float:
-            # roc_auc_score requires numeric inputs; raw class labels may be
-            # strings (e.g. "no"/"yes"), so map both sides to 0/1
-            # positive-indicator arrays first. Rank-preserving for numeric
-            # labels, so existing 0/1 behavior is unchanged.
-            return float(
-                roc_auc_score(
-                    (np.asarray(y_true) == positive).astype(int),
-                    (np.asarray(y_pred) == positive).astype(int),
-                )
-            )
-
-        return roc_auc
 
     return _STATIC_SCORERS[metric]
 
@@ -177,8 +170,7 @@ class ThresholdTuningService:
     @staticmethod
     async def preview(session: AsyncSession, job_id: str, metric: str) -> dict:
         """Compute (without saving) tuned per-class thresholds for a job's evaluation data."""
-        if metric not in _SUPPORTED_METRICS:
-            raise ThresholdTuningError(f"Unsupported metric: {metric}")
+        _validate_metric(metric)
 
         await ThresholdTuningService._get_job_or_raise(session, job_id)
 
@@ -191,17 +183,6 @@ class ThresholdTuningService:
         y_proba_values, classes = ThresholdTuningService._coerce_classes_and_proba(
             split_data["y_proba"]
         )
-
-        if metric == "roc_auc" and len(classes) > 2:
-            # optimize_thresholds() always scores hard, post-threshold class
-            # predictions (never probability scores), and roc_auc_score on
-            # discrete multiclass labels raises ValueError (it requires a 2D
-            # probability matrix for multi_class="ovr"/"ovo"). Binary is fine
-            # since it reduces to a 0/1 label comparison.
-            raise ThresholdTuningError(
-                "roc_auc is only supported for binary classification threshold tuning "
-                f"(job has {len(classes)} classes)."
-            )
 
         scorer = _build_scorer(metric, classes)
         thresholds = optimize_thresholds(y_true, y_proba_values, metric=scorer, classes=classes)
@@ -223,8 +204,7 @@ class ThresholdTuningService:
         skips any saved set that doesn't cover every model class, so a bad save
         looks active but is quietly ignored at predict time.
         """
-        if metric not in _SUPPORTED_METRICS:
-            raise ThresholdTuningError(f"Unsupported metric: {metric}")
+        _validate_metric(metric)
         if not classes:
             raise ThresholdTuningError("classes must be a non-empty list of class labels")
         expected_keys = {str(c) for c in classes}

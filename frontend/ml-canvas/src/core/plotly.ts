@@ -7,14 +7,16 @@
 // usages of geo/mapbox, sankey, treemap, sunburst, parcoords, or
 // finance traces, so the slim build is a complete swap.
 //
-// `react-plotly.js` is wired through its `factory` entry point so it
-// uses our slim Plotly instance instead of pulling its own copy of
-// the full `plotly.js` package transitively.
+// package.json aliases `plotly.js` to the official GL3D bundle. This
+// satisfies the React wrapper's peer dependency without installing
+// the unused full Plotly package and its mapping dependencies.
+// The factory entry point uses this same slim instance for rendering.
 //
 // If a future feature needs an unsupported trace type, swap this
-// single import to `plotly.js-dist-min` and the rest of the app keeps
-// working unchanged.
-import Plotly from 'plotly.js-gl3d-dist-min';
+// alias to an appropriate official bundle and verify rendering/export
+// and bundle budgets. The default React wrapper entry requires full
+// Plotly's dist/plotly path, so keep the factory entry point below.
+import Plotly from 'plotly.js';
 import createPlotlyComponent from 'react-plotly.js/factory';
 
 export const Plot = createPlotlyComponent(Plotly);

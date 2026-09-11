@@ -9,7 +9,6 @@ import { ValidationNavigation } from '../../../components/shared/ValidationField
 import { BinningNode } from './BinningNode';
 import { FeatureGenerationNode } from './FeatureGenerationNode';
 import { FeatureInteractionNode } from './FeatureInteractionNode';
-import { FeatureSelectionNode } from './FeatureSelectionNode';
 import { PolynomialFeaturesNode } from './PolynomialFeaturesNode';
 import { TransformationNode } from './TransformationNode';
 
@@ -57,11 +56,6 @@ describe('processing validation reveals', () => {
       definition: BinningNode,
       config: { ...BinningNode.getDefaultConfig(), columns: ['age'], strategy: 'custom', n_bins: 1 },
       field: 'n_bins',
-    },
-    {
-      definition: FeatureSelectionNode,
-      config: { ...FeatureSelectionNode.getDefaultConfig(), method: 'correlation_threshold' },
-      field: 'target_column',
     },
   ];
 

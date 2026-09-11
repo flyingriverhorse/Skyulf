@@ -121,8 +121,8 @@ async def get_job_trials(job_id: str):
 
     The ``/ws/jobs`` broadcast only reaches already-connected clients; this
     backfills the trials (tuning) or boosting iterations a late opener
-    missed. Empty once the job's buffer has been evicted — terminal jobs
-    redraw from persisted ``metrics.trials`` / ``metrics.iterations``.
+    missed. Empty once execution cleanup or eviction drops the buffer —
+    completed jobs redraw from persisted ``metrics.trials`` / ``metrics.iterations``.
     """
     trials = get_trials(job_id)
     metric = next((t["metric"] for t in reversed(trials) if t["metric"]), None)

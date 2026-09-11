@@ -76,6 +76,13 @@ The analyzer automatically detects column types (Numeric, Categorical, Date, Tex
 *   **Date:** Min/Max date, Range, Year/Month distribution.
 *   **Text:** Avg length, Common words, **Sentiment Analysis** (Positive/Neutral/Negative).
 
+Native Polars `Categorical` and `Enum` columns are profiled as categorical,
+including their value frequencies. A column with dtype `Null` (only missing
+values and no declared type) is reported as `Unknown`: its missing count,
+missing percentage and quality alerts remain available, while type-specific
+statistics are omitted. An all-null column with a declared type, such as
+`Float64`, retains that type's profile.
+
 ### 2. Smart Alerts
 Skyulf automatically flags potential data quality issues:
 *   **High Null Rate:** Columns with >50% missing values.
@@ -90,7 +97,7 @@ Skyulf automatically flags potential data quality issues:
 *   **Outlier Detection:** Uses Isolation Forest to identify anomalous rows.
 *   **PCA:** Computes Principal Components to visualize high-dimensional data structure.
 *   **Clustering (Post-Hoc Analysis):** Uses KMeans to automatically discover segments (clusters) in the numeric data and profiles them.
-*   **Causal Discovery:** Uses the PC Algorithm to infer causal relationships between variables (DAG).
+*   **Causal Discovery:** Uses the PC Algorithm with Fisher-Z tests to estimate a partially directed graph among numeric variables.
 *   **Decision Tree (Rule Discovery):** Uses a surrogate Decision Tree model to extract human-readable rules.
     *   **Classification:** "If Age > 50 -> High Risk (Confidence: 85%)"
     *   **Regression:** "If Age > 50 -> Value = 120.5 (Samples: 100)"
@@ -99,18 +106,55 @@ Skyulf automatically flags potential data quality issues:
 *   **Geospatial:** Automatically detects Lat/Lon columns and computes bounding boxes.
 *   **Time Series:** Detects seasonality and trends in datetime columns.
 
+For a categorical or Boolean target, feature association uses the correlation
+ratio (eta), where 0 means no difference between group means and 1 means no
+within-group variation. Each numeric feature is evaluated using only rows
+where both that feature and the target are present. Missing values in another
+feature do not affect its score, and this calculation does not remove rows
+from your dataset. Features with no complete pairs are omitted; constant
+observed features keep a score of 0. Rows missing either value contribute
+neither to group sizes nor to the sums of squares used in this calculation.
+
+Previously saved reports retain their recorded scores. Rerun EDA to refresh
+the association values and feature ranking after this correction.
+
+Categorical and Boolean targets keep their original names and values. They
+appear in **Target Analysis** through category-aware associations and box
+plots; they are not converted to arbitrary numeric codes for Pearson
+correlations or causal discovery. For example, selecting `species` does not
+create a `species_encoded` variable. The web app explains this omission in
+the causal and correlation views, including when no numeric graph is available.
+Numeric targets classified as categories are treated the same way.
+
+Target and grouping column names such as `mean`, `n`, `min`, `median`, `count`
+and `group` are supported without dropping their statistics or recommendations.
+
 ### 4. Task Type Control
 By default, Skyulf automatically detects if your target is **Classification** (Categorical) or **Regression** (Numeric). However, you can override this behavior:
 
 *   **Force Classification:** Useful for ID columns or numeric codes (e.g., Zip Code, Status Code) that should be treated as categories.
-*   **Force Regression:** Useful for ordinal categories (e.g., Rating 1-5) that you want to treat as continuous.
+*   **Force Regression:** Useful for numeric ratings (e.g., 1–5) that you want to treat as measurements. String labels are not automatically converted into numeric ratings.
 
 ```python
 # Force Classification on a numeric ID column
 profile = analyzer.analyze(target_col="zip_code", task_type="Classification")
 ```
 
+An explicit classification task also excludes a numerically stored target
+from target Pearson and Fisher-Z analysis, while retaining categorical
+associations. An explicit regression task permits an existing numeric target
+even if its low number of distinct values led to a categorical profile type.
+
 ## Visualization Support (`skyulf-core[viz]`)
+
+PCA plots keep points whose target label is missing, showing them as gray
+crosses marked **Unlabeled**. If every label is missing, the plot still shows
+all points without a target colorbar. Categorical PCA and geospatial plots
+use a deterministic color mapping for the same set of category labels, even
+when row order or the Python process changes. Recreate existing plots with
+`EDAVisualizer` to use the corrected rendering; the saved profile can be reused.
+PCA treats text labels such as `"nan"` and `"inf"` as categories so their
+points remain visible.
 
 The core library is designed to be lightweight. To use the `EDAVisualizer` and generate plots, you must install the optional visualization dependencies:
 
@@ -121,6 +165,31 @@ pip install skyulf-core[viz]
 This installs:
 *   `matplotlib`: For generating plots.
 *   `rich`: For beautiful terminal dashboards.
+
+### EDA charts in the web app
+
+The **PCA & Clusters**, **Bivariate** scatter charts and **Geospatial** map
+share category colors. Colors stay stable when rows are reordered, provided
+the displayed category set stays the same. Adding or removing categories can
+change the mapping; the palette repeats for large category sets.
+Category labels use English alphabetical ordering, including case and accents,
+so the browser's language does not change their color or marker assignment.
+
+The 2D and 3D scatter views use the same five repeating marker shapes: circle,
+square, diamond, plus (`+`) and diagonal cross (`x`). The legend shows the
+shape actually drawn for each category. Missing-label points use gray plus
+markers in both views.
+
+Missing target labels form a separate gray **Unlabeled** group. Real values
+such as `Other`, `Unlabeled`, `constructor` and `__proto__` remain ordinary
+categories. If `Unlabeled` already exists, the missing group is named
+**Unlabeled (missing)**, with a numeric suffix if needed to keep names distinct.
+All-missing targets still show every point and a legend entry. Maps use circles
+and show their category legend, including a filter for long lists; they retain
+category colors above twenty groups.
+
+Reload the web app to use these rendering fixes with existing saved profiles.
+The chart data table and CSV export retain the original label values.
 
 ## Filtering & Exclusion
 
@@ -140,12 +209,30 @@ profile = analyzer.analyze(
 )
 ```
 
+Column exclusions also apply to explicit `lat_col` and `lon_col` selections.
+If either selected coordinate is excluded, `profile.geospatial` is `None`,
+so its points, bounds and centroid are omitted. Exclusions persist when you
+reuse an analyzer; create a new `EDAAnalyzer(df)` to start with all columns
+again. Rerun saved analyses to refresh their stored reports after an update.
+
+Exclusions also take precedence over the selected target: an excluded target
+does not contribute associations, causal nodes, inferred task type or decision
+tree rules. Its name remains in `profile.target_col` to record the requested
+configuration; `profile.causal_target_exclusion_reason` is `"excluded"`.
+
 ## Advanced Analysis Modules
 
 The `EDAAnalyzer` automatically runs several advanced analysis modules if the data supports them. Here is how to use and interpret each one.
 
 ### 1. Outlier Detection
 Uses **Isolation Forest** to identify anomalous rows in your dataset. This is useful for cleaning data or detecting fraud/errors.
+
+For more than 50,000 rows, detection uses a reproducible sample of 50,000 rows.
+Each returned `index` is the zero-based position in the analyzed dataframe
+after row filters, before sampling. Without filters, it is the position in
+the input dataframe. It is never the position within the randomized sample.
+The outlier count and percentage describe the analyzed sample when sampling
+is used.
 
 ```python
 if profile.outliers:
@@ -172,9 +259,28 @@ if profile.pca_data:
 ```
 
 ### 3. Causal Discovery
-Skyulf integrates `causal-learn` to perform causal discovery using the PC Algorithm. This helps distinguish between correlation and causation by building a Directed Acyclic Graph (DAG).
+Skyulf integrates `causal-learn` to run PC with Fisher-Z tests on eligible
+numeric measurements. PC can leave relationships unoriented, so the result
+is a partially directed graph. It is an observational estimate for exploring
+hypotheses, not proof that one variable causes another.
 
-> **Note:** To ensure performance on wide datasets, the causal graph is built using the **Target** and the **top 14 features** most correlated with it (instead of just high variance).
+Categorical and Boolean variables are omitted from this method. A categorical
+target such as `species` remains available in **Target Analysis**; it is not
+given an arbitrary ordering to place it in the causal graph. Fisher-Z's
+linear-Gaussian assumptions still matter for the numeric variables you analyze.
+
+The graph uses at least 50 and up to the first 5,000 complete rows across
+its selected columns. It includes all eligible variables up to a maximum of
+15. Above that limit, an eligible selected numeric target is retained along
+with up to 14 features ranked by absolute Pearson correlation with it.
+Without an eligible numeric target, the 15 highest-variance numeric variables
+are selected. A feature named `target` or `label` does not override your choice.
+
+New reports record `profile.causal_graph.selection_method` as `"all"`,
+`"target_correlation"` or `"variance"`. If the selected target cannot enter
+numeric analysis, `profile.causal_target_exclusion_reason` is `"categorical"`,
+`"excluded"` or `"unsupported"`; this explanation is available even when the
+graph itself is `None`. Both fields are optional when reading older reports.
 
 ```python
 if profile.causal_graph:
@@ -184,6 +290,15 @@ if profile.causal_graph:
         # Types: "directed" (->), "undirected" (--), "bidirected" (<->)
         print(f"{edge.source} {edge.type} {edge.target}")
 ```
+
+Directed edges preserve the orientation returned by PC. The web graph keeps
+distinct column names such as `petal width` and `petal_width` separate and
+shows both arrowheads for a bidirected edge. Loading a report with an empty
+graph clears the previous graph.
+
+Reload the app for rendering corrections. **Run Analyze again** to regenerate
+saved causal graphs, target statistics, rules and outlier row indices: existing
+stored reports retain the results produced by their original analysis.
 
 ### 4. Geospatial Analysis
 Automatically detects Latitude/Longitude columns and computes bounding boxes and centroids.

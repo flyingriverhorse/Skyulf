@@ -2,6 +2,7 @@
 
 import numpy as np
 import pandas as pd
+import pytest
 
 from skyulf.registry import NodeRegistry
 
@@ -36,6 +37,20 @@ def test_ensemble_nodes_registered():
         assert nid in NodeRegistry.get_all_metadata()
         assert NodeRegistry.get_calculator(nid)
         assert NodeRegistry.get_applier(nid)
+
+
+@pytest.mark.parametrize(
+    "node_id",
+    ["voting_classifier", "stacking_classifier", "voting_regressor", "stacking_regressor"],
+)
+def test_registered_ensemble_is_discoverable_only_as_a_model(node_id):
+    """SDK callers must find all built-in ensembles without treating them as preprocessing nodes."""
+    assert NodeRegistry.get_all_metadata()[node_id]["category"] == "Ensemble"
+    assert node_id in NodeRegistry.list_models()
+    assert node_id in NodeRegistry.list_models(category="Ensemble")
+    assert node_id not in NodeRegistry.list_models(category="Modeling")
+    assert node_id not in NodeRegistry.list_transformers()
+    assert node_id not in NodeRegistry.list_transformers(category="Ensemble")
 
 
 def test_voting_classifier_soft_proba_in_range():

@@ -26,6 +26,7 @@ from backend.ml_pipeline._execution.strategies import JobStrategy, JobStrategyFa
 from backend.ml_pipeline.artifacts.store import ArtifactStore
 from backend.ml_pipeline.constants import StepType
 from backend.realtime.events import JobEvent, publish_job_event
+from backend.realtime.trial_buffer import clear_iterations, clear_trials
 
 logger = logging.getLogger(__name__)
 
@@ -232,6 +233,11 @@ def execute_pipeline(job_id: str, pipeline_config_dict: dict, session: Session) 
 
     except Exception as exc:  # noqa: BLE001 - job boundary: any error marks job failed
         _handle_execution_exception(session, job_id, exc)
+    finally:
+        # The producer has stopped; successful chart history is now in job.metrics.
+        # Repeat cancellation cleanup here to remove points emitted after cancellation.
+        clear_trials(job_id)
+        clear_iterations(job_id)
 
 
 def _resolve_dataset_name(session: Session, job: object) -> str:
