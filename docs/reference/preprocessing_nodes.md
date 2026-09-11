@@ -597,6 +597,11 @@ Config:
 - `interaction_only`: bool (default True; skips self-products like `x1 * x1`)
 - `include_bias`: bool (default False; adds a constant `interaction_bias` column of 1.0)
 
+With `interaction_only=False` (clear **Interaction Only** in the Canvas), one
+column can generate its square, cube or fourth power. Two columns at degree 3
+generate `a*a*a`, `a*a*b`, `a*b*b` and `b*b*b`. With `interaction_only=True`,
+at least `degree` distinct columns are needed to generate products.
+
 Learned params:
 
 - `columns`, `degree`, `interaction_only`, `include_bias`, `combinations`, `feature_names`

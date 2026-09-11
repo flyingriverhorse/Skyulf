@@ -206,6 +206,7 @@ uses, so a fixed finding stays where it was filed.
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
+| OC-21 | 🟡 | WOE additive smoothing not normalized over categories (`encoding/woe.py`) | small | ✅ fixed 2026-09-11 — normalize class totals by all observed-category pseudocounts in full fits and training complements, correcting WOE/IV without rewriting saved mappings. |
 | OC-172 | 🟡 | `StandardScaler` crashes on mixed pandas nullable numeric columns containing `pd.NA`; native sklearn and equivalent Polars input succeed (`preprocessing/scaling/standard.py:144,154`, `engines/sklearn_bridge.py:52`) | small | ✅ fixed 2026-09-09 - nullable numeric missing sentinels become NumPy NaN without rounding observed integers; StandardScaler applies numeric arithmetic safely. |
 | OC-178 | 🟡 | `HashEncoder` hashes the same missing value into different buckets across Polars, pandas object, and pandas nullable string inputs, even with one shared fitted artifact (`preprocessing/encoding/hash.py:45,76`) | small | ✅ already fixed - verified 2026-09-09: one shared hash artifact gives identical missing-value buckets across pandas object/string and Polars. |
 | OC-171 | 🟡 | Pandas `SimpleImputer` silently excludes explicitly selected constant/binary numeric columns for mean/median, leaving missing values unfilled; Polars honors the selection (`preprocessing/imputation/simple.py:173-177`) | small | ✅ already fixed - verified 2026-09-09: explicit constant/binary mean and median imputation fills missing values in both engines. |
@@ -223,6 +224,7 @@ uses, so a fixed finding stays where it was filed.
 | OC-212 | 🟡 | Similarity generation silently omits its output column for duplicate pandas indexes: label-based `.at[i]` returns Series to a scalar helper and the operation exception is swallowed (`feature_generation/_common.py:137-139`) | small | ✅ fixed 2026-09-08 — similarity now reads and assigns by row position, preserving duplicate indexes and individual scores; see the Log entry. |
 | OC-25 | 🟠 | RFE "K" chosen in UI ignored by backend (`feature_selection/_common.py:236-240`) | small | ✅ fixed 2026-09-05 — closes OC-143 too |
 | OC-26 | 🟠 | `HashingVectorizer` UI "none" norm is an invalid sklearn value → crash (`hashing_vectorizer.py`) | small | ✅ fixed 2026-09-11 — normalize the Canvas value to Python `None`, preserving unnormalized token counts and existing L1/L2 behavior. |
+| OC-33 | 🟡 | `FeatureInteraction` cannot generate single-column self-products (`feature_generation/interaction.py`) | small | ✅ fixed 2026-09-11 — generate repeated-column combinations when `interaction_only=False`, including fewer columns than the degree; align Canvas validation. |
 | OC-27 | 🟠 | `GeneralTransformation` ignores the UI `standardize` toggle (`transformations/general.py`) | small | ✅ fixed 2026-09-11 — retain each power rule's standardization choice through fitting and replay; older artifacts keep their previous default. |
 | OC-28 | 🟠 | Box-Cox transform failures silently return untransformed data (`transformations/power.py:97-104`) | small | ✅ fixed 2026-09-06 — the silent path was the `valid_cols` filter, not the `except` (which has logged since the node was created); both engines now share `_fitted_columns_present`, which names the fitted columns the frame lacks, and fail-open is kept by decision. See the log entry |
 
@@ -367,6 +369,83 @@ respective fix logs; OC-167 closed with canonical artifact framing on 2026-09-09
 ---
 
 ## Log
+
+### 2026-09-11 - OC-33 fixed: self-products with fewer columns than the degree
+
+Revalidated in Core and Canvas before changing production code. Core skipped
+combination generation whenever the selected-column count was below the degree,
+even with `interaction_only=False`. Canvas independently rejected the same valid
+configuration. This affected single-column squares, cubes and fourth powers, as
+well as two-column degree-three products. The existing combination resolver
+already handles repeated columns correctly; fit now calls it directly. Canvas
+requires at least `degree` columns only when distinct-column interactions are
+enabled (including the existing omitted-setting default).
+
+The new Core regressions first reported **4 failures / 8 controls passed**.
+They pin hand-calculated powers and product names, missing values, duplicate
+indexes, target alignment, input preservation, empty selections and optional
+bias columns. Frontend regressions first reported **5 failures / 14 controls
+passed**, including an invalid degree whose error previously targeted columns.
+The related Core interaction, registry-contract and feature-operation leakage
+suites now pass **302 tests**, with nine existing warnings. Focused frontend
+validation and serialization checks pass **124 tests**.
+
+The new Playwright test passes through the actual Canvas control and Preview
+submission: keyboard toggling clears the validation issue, the request retains
+one column with degree four and `interaction_only=False`, and a mocked response
+renders the generated column. It also checks mobile read-only layout and retained
+settings after returning to desktop. Numerical results are covered by Core tests.
+
+Verification: **2,452 frontend tests pass across 188 files**, and the browser
+regression passes. Repository Ruff/Ty, scoped Python formatting, frontend lint,
+complexity, production build, bundle-size checks and `git diff --check` pass.
+Independent review found no actionable issue. The node reference, calculator
+docstrings, changelog and generated `static/ml_canvas` assets are updated.
+The live queue now contains **49 open / 4 parked** findings.
+
+### 2026-09-11 - OC-21 fixed: normalize WOE smoothing over observed categories
+
+Revalidated before changing production code. The effect is broader than the
+original report's "more than two categories": two equally sized categories,
+each with one positive and two negative targets, produced WOE `-0.076961`
+for both and IV `0.006841`, where both should be zero. Each category received
+a regularization pseudocount, but the class totals included only one such
+pseudocount, so neither class's category probabilities summed to one.
+
+`_column_woe` now adds `regularization * n_categories` to each class total.
+The shared calculation covers the full-training artifact and each training
+complement independently. Missing feature values count as an observed category;
+categories seen only in held-out rows do not inflate the training denominator
+and continue to receive the existing zero fallback. Stored mappings are applied
+unchanged, so existing fitted models retain their inference values; refit to
+use the corrected WOE/IV calculation.
+
+The seven new regressions all failed against the original code, while two
+existing controls passed. They cover two/three equally sized categories with
+identical target rates, two regularization values, hand-derived WOE and IV for
+an imbalanced three-category example (including a missing category), and the
+actual cross-fitting training hook with three categories per complement versus
+four globally, unseen categories and a single-class complement. Two existing
+test helpers copied the incorrect production formula; those expectations now
+use hand-derived literals, including the deterministic held-out-fold results.
+
+Verification: **169 related tests pass**, with two existing OneHotEncoder
+unknown-category warnings. Repository Ruff/Ty, scoped formatting and
+`git diff --check` pass. Related test command:
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest `
+  skyulf-core/tests/integration/test_encoding_woe.py `
+  skyulf-core/tests/integration/test_woe_and_calibration.py `
+  skyulf-core/tests/unit/test_encoding_operation_leakage.py `
+  skyulf-core/tests/unit/test_encoding_text_deep_audit_20260908.py `
+  -q --tb=short --basetemp=.pytest-tmp-oc21-green -o cache_dir=.pytest-tmp-oc21-cache
+```
+
+The calculator docstring and preprocessing placement guide explain the
+normalization and saved-artifact behavior; release notes are under **v0.8.20**.
+Independent review found no actionable issue. OC-21 moves to the archive,
+leaving **50 open / 4 parked** findings.
 
 ### 2026-09-11 - OC-27 fixed: preserve each power rule's standardization setting
 

@@ -1,9 +1,9 @@
 """Feature-interaction node — automatic 2-way / 3-way / 4-way multiplicative interactions.
 
-Unlike :mod:`.polynomial` (which also generates squared/cubed terms), this
-node focuses purely on cross-products between distinct columns and names the
-resulting columns with a regularization-friendly, deterministic scheme so the
-same combination of inputs always produces the same output column name.
+This node generates products of exactly the configured degree. By default,
+only distinct columns participate; ``interaction_only=False`` also allows
+repeated columns, including powers of a single input. Generated names are
+deterministic so the same inputs always produce the same output column name.
 """
 
 from itertools import combinations, combinations_with_replacement
@@ -179,9 +179,10 @@ class FeatureInteractionCalculator(BaseCalculator):
         """Validate the requested columns and degree, then enumerate the combinations.
 
         Columns are sorted into the artifact so the generated names depend only
-        on the set of inputs, never on the order they were configured in. Fewer
-        columns than ``degree`` yields an empty combination list — an artifact
-        that generates nothing — rather than an error.
+        on the set of inputs, never on the order they were configured in.
+        With ``interaction_only=True``, fewer columns than ``degree`` yields
+        no products. With ``False``, one column is sufficient for self-products.
+        An empty selection yields no products; bias generation is independent.
 
         Raises:
             ValueError: If a configured column is missing or non-numeric, or if
@@ -197,9 +198,7 @@ class FeatureInteractionCalculator(BaseCalculator):
         interaction_only = config.get("interaction_only", True)
         include_bias = config.get("include_bias", False)
 
-        combos = (
-            _resolve_combinations(cols, degree, interaction_only) if len(cols) >= degree else []
-        )
+        combos = _resolve_combinations(cols, degree, interaction_only)
         feature_names = _build_interaction_feature_names(combos, include_bias)
 
         return cast(

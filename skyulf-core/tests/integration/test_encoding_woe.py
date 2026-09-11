@@ -32,13 +32,6 @@ def _fit_apply(
     return dict(params), X_out
 
 
-def _expected_woe(pos: int, neg: int, total_pos: int, total_neg: int, reg: float) -> float:
-    """Hand-compute the WOE formula used by ``_column_woe`` for verification."""
-    dist_pos = (pos + reg) / (total_pos + reg)
-    dist_neg = (neg + reg) / (total_neg + reg)
-    return math.log(dist_neg / dist_pos)
-
-
 def test_fit_computes_correct_woe_values() -> None:
     """WOE values match the hand-computed log-odds formula for a simple 2-category case."""
     X = pd.DataFrame({"city": ["a", "a", "a", "b", "b", "b"]})
@@ -46,11 +39,42 @@ def test_fit_computes_correct_woe_values() -> None:
     # city=a: pos=2, neg=1 ; city=b: pos=1, neg=2 ; total_pos=3, total_neg=3
     params = WOEEncoderCalculator().fit((X, y), {"columns": ["city"], "regularization": 0.5})
 
-    expected_a = _expected_woe(pos=2, neg=1, total_pos=3, total_neg=3, reg=0.5)
-    expected_b = _expected_woe(pos=1, neg=2, total_pos=3, total_neg=3, reg=0.5)
+    expected_a = math.log(3 / 5)
+    expected_b = math.log(5 / 3)
     np.testing.assert_allclose(params["mappings"]["city"]["a"], expected_a, rtol=1e-9)
     np.testing.assert_allclose(params["mappings"]["city"]["b"], expected_b, rtol=1e-9)
     assert params["information_value"]["city"] > 0
+
+
+@pytest.mark.parametrize("n_categories", [2, 3])
+@pytest.mark.parametrize("regularization", [0.5, 2.0])
+def test_equal_category_target_rates_have_zero_woe_and_information_value(
+    n_categories: int, regularization: float
+) -> None:
+    """Smoothing must not invent evidence for identical category distributions."""
+    X = pd.DataFrame({"city": np.repeat([f"c{i}" for i in range(n_categories)], 3)})
+    y = pd.Series([1, 0, 0] * n_categories, name="target")
+
+    params, out = _fit_apply(X, y, {"columns": ["city"], "regularization": regularization})
+
+    np.testing.assert_allclose(out["city"].to_numpy(), 0.0, atol=1e-12)
+    assert params["information_value"]["city"] == pytest.approx(0.0, abs=1e-12)
+
+
+@pytest.mark.parametrize("last_category", ["c", None], ids=["string", "missing"])
+def test_multicategory_woe_and_iv_use_normalized_smoothed_distributions(
+    last_category: str | None,
+) -> None:
+    """Imbalanced targets and missing categories must use normalized class probabilities."""
+    X = pd.DataFrame({"city": ["a", "b"] + [last_category] * 4})
+    y = pd.Series([1, 0, 1, 0, 0, 0], name="target")
+
+    params, out = _fit_apply(X, y, {"columns": ["city"], "regularization": 0.5})
+
+    # Smoothed positive probabilities: [3/7, 1/7, 3/7]; negative: [1/11, 3/11, 7/11].
+    a, b, c = math.log(7 / 33), math.log(21 / 11), math.log(49 / 33)
+    np.testing.assert_allclose(out["city"].to_numpy(), [a, b, c, c, c, c])
+    assert params["information_value"]["city"] == pytest.approx((-26 * a + 10 * b + 16 * c) / 77)
 
 
 def test_fit_apply_round_trip_replaces_values_in_place() -> None:
@@ -329,38 +353,6 @@ class TestRealShapedDataset:
 # ---------------------------------------------------------------------------
 
 
-def _expected_out_of_fold_woe(
-    cats: list[str], y_bin: np.ndarray, reg: float, n_folds: int, default: float = 0.0
-) -> np.ndarray:
-    """Independently recompute out-of-fold WOE.
-
-    Each row is encoded with the mapping fitted on the complement of its own
-    fold; a category unseen in that complement falls back to ``default``,
-    mirroring the apply path's unseen-category behaviour.
-    """
-    from sklearn.model_selection import KFold
-
-    values = np.asarray(cats)
-    encoded = np.zeros(len(cats))
-    kf = KFold(n_splits=n_folds, shuffle=True, random_state=42)
-    for train_idx, hold_idx in kf.split(np.arange(len(cats))):
-        train_vals = values[train_idx]
-        y_sub = y_bin[train_idx]
-        total_pos = float(y_sub.sum())
-        total_neg = float(len(train_idx) - total_pos)
-        for i in hold_idx:
-            mask = train_vals == values[i]
-            if not mask.any():
-                encoded[i] = default
-                continue
-            pos = float(y_sub[mask].sum())
-            neg = float(mask.sum() - pos)
-            dist_pos = (pos + reg) / (total_pos + reg)
-            dist_neg = (neg + reg) / (total_neg + reg)
-            encoded[i] = math.log(dist_neg / dist_pos)
-    return encoded
-
-
 def test_fit_transform_train_cross_fits_training_rows() -> None:
     """Training rows must be encoded out-of-fold; the artifact keeps the full-data fit."""
     X = pd.DataFrame({"city": ["a", "b", "c", "a", "b", "c"]})
@@ -373,13 +365,29 @@ def test_fit_transform_train_cross_fits_training_rows() -> None:
     full_artifact = WOEEncoderCalculator().fit((X, y), config)
     assert artifact["mappings"] == full_artifact["mappings"]
 
-    y_bin = np.array([1.0, 0.0, 0.0, 1.0, 0.0, 1.0])
-    expected = _expected_out_of_fold_woe(list(X["city"]), y_bin, reg=0.5, n_folds=3)
+    # Seed 42 holds out [0, 1], [2, 5], [3, 4]; c is unseen in its complement.
+    expected = [math.log(1 / 3), math.log(3), 0.0, math.log(1 / 3), math.log(3), 0.0]
     np.testing.assert_allclose(X_out["city"].to_numpy(), expected)
 
     leaky = X["city"].map(full_artifact["mappings"]["city"]).to_numpy()
     assert not np.allclose(X_out["city"].to_numpy(), leaky)
     assert list(y_out) == list(y)
+
+
+def test_cross_fit_smoothing_counts_only_complement_categories() -> None:
+    """Held-out categories must neither inflate smoothing totals nor leak into mappings."""
+    X = pd.DataFrame({"city": ["a", "b", "rare", "a", "b", "c"]})
+    y = pd.Series([1, 0, 0, 0, 0, 1], name="target")
+
+    _, (out, y_out) = WOEEncoderCalculator().fit_transform_train(
+        (X, y), {"columns": ["city"], "regularization": 0.5}
+    )
+
+    # Seed 42 holds out [0, 1, 5] and [2, 3, 4]. Each complement has three bins.
+    # The first has only negatives; the second has P=[3/7, 1/7, 3/7], N=[1/5, 3/5, 1/5].
+    expected = [0.0, 0.0, 0.0, math.log(7 / 15), math.log(21 / 5), 0.0]
+    np.testing.assert_allclose(out["city"].to_numpy(), expected, atol=1e-12)
+    pd.testing.assert_series_equal(y_out, y)
 
 
 def test_fit_transform_train_cross_fit_matches_across_engines() -> None:
