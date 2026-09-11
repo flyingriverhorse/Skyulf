@@ -250,6 +250,7 @@ uses, so a fixed finding stays where it was filed.
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
+| OC-74 | 🟡 | `NodeRegistry.list_models()` hides all 4 Ensemble models; `category` arg dead (`registry.py:101-108`) | small | ✅ fixed 2026-09-11 - include Modeling and Ensemble in model discovery and exclude both from transformer discovery; preserve exact category filters and registration order. |
 | OC-167 | 🟡 | Ambiguous string boundaries in artifact serialization give different fitted label encoders identical pipeline fingerprints, despite encoding the same input as 0 vs −1 (`pipeline/seal.py:52,64`) — distinct from OC-62's pointer instability | small | ✅ fixed 2026-09-09 - typed length framing and canonical unordered entries distinguish different fitted values deterministically. |
 | OC-63 | 🟠 | `artifact_digest` raises `RecursionError` instead of the documented `TypeError` on cyclic graphs (`pipeline/seal.py`) | small | ✅ fixed 2026-09-09 - active-path cycle detection raises TypeError and still accepts shared acyclic state. |
 | OC-170 | 🟡 | `validate_leakage_safety()` rejects registered stateless nodes before the split as unknown/data-dependent, including `TextCleaning`, `DateFeatures`, `Casting`, and `feature_target_split` (`leakage.py:140-156`) | small | ✅ already fixed - verified 2026-09-09: all four filed stateless nodes are accepted before a split. |
@@ -375,6 +376,39 @@ respective fix logs; OC-167 closed with canonical artifact framing on 2026-09-09
 ---
 
 ## Log
+
+### 2026-09-11 - OC-74 fixed: ensemble-aware model discovery
+
+Committed OC-29, OC-144 and OC-142 together as `23ea9a2d`, with DCO sign-off,
+**798 fresh tests passing / 11 optional H3 skips** and all applicable
+pre-commit hooks passing. No push was performed.
+
+Reproduced OC-74 against the real registered nodes before editing code:
+`voting_classifier`, `stacking_classifier`, `voting_regressor` and
+`stacking_regressor` were all registered but absent from `list_models()` and
+`list_models(category="Ensemble")`. All four were also incorrectly returned
+by `list_transformers()`. The category argument was not literally unused;
+the hardcoded Modeling check prevented it from selecting any Ensemble node.
+The actual backend `_build_node_registry()` already returned the four models
+because it uses `get_all_metadata()`, so the current Canvas is unaffected.
+
+A shared immutable set of model categories now defines complementary model
+and transformer lists. Unfiltered models include both Modeling and Ensemble;
+exact category filtering keeps those groups distinct. Transformer discovery
+excludes both, while custom non-model categories and unknown-category empty
+results retain their existing behavior. Node IDs, metadata and registration
+order are unchanged.
+
+Red phase: **6 failures / 5 controls passed**, using a category-filter matrix
+and all four real ensemble nodes. The two focused modules then passed all
+**52 tests**. Broader verification passes **337 Core tests / 3 backend registry
+API tests**, covering model discovery, ensemble fitting/prediction, existing
+classifiers, text-node listing and preprocessing registry/replay behavior.
+Two optional H3 tests skip; the 22 combined warnings are existing deprecations.
+Repository Ruff/Ty, scoped formatting and `git diff --check` pass. Independent
+review found no actionable issue. Updated the discovery docstrings, SDK README,
+modeling reference and changelog. No frontend implementation change is needed.
+The live queue now contains **42 open / 4 parked** findings.
 
 ### 2026-09-11 - OC-142 fixed: complete-pair target association statistics
 

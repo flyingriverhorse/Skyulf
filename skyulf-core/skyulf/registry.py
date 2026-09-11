@@ -12,6 +12,8 @@ from typing import Any, ClassVar
 
 logger = logging.getLogger(__name__)
 
+_MODEL_CATEGORIES = frozenset({"Modeling", "Ensemble"})
+
 
 class NodeRegistry:
     """Class-level store of every registered node, its Applier and its UI metadata.
@@ -115,20 +117,20 @@ class NodeRegistry:
 
     @classmethod
     def list_transformers(cls, category: str | None = None) -> list[str]:
-        """Return non-model node IDs, optionally limited to a category."""
+        """Return node IDs outside Modeling/Ensemble, optionally limited to a category."""
         return [
             node_id
             for node_id, metadata in cls.get_all_metadata().items()
-            if metadata["category"] != "Modeling"
+            if metadata["category"] not in _MODEL_CATEGORIES
             and (category is None or metadata["category"] == category)
         ]
 
     @classmethod
     def list_models(cls, category: str | None = None) -> list[str]:
-        """Return model node IDs, optionally limited to a category."""
+        """Return Modeling and Ensemble node IDs, optionally limited to either category."""
         return [
             node_id
             for node_id, metadata in cls.get_all_metadata().items()
-            if metadata["category"] == "Modeling"
+            if metadata["category"] in _MODEL_CATEGORIES
             and (category is None or metadata["category"] == category)
         ]

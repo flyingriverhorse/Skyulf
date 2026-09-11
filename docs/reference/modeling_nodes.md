@@ -2,6 +2,13 @@
 
 This page documents modeling configuration for `SkyulfPipeline`.
 
+To discover registered model IDs, call `NodeRegistry.list_models()`. It includes
+both `Modeling` and `Ensemble` categories; pass `category="Ensemble"` for just
+`voting_classifier`, `stacking_classifier`, `voting_regressor` and
+`stacking_regressor`. Passing `category="Modeling"` returns the other models.
+`NodeRegistry.list_transformers()` excludes both categories. These helpers
+preserve registration order, and unknown category filters return an empty list.
+
 > **Note:** The canvas used to offer separate "Basic Training" and "Advanced Tuning" nodes. These have been superseded by four task-scoped nodes — **Classification**, **Regression**, **Text Classification**, and **Segmentation** — each with a `run_mode: "basic" | "advanced"` toggle (Segmentation has no toggle; clustering is always direct-fit). The old node types still open in previously-saved canvases for backward compatibility, but are no longer offered when building new pipelines.
 
 ## Common config shape
