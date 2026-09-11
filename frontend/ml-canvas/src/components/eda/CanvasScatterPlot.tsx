@@ -9,10 +9,9 @@ import {
   ChartOptions
 } from 'chart.js';
 import { Scatter } from 'react-chartjs-2';
-import { COLORS } from './constants';
 import { useChartTheme } from '../../core/hooks/useChartTheme';
 import { groupScatterPoints } from './scatterGrouping';
-import { markerShapeForIndex, toChartJsPointStyle } from './chartMarkerShapes';
+import { toChartJsPointStyle } from './chartMarkerShapes';
 import type { ScatterPoint } from './ThreeDScatterPlot';
 
 ChartJS.register(LinearScale, PointElement, LineElement, Tooltip, Legend);
@@ -37,6 +36,7 @@ interface ChartDataset {
   label: string;
   data: ChartPoint[];
   backgroundColor: string;
+  borderColor: string;
   pointStyle: string;
   pointRadius: number;
   pointHoverRadius: number;
@@ -57,11 +57,12 @@ export const CanvasScatterPlot: React.FC<CanvasScatterPlotProps> = ({
   const datasets: ChartDataset[] = useMemo(() => {
     const groups = groupScatterPoints(data, labelKey);
 
-    return Object.keys(groups).map((label, idx) => ({
+    return groups.map(({ label, points, color, shape }) => ({
       label,
-      data: (groups[label] ?? []).map((d) => ({ x: Number(d[xKey]), y: Number(d[yKey]), raw: d as ScatterPoint })),
-      backgroundColor: COLORS[idx % COLORS.length]!,
-      pointStyle: toChartJsPointStyle(markerShapeForIndex(idx)),
+      data: points.map((d) => ({ x: Number(d[xKey]), y: Number(d[yKey]), raw: d })),
+      backgroundColor: color,
+      borderColor: color,
+      pointStyle: toChartJsPointStyle(shape),
       pointRadius: 3,
       pointHoverRadius: 5,
     }));

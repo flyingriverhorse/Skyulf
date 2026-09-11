@@ -147,7 +147,7 @@ export const PCATab: React.FC<PCATabProps> = ({ profile, isPCA3D, setIsPCA3D, do
                 )}
                 </div>
 
-                {legendEntries.length > 1 && <ChartLegend entries={legendEntries} />}
+                {legendEntries.length > 0 && <ChartLegend entries={legendEntries} />}
 
                 <ChartDataTable
                     caption="PCA projection data"

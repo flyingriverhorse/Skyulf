@@ -15,7 +15,7 @@ file deliberately carries no history.
 per-area report files `00`–`18`).
 **Baseline:** commit `93d7719e` (master), audit run 2026-08-31 → 09-01 by 15
 parallel read-only agents (Claude Opus 5). 116 findings: 5 🔴 / 45 🟠 / 44 🟡 /
-22 ⚪, plus OC-160–230 filed by later reviews. OC-100 was retracted as a false
+22 ⚪, plus OC-160–234 filed by later reviews. OC-100 was retracted as a false
 positive and is not counted; the corrections pass stays in the archive.
 
 **Status key:** ⬜ open · 🟨 in progress · ✅ done · ⏭️ parked
@@ -96,7 +96,6 @@ closed that on 2026-09-07.
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
-| OC-230 | 🟡 | Native Polars NaN inputs propagate through feature ratios while pandas treats them as missing (`feature_generation/_polars_ops.py:_polars_ratio`, `_pandas_ops.py:_pandas_ratio`) | small | ⬜ open |
 | OC-24 | 🟠 | Polars group aggregates treat null group keys differently from pandas (`_polars_ops.py:222-234`) | small | ⬜ open |
 | OC-30 | 🟡 | Datetime extraction ignores the UI output name, overwrites collisions (`_pandas_ops.py:173-184`) | small | ⬜ open |
 
@@ -107,10 +106,8 @@ closed that on 2026-09-07.
 | OC-192 | 🟡 | Decomposition's categorical null bucket displays as `Unknown`, but drilling into it filters for the literal string and silently loses the bucket's rows (`profiling/_analyzer/decomposition.py:71-76`) | small | ⬜ open |
 | OC-47 | 🟡 | Common-column dtype drift can silently disappear (`profiling/drift.py:136-153`) | small | ⬜ open |
 | OC-48 | 🟡 | Expectations pass vacuously on empty frames (`profiling/expect.py:92-209`) | small | ⬜ open |
-| OC-49 | 🟡 | Valid partially-unlabelled PCA payloads crash plotting (`profiling/visualizer.py:716-737`) | small | ⬜ open |
 | OC-50 | 🟡 | Binary targets miss class-balance advice or flip to regression by sample size (`recommendations.py:147-152`) | small | ⬜ open |
 | OC-51 | 🟡 | Transform advice can be mathematically invalid and self-contradictory (`recommendations.py:66-78,129-139`) | small | ⬜ open |
-| OC-52 | ⚪ | Categorical colour mapping is process-nondeterministic (`visualizer.py:710-713`) | small | ⬜ open |
 
 ### Remaining — core / engines / pipeline
 
@@ -309,22 +306,6 @@ source read when the finding was filed, so they may have moved.
 
 Findings filed before 2026-09-05 — OC-169 and OC-178–182 among them — keep
 their reproduction detail in the archive's `## Log` entries instead.
-
-### 2026-09-11 - OC-230: native NaN ratio parity
-
-Reproduced through public `FeatureGenerationCalculator.fit` and
-`FeatureGenerationApplier.apply` while verifying OC-23. Select ratio inputs
-`input_columns=["n"]`, `secondary_columns=["d"]`, `output_column="r"` and use
-the default epsilon. On `{"n": [1.0], "d": [float("nan")]}`, a native pandas
-DataFrame produces approximately **1e9**, while a native Polars DataFrame
-produces **NaN**. Pandas' horizontal sum treats missing values as zero;
-Polars' sum preserves native NaN. Constructing the Polars frame with
-`pl.from_pandas` normalizes NaN to null and hides the difference.
-
-**Fix/verification target:** define and apply consistent missing-value
-semantics to native ratio inputs, with direct engine-native frames covering
-NaN numerators, denominators and sums. OC-23 addresses only the sign of
-finite near-zero denominators and does not close this separate behavior.
 
 ### 2026-09-08 — OC-213–215: Problems panel review
 

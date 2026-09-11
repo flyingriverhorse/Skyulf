@@ -222,6 +222,7 @@ uses, so a fixed finding stays where it was filed.
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
+| OC-230 | 🟡 | Native Polars NaN inputs propagate through feature ratios while pandas treats them as missing (`feature_generation/_polars_ops.py:_polars_ratio`, `_pandas_ops.py:_pandas_ratio`) | small | ✅ fixed 2026-09-11 - normalize native NaN and null ratio operands to zero before summing, preserving other operands, input columns and signed epsilon. |
 | OC-23 | 🟠 | Polars `ratio` flips the sign of near-zero negative denominators (`feature_generation/_polars_ops.py:97-112`) | small | ✅ fixed 2026-09-11 - preserve the sign when clamping a near-zero ratio denominator to epsilon on Polars, matching pandas. |
 | OC-211 | 🟡 | Pandas datetime features depend on prediction-batch composition: prepending a different valid date format makes the original rows' year/month/day missing in both `FeatureGeneration.datetime_extract` and `DateFeatures` (`feature_generation/_pandas_ops.py:179`, `time_series/date_features.py:64`) | small | ✅ already fixed - verified 2026-09-09: mixed-format batch companions preserve calendar features across both engines and aliases. |
 | OC-212 | 🟡 | Similarity generation silently omits its output column for duplicate pandas indexes: label-based `.at[i]` returns Series to a scalar helper and the operation exception is swallowed (`feature_generation/_common.py:137-139`) | small | ✅ fixed 2026-09-08 — similarity now reads and assigns by row position, preserving duplicate indexes and individual scores; see the Log entry. |
@@ -239,6 +240,8 @@ uses, so a fixed finding stays where it was filed.
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
+| OC-49 | 🟡 | Valid partially-unlabelled PCA payloads crash plotting (`profiling/visualizer.py:716-737`) | small | ✅ fixed 2026-09-11 - render missing-label PCA points as a separate gray series; preserve every coordinate and omit the colorbar when all labels are absent. |
+| OC-52 | ⚪ | Categorical colour mapping is process-nondeterministic (`visualizer.py:710-713`) | small | ✅ fixed 2026-09-11 - sort the shared categorical label set for reproducible PCA and geospatial colors across row order and Python hash seeds. |
 | OC-191 | 🟡 | All-null and Polars Enum columns are classified as text and sent to string-only aggregates, aborting the whole profile (`profiling/analyzer.py`, `_analyzer/column.py`) | small | ✅ fixed 2026-09-11 - profile Null dtype as Unknown with missing-value reporting and native Enum as Categorical, preserving the rest of the report. |
 | OC-199 | 🟡 | Explicit latitude/longitude selections bypass `exclude_cols`, returning coordinates for columns excluded from the profile (`profiling/_analyzer/geo.py:58-59`) | small | ✅ fixed 2026-09-11 - resolve explicit coordinates only within the persistent active column selection; excluded coordinates omit geospatial output. |
 | OC-193 | 🟡 | A single missing timestamp removes time-series analysis at the 1,000-row resampling boundary: dynamic grouping receives null date keys and the exception is swallowed (`profiling/_analyzer/temporal.py:232,243`) | small | ✅ fixed 2026-09-09 - null timestamps are excluded from temporal calculations without changing the existing resampling threshold. |
@@ -295,6 +298,10 @@ uses, so a fixed finding stays where it was filed.
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
+| OC-234 | 🟡 | 3D scatter legends promise triangle/star markers that Plotly silently renders as circles (`chartMarkerShapes.ts`, `ThreeDScatterPlot.tsx`) | small | ✅ fixed 2026-09-11 - use five shapes supported by both scatter engines and render matching plus/X legend symbols; real browser regressions verify resolved Plotly markers. |
+| OC-231 | ⚪ | EDA scatter and geospatial category colors depend on first appearance; reordering identical points changes the color of the same category (`scatterGrouping.ts:32-35`, `GeospatialTab.tsx:60-67`) | small | ✅ fixed 2026-09-11 - Sort observed category labels and share color metadata across 2D, 3D, map and legends; row reordering preserves category colors. |
+| OC-232 | 🟡 | Missing PCA/scatter labels are merged with genuine `Other` labels, making unlabeled and observed categories indistinguishable (`scatterGrouping.ts:22-23`) | small | ✅ fixed 2026-09-11 - Keep missing values in a neutral group with collision-safe captions, preserving every point and showing all-missing legends. |
+| OC-233 | 🟡 | Valid scatter labels such as `__proto__`, `constructor` and `toString` crash grouping because inherited object properties are treated as arrays (`scatterGrouping.ts:20-24`) | small | ✅ fixed 2026-09-11 - Use Map-backed grouping so prototype-named categories render normally without losing points or crashing. |
 | OC-214 | 🟠 | Frontend PostCSS retains vulnerable `nanoid@3.3.17` (CVE-2026-67213) | small | ✅ fixed 2026-09-10 — lockfile and installed tree use compatible 3.3.18; npm audit no longer reports the package, and frontend coverage/tests, lint, CCN and build pass. |
 | OC-215 | 🟡 | Frontend Tailwind/PostCSS retains vulnerable `postcss-selector-parser@6.1.2` (CVE-2026-9358) | small | ✅ fixed 2026-09-10 — both parent paths resolve to compatible 6.1.4; npm audit no longer reports the package, and frontend coverage/tests, lint, CCN and build pass. |
 | OC-228 | 🟡 | Add Casting Rule overwrites the first column's existing type with `float` when every available column already has a rule | small | ✅ fixed 2026-09-10 — Add is disabled and its handler returns when no unassigned usable column remains; unit and browser regressions preserve types and cover removal/re-addition and Preview payloads. |
@@ -379,6 +386,252 @@ respective fix logs; OC-167 closed with canonical artifact framing on 2026-09-09
 ---
 
 ## Log
+
+### 2026-09-11 - OC-234 fixed: matching scatter marker shapes and legends
+
+The user requested the separately filed 3D marker repair. Two new component
+regressions failed on the old shape cycle and diagonal cross legend. Four
+real-browser PCA cases also failed before source changes: on desktop and
+mobile, Plotly coerced triangle-up/star to circles, while the all-missing
+legend drew X for a resolved cross (+) marker.
+
+The shared cycle now uses circle, square, diamond, cross (+) and x. Chart.js
+maps these to circle/rect/rectRot/cross/crossRot; scatter3d accepts their common
+names unchanged. The legend draws the matching plus and diagonal X. The five
+shapes repeat for larger category sets. This shared configuration covers PCA
+and Bivariate in both dimensions, preserving category colors, row grouping
+and missing-value identity. Maps continue using their circle legend.
+
+Verification:
+
+- **99 focused EDA tests pass**, including both new regressions.
+- **2,476 frontend tests pass** across 190 files.
+- **7 browser tests pass**: the six desktop/mobile label cases plus the
+  existing real Plotly PNG export test. The strengthened checks compare
+  `_fullData[].marker.symbol` with requested symbols and the legend's actual
+  SVG geometry through 2D -> 3D -> 2D and reversed rows. All five symbols are
+  preserved; gray missing markers and their plus legend also match.
+- Lint, CCN10, TypeScript/Vite build, all eleven size limits and diff checks
+  pass. Production assets rebuilt at v0.8.20. Independent review found no
+  actionable issue and confirmed Chart.js marker geometry with a drawing probe.
+
+The EDA guide and v0.8.20 changelog describe the common marker cycle. OC-234
+moves to the closed rows; the live queue has **37 open / 4 parked** findings.
+
+Original pre-fix reproduction evidence, moved from the live queue:
+
+### 2026-09-11 - OC-234: Plotly 3D marker shapes differ from the legend
+
+Found while verifying OC-231-233 in the real EDA page. The existing shared
+adapter supplies triangle-up and star to scatter3d, but Plotly coerces both
+to circle. The external legend still shows a triangle/star. This predates
+the grouping changes; `chartMarkerShapes.ts` is unchanged by this fix batch.
+
+Executed `npm.cmd run test:e2e -- e2e/eda-label-groups.spec.ts --workers=1
+--reporter=line`: six tests pass for category colors, coordinates and label
+identity. The PCA cases also record requested `data[].marker.symbol` and
+resolved `_fullData[].marker.symbol` in `pca-marker-symbols.json` attachments.
+Both desktop and mobile record triangle-up -> circle for the real Unlabeled
+category and star -> circle for constructor. Circle, square, diamond and
+cross remain unchanged. These color/point tests do not claim symbol parity.
+
+Fix target: use renderer-supported shapes and align each chart's visible
+legend with its actual markers; pin resolved Plotly symbols as well as input
+trace props.
+
+### 2026-09-11 - v0.8.20 versions and OC-21 artifact snapshot correction
+
+The user supplied full-suite CI failures for the WOE artifact snapshot. The
+failure reproduced locally: the OC-21 normalization fix correctly returns
+IV `1.739533`, while the active unit snapshot still expected `2.126096`.
+For its x/y/z fixture, positive proportions are `[7, 3, 1] / 11` and negative
+proportions are `[1, 5, 5] / 11`; both sum to one. Independent calculation gives
+IV `1.7395330719636604`. The old denominator reproduces `2.1260959768444736`.
+
+The existing test now checks this hand-derived IV before comparing the whole
+artifact. Syrupy regenerated the active snapshot with `--snapshot-update`;
+the only snapshot change is the city IV scalar. WOE mappings and production
+calculation are unchanged. This closes the snapshot omission from the earlier
+OC-21 verification, which did not include `test_artifact_snapshots.py`.
+
+Root app/Core versions, the uv lock record and frontend package/lock mirrors
+are now **0.8.20**. Dependency payloads are unchanged. The local Core editable
+install was refreshed offline without dependencies; `skyulf.__version__`
+also reports **0.8.20**. Frontend assets were rebuilt from the current tree.
+
+Verification: **172 related tests pass**, including all three artifact
+snapshots; the snapshot module also passes from the `skyulf-core` directory.
+Scoped Ruff, format and Ty checks, version sync/check, production frontend
+build and all eleven bundle-size limits pass. Independent review found no
+actionable issue. Changelog updated; queue remains **38 open / 4 parked**.
+
+### 2026-09-11 - OC-231-233 fixed: web EDA category identity
+
+Shared grouping now uses Map keys with null reserved for missing values and
+sorted observed labels for repeatable color/shape assignment. Missing groups
+keep a neutral gray color and a collision-safe caption, including when real
+categories contain Other, Unlabeled or its missing suffix. 2D datasets, 3D
+traces and maps consume the same category color metadata. Colors are stable
+for the same observed category set; this is not a global category palette.
+
+All-missing PCA/scatter legends remain visible. Map legends use circles to
+match Leaflet markers and retain category colors beyond twenty groups, with
+the existing long-list filter. No-target maps preserve blue coordinate-only
+markers/popups. Chart.js receives the category color for fill and stroke, so
+missing crosses are actually gray. Raw table/CSV labels are preserved. The
+guide and changelog explain the behavior and reuse of existing saved profiles.
+
+Verification:
+
+- New helper tests first reproduced row-order color changes and prototype-key
+  crashes; component tests caught the old map color differences. Two review
+  regressions then reproduced a missing Chart.js stroke color and an unwanted
+  no-target map legend, and passed after correction.
+- Focused EDA suite: **97 tests passed**. Final full frontend suite:
+  **2,474 tests passed** across 190 files (`npm.cmd test -- --maxWorkers=4
+  --reporter=dot --silent`). Existing deliberate error-boundary traces remain.
+- Six new real-browser tests pass on desktop and mobile across PCA 2D/3D,
+  Leaflet points/popups, row reversal, missing/colliding labels and all-missing
+  targets (`npm.cmd run test:e2e -- e2e/eda-label-groups.spec.ts --workers=1
+  --reporter=line`). Unit regressions supplied the source-red evidence;
+  browser tests were first run after implementation.
+- Final lint, CCN10, TypeScript/Vite production build and bundle-size checks
+  pass. Generated `static/ml_canvas` assets were rebuilt. Read-only review
+  found no remaining scoped issue and verified the actual Chart.js stroke.
+
+The renderer-specific Plotly shape coercion found during browser validation
+is separately filed as OC-234; overall 2D/3D shape parity is not claimed.
+The live queue has **38 open / 4 parked** findings after these three closures
+and the new finding. No commit was requested for this frontend fix turn.
+
+Original pre-fix reproduction evidence, moved from the live queue:
+
+### 2026-09-11 - OC-231-233: frontend EDA label review
+
+Review requested after the OC-49/52 Python visualizer examples. These frontend
+charts consume profile JSON using Chart.js, Plotly and Leaflet; they do not
+use `EDAVisualizer.plot()`. Executed the current `CanvasScatterPlot`,
+`ThreeDScatterPlot`, `GeospatialTab` and shared grouping helpers through React
+server rendering, capturing chart-library props while keeping the actual
+component/grouping code. This is runtime payload validation, not a browser
+pixel/rendering check. Reproduction script:
+`tmp_repro_artifacts/frontend_eda_label_audit.cjs` (ignored local artifact).
+
+**Controls:** partial labels `["a",null,"b"]`, all-null labels, and text labels
+`["nan",null,"inf","-inf","1e309","1"]` retain all coordinates in both 2D
+Chart.js datasets and 3D Plotly traces. Labels are not converted into numeric
+colors, so the Python non-finite-color masking defect is not reproduced here.
+
+**OC-231:** render labels `["Gold","Silver","Bronze"]`, then reverse their
+order. Gold changes from `#8884d8` to `#ffc658` in scatter datasets. Reordering
+geospatial points produces the same color change. The palette index comes
+from first-seen group order. **Fix/verification target:** deterministic category
+identity for the same label set across row order, matching chart/legend colors
+and marker shapes; use the same rule for 2D, 3D and the map.
+
+**OC-232:** labels `[null,"Other","a"]` produce a single Other group with
+**2 points**, shared by both scatter engines and the legend. No coordinates
+are dropped, but missing and genuine category identity are conflated.
+**Fix/verification target:** keep missing labels separate from real strings,
+with an explicit missing-label presentation that cannot collide with an
+observed category of the same displayed name.
+
+**OC-233:** each label `__proto__`, `constructor` and `toString` throws
+`groups[label].push is not a function` through the current scatter component.
+The empty `{}` grouping object inherits these keys, and `??=` does not replace
+the non-null inherited value with an array. **Fix/verification target:** group
+arbitrary labels without prototype-key collisions and keep 2D/3D/legend
+consumers consistent. This is a reproduced rendering failure, not a claim of
+an application security exploit.
+
+### 2026-09-11 - OC-231-233 filed: frontend EDA needs separate label fixes
+
+The user asked whether the Python visualizer defects also affect frontend EDA.
+Runtime component/renderer-boundary probes confirmed three separate frontend
+findings, now open with reproduction evidence in the live queue: row-order
+color changes (OC-231), missing/Other category collision (OC-232), and
+prototype-named label crashes (OC-233).
+
+Partial/all-missing labels and numeric-looking text labels retain their point
+coordinates in both 2D and 3D chart payloads. Python and frontend rendering
+implementations are independent. The earlier "no Canvas change is required"
+statement applies only to integrating the Python correction; it was not a
+validated claim that frontend label handling had no defects. This review
+corrects that overbroad interpretation. No frontend implementation was changed
+in this review, and no browser pixel-level check is claimed.
+The existing OC-230/49/52 Python fixes remain valid and pending commit.
+The live queue is now **40 open / 4 parked** findings.
+
+### 2026-09-11 - OC-230, OC-49 and OC-52 fixed: missing ratios and plot labels
+
+Committed OC-23, OC-191 and OC-199 as `b28f90fc` with DCO sign-off after
+**574 Core / 59 backend tests passed** and all applicable hooks passed.
+No push was performed. Reproduced each item in the next three-finding batch
+before implementing its correction.
+
+**OC-230:** native Polars NaNs survived operand normalization and poisoned
+ratio sums, unlike pandas' existing missing-as-zero behavior. Normalize each
+ratio operand's NaN and null values to zero before summing. An observed value
+in another operand still contributes; signed epsilon clamping is unchanged.
+Direct native frames cover numerator/denominator NaNs, mixed/all-missing sums,
+negative small denominators, default/custom epsilon, integer/null-only inputs,
+infinity controls and unchanged source columns. Red: **2 failures / 6 controls
+passed**; both Polars cases had 9 incorrect rows out of 11. The new cases and
+OC-23 sign regressions then passed **12 tests**. No fitted artifact migration
+is needed; existing ratio artifacts use the corrected applier.
+
+**OC-49:** missing labels shortened the PCA color vector without shortening
+the coordinates. Real plotting reproduced the color/coordinate size error.
+PCA now renders labeled points with target colors and missing-label points as
+gray crosses with an Unlabeled legend. There is no numeric missing-label
+sentinel, so real labels such as -1 and 0 retain their existing meaning.
+All-missing labels produce a complete plot without a target colorbar.
+Independent review also reproduced masked points for valid text labels such
+as "nan" and "inf". Numeric colors now require finite conversions; otherwise
+the complete label set uses categorical colors. Four real-artist regressions
+failed before this correction, then passed, including "-inf" and "1e309";
+a finite-numeric scale control preserves continuous target coloring.
+
+**OC-52:** enumerating a set assigned different category codes across Python
+hash seeds. The shared helper now sorts the non-null category strings before
+enumerating, stabilizing PCA/geospatial colors for an unchanged category set
+regardless of row order or process. Changing the category set can still
+renumber codes; persistent category palettes are outside this fix.
+
+Visualizer red phase: **8 failures / 2 controls passed**, including actual Agg
+rendering and different PYTHONHASHSEED subprocesses. The final **15 new tests**
+exercise public `plot()` for eleven label combinations, inspect real artists
+for visible/unmasked coordinates and missing-label presentation, and cover
+both categorical consumers and subprocess stability. A mixed-label PCA image
+was also generated and visually checked. The existing visualizer tests remain
+unchanged and pass alongside these regressions.
+
+Combined verification: **597 Core tests pass**, covering all profiling and
+feature-generation test modules; 121 existing warnings concern numerical
+edge cases, library deprecations and the headless/Windows environment. Updated
+the EDA guide, Feature Generation reference, relevant docstrings and changelog.
+These are Python library behavior and plotting corrections; no Canvas change
+is required. Existing saved profiles can be replotted without rerunning EDA.
+Repository Ruff/Ty, scoped formatting, all applicable pre-commit hooks and
+`git diff --check` pass. Independent review confirmed the non-finite-label
+follow-up resolves its finding and reported no remaining actionable issues.
+The live queue now has **37 open / 4 parked** findings.
+
+Original pre-fix OC-230 reproduction, moved from the live queue:
+
+Reproduced through public `FeatureGenerationCalculator.fit` and
+`FeatureGenerationApplier.apply` while verifying OC-23. Select ratio inputs
+`input_columns=["n"]`, `secondary_columns=["d"]`, `output_column="r"` and use
+the default epsilon. On `{"n": [1.0], "d": [float("nan")]}`, a native pandas
+DataFrame produces approximately **1e9**, while a native Polars DataFrame
+produces **NaN**. Pandas' horizontal sum treats missing values as zero;
+Polars' sum preserves native NaN. Constructing the Polars frame with
+`pl.from_pandas` normalizes NaN to null and hides the difference.
+
+**Fix/verification target:** define and apply consistent missing-value
+semantics to native ratio inputs, with direct engine-native frames covering
+NaN numerators, denominators and sums. OC-23 addresses only the sign of
+finite near-zero denominators and does not close this separate behavior.
 
 ### 2026-09-11 - OC-23, OC-191 and OC-199 fixed: ratios and profiling inputs
 

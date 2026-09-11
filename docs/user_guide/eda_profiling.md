@@ -131,6 +131,15 @@ profile = analyzer.analyze(target_col="zip_code", task_type="Classification")
 
 ## Visualization Support (`skyulf-core[viz]`)
 
+PCA plots keep points whose target label is missing, showing them as gray
+crosses marked **Unlabeled**. If every label is missing, the plot still shows
+all points without a target colorbar. Categorical PCA and geospatial plots
+use a deterministic color mapping for the same set of category labels, even
+when row order or the Python process changes. Recreate existing plots with
+`EDAVisualizer` to use the corrected rendering; the saved profile can be reused.
+PCA treats text labels such as `"nan"` and `"inf"` as categories so their
+points remain visible.
+
 The core library is designed to be lightweight. To use the `EDAVisualizer` and generate plots, you must install the optional visualization dependencies:
 
 ```bash
@@ -140,6 +149,29 @@ pip install skyulf-core[viz]
 This installs:
 *   `matplotlib`: For generating plots.
 *   `rich`: For beautiful terminal dashboards.
+
+### EDA charts in the web app
+
+The **PCA & Clusters**, **Bivariate** scatter charts and **Geospatial** map
+share category colors. Colors stay stable when rows are reordered, provided
+the displayed category set stays the same. Adding or removing categories can
+change the mapping; the palette repeats for large category sets.
+
+The 2D and 3D scatter views use the same five repeating marker shapes: circle,
+square, diamond, plus (`+`) and diagonal cross (`x`). The legend shows the
+shape actually drawn for each category. Missing-label points use gray plus
+markers in both views.
+
+Missing target labels form a separate gray **Unlabeled** group. Real values
+such as `Other`, `Unlabeled`, `constructor` and `__proto__` remain ordinary
+categories. If `Unlabeled` already exists, the missing group is named
+**Unlabeled (missing)**, with a numeric suffix if needed to keep names distinct.
+All-missing targets still show every point and a legend entry. Maps use circles
+and show their category legend, including a filter for long lists; they retain
+category colors above twenty groups.
+
+Reload the web app to use these rendering fixes with existing saved profiles.
+The chart data table and CSV export retain the original label values.
 
 ## Filtering & Exclusion
 

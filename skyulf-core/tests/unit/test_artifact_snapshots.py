@@ -6,9 +6,11 @@ snapshots stay stable across platforms — we are guarding structure, not the
 last ULP (engine parity already guards numeric equality).
 """
 
+import math
 from typing import Any
 
 import pandas as pd
+import pytest
 
 from skyulf.preprocessing.encoding import WOEEncoderCalculator
 from skyulf.preprocessing.scaling import (
@@ -52,6 +54,11 @@ def test_min_max_scaler_artifact_snapshot(snapshot):
 
 
 def test_woe_encoder_artifact_snapshot(snapshot):
+    """Keep normalized IV correct independently of snapshot approval."""
     df = _fixed_categorical_frame()
     params = WOEEncoderCalculator().fit((df[["city"]], df["target"]), {"columns": ["city"]})
+    # For x/y/z, smoothed positive proportions are [7, 3, 1] / 11 and
+    # negative proportions are [1, 5, 5] / 11 (four of each class, alpha=0.5).
+    expected_iv = (6 * math.log(7) + 2 * math.log(5 / 3) + 4 * math.log(5)) / 11
+    assert params["information_value"]["city"] == pytest.approx(expected_iv)
     assert _round(params) == snapshot

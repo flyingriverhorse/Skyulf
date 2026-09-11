@@ -2,7 +2,7 @@
 
 [project]
 name = "skyulf"
-version = "0.8.19"
+version = "0.8.20"
 description = "MLOps web application for privacy-preserving ML workflows"
 readme = "README.md"
 requires-python = ">=3.12"

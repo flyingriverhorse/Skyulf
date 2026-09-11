@@ -2,32 +2,60 @@ import { CHART_SERIES_COLORS } from '../../core/theme/chartTheme';
 import { markerShapeForIndex } from './chartMarkerShapes';
 import type { ChartLegendEntry } from './ChartLegend';
 
-export type ScatterPointLike = Record<string, string | number | null | undefined>;
+interface ScatterGroup<T> extends ChartLegendEntry {
+  /** Original category identity; null is reserved for missing values. */
+  value: string | null;
+  points: T[];
+}
 
-/**
- * Groups scatter points by the string value of `labelKey`, falling back to a
- * single "Data Points" group when no `labelKey` is provided. Shared by
- * `CanvasScatterPlot` and `ThreeDScatterPlot` so both chart engines and the
- * accompanying `ChartLegend`/`ChartDataTable` agree on group order and color.
- */
-export const groupScatterPoints = (
-  data: ScatterPointLike[],
-  labelKey?: string | undefined
-): Record<string, ScatterPointLike[]> => {
-  if (!labelKey) return { 'Data Points': data };
-
-  const groups: Record<string, ScatterPointLike[]> = {};
-  data.forEach((point) => {
-    const label = String(point[labelKey] ?? 'Other');
-    (groups[label] ??= []).push(point);
-  });
-  return groups;
+/** Chooses a missing-label caption that cannot impersonate an observed category. */
+const missingGroupLabel = (labels: ReadonlySet<string>): string => {
+  let label = 'Unlabeled';
+  let suffix = 1;
+  while (labels.has(label)) {
+    label = suffix === 1 ? 'Unlabeled (missing)' : `Unlabeled (missing) ${suffix}`;
+    suffix += 1;
+  }
+  return label;
 };
 
-/** Builds legend entries (color + shape) for a set of scatter groups, in the same order the chart renders them. */
-export const buildScatterLegendEntries = (groups: Record<string, ScatterPointLike[]>): ChartLegendEntry[] =>
-  Object.keys(groups).map((label, idx) => ({
-    label,
+/**
+ * Shares category identity and styling across scatter plots, maps and legends.
+ * Sorting observed labels stabilizes colors/shapes for the same category set.
+ * Missing values keep their own neutral group without shifting category colors.
+ */
+export const groupScatterPoints = <T extends Record<string, unknown>>(
+  data: T[],
+  labelKey?: string | undefined
+): ScatterGroup<T>[] => {
+  if (!labelKey) return [{
+    value: null, label: 'Data Points', points: data,
+    color: CHART_SERIES_COLORS[0]!, shape: markerShapeForIndex(0),
+  }];
+
+  const groups = new Map<string | null, T[]>();
+  data.forEach((point) => {
+    const value = point[labelKey];
+    const label = value == null ? null : String(value);
+    const points = groups.get(label) ?? [];
+    points.push(point);
+    groups.set(label, points);
+  });
+
+  const labels = [...groups.keys()].filter((label): label is string => label !== null).sort();
+  const result: ScatterGroup<T>[] = labels.map((label, idx) => ({
+    value: label, label, points: groups.get(label)!,
     color: CHART_SERIES_COLORS[idx % CHART_SERIES_COLORS.length]!,
     shape: markerShapeForIndex(idx),
   }));
+  const missing = groups.get(null);
+  if (missing) result.push({
+    value: null, label: missingGroupLabel(new Set(labels)), points: missing,
+    color: '#6b7280', shape: 'cross',
+  });
+  return result;
+};
+
+/** Builds legend entries (color + shape) for a set of scatter groups, in the same order the chart renders them. */
+export const buildScatterLegendEntries = (groups: readonly ChartLegendEntry[]): ChartLegendEntry[] =>
+  groups.map(({ label, color, shape }) => ({ label, color, shape }));

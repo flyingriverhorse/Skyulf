@@ -3,7 +3,8 @@ import { Map, Info } from 'lucide-react';
 import { MapContainer, TileLayer, CircleMarker, Popup } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import { InfoTooltip } from '../../ui/InfoTooltip';
-import { COLORS } from '../constants';
+import { ChartLegend } from '../ChartLegend';
+import { groupScatterPoints } from '../scatterGrouping';
 import { EmptyState } from '../../shared/EmptyState';
 
 interface GeoPoint {
@@ -34,6 +35,15 @@ export const GeospatialTab: React.FC<GeospatialTabProps> = ({ profile }) => {
         return <EmptyState icon={<Map className="w-12 h-12 text-slate-300 dark:text-slate-600" />} title="No Geospatial Data" description="No latitude/longitude columns were detected in the dataset." />;
     }
 
+    const geo = profile.geospatial;
+    const hasTarget = Boolean(profile.target_col);
+    const groups = groupScatterPoints(geo.sample_points ?? [], hasTarget ? 'label' : undefined);
+    // Leaflet uses circles for every group; its legend must match those markers.
+    const legendEntries = groups.map(({ label, color }) => ({ label, color, shape: 'circle' as const }));
+    const bounds: [[number, number], [number, number]] = [
+        [geo.min_lat, geo.min_lon], [geo.max_lat, geo.max_lon]
+    ];
+
     return (
         <div className="mt-4 bg-white dark:bg-gray-800 p-6 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm">
             <div className="flex items-center justify-between mb-6">
@@ -48,60 +58,42 @@ export const GeospatialTab: React.FC<GeospatialTabProps> = ({ profile }) => {
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <div className="lg:col-span-2 h-96 rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 relative z-0">
-                    {(() => {
-                        // Calculate bounds for the map
-                        const bounds: [[number, number], [number, number]] = [
-                            [profile.geospatial.min_lat, profile.geospatial.min_lon],
-                            [profile.geospatial.max_lat, profile.geospatial.max_lon]
-                        ];
-
-                        // Helper to get color
-                        const uniqueLabels = Array.from(new Set((profile.geospatial!.sample_points ?? []).map((p) => p.label))).filter(Boolean);
-                        const isChaotic = uniqueLabels.length > 20;
-
-                        const getColor = (label: string | null) => {
-                            if (!label) return '#3b82f6'; // Default blue
-                            if (isChaotic) return '#3b82f6'; // Single color for chaotic
-                            const index = uniqueLabels.indexOf(label);
-                            return COLORS[index % COLORS.length];
-                        };
-
-                        return (
-                            <MapContainer
-                                key={`${profile.geospatial!.lat_col ?? ''}-${profile.geospatial!.lon_col ?? ''}-${bounds.flat().join(',')}`}
-                                bounds={bounds}
-                                style={{ height: '100%', width: '100%' }}
-                                scrollWheelZoom={true}
-                            >
-                                <TileLayer
-                                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                                />
-                                {(profile.geospatial!.sample_points ?? []).map((point, idx: number) => (
-                                    <CircleMarker
-                                        key={idx}
-                                        center={[point.lat, point.lon]}
-                                        radius={5}
-                                        pathOptions={{
-                                            color: getColor(point.label ?? null),
-                                            fillColor: getColor(point.label ?? null),
-                                            fillOpacity: 0.7,
-                                            weight: 1
-                                        }}
-                                    >
-                                        <Popup>
-                                            <div className="text-xs">
-                                                <strong>Lat:</strong> {point.lat.toFixed(4)}<br/>
-                                                <strong>Lon:</strong> {point.lon.toFixed(4)}<br/>
-                                                {!!point.label && <><strong>{profile.target_col}:</strong> {point.label}</>}
-                                            </div>
-                                        </Popup>
-                                    </CircleMarker>
-                                ))}
-                            </MapContainer>
-                        );
-                    })()}
+                <div className="lg:col-span-2 min-w-0">
+                    <div className="h-96 rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 relative z-0">
+                        <MapContainer
+                            key={`${geo.lat_col ?? ''}-${geo.lon_col ?? ''}-${bounds.flat().join(',')}`}
+                            bounds={bounds}
+                            style={{ height: '100%', width: '100%' }}
+                            scrollWheelZoom={true}
+                        >
+                            <TileLayer
+                                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                            />
+                            {groups.flatMap((group) => group.points.map((point, idx) => (
+                                <CircleMarker
+                                    key={JSON.stringify([group.value, idx])}
+                                    center={[point.lat, point.lon]}
+                                    radius={5}
+                                    pathOptions={{
+                                        color: hasTarget ? group.color : '#3b82f6',
+                                        fillColor: hasTarget ? group.color : '#3b82f6',
+                                        fillOpacity: 0.7,
+                                        weight: 1
+                                    }}
+                                >
+                                    <Popup>
+                                        <div className="text-xs">
+                                            <strong>Lat:</strong> {point.lat.toFixed(4)}<br/>
+                                            <strong>Lon:</strong> {point.lon.toFixed(4)}<br/>
+                                            {hasTarget && <><strong>{profile.target_col}:</strong> {group.label}</>}
+                                        </div>
+                                    </Popup>
+                                </CircleMarker>
+                            )))}
+                        </MapContainer>
+                    </div>
+                    {hasTarget && <ChartLegend entries={legendEntries} />}
                 </div>
 
                 <div className="space-y-4">

@@ -628,6 +628,12 @@ negative and `+epsilon` otherwise (including zero). This preserves the ratio's
 sign on both engines; for example, `1 / -1e-12` with the default epsilon
 produces `-1e9`. The saved epsilon is reused when applying a fitted node.
 
+Missing operands (`NaN` or null) contribute zero to each ratio sum on both
+engines. Other selected operands still contribute normally: `(NaN + 2) / 4`
+produces `0.5`. An entirely missing denominator uses positive epsilon, and an
+entirely missing numerator sums to zero. Source columns retain their values;
+this rule applies to the generated ratio.
+
 Learned params:
 
 - `operations`, `epsilon`, `allow_overwrite`

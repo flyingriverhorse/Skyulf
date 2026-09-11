@@ -215,7 +215,7 @@ export const BivariateTab: React.FC<BivariateTabProps> = ({
                 <BivariatePlot profile={profile} scatterX={scatterX} scatterY={scatterY} scatterZ={scatterZ} scatterColor={scatterColor} is3D={is3D} />
             </div>
 
-            {scatterColor && legendEntries.length > 1 && <ChartLegend entries={legendEntries} />}
+            {scatterColor && legendEntries.length > 0 && <ChartLegend entries={legendEntries} />}
 
             <ChartDataTable
                 caption="Bivariate scatter plot data"
