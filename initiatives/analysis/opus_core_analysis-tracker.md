@@ -184,6 +184,7 @@ uses, so a fixed finding stays where it was filed.
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
+| OC-120 | 🟠 | Decimal columns skipped by numeric auto-selection and mishandled during explicit numeric processing (`utils.py`, `preprocessing/_helpers.py` and numeric nodes) | small | ✅ fixed 2026-09-12 — recognize parameterized Polars and pandas object Decimals, normalize selected values at numeric boundaries, and preserve missingness, source values and target alignment. |
 | OC-110 | 🟠 | Semantic-type inference misclassifies small categorical columns as `Text`, so task type never inferred (`profiling/_analyzer/_utils.py`, `analyzer.py`) | small | ✅ fixed 2026-09-12 — infer repeated small string categories from non-null counts in both profiling paths, restoring statistics and classification target analysis. |
 | OC-113 | 🟠 | Near-perfect multicollinearity silently reports VIF = 1.0 — `max(1.0, …)` clamps numerical garbage (`profiling/_analyzer/numeric.py`) | small | ✅ fixed 2026-09-12 — use per-feature regression residuals for unstable correlation inversion, preserving high-VIF warnings without falsely flagging unrelated columns. |
 | OC-114 | 🟡 | All-null tracked column yields 30 `NaN` autocorrelation lags as real analysis (≥1000-row datasets) (`temporal.py:167-191`) | small | ✅ fixed 2026-09-09 - undefined temporal diagnostics are omitted unless sufficient finite varying observations and finite results support them. |
@@ -400,6 +401,45 @@ respective fix logs; OC-167 closed with canonical artifact framing on 2026-09-09
 ---
 
 ## Log
+
+### 2026-09-12 — OC-120 fixed: Decimal numeric selection and processing
+
+After committing OC-113 as `4fea1cca`, reproduced OC-120 with Decimal prices
+on native and wrapped pandas/Polars frames. Both numeric selectors omitted
+prices. The original explicit StandardScaler crash was already repaired;
+Robust/MinMax/MaxAbs still raised Decimal/float arithmetic errors on pandas.
+Winsorize fitted bounds but skipped Decimal values on both engines, Polars
+IQR/ZScore called unsupported Decimal `is_nan`, KNN/Iterative fitting failed
+on object NumPy arrays, and binning could silently omit the output column.
+
+Numeric detection now recognizes parameterized Polars Decimal dtypes and
+homogeneous non-missing pandas Decimal objects without accepting numeric
+strings or mixed string/Decimal columns. Binary/constant/all-missing exclusions,
+target exclusion and explicit empty scaler selections remain intact. Numeric
+boundaries convert only selected Decimal columns to float64, including pandas
+`pd.NA`; original frames and unselected columns are unchanged. Mean/median
+imputation remains numeric for downstream nodes, outlier filters preserve null
+rows and matching targets, and DatasetProfile emits numeric Decimal statistics.
+Schema promotion also recognizes Decimal dtype labels.
+
+Verification:
+
+- The initial public-path regression matrix reproduced **67 failures / 10
+  passes**. Added missing-sentinel cases reproduced seven further failures
+  before repairing fit/apply conversion boundaries.
+- **110 Decimal regressions pass**, covering four scalers, power transforms,
+  imputers, outliers, binning, feature selection/generation, profile statistics,
+  native/wrapped inputs, Arrow Decimal missingness and precision/scale variants.
+- Broader Core preprocessing, utility, engine and schema suites: **1,924 passed,
+  2 skipped**. Backend catalog/data-service/preprocessing suites: **65 passed**.
+- The real FileSystemCatalog Parquet path feeds automatic SimpleImputer then
+  MinMaxScaler through FeatureEngineer on both engines; fit and replay produce
+  `[0.0, 0.5, 1.0]` while retaining the source Decimals and label column.
+- Ruff and full configured `ty check` pass. Focused review found no blockers.
+
+Docs and changelog explain float64 precision and refitting older pipelines whose
+artifacts omitted Decimal columns. The live queue has **35 open / 4 parked**;
+OC-121 remains open and parked findings remain parked.
 
 ### 2026-09-12 — OC-113 fixed: stable per-feature VIF diagnostics
 

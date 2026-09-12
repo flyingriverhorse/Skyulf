@@ -21,6 +21,7 @@ from ..registry import NodeRegistry
 from ..types import DEFAULT_RANDOM_STATE
 from ..utils import (
     detect_numeric_columns,
+    is_decimal_series,
     user_picked_no_columns,
 )
 from ._artifacts import GeneralBinningArtifact
@@ -225,6 +226,8 @@ def _bin_one_column_pandas(
     missing_label = params.get("missing_label", "Missing")
 
     labels = _resolve_pandas_labels(label_format, edges, custom_labels)
+    if is_decimal_series(series):
+        series = pd.to_numeric(series)
     binned = pd.cut(series, bins=sorted_edges, labels=labels, include_lowest=include_lowest)
 
     binned = _apply_missing_strategy(binned, missing_strategy, missing_label)

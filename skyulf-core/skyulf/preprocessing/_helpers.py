@@ -29,7 +29,7 @@ from ..engines import (
     SkyulfDataFrame,
     get_engine,
 )
-from ..utils import resolve_columns
+from ..utils import is_decimal_series, resolve_columns
 from ._schema import SkyulfSchema
 
 
@@ -69,7 +69,7 @@ def promote_configured_columns_to_float64(
 
 def _is_numeric_schema_dtype(dtype: str | None) -> bool:
     """Return whether an engine-neutral schema dtype is numeric."""
-    return bool(dtype) and dtype.lower().startswith(("int", "uint", "float"))
+    return bool(dtype) and dtype.lower().startswith(("int", "uint", "float", "decimal"))
 
 
 def safe_scale(scale_arr: np.ndarray) -> np.ndarray:
@@ -88,6 +88,16 @@ def to_pandas(X: Any) -> pd.DataFrame:
     paths that bypass the dispatcher (e.g. shared subset-selection helpers).
     """
     return X.to_pandas() if hasattr(X, "to_pandas") else X
+
+
+def decimal_columns_to_float(X: pd.DataFrame, columns: Iterable[str]) -> pd.DataFrame:
+    """Convert selected Decimal object columns for numeric math without mutating input."""
+    converted = {
+        col: X[col].to_numpy(dtype=np.float64, na_value=np.nan)
+        for col in columns
+        if is_decimal_series(X[col])
+    }
+    return X.assign(**converted) if converted else X
 
 
 def select_rows_by_position(y: Any, positions: Any) -> Any:
@@ -153,6 +163,9 @@ def resolve_columns_then_to_pandas(
     the selected columns instead of the full input frame avoids paying for
     unrelated columns on wide frames (large win when few columns of many are
     selected, neutral when most/all columns are selected).
+
+    Selected pandas Decimal object columns become float64 for numeric math;
+    the caller's frame and unselected columns retain their original values.
     """
     columns = resolve_columns(X, config, default_selection_func, target_column_key)
     if hasattr(X, "to_pandas") and not isinstance(X, pd.DataFrame):
@@ -160,7 +173,7 @@ def resolve_columns_then_to_pandas(
         X = (X.select(select_cols) if select_cols else X).to_pandas()
     else:
         X = to_pandas(X)
-    return X, columns
+    return decimal_columns_to_float(X, columns), columns
 
 
 def resolve_columns_then_to_numpy(
@@ -180,15 +193,26 @@ def resolve_columns_then_to_numpy(
     ``.select(cols).to_numpy()`` is native, no Pandas involved. Pandas inputs
     still go through ``DataFrame.to_numpy()`` (also native, no extra copy vs.
     the old ``pandas -> pandas -> numpy`` path).
+
+    Decimal columns are converted to float64 before NumPy consumers run, with
+    missing values represented as NaN on both engines.
     """
     columns = resolve_columns(X, config, default_selection_func, target_column_key)
     if not columns:
         return np.empty((0, 0)), columns
-    if hasattr(X, "to_pandas") and not isinstance(X, pd.DataFrame):
+    if is_polars(X):
         select_cols = [c for c in columns if c in X.columns]
-        X_np = X.select(select_cols).to_numpy() if select_cols else np.empty((0, 0))
+        subset = X.select(select_cols)
+        decimal_cols = [
+            c
+            for c, dt in zip(subset.columns, subset.dtypes, strict=True)
+            if isinstance(dt, pl.Decimal)
+        ]
+        if decimal_cols:
+            subset = subset.with_columns(pl.col(decimal_cols).cast(pl.Float64))
+        X_np = subset.to_numpy()
     else:
-        subset = X[columns]
+        subset = decimal_columns_to_float(to_pandas(X)[columns], columns)
         # Nullable extension dtypes (Int64, Float64...) to_numpy() as object
         # arrays full of pd.NA, which crash sklearn (F-10). Force the
         # float64/NaN representation the Polars path produces natively.
@@ -258,16 +282,18 @@ def auto_detect_text_columns(df: pd.DataFrame | SkyulfDataFrame) -> list[str]:
 
 
 def auto_detect_numeric_columns(df: pd.DataFrame | SkyulfDataFrame) -> list[str]:
-    """Return numeric columns from either a Pandas or Polars frame."""
+    """Return numeric columns, including Decimals, without cardinality exclusions."""
     engine = get_engine(df)
     if engine.name == EngineName.POLARS:
         polars_df = cast(PolarsBackedFrame, df)
         return [
             c
             for c, t in zip(polars_df.columns, polars_df.dtypes, strict=True)
-            if t in POLARS_NUMERIC_DTYPES
+            if t in POLARS_NUMERIC_DTYPES or isinstance(t, pl.Decimal)
         ]
-    return list(cast(PandasBackedFrame, df).select_dtypes(include=["number"]).columns)
+    frame = to_pandas(df)
+    numeric = set(frame.select_dtypes(include=["number"]).columns)
+    return [c for c in frame.columns if c in numeric or is_decimal_series(frame[c])]
 
 
 def auto_detect_datetime_columns(df: pd.DataFrame | SkyulfDataFrame) -> list[str]:

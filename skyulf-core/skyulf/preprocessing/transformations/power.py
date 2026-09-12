@@ -12,7 +12,11 @@ from ...core.meta.decorators import node_meta
 from ...registry import NodeRegistry
 from ...utils import detect_numeric_columns, user_picked_no_columns
 from .._artifacts import PowerTransformerArtifact
-from .._helpers import promote_configured_columns_to_float64, resolve_columns_then_to_pandas
+from .._helpers import (
+    decimal_columns_to_float,
+    promote_configured_columns_to_float64,
+    resolve_columns_then_to_pandas,
+)
 from .._schema import SkyulfSchema
 from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
 from ..dispatcher import apply_dual_engine
@@ -131,16 +135,13 @@ class PowerTransformerApplier(BaseApplier):
             # Computed before the copy so a failure hands back the caller's frame
             # rather than one whose columns were already cast to float64, matching
             # what the polars path returns.
-            X_vals = X[valid_cols].to_numpy()
+            subset = decimal_columns_to_float(X[valid_cols], valid_cols)
+            X_vals = subset.to_numpy(dtype=np.float64, na_value=np.nan)
             X_trans = np.asarray(_power_transform_array(X_vals, params, cols, valid_cols))
             df_out = X.copy()
-            # The transform result is float; writing it into an integer column is
-            # the pandas "incompatible dtype" FutureWarning, slated to become an
-            # error — which the bare except below would swallow into a silent
-            # no-op that returns untransformed data. Cast first.
-            for col in valid_cols:
-                df_out[col] = df_out[col].astype("float64")
-            df_out.loc[:, valid_cols] = X_trans
+            # Replace selected columns so nullable integers and Decimal objects
+            # can receive float results without incompatible-dtype assignment.
+            df_out[valid_cols] = X_trans
         except Exception:  # noqa: BLE001 - transform failure is logged; frame left unchanged
             logger.exception("PowerTransformer (Pandas) application failed")
             return X, _y

@@ -9,6 +9,7 @@ to branch on pandas vs polars itself.
 import contextlib
 import logging
 from collections.abc import Callable
+from decimal import Decimal
 from typing import Any, cast
 
 import numpy as np
@@ -214,7 +215,7 @@ def _is_binary_numeric(series: pd.Series | Any) -> bool:
         unique_vals = series.drop_nulls().unique()
         if len(unique_vals) > 2:
             return False
-        return all(np.isclose(val, 0) or np.isclose(val, 1) for val in unique_vals)
+        return all(_is_close_to_binary(val) for val in unique_vals)
 
     # Pandas Series
     unique_vals = series.dropna().unique()
@@ -222,13 +223,34 @@ def _is_binary_numeric(series: pd.Series | Any) -> bool:
         return False
 
     # Check if values are close to 0 or 1
-    return all(np.isclose(val, 0) or np.isclose(val, 1) for val in unique_vals)
+    return all(_is_close_to_binary(val) for val in unique_vals)
+
+
+def _is_close_to_binary(value: Any) -> bool:
+    """Compare Decimal values using the same float tolerance as other numeric values."""
+    if isinstance(value, Decimal):
+        value = float(value)
+    return bool(np.isclose(value, 0) or np.isclose(value, 1))
+
+
+def is_decimal_series(series: pd.Series) -> bool:
+    """Recognize homogeneous non-missing Decimal values in a pandas object column.
+
+    Numeric strings and mixed object columns remain non-numeric. Native numeric
+    and Arrow dtypes are handled by the usual dtype predicates.
+    """
+    return bool(
+        pd.api.types.is_object_dtype(series.dtype)
+        and pd.api.types.infer_dtype(series, skipna=True) == "decimal"
+    )
 
 
 def _polars_numeric_dtype_cols(frame: Any) -> list[str]:
-    """List the columns of a Polars frame whose dtype is numeric (float/int/uint)."""
+    """List Polars numeric columns, including parameterized Decimal dtypes."""
     return [
-        c for c, t in zip(frame.columns, frame.dtypes, strict=True) if t in POLARS_NUMERIC_DTYPES
+        c
+        for c, t in zip(frame.columns, frame.dtypes, strict=True)
+        if t in POLARS_NUMERIC_DTYPES or isinstance(t, pl.Decimal)
     ]
 
 
@@ -267,7 +289,7 @@ def _pandas_column_excluded(series: Any, exclude_binary: bool, exclude_constant:
     if pd.api.types.is_bool_dtype(dtype):
         return True
     # Strict Numeric Check (Align with Polars behavior)
-    if not pd.api.types.is_numeric_dtype(dtype):
+    if not pd.api.types.is_numeric_dtype(dtype) and not is_decimal_series(series):
         return True
 
     valid = series.dropna()
@@ -305,6 +327,9 @@ def detect_numeric_columns(
     exclude_constant: bool = True,
 ) -> list[str]:
     """Find numeric-like columns.
+
+    Includes Polars Decimal dtypes and pandas object columns whose observed
+    values are all ``decimal.Decimal``. Detection does not convert values.
 
     Args:
         frame: DataFrame to analyze

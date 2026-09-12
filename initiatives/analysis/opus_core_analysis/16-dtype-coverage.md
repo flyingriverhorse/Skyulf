@@ -15,6 +15,13 @@ dtype not explicitly listed is silently invisible. Two real dtypes fall through.
 ## Findings
 
 ### OC-120
+
+**Resolved 2026-09-12.** See the
+[verification and fix log](../opus_core_analysis-tracker.md#2026-09-12-oc-120-fixed-decimal-numeric-selection-and-processing).
+The original reproduction below is retained as historical evidence. Numeric
+selectors now include Decimal columns; selected values are normalized at numeric
+boundaries, with cross-engine fit/apply and Parquet pipeline regressions.
+
 ### 🟠 High — `Decimal` columns are silently skipped by every auto-numeric node, and crash pandas when selected explicitly
 
 **Files:** `skyulf/engines/__init__.py` (`POLARS_NUMERIC_DTYPES`),

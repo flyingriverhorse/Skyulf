@@ -44,7 +44,10 @@ class ZScoreApplier(BaseApplier):
                 continue
             z = (pl.col(col) - stat["mean"]) / stat["std"]
             col_mask = z.abs() <= threshold
-            mask = mask & (col_mask | pl.col(col).is_null() | pl.col(col).is_nan())
+            missing = pl.col(col).is_null()
+            if X.schema[col].is_float():
+                missing = missing | pl.col(col).is_nan()
+            mask = mask & (col_mask | missing)
 
         mask_series = X.select(mask.alias("mask")).get_column("mask")
         return X.filter(mask_series), _filter_y_polars(y, mask_series)

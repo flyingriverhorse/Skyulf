@@ -16,6 +16,27 @@ Every preprocessing step in the pipeline config uses:
 
 Where `params` is passed into the node's Calculator `fit()`.
 
+### Decimal numeric columns
+
+Numeric auto-selection includes Polars `Decimal(precision, scale)` columns and
+pandas object columns whose non-missing values are all `decimal.Decimal`.
+Numeric strings and mixed Decimal/string columns remain outside automatic
+numeric selection. Existing exclusions for booleans, binary values, constants
+and all-missing columns still apply according to the node's selection rules.
+
+Selected Decimal values use float64 for numerical transformations such as
+scaling, power transforms and mean/median imputation. This has ordinary floating
+point precision, rather than exact decimal arithmetic. Source frames and
+unselected columns retain their original values; outlier filtering retains the
+original values of kept rows and their matching targets.
+
+For example, `MinMaxScaler` with `params={}` now scales Decimal prices
+`[100.00, 200.00, 300.00, 400.00]` to `[0.0, 0.3333, 0.6667, 1.0]` on both
+engines. An explicit `columns=[]` still makes the scaler a no-op.
+
+Refit pipelines whose previous automatic selection skipped Decimal columns.
+Existing fitted artifacts keep their original selection when replayed.
+
 ## Splitters
 
 Example step:

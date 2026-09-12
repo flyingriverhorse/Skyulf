@@ -15,6 +15,7 @@ from sklearn.tree import DecisionTreeRegressor
 from ..._validation import raise_invalid_choice
 from ...engines.sklearn_bridge import SklearnBridge
 from ...utils import detect_numeric_columns, resolve_columns
+from .._helpers import decimal_columns_to_float
 
 logger = logging.getLogger(__name__)
 
@@ -88,7 +89,7 @@ def _sklearn_transform_subset(X: Any, cols: list[str], imputer: Any, is_polars: 
         return X.with_columns(new_cols)
 
     X_out = X.copy()
-    X_subset = X_out[cols].copy()
+    X_subset = decimal_columns_to_float(X_out[cols].copy(), cols)
     # Nullable extension dtypes (Int64...) hand pd.NA to sklearn and refuse
     # float results on write-back; upcast them to float64 like the Polars
     # branch does natively (F-10).

@@ -8,9 +8,9 @@ from sklearn.impute import SimpleImputer
 
 from ...core.meta.decorators import node_meta
 from ...registry import NodeRegistry
-from ...utils import detect_numeric_columns, user_picked_no_columns
+from ...utils import detect_numeric_columns, is_decimal_series, user_picked_no_columns
 from .._artifacts import SimpleImputerArtifact
-from .._helpers import promote_configured_columns_to_float64
+from .._helpers import decimal_columns_to_float, promote_configured_columns_to_float64
 from .._schema import SkyulfSchema
 from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
 from ..dispatcher import apply_dual_engine, fit_dual_engine
@@ -86,6 +86,8 @@ class SimpleImputerApplier(BaseApplier):
                 X_out[col] = val
             else:
                 series = X_out[col]
+                if is_decimal_series(series) and params.get("strategy") in {"mean", "median"}:
+                    series = pd.to_numeric(series)
                 # Nullable numeric extension dtypes (Int64...) refuse a float
                 # fill value; upcast like the Polars fill does (F-10).
                 if (
@@ -196,7 +198,10 @@ class SimpleImputerCalculator(BaseCalculator):
             fill_value=fill_value,
             keep_empty_features=strategy == "constant",
         )
-        imputer.fit(X[cols])
+        fit_data = (
+            decimal_columns_to_float(X[cols], cols) if strategy in {"mean", "median"} else X[cols]
+        )
+        imputer.fit(fit_data)
 
         if strategy == "constant" and fill_value is not None:
             # Validation still runs, but heldout missingness must not choose a constant.
