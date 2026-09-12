@@ -269,6 +269,13 @@ when `target_col` is supplied, independent of row count.
 ---
 
 ### OC-51
+
+**Resolved 2026-09-12.** Transformation advice checks the observed domain and
+skew direction. All preparation actions, including target resampling, suppress
+the clean-dataset message; its wording no longer promises modeling readiness.
+See the [verification log](../opus_core_analysis-tracker.md#2026-09-12-oc-51101140-recommendations-calibration-seeds-and-numeric-rules).
+The original reproduction below is retained as historical evidence.
+
 ### 🟡 Medium — Transform advice can be invalid and self-contradictory
 
 **File:** `_analyzer/recommendations.py:66-78,129-139`

@@ -110,6 +110,20 @@ Skyulf automatically flags potential data quality issues:
 *   **Class Imbalance:** Target variables with skewed class distributions.
 *   **Data Leakage:** Features with 1.0 correlation to the target.
 
+### Smart Recommendations
+
+For highly skewed numeric columns, transformation advice follows the observed
+value range. Log or Box-Cox is suggested for strictly positive, right-skewed
+data. Columns containing zero or negative values, left-skewed columns, and
+profiles with an unknown minimum receive Yeo-Johnson advice instead. These
+are suggestions to evaluate; EDA does not transform the source data.
+
+The clean-dataset message appears only when no drop, imputation, transformation,
+encoding or resampling action is recommended. It describes the outcome of
+these checks, without certifying that a dataset is ready for modeling. An
+informational balanced-target message can appear alongside it. Rerun saved
+analyses to refresh their recommendations.
+
 ### 3. Advanced Analysis
 *   **Outlier Detection:** Uses Isolation Forest to identify anomalous rows.
 *   **PCA:** Computes Principal Components to visualize high-dimensional data structure.

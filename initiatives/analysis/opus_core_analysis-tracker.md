@@ -110,7 +110,7 @@ uses, so a fixed finding stays where it was filed.
 | OC-20 | 🟡 | Value Replacement's "empty columns = all columns" UI promise is false (`cleaning/value_replacement.py:163-180`) | small | ✅ fixed 2026-09-04 |
 | OC-53 | 🟡 | `select_from_model`'s `max_features` is Python-only, UI-unreachable | small | ✅ fixed 2026-09-04 |
 | OC-61 | ⚪ | `BinningNode`'s "Precision (Decimals)" UI field never sent to backend (`BinningNode.tsx`) | small | ✅ fixed 2026-09-04 |
-| OC-66 | 🟠 | `CalibratedClassifierCV`'s user-selected base estimator silently discarded during tuning (`classification.py:206-282` vs `_tuning/engine.py:495-499`) | small | ✅ fixed 2026-09-04 |
+| OC-66 | 🟠 | `CalibratedClassifierCV`'s user-selected base estimator silently discarded during tuning (`classification.py` vs `_tuning/engine.py`) | small | ✅ completed 2026-09-12 — the earlier flat-config fix missed Canvas search-space candidates; every strategy now resolves the selected base through trial fitting and final refitting, including fold pipelines. |
 | OC-16 | 🟠 | KNN/Iterative imputers crash on all-missing fitted columns (`imputation/knn.py:64-76`, `iterative.py:68-84`) | small | ✅ fixed 2026-09-04 |
 | OC-17 | 🟠 | SimpleImputer polars mean/median crashes on all-null columns (engine divergence, `imputation/_common.py:32-37`) | small | ✅ fixed 2026-09-04 |
 | OC-69 | 🟠 | Engine trusts `config.nodes` list order, never verifies topological sort (`_schema_graph.py:49-70`); `_kahn_topological_order` already exists — wiring fix | small | ✅ fixed 2026-09-04 |
@@ -184,6 +184,7 @@ uses, so a fixed finding stays where it was filed.
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
+| OC-101 | 🟡 | `calibrated_classifier`'s `random_state` is dropped and its factories hardcode the seed | small | ✅ fixed 2026-09-12 — a cloneable calibration wrapper seeds supported base estimators during training, tuning and final refitting; defaults, explicit 0/None, unshuffled integer CV and saved predictions are covered. |
 | OC-121 | ⚪ | Polars Enum columns omitted by text auto-selection, unlike pandas Categorical (`preprocessing/_helpers.py`) | small | ✅ fixed 2026-09-12 — recognize parameterized Enum dtypes in the shared selector; TextCleaning and AliasReplacement now include them while preserving nulls, explicit selections and replay behavior. |
 | OC-120 | 🟠 | Decimal columns skipped by numeric auto-selection and mishandled during explicit numeric processing (`utils.py`, `preprocessing/_helpers.py` and numeric nodes) | small | ✅ fixed 2026-09-12 — recognize parameterized Polars and pandas object Decimals, normalize selected values at numeric boundaries, and preserve missingness, source values and target alignment. |
 | OC-110 | 🟠 | Semantic-type inference misclassifies small categorical columns as `Text`, so task type never inferred (`profiling/_analyzer/_utils.py`, `analyzer.py`) | small | ✅ fixed 2026-09-12 — infer repeated small string categories from non-null counts in both profiling paths, restoring statistics and classification target analysis. |
@@ -197,6 +198,7 @@ uses, so a fixed finding stays where it was filed.
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
+| OC-140 | 🟠 | `InvalidValueReplacement` silently coerces nonnumeric values on pandas but fails on Polars | small | ✅ fixed 2026-09-12 — reject nonnumeric selections consistently before active operations at fit/apply, exclude durations from automatic selection, and preserve inactive operations, source values, targets and existing wrapper output conventions. |
 | OC-142 | 🟠 | EDA correlation ratio η exceeds 1.0 with nulls; null-heavy columns rank as strongest association | small | ✅ fixed 2026-09-11 - use complete target-feature pairs for all group counts, means and sums of squares; preserve source rows and correct report ranking. |
 | OC-144 | ⚪ | Geo distance column named `_km` even when the unit is miles | small | ✅ fixed 2026-09-11 - resolve automatic names from the selected unit; preserve explicit configuration and saved artifact names. |
 | OC-143 | 🟠 | RFE ignores the UI's `k`, silently selecting half the features — **duplicate of OC-25**, same file and line; one fix retires both | small | ✅ fixed 2026-09-05 — with OC-25 |
@@ -245,6 +247,7 @@ uses, so a fixed finding stays where it was filed.
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
+| OC-51 | 🟡 | Transform advice can be mathematically invalid and contradict the clean-dataset message | small | ✅ fixed 2026-09-12 — use domain/skew-aware transform advice and evaluate all preparation recommendations, including target resampling, before emitting a limited clean-dataset message. |
 | OC-247 | 🟡 | Missing categorical values inflate unique/rare-label counts and consume a top-10 frequency slot (`profiling/analyzer.py`, `_analyzer/categorical.py`) | small | ✅ filed and fixed 2026-09-12 — exclude nulls before frequency ranking and rare-label aggregation, and remove the null entry from the distinct-label count. |
 | OC-235 | 🟠 | Directed causal edges are serialized backwards (`profiling/_analyzer/causal.py`) | small | ✅ fixed 2026-09-11 — preserve causal-learn endpoint order; real graph objects and public collider regressions verify both orientations. |
 | OC-236 | 🟠 | Nominal target codes feed Pearson/Fisher-Z as numeric magnitudes, making results depend on category order (`profiling/analyzer.py`) | design + medium | ✅ fixed 2026-09-11 — omit categorical targets from numeric analysis while preserving category associations; numeric task overrides and omission metadata are explicit. |
@@ -405,6 +408,101 @@ respective fix logs; OC-167 closed with canonical artifact framing on 2026-09-09
 ---
 
 ## Log
+
+### 2026-09-12 — OC-66 follow-up: Canvas calibrated base selection
+
+The user reported Optuna rejecting `model__estimator__base_estimator` after
+selecting Random Forest for a calibrated classifier. This reopened an uncovered
+path of OC-66: the 2026-09-04 fix handled a flat structural selection, and the
+OC-101 seed regression manually prepared that flat shape. Neither covered the
+Canvas multiselect's `tuning_config.search_space.base_estimator` list.
+
+Reproduced with the real backend `_prepare_tuning_config`, a StandardScaler
+fold adapter and one Optuna trial: `method="isotonic"`, `cv=3` and
+`base_estimator="random_forest"` reached the nested estimator's `set_params`,
+which rejected the last key. Grid search instead silently filtered that key
+and trained logistic regression. Thus adding scaling cannot repair this
+parameter-routing error.
+
+The calibration-specific estimator now retains `base_estimator` as a cloneable
+symbolic parameter. Each fit resolves the selected factory before applying the
+seed, so searcher clones, fold pipelines and the winning refit all use the
+requested model family. The factory is shared with the existing basic and flat
+tuning paths, preserving their choices and fallback behavior. Multiple selected
+bases remain valid search candidates; trial and best-parameter reports retain
+JSON-safe names without internal pipeline prefixes. No frontend or backend
+production change was needed.
+
+Added **12 Core regressions**, all observed failing before the repair: every
+search strategy with and without fold preprocessing, observed trial/refit model
+types and seeds, multi-base comparisons, cloning, changing candidates, source
+configuration preservation and pickle round trips. Added **two backend
+regressions** using Canvas-shaped node config and real Grid/Optuna training;
+both failed before the fix and now pass. Together with the OC-101 checks, the
+calibration module passes 33 cases.
+
+Final related verification: **395 Core tests and 171 backend tests passed**,
+covering calibration, hyperparameters, all tuning strategies, fold replay and
+node runners. Scoped Ruff lint/format, the configured full ty check and an
+independent review passed. Updated model docs, dynamic field help, changelog
+and both source-audit notes. OC-66 keeps its existing archive row, now marked
+completed for the actual Canvas path; queue remains **28 open / 4 parked**.
+
+### 2026-09-12 — OC-51/101/140: recommendations, calibration seeds and numeric rules
+
+Committed OC-24/59/60 as `9663132a` after 131 fresh focused tests, a strict
+documentation build and all applicable commit hooks passed. Continued with
+three independent findings, two implementation agents and a separate review
+of each change.
+
+**OC-51 — fixed.** Public analysis of `[-100, 1, 2, 3, 4, 5, 6, 7]` and
+zero-containing skewed data recommended Log/Box-Cox and simultaneously claimed
+modeling readiness. An imbalanced string target also produced both Keep and
+Resample. Log/Box-Cox advice now requires known positive values and right skew;
+non-positive values, left skew and unknown domain evidence use Yeo-Johnson.
+The clean message is evaluated after target advice and is suppressed by Drop,
+Impute, Transform, Encode or Resample. Its text describes these checks rather
+than certifying readiness. New public-profile and serialized-payload tests
+cover those actions, signed/zero/positive domains, incomplete/nonfinite stats,
+thresholds, source preservation and the allowed Info+Keep case: **20 failed
+before the repair, 22 passed afterward**. The existing Insights tab displays
+the supplied recommendation text; no frontend change was required.
+
+**OC-101 — fixed.** A configured calibrated random forest seed of 7 was
+dropped as unsupported, and its base estimator still used 42. The tuning path
+constructs and clones `model_class` directly, so a calculator-only change would
+leave tuning broken. A small calibration-specific sklearn subclass accepts the
+seed and applies it to a cloned supported base estimator at fit. It covers
+ordinary training, search clones and final refitting without changing generic
+wrappers. Default 42, explicit 0 and None, deterministic bases and integer CV
+semantics are preserved. Dynamic hyperparameter text now describes the actual
+control. **17 initial regression failures** led to **21 passing new cases**,
+including fitted fold seeds, repeatable/different forest predictions, caller
+preservation on success/failure, clone/set_params, public tuning and pickle
+round trips. Existing fitted artifacts keep their predictions; retraining
+applies previously ignored custom seeds.
+
+**OC-140 — fixed.** With Canvas-shaped `mode="negative_to_nan"` on
+`["hello", "-3", "2"]`, pandas produced `[NaN, NaN, 2.0]` while Polars raised
+a numeric comparison error. Active numeric operations now reject selected
+nonnumeric columns consistently at fit and apply, naming the columns and
+requiring explicit conversion. Apply validation also covers inference dtype
+changes. A local numeric selector excludes pandas durations from automatic
+selection, matching Polars. Inactive operations remain no-ops. Four native/
+wrapped engine shapes cover rules, infinity flags, temporal/text/category/bool
+inputs, Decimal/nullable numeric values, empty selections and source/target
+preservation. **59 original failures**, two duration failures and five wrapper
+return-type failures were observed during development; the final new module
+passes **116 cases**. The wrapper regressions ensured no-op handling preserves
+the dispatcher's native pandas output and wrapped Polars output. Canvas already
+restricts selection to numeric columns and passes the config through.
+
+Final combined verification: **1,566 Core tests passed** across profiling,
+classification, tuning, cleaning, registry and artifact/schema coverage;
+**79 backend tests passed** across EDA, frontend-node contracts and cleaning/
+preprocessing integration. Scoped Ruff lint and format checks, the configured
+full ty check, and independent reviews of all three changes passed. User docs,
+changelog and source findings were updated. Queue: **28 open / 4 parked**.
 
 ### 2026-09-12 — OC-24/59/60: parallel preprocessing audit closure
 

@@ -156,6 +156,14 @@ Config:
 - `replacement`: any (default NaN)
 - `min_value` / `max_value`: used by `custom_range`
 
+Active numeric rules and infinity replacement require numeric selected columns
+on both engines. Text, categorical, Boolean and temporal selections raise a
+`ValueError` naming the columns; convert numeric text explicitly before this
+node. The same check runs when applying a fitted artifact, so inference data
+that changes a selected column to text fails clearly without coercing values.
+Automatic selection excludes temporal columns. An empty selection or a
+configuration with no active rule or infinity replacement leaves data untouched.
+
 Learned params:
 
 - `columns`, `rule`, `replacement`, `min_value`, `max_value`

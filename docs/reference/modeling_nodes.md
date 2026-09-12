@@ -76,6 +76,31 @@ Learned params:
 
 - fitted sklearn estimator (stored in-memory and pickled when saving the pipeline)
 
+### calibrated_classifier
+
+Calibrates a selected base classifier using sigmoid or isotonic calibration.
+Defaults are `base_estimator="logistic_regression"`, `method="sigmoid"` and
+`cv=5`. Other base choices are `random_forest`, `gradient_boosting`,
+`decision_tree`, `gaussian_nb` and `svc`.
+
+In advanced mode, Base Estimator is a search choice. For example,
+`"search_space": {"base_estimator": ["random_forest"], "method": ["isotonic"],
+"cv": [3]}` tunes a calibrated random forest. Selecting multiple bases compares
+those classifier families. All five search strategies preserve this choice
+during trials and the final refit, including with preprocessing fitted inside
+each fold. The winning parameters retain the selected base name in reports.
+
+`random_state` controls randomness in base estimators that support it, including
+the models fitted inside calibration folds. It defaults to 42, accepts 0, and
+can be set to `None` (`null` in JSON) for unseeded fitting. It also applies during
+tuning and the final model refit. Deterministic estimators such as Gaussian
+Naive Bayes are unaffected. An integer `cv` retains unshuffled calibration
+folds; this seed does not change those splits.
+
+For example, `{"base_estimator": "random_forest", "random_state": 7}` now
+seeds the calibrated forest with 7. Previously the forest always used 42.
+Existing fitted models retain their predictions; retrain to apply the setting.
+
 ### random_forest_classifier
 
 Backed by `sklearn.ensemble.RandomForestClassifier`.

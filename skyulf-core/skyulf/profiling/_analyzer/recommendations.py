@@ -3,7 +3,7 @@
 from ..schemas import Alert, ColumnProfile, Recommendation
 from ._utils import _AnalyzerState
 
-# |skew| above this triggers a log/Box-Cox transform recommendation.
+# |skew| above this triggers domain-aware transform advice.
 SKEWNESS_TRANSFORM_THRESHOLD = 1.5
 # Class-ratio bands: above the upper band the target is balanced, below the
 # lower band it is imbalanced enough to recommend resampling.
@@ -20,6 +20,7 @@ class RecommendationsMixin(_AnalyzerState):
         alerts: list[Alert],
         target_col: str | None,
     ) -> list[Recommendation]:
+        """Collect actionable advice before deciding whether a clean message applies."""
         recs: list[Recommendation] = []
 
         for col, profile in profiles.items():
@@ -33,8 +34,8 @@ class RecommendationsMixin(_AnalyzerState):
         for col, profile in profiles.items():
             recs.extend(self._id_column_recommendations(col, profile))
 
-        recs.extend(self._clean_dataset_recommendation(recs))
         recs.extend(self._target_balance_recommendations(profiles, target_col))
+        recs.extend(self._clean_dataset_recommendation(recs))
 
         return recs
 
@@ -64,21 +65,36 @@ class RecommendationsMixin(_AnalyzerState):
         return []
 
     def _skewness_recommendations(self, col: str, profile: ColumnProfile) -> list[Recommendation]:
-        """Recommend a transformation for highly skewed numeric columns."""
+        """Select transform advice using the numeric domain and skew direction.
+
+        Log/Box-Cox advice requires positive observations and right skew.
+        Yeo-Johnson supports non-positive values and is also the fallback
+        when the profile cannot establish a strictly positive domain.
+        """
+        stats = profile.numeric_stats
         if (
-            profile.numeric_stats
-            and profile.numeric_stats.skewness
-            and abs(profile.numeric_stats.skewness) > SKEWNESS_TRANSFORM_THRESHOLD
+            stats is None
+            or stats.skewness is None
+            or abs(stats.skewness) <= SKEWNESS_TRANSFORM_THRESHOLD
         ):
-            return [
-                Recommendation(
-                    column=col,
-                    action="Transform",
-                    reason=f"High skewness ({profile.numeric_stats.skewness:.2f})",
-                    suggestion=f"Apply Log or Box-Cox transformation to '{col}'.",
-                )
-            ]
-        return []
+            return []
+
+        positive_right_skew = (
+            stats.skewness > 0
+            and stats.min is not None
+            and stats.min > 0
+            and not stats.zeros_count
+            and not stats.negatives_count
+        )
+        method = "Log or Box-Cox" if positive_right_skew else "Yeo-Johnson"
+        return [
+            Recommendation(
+                column=col,
+                action="Transform",
+                reason=f"High skewness ({stats.skewness:.2f})",
+                suggestion=f"Consider {method} transformation for '{col}'.",
+            )
+        ]
 
     def _cardinality_recommendations(
         self, col: str, profile: ColumnProfile
@@ -128,15 +144,14 @@ class RecommendationsMixin(_AnalyzerState):
         return []
 
     def _clean_dataset_recommendation(self, recs: list[Recommendation]) -> list[Recommendation]:
-        """Provide positive reinforcement when no critical issues were found."""
-        critical_issues = [r for r in recs if r.action in ["Drop", "Impute"]]
-        if not critical_issues:
+        """Report no recommended preparation only after all actionable advice is known."""
+        if not any(r.action in {"Drop", "Impute", "Transform", "Encode", "Resample"} for r in recs):
             return [
                 Recommendation(
                     column=None,
                     action="Keep",
                     reason="Clean Dataset",
-                    suggestion="No missing values or constant columns found. Data is ready for modeling!",
+                    suggestion="No data preparation changes were recommended by these checks.",
                 )
             ]
         return []

@@ -5,7 +5,7 @@ import warnings
 from collections.abc import Callable
 from typing import Any, ClassVar
 
-from sklearn.base import BaseEstimator
+from sklearn.base import BaseEstimator, clone
 from sklearn.calibration import CalibratedClassifierCV
 from sklearn.ensemble import (
     AdaBoostClassifier,
@@ -192,6 +192,66 @@ class LogisticRegressionCalculator(SklearnCalculator):
 
 
 # --- Calibrated Classifier ---
+_CALIBRATED_BASE_ESTIMATORS: dict[str, Callable[[], BaseEstimator]] = {
+    "logistic_regression": lambda: LogisticRegression(max_iter=1000),
+    "random_forest": lambda: RandomForestClassifier(
+        n_estimators=100, random_state=DEFAULT_RANDOM_STATE
+    ),
+    "gradient_boosting": lambda: GradientBoostingClassifier(random_state=DEFAULT_RANDOM_STATE),
+    "decision_tree": lambda: DecisionTreeClassifier(random_state=DEFAULT_RANDOM_STATE),
+    "gaussian_nb": GaussianNB,
+    "svc": lambda: SVC(probability=True, random_state=DEFAULT_RANDOM_STATE),
+}
+
+
+def _make_calibrated_base_estimator(key: str) -> BaseEstimator:
+    """Resolve a symbolic calibration base consistently for direct fits and search trials."""
+    factory = _CALIBRATED_BASE_ESTIMATORS.get(key)
+    if factory is None:
+        logger.warning("Unknown base_estimator '%s'; falling back to logistic_regression.", key)
+        factory = _CALIBRATED_BASE_ESTIMATORS["logistic_regression"]
+    return factory()
+
+
+class _SeededCalibratedClassifierCV(CalibratedClassifierCV):
+    """Resolve a cloneable base selection and seed for each calibration fit.
+
+    Tuning constructs and clones ``model_class`` directly, bypassing the
+    calculator's ``fit``. Both ``base_estimator`` and ``random_state`` must
+    survive searcher ``set_params`` calls, including fold pipeline prefixes.
+    An explicit symbolic base overrides ``estimator`` for that candidate;
+    without one, the supplied estimator or sklearn default is preserved.
+    Integer CV folds retain sklearn's unshuffled splitting semantics.
+    """
+
+    def __init__(
+        self,
+        estimator: BaseEstimator | None = None,
+        *,
+        method: str = "sigmoid",
+        cv: Any = None,
+        n_jobs: int | None = None,
+        ensemble: bool | str = "auto",
+        random_state: int | None = DEFAULT_RANDOM_STATE,
+        base_estimator: str | None = None,
+    ) -> None:
+        """Keep constructor parameters intact for sklearn cloning and ``set_params``."""
+        super().__init__(
+            estimator=estimator, method=method, cv=cv, n_jobs=n_jobs, ensemble=ensemble
+        )
+        self.random_state = random_state
+        self.base_estimator = base_estimator
+
+    def fit(self, X: Any, y: Any, sample_weight: Any = None, **fit_params: Any) -> Any:
+        """Resolve and seed this candidate without modifying a caller-supplied estimator."""
+        if self.base_estimator is not None:
+            self.estimator = _make_calibrated_base_estimator(self.base_estimator)
+        estimator = self._get_estimator()
+        if "random_state" in estimator.get_params(deep=False):
+            self.estimator = clone(estimator).set_params(random_state=self.random_state)
+        return super().fit(X, y, sample_weight=sample_weight, **fit_params)
+
+
 class CalibratedClassifierApplier(SklearnApplier):
     """Calibrated Classifier Applier (well-calibrated predict_proba)."""
 
@@ -215,21 +275,16 @@ class CalibratedClassifierCalculator(SklearnCalculator):
     The frontend sends ``base_estimator`` as a string key (e.g.
     ``"random_forest"``); it is resolved here into a fresh estimator instance
     before ``CalibratedClassifierCV`` is constructed. Defaults to logistic
-    regression for backward compatibility.
+    regression for backward compatibility. ``random_state`` seeds supported
+    base estimators, defaults to 42, and accepts ``None`` for unseeded fits.
+    It does not shuffle calibration CV folds or affect deterministic bases.
+    A tuning search space can select one or more ``base_estimator`` keys;
+    each candidate and the final refit use the selected classifier family.
     """
 
     # Map of selectable base estimators → factory. Each must support
     # ``predict_proba`` (or ``decision_function``) so calibration is meaningful.
-    BASE_ESTIMATORS: ClassVar[dict[str, Callable[[], BaseEstimator]]] = {
-        "logistic_regression": lambda: LogisticRegression(max_iter=1000),
-        "random_forest": lambda: RandomForestClassifier(
-            n_estimators=100, random_state=DEFAULT_RANDOM_STATE
-        ),
-        "gradient_boosting": lambda: GradientBoostingClassifier(random_state=DEFAULT_RANDOM_STATE),
-        "decision_tree": lambda: DecisionTreeClassifier(random_state=DEFAULT_RANDOM_STATE),
-        "gaussian_nb": GaussianNB,
-        "svc": lambda: SVC(probability=True, random_state=DEFAULT_RANDOM_STATE),
-    }
+    BASE_ESTIMATORS: ClassVar[dict[str, Callable[[], BaseEstimator]]] = _CALIBRATED_BASE_ESTIMATORS
 
     STRUCTURAL_TUNING_KEYS: tuple[str, ...] = ("base_estimator",)
 
@@ -242,7 +297,7 @@ class CalibratedClassifierCalculator(SklearnCalculator):
         :meth:`prepare_tuning_params` records a different selection.
         """
         super().__init__(
-            model_class=CalibratedClassifierCV,
+            model_class=_SeededCalibratedClassifierCV,
             default_params={
                 "estimator": LogisticRegression(max_iter=1000),
                 "method": "sigmoid",
@@ -264,13 +319,7 @@ class CalibratedClassifierCalculator(SklearnCalculator):
         if self._tuning_base_config:
             key = self._tuning_base_config.get("base_estimator")
             if isinstance(key, str):
-                factory = self.BASE_ESTIMATORS.get(key)
-                if factory is None:
-                    logger.warning(
-                        "Unknown base_estimator '%s'; falling back to logistic_regression.", key
-                    )
-                    factory = self.BASE_ESTIMATORS["logistic_regression"]
-                params["estimator"] = factory()
+                params["estimator"] = _make_calibrated_base_estimator(key)
         return params
 
     def prepare_tuning_params(self, config: dict[str, Any]) -> None:
@@ -320,13 +369,7 @@ class CalibratedClassifierCalculator(SklearnCalculator):
         bucket = dict(resolved["params"]) if nested else resolved
         key = bucket.pop("base_estimator", None)
         if isinstance(key, str):
-            factory = cls.BASE_ESTIMATORS.get(key)
-            if factory is None:
-                logger.warning(
-                    "Unknown base_estimator '%s'; falling back to logistic_regression.", key
-                )
-                factory = cls.BASE_ESTIMATORS["logistic_regression"]
-            bucket["estimator"] = factory()
+            bucket["estimator"] = _make_calibrated_base_estimator(key)
         if nested:
             resolved["params"] = bucket
             return resolved

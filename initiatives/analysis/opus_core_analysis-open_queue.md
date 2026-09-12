@@ -27,9 +27,8 @@ detail lives in the archive's `## Log` section.
 
 ## Live — fix queue
 
-**Current status (2026-09-12): 31 open / 4 parked.** OC-59/60 are fixed and
-OC-24 is verified already fixed at the public fit/apply boundary; all three
-are recorded in the archive.
+**Current status (2026-09-12): 28 open / 4 parked.** OC-51/101/140 are fixed
+and recorded in the archive with reproduction and regression evidence.
 
 Ordered by the master report's suggested fix order: **Now** (silent wrongness
 reaching users), **Next** (wrong results in realistic configs), **Then** (decide
@@ -65,7 +64,6 @@ closed that on 2026-09-07.
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
 | OC-91 | 🟡 | Three public `core/` seams (263 lines) have zero call sites; one duplicates a differently-shaped backend class name | small | ⬜ open |
-| OC-101 | 🟡 | `calibrated_classifier`'s `random_state` no-op for two independent reasons (estimator rejects it AND factories hardcode the seed) | small | ⬜ open |
 | OC-111 | 🟡 | A profiling recommendation branch is unreachable | small | ⬜ open |
 | OC-102 | ⚪ | Five tunable models return an empty search space from the live `/defaults` endpoint (`hyperparameters/_registry.py`) | small | ⬜ open |
 | OC-90 | ⚪ | Unknown split config keys silently dropped instead of rejected (`preprocessing/split.py`) | small | ⬜ open |
@@ -74,7 +72,6 @@ closed that on 2026-09-07.
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
-| OC-140 | 🟠 | `InvalidValueReplacement` diverges across engines on non-numeric columns (pandas silently NaNs, polars raises) | small | ⬜ open |
 
 ### Remaining — cross-cutting & packaging
 
@@ -106,7 +103,6 @@ closed that on 2026-09-07.
 | OC-47 | 🟡 | Common-column dtype drift can silently disappear (`profiling/drift.py:136-153`) | small | ⬜ open |
 | OC-48 | 🟡 | Expectations pass vacuously on empty frames (`profiling/expect.py:92-209`) | small | ⬜ open |
 | OC-50 | 🟡 | Binary targets miss class-balance advice or flip to regression by sample size (`recommendations.py:147-152`) | small | ⬜ open |
-| OC-51 | 🟡 | Transform advice can be mathematically invalid and self-contradictory (`recommendations.py:66-78,129-139`) | small | ⬜ open |
 
 
 ### Remaining — core / engines / pipeline
