@@ -52,6 +52,7 @@ from ..core.meta.decorators import node_meta
 from ..registry import NodeRegistry
 from ..types import DEFAULT_RANDOM_STATE
 from ._boosting_progress import LightGBMIterationAdapter, XgboostIterationAdapter
+from ._lightgbm import resolve_sampling_frequency
 from ._sklearn_compat import normalize_logistic_regression_params
 from .sklearn_wrapper import SklearnApplier, SklearnCalculator
 
@@ -741,6 +742,13 @@ class HistGradientBoostingClassifierCalculator(SklearnCalculator):
 # --- LightGBM Classifier (optional) ---
 if LIGHTGBM_AVAILABLE:
 
+    class _SamplingLGBMClassifier(LGBMClassifier):
+        """Resolve automatic row sampling after tuning applies candidate parameters."""
+
+        def _process_params(self, stage: str) -> dict[str, Any]:
+            """Apply the sampling policy without mutating cloneable constructor state."""
+            return resolve_sampling_frequency(super()._process_params(stage))
+
     class LGBMClassifierApplier(SklearnApplier):
         """LightGBM Classifier Applier.
 
@@ -782,12 +790,14 @@ if LIGHTGBM_AVAILABLE:
 
             ``max_depth=-1`` leaves depth unbounded, so ``num_leaves=31`` alone
             governs tree shape, and both subsampling rates and both L1/L2
-            penalties start at their neutral values. ``verbose`` and
+            penalties start at their neutral values. Automatic ``subsample_freq``
+            enables per-round bagging when the fraction is below one, except
+            for GOSS, which keeps its gradient sampling. ``verbose`` and
             ``verbosity`` are pinned to -1 to quiet LightGBM's native logging
             alongside the no-op logger registered at import time.
             """
             super().__init__(
-                model_class=LGBMClassifier,
+                model_class=_SamplingLGBMClassifier,
                 default_params={
                     "n_estimators": 100,
                     "num_leaves": 31,
@@ -795,6 +805,7 @@ if LIGHTGBM_AVAILABLE:
                     "max_depth": -1,
                     "min_child_samples": 20,
                     "subsample": 1.0,
+                    "subsample_freq": None,
                     "colsample_bytree": 1.0,
                     "reg_alpha": 0.0,
                     "reg_lambda": 0.0,

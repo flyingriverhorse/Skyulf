@@ -321,6 +321,8 @@ class TuningCalculator(BaseModelCalculator):
             "XGBRegressor",
             "LGBMClassifier",
             "LGBMRegressor",
+            "_SamplingLGBMClassifier",
+            "_SamplingLGBMRegressor",
             "HistGradientBoostingClassifier",
             "HistGradientBoostingRegressor",
         }

@@ -9,6 +9,11 @@ export interface Filter {
     value: string | number | boolean | Array<string | number>;
 }
 
+/** Decomposition drill-down supports an explicit null for the selected missing bucket. */
+export interface DecompositionFilter extends Omit<Filter, 'value'> {
+    value: Filter['value'] | null;
+}
+
 export interface EDAReport {
     id?: number;
     status?: 'PENDING' | 'COMPLETED' | 'FAILED' | string;
@@ -65,7 +70,7 @@ export const EDAService = {
     return response.data;
   },
 
-  getDecomposition: async (datasetId: number, measureCol: string | null, measureAgg: string, splitCol: string, filters: Filter[]) => {
+  getDecomposition: async (datasetId: number, measureCol: string | null, measureAgg: string, splitCol: string, filters: DecompositionFilter[]) => {
     // nosemgrep: node-ssrf -- browser axios call to our own fixed API_BASE; `datasetId`
     // is a numeric identifier, never an attacker-supplied host/URL.
     const response = await axios.post(`${API_BASE}/${datasetId}/decomposition`, {

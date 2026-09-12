@@ -147,9 +147,10 @@ const convertEncoding: NodeConverter = (node) => {
 };
 
 const convertTrainTestSplitter: NodeConverter = (node) => {
+  const keys = new Set(['test_size', 'validation_size', 'random_state', 'shuffle', 'stratify', 'target_column']);
   return {
     stepType: 'TrainTestSplitter',
-    params: node.data || {}
+    params: Object.fromEntries(Object.entries(node.data || {}).filter(([key]) => keys.has(key)))
   };
 };
 

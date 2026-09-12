@@ -45,8 +45,8 @@ class DecompositionMixin(_AnalyzerState):
         return filtered_df
 
     @staticmethod
-    def _filter_unknown_numeric(filtered_df: pl.DataFrame, col: str, op: str) -> pl.DataFrame:
-        """Filter a numeric column against the FE's "Unknown" (null) sentinel."""
+    def _filter_missing(filtered_df: pl.DataFrame, col: str, op: str) -> pl.DataFrame:
+        """Select or exclude missing rows without comparing a display label."""
         if op == "==":
             return filtered_df.filter(pl.col(col).is_null())
         elif op == "!=":
@@ -56,8 +56,8 @@ class DecompositionMixin(_AnalyzerState):
     def _apply_single_filter(self, filtered_df: pl.DataFrame, f: dict[str, Any]) -> pl.DataFrame:
         """Apply one filter dict to ``filtered_df``, with numeric-vs-string coercion.
 
-        FE serializes all filter values as strings, so numeric columns need
-        coercion, and "Unknown" is the FE's stand-in for nulls.
+        Numeric labels need coercion. A JSON null selects missing rows; older
+        clients can still use "Unknown" for numeric columns.
         """
         col = f["column"]
         op = f["operator"]
@@ -66,12 +66,15 @@ class DecompositionMixin(_AnalyzerState):
         if col not in filtered_df.columns:
             return filtered_df
 
+        if val is None:
+            return self._filter_missing(filtered_df, col, op)
+
         dtype = filtered_df.schema[col]
         is_numeric = dtype in self._NUMERIC_DTYPES
 
         if is_numeric and isinstance(val, str):
             if val == "Unknown":
-                return self._filter_unknown_numeric(filtered_df, col, op)
+                return self._filter_missing(filtered_df, col, op)
             val = self._coerce_filter_value(dtype, val)
 
         col_expr = (
@@ -137,7 +140,7 @@ class DecompositionMixin(_AnalyzerState):
         return temp_df.group_by(split_col).agg(value_expr.alias("value"))
 
     def _rows_to_split_result(self, agg_df: pl.DataFrame, split_col: str) -> list[dict[str, Any]]:
-        """Add a normalized "ratio" column to ``agg_df`` and convert it to result dicts."""
+        """Format labels and ratios while retaining nullable group values for filtering."""
         total_val = agg_df["value"].sum()
         if total_val == 0 or total_val is None:
             result_df = agg_df.with_columns(pl.lit(0.0).alias("ratio"))
@@ -148,7 +151,8 @@ class DecompositionMixin(_AnalyzerState):
 
         return [
             {
-                "name": str(row[split_col]),
+                "name": row[split_col] if row[split_col] is not None else "Unknown",
+                "filter_value": row[split_col],
                 "value": row["value"] if row["value"] is not None else 0,
                 "ratio": row["ratio"] if row["ratio"] is not None else 0,
             }
@@ -166,8 +170,8 @@ class DecompositionMixin(_AnalyzerState):
         if split_col not in filtered_df.columns:
             return []
 
-        # Surface nulls as "Unknown" rather than dropping them.
-        temp_df = filtered_df.with_columns(pl.col(split_col).fill_null("Unknown").cast(pl.Utf8))
+        # Keep nulls distinct from a real "Unknown" category until display formatting.
+        temp_df = filtered_df.with_columns(pl.col(split_col).cast(pl.Utf8))
 
         agg_df = self._aggregate_grouped(temp_df, split_col, measure_col, measure_agg)
         if agg_df is None:
@@ -182,7 +186,13 @@ class DecompositionMixin(_AnalyzerState):
         split_col: str | None,
         filters: list[dict[str, Any]],
     ) -> list[dict[str, Any]]:
-        """Apply ``filters``, then aggregate ``measure_col`` either globally or split by ``split_col``."""
+        """Filter rows and aggregate a measure globally or by the selected split column.
+
+        Grouped results include a display ``name`` and a nullable ``filter_value``.
+        Use ``filter_value`` for subsequent equality filters: null selects missing
+        rows, while the string "Unknown" selects that literal category. Numeric
+        columns also accept the legacy "Unknown" missing-value filter.
+        """
         # 1. Apply filters (with numeric-vs-string coercion since FE serializes everything as strings).
         filtered_df = self._apply_decomposition_filters(filters)
 

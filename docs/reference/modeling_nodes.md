@@ -62,6 +62,25 @@ Seed** in each node's Cross Validation section. Full precedence rules:
 
 ## Classification
 
+### LightGBM row sampling
+
+The `lgbm_classifier` and `lgbm_regressor` nodes apply `subsample` during basic
+training, hyperparameter search and the final refit. With GBDT or DART,
+`subsample=0.4` uses 40% of the training rows per boosting iteration. The default
+`subsample=1.0` uses all rows. GOSS keeps its gradient-based sampling instead of
+ordinary row bagging, so this fraction does not control GOSS sampling.
+
+Skyulf resolves its automatic `subsample_freq=None` to 1 for ordinary boosting
+and 0 for GOSS after each candidate's parameters are applied. Explicit numeric
+frequencies and LightGBM's `bagging_freq` alias are preserved; `subsample_freq=0`
+disables row bagging. Explicit combinations that LightGBM rejects, such as GOSS
+with ordinary bagging enabled, continue to raise an error.
+
+Previously the default frequency was 0, so changing `subsample` had no effect.
+Existing fitted models retain their predictions. Retrain or rerun tuning to
+apply a previously ignored fraction. To reproduce the previous sampling policy
+in a new fit, set `subsample_freq=0` explicitly.
+
 ### logistic_regression
 
 Backed by `sklearn.linear_model.LogisticRegression`.

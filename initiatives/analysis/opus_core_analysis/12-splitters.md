@@ -26,6 +26,15 @@ is filed. New ids continue from the master at **OC-90**.
 ### OC-90
 ### ⚪ Low — Unrecognised split config keys are silently dropped
 
+**Fixed 2026-09-12:** fitting now logs one warning naming unknown public
+configuration keys and listing the supported settings. The existing
+ignore-unknown behavior and artifact shape remain compatible; `type` and
+private underscore-prefixed metadata are quiet. Canvas now serializes the six
+supported settings without editor labels/identifiers, then adds its existing
+routing metadata. Public direct/pipeline regressions cover both engines and
+preserve the old row partitioning while making mistyped settings visible.
+The source recommendation below was implemented as a warning, not rejection.
+
 **File:** `skyulf-core/skyulf/preprocessing/split.py:174-183`
 
 `SplitCalculator.fit` copies a fixed whitelist into the artifact:

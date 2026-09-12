@@ -58,7 +58,15 @@ Config (`params`):
 - `stratify`: bool (default False)
 - `target_column`: str (required only when splitting a DataFrame and using stratify)
 
-Learned params: none (passes through config).
+The node copies only these six settings into its fitted artifact. Unknown
+public keys produce a warning and are ignored; they do not change the split.
+For example, `stratify_col="target"` is a `DataSplitter` constructor argument,
+not a node setting. Use `stratify=True` and `target_column="target"` here.
+The artifact's `type` field and private underscore-prefixed routing metadata
+are ignored without warnings. Canvas sends the supported settings separately
+from its editor labels and identifiers.
+
+Learned params: none (records the recognized config settings).
 
 ### feature_target_split
 

@@ -302,7 +302,24 @@ Get a specific EDA report by ID.
 Cancel a running EDA analysis.
 
 ### `POST /api/eda/{dataset_id}/decomposition`
-Run time-series decomposition on a dataset column.
+Aggregate a measure for one level of the EDA decomposition tree, optionally
+grouped by `split_col` and restricted by `filters`.
+
+Grouped response rows include `name` (display label), `filter_value` (the
+category identity), `value` and `ratio`. Use `filter_value` when drilling into a
+row: missing values have JSON `null`, while a real category named `Unknown`
+has the string `"Unknown"`. For example, the following filter selects missing
+values in `group`:
+
+```json
+{"column": "group", "operator": "==", "value": null}
+```
+
+Use `"!="` with `null` to select non-missing rows. The UI labels the missing
+bucket `Unknown (missing)` and keeps literal `Unknown` separate. Older response
+rows without `filter_value` fall back to their display name; the legacy string
+`"Unknown"` still selects missing values on numeric columns. Reload or reopen
+the tree to obtain updated group identities; no stored-data migration is needed.
 
 ### `GET /api/eda/jobs/all`
 List all EDA jobs with status. Query params: `limit` (default 50), `skip` (default 0).

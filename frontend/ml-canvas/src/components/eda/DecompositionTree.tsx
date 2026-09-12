@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { EDAService, Filter } from '../../core/api/eda';
+import { EDAService, DecompositionFilter, Filter } from '../../core/api/eda';
 import { Plus, X, Loader2 } from 'lucide-react';
 import { clickableProps } from '../../core/utils/a11y';
 
 interface TreeItem {
     name: string;
+    filter_value?: string | null;
     value: number;
     ratio: number;
 }
@@ -13,8 +14,8 @@ interface TreeLevel {
     id: string;
     splitColumn: string | null; // The column used to generate this level's items
     items: TreeItem[];
-    selectedItemName: string | null;
-    filters: Filter[]; // Filters applied to reach this level
+    selectedItemKey: string | null;
+    filters: DecompositionFilter[]; // Filters applied to reach this level
 }
 
 interface DecompositionTreeProps {
@@ -30,6 +31,16 @@ interface DecompositionTreeProps {
 // don't retain every tree ever viewed for the lifetime of the page.
 const TREE_CACHE_MAX_ENTRIES = 20;
 const treeCache = new Map<string, { levels: TreeLevel[], splitPath: (string|null)[] }>();
+
+/** Retain explicit nulls while accepting responses from before filter values were added. */
+function getItemFilterValue(item: TreeItem): string | null {
+    return item.filter_value === undefined ? item.name : item.filter_value;
+}
+
+/** Missing rows and a real category named Unknown must have different selection identities. */
+function getItemKey(item: TreeItem): string {
+    return JSON.stringify([getItemFilterValue(item)]);
+}
 
 function setTreeCache(key: string, value: { levels: TreeLevel[], splitPath: (string|null)[] }): void {
     // Re-inserting moves the key to the "most recently used" end.
@@ -81,10 +92,10 @@ export const DecompositionTree: React.FC<DecompositionTreeProps> = ({
         levels.forEach((level, index) => {
             if (index >= levels.length - 1) return;
 
-            const selectedItemName = level.selectedItemName;
-            if (!selectedItemName) return;
+            const selectedItemIndex = level.items.findIndex(item => getItemKey(item) === level.selectedItemKey);
+            if (selectedItemIndex < 0) return;
 
-            const startId = `node-${index}-${selectedItemName}`;
+            const startId = `node-${index}-${selectedItemIndex}`;
             const startEl = document.getElementById(startId);
 
             if (startEl) {
@@ -99,9 +110,10 @@ export const DecompositionTree: React.FC<DecompositionTreeProps> = ({
 
                 const nextLevel = levels[index + 1];
                 if (!nextLevel) return;
-                if (nextLevel.selectedItemName) {
+                if (nextLevel.selectedItemKey) {
                     // If next level has a selection, connect to that item
-                    const endId = `node-${index + 1}-${nextLevel.selectedItemName}`;
+                    const nextItemIndex = nextLevel.items.findIndex(item => getItemKey(item) === nextLevel.selectedItemKey);
+                    const endId = `node-${index + 1}-${nextItemIndex}`;
                     const endEl = document.getElementById(endId);
 
                     if (endEl) {
@@ -189,7 +201,7 @@ export const DecompositionTree: React.FC<DecompositionTreeProps> = ({
                 id: 'root',
                 splitColumn: null,
                 items: res,
-                selectedItemName: null,
+                selectedItemKey: null,
                 filters: initialFilters
             };
 
@@ -209,12 +221,12 @@ export const DecompositionTree: React.FC<DecompositionTreeProps> = ({
     const handleHeaderSplitClick = (levelIndex: number, event: React.MouseEvent) => {
         // Only allow splitting if an item is selected in this level
         const level = levels[levelIndex];
-        if (!level || !level.selectedItemName) {
+        if (!level || !level.selectedItemKey) {
             // Maybe show a toast or tooltip? For now just return.
             return;
         }
 
-        const item = level.items.find(i => i.name === level.selectedItemName);
+        const item = level.items.find(i => getItemKey(i) === level.selectedItemKey);
         if (!item) return;
 
         // Open Split Menu
@@ -252,7 +264,7 @@ export const DecompositionTree: React.FC<DecompositionTreeProps> = ({
         // fetch below fails.
         const currentLevel = levels[levelIndex];
         if (!currentLevel) return;
-        const updatedCurrentLevel = { ...currentLevel, selectedItemName: item.name };
+        const updatedCurrentLevel = { ...currentLevel, selectedItemKey: getItemKey(item) };
         const newLevels = levels.map((l, i) => (i === levelIndex ? updatedCurrentLevel : l));
 
         // Check if we have a next level defined in our split path
@@ -269,7 +281,7 @@ export const DecompositionTree: React.FC<DecompositionTreeProps> = ({
                     newFilters.push({
                         column: updatedCurrentLevel.splitColumn,
                         operator: '==',
-                        value: item.name
+                        value: getItemFilterValue(item)
                     });
                 } else if (levelIndex === 0) {
                     // Root level
@@ -293,7 +305,7 @@ export const DecompositionTree: React.FC<DecompositionTreeProps> = ({
                     id: `level-${levelIndex + 1}`,
                     splitColumn: nextSplitCol,
                     items: res,
-                    selectedItemName: null, // Reset selection in next level
+                    selectedItemKey: null, // Reset selection in next level
                     filters: newFilters
                 };
 
@@ -341,7 +353,7 @@ export const DecompositionTree: React.FC<DecompositionTreeProps> = ({
                 newFilters.push({
                     column: currentLevel.splitColumn,
                     operator: '==',
-                    value: item.name
+                    value: getItemFilterValue(item)
                 });
             }
 
@@ -360,7 +372,7 @@ export const DecompositionTree: React.FC<DecompositionTreeProps> = ({
                 id: `level-${levelIndex + 1}`,
                 splitColumn: column,
                 items: res,
-                selectedItemName: null,
+                selectedItemKey: null,
                 filters: newFilters
             };
 
@@ -413,10 +425,10 @@ export const DecompositionTree: React.FC<DecompositionTreeProps> = ({
                                             onClick={(e) => handleHeaderSplitClick(index, e)}
                                             className={`
                                                 p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors
-                                                ${level.selectedItemName ? 'text-blue-500' : 'text-slate-300 cursor-not-allowed'}
+                                                ${level.selectedItemKey ? 'text-blue-500' : 'text-slate-300 cursor-not-allowed'}
                                             `}
-                                            title={level.selectedItemName ? "Split further" : "Select an item to split"}
-                                            disabled={!level.selectedItemName}
+                                            title={level.selectedItemKey ? "Split further" : "Select an item to split"}
+                                            disabled={!level.selectedItemKey}
                                         >
                                             <Plus className="w-4 h-4" />
                                         </button>
@@ -436,16 +448,18 @@ export const DecompositionTree: React.FC<DecompositionTreeProps> = ({
                                 className="flex-1 overflow-y-auto pr-2 space-y-2 scrollbar-thin scrollbar-thumb-slate-300 dark:scrollbar-thumb-slate-600"
                                 onScroll={updatePaths}
                             >
-                                {level.items.map((item) => {
-                                    const isSelected = level.selectedItemName === item.name;
+                                {level.items.map((item, itemIndex) => {
+                                    const itemKey = getItemKey(item);
+                                    const isSelected = level.selectedItemKey === itemKey;
                                     const isMax = Math.max(...level.items.map(i => i.value));
                                     const barWidth = (item.value / isMax) * 100;
 
                                     return (
                                         <div
-                                            key={item.name}
-                                            id={`node-${index}-${item.name}`}
+                                            key={itemKey}
+                                            id={`node-${index}-${itemIndex}`}
                                             {...clickableProps(() => handleItemClick(index, item))}
+                                            aria-pressed={isSelected}
                                             className={`
                                                 relative p-3 rounded-md border cursor-pointer transition-all group
                                                 ${isSelected
@@ -457,6 +471,7 @@ export const DecompositionTree: React.FC<DecompositionTreeProps> = ({
                                             <div className="flex justify-between items-center mb-1 relative z-10 gap-2">
                                                 <span className="font-medium text-sm truncate flex-1 min-w-0" title={item.name}>
                                                     {item.name}
+                                                    {item.filter_value === null && <span className="text-slate-500"> (missing)</span>}
                                                 </span>
                                                 <span className="text-xs font-mono text-slate-500 dark:text-slate-400 whitespace-nowrap">
                                                     {item.value.toLocaleString()} ({Math.round(item.ratio * 100)}%)
