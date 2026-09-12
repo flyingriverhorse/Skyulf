@@ -207,4 +207,5 @@ def test_legacy_ordered_power_artifact_keeps_its_saved_statistics(engine):
     }
     out = GeneralTransformationApplier().apply(_frame({"x": [0.0, 2.0, 4.0]}, engine), params)
 
-    np.testing.assert_allclose(out["x"].to_numpy(), [0.0, -0.5, 0.0])
+    # Equivalent Yeo-Johnson implementations can leave roundoff near exact zero.
+    np.testing.assert_allclose(out["x"].to_numpy(), [0.0, -0.5, 0.0], rtol=0, atol=1e-12)

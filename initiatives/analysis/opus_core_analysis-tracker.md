@@ -462,6 +462,50 @@ respective fix logs; OC-167 closed with canonical artifact framing on 2026-09-09
 
 ## Log
 
+### 2026-09-13 — 0.8.21 CI follow-up: complexity and sklearn 1.9 compatibility
+
+Reproduced the reported Lizard gate failure: GeneralTransformation `fit`
+had CCN 9. Extracted per-rule artifact fitting into `_fit_transformation_rule`
+without changing rule order, skip/error handling or saved-artifact replay.
+`fit` now has CCN 7 and the helper CCN 4; the exact four-directory CCN 8 gate
+passes. Pylint also reproduced the reported missing-`params` warning. It is a
+false positive caused by `apply_method` exposing `(data, params)` over the
+internal `(X, y, params)` signature; documented that contract and applied the
+existing per-call suppression convention. No runtime argument was missing.
+
+The local sklearn 1.8.0 environment initially passed all 41 reported-area
+tests. An isolated sklearn 1.9.1 installation reproduced the four CI failures:
+two legacy power-artifact assertions rejected about `4.44e-16` roundoff, and
+two tree tests incorrectly expected NaN rejection. Sklearn 1.9 changed
+Yeo-Johnson evaluation and added missing-value support for `absolute_error`
+and monotonic trees; see the [upstream release notes](https://scikit-learn.org/stable/whats_new/v1.9.html).
+The legacy assertion now uses `rtol=0, atol=1e-12`, retaining strict checks of
+saved statistics while admitting floating-point roundoff around zero.
+
+Tree regressions now compare tuning with direct fitting on the installed
+sklearn version. Additional real Bagging(Ridge)/Bagging(tree) cases retain
+configuration-sensitive rejection/acceptance and searched-estimator overrides
+for Grid and Halving Grid. The production NaN admission guard is unchanged.
+Process-local mutation checks confirm that the new tests reject both an
+always-permissive guard and one that ignores searched overrides.
+
+Focused checks pass 114 transformation tests and 31 native-NaN tuning tests
+on both sklearn 1.8.0 and 1.9.1. The isolated installation leaves the working
+environment unchanged. Independent review confirms preserved transformation
+semantics. This follow-up does not close another queue item: **58 open /
+4 parked** remain, with OC-319 still separate.
+
+Final full-Core verification using sklearn **1.9.1** and imbalanced-learn
+**0.14.2** passes **8,839 tests / 80 skipped / three snapshots**. The initial
+isolated probe reused imbalanced-learn 0.14.1, whose private sklearn API usage
+caused four unrelated G-score failures; updating only the isolated target to
+the CI-permitted 0.14.2 resolves them, including all 12 focused G-score cases.
+No project dependency declaration or installed working-environment version
+was changed. Core Ruff, global Ty, scoped formatting, the Lizard hard gate,
+the reported Pylint check and applicable pre-commit hooks pass. Fresh checks
+before the requested DCO-signed commit pass all 145 focused tests on each
+sklearn version, along with the Lizard and reported Pylint checks.
+
 ### 2026-09-12 — 0.8.21 version alignment and six-fix commit verification
 
 Prepared OC-264/275/282/285/294/295, their regression tests and documentation

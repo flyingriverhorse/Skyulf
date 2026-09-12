@@ -5,7 +5,8 @@ from typing import Any
 import numpy as np
 import pandas as pd
 import pytest
-from sklearn.ensemble import VotingRegressor
+from sklearn.ensemble import BaggingRegressor, VotingRegressor
+from sklearn.linear_model import Ridge
 from sklearn.tree import DecisionTreeRegressor
 
 from skyulf.modeling._tuning import engine as tuning_engine
@@ -71,19 +72,93 @@ def test_native_missing_features_reach_search_and_best_model(
 
 
 @pytest.mark.parametrize("settings", [{"criterion": "absolute_error"}, {"monotonic_cst": [1, 0]}])
-def test_missing_unsupported_tree_configuration_is_rejected(settings: dict[str, Any]) -> None:
-    """NaN support for one tree configuration must not authorize incompatible settings."""
+@pytest.mark.parametrize("strategy", ["grid", "halving_grid"])
+def test_missing_tree_configuration_matches_direct_fit(
+    settings: dict[str, Any], strategy: Any
+) -> None:
+    """Tuning must follow installed tree support, which expanded in sklearn 1.9."""
     X, y = _missing_data()
     calculator = SklearnCalculator(DecisionTreeRegressor, settings, "regression")
-    with pytest.raises(ValueError, match="NaN"):
-        TuningCalculator(calculator).fit(
-            X, y, TuningConfig(strategy="grid", metric="r2", search_space={"max_depth": [2]})
-        )
+    config = TuningConfig(
+        strategy=strategy, metric="r2", search_space={"max_depth": [2]}, cv_folds=2
+    )
+    direct = DecisionTreeRegressor(**settings, max_depth=2)
+    try:
+        direct.fit(X.to_numpy(), y.to_numpy())
+    except ValueError as exc:
+        assert "NaN" in str(exc)
+        with pytest.raises(ValueError, match="NaN"):
+            TuningCalculator(calculator).fit(X, y, config)
+        return
+
+    assert np.isfinite(direct.predict(X.to_numpy())).all()
+    model, result = TuningCalculator(calculator).fit(X, y, config)
+    assert result.best_params == {"max_depth": 2}
+    assert np.isfinite(result.best_score)
+    assert all(model.get_params()[key] == value for key, value in settings.items())
+    assert np.isfinite(model.predict(X.to_numpy())).all()
+
+
+@pytest.mark.parametrize("estimator_type", [DecisionTreeRegressor, Ridge])
+@pytest.mark.parametrize("strategy", ["grid", "halving_grid"])
+def test_missing_bagging_features_follow_configured_estimator(
+    estimator_type: type[Any], strategy: Any
+) -> None:
+    """A fixed base estimator must govern bagging's NaN admission before search."""
+    X, y = _missing_data()
+    settings = {"estimator": estimator_type(), "n_estimators": 2}
+    calculator = SklearnCalculator(BaggingRegressor, settings, "regression")
+    config = TuningConfig(
+        strategy=strategy, metric="r2", search_space={"n_estimators": [2]}, cv_folds=2
+    )
+    direct = BaggingRegressor(**settings)
+    if estimator_type is Ridge:
+        with pytest.raises(ValueError, match="NaN"):
+            direct.fit(X.to_numpy(), y.to_numpy())
+        with pytest.raises(ValueError, match=r"Input features \(X\) contain NaN"):
+            TuningCalculator(calculator).fit(X, y, config)
+        return
+
+    direct.fit(X.to_numpy(), y.to_numpy())
+    assert np.isfinite(direct.predict(X.to_numpy())).all()
+    model, result = TuningCalculator(calculator).fit(X, y, config)
+    assert result.best_params == {"n_estimators": 2}
+    assert np.isfinite(result.best_score)
+    assert isinstance(model.estimator_, estimator_type)
+    assert np.isfinite(model.predict(X.to_numpy())).all()
 
 
 @pytest.mark.parametrize("strategy", ["grid", "halving_grid"])
-def test_search_can_select_missing_support_over_an_incompatible_default(strategy: Any) -> None:
-    """A searched criterion must replace a fixed default before judging its NaN support."""
+def test_search_can_replace_a_nan_incompatible_base_estimator(strategy: Any) -> None:
+    """A searched native base estimator must replace bagging's non-native default."""
+    X, y = _missing_data()
+    calculator = SklearnCalculator(
+        BaggingRegressor, {"estimator": Ridge(), "n_estimators": 2}, "regression"
+    )
+    with pytest.raises(ValueError, match="NaN"):
+        BaggingRegressor(estimator=Ridge(), n_estimators=2).fit(X.to_numpy(), y.to_numpy())
+
+    replacement = DecisionTreeRegressor(max_depth=2)
+    model, result = TuningCalculator(calculator).fit(
+        X,
+        y,
+        TuningConfig(
+            strategy=strategy,
+            metric="r2",
+            search_space={"estimator": [replacement]},
+            cv_folds=2,
+        ),
+    )
+    assert result.best_params == {"estimator": replacement}
+    assert np.isfinite(result.best_score)
+    assert isinstance(model.estimator_, DecisionTreeRegressor)
+    assert model.estimator_.max_depth == 2
+    assert np.isfinite(model.predict(X.to_numpy())).all()
+
+
+@pytest.mark.parametrize("strategy", ["grid", "halving_grid"])
+def test_search_can_replace_a_criterion_with_version_dependent_nan_support(strategy: Any) -> None:
+    """The searched criterion must work even on releases rejecting the fixed default."""
     X, y = _missing_data()
     calculator = SklearnCalculator(
         DecisionTreeRegressor, {"criterion": "absolute_error"}, "regression"
