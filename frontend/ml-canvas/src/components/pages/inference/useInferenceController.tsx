@@ -42,10 +42,10 @@ export function useInferenceController() {
      * at /predict time whenever `enabled` is true and no ad-hoc override is set. */
     const savedThresholds = useSavedThresholdInfo(activeDeployment?.job_id ?? null);
     const {
-        lastAttemptRef, predictions, setPredictions, activeRun, currentRunMeta,
-        setCurrentRunMeta, runHistory, setRunHistory, error, setError, latencyMs,
-        setLatencyMs, thresholdsApplied, setThresholdsApplied, submitRun, handleRetryRun,
-        handleCancelRun, handleRestoreRun, handleClearRunHistory,
+        lastAttemptRef, predictions, activeRun, currentRunMeta,
+        runHistory, setRunHistory, error, setError, latencyMs,
+        thresholdsApplied, submitRun, handleRetryRun,
+        handleCancelRun, handleRestoreRun, handleClearRunHistory, clearResults,
     } = useInferenceRuns(activeDeployment, savedThresholds, setInputData);
     const [bannerDismissed, setBannerDismissed] = useState(false);
 
@@ -106,14 +106,14 @@ export function useInferenceController() {
     }, [predictions]);
 
     const parsedInputRows = useMemo(() => {
-        if (!inputStatus.valid) return [];
+        if (!predictions || currentRunMeta?.status !== 'success') return [];
         try {
-            const arr = JSON.parse(inputData);
+            const arr = JSON.parse(currentRunMeta.input);
             return Array.isArray(arr) ? (arr as unknown[]) : [];
         } catch {
             return [];
         }
-    }, [inputStatus.valid, inputData]);
+    }, [predictions, currentRunMeta]);
 
     /** Detect "this is a single classification probability response" shape. */
     const singleProbMap = useMemo(() => {
@@ -264,9 +264,7 @@ export function useInferenceController() {
             setActiveDeployment(null);
             setDatasetId(null);
             setExcludedColumns(new Set());
-            setPredictions(null);
-            setLatencyMs(null);
-            setCurrentRunMeta(null);
+            clearResults();
             setRunHistory([]);
             persistRunHistory([]);
         } catch (e) {
@@ -322,11 +320,7 @@ export function useInferenceController() {
     /** Wipe input + results back to the empty default. */
     const handleClearInput = () => {
         setInputData(DEFAULT_INPUT);
-        setPredictions(null);
-        setError(null);
-        setLatencyMs(null);
-        setThresholdsApplied(null);
-        setCurrentRunMeta(null);
+        clearResults();
     };
 
     const handleTextareaKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {

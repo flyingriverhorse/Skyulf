@@ -16,8 +16,8 @@ and is not counted.
 
 **Qwen follow-up (2026-09-12):** the verified findings
 filed 48 additional records, OC-271–318, after deduplication and scope
-correction. Eight have since closed. The live queue now has
-**70 open / 4 parked**; details
+correction. Fourteen have since closed. The live queue now has
+**63 open / 4 parked**; details
 and exclusions are in the latest Log entry. Historical baseline counts
 below are unchanged.
 
@@ -109,6 +109,9 @@ uses, so a fixed finding stays where it was filed.
 | OC-276 | 🟠 | **Binning interval labels differ between training and replay engines** (`skyulf-core/skyulf/preprocessing/bucketing.py:55,67,170,179`) — Qwen #7. Canonicalize integral bin-edge labels across engines and verify an actual downstream DummyEncoder replay. | medium | ✅ fixed — 2026-09-12: New range artifacts persist identical labels for both engines, using exact edge text when rounding merges names; serialized binning-to-Dummy replay preserves all four indicators, with legacy formatting retained until coordinated refit. |
 | OC-283 | 🟠 | **Binning can overwrite an existing output column or delete its source** (`skyulf-core/skyulf/preprocessing/bucketing.py:98,138,266,279`) — Qwen #15. Validate generated-name collisions and define safe same-name output/drop behavior before mutating either engine. | small | ✅ fixed — 2026-09-12: Fit and inference reject retained-name collisions and build outputs from original source values, so empty-suffix replacement preserves its binned output and other dropped source names can be reused safely. |
 | OC-297 | 🟠 | **Replacing infinity can silently round large Polars integers** (`skyulf-core/skyulf/preprocessing/cleaning/invalid_value.py:67,182,213`) — Qwen #30. Preserve exact integer values and avoid widening integer columns merely to inspect or replace floating-point infinities. | small | ✅ fixed — 2026-09-12: Infinity-only cleanup skips impossible integer matches, preserving exact signed/unsigned values and dtypes at fit/apply boundaries while configured numeric rules and float replacements remain effective. |
+| OC-290 | 🟠 | **Tokenizer and vectorizer outputs collide with existing columns** (`skyulf-core/skyulf/preprocessing/vectorization/tokenizer.py:63,98`) — Qwen #23. Apply collision-safe output handling to Tokenizer and the shared Count/TF-IDF/Hashing append path. | medium | ✅ fixed — 2026-09-12: Tokenizer and all four vectorizer consumers validate retained-column collisions at fit/apply; Tokenizer computes from original sources before dropping them, preserving safe name reuse and engine/wrapper/index behavior. |
+| OC-293 | 🟠 | **Inference CSV pairs saved predictions with subsequently edited input** (`frontend/ml-canvas/src/components/pages/inference/useInferenceController.tsx:429-447`) — Qwen #26. Export the input snapshot belonging to the completed inference result and handle edits or reruns without mixing generations. | small | ✅ fixed — 2026-09-12: The results table and CSV use the displayed completed run's saved input through edits, reruns and history restoration; clearing or retiring a request blocks late success/error/finally writes. |
+| OC-317 | 🟠 | **Drift summary cards ignore available categorical PSI metrics** (`frontend/ml-canvas/src/pages/drift/SummaryCards.tsx:16-27`) — Qwen #54. Include the appropriate categorical metric when calculating overall drift and selecting the most-drifted feature. | small | ✅ fixed — 2026-09-12: Summary cards include finite numeric and categorical PSI once per column; the 0.01/5 example shows average 2.5050 and category as most drifted, while unavailable PSI remains distinct from measured zero. |
 
 
 ### Next — wrong results in realistic configs
@@ -140,6 +143,7 @@ uses, so a fixed finding stays where it was filed.
 | OC-43 | 🟠 | Correlation drops valid columns/rows instead of the defined missing-data policy (`correlations.py:41-44,100-110`) | small | ✅ fixed 2026-09-05 |
 | OC-44 | 🟠 | Wasserstein drift thresholds normalized value but reports raw one (`drift.py:181-195`) | small | ✅ fixed 2026-09-05 |
 | OC-45 | 🟠 | Schema drift computed but never counted or rendered as drift (`drift.py:76-98`) | small | ✅ fixed 2026-09-05 |
+| OC-291 | 🟡 | **Out-of-order polling responses restore stale non-terminal job state** (`frontend/ml-canvas/src/core/hooks/useJobPolling.ts:161-197`) — Qwen #24. Scope response writes to the active polling generation and keep terminal state consistent with scheduling. | small | ✅ fixed — 2026-09-12: Polling ignores responses older than its newest applied snapshot and stops queued/socket refreshes after terminal results; slow APIs still publish progress and stale failures cannot corrupt retry accounting. |
 
 ### Ongoing — remove the hiding conditions
 
@@ -244,6 +248,7 @@ uses, so a fixed finding stays where it was filed.
 | OC-182 | ð¡ | Encoder auto-detection ignores pandas `StringDtype` columns: Dummy/Hash encoding silently leaves strings untouched unless columns are selected explicitly (`preprocessing/encoding/_common.py:140`) | small | â fixed 2026-09-08 |
 | OC-22 | ⚪ | `TargetEncoder.infer_output_schema` checks an impossible `regression` value (`encoding/target.py:340-360`) | 1 line | ✅ fixed 2026-09-06 — the `("binary", "regression")` passthrough was pinned by a test asserting a prediction for a config sklearn 1.8 rejects outright; changed to `"continuous"` and confirmed it really encodes rather than merely being reachable. See the log entry |
 | OC-299 | 🟡 | **Automatic encoder selection skips native Enum columns** (`skyulf-core/skyulf/preprocessing/encoding/_common.py:131,146`) — Qwen #32. Include supported categorical Enum types in the common selector used by all six encoders. | small | ✅ fixed — 2026-09-12: The shared categorical selector now includes native Enum for all six encoder consumers; auto-selection matches explicit encoding and persisted held-out replay, with pipeline refit needed for previously skipped columns. |
+| OC-296 | 🟡 | **MissingIndicator schema predicts output columns that execution will not create** (`skyulf-core/skyulf/preprocessing/drop_and_missing/missing_indicator.py:103,117,157`) — Qwen #29. Make inferred output schema match missing-column handling and validate downstream references against the actual result. | small | ✅ fixed — 2026-09-12: MissingIndicator predicts flags only for sources present in its original input schema; real schema-graph propagation now exposes downstream phantom references and matches both engines' runtime columns. |
 
 
 ### Remaining — feature generation / selection / vectorization / transformations
@@ -266,6 +271,7 @@ uses, so a fixed finding stays where it was filed.
 | OC-34 | 🟡 | Count/TF-IDF vectorizers crash on empty or stop-word-only corpora (`vectorization/count_vectorizer.py`, `tfidf_vectorizer.py`) | small | ✅ fixed 2026-09-11 — warn and return an empty artifact for an empty vocabulary; preserve source data and replay, while other settings/pruning errors still raise. |
 | OC-27 | 🟠 | `GeneralTransformation` ignores the UI `standardize` toggle (`transformations/general.py`) | small | ✅ fixed 2026-09-11 — retain each power rule's standardization choice through fitting and replay; older artifacts keep their previous default. |
 | OC-28 | 🟠 | Box-Cox transform failures silently return untransformed data (`transformations/power.py:97-104`) | small | ✅ fixed 2026-09-06 — the silent path was the `valid_cols` filter, not the `except` (which has logged since the node was created); both engines now share `_fitted_columns_present`, which names the fitted columns the frame lacks, and fail-open is kept by decision. See the log entry |
+| OC-300 | 🟡 | **Polars arithmetic feature fillna leaves floating-point NaN untouched** (`skyulf-core/skyulf/preprocessing/feature_generation/_polars_ops.py:30`) — Qwen #33. Apply the configured missing-value policy to both null and NaN before arithmetic operations. | small | ✅ fixed — 2026-09-12: Polars arithmetic fills both NaN and null using the configured replacement before add/subtract/multiply/divide, preserving source values and integer/null-only controls. |
 
 ### Remaining — profiling (outside the OC-39–46 cluster)
 
@@ -296,6 +302,7 @@ uses, so a fixed finding stays where it was filed.
 | OC-189 | 🟡 | Classification rule text reports `Samples: 1` for leaves containing multiple rows: it sums sklearn's normalized class proportions instead of using the leaf sample count (`profiling/_analyzer/rules.py:299-301`) | small | ✅ fixed 2026-09-09 - classification rule support uses the fitted tree row count while confidence retains class proportions. |
 | OC-188 | 🟠 | Rule discovery decodes sklearn class positions against Polars' shared category dictionary, publishing labels absent from the target while reporting perfect accuracy (`profiling/_analyzer/rules.py:169-170,196-198,295-298`) | small | ✅ fixed 2026-09-09 - target-local codes map every rule prediction to the actual observed class label. |
 | OC-305 | 🟡 | **All-null temporal profile bounds serialize as the string None** (`skyulf-core/skyulf/profiling/_analyzer/dates.py:164-171`) — Qwen #40. Return actual nullable bounds in the profile schema instead of stringifying absent temporal extrema. | small | ✅ fixed — 2026-09-12: Missing Date/Datetime extrema remain actual nulls in profile dictionaries and JSON while native units, timezones and nonmissing bounds retain their existing behavior. |
+| OC-257 | 🟡 | Native Enum columns bypass categorical drift dispatch and disappear from the report (`profiling/drift.py:154-162`) | small | ✅ fixed — 2026-09-12: Native Enum uses categorical drift dispatch; the 100 a to 100 b shift yields PSI 10.543651559430593 and one drifted column, matching String/Categorical controls. |
 
 
 ### Remaining — core / engines / pipeline
@@ -448,6 +455,74 @@ respective fix logs; OC-167 closed with canonical artifact framing on 2026-09-09
 ---
 
 ## Log
+
+### 2026-09-12 — OC-257/290/291/293/296/300/317: seven verified fixes
+
+Committed the preceding eight-finding Core batch as `8053a84c` with DCO
+sign-off after fresh regression tests and passing commit hooks. Continued
+with seven unparked findings using three agents and independent diff reviews.
+This new batch remains uncommitted for review; no push was requested or made.
+
+- **OC-257:** native Enum columns now enter categorical drift calculation.
+  Replacing 100 `a` values with 100 `b` values produces categorical PSI
+  `10.543651559430593` and one drifted column, matching String/Categorical
+  controls. Stable data, unused Enum labels and custom thresholds are covered.
+  The separate lossy dtype-cast finding OC-47 remains open.
+- **OC-290:** Tokenizer, Count, TF-IDF, Hashing and Sentence Embedder validate
+  generated names against the full retained input schema at fit and replay.
+  Retained-name collisions now raise `ValueError` on both engines. Tokenizer
+  computes all outputs from original source values before dropping/concatenating,
+  so names of dropped sources can be reused without corrupting later inputs.
+  Tests cover pipeline replay, native/wrapped engines, labels, indices, missing
+  sources and vocabulary controls. Sentence Embedder's external model loader
+  is stubbed; no model download or real embedding quality claim is involved.
+- **OC-291:** effect-local polling generations protect status and failure
+  counters from out-of-order completions. Terminal results stop pending timer
+  and socket refreshes. Review reproduced starvation in an initial guard when
+  every request exceeded the polling interval; the final guard compares against
+  the newest applied request, allowing slow progress while newer work is pending.
+- **OC-293:** result-table rows and downloaded CSV use the displayed completed
+  run's saved input, including persisted history and results kept during a rerun.
+  Predictions `10/20` for input `1/2` still export `1,10` and `2,20` after the
+  editor changes to `9/8/7` or invalid JSON. Clear, undeploy, deployment changes
+  and unmount retire obsolete requests; stale success/error/finally handlers
+  cannot overwrite newer state. Unmount retains interrupted-run provenance.
+- **OC-296:** schema prediction checks MissingIndicator sources against the
+  original input schema, matching runtime filtering. Input `x` with selected
+  `ghost` no longer invents `ghost_missing`. Actual backend schema propagation
+  and reference validation detect both the original missing source and the
+  downstream phantom flag; mixed selections, custom suffixes and cascading
+  flag names are covered on both engines. Automatic selection stays unknown.
+- **OC-300:** Polars arithmetic replaces both NaN and null before all four
+  arithmetic operations, using the configured `fillna` or default zero. The
+  `[1, NaN, 3] + 2` example with replacement `10` now gives `[3, 12, 5]`.
+  Primary/secondary operands, source preservation and integer/null-only
+  controls agree with pandas; the separate ratio behavior is unchanged.
+- **OC-317:** the real summary cards use finite `psi` and `psi_categorical`
+  measurements once per column. Numeric `0.01` plus categorical `5` now shows
+  average `2.5050`, Significant drift, and category as Most Drifted. Missing or
+  non-finite PSI is unavailable, while measured zero remains valid. Scope is
+  the summary cards; compact history summaries and CSV metric selection were
+  not changed by this item.
+
+Verification: failing regressions were captured before production changes.
+The final affected Core suites passed **703 tests** (365 feature/schema/missing
+tests plus 338 vectorization/drift tests), and the separate backend schema
+graph/preview/reference suites passed **28 tests**. Full frontend Vitest passed
+**2,522 tests in 195 files**. Four Playwright cases passed at desktop 1440px
+and mobile 390px using the real pages with mocked API boundaries; inference
+checks inspect actual downloaded CSV contents, and drift screenshots were
+visually checked. The CSV test's ambiguous upload/download selector was fixed
+before its successful rerun. Scoped Ruff/format, global `ty check`, full ESLint,
+CCN, explicit E2E lint, TypeScript/Vite production build and bundle size gates
+passed. Generated `static/ml_canvas` assets were rebuilt.
+
+Updated preprocessing, text-NLP and drift user documentation plus the v0.8.21
+changelog. Existing conflicting text inputs must be renamed; rerun affected
+transformations from original data and refit downstream models where needed.
+Regenerate old Enum drift checks to recover omitted metrics. The seven rows
+are archived with their evidence: **63 open / 4 parked** remain. The user's
+deleted standalone Qwen reports and unrelated `tmp_eda_shots/` stay untouched.
 
 ### 2026-09-12 — OC-271/273/276/283/284/297/299/305: eight Core fixes
 

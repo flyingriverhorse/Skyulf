@@ -147,8 +147,9 @@ class MissingIndicatorCalculator(BaseCalculator):
         """Predict the added flag columns, or ``None`` when the set is data-dependent.
 
         With an explicit list the output is the input plus one ``int64``
-        ``<col><flag_suffix>`` column each; otherwise which columns hold
-        missing values decides, and callers must introspect at runtime.
+        ``<col><flag_suffix>`` column for each source present in the input;
+        otherwise which columns hold missing values decides, and callers
+        must introspect at runtime.
         """
         # Adds one int64 (0/1) column "<col><flag_suffix>" per indicator
         # column. Only predictable when the user supplied an explicit column
@@ -160,7 +161,8 @@ class MissingIndicatorCalculator(BaseCalculator):
         suffix = config.get("flag_suffix") or _DEFAULT_FLAG_SUFFIX
         new_schema = input_schema
         for col in explicit:
-            new_schema = new_schema.add(f"{col}{suffix}", "int64")
+            if col in input_schema:
+                new_schema = new_schema.add(f"{col}{suffix}", "int64")
         return new_schema
 
     def fit(self, df: Any, config: dict[str, Any]) -> MissingIndicatorArtifact:

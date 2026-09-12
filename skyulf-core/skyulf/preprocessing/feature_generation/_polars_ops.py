@@ -23,11 +23,12 @@ logger = logging.getLogger(__name__)
 
 
 def _polars_arith_terms(op: dict[str, Any], existing: list[str]) -> tuple[list[Any], list[float]]:
+    """Build numeric operands with the same null and NaN replacement as pandas."""
     valid = [
         c for c in op.get("input_columns", []) + op.get("secondary_columns", []) if c in existing
     ]
     fill_val = op.get("fillna") if op.get("fillna") is not None else 0
-    col_exprs = [pl.col(c).cast(pl.Float64).fill_null(fill_val) for c in valid]
+    col_exprs = [pl.col(c).cast(pl.Float64).fill_nan(fill_val).fill_null(fill_val) for c in valid]
     const_vals = [float(c) for c in op.get("constants", [])]
     return col_exprs, const_vals
 

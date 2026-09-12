@@ -21,11 +21,13 @@ from ...registry import NodeRegistry
 from .._artifacts import SentenceEmbedderArtifact
 from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
 from ._common import (
+    _drop_and_concat,
     _drop_and_concat_polars,
     _join_text_columns,
     _join_text_columns_polars,
     apply_text_dual_engine,
     resolve_fit_text_valid_columns,
+    validate_text_output_names,
 )
 
 logger = logging.getLogger(__name__)
@@ -73,6 +75,7 @@ def _embedding_dimension(model: Any) -> int:
 def _embed_apply_pandas(
     X: pd.DataFrame, y: Any, params: dict[str, Any]
 ) -> tuple[pd.DataFrame, Any]:
+    """Encode the original text and attach embeddings without aliasing retained columns."""
     cols: list[str] = params.get("columns", [])
     output_columns: list[str] = params.get("output_columns", [])
     model_name: str = params.get("model_name", "all-MiniLM-L6-v2")
@@ -93,10 +96,7 @@ def _embed_apply_pandas(
         index=X.index,
     )
 
-    X_out = X.copy()
-    if drop_original:
-        X_out = X_out.drop(columns=valid_cols)
-    return pd.concat([X_out, emb_df], axis=1), y
+    return _drop_and_concat(X, emb_df, valid_cols, drop_original), y
 
 
 def _embed_apply_polars(X: Any, params: dict[str, Any]) -> Any:
@@ -115,6 +115,7 @@ def _embed_apply_polars(X: Any, params: dict[str, Any]) -> Any:
     if not valid_cols or not output_columns:
         return X
 
+    validate_text_output_names(X, params, valid_cols)
     text = _join_text_columns_polars(X, valid_cols)
     if text is None:
         return None
@@ -218,4 +219,6 @@ class SentenceEmbedderCalculator(BaseCalculator):
         if valid_cols is None:
             return {}
 
-        return _build_sentence_embedder_artifact(config, valid_cols)
+        artifact = _build_sentence_embedder_artifact(config, valid_cols)
+        validate_text_output_names(X, artifact, valid_cols)
+        return artifact

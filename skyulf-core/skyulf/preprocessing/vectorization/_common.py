@@ -13,7 +13,7 @@ Boundary with ``dispatcher.py``:
 """
 
 import logging
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from typing import Any
 
 import numpy as np
@@ -23,6 +23,7 @@ import polars as pl
 from ...engines.polars_engine import SkyulfPolarsWrapper
 from ...utils import pack_pipeline_output, unpack_pipeline_input
 from .._helpers import resolve_valid_columns
+from .._output_names import validate_generated_column_names
 
 logger = logging.getLogger(__name__)
 
@@ -164,6 +165,16 @@ def _text_series(series: pd.Series) -> pd.Series:
     return series.astype(object).where(series.notna(), "").astype(str)
 
 
+def validate_text_output_names(X: Any, params: Mapping[str, Any], valid_cols: list[str]) -> None:
+    """Check emitted text features against the full retained input schema."""
+    validate_generated_column_names(
+        X.columns,
+        params.get("output_columns", []),
+        dropped_columns=valid_cols if params.get("drop_original", False) else (),
+        node_name=params.get("type", "Text vectorizer"),
+    )
+
+
 def _join_text_columns(X: pd.DataFrame, cols: list) -> pd.Series:
     """Concatenate one or more text columns into a single string series."""
     series = _text_series(X[cols[0]])
@@ -216,7 +227,13 @@ def _vectorizer_transform_to_frame(
 def _drop_and_concat(
     X: pd.DataFrame, encoded_df: pd.DataFrame, valid_cols: list[str], drop_original: bool
 ) -> pd.DataFrame:
-    """Optionally drop source columns from *X*, then concat the encoded frame."""
+    """Validate generated names, optionally drop sources, then attach their encoded values."""
+    validate_generated_column_names(
+        X.columns,
+        encoded_df.columns,
+        dropped_columns=valid_cols if drop_original else (),
+        node_name="Text vectorizer",
+    )
     X_out = X.copy()
     if drop_original:
         X_out = X_out.drop(columns=valid_cols)
@@ -252,6 +269,12 @@ def _drop_and_concat_polars(
     X: Any, encoded_frame: Any, valid_cols: list[str], drop_original: bool
 ) -> Any:
     """Native-Polars equivalent of :func:`_drop_and_concat`."""
+    validate_generated_column_names(
+        X.columns,
+        encoded_frame.columns,
+        dropped_columns=valid_cols if drop_original else (),
+        node_name="Text vectorizer",
+    )
     X_out = X.drop(valid_cols) if drop_original else X
     return X_out.hstack(encoded_frame)
 
@@ -276,6 +299,7 @@ def _sklearn_vectorizer_apply_polars(X: Any, params: dict[str, Any]) -> Any:
     if not valid_cols:
         return X
 
+    validate_text_output_names(X, params, valid_cols)
     text = _join_text_columns_polars(X, valid_cols)
     if text is None:
         return None

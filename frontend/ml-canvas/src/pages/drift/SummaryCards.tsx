@@ -13,25 +13,31 @@ function summarizeReport(report: DriftReport) {
     // The report-wide count includes schema changes, which are shown separately.
     // Feature percentages must use the same measured columns as the denominator.
     const driftedCount = allCols.filter(c => c.drift_detected).length;
-    const psiValues = allCols
-        .map(c => c.metrics.find(m => m.metric === 'psi')?.value)
-        .filter((v): v is number => v != null);
-    const avgPsi = psiValues.length > 0 ? psiValues.reduce((a, b) => a + b, 0) / psiValues.length : 0;
-    const mostDrifted = [...allCols].sort((a, b) => {
-        const pa = a.metrics.find(m => m.metric === 'psi')?.value ?? 0;
-        const pb = b.metrics.find(m => m.metric === 'psi')?.value ?? 0;
-        return pb - pa;
-    })[0];
+    const psiColumns = allCols.flatMap(column => {
+        const psi = column.metrics.find(metric =>
+            (metric.metric === 'psi' || metric.metric === 'psi_categorical') && Number.isFinite(metric.value),
+        )?.value;
+        return psi == null ? [] : [{ column: column.column, psi }];
+    });
+    const avgPsi = psiColumns.length > 0
+        ? psiColumns.reduce((sum, column) => sum + column.psi, 0) / psiColumns.length : null;
+    const mostDrifted = psiColumns.sort((a, b) => b.psi - a.psi)[0];
 
     const driftedPct = totalCols > 0 ? Math.round((driftedCount / totalCols) * 100) : 0;
-    const mostDriftedPsi = mostDrifted?.metrics.find(m => m.metric === 'psi')?.value ?? 0;
 
-    return { totalCols, driftedCount, avgPsi, mostDrifted, driftedPct, mostDriftedPsi };
+    return { totalCols, driftedCount, avgPsi, mostDrifted, driftedPct };
+}
+
+/** Keep unavailable PSI distinct from a measured stable distribution. */
+function psiInterpretation(value: number | null): string {
+    if (value == null) return 'No PSI available';
+    if (value < 0.1) return 'Stable';
+    return value < 0.2 ? 'Minor drift' : 'Significant drift';
 }
 
 /** Four headline metric cards: total cols, drifted, avg PSI, most drifted. */
 export const SummaryCards: React.FC<SummaryCardsProps> = ({ report }) => {
-    const { totalCols, driftedCount, avgPsi, mostDrifted, driftedPct, mostDriftedPsi } = summarizeReport(report);
+    const { totalCols, driftedCount, avgPsi, mostDrifted, driftedPct } = summarizeReport(report);
 
     return (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
@@ -65,17 +71,17 @@ export const SummaryCards: React.FC<SummaryCardsProps> = ({ report }) => {
                 </div>
                 <div
                     className={`text-2xl font-bold tabular-nums ${
-                        avgPsi > 0.2
+                        (avgPsi ?? 0) > 0.2
                             ? 'text-red-600 dark:text-red-400'
-                            : avgPsi > 0.1
+                            : (avgPsi ?? 0) > 0.1
                             ? 'text-amber-600 dark:text-amber-400'
                             : ''
                     }`}
                 >
-                    {avgPsi.toFixed(4)}
+                    {avgPsi?.toFixed(4) ?? '—'}
                 </div>
                 <div className="text-[11px] text-gray-400 mt-0.5">
-                    {avgPsi < 0.1 ? 'Stable' : avgPsi < 0.2 ? 'Minor drift' : 'Significant drift'}
+                    {psiInterpretation(avgPsi)}
                 </div>
             </div>
             <div className="bg-gray-50 dark:bg-slate-900/50 rounded-lg p-4 border dark:border-slate-700">
@@ -85,7 +91,7 @@ export const SummaryCards: React.FC<SummaryCardsProps> = ({ report }) => {
                 <div className="text-lg font-bold truncate" title={mostDrifted?.column}>
                     {mostDrifted?.column ?? '—'}
                 </div>
-                <div className="text-[11px] text-gray-400 mt-0.5">PSI: {mostDriftedPsi.toFixed(4)}</div>
+                <div className="text-[11px] text-gray-400 mt-0.5">PSI: {mostDrifted?.psi.toFixed(4) ?? '—'}</div>
             </div>
         </div>
     );

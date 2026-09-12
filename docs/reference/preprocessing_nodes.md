@@ -221,6 +221,12 @@ Learned params:
 
 Adds `{col}_missing` indicator columns by default.
 
+An explicit `columns` list selects only names present in the input. Missing
+names produce no flag in either execution or the predicted output schema.
+For example, selecting `ghost` when the input only contains `x` does not create
+`ghost_missing`; downstream references to that flag remain invalid. Automatic
+selection depends on the actual missing values and has no static output schema.
+
 Generated names must be unique and must not collide with existing columns.
 Fitting and applying raise `ValueError` on a collision, including one introduced by new inference
 data. Rename the conflicting input column or change the selected columns.
@@ -740,6 +746,13 @@ Supported `operation_type` values are `arithmetic` (the default), `ratio`,
 `ValueError` during fitting and when replaying saved artifacts. In particular,
 `polynomial` is not a Feature Generation operation: use the separate
 [`PolynomialFeatures`](#polynomialfeatures) node for powers and interactions.
+
+Arithmetic operations (`add`, `subtract`, `multiply`, `divide`) replace null
+and `NaN` operands with the operation's `fillna` value on both engines. Omitted
+or null `fillna` defaults to zero. For example, adding `2` to `[1, NaN, 3]`
+with `fillna=10` produces `[3, 12, 5]`. Source columns retain their values.
+Rerun affected transformations and refit downstream models if they previously
+used arithmetic features containing unfilled Polars NaNs.
 
 For `ratio`, the denominator is the sum of the selected denominator columns.
 If its absolute value is below `epsilon`, it is replaced by `-epsilon` when

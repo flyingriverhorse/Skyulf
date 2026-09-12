@@ -22,6 +22,7 @@ from ._common import (
     _warn_large_output,
     apply_text_dual_engine,
     resolve_fit_text_columns,
+    validate_text_output_names,
 )
 
 logger = logging.getLogger(__name__)
@@ -162,6 +163,8 @@ class TfidfVectorizerCalculator(BaseCalculator):
         resolved = resolve_fit_text_columns(X, config, _y)
         if resolved is None:
             return {}
-        X, valid_cols = resolved
+        text_frame, valid_cols = resolved
 
-        return _build_tfidf_artifact(config, X, valid_cols)
+        artifact = _build_tfidf_artifact(config, text_frame, valid_cols)
+        validate_text_output_names(X, artifact, valid_cols)
+        return artifact
