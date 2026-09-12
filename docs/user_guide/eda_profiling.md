@@ -101,6 +101,12 @@ Skyulf automatically flags potential data quality issues:
 *   **High Cardinality:** Categorical columns with too many unique values.
 *   **High Correlation:** Pairs of features with correlation > 0.95.
 *   **Multicollinearity (VIF):** Detects features with Variance Inflation Factor > 5.0.
+    Nearly duplicated features still produce warnings when the correlation
+    matrix cannot be reliably inverted. The calculation then uses a separate
+    regression for each feature, preserving low VIF for unrelated features.
+    A value of **999** is a finite warning marker for effectively perfect
+    dependence, not a precise estimate or a cap on other VIF values. Rerun
+    saved analyses to refresh these results.
 *   **Class Imbalance:** Target variables with skewed class distributions.
 *   **Data Leakage:** Features with 1.0 correlation to the target.
 

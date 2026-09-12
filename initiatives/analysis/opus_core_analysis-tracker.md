@@ -185,6 +185,7 @@ uses, so a fixed finding stays where it was filed.
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
 | OC-110 | 🟠 | Semantic-type inference misclassifies small categorical columns as `Text`, so task type never inferred (`profiling/_analyzer/_utils.py`, `analyzer.py`) | small | ✅ fixed 2026-09-12 — infer repeated small string categories from non-null counts in both profiling paths, restoring statistics and classification target analysis. |
+| OC-113 | 🟠 | Near-perfect multicollinearity silently reports VIF = 1.0 — `max(1.0, …)` clamps numerical garbage (`profiling/_analyzer/numeric.py`) | small | ✅ fixed 2026-09-12 — use per-feature regression residuals for unstable correlation inversion, preserving high-VIF warnings without falsely flagging unrelated columns. |
 | OC-114 | 🟡 | All-null tracked column yields 30 `NaN` autocorrelation lags as real analysis (≥1000-row datasets) (`temporal.py:167-191`) | small | ✅ fixed 2026-09-09 - undefined temporal diagnostics are omitted unless sufficient finite varying observations and finite results support them. |
 | OC-112 | ⚪ | Comment and code disagree in the categorical profiler — the comment promises a rendered missing-value marker, the code `continue`s and discards the null category (`profiling/_analyzer/categorical.py:22-30`). *Filed as "disagree about the applied threshold"; the real subject is the null-category marker* | 1 line | ✅ fixed 2026-09-06 — comment-only, no behaviour change; the reasoning for why dropping the null category is correct now lives in the code comment it rewrote. See the log entry |
 | OC-148 | 🟡 | PII detector flags ordinary 7+ digit numeric ID columns as "Email/Phone" (`profiling/_analyzer/text.py:107-128`) | small | ✅ fixed 2026-09-07 — phone detection now requires positive format evidence and repeated sample evidence; plain IDs, ZIP+4, and isolated phone-shaped IDs are excluded |
@@ -399,6 +400,53 @@ respective fix logs; OC-167 closed with canonical artifact framing on 2026-09-09
 ---
 
 ## Log
+
+### 2026-09-12 — OC-113 fixed: stable per-feature VIF diagnostics
+
+After committing OC-110/247 as DCO-signed `529e7c9b` with passing hooks,
+the next unparked finding was reproduced through public `EDAAnalyzer.analyze`.
+For 100 standard-normal rows from `default_rng(2)`, `b = 2*a + 1e-9*noise`
+and an independent third column, the correlation condition number was
+`1.811e16`. Both near-duplicate columns reported VIF **1.0**, and no
+multicollinearity alerts were emitted. Seeds 3 and 4 reproduced the same
+false all-clear. An exact duplicate pair also exposed the old singular fallback
+incorrectly assigning 999 to an independent feature.
+
+Well-conditioned inputs retain the inverse-correlation calculation. Above a
+condition number of `1e10`, on inversion failure, or with invalid inverse
+diagonal entries, VIF is computed from each feature's regression on the other
+centered, normalized features. Direct residual sums avoid the cancellation in
+`1 - R²`; the existing finite 999 warning marker applies only to a feature whose
+residual variance ratio is at or below float64 epsilon. Unrelated features
+retain their own VIF. The seed-2 report now returns **999 / 999 / 1.020194**
+and two high-VIF alerts. Constants, missing-row handling and the minimum-row
+guard are preserved.
+
+The approach follows NumPy's documented
+[inverse-conditioning caveat](https://numpy.org/doc/stable/reference/generated/numpy.linalg.inv.html)
+and [least-squares residual definition](https://numpy.org/doc/stable/reference/generated/numpy.linalg.lstsq.html).
+Unlike a blanket 999 fallback or a correlation pseudoinverse, it does not
+publish a low VIF for dependent features or blame every feature for a singular
+pair. No dependency or wire-format change is needed.
+
+Tests first produced **9 expected failures / 6 passing controls**, followed
+by four failing invalid-inverse cases. All **19 focused tests** now pass.
+An orthogonal design has the independently derived VIF `1 + 4/noise²`, tested
+at noise 0.5, 1e-5 and 1e-7, including shifted/scaled columns. Other cases cover
+exact dependence with an independent feature, three original false-negative
+seeds, negative/sub-one/non-finite inverse outputs, public warnings and backend
+JSON serialization with `allow_nan=False`.
+
+Final verification: **558 tests passed / 133 existing dependency and numeric
+edge-case warnings** across every `test_profiling_*.py` module and the seven
+backend EDA suites (the prior six plus `test_eda_vif.py`). The run used
+`-q --tb=short -p no:cacheprovider
+--basetemp=tmp_repro_artifacts/oc113-final-pytest`; output is recorded in ignored
+`tmp_repro_artifacts/oc113-final-tests.log`. Repository-wide Ruff, the configured
+backend/Core Ty scope, changed Python formatting and diff checks pass.
+Independent review found no remaining issue. User documentation and v0.8.20
+release notes explain the warning marker and rerunning saved analyses.
+OC-113 moves to the archive; the live queue has **36 open / 4 parked** findings.
 
 ### 2026-09-12 — OC-110/247 fixed: observed string categories and counts
 
