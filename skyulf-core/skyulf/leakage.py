@@ -134,31 +134,48 @@ def leakage_exemption_reason(
     """
     if is_target_only_encoding(step_type, params, target_column):
         return "target-only encoding or explicit no-op"
-    if is_explicit_column_drop(step_type, params):
-        return "explicit column drop without a learned missingness threshold"
-    if is_constant_imputation(step_type, params):
-        return "constant imputation"
-    if is_explicit_missing_indicator(step_type, params):
-        return "explicit missing-indicator columns"
-    if is_explicit_hash_encoding(step_type, params):
-        return "hash encoding with explicit columns"
+    for predicate, reason in (
+        (is_explicit_column_drop, "explicit column drop without a learned missingness threshold"),
+        (is_constant_imputation, "constant imputation"),
+        (is_explicit_missing_indicator, "explicit missing-indicator columns"),
+        (is_explicit_hash_encoding, "hash encoding with explicit columns"),
+    ):
+        if predicate(step_type, params):
+            return reason
     columns = params.get("columns")
+    reason = _column_selection_exemption(step_type, params, columns, target_column)
+    if reason is not None:
+        return reason
+    return _fixed_operation_exemption(step_type, params, columns)
+
+
+def _column_selection_exemption(
+    step_type: str, params: dict[str, Any], columns: Any, target_column: str | None
+) -> str | None:
+    """Identify explicit feature selections that avoid learning column statistics."""
     if step_type in {"PolynomialFeatures", "PolynomialFeaturesNode"}:
         if columns:
             return "polynomial features with explicit columns"
         if not params.get("auto_detect", False):
             return "polynomial features without automatic column discovery"
     if step_type in {"count_vectorizer", "tfidf_vectorizer"}:
-        if columns is None or columns == []:
-            return "text vectorization requires an explicit nonempty column selection"
-        if (
-            isinstance(columns, list)
-            and target_column is not None
-            and set(columns) == {target_column}
-        ):
-            return "target columns are excluded from text vectorization"
+        return _text_selection_exemption(columns, target_column)
     if step_type in _EMPTY_COLUMN_NOOPS and isinstance(columns, list) and not columns:
         return "explicit empty column selection is a no-op"
+    return None
+
+
+def _text_selection_exemption(columns: Any, target_column: str | None) -> str | None:
+    """Explain a vectorizer selection that cannot fit any feature vocabulary."""
+    if columns is None or columns == []:
+        return "text vectorization requires an explicit nonempty column selection"
+    if isinstance(columns, list) and target_column is not None and set(columns) == {target_column}:
+        return "target columns are excluded from text vectorization"
+    return None
+
+
+def _fixed_operation_exemption(step_type: str, params: dict[str, Any], columns: Any) -> str | None:
+    """Classify formulas and casts whose configured operations are fixed."""
     if step_type == "GeneralTransformation":
         operations = params.get("transformations", [])
         if isinstance(operations, list) and all(
@@ -166,27 +183,38 @@ def leakage_exemption_reason(
         ):
             return "fixed row-wise mathematical transformations"
     if step_type in _FEATURE_GENERATORS:
-        operations = params.get("operations", [])
-        if isinstance(operations, list) and all(
-            isinstance(op, dict)
-            and op.get("operation_type", "arithmetic") in _FIXED_FEATURE_OPERATIONS
-            for op in operations
-        ):
-            return "fixed row-wise feature operations"
+        return _feature_operation_exemption(params)
     if step_type == "CustomBinning" and isinstance(columns, list):
         return "fixed bin edges with explicit columns"
     if step_type == "Casting":
-        raw_types = params.get("column_types", {})
-        if isinstance(raw_types, dict):
-            type_map = dict(raw_types)
-            target_type = params.get("target_type")
-            if isinstance(columns, list) and columns and target_type:
-                type_map.update(dict.fromkeys(columns, target_type))
-            if all(
-                isinstance(dtype, str) and dtype.lower() not in {"category", "categorical"}
-                for dtype in type_map.values()
-            ):
-                return "fixed non-categorical type casts"
+        return _casting_exemption(params, columns)
+    return None
+
+
+def _feature_operation_exemption(params: dict[str, Any]) -> str | None:
+    """Recognize feature formulas without a fitted aggregate or automatic discovery."""
+    operations = params.get("operations", [])
+    if isinstance(operations, list) and all(
+        isinstance(op, dict) and op.get("operation_type", "arithmetic") in _FIXED_FEATURE_OPERATIONS
+        for op in operations
+    ):
+        return "fixed row-wise feature operations"
+    return None
+
+
+def _casting_exemption(params: dict[str, Any], columns: Any) -> str | None:
+    """Keep categorical vocabulary learning outside the fixed-cast exemption."""
+    raw_types = params.get("column_types", {})
+    if isinstance(raw_types, dict):
+        type_map = dict(raw_types)
+        target_type = params.get("target_type")
+        if isinstance(columns, list) and columns and target_type:
+            type_map.update(dict.fromkeys(columns, target_type))
+        if all(
+            isinstance(dtype, str) and dtype.lower() not in {"category", "categorical"}
+            for dtype in type_map.values()
+        ):
+            return "fixed non-categorical type casts"
     return None
 
 
@@ -238,13 +266,22 @@ def validate_leakage_safety(
     preprocessing = pipeline_config.get("preprocessing", [])
     splitters = train_test_splitters()
     if target_column is None:
-        for step in preprocessing:
-            if step.get("transformer") in splitters | {"feature_target_split"}:
-                candidate = (step.get("params") or {}).get("target_column")
-                if candidate:
-                    target_column = candidate
-                    break
-    splitter = next(
+        target_column = _find_pipeline_target(preprocessing, splitters)
+    splitter = _first_pipeline_splitter(preprocessing, splitters)
+    if splitter is None:
+        return [] if on_leakage == "ignore" else [NO_SPLIT_DIAGNOSTIC]
+
+    violations = _pre_split_violations(preprocessing, splitter, target_column)
+    if violations and on_leakage == "raise":
+        raise ValueError("Data leakage risk:\n" + "\n".join(violations))
+    return violations if on_leakage == "warn" else []
+
+
+def _first_pipeline_splitter(
+    preprocessing: Any, splitters: frozenset[str]
+) -> tuple[int, Any] | None:
+    """Locate the first configured train/test boundary and retain its step name."""
+    return next(
         (
             (index, step.get("transformer"))
             for index, step in enumerate(preprocessing)
@@ -252,9 +289,22 @@ def validate_leakage_safety(
         ),
         None,
     )
-    if splitter is None:
-        return [] if on_leakage == "ignore" else [NO_SPLIT_DIAGNOSTIC]
 
+
+def _find_pipeline_target(preprocessing: Any, splitters: frozenset[str]) -> str | None:
+    """Use the first declared splitter target as authoritative label context."""
+    for step in preprocessing:
+        if step.get("transformer") in splitters | {"feature_target_split"}:
+            candidate = (step.get("params") or {}).get("target_column")
+            if candidate:
+                return candidate
+    return None
+
+
+def _pre_split_violations(
+    preprocessing: Any, splitter: tuple[int, Any], target_column: str | None
+) -> list[str]:
+    """Describe learned steps before the first boundary in their configured order."""
     splitter_index, splitter_name = splitter
     metadata = NodeRegistry.get_all_metadata()
     violations = []
@@ -273,6 +323,4 @@ def validate_leakage_safety(
             f"(step {splitter_index}, '{splitter_name}') and {reason} - move it after the splitter."
         )
 
-    if violations and on_leakage == "raise":
-        raise ValueError("Data leakage risk:\n" + "\n".join(violations))
-    return violations if on_leakage == "warn" else []
+    return violations

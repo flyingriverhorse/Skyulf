@@ -87,6 +87,15 @@ def _node_label(head: str, detail: str | None) -> str:
     return label
 
 
+def _preprocessing_label(step: Mapping[str, Any], index: int) -> str:
+    """Build a step label from its display name, transformer, and optional details."""
+    name = str(step.get("name") or f"step_{index}")
+    transformer = str(step.get("transformer") or "")
+    head = f"{name} ({transformer})" if transformer and transformer != name else name
+    detail = step.get("details") or params_summary(step.get("params") or {})
+    return _node_label(head, detail)
+
+
 def build_mermaid_diagram(
     preprocessing_steps: Sequence[Mapping[str, Any]],
     modeling_config: Mapping[str, Any],
@@ -110,11 +119,7 @@ def build_mermaid_diagram(
 
     for i, step in enumerate(preprocessing_steps):
         node = f"pp{i}"
-        name = str(step.get("name") or f"step_{i}")
-        transformer = str(step.get("transformer") or "")
-        head = f"{name} ({transformer})" if transformer and transformer != name else name
-        detail = step.get("details") or params_summary(step.get("params") or {})
-        lines.append(f'    {node}["{_node_label(head, detail)}"]')
+        lines.append(f'    {node}["{_preprocessing_label(step, i)}"]')
         lines.append(f"    {prev} --> {node}")
         prev = node
 

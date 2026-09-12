@@ -196,6 +196,70 @@ def _compute_reference_crosstab(
     }
 
 
+def _evaluate_polars_clusters(
+    pl_frame: pl.DataFrame, labels_np: np.ndarray, reference_column: str
+) -> tuple[dict[str, float], list[ClusterCentroid], dict[str, dict[str, int]] | None]:
+    """Evaluate numeric Polars features and summarize the reference labels."""
+    reference_pl = None
+    if reference_column and reference_column in pl_frame.columns:
+        reference_pl = pl_frame.get_column(reference_column)
+        pl_frame = pl_frame.drop(reference_column)
+
+    # Distance-based metrics (silhouette/Calinski-Harabasz/Davies-Bouldin)
+    # require a purely numeric matrix — mirror the same numeric-only
+    # filtering `KMeansCalculator.fit`/`KMeansApplier.predict` apply, so a
+    # stray text/id column left in `X` (e.g. no encoding node upstream)
+    # doesn't crash evaluation with "could not convert string to float".
+    numeric_cols = [
+        c
+        for c, t in zip(pl_frame.columns, pl_frame.dtypes, strict=True)
+        if t in POLARS_NUMERIC_BOOL_DTYPES
+    ]
+    if numeric_cols:
+        X_numeric_pl = pl_frame.select(numeric_cols)
+    else:
+        # `pl_frame.select([])` collapses to 0 rows, unlike pandas'
+        # `select_dtypes(...)` which preserves row count with 0 columns —
+        # keep the height so downstream row-count validation matches.
+        X_numeric_pl = pl.DataFrame(np.empty((pl_frame.height, 0)))
+    metrics = calculate_clustering_metrics(X_numeric_pl, labels_np)
+    centroids = _compute_centroids_polars(X_numeric_pl, labels_np)
+    reference_crosstab = (
+        _compute_reference_crosstab_polars(labels_np, reference_pl)
+        if reference_pl is not None
+        else None
+    )
+    return metrics, centroids, reference_crosstab
+
+
+def _evaluate_pandas_clusters(
+    X: Any, labels_np: np.ndarray, reference_column: str
+) -> tuple[dict[str, float], list[ClusterCentroid], dict[str, dict[str, int]] | None]:
+    """Evaluate numeric pandas features and summarize the reference labels."""
+    X_df = _feature_frame(X)
+    X_df = X_df.reset_index(drop=True)
+
+    reference_values = None
+    if reference_column and reference_column in X_df.columns:
+        reference_values = X_df[reference_column].reset_index(drop=True)
+        X_df = X_df.drop(columns=[reference_column])
+
+    # Distance-based metrics (silhouette/Calinski-Harabasz/Davies-Bouldin)
+    # require a purely numeric matrix — mirror the same numeric-only
+    # filtering `KMeansCalculator.fit`/`KMeansApplier.predict` apply, so a
+    # stray text/id column left in `X` (e.g. no encoding node upstream)
+    # doesn't crash evaluation with "could not convert string to float".
+    X_numeric = X_df.select_dtypes(include=["number", "bool"])
+    metrics = calculate_clustering_metrics(X_numeric, labels_np)
+    centroids = _compute_centroids(X_df, labels_np, X_numeric)
+    reference_crosstab = (
+        _compute_reference_crosstab(labels_np, reference_values)
+        if reference_values is not None
+        else None
+    )
+    return metrics, centroids, reference_crosstab
+
+
 def evaluate_clustering_model(
     model: Any,
     X: pd.DataFrame | pl.DataFrame | SkyulfDataFrame,
@@ -218,56 +282,12 @@ def evaluate_clustering_model(
 
     pl_frame = _as_polars_frame(X)
     if pl_frame is not None:
-        reference_pl = None
-        if reference_column and reference_column in pl_frame.columns:
-            reference_pl = pl_frame.get_column(reference_column)
-            pl_frame = pl_frame.drop(reference_column)
-
-        # Distance-based metrics (silhouette/Calinski-Harabasz/Davies-Bouldin)
-        # require a purely numeric matrix — mirror the same numeric-only
-        # filtering `KMeansCalculator.fit`/`KMeansApplier.predict` apply, so a
-        # stray text/id column left in `X` (e.g. no encoding node upstream)
-        # doesn't crash evaluation with "could not convert string to float".
-        numeric_cols = [
-            c
-            for c, t in zip(pl_frame.columns, pl_frame.dtypes, strict=True)
-            if t in POLARS_NUMERIC_BOOL_DTYPES
-        ]
-        if numeric_cols:
-            X_numeric_pl = pl_frame.select(numeric_cols)
-        else:
-            # `pl_frame.select([])` collapses to 0 rows, unlike pandas'
-            # `select_dtypes(...)` which preserves row count with 0 columns —
-            # keep the height so downstream row-count validation matches.
-            X_numeric_pl = pl.DataFrame(np.empty((pl_frame.height, 0)))
-        metrics = calculate_clustering_metrics(X_numeric_pl, labels_np)
-        centroids = _compute_centroids_polars(X_numeric_pl, labels_np)
-        reference_crosstab = (
-            _compute_reference_crosstab_polars(labels_np, reference_pl)
-            if reference_pl is not None
-            else None
+        metrics, centroids, reference_crosstab = _evaluate_polars_clusters(
+            pl_frame, labels_np, reference_column
         )
     else:
-        X_df = _feature_frame(X)
-        X_df = X_df.reset_index(drop=True)
-
-        reference_values = None
-        if reference_column and reference_column in X_df.columns:
-            reference_values = X_df[reference_column].reset_index(drop=True)
-            X_df = X_df.drop(columns=[reference_column])
-
-        # Distance-based metrics (silhouette/Calinski-Harabasz/Davies-Bouldin)
-        # require a purely numeric matrix — mirror the same numeric-only
-        # filtering `KMeansCalculator.fit`/`KMeansApplier.predict` apply, so a
-        # stray text/id column left in `X` (e.g. no encoding node upstream)
-        # doesn't crash evaluation with "could not convert string to float".
-        X_numeric = X_df.select_dtypes(include=["number", "bool"])
-        metrics = calculate_clustering_metrics(X_numeric, labels_np)
-        centroids = _compute_centroids(X_df, labels_np, X_numeric)
-        reference_crosstab = (
-            _compute_reference_crosstab(labels_np, reference_values)
-            if reference_values is not None
-            else None
+        metrics, centroids, reference_crosstab = _evaluate_pandas_clusters(
+            X, labels_np, reference_column
         )
 
     cluster_sizes = {str(int(c)): int((labels_np == c).sum()) for c in sorted(np.unique(labels_np))}

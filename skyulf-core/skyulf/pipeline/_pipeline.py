@@ -78,6 +78,23 @@ class _TuningColumnDropApplier(BaseApplier):
         return X, _y
 
 
+def _record_tuning_column_drops(
+    engineer: FeatureEngineer, raw_features: Any, input_columns: list[str]
+) -> None:
+    """Prepend the tuner's removed time columns to the fitted inference chain."""
+    removed_columns = [c for c in raw_features.columns if c not in input_columns]
+    if removed_columns:
+        engineer.fitted_steps.insert(
+            0,
+            {
+                "name": "tuning_time_columns",
+                "type": "TuningColumnDrop",
+                "applier": _TuningColumnDropApplier(),
+                "artifact": {"columns": removed_columns},
+            },
+        )
+
+
 def _merge_preprocessing_metrics(
     prefix: dict[str, Any], suffix: dict[str, Any], prefix_length: int
 ) -> dict[str, Any]:
@@ -189,10 +206,10 @@ class SkyulfPipeline:
             node_id=node_id, calculator=calculator, applier=applier
         )
 
-    def _fit_tuning_pipeline(
+    def _fit_tuning_prefix(
         self, data: Any, target_column: str
-    ) -> tuple[SplitDataset, dict[str, Any]]:
-        """Tune from raw outer partitions and adopt the final training preprocessor."""
+    ) -> tuple[FeatureEngineer, SplitDataset, dict[str, Any], int]:
+        """Fit only the outer-split prefix and normalize its raw partition payload."""
         prefix_length = 0
         if not isinstance(data, SplitDataset):
             prefix_length = next(
@@ -212,7 +229,15 @@ class SkyulfPipeline:
             raw_dataset = SplitDataset(
                 train=raw_data, test=get_engine(raw_frame).create_dataframe({}), validation=None
             )
+        return prefix, raw_dataset, prefix_metrics, prefix_length
 
+    def _fit_tuning_pipeline(
+        self, data: Any, target_column: str
+    ) -> tuple[SplitDataset, dict[str, Any]]:
+        """Tune from raw outer partitions and adopt the final training preprocessor."""
+        prefix, raw_dataset, prefix_metrics, prefix_length = self._fit_tuning_prefix(
+            data, target_column
+        )
         raw_train = extract_xy(raw_dataset.train, target_column)
         raw_validation = (
             extract_xy(raw_dataset.validation, target_column)
@@ -242,17 +267,7 @@ class SkyulfPipeline:
         # before fitting. Record that operation ahead of the fitted fold chain
         # so evaluation and serving see the same feature space, without sorting
         # new prediction requests or changing their row order.
-        removed_columns = [c for c in raw_train[0].columns if c not in adapter.input_columns]
-        if removed_columns:
-            adapter._engineer.fitted_steps.insert(
-                0,
-                {
-                    "name": "tuning_time_columns",
-                    "type": "TuningColumnDrop",
-                    "applier": _TuningColumnDropApplier(),
-                    "artifact": {"columns": removed_columns},
-                },
-            )
+        _record_tuning_column_drops(adapter._engineer, raw_train[0], adapter.input_columns)
         self.feature_engineer.fitted_steps = prefix.fitted_steps + adapter._engineer.fitted_steps
         transformed = SplitDataset(
             train=adapter.training_payload,

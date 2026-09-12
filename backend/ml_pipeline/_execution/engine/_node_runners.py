@@ -184,7 +184,30 @@ class NodeRunnersMixin:
         if isinstance(data, tuple):
             self._record_tuple_shape_metrics(metrics, data)
 
+    @staticmethod
+    def _assert_loader_frame(df: Any, dataset_id: str) -> None:
+        """Reject catalog outputs unsupported by the configured execution engine."""
+        # Frame-type guard at the single choke point where data enters the
+        # engine. Catalogs honor SKYULF_ENGINE, so the loaded frame must
+        # match the configured engine; dozens of downstream `isinstance(x,
+        # pd.DataFrame)` checks (SHAP extraction, drift-reference capture,
+        # merge, summary) depend on knowing exactly which engine is running.
+        # A mismatch or a non-frame object fails loudly here instead of
+        # silently no-op-ing downstream.
+        engine = get_settings().SKYULF_ENGINE
+        frame_ok = isinstance(df, pd.DataFrame) or (
+            engine == "polars" and isinstance(df, pl.DataFrame)
+        )
+        if not frame_ok:
+            expected = "pandas" if engine == "pandas" else "pandas or Polars"
+            raise TypeError(
+                f"Dataset {dataset_id} loaded as {type(df).__name__}, but the pipeline "
+                f"execution engine (SKYULF_ENGINE={engine}) requires a {expected} DataFrame. "
+                "Catalogs must return frames matching the configured engine."
+            )
+
     def _run_data_loader(self, node: NodeConfig, job_id: str = "unknown") -> str:
+        """Load the configured dataset and persist its data and optional drift reference."""
         # params: {"source": "csv", "path": "...", "sample": True/False, "limit": 1000}
 
         # Some callers use `dataset_id` as a path.
@@ -219,25 +242,7 @@ class NodeRunnersMixin:
                 f"Dataset {dataset_id} not found. Please check if the file exists."
             ) from None
 
-        # Frame-type guard at the single choke point where data enters the
-        # engine. Catalogs honor SKYULF_ENGINE, so the loaded frame must
-        # match the configured engine; dozens of downstream `isinstance(x,
-        # pd.DataFrame)` checks (SHAP extraction, drift-reference capture,
-        # merge, summary) depend on knowing exactly which engine is running.
-        # A mismatch or a non-frame object fails loudly here instead of
-        # silently no-op-ing downstream.
-        engine = get_settings().SKYULF_ENGINE
-        frame_ok = isinstance(df, pd.DataFrame) or (
-            engine == "polars" and isinstance(df, pl.DataFrame)
-        )
-        if not frame_ok:
-            expected = "pandas" if engine == "pandas" else "pandas or Polars"
-            raise TypeError(
-                f"Dataset {dataset_id} loaded as {type(df).__name__}, but the pipeline "
-                f"execution engine (SKYULF_ENGINE={engine}) requires a {expected} DataFrame. "
-                "Catalogs must return frames matching the configured engine."
-            )
-
+        self._assert_loader_frame(df, dataset_id)
         self.log(
             f"Data loaded successfully. Shape: {df.shape} ({len(df)} rows, {len(df.columns)} columns)"
         )
@@ -310,6 +315,24 @@ class NodeRunnersMixin:
             return self._resolve_train_frame(data[0])
         return data
 
+    @staticmethod
+    def _non_feature_training_columns(
+        frame: Any, target_col: str, tuning_params: dict[str, Any]
+    ) -> set[str]:
+        """Exclude legitimate label and time-series columns from numeric feature checks."""
+        excluded: set[str] = set()
+        if target_col and target_col in frame.columns:
+            excluded.add(target_col)
+        if tuning_params.get("cv_type") == "time_series_split":
+            time_col = tuning_params.get("cv_time_column")
+            if not time_col:
+                is_polars = EngineRegistry.resolve(frame).name == EngineName.POLARS
+                datetime_cols = _detect_datetime_columns(frame, is_polars)
+                time_col = datetime_cols[0] if datetime_cols else None
+            if time_col and time_col in frame.columns:
+                excluded.add(time_col)
+        return excluded
+
     def _assert_numeric_training_frame(
         self,
         node: NodeConfig,
@@ -335,17 +358,7 @@ class NodeRunnersMixin:
         frame = self._resolve_train_frame(data)
         if not hasattr(frame, "columns") or len(frame.columns) == 0:
             return
-        excluded: set[str] = set()
-        if target_col and target_col in frame.columns:
-            excluded.add(target_col)
-        if tuning_params.get("cv_type") == "time_series_split":
-            time_col = tuning_params.get("cv_time_column")
-            if not time_col:
-                is_polars = EngineRegistry.resolve(frame).name == EngineName.POLARS
-                datetime_cols = _detect_datetime_columns(frame, is_polars)
-                time_col = datetime_cols[0] if datetime_cols else None
-            if time_col and time_col in frame.columns:
-                excluded.add(time_col)
+        excluded = self._non_feature_training_columns(frame, target_col, tuning_params)
         _, dropped = _select_numeric_features(frame)
         offending = [c for c in dropped if c not in excluded]
         if not offending:
@@ -378,6 +391,19 @@ class NodeRunnersMixin:
             return str(EngineRegistry.resolve(frame).name)
         return get_settings().SKYULF_ENGINE
 
+    @staticmethod
+    def _numeric_feature_columns(train_frame: Any, columns: list[str]) -> list[str]:
+        """Apply the same numeric feature filter used by clustering fits."""
+        if hasattr(train_frame, "select_dtypes"):
+            numeric_cols = set(train_frame.select_dtypes(include=["number", "bool"]).columns)
+            return [c for c in columns if c in numeric_cols]
+        # Polars frames have no select_dtypes; reuse the exact filter the fit
+        # applies so persisted columns match the actual training frame (F-12).
+        _, dropped = _select_numeric_features(train_frame)
+        if dropped:
+            return [c for c in columns if c not in set(dropped)]
+        return columns
+
     def _resolve_train_feature_columns(
         self,
         data: Any,
@@ -408,16 +434,7 @@ class NodeRunnersMixin:
         if target_col and target_col in columns:
             columns.remove(target_col)
         if numeric_only:
-            if hasattr(train_frame, "select_dtypes"):
-                numeric_cols = set(train_frame.select_dtypes(include=["number", "bool"]).columns)
-                columns = [c for c in columns if c in numeric_cols]
-            else:
-                # Polars frames have no select_dtypes; reuse the exact filter
-                # the clustering fit applies so the persisted list can never
-                # advertise columns the model was never fit on (F-12).
-                _, dropped = _select_numeric_features(train_frame)
-                if dropped:
-                    columns = [c for c in columns if c not in set(dropped)]
+            columns = self._numeric_feature_columns(train_frame, columns)
         if exclude_columns:
             columns = [c for c in columns if c not in exclude_columns]
         return columns
@@ -917,6 +934,19 @@ class NodeRunnersMixin:
         )
         return self._aggregate_cv_metrics(cv_results)
 
+    @staticmethod
+    def _record_iteration_metrics(
+        metrics: dict[str, Any], iteration_points: list[dict[str, Any]]
+    ) -> None:
+        """Persist boosting history and its final metric metadata for completed-job redraws."""
+        if iteration_points:
+            metrics["iterations"] = iteration_points
+            last_point = iteration_points[-1]
+            if last_point.get("metric"):
+                metrics["iteration_metric"] = last_point["metric"]
+            if last_point.get("direction"):
+                metrics["iteration_direction"] = last_point["direction"]
+
     def _run_training_tuned(
         self,
         node: NodeConfig,
@@ -1051,13 +1081,7 @@ class NodeRunnersMixin:
 
         # Persist the boosting iteration history (when the model streamed one)
         # so completed jobs redraw the curve without the live buffer.
-        if iteration_points:
-            metrics["iterations"] = iteration_points
-            last_point = iteration_points[-1]
-            if last_point.get("metric"):
-                metrics["iteration_metric"] = last_point["metric"]
-            if last_point.get("direction"):
-                metrics["iteration_direction"] = last_point["direction"]
+        self._record_iteration_metrics(metrics, iteration_points)
 
         # Demand telemetry (fallback-shapes plan Phase 0): a stable reason
         # code for graphs that fell back to pre-transformed scoring, so we

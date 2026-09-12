@@ -23,6 +23,22 @@ _INT_DTYPES = (
 )
 
 
+def _string_semantic_bucket(n_unique: int, count: int, null_count: int) -> str:
+    """Classify strings using non-null cardinality and repetition."""
+    observed_unique = n_unique - int(null_count > 0)
+    observed_count = count - null_count
+    if observed_count == 0 or observed_unique == observed_count:
+        return "Text"
+    ratio = observed_unique / observed_count
+    return "Categorical" if ratio < 0.05 or observed_unique <= 20 else "Text"
+
+
+def _integer_semantic_bucket(n_unique: int, count: int) -> str:
+    """Classify low-cardinality integers with the existing all-row ratio."""
+    ratio = n_unique / count if count > 0 else 0
+    return "Categorical" if (ratio < 0.05 and n_unique < 20) else "Numeric"
+
+
 def _dtype_to_semantic_bucket(dtype: Any, n_unique: int, count: int, null_count: int = 0) -> str:
     """Map a Polars dtype and column counts to a semantic bucket.
 
@@ -46,19 +62,13 @@ def _dtype_to_semantic_bucket(dtype: Any, n_unique: int, count: int, null_count:
     if dtype in (pl.Float32, pl.Float64):
         return "Numeric"
     if dtype in _INT_DTYPES:
-        ratio = n_unique / count if count > 0 else 0
-        return "Categorical" if (ratio < 0.05 and n_unique < 20) else "Numeric"
+        return _integer_semantic_bucket(n_unique, count)
     if dtype == pl.Boolean:
         return "Boolean"
     if dtype in (pl.Date, pl.Datetime, pl.Duration):
         return "DateTime"
     if dtype in (pl.Utf8, pl.String):
-        observed_unique = n_unique - int(null_count > 0)
-        observed_count = count - null_count
-        if observed_count == 0 or observed_unique == observed_count:
-            return "Text"
-        ratio = observed_unique / observed_count
-        return "Categorical" if ratio < 0.05 or observed_unique <= 20 else "Text"
+        return _string_semantic_bucket(n_unique, count, null_count)
     if dtype in (pl.Categorical, pl.Enum):
         return "Categorical"
     return "Text"

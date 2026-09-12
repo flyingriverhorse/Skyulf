@@ -31,6 +31,25 @@ from .schemas import TuningConfig, TuningResult
 logger = logging.getLogger(__name__)
 
 
+def _report_refit_warnings(
+    caught: list[warnings.WarningMessage],
+    model_cls: Any,
+    log_callback: Callable[[str], None] | None,
+) -> None:
+    """Log convergence failures and re-emit all other final-refit warnings."""
+    for w in caught:
+        if issubclass(w.category, ConvergenceWarning):
+            conv_msg = (
+                f"Final refit of {model_cls.__name__} with the best params did not "
+                f"fully converge: {w.message}"
+            )
+            logger.warning(conv_msg)
+            if log_callback:
+                log_callback(conv_msg)
+        else:
+            warnings.warn_explicit(w.message, w.category, w.filename, w.lineno)
+
+
 def refit_best_model(
     model_calculator: BaseModelCalculator,
     tuning_result: TuningResult,
@@ -81,17 +100,7 @@ def refit_best_model(
         model.fit(X_np, y_np, **weight_kwargs, **extra_fit_kwargs)
     if detach_callbacks:
         model.callbacks = None
-    for w in caught:
-        if issubclass(w.category, ConvergenceWarning):
-            conv_msg = (
-                f"Final refit of {model_cls.__name__} with the best params did not "
-                f"fully converge: {w.message}"
-            )
-            logger.warning(conv_msg)
-            if log_callback:
-                log_callback(conv_msg)
-        else:
-            warnings.warn_explicit(w.message, w.category, w.filename, w.lineno)
+    _report_refit_warnings(caught, model_cls, log_callback)
 
     return model
 

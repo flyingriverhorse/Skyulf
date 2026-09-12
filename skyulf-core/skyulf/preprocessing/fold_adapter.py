@@ -185,22 +185,28 @@ class MergedBranchFoldAdapter:
             raise ValueError("Merged fold features and target have different row counts")
         for engineer in engineers:
             out = engineer.fit_transform(payload)[0] if fit else engineer.transform(payload)
-            if isinstance(out, tuple) and len(out) == 2:
-                frame, y_out = out
-            else:
-                # Appliers that return a bare frame pass the target through.
-                frame, y_out = out, input_y
-            if frame_rows(frame) != expected_rows or (
-                y_out is not None and frame_rows(y_out) != expected_rows
-            ):
-                raise ValueError(
-                    "Merged fold branch changed row counts; positional merge is unsafe"
-                )
-            if isinstance(frame, pl.DataFrame):
-                frame = frame.to_pandas()
+            frame, y_out = self._validated_branch_output(out, input_y, expected_rows)
             frames.append(frame)
             ys.append(y_out)
         return frames, ys
+
+    @staticmethod
+    def _validated_branch_output(
+        out: Any, input_y: Any, expected_rows: int
+    ) -> tuple[pd.DataFrame, Any]:
+        """Unpack a branch and validate feature and target lengths before conversion."""
+        if isinstance(out, tuple) and len(out) == 2:
+            frame, y_out = out
+        else:
+            # Appliers that return a bare frame pass the target through.
+            frame, y_out = out, input_y
+        if frame_rows(frame) != expected_rows or (
+            y_out is not None and frame_rows(y_out) != expected_rows
+        ):
+            raise ValueError("Merged fold branch changed row counts; positional merge is unsafe")
+        if isinstance(frame, pl.DataFrame):
+            frame = frame.to_pandas()
+        return frame, y_out
 
     def _finalize(self, frames: list[pd.DataFrame], ys: list[Any]) -> tuple[Any, Any]:
         """Apply column ownership and configured drops to validated branch outputs."""

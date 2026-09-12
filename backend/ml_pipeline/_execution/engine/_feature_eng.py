@@ -72,6 +72,20 @@ class FeatureEngMixin:
             return list((node.params or {}).get("steps", []))
         return [{"name": "step", "transformer": node.step_type, "params": node.params or {}}]
 
+    @staticmethod
+    def _branch_learns_or_splits(
+        chain: list[tuple[str, list[dict[str, Any]]]], target_column: str | None
+    ) -> bool:
+        """Reject a raw merge anchor if any upstream branch learns or partitions rows."""
+        for _node_id, branch_steps in chain:
+            if any(
+                step.get("transformer") in train_test_splitters()
+                or _step_learns_from_data(step, target_column)
+                for step in branch_steps
+            ):
+                return True
+        return False
+
     def _safe_split_merge_anchor(self, node: NodeConfig, target_column: str | None) -> bool:
         """Accept a merged raw frame only when its shared-loader branches learn nothing."""
         steps = self._node_steps(node)
@@ -89,13 +103,8 @@ class FeatureEngMixin:
                 return False
             loader_id, chain = branch
             loaders.add(loader_id)
-            for _node_id, branch_steps in chain:
-                if any(
-                    step.get("transformer") in train_test_splitters()
-                    or _step_learns_from_data(step, target_column)
-                    for step in branch_steps
-                ):
-                    return False
+            if self._branch_learns_or_splits(chain, target_column):
+                return False
         return len(loaders) == 1
 
     def _upstream_has_learners(self, node: NodeConfig, target_column: str | None) -> bool:
@@ -354,6 +363,11 @@ class FeatureEngMixin:
             logger.exception("Failed to bundle transformers with model")
             raise
 
+    @staticmethod
+    def _has_multiple_inputs(node: NodeConfig) -> bool:
+        """Count distinct upstream nodes so duplicate edges remain a linear input."""
+        return len(dict.fromkeys(node.inputs or [])) > 1
+
     def _upstream_fe_chain(
         self, training_node: NodeConfig
     ) -> tuple[str, list[tuple[str, list[dict[str, Any]]]]] | None:
@@ -368,14 +382,14 @@ class FeatureEngMixin:
         loader, or an unsupported node type (training/preview in between).
         """
         chain: list[tuple[str, list[dict[str, Any]]]] = []
-        if len(dict.fromkeys(training_node.inputs or [])) > 1:
+        if self._has_multiple_inputs(training_node):
             return None
         current_id = training_node.inputs[0] if training_node.inputs else None
         while current_id is not None:
             cfg = self._node_configs.get(current_id)
             if cfg is None:
                 return None
-            if len(dict.fromkeys(cfg.inputs or [])) > 1:
+            if self._has_multiple_inputs(cfg):
                 if not self._safe_split_merge_anchor(
                     cfg, training_node.params.get("target_column")
                 ):
@@ -384,24 +398,9 @@ class FeatureEngMixin:
                 return f"exec_{cfg.node_id}_input", list(reversed(chain))
             if cfg.step_type == StepType.DATA_LOADER:
                 return current_id, list(reversed(chain))
-            if cfg.step_type == StepType.FEATURE_ENGINEERING:
-                chain.append((cfg.node_id, list((cfg.params or {}).get("steps", []))))
-            elif cfg.step_type not in (StepType.TRAINING, "data_preview"):
-                # Single-transformer node, wrapped exactly like _run_transformer does.
-                chain.append(
-                    (
-                        cfg.node_id,
-                        [
-                            {
-                                "name": "step",
-                                "transformer": cfg.step_type,
-                                "params": cfg.params or {},
-                            }
-                        ],
-                    )
-                )
-            else:
+            if cfg.step_type in (StepType.TRAINING, "data_preview"):
                 return None
+            chain.append((cfg.node_id, self._node_steps(cfg)))
             current_id = cfg.inputs[0] if cfg.inputs else None
         return None
 
@@ -434,27 +433,13 @@ class FeatureEngMixin:
             cfg = self._node_configs.get(current_id)
             if cfg is None:
                 return None
-            if len(dict.fromkeys(cfg.inputs or [])) > 1:
+            if self._has_multiple_inputs(cfg):
                 return None
             if cfg.step_type == StepType.DATA_LOADER:
                 return current_id, list(reversed(chain))
-            if cfg.step_type == StepType.FEATURE_ENGINEERING:
-                chain.append((cfg.node_id, list((cfg.params or {}).get("steps", []))))
-            elif cfg.step_type not in (StepType.TRAINING, "data_preview"):
-                chain.append(
-                    (
-                        cfg.node_id,
-                        [
-                            {
-                                "name": "step",
-                                "transformer": cfg.step_type,
-                                "params": cfg.params or {},
-                            }
-                        ],
-                    )
-                )
-            else:
+            if cfg.step_type in (StepType.TRAINING, "data_preview"):
                 return None
+            chain.append((cfg.node_id, self._node_steps(cfg)))
             current_id = cfg.inputs[0] if cfg.inputs else None
         return None
 
@@ -729,6 +714,7 @@ class FeatureEngMixin:
                     self.log(message)
 
     def _run_feature_engineering(self, node: NodeConfig) -> tuple[str, dict[str, Any]]:
+        """Fit a feature pipeline while preserving split snapshots and fitted artifacts."""
         # Input: DataFrame or SplitDataset (merged when multiple branches feed in).
         target_column = self._execution_target_column(node)
         df = self._get_input(node, target_column or "")
@@ -760,18 +746,7 @@ class FeatureEngMixin:
         # as this node's artifact, so downstream inference can reload the pipeline.
         self.artifact_store.save(f"{node.node_id}_pipeline", engineer)
 
-        if hasattr(processed_df, "shape"):
-            self.log(f"Feature engineering completed. Output shape: {processed_df.shape}")
-        elif isinstance(processed_df, SplitDataset):
-            self.log("Feature engineering completed. SplitDataset created.")
-
-        if isinstance(processed_df, tuple):
-            # SplitDataset
-            train_part = processed_df[0]
-            test_part = processed_df[1] if len(processed_df) > 1 else None
-            train_shape = getattr(train_part, "shape", None)
-            test_shape = getattr(test_part, "shape", None) if test_part is not None else None
-            self.log(f"Split details - Train: {train_shape}, Test: {test_shape or 'None'}")
+        self._log_feature_engineering_output(processed_df)
 
         self.artifact_store.save(node.node_id, processed_df)
 
@@ -789,3 +764,18 @@ class FeatureEngMixin:
             )
 
         return node.node_id, metrics
+
+    def _log_feature_engineering_output(self, processed_df: Any) -> None:
+        """Describe the processed frame or train/test output without changing its shape."""
+        if hasattr(processed_df, "shape"):
+            self.log(f"Feature engineering completed. Output shape: {processed_df.shape}")
+        elif isinstance(processed_df, SplitDataset):
+            self.log("Feature engineering completed. SplitDataset created.")
+
+        if isinstance(processed_df, tuple):
+            # SplitDataset
+            train_part = processed_df[0]
+            test_part = processed_df[1] if len(processed_df) > 1 else None
+            train_shape = getattr(train_part, "shape", None)
+            test_shape = getattr(test_part, "shape", None) if test_part is not None else None
+            self.log(f"Split details - Train: {train_shape}, Test: {test_shape or 'None'}")

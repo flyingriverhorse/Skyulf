@@ -25,6 +25,50 @@ class ArtifactState:
 
 
 @pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        (
+            [
+                None,
+                True,
+                np.bool_(False),
+                0,
+                np.int64(-9),
+                -0.0,
+                np.float64(np.inf),
+                complex(2, -3),
+                "λ:str:",
+                b"\0bytes:",
+                bytearray(b"x"),
+                memoryview(b"y"),
+                {"b": {1, 2}, "a": ("c",)},
+                frozenset({4, 5}),
+                int,
+                SimpleNamespace(value=[1, 2]),
+            ],
+            "240510dfef5056634a40a4bb93b74ea65a4f3f2cc68b62742096d1ad5a75045a",
+        ),
+        (
+            np.array([[1.5, -0.0], [np.nan, np.inf]], dtype="<f8"),
+            "4050de9236b84c5f41764e36c8652674e34dd6fc8400fa0a6724697a157d4f52",
+        ),
+        (
+            np.array([["a", None], [3, b"b"]], dtype=object),
+            "230765659f8b31488b70433fb5121b761b84c97681f13b2eb509ac6315ad2469",
+        ),
+        (
+            np.array([(1, 0.5), (2, 1.5)], dtype=[("count", "<i8"), ("value", "<f8")]),
+            "1ca5bc2b341218b1947e421ce9c7dd167b546b85ba2c615a375ae9af02712214",
+        ),
+    ],
+    ids=["scalars-and-containers", "numeric-array", "object-array", "structured-array"],
+)
+def test_artifact_digest_preserves_canonical_encoding(value: Any, expected: str) -> None:
+    """Refactoring serialization must preserve previously stored semantic digests."""
+    assert artifact_digest(value).hex() == expected
+
+
+@pytest.mark.parametrize(
     ("left", "right"),
     [
         (
@@ -113,6 +157,32 @@ def test_artifact_digest_accepts_deep_acyclic_lists() -> None:
         second = [second]
 
     assert artifact_digest(first) != artifact_digest(second)
+
+
+@pytest.mark.parametrize(
+    ("kind", "depth", "expected"),
+    [
+        ("dict", 220, "c36185a7740aa4e4a6d1ed00b6f4c4721560495e9966efbdb92ca91602740109"),
+        ("mixed", 220, "b7ab6efea93a50b090b790368e3837414fa0a4635d69e25476b75de7c5dcfe49"),
+        ("array", 350, "5bf1426d9538fe26653efc5241eb36549e6ce1b26de619f4b0ecc0724643d5b4"),
+    ],
+)
+def test_artifact_digest_preserves_deep_container_capacity(
+    kind: str, depth: int, expected: str
+) -> None:
+    """Encoder helpers must not consume recursive frames and reject existing deep artifacts."""
+    value: Any = 0
+    for _ in range(depth):
+        if kind == "dict":
+            value = {"child": value}
+        elif kind == "mixed":
+            value = [{"child": value}]
+        else:
+            parent = np.empty(1, dtype=object)
+            parent[0] = value
+            value = parent
+
+    assert artifact_digest(value).hex() == expected
 
 
 def test_artifact_digest_rejects_deep_reference_cycle() -> None:

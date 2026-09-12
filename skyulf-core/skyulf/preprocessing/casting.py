@@ -137,6 +137,49 @@ def _bool_expr_from_numeric_col_polars(col: str) -> Any:
     )
 
 
+def _polars_float_to_integer_expr(X: Any, col: str, pl_dtype: Any, coerce_on_error: bool) -> Any:
+    """Coerce or reject fractional floats before Polars can truncate them."""
+    src = pl.col(col)
+    fractional = src.is_not_null() & ((src - src.round(0)).abs() >= 1e-9)
+    if coerce_on_error:
+        return pl.when(fractional).then(None).otherwise(src).cast(pl_dtype, strict=False).alias(col)
+    # Polars strict integer casts truncate fractions instead of raising.
+    if X.select(fractional.any()).item():
+        raise ValueError(f"Column '{col}' contains fractional values, cannot cast to integer.")
+    return src.cast(pl_dtype, strict=True).alias(col)
+
+
+def _polars_cast_expr(X: Any, col: str, pl_dtype: Any, coerce_on_error: bool) -> tuple[Any, bool]:
+    """Build a supported cast and report whether strict boolean validation is needed."""
+    if pl_dtype == pl.Datetime and X.schema[col] in (pl.String, pl.Utf8):
+        # Share pandas' mixed-format parser, converting only the selected column.
+        parsed = _cast_datetime(X[col].to_pandas(), coerce_on_error)
+        return pl.lit(pl.from_pandas(parsed)).cast(pl_dtype).alias(col), False
+    if pl_dtype == pl.Boolean and X.schema[col] in (
+        pl.String,
+        pl.Utf8,
+        pl.Categorical,
+        pl.Enum,
+    ):
+        return _bool_expr_from_string_col_polars(col), True
+    if pl_dtype == pl.Boolean and X.schema[col].is_numeric():
+        # Accept only exact 0/1 like pandas, rather than Polars' C-style truthiness.
+        return _bool_expr_from_numeric_col_polars(col), True
+    pl_int_dtypes = (
+        pl.Int8,
+        pl.Int16,
+        pl.Int32,
+        pl.Int64,
+        pl.UInt8,
+        pl.UInt16,
+        pl.UInt32,
+        pl.UInt64,
+    )
+    if pl_dtype in pl_int_dtypes and X.schema[col].is_float():
+        return _polars_float_to_integer_expr(X, col, pl_dtype, coerce_on_error), False
+    return pl.col(col).cast(pl_dtype, strict=not coerce_on_error).alias(col), False
+
+
 def _build_polars_cast_exprs(
     X: Any,
     type_map: dict[str, Any],
@@ -174,63 +217,10 @@ def _build_polars_cast_exprs(
                     "Polars engine."
                 )
             continue
-        if pl_dtype == pl.Datetime and X.schema[col] in (pl.String, pl.Utf8):
-            # Share pandas' mixed-format parser: generic Polars casts lose
-            # date-only strings, and inferred parsing rejects all-invalid
-            # columns even in coercion mode. Convert only the selected column.
-            parsed = _cast_datetime(X[col].to_pandas(), coerce_on_error)
-            exprs.append(pl.lit(pl.from_pandas(parsed)).cast(pl_dtype).alias(col))
-            continue
-        if pl_dtype == pl.Boolean and X.schema[col] in (
-            pl.String,
-            pl.Utf8,
-            pl.Categorical,
-            pl.Enum,
-        ):
-            exprs.append(_bool_expr_from_string_col_polars(col))
+        expr, validate_bool = _polars_cast_expr(X, col, pl_dtype, coerce_on_error)
+        exprs.append(expr)
+        if validate_bool:
             string_bool_cols.append(col)
-            continue
-        if pl_dtype == pl.Boolean and X.schema[col].is_numeric():
-            # Polars' default numeric->Boolean cast is C-style truthiness
-            # (x != 0) and never raises, so 2.0 would silently become True.
-            # Mirror the pandas reference (astype("boolean")) which only
-            # accepts exact 0/1 values; anything else becomes null and is
-            # validated below in strict mode.
-            exprs.append(_bool_expr_from_numeric_col_polars(col))
-            string_bool_cols.append(col)
-            continue
-        pl_int_dtypes = (
-            pl.Int8,
-            pl.Int16,
-            pl.Int32,
-            pl.Int64,
-            pl.UInt8,
-            pl.UInt16,
-            pl.UInt32,
-            pl.UInt64,
-        )
-        if pl_dtype in pl_int_dtypes and X.schema[col].is_float():
-            src = pl.col(col)
-            fractional = src.is_not_null() & ((src - src.round(0)).abs() >= 1e-9)
-            if coerce_on_error:
-                exprs.append(
-                    pl.when(fractional)
-                    .then(None)
-                    .otherwise(src)
-                    .cast(pl_dtype, strict=False)
-                    .alias(col)
-                )
-            else:
-                # `cast(strict=True)` truncates fractional floats instead of
-                # raising (unlike pandas' `_drop_fractional_or_raise`), so
-                # detect and raise explicitly to keep engine parity.
-                if X.select(fractional.any()).item():
-                    raise ValueError(
-                        f"Column '{col}' contains fractional values, cannot cast to integer."
-                    )
-                exprs.append(src.cast(pl_dtype, strict=True).alias(col))
-            continue
-        exprs.append(pl.col(col).cast(pl_dtype, strict=not coerce_on_error).alias(col))
 
     return exprs, string_bool_cols
 
@@ -521,7 +511,19 @@ class CastingCalculator(BaseCalculator):
                 if col in X.columns:
                     final_map[col] = resolved_type
 
-        category_columns = [col for col, dtype in final_map.items() if dtype == "category"]
+        categories = self._fit_categories(X, final_map)
+
+        return {
+            "type": "casting",
+            "type_map": final_map,
+            "coerce_on_error": config.get("coerce_on_error", True),
+            "categories": categories,
+        }
+
+    @staticmethod
+    def _fit_categories(X: Any, type_map: dict[str, Any]) -> dict[str, list[Any]]:
+        """Learn observed training categories without retaining unused vocabulary entries."""
+        category_columns = [col for col, dtype in type_map.items() if dtype == "category"]
         categories: dict[str, list[Any]] = {}
         if category_columns:
             category_frame = select_then_to_pandas(X, category_columns)
@@ -530,9 +532,4 @@ class CastingCalculator(BaseCalculator):
                 # that a sliced frame may have inherited from held-out rows.
                 categories[col] = pd.Categorical(category_frame[col].to_numpy()).categories.tolist()
 
-        return {
-            "type": "casting",
-            "type_map": final_map,
-            "coerce_on_error": config.get("coerce_on_error", True),
-            "categories": categories,
-        }
+        return categories

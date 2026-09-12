@@ -15,6 +15,14 @@ from .._sklearn_compat import normalize_logistic_regression_params
 from .schemas import TuningConfig
 
 
+def _default_elasticnet_ratios(ratios: Any, choices: Any) -> Any:
+    """Fill omitted Elastic Net ratios while preserving categorical distributions."""
+    resolved: Any = [0.5 if ratio is None else ratio for ratio in choices]
+    if hasattr(ratios, "choices"):
+        resolved = type(ratios)(resolved)
+    return resolved
+
+
 def normalize_logistic_search_config(
     model_class: Any, defaults: dict[str, Any], config: TuningConfig
 ) -> TuningConfig:
@@ -43,9 +51,7 @@ def normalize_logistic_search_config(
             "Logistic Regression: search elasticnet separately from other penalties "
             "when l1_ratio is omitted or None."
         )
-    resolved: Any = [0.5 if ratio is None else ratio for ratio in choices]
-    if hasattr(ratios, "choices"):
-        resolved = type(ratios)(resolved)
+    resolved = _default_elasticnet_ratios(ratios, choices)
     return replace(
         config,
         search_space={

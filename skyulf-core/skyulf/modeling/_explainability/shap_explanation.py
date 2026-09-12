@@ -199,6 +199,23 @@ def _per_sample_shap_and_base(
     return None
 
 
+def _mean_absolute_interactions(values: np.ndarray, n_features: int) -> np.ndarray | None:
+    """Aggregate supported SHAP interaction shapes across rows and classes."""
+    if values.ndim == 4:
+        # Multi-class: (n_samples, n_features, n_features, n_classes).
+        if values.shape[1] != n_features or values.shape[2] != n_features:
+            return None
+        mean_abs = np.abs(values).mean(axis=(0, 3))
+    elif values.ndim == 3:
+        # Binary/regression: (n_samples, n_features, n_features).
+        if values.shape[1] != n_features or values.shape[2] != n_features:
+            return None
+        mean_abs = np.abs(values).mean(axis=0)
+    else:
+        return None
+    return mean_abs
+
+
 def _compute_interaction_summary(
     model: Any,
     sample: pd.DataFrame,
@@ -234,18 +251,8 @@ def _compute_interaction_summary(
 
     values = np.asarray(raw)
     n_features = len(feature_names)
-
-    if values.ndim == 4:
-        # Multi-class: (n_samples, n_features, n_features, n_classes).
-        if values.shape[1] != n_features or values.shape[2] != n_features:
-            return None
-        mean_abs = np.abs(values).mean(axis=(0, 3))
-    elif values.ndim == 3:
-        # Binary/regression: (n_samples, n_features, n_features).
-        if values.shape[1] != n_features or values.shape[2] != n_features:
-            return None
-        mean_abs = np.abs(values).mean(axis=0)
-    else:
+    mean_abs = _mean_absolute_interactions(values, n_features)
+    if mean_abs is None:
         return None
 
     if n_features > max_interaction_features:
@@ -263,6 +270,73 @@ def _compute_interaction_summary(
         "feature_names": selected_names,
         "matrix": [[round(float(v), 6) for v in row] for row in mean_abs],
     }
+
+
+def _explain_sample(
+    explainer: Any,
+    sample: pd.DataFrame,
+    _shap_exceptions: Any,
+    is_exact_tree: bool,
+    model: Any,
+) -> Any:
+    """Retry exact tree explanations only when SHAP reports additivity failure."""
+    try:
+        explanation = explainer(sample)
+    except Exception as exc:
+        # Only catch additivity failures here — everything else
+        # propagates to the outer handler. When `_shap_exceptions` is
+        # available we check via `isinstance` against `ExplainerError`;
+        # otherwise we fall back to a message-based heuristic so
+        # explainability isn't silently disabled on SHAP versions that
+        # don't expose the private `_exceptions` module.
+        _is_additivity = (
+            _shap_exceptions is not None and isinstance(exc, _shap_exceptions.ExplainerError)
+        ) or (_shap_exceptions is None and "additivity" in str(exc).lower())
+        if not _is_additivity or not is_exact_tree:
+            raise
+        # `tree_path_dependent` computes Shapley values directly from
+        # each tree's own path/sample-weight structure with no
+        # background approximation involved, so this additivity
+        # mismatch can only be a floating-point tolerance artefact in
+        # `shap`'s own re-check (a known upstream issue for some
+        # scikit-learn/shap version combinations), not evidence that we
+        # fed the explainer inconsistent data. Retry without the
+        # (redundant, in this case) re-verification rather than
+        # dropping the explanation entirely.
+        logger.warning(
+            "SHAP additivity re-check failed for model_type=%s despite using the "
+            "exact tree_path_dependent algorithm; retrying with check_additivity=False "
+            "(see https://github.com/shap/shap/issues/2777)",
+            type(model).__name__,
+        )
+        explanation = explainer(sample, check_additivity=False)
+    return explanation
+
+
+def _display_shap_samples(
+    resolved: tuple[np.ndarray, list[float]] | None,
+    sample: pd.DataFrame,
+    feature_names: list[str],
+    max_display_samples: int,
+) -> list[dict[str, Any]]:
+    """Serialize the capped per-row SHAP explanations for display."""
+    samples: list[dict[str, Any]] = []
+    if resolved is not None:
+        shap_rows, base_values = resolved
+        display_sample = sample.iloc[:max_display_samples]
+        for i in range(len(display_sample)):
+            row = display_sample.iloc[i]
+            samples.append(
+                {
+                    "base_value": round(float(base_values[i]), 6),
+                    "feature_values": {name: round(float(row[name]), 6) for name in feature_names},
+                    "shap_values": {
+                        name: round(float(shap_rows[i, j]), 6)
+                        for j, name in enumerate(feature_names)
+                    },
+                }
+            )
+    return samples
 
 
 def compute_shap_explanation(
@@ -333,36 +407,7 @@ def compute_shap_explanation(
             return None
 
         explainer, is_exact_tree = _build_explainer(shap, model, sample)
-        try:
-            explanation = explainer(sample)
-        except Exception as exc:
-            # Only catch additivity failures here — everything else
-            # propagates to the outer handler. When `_shap_exceptions` is
-            # available we check via `isinstance` against `ExplainerError`;
-            # otherwise we fall back to a message-based heuristic so
-            # explainability isn't silently disabled on SHAP versions that
-            # don't expose the private `_exceptions` module.
-            _is_additivity = (
-                _shap_exceptions is not None and isinstance(exc, _shap_exceptions.ExplainerError)
-            ) or (_shap_exceptions is None and "additivity" in str(exc).lower())
-            if not _is_additivity or not is_exact_tree:
-                raise
-            # `tree_path_dependent` computes Shapley values directly from
-            # each tree's own path/sample-weight structure with no
-            # background approximation involved, so this additivity
-            # mismatch can only be a floating-point tolerance artefact in
-            # `shap`'s own re-check (a known upstream issue for some
-            # scikit-learn/shap version combinations), not evidence that we
-            # fed the explainer inconsistent data. Retry without the
-            # (redundant, in this case) re-verification rather than
-            # dropping the explanation entirely.
-            logger.warning(
-                "SHAP additivity re-check failed for model_type=%s despite using the "
-                "exact tree_path_dependent algorithm; retrying with check_additivity=False "
-                "(see https://github.com/shap/shap/issues/2777)",
-                type(model).__name__,
-            )
-            explanation = explainer(sample, check_additivity=False)
+        explanation = _explain_sample(explainer, sample, _shap_exceptions, is_exact_tree, model)
         shap_values = getattr(explanation, "values", explanation)
 
         mean_abs_importance = _mean_abs_per_feature(shap_values, feature_names)
@@ -372,24 +417,7 @@ def compute_shap_explanation(
         resolved = _per_sample_shap_and_base(
             shap_values, getattr(explanation, "base_values", 0.0), model, sample
         )
-        samples: list[dict[str, Any]] = []
-        if resolved is not None:
-            shap_rows, base_values = resolved
-            display_sample = sample.iloc[:max_display_samples]
-            for i in range(len(display_sample)):
-                row = display_sample.iloc[i]
-                samples.append(
-                    {
-                        "base_value": round(float(base_values[i]), 6),
-                        "feature_values": {
-                            name: round(float(row[name]), 6) for name in feature_names
-                        },
-                        "shap_values": {
-                            name: round(float(shap_rows[i, j]), 6)
-                            for j, name in enumerate(feature_names)
-                        },
-                    }
-                )
+        samples = _display_shap_samples(resolved, sample, feature_names, max_display_samples)
 
         interactions = _compute_interaction_summary(model, sample, feature_names)
 

@@ -184,31 +184,9 @@ class FeatureEngineer:
                 metrics=step_metrics,
             )
 
-            step_record = {
-                "name": name,
-                "transformer": transformer_type,
-                "fit_time": (
-                    getattr(transformer_inst, "fit_time", 0.0)
-                    if transformer_inst is not None
-                    else 0.0
-                ),
-                "peak_memory_bytes": (
-                    getattr(transformer_inst, "peak_memory_bytes", 0)
-                    if transformer_inst is not None
-                    else 0
-                ),
-                "rows_in": (
-                    getattr(transformer_inst, "rows_in", rows_before)
-                    if transformer_inst is not None
-                    else rows_before
-                ),
-                "rows_out": (
-                    getattr(transformer_inst, "rows_out", rows_after)
-                    if transformer_inst is not None
-                    else rows_after
-                ),
-                "details": step_metrics,
-            }
+            step_record = self._step_metric_record(
+                name, transformer_type, transformer_inst, rows_before, rows_after, step_metrics
+            )
             metrics["steps"][step_key] = step_record
 
             summary = metrics["summary"]
@@ -226,6 +204,40 @@ class FeatureEngineer:
         metrics["rows_out"] = metrics["summary"]["rows_out"]
 
         return current_data, metrics
+
+    @staticmethod
+    def _step_metric_record(
+        name: str,
+        transformer_type: str,
+        transformer_inst: Any,
+        rows_before: int,
+        rows_after: int,
+        details: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Capture a step's measurements, falling back to observed row counts."""
+        return {
+            "name": name,
+            "transformer": transformer_type,
+            "fit_time": (
+                getattr(transformer_inst, "fit_time", 0.0) if transformer_inst is not None else 0.0
+            ),
+            "peak_memory_bytes": (
+                getattr(transformer_inst, "peak_memory_bytes", 0)
+                if transformer_inst is not None
+                else 0
+            ),
+            "rows_in": (
+                getattr(transformer_inst, "rows_in", rows_before)
+                if transformer_inst is not None
+                else rows_before
+            ),
+            "rows_out": (
+                getattr(transformer_inst, "rows_out", rows_after)
+                if transformer_inst is not None
+                else rows_after
+            ),
+            "details": details,
+        }
 
     # ------------------------------------------------------------------
     # Step execution

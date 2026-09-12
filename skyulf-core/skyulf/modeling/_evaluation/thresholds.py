@@ -26,6 +26,17 @@ def _resolve_classes(y_true: Any, classes: Any) -> np.ndarray:
     return np.unique(np.asarray(y_true))
 
 
+def _class_threshold_array(thresholds: dict[Any, float], classes: np.ndarray) -> np.ndarray:
+    """Validate threshold coverage and order values by probability column."""
+    missing = [c for c in classes if c not in thresholds]
+    if missing:
+        raise ValueError(
+            f"thresholds is missing entries for classes: {missing}. "
+            "apply_thresholds() requires a threshold for every class."
+        )
+    return np.array([float(thresholds[c]) for c in classes])
+
+
 def apply_thresholds(
     y_proba: Any,
     thresholds: dict[Any, float] | float,
@@ -87,14 +98,7 @@ def apply_thresholds(
         threshold = float(threshold)
         return np.where(y_proba[:, 1] >= threshold, classes[1], classes[0])
 
-    missing = [c for c in classes if c not in thresholds]
-    if missing:
-        raise ValueError(
-            f"thresholds is missing entries for classes: {missing}. "
-            "apply_thresholds() requires a threshold for every class."
-        )
-
-    thresholds_array = np.array([float(thresholds[c]) for c in classes])
+    thresholds_array = _class_threshold_array(thresholds, classes)
     scaled = y_proba / thresholds_array
     if n_classes == 2:
         # `np.argmax` breaks exact ties toward the first column, which would

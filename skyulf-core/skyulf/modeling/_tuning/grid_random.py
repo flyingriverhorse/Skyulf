@@ -102,6 +102,11 @@ def evaluate_candidate_cv(
     return float(np.mean(fold_scores)) if fold_scores else -float("inf")
 
 
+def _slice_fold_rows(data: Any, indices: Any) -> Any:
+    """Select fold rows by position without changing their container type."""
+    return data.iloc[indices] if hasattr(data, "iloc") else data[indices]
+
+
 def fit_and_score_candidate_fold(
     candidate_idx: int,
     fold_idx: int,
@@ -129,10 +134,10 @@ def fit_and_score_candidate_fold(
     every failure message is appended so the search can surface them if every trial fails.
     """
     # Split
-    X_train_fold = X_any.iloc[train_idx] if hasattr(X_any, "iloc") else X_any[train_idx]
-    y_train_fold = y_any.iloc[train_idx] if hasattr(y_any, "iloc") else y_any[train_idx]
-    X_val_fold = X_any.iloc[val_idx] if hasattr(X_any, "iloc") else X_any[val_idx]
-    y_val_fold = y_any.iloc[val_idx] if hasattr(y_any, "iloc") else y_any[val_idx]
+    X_train_fold = _slice_fold_rows(X_any, train_idx)
+    y_train_fold = _slice_fold_rows(y_any, train_idx)
+    X_val_fold = _slice_fold_rows(X_any, val_idx)
+    y_val_fold = _slice_fold_rows(y_any, val_idx)
 
     # Instantiate and Fit
     # Note: We must handle potential errors (e.g. incompatible params)

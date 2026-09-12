@@ -23,13 +23,27 @@ def validate_no_cycles(nodes: list[NodeConfig]) -> None:
     """
     known = {node.node_id for node in nodes}
     inputs = {node.node_id: [i for i in node.inputs if i in known] for node in nodes}
-
-    in_degree = {nid: len(ups) for nid, ups in inputs.items()}
     children: dict[str, list[str]] = {nid: [] for nid in known}
     for nid, ups in inputs.items():
         for up in ups:
             children[up].append(nid)
 
+    ordered = _order_acyclic_nodes(inputs, children)
+    if len(ordered) == len(known):
+        return
+
+    stuck = _prune_downstream_nodes(known - ordered, children)
+    loop = _trace_loop(stuck, inputs)
+    raise PipelineCycleError(
+        "Pipeline contains a cycle: "
+        + " -> ".join([*loop, loop[0]])
+        + ". Remove one of these connections so the pipeline flows in one direction."
+    )
+
+
+def _order_acyclic_nodes(inputs: dict[str, list[str]], children: dict[str, list[str]]) -> set[str]:
+    """Consume zero-indegree nodes using the graph's existing traversal order."""
+    in_degree = {nid: len(ups) for nid, ups in inputs.items()}
     ready = [nid for nid, deg in in_degree.items() if deg == 0]
     ordered: set[str] = set()
     while ready:
@@ -39,10 +53,11 @@ def validate_no_cycles(nodes: list[NodeConfig]) -> None:
             in_degree[child] -= 1
             if in_degree[child] == 0:
                 ready.append(child)
-    if len(ordered) == len(known):
-        return
+    return ordered
 
-    stuck = known - ordered
+
+def _prune_downstream_nodes(stuck: set[str], children: dict[str, list[str]]) -> set[str]:
+    """Remove blocked descendants so cycle diagnostics name only loop members."""
     # A stuck node with no stuck successor is merely downstream of the loop,
     # not part of it — prune those so the message targets the loop only.
     while True:
@@ -50,13 +65,7 @@ def validate_no_cycles(nodes: list[NodeConfig]) -> None:
         if not removable:
             break
         stuck -= removable
-
-    loop = _trace_loop(stuck, inputs)
-    raise PipelineCycleError(
-        "Pipeline contains a cycle: "
-        + " -> ".join([*loop, loop[0]])
-        + ". Remove one of these connections so the pipeline flows in one direction."
-    )
+    return stuck
 
 
 def _trace_loop(stuck: set[str], inputs: dict[str, list[str]]) -> list[str]:

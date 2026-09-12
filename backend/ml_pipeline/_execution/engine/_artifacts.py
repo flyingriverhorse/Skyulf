@@ -158,6 +158,44 @@ class ArtifactsMixin:
             self.log(f"Saving model artifact to job key: {job_id}")
             self.artifact_store.save(job_id, model_artifact)
 
+    @staticmethod
+    def _target_name(y: Any) -> str:
+        """Recover a named target without inventing a label for anonymous values."""
+        if isinstance(y, pd.Series) and y.name is not None:
+            return str(y.name)
+        if isinstance(y, pl.Series):
+            return y.name
+        if isinstance(y, (pd.DataFrame, pl.DataFrame)) and len(y.columns) == 1:
+            return str(y.columns[0])
+        return ""
+
+    @staticmethod
+    def _reattach_pandas_target(X: pd.DataFrame, y: Any, target_col: str) -> pd.DataFrame:
+        """Copy features and restore compatible pandas target values and alignment."""
+        train_df = X.copy()
+        if not target_col:
+            return train_df
+        # A single-column DataFrame target is positional; Series retain their index.
+        if isinstance(y, pd.DataFrame):
+            if y.shape[1] == 1:
+                train_df[target_col] = y.iloc[:, 0].to_numpy()
+        elif isinstance(y, (pd.Series, np.ndarray, list)):
+            train_df[target_col] = y
+        return train_df
+
+    @staticmethod
+    def _reattach_polars_target(X: pl.DataFrame, y: Any, target_col: str) -> pl.DataFrame:
+        """Clone features and restore compatible Polars target values."""
+        train_df = X.clone()
+        if not target_col:
+            return train_df
+        if isinstance(y, pl.DataFrame):
+            if y.width == 1:
+                train_df = train_df.with_columns(y.get_column(y.columns[0]).alias(target_col))
+        elif isinstance(y, (pl.Series, pd.Series, np.ndarray, list)):
+            train_df = train_df.with_columns(pl.Series(name=target_col, values=y))
+        return train_df
+
     def _normalize_train_frame(self, data: Any, target_col: str) -> Any | None:
         """Extract and normalize training data to a DataFrame, or `None` if not derivable.
 
@@ -175,38 +213,11 @@ class ArtifactsMixin:
             # Splitters do not pass target_col, but split_xy preserves the
             # label's name. Never persist an anonymous target as a feature.
             if not target_col:
-                if isinstance(y, pd.Series) and y.name is not None:
-                    target_col = str(y.name)
-                elif isinstance(y, pl.Series):
-                    target_col = y.name
-                elif isinstance(y, (pd.DataFrame, pl.DataFrame)) and len(y.columns) == 1:
-                    target_col = str(y.columns[0])
+                target_col = self._target_name(y)
             if isinstance(X, pd.DataFrame):
-                train_df = X.copy()
-                if not target_col:
-                    return train_df
-                # Add target column back if y is compatible. A single-column
-                # `pd.DataFrame` is a legitimate target shape (``split_xy`` can
-                # produce one); squeeze it rather than silently dropping the
-                # target from the drift-reference frame.
-                if isinstance(y, pd.DataFrame):
-                    if y.shape[1] == 1:
-                        train_df[target_col] = y.iloc[:, 0].to_numpy()
-                elif isinstance(y, (pd.Series, np.ndarray, list)):
-                    train_df[target_col] = y
-                return train_df
+                return self._reattach_pandas_target(X, y, target_col)
             if isinstance(X, pl.DataFrame):
-                train_df = X.clone()
-                if not target_col:
-                    return train_df
-                if isinstance(y, pl.DataFrame):
-                    if y.width == 1:
-                        train_df = train_df.with_columns(
-                            y.get_column(y.columns[0]).alias(target_col)
-                        )
-                elif isinstance(y, (pl.Series, pd.Series, np.ndarray, list)):
-                    train_df = train_df.with_columns(pl.Series(name=target_col, values=y))
-                return train_df
+                return self._reattach_polars_target(X, y, target_col)
         return None
 
     def _persist_reference_frame(self, train_df: Any | None, job_id: str) -> None:

@@ -20,6 +20,26 @@ from .optuna import _ensure_optuna_loaded
 logger = logging.getLogger(__name__)
 
 
+def _raise_search_failure(error: Exception) -> None:
+    """Translate known search failures and re-raise unrecognized exceptions."""
+    error_msg = str(error)
+    if "No trials are completed yet" in error_msg:
+        raise ValueError(
+            "Hyperparameter tuning failed: No trials completed successfully. "
+            "This usually means the model failed to train with the provided hyperparameter combinations. "
+            "Please check your search space and data."
+        ) from error
+
+    if "n_samples" in error_msg and "resample" in error_msg and "Got 0" in error_msg:
+        raise ValueError(
+            "Hyperparameter tuning with Halving strategy failed because the dataset is too small "
+            "for the configured halving parameters. Please try using 'Random Search' or 'Grid Search' instead, "
+            "or increase your dataset size."
+        ) from error
+
+    raise error
+
+
 def execute_search(
     searcher: Any,
     X_arr: Any,
@@ -73,22 +93,7 @@ def execute_search(
                 searcher.fit(X_arr, y_arr)
     except Exception as e:
         logger.exception("Hyperparameter tuning failed")
-        error_msg = str(e)
-        if "No trials are completed yet" in error_msg:
-            raise ValueError(
-                "Hyperparameter tuning failed: No trials completed successfully. "
-                "This usually means the model failed to train with the provided hyperparameter combinations. "
-                "Please check your search space and data."
-            ) from e
-
-        if "n_samples" in error_msg and "resample" in error_msg and "Got 0" in error_msg:
-            raise ValueError(
-                "Hyperparameter tuning with Halving strategy failed because the dataset is too small "
-                "for the configured halving parameters. Please try using 'Random Search' or 'Grid Search' instead, "
-                "or increase your dataset size."
-            ) from e
-
-        raise e
+        _raise_search_failure(e)
     finally:
         if optuna_logger is not None and handler is not None:
             optuna_logger.removeHandler(handler)

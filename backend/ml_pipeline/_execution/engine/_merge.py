@@ -9,7 +9,7 @@ Relies on ``self._node_configs``, ``self._resolve_all_inputs``,
 """
 
 import logging
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from typing import Any, cast
 
 import pandas as pd
@@ -22,6 +22,15 @@ from ..graph_utils import _extract_columns
 from ..schemas import NodeConfig
 
 logger = logging.getLogger(__name__)
+
+
+def _column_name_counts(column_groups: Iterable[Iterable[str]]) -> dict[str, int]:
+    """Count column occurrences while preserving their first-appearance order."""
+    counts: dict[str, int] = {}
+    for columns in column_groups:
+        for col in columns:
+            counts[col] = counts.get(col, 0) + 1
+    return counts
 
 
 class MergeMixin:
@@ -117,10 +126,7 @@ class MergeMixin:
         if baseline is None:
             return {}
 
-        counts: dict[str, int] = {}
-        for df in frames:
-            for col in df.columns:
-                counts[col] = counts.get(col, 0) + 1
+        counts = _column_name_counts(df.columns for df in frames)
 
         modifiers: dict[str, list[int]] = {}
         for col, count in counts.items():
@@ -216,22 +222,13 @@ class MergeMixin:
             return "last_wins"
         return strat
 
-    def _merge_frames_columnwise(
-        self,
+    @staticmethod
+    def _merge_column_values(
         frames: list[pd.DataFrame],
-        node_id: str,
+        owners: dict[str, int],
         strategy: str,
-        prefix: str,
-    ) -> pd.DataFrame:
-        """Merge same-row-count frames column-wise, resolving overlapping columns.
-
-        A column carried unchanged by one branch and rewritten by another is not
-        a conflict — the branch that actually modified it owns it, whatever the
-        input order. The configured strategy only breaks ties between two or
-        more branches that each changed the same column.
-        """
-        owners = self._column_owners(frames, node_id)
-
+    ) -> tuple[dict[str, pd.Series], list[str]]:
+        """Resolve column ownership and ties without changing first-appearance order."""
         result_cols: dict[str, pd.Series] = {}
         contested: list[str] = []
         # OC-157: walk the inputs in their own order under both strategies.
@@ -254,6 +251,24 @@ class MergeMixin:
                 if claimed and strategy == "first_wins":
                     continue
                 result_cols[col] = df_aligned[col]
+        return result_cols, contested
+
+    def _merge_frames_columnwise(
+        self,
+        frames: list[pd.DataFrame],
+        node_id: str,
+        strategy: str,
+        prefix: str,
+    ) -> pd.DataFrame:
+        """Merge same-row-count frames column-wise, resolving overlapping columns.
+
+        A column carried unchanged by one branch and rewritten by another is not
+        a conflict — the branch that actually modified it owns it, whatever the
+        input order. The configured strategy only breaks ties between two or
+        more branches that each changed the same column.
+        """
+        owners = self._column_owners(frames, node_id)
+        result_cols, contested = self._merge_column_values(frames, owners, strategy)
 
         merged = pd.DataFrame(result_cols)
         shape_log = " + ".join(str(df.shape) for df in frames)
@@ -285,6 +300,46 @@ class MergeMixin:
                 f"Column sets: {[sorted(cs) for cs in col_sets]}"
             )
 
+        self._record_row_count_mismatch(node_id, part_label, row_counts, col_sets)
+
+        if any(common_cols != cs for cs in col_sets):
+            extras = sorted(set().union(*col_sets) - common_cols)
+            self.log(f"{prefix}: row-merge dropping non-shared columns {extras}")
+            # Surface dropped columns to the UI so users see what was lost
+            # instead of having to dig through job logs.
+            self.merge_warnings.append(
+                {
+                    "node_id": node_id,
+                    "kind": "row_concat_drop",
+                    "part": part_label or "rows",
+                    "dropped_columns": extras,
+                    "kept_columns": sorted(common_cols),
+                    "message": (
+                        f"Node '{node_id}': row-wise merge kept only the {len(common_cols)} "
+                        f"shared columns; {len(extras)} column(s) present in some inputs but "
+                        f"not all were dropped: {extras}."
+                    ),
+                }
+            )
+        merged = pd.concat(
+            [df[sorted(common_cols)] for df in frames],
+            axis=0,
+            ignore_index=True,
+        )
+        self.log(
+            f"{prefix}: row-wise merge "
+            f"{' + '.join(str(rc) for rc in row_counts)} rows → {len(merged)} rows"
+        )
+        return merged
+
+    def _record_row_count_mismatch(
+        self,
+        node_id: str,
+        part_label: str,
+        row_counts: list[int],
+        col_sets: list[set[str]],
+    ) -> None:
+        """Report the switch from a feature union to stacking differing row counts."""
         # OC-153: reaching this method at all is worth telling the user about.
         # Wiring branches into a merge node expresses a feature union, but a
         # union is impossible once the branches describe different numbers of
@@ -320,36 +375,6 @@ class MergeMixin:
                 ),
             }
         )
-
-        if any(common_cols != cs for cs in col_sets):
-            extras = sorted(set().union(*col_sets) - common_cols)
-            self.log(f"{prefix}: row-merge dropping non-shared columns {extras}")
-            # Surface dropped columns to the UI so users see what was lost
-            # instead of having to dig through job logs.
-            self.merge_warnings.append(
-                {
-                    "node_id": node_id,
-                    "kind": "row_concat_drop",
-                    "part": part_label or "rows",
-                    "dropped_columns": extras,
-                    "kept_columns": sorted(common_cols),
-                    "message": (
-                        f"Node '{node_id}': row-wise merge kept only the {len(common_cols)} "
-                        f"shared columns; {len(extras)} column(s) present in some inputs but "
-                        f"not all were dropped: {extras}."
-                    ),
-                }
-            )
-        merged = pd.concat(
-            [df[sorted(common_cols)] for df in frames],
-            axis=0,
-            ignore_index=True,
-        )
-        self.log(
-            f"{prefix}: row-wise merge "
-            f"{' + '.join(str(rc) for rc in row_counts)} rows → {len(merged)} rows"
-        )
-        return merged
 
     @staticmethod
     def _to_pandas_frame(df: Any) -> pd.DataFrame:
@@ -389,7 +414,15 @@ class MergeMixin:
 
         had_polars = any(isinstance(df, pl.DataFrame) for df in frames)
         frames = [self._to_pandas_frame(df) for df in frames]
+        merged = self._merge_pandas_frames(frames, node_id, part_label)
+        if had_polars and get_settings().SKYULF_ENGINE == "polars":
+            return pl.from_pandas(merged)
+        return merged
 
+    def _merge_pandas_frames(
+        self, frames: list[pd.DataFrame], node_id: str, part_label: str
+    ) -> pd.DataFrame:
+        """Choose column union or row stacking after normalizing the frame engine."""
         prefix = f"Node {node_id}"
         if part_label:
             prefix = f"{prefix} [{part_label}]"
@@ -399,16 +432,13 @@ class MergeMixin:
         same_rows = all(rc == row_counts[0] for rc in row_counts)
         strategy = self._get_merge_strategy(node_id)
 
-        merged = (
+        return (
             self._merge_frames_columnwise(frames, node_id, strategy, prefix)
             if same_rows
             else self._merge_frames_rowwise(
                 frames, node_id, part_label, prefix, row_counts, col_sets
             )
         )
-        if had_polars and get_settings().SKYULF_ENGINE == "polars":
-            return pl.from_pandas(merged)
-        return merged
 
     def _split_dataset_train_columns(self, art: SplitDataset) -> list[str]:
         """Best-effort extraction of column names from a ``SplitDataset``'s train slot."""
@@ -443,10 +473,11 @@ class MergeMixin:
             if modifiers:
                 return [col for col, changed_by in modifiers.items() if len(changed_by) > 1]
 
-        seen: dict[str, int] = {}
-        for art in artifacts:
-            for c in self._artifact_columns(art):
-                seen[c] = seen.get(c, 0) + 1
+        return self._overlapping_artifact_columns(artifacts)
+
+    def _overlapping_artifact_columns(self, artifacts: list[Any]) -> list[str]:
+        """Find repeated column names when no usable branch baseline is available."""
+        seen = _column_name_counts(self._artifact_columns(art) for art in artifacts)
         return [c for c, cnt in seen.items() if cnt > 1]
 
     def _has_redundant_ancestor_edge(

@@ -321,6 +321,17 @@ class PipelineEngine(ArtifactsMixin, MergeMixin, FeatureEngMixin, NodeRunnersMix
         # Try to run as a single transformer step
         return self._dispatch_transformer_fallback(node, job_id)
 
+    def _summary_input_shape(self, node: NodeConfig) -> tuple[int, int] | None:
+        """Probe the first upstream frame shape without making summaries fail execution."""
+        try:
+            if node.inputs:
+                upstream = self.artifact_store.load(node.inputs[0])
+                if isinstance(upstream, (pd.DataFrame, pl.DataFrame)):
+                    return upstream.shape
+        except Exception:  # noqa: BLE001 - upstream shape probe is best-effort
+            return None
+        return None
+
     def _build_node_metadata(self, node: NodeConfig, metrics: dict[str, Any]) -> dict[str, Any]:
         """Best-effort assembly of the one-line node-card summary metadata.
 
@@ -344,14 +355,7 @@ class PipelineEngine(ArtifactsMixin, MergeMixin, FeatureEngMixin, NodeRunnersMix
             output = self.artifact_store.load(node.node_id)
         except Exception:  # noqa: BLE001 - best-effort load; failure just skips summary
             logger.debug("summary: output load skipped for %s", node.node_id, exc_info=True)
-        input_shape: tuple[int, int] | None = None
-        try:
-            if node.inputs:
-                upstream = self.artifact_store.load(node.inputs[0])
-                if isinstance(upstream, (pd.DataFrame, pl.DataFrame)):
-                    input_shape = upstream.shape
-        except Exception:  # noqa: BLE001 - upstream shape probe is best-effort
-            input_shape = None
+        input_shape = self._summary_input_shape(node)
         try:
             summary = build_summary(
                 step_type=node.step_type,

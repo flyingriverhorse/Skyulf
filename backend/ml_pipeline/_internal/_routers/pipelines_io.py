@@ -385,27 +385,7 @@ async def get_pipeline_audit_log(
     # chronological ordering — reversing it would diff a version against the
     # wrong predecessor. Sort on `version_int` so each diff sees true history.
     chronological = sorted(versions, key=lambda v: v.version_int)
-    entries: list[dict[str, Any]] = []
-    prev_graph: Any = None
-    for v in chronological:
-        diff = _diff_versions(prev_graph, v.graph)
-        entries.append(
-            {
-                "id": v.id,
-                "version_int": v.version_int,
-                "name": v.name,
-                "note": v.note,
-                "kind": v.kind,
-                "user_id": v.user_id,
-                "created_at": v.created_at.isoformat() if v.created_at else None,
-                "node_count": v.node_count,
-                "edge_count": v.edge_count,
-                "diff": diff,
-            }
-        )
-        # Advance the baseline for every version, including filtered-out ones,
-        # so a filtered view still reports each entry's real change.
-        prev_graph = v.graph
+    entries = _build_audit_entries(chronological)
 
     total_unfiltered = len(entries)
     # Facets are computed before filtering so the client's dropdowns list every
@@ -416,27 +396,12 @@ async def get_pipeline_audit_log(
     has_anonymous_actor = any(e["user_id"] is None for e in entries)
 
     def _matches(entry: dict[str, Any]) -> bool:
-        if actor is not None:
-            # Saves made outside an authenticated session have no `user_id`;
-            # ANONYMOUS_ACTOR is the only way for a client to select them.
-            # `user_id` may be an int, so compare on its string form.
-            if actor == ANONYMOUS_ACTOR:
-                if entry["user_id"] is not None:
-                    return False
-            elif entry["user_id"] is None or str(entry["user_id"]) != actor:
-                return False
+        """Apply the requested actor, kind, and date filters to one saved version."""
+        if not _audit_actor_matches(entry, actor):
+            return False
         if kind is not None and entry["kind"] != kind:
             return False
-        if after is not None or before is not None:
-            raw = entry["created_at"]
-            if raw is None:
-                return False
-            stamp = datetime.fromisoformat(raw)
-            if after is not None and stamp < after:
-                return False
-            if before is not None and stamp > before:
-                return False
-        return True
+        return _audit_timestamp_matches(entry, after, before)
 
     entries = [e for e in entries if _matches(e)]
     # Newest-first for UI consumption; cap after the diff walk so each
@@ -459,6 +424,63 @@ async def get_pipeline_audit_log(
         },
         "entries": entries[:capped_limit],
     }
+
+
+def _build_audit_entries(chronological: Any) -> list[dict[str, Any]]:
+    """Diff every version against its true predecessor before filtering or limiting."""
+    entries: list[dict[str, Any]] = []
+    prev_graph: Any = None
+    for v in chronological:
+        diff = _diff_versions(prev_graph, v.graph)
+        entries.append(
+            {
+                "id": v.id,
+                "version_int": v.version_int,
+                "name": v.name,
+                "note": v.note,
+                "kind": v.kind,
+                "user_id": v.user_id,
+                "created_at": v.created_at.isoformat() if v.created_at else None,
+                "node_count": v.node_count,
+                "edge_count": v.edge_count,
+                "diff": diff,
+            }
+        )
+        # Advance the baseline for every version, including filtered-out ones,
+        # so a filtered view still reports each entry's real change.
+        prev_graph = v.graph
+
+    return entries
+
+
+def _audit_actor_matches(entry: dict[str, Any], actor: str | None) -> bool:
+    """Match actor ids as strings while preserving the anonymous actor sentinel."""
+    if actor is not None:
+        # Saves made outside an authenticated session have no `user_id`;
+        # ANONYMOUS_ACTOR is the only way for a client to select them.
+        # `user_id` may be an int, so compare on its string form.
+        if actor == ANONYMOUS_ACTOR:
+            if entry["user_id"] is not None:
+                return False
+        elif entry["user_id"] is None or str(entry["user_id"]) != actor:
+            return False
+    return True
+
+
+def _audit_timestamp_matches(
+    entry: dict[str, Any], after: datetime | None, before: datetime | None
+) -> bool:
+    """Apply inclusive timestamp bounds only when the entry has a recorded date."""
+    if after is not None or before is not None:
+        raw = entry["created_at"]
+        if raw is None:
+            return False
+        stamp = datetime.fromisoformat(raw)
+        if after is not None and stamp < after:
+            return False
+        if before is not None and stamp > before:
+            return False
+    return True
 
 
 __all__ = ["router"]
