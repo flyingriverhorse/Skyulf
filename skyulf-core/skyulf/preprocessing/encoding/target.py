@@ -17,6 +17,7 @@ from ...registry import NodeRegistry
 from ...types import DEFAULT_RANDOM_STATE
 from ...utils import resolve_columns, user_picked_no_columns
 from .._artifacts import TargetEncoderArtifact
+from .._output_names import validate_generated_column_names
 from .._schema import SkyulfSchema
 from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
 from ..dispatcher import apply_dual_engine, fit_dual_engine, fit_transform_train_dual_engine
@@ -40,6 +41,17 @@ def _resolve_apply_inputs(X: Any, params: dict[str, Any]) -> tuple[list[str], An
     return valid_cols, encoder
 
 
+def _validate_multiclass_names(X: Any, cols: list[str], n_classes: int) -> None:
+    """Reject class-feature collisions while allowing names of dropped originals."""
+    if n_classes > 1:
+        validate_generated_column_names(
+            X.columns,
+            (f"{col}_cls{ci}" for col in cols for ci in range(n_classes)),
+            dropped_columns=cols,
+            node_name="TargetEncoder",
+        )
+
+
 def _replace_target_encoded_polars(
     X: Any, y: Any, valid_cols: list[str], encoded: Any
 ) -> tuple[Any, Any]:
@@ -50,6 +62,7 @@ def _replace_target_encoded_polars(
         return X.with_columns(new_cols), y
 
     n_classes = encoded.shape[1] // n_feats
+    _validate_multiclass_names(X, valid_cols, n_classes)
     new_cols = []
     for fi, col in enumerate(valid_cols):
         for ci in range(n_classes):
@@ -68,6 +81,7 @@ def _replace_target_encoded_pandas(
         return X_out, y
 
     n_classes = encoded.shape[1] // n_feats
+    _validate_multiclass_names(X, valid_cols, n_classes)
     X_out = X_out.drop(columns=valid_cols)
     for fi, col in enumerate(valid_cols):
         for ci in range(n_classes):
@@ -104,7 +118,8 @@ class TargetEncoderApplier(BaseApplier):
     the artifact, so parity comes from sharing it. The output shape follows the
     target type: binary and regression targets are encoded in place, while a
     multiclass target drops the originals and emits one ``{col}_cls{i}`` column
-    per class.
+    per class. Multiclass output names must not collide with retained columns;
+    conflicts raise ``ValueError`` before any input values are replaced.
     """
 
     @apply_method
@@ -251,6 +266,8 @@ def _target_fit_polars(X: Any, y: Any, config: dict[str, Any]) -> Mapping[str, A
         return {}
 
     encoder = _fit_target_encoder(X.select(cols), y, config)
+    if encoder.target_type_ == "multiclass" and encoder.classes_ is not None:
+        _validate_multiclass_names(X, cols, len(encoder.classes_))
     return {"type": "target_encoder", "columns": cols, "encoder_object": encoder}
 
 
@@ -265,6 +282,8 @@ def _target_fit_pandas(X: Any, y: Any, config: dict[str, Any]) -> Mapping[str, A
         return {}
 
     encoder = _fit_target_encoder(X[cols], y, config)
+    if encoder.target_type_ == "multiclass" and encoder.classes_ is not None:
+        _validate_multiclass_names(X, cols, len(encoder.classes_))
     return {"type": "target_encoder", "columns": cols, "encoder_object": encoder}
 
 

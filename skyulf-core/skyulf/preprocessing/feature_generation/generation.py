@@ -45,6 +45,14 @@ class FeatureGenerationApplier(BaseApplier):
         skipped, and an output name that already exists is suffixed until
         unique unless ``allow_overwrite`` says otherwise.
 
+        Datetime extraction uses ``output_column`` exactly for one configured
+        source and feature. With multiple features it produces ``name_feature``;
+        with multiple sources it produces ``name_source_feature``. Without an
+        explicit name, outputs remain ``source_feature``, optionally preceded
+        by ``output_prefix``. Every datetime output follows the collision policy.
+        Saved pipelines affected by formerly ignored names or overwritten
+        columns require refitting after upgrading.
+
         Group aggregates require training-fitted mappings. Legacy artifacts
         lacking those mappings must be refitted before inference.
         """

@@ -215,6 +215,15 @@ missing=[]  new=[]  column_drifts={}  drifted_count=0
 ### OC-48
 ### 🟡 Medium — Expectations pass vacuously on empty frames
 
+**Fixed 2026-09-12:** all three row-level expectations now require at least one
+row by default, with keyword-only `allow_empty=True` for intentional empty
+partitions. Requested-column validation still runs; `expect_columns_exist`
+remains schema-only, and range checks still ignore nulls in nonempty frames.
+After null removal, a range check with no observed values returns before
+comparison, also supporting inferred Polars `Null` dtype safely.
+Public regressions cover Pandas/Polars and both wrappers, including native
+Polars execution. The reproduction below records the former behavior.
+
 **File:** `profiling/expect.py:92-209`
 
 `expect_no_nulls`, `expect_value_range`, and `expect_unique` all **pass** on an

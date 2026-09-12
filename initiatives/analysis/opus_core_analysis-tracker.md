@@ -214,6 +214,7 @@ uses, so a fixed finding stays where it was filed.
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
+| OC-18 | 🟡 | One-hot/dummy generated names can collide with existing columns (`encoding/one_hot.py`, `dummy.py`) | small | ✅ fixed 2026-09-12 — reject conflicting generated names in one-hot, dummy, missing-indicator and multiclass target encoding at fit/apply, while preserving legitimate reuse of dropped source names. |
 | OC-21 | 🟡 | WOE additive smoothing not normalized over categories (`encoding/woe.py`) | small | ✅ fixed 2026-09-11 — normalize class totals by all observed-category pseudocounts in full fits and training complements, correcting WOE/IV without rewriting saved mappings. |
 | OC-172 | 🟡 | `StandardScaler` crashes on mixed pandas nullable numeric columns containing `pd.NA`; native sklearn and equivalent Polars input succeed (`preprocessing/scaling/standard.py:144,154`, `engines/sklearn_bridge.py:52`) | small | ✅ fixed 2026-09-09 - nullable numeric missing sentinels become NumPy NaN without rounding observed integers; StandardScaler applies numeric arithmetic safely. |
 | OC-178 | 🟡 | `HashEncoder` hashes the same missing value into different buckets across Polars, pandas object, and pandas nullable string inputs, even with one shared fitted artifact (`preprocessing/encoding/hash.py:45,76`) | small | ✅ already fixed - verified 2026-09-09: one shared hash artifact gives identical missing-value buckets across pandas object/string and Polars. |
@@ -228,6 +229,7 @@ uses, so a fixed finding stays where it was filed.
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
+| OC-30 | 🟡 | Datetime extraction ignores the UI output name and overwrites collisions (`feature_generation/_pandas_ops.py`, `_polars_ops.py`) | small | ✅ fixed 2026-09-12 — honor exact/prefix output naming and the shared numbered collision policy on both engines, including fitted operation replay. |
 | OC-24 | 🟠 | Polars group aggregates treat missing keys differently from pandas (`feature_generation/_polars_ops.py`) | small | ✅ already fixed — verified 2026-09-12: public fitted aggregates share null/NaN training groups across engines and wrappers; unseen groups remain missing, while the public artifact guard excludes divergent private unfitted helpers. |
 | OC-230 | 🟡 | Native Polars NaN inputs propagate through feature ratios while pandas treats them as missing (`feature_generation/_polars_ops.py:_polars_ratio`, `_pandas_ops.py:_pandas_ratio`) | small | ✅ fixed 2026-09-11 - normalize native NaN and null ratio operands to zero before summing, preserving other operands, input columns and signed epsilon. |
 | OC-23 | 🟠 | Polars `ratio` flips the sign of near-zero negative denominators (`feature_generation/_polars_ops.py:97-112`) | small | ✅ fixed 2026-09-11 - preserve the sign when clamping a near-zero ratio denominator to epsilon on Polars, matching pandas. |
@@ -247,6 +249,7 @@ uses, so a fixed finding stays where it was filed.
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
+| OC-48 | 🟡 | Expectations pass vacuously on empty frames (`profiling/expect.py`) | small | ✅ fixed 2026-09-12 — require at least one row by default in null/range/uniqueness checks, with explicit `allow_empty=True`, preserved schema validation and safe all-null range checks. |
 | OC-51 | 🟡 | Transform advice can be mathematically invalid and contradict the clean-dataset message | small | ✅ fixed 2026-09-12 — use domain/skew-aware transform advice and evaluate all preparation recommendations, including target resampling, before emitting a limited clean-dataset message. |
 | OC-247 | 🟡 | Missing categorical values inflate unique/rare-label counts and consume a top-10 frequency slot (`profiling/analyzer.py`, `_analyzer/categorical.py`) | small | ✅ filed and fixed 2026-09-12 — exclude nulls before frequency ranking and rare-label aggregation, and remove the null entry from the distinct-label count. |
 | OC-235 | 🟠 | Directed causal edges are serialized backwards (`profiling/_analyzer/causal.py`) | small | ✅ fixed 2026-09-11 — preserve causal-learn endpoint order; real graph objects and public collider regressions verify both orientations. |
@@ -408,6 +411,58 @@ respective fix logs; OC-167 closed with canonical artifact framing on 2026-09-09
 ---
 
 ## Log
+
+### 2026-09-12 — OC-18/30/48: generated names, datetime outputs and empty-data checks
+
+Continued the unparked queue after signed commit `7947d5af`; the calibrated
+Base Estimator multiselect stays unchanged. Reproductions used public
+Calculator/Applier and expectation APIs with native and wrapped Pandas/Polars
+frames. Canvas encoding and datetime payloads already forwarded the relevant
+settings correctly, so this batch changes Core behavior without frontend edits.
+
+- **OC-18:** one-hot/dummy generated `city_a` names duplicated an existing
+  Pandas column; Polars one-hot raised `DuplicateError`, while dummy encoding
+  silently replaced the retained values. MissingIndicator and multiclass
+  TargetEncoder also overwrote retained output names, including cross-fitted
+  target-encoder training. A shared validator now rejects names duplicated
+  within generated outputs or shared with retained inputs at fit/apply. Names
+  belonging only to dropped sources remain available. One-hot and dummy
+  construction reads all original sources before output assembly, fixing lost
+  indicators and corrupted secondary source values in those valid cases.
+  The dedicated regressions went from **78 failed / 46 passed** to **124 passed**.
+- **OC-30:** a Canvas-shaped datetime operation with
+  `output_column="custom_year"` ignored that name and replaced an existing
+  `dt_year=99` with `2024` despite overwrite being disabled. Both engines now
+  honor exact single-result names, feature/source prefixes for multiple
+  results, optional default-name prefixes and the existing numbered collision
+  policy. The configured source count keeps remaining names stable when an
+  inference source is absent; suffixes still depend on the current input
+  schema, as for other Feature Generation operations. The node's existing
+  schema-prediction fallback remains `None`. **68 regressions** cover native
+  and wrapped inputs, replay, overwrite, repeated features, runtime columns,
+  and downstream arithmetic/fitted group aggregation.
+- **OC-48:** all three row-level expectations returned success for zero-row
+  datasets on both engines. They now raise `ExpectationError` by default, with
+  keyword-only `allow_empty=True` for intentionally empty data. Requested
+  columns are still validated first; column-existence checks stay schema-only.
+  An additional probe found empty/all-null Polars `Null` series invoking an
+  unsupported comparison. Range checks now return after null removal when no
+  observed values remain, preserving their documented null-ignore behavior.
+  **81 regressions** distinguish empty rows, absent columns, all-null values,
+  invalid nonempty data, zero-width Pandas frames and native Polars execution.
+
+Validation: the combined encoding, feature-generation, expectation, artifact,
+schema, preprocessing-pipeline and leakage Core selection passed **2,080 tests**
+and **3 snapshots** (11 existing warnings). Separate backend encoding,
+preprocessing, schema-preview/graph and operation-leakage suites passed
+**925 tests** (two existing deprecations); the two existing root feature-generation
+suites also passed **3 tests**. Full-repository Ruff, all 13 changed Python files'
+format checks, and the complete configured ty gate passed. Independent reviews
+found no actionable issues. Reference docs, changelog and source findings record
+the behavior changes: rename conflicting encoder inputs, refit pipelines affected
+by datetime naming/overwrite changes, and explicitly allow expected empty data.
+
+The queue now has **25 open / 4 parked**. OC-71/72/73/185 remain parked.
 
 ### 2026-09-12 — OC-66 follow-up: Canvas calibrated base selection
 

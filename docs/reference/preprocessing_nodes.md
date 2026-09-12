@@ -206,15 +206,20 @@ Learned params:
 
 ### MissingIndicator
 
-Adds `{col}_missing` indicator columns.
+Adds `{col}_missing` indicator columns by default.
+
+Generated names must be unique and must not collide with existing columns.
+Fitting and applying raise `ValueError` on a collision, including one introduced by new inference
+data. Rename the conflicting input column or change the selected columns.
 
 Config:
 
 - `columns`: list[str] (optional; defaults to all columns with any missing values)
+- `flag_suffix`: str (default `_missing`)
 
 Learned params:
 
-- `columns`
+- `columns`, `flag_suffix`
 
 ## Imputation
 
@@ -278,6 +283,13 @@ Example step:
 
 ### OneHotEncoder
 
+Generated names must be unique and must not collide with retained input
+columns. Fitting and applying raise `ValueError` before returning ambiguous
+columns or replacing existing data. This also checks new inference columns
+and older fitted artifacts. Rename conflicting inputs or categories before
+encoding. A selected source that is removed by `drop_original=True` does not
+reserve its name; other retained columns do.
+
 Config:
 
 - `columns`: list[str] (optional; auto-detects categorical columns)
@@ -295,6 +307,9 @@ Learned params:
 - `drop_original`, `include_missing`
 
 ### DummyEncoder
+
+Uses the same collision checks as `OneHotEncoder`. Generated columns are
+computed from the original source values before selected sources are dropped.
 
 Config:
 
@@ -351,6 +366,12 @@ the training-row count). A one-row split, or a classification split where any
 target class appears only once, raises a clear error instead of leaking the
 row's target into its encoded value. Direct Calculator/Applier use remains an
 advanced API and uses the explicit fit/apply calls supplied by the caller.
+
+Multiclass output names must be unique and must not collide with retained
+input columns. A collision raises `ValueError` during fitting, cross-fitted
+training, or later application, including with older artifacts. Rename the
+conflicting input column before encoding. Binary and regression encodings
+continue to replace their selected source columns.
 
 Config:
 
@@ -678,6 +699,21 @@ engines. Other selected operands still contribute normally: `(NaN + 2) / 4`
 produces `0.5`. An entirely missing denominator uses positive epsilon, and an
 entirely missing numerator sums to zero. Source columns retain their values;
 this rule applies to the generated ratio.
+
+For `datetime_extract`, `output_column` names a single source/feature result
+exactly. With one source and multiple features, it becomes a prefix:
+`output_column="calendar"` with `["year", "month"]` produces `calendar_year`
+and `calendar_month`. With multiple sources, names also include the source,
+such as `calendar_start_year`. Without `output_column`, the default is
+`source_feature`; an optional `output_prefix` is prepended to that default.
+
+Datetime outputs now follow `allow_overwrite` (default `False`): a collision
+adds `_1`, `_2`, and so on until the name is available. Setting it to `True`
+permits replacement. For example, an existing `dt_year` is retained and a new
+year feature becomes `dt_year_1`. Names are resolved against the frame being
+transformed, as for other Feature Generation operations. Refit affected saved
+pipelines and downstream models if they depended on previously ignored names
+or overwritten columns.
 
 For `group_agg`, null and NaN keys share a single training group on both engines.
 Later transformations reuse that fitted aggregate, including for missing keys;

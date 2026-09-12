@@ -11,6 +11,7 @@ from ...core.meta.decorators import node_meta
 from ...registry import NodeRegistry
 from ...utils import resolve_columns, user_picked_no_columns
 from .._artifacts import DummyEncoderArtifact
+from .._output_names import validate_generated_column_names
 from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
 from ..dispatcher import apply_dual_engine, fit_dual_engine
 from ._common import _exclude_target_column, detect_categorical_columns
@@ -33,6 +34,20 @@ def _drop_first_if_needed(cats: list[Any], drop_first: bool) -> list[Any]:
     if drop_first and cats:
         return cats[1:]
     return cats
+
+
+def _validate_dummy_names(
+    X: Any, cols: list[str], categories: dict[str, list[Any]], drop_first: bool
+) -> None:
+    """Check only the indicators emitted from the fitted category lists."""
+    names = (
+        f"{col}_{cat}"
+        for col in cols
+        for cat in _drop_first_if_needed(categories.get(col, []), drop_first)
+    )
+    validate_generated_column_names(
+        X.columns, names, dropped_columns=cols, node_name="DummyEncoder"
+    )
 
 
 # A trailing ".0" is stripped from float columns so an integral value renders
@@ -87,15 +102,19 @@ def _dummy_apply_polars(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, An
 
     categories = params.get("categories", {})
     drop_first = params.get("drop_first", False)
-    X_out = X
+    _validate_dummy_names(X, valid_cols, categories, drop_first)
+    exprs = []
     for col in valid_cols:
         cats = _drop_first_if_needed(categories.get(col, []), drop_first)
         rendered = _polars_col_to_str_expr(X, col)
-        exprs = [
+        exprs.extend(
             (rendered == str(cat)).cast(pl.Int8).fill_null(0).alias(f"{col}_{cat}") for cat in cats
-        ]
-        X_out = X_out.with_columns(exprs)
-    return X_out.drop(valid_cols), y
+        )
+    retained = X.drop(valid_cols)
+    if not exprs:
+        return retained, y
+    encoded = X.select(exprs)
+    return (retained.hstack(encoded) if retained.width else encoded), y
 
 
 def _dummy_apply_pandas(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
@@ -105,6 +124,7 @@ def _dummy_apply_pandas(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, An
 
     categories = params.get("categories", {})
     drop_first = params.get("drop_first", False)
+    _validate_dummy_names(X, valid_cols, categories, drop_first)
     X_out = X.copy()
     for col in valid_cols:
         known_cats = categories.get(col, [])
@@ -125,6 +145,8 @@ class DummyEncoderApplier(BaseApplier):
     and ``_polars_col_to_str_expr``, which is a function of the value alone so
     a category cannot stop matching because of what else shares its batch. A
     value unseen at fit time yields an all-zero row rather than raising.
+    Generated names that duplicate another indicator or a retained input
+    column raise ``ValueError`` before output construction.
     """
 
     @apply_method
@@ -143,10 +165,13 @@ class DummyEncoderApplier(BaseApplier):
 
 
 def _build_dummy_artifact(
+    X: Any,
     cols: list[str],
     categories: dict[str, list[str]],
     config: dict[str, Any],
 ) -> Mapping[str, Any]:
+    """Validate fitted indicator names before returning the reusable artifact."""
+    _validate_dummy_names(X, cols, categories, config.get("drop_first", False))
     return {
         "type": "dummy_encoder",
         "columns": cols,
@@ -163,7 +188,7 @@ def _dummy_fit_polars(X: Any, y: Any, config: dict[str, Any]) -> Mapping[str, An
     for col in cols:
         rendered = X.select(_polars_col_to_str_expr(X, col).unique().sort()).to_series().to_list()
         categories[col] = [str(c) for c in rendered if c is not None]
-    return _build_dummy_artifact(cols, categories, config)
+    return _build_dummy_artifact(X, cols, categories, config)
 
 
 def _dummy_fit_pandas(X: Any, y: Any, config: dict[str, Any]) -> Mapping[str, Any]:
@@ -173,7 +198,7 @@ def _dummy_fit_pandas(X: Any, y: Any, config: dict[str, Any]) -> Mapping[str, An
     categories: dict[str, list[str]] = {
         col: sorted(_pandas_col_to_str(X[col]).dropna().unique().tolist()) for col in cols
     }
-    return _build_dummy_artifact(cols, categories, config)
+    return _build_dummy_artifact(X, cols, categories, config)
 
 
 @NodeRegistry.register("DummyEncoder", DummyEncoderApplier)

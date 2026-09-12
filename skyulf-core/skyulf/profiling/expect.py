@@ -61,6 +61,15 @@ def _resolve_columns(df: Any, columns: Sequence[str] | None) -> list[str]:
     return list(columns)
 
 
+def _check_row_count(frame: pd.DataFrame | pl.DataFrame, *, allow_empty: bool) -> None:
+    """Reject zero rows unless the caller explicitly permits an empty dataset."""
+    if len(frame) == 0 and not allow_empty:
+        raise ExpectationError(
+            "Expected at least one row, but the frame is empty. "
+            "Set allow_empty=True to allow zero rows."
+        )
+
+
 def _polars_null_count(series: pl.Series) -> int:
     """Count null and floating NaN values with Pandas isnull semantics."""
     count = int(series.null_count())
@@ -89,11 +98,17 @@ def expect_columns_exist(df: Any, columns: Sequence[str]) -> None:
         raise ExpectationError(f"Expected columns are missing: {missing}")
 
 
-def expect_no_nulls(df: Any, columns: Sequence[str] | None = None) -> None:
-    """Assert that the given columns (default: all) contain no null values."""
+def expect_no_nulls(
+    df: Any, columns: Sequence[str] | None = None, *, allow_empty: bool = False
+) -> None:
+    """Assert that the given columns (default: all) contain no null values.
+
+    Zero-row frames fail unless ``allow_empty=True`` is explicitly requested.
+    """
     frame = _as_polars(df)
     if frame is not None:
         cols = _resolve_columns(frame, columns)
+        _check_row_count(frame, allow_empty=allow_empty)
         offenders = {
             column: count
             for column in cols
@@ -102,6 +117,7 @@ def expect_no_nulls(df: Any, columns: Sequence[str] | None = None) -> None:
     else:
         pandas_frame = _as_pandas(df)
         cols = _resolve_columns(pandas_frame, columns)
+        _check_row_count(pandas_frame, allow_empty=allow_empty)
         null_counts = {c: int(pandas_frame[c].isnull().sum()) for c in cols}
         offenders = {c: n for c, n in null_counts.items() if n > 0}
     if offenders:
@@ -115,15 +131,19 @@ def expect_value_range(
     minimum: float | None = None,
     maximum: float | None = None,
     inclusive: bool = True,
+    allow_empty: bool = False,
 ) -> None:
     """Assert that all values in ``column`` fall within ``[minimum, maximum]``.
 
     ``minimum`` / ``maximum`` are optional (open-ended on the unset side).
     Null values are ignored. Set ``inclusive=False`` for a strict comparison.
+    Zero-row frames fail unless ``allow_empty=True`` is explicitly requested;
+    a frame containing only null values still has rows and passes this check.
     """
     frame = _as_polars(df)
     if frame is not None:
         expect_columns_exist(frame, [column])
+        _check_row_count(frame, allow_empty=allow_empty)
         series = frame.get_column(column)
         if series.dtype == pl.Boolean:
             pandas_frame = _as_pandas(df)
@@ -137,8 +157,11 @@ def expect_value_range(
     else:
         pandas_frame = _as_pandas(df)
         expect_columns_exist(pandas_frame, [column])
+        _check_row_count(pandas_frame, allow_empty=allow_empty)
         series = pandas_frame[column].dropna()
         observed_as_float = False
+    if len(series) == 0:
+        return
     _check_lower_bound(series, column, minimum, inclusive, observed_as_float=observed_as_float)
     _check_upper_bound(series, column, maximum, inclusive, observed_as_float=observed_as_float)
 
@@ -192,15 +215,20 @@ def _check_upper_bound(
         )
 
 
-def expect_unique(df: Any, columns: Sequence[str]) -> None:
-    """Assert that the combination of ``columns`` has no duplicate rows."""
+def expect_unique(df: Any, columns: Sequence[str], *, allow_empty: bool = False) -> None:
+    """Assert that the combination of ``columns`` has no duplicate rows.
+
+    Zero-row frames fail unless ``allow_empty=True`` is explicitly requested.
+    """
     frame = _as_polars(df)
     if frame is not None:
         expect_columns_exist(frame, columns)
+        _check_row_count(frame, allow_empty=allow_empty)
         dup_count = int(_polars_duplicate_subset(frame, columns).is_duplicated().sum())
     else:
         pandas_frame = _as_pandas(df)
         expect_columns_exist(pandas_frame, columns)
+        _check_row_count(pandas_frame, allow_empty=allow_empty)
         duplicated = pandas_frame.duplicated(subset=list(columns), keep=False)
         dup_count = int(duplicated.sum())
     if dup_count:
