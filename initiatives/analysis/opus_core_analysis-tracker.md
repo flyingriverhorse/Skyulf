@@ -462,6 +462,28 @@ respective fix logs; OC-167 closed with canonical artifact framing on 2026-09-09
 
 ## Log
 
+### 2026-09-13 — complexity thresholds: error above 10, report above 8
+
+Separated the informational report from the blocking gate in the Core and
+backend workflows. Both full-tree reports retain CCN 8 and run before the
+gate so their output remains visible when a gate fails. The user explicitly
+requested coverage of all source files, without selecting individual files
+or packages. The CCN 10 gates therefore check the complete `skyulf-core/skyulf`
+and `backend` trees. No whitelist or baseline exemption is applied.
+
+The full-tree gates currently fail on 26 Core and 33 backend functions above
+10. These existing violations remain blocking until corrected; this change
+configures the requested checks without refactoring application functions.
+Local commands and the v0.8.21 changelog reflect the full-tree policy.
+
+Verification: actual Lizard probes at CCN 8/9/10/11 confirm that 9 and 10 are
+reported but pass the error threshold,
+while 11 fails. Both full-tree report commands exit zero; `run_check.sh`
+preserves both gates' nonzero results. YAML and whitespace checks pass.
+The user accepted these blocking findings and deferred the 59 function
+refactors to the next release. The requested commit delivers the thresholds
+and documentation only. Queue rows are unchanged.
+
 ### 2026-09-13 — 0.8.21 CI follow-up: complexity and sklearn 1.9 compatibility
 
 Reproduced the reported Lizard gate failure: GeneralTransformation `fit`
