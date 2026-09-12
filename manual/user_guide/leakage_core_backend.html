@@ -3642,6 +3642,15 @@ the fork point, and transformer branches merging <strong>directly into the model
 <li>Trunk preprocessing before the splitter is genuinely safe.</li>
 <li>Branch column selection and merge order preserve the intended features.</li>
 </ul>
+<p>The positional merge rejects <code>ManualBounds</code>, <code>LagFeatures(drop_na=True)</code> and
+<code>LagFeatures</code>/<code>RollingAggregate</code> with a configured <code>sort_by</code>. These settings
+can filter or reorder observations in one branch independently of the others.
+Lag and rolling features with sorting and filtering disabled remain supported.
+The same check runs in the Core merged-fold adapter and backend reconstruction
+path; CV/tuning is blocked by default for an unsupported learned graph.
+An explicit <code>on_leakage="warn"</code> or <code>"ignore"</code> retains the documented legacy
+fallback and records <code>fold_refit_fallback="row_changing_branch_step"</code>.
+Single-branch adapters retain their existing sorting/filtering behavior.</p>
 <p>Overlapping columns can be replaced according to merge order. Prefer disjoint
 feature outputs where appropriate; topology support alone does not establish
 correct merge semantics.</p>

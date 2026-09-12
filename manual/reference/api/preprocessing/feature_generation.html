@@ -3469,7 +3469,15 @@ constants for backward compatibility.</p>
 <span class="normal">58</span>
 <span class="normal">59</span>
 <span class="normal">60</span>
-<span class="normal">61</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">FeatureGenerationApplier</span><span class="p">(</span><span class="n">BaseApplier</span><span class="p">):</span>
+<span class="normal">61</span>
+<span class="normal">62</span>
+<span class="normal">63</span>
+<span class="normal">64</span>
+<span class="normal">65</span>
+<span class="normal">66</span>
+<span class="normal">67</span>
+<span class="normal">68</span>
+<span class="normal">69</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">FeatureGenerationApplier</span><span class="p">(</span><span class="n">BaseApplier</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""Append the columns described by a feature-generation artifact."""</span>
 
     <span class="nd">@apply_method</span>
@@ -3481,6 +3489,14 @@ constants for backward compatibility.</p>
 <span class="sd">        operation runs. A failure inside a supported operation is logged and</span>
 <span class="sd">        skipped, and an output name that already exists is suffixed until</span>
 <span class="sd">        unique unless ``allow_overwrite`` says otherwise.</span>
+
+<span class="sd">        Datetime extraction uses ``output_column`` exactly for one configured</span>
+<span class="sd">        source and feature. With multiple features it produces ``name_feature``;</span>
+<span class="sd">        with multiple sources it produces ``name_source_feature``. Without an</span>
+<span class="sd">        explicit name, outputs remain ``source_feature``, optionally preceded</span>
+<span class="sd">        by ``output_prefix``. Every datetime output follows the collision policy.</span>
+<span class="sd">        Saved pipelines affected by formerly ignored names or overwritten</span>
+<span class="sd">        columns require refitting after upgrading.</span>
 
 <span class="sd">        Group aggregates require training-fitted mappings. Legacy artifacts</span>
 <span class="sd">        lacking those mappings must be refitted before inference.</span>
@@ -3529,6 +3545,13 @@ created. Unsupported operation types raise <code>ValueError</code> before any
 operation runs. A failure inside a supported operation is logged and
 skipped, and an output name that already exists is suffixed until
 unique unless <code>allow_overwrite</code> says otherwise.</p>
+<p>Datetime extraction uses <code>output_column</code> exactly for one configured
+source and feature. With multiple features it produces <code>name_feature</code>;
+with multiple sources it produces <code>name_source_feature</code>. Without an
+explicit name, outputs remain <code>source_feature</code>, optionally preceded
+by <code>output_prefix</code>. Every datetime output follows the collision policy.
+Saved pipelines affected by formerly ignored names or overwritten
+columns require refitting after upgrading.</p>
 <p>Group aggregates require training-fitted mappings. Legacy artifacts
 lacking those mappings must be refitted before inference.</p>
 
@@ -3558,7 +3581,15 @@ lacking those mappings must be refitted before inference.</p>
 <span class="normal">58</span>
 <span class="normal">59</span>
 <span class="normal">60</span>
-<span class="normal">61</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@apply_method</span>
+<span class="normal">61</span>
+<span class="normal">62</span>
+<span class="normal">63</span>
+<span class="normal">64</span>
+<span class="normal">65</span>
+<span class="normal">66</span>
+<span class="normal">67</span>
+<span class="normal">68</span>
+<span class="normal">69</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@apply_method</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">apply</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">_y</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">params</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>  <span class="c1"># pylint: disable=arguments-differ</span>
 <span class="w">    </span><span class="sd">"""Evaluate each configured operation and append its output column to ``X``.</span>
 
@@ -3567,6 +3598,14 @@ lacking those mappings must be refitted before inference.</p>
 <span class="sd">    operation runs. A failure inside a supported operation is logged and</span>
 <span class="sd">    skipped, and an output name that already exists is suffixed until</span>
 <span class="sd">    unique unless ``allow_overwrite`` says otherwise.</span>
+
+<span class="sd">    Datetime extraction uses ``output_column`` exactly for one configured</span>
+<span class="sd">    source and feature. With multiple features it produces ``name_feature``;</span>
+<span class="sd">    with multiple sources it produces ``name_source_feature``. Without an</span>
+<span class="sd">    explicit name, outputs remain ``source_feature``, optionally preceded</span>
+<span class="sd">    by ``output_prefix``. Every datetime output follows the collision policy.</span>
+<span class="sd">    Saved pipelines affected by formerly ignored names or overwritten</span>
+<span class="sd">    columns require refitting after upgrading.</span>
 
 <span class="sd">    Group aggregates require training-fitted mappings. Legacy artifacts</span>
 <span class="sd">    lacking those mappings must be refitted before inference.</span>
@@ -3624,15 +3663,7 @@ lacking those mappings must be refitted before inference.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>skyulf-core/skyulf/preprocessing/feature_generation/generation.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 97</span>
-<span class="normal"> 98</span>
-<span class="normal"> 99</span>
-<span class="normal">100</span>
-<span class="normal">101</span>
-<span class="normal">102</span>
-<span class="normal">103</span>
-<span class="normal">104</span>
-<span class="normal">105</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">105</span>
 <span class="normal">106</span>
 <span class="normal">107</span>
 <span class="normal">108</span>
@@ -3672,7 +3703,15 @@ lacking those mappings must be refitted before inference.</p>
 <span class="normal">142</span>
 <span class="normal">143</span>
 <span class="normal">144</span>
-<span class="normal">145</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">"FeatureGeneration"</span><span class="p">,</span> <span class="n">FeatureGenerationApplier</span><span class="p">)</span>
+<span class="normal">145</span>
+<span class="normal">146</span>
+<span class="normal">147</span>
+<span class="normal">148</span>
+<span class="normal">149</span>
+<span class="normal">150</span>
+<span class="normal">151</span>
+<span class="normal">152</span>
+<span class="normal">153</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">"FeatureGeneration"</span><span class="p">,</span> <span class="n">FeatureGenerationApplier</span><span class="p">)</span>
 <span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">"FeatureMath"</span><span class="p">,</span> <span class="n">FeatureGenerationApplier</span><span class="p">)</span>
 <span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">"FeatureGenerationNode"</span><span class="p">,</span> <span class="n">FeatureGenerationApplier</span><span class="p">)</span>
 <span class="nd">@node_meta</span><span class="p">(</span>
@@ -3759,15 +3798,7 @@ belongs in the separate <code>PolynomialFeatures</code> node.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>skyulf-core/skyulf/preprocessing/feature_generation/generation.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">111</span>
-<span class="normal">112</span>
-<span class="normal">113</span>
-<span class="normal">114</span>
-<span class="normal">115</span>
-<span class="normal">116</span>
-<span class="normal">117</span>
-<span class="normal">118</span>
-<span class="normal">119</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">119</span>
 <span class="normal">120</span>
 <span class="normal">121</span>
 <span class="normal">122</span>
@@ -3793,7 +3824,15 @@ belongs in the separate <code>PolynomialFeatures</code> node.</p>
 <span class="normal">142</span>
 <span class="normal">143</span>
 <span class="normal">144</span>
-<span class="normal">145</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@fit_method</span>
+<span class="normal">145</span>
+<span class="normal">146</span>
+<span class="normal">147</span>
+<span class="normal">148</span>
+<span class="normal">149</span>
+<span class="normal">150</span>
+<span class="normal">151</span>
+<span class="normal">152</span>
+<span class="normal">153</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@fit_method</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">fit</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">X</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>

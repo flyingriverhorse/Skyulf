@@ -1629,6 +1629,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#smart-recommendations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Smart Recommendations
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#3-advanced-analysis" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3639,7 +3650,9 @@ for alert in profile.alerts:
     *   <em>Normality Tests:</em> For performance, normality tests are performed on a sample of up to 5,000 rows.
         *   <strong>Shapiro-Wilk:</strong> Used for N &lt; 5,000.
         *   <strong>Kolmogorov-Smirnov:</strong> Used for N &gt;= 5,000 (on a 5k sample).
-*   <strong>Categorical:</strong> Unique count, Mode, Frequency distribution.
+*   <strong>Categorical:</strong> Unique count, Mode, Frequency distribution. Unique and
+    rare-label counts and the top categories exclude missing values, which
+    are reported separately in the column's missing count and percentage.
 *   <strong>Date:</strong> Min/Max date, Range, Year/Month distribution.
 *   <strong>Text:</strong> Avg length, Common words, <strong>Sentiment Analysis</strong> (Positive/Neutral/Negative).</p>
 <p>Native Polars <code>Categorical</code> and <code>Enum</code> columns are profiled as categorical,
@@ -3648,6 +3661,22 @@ values and no declared type) is reported as <code>Unknown</code>: its missing co
 missing percentage and quality alerts remain available, while type-specific
 statistics are omitted. An all-null column with a declared type, such as
 <code>Float64</code>, retains that type's profile.</p>
+<p>Automatic date detection converts a string column only when the selected format
+parses every non-missing value in the full column. If a later value uses another
+format or cannot be parsed, the original strings remain available for profiling;
+parse failures do not become missing cells or trigger a false missing-data Drop
+recommendation. Normalize such a column explicitly before requesting temporal
+analysis. An all-null native Date/Datetime column retains its type and reports
+actual null minimum/maximum bounds. Regenerate saved profiles to apply these
+corrections.</p>
+<p>String columns are treated as categorical when fewer than 5% of their
+non-missing values are distinct, or when they contain at most 20 distinct
+non-missing values with at least one repetition. This also recognizes small
+datasets with repeated class or city labels. Missing values do not count as
+labels or dilute the ratio; all-null strings and strings with no repeated
+values remain Text. A recognized string target receives classification
+statistics, associations and rule discovery when numeric features are available.
+Rerun saved analyses to refresh their inferred types and target results.</p>
 <h3 id="2-smart-alerts">2. Smart Alerts</h3>
 <p>Skyulf automatically flags potential data quality issues:
 *   <strong>High Null Rate:</strong> Columns with &gt;50% missing values.
@@ -3655,8 +3684,25 @@ statistics are omitted. An all-null column with a declared type, such as
 *   <strong>High Cardinality:</strong> Categorical columns with too many unique values.
 *   <strong>High Correlation:</strong> Pairs of features with correlation &gt; 0.95.
 *   <strong>Multicollinearity (VIF):</strong> Detects features with Variance Inflation Factor &gt; 5.0.
+    Nearly duplicated features still produce warnings when the correlation
+    matrix cannot be reliably inverted. The calculation then uses a separate
+    regression for each feature, preserving low VIF for unrelated features.
+    A value of <strong>999</strong> is a finite warning marker for effectively perfect
+    dependence, not a precise estimate or a cap on other VIF values. Rerun
+    saved analyses to refresh these results.
 *   <strong>Class Imbalance:</strong> Target variables with skewed class distributions.
 *   <strong>Data Leakage:</strong> Features with 1.0 correlation to the target.</p>
+<h3 id="smart-recommendations">Smart Recommendations</h3>
+<p>For highly skewed numeric columns, transformation advice follows the observed
+value range. Log or Box-Cox is suggested for strictly positive, right-skewed
+data. Columns containing zero or negative values, left-skewed columns, and
+profiles with an unknown minimum receive Yeo-Johnson advice instead. These
+are suggestions to evaluate; EDA does not transform the source data.</p>
+<p>The clean-dataset message appears only when no drop, imputation, transformation,
+encoding or resampling action is recommended. It describes the outcome of
+these checks, without certifying that a dataset is ready for modeling. An
+informational balanced-target message can appear alongside it. Rerun saved
+analyses to refresh their recommendations.</p>
 <h3 id="3-advanced-analysis">3. Advanced Analysis</h3>
 <ul>
 <li><strong>Outlier Detection:</strong> Uses Isolation Forest to identify anomalous rows.</li>

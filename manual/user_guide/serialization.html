@@ -3268,6 +3268,12 @@
 <li>Some preprocessing nodes store sklearn objects inside <code>params</code> (e.g., KNN/Iterative imputers, OneHotEncoder).
   Those are not JSON-serializable and require pickling.</li>
 </ul>
+<p>Dataframe wrappers returned by <code>EngineRegistry.wrap()</code> can be restored through
+Python <code>pickle</code> and Core's <code>JoblibModelSerializer</code>, including inside nested
+artifact containers. Restoration preserves the native dataframe, its dtypes,
+missing values and pandas index, along with normal wrapper method delegation.
+Previously saved wrappers that failed to load with <code>RecursionError</code> can be
+loaded with the corrected code; no artifact rewrite is required.</p>
 <h2 id="load-and-use">Load and use</h2>
 <pre><code class="language-python">import tempfile
 from pathlib import Path
@@ -3330,11 +3336,12 @@ print(preds)
 </code></pre>
 <h2 id="reproducibility-fingerprint">Reproducibility fingerprint</h2>
 <p><code>pipeline.fingerprint()</code> returns a deterministic SHA-256 over the pipeline's
-topology <strong>and</strong> its fitted artifacts:</p>
+topology, fitted artifacts and stored decision thresholds:</p>
 <pre><code class="language-python">print(pipeline.fingerprint())  # 64-char hex, e.g. &quot;9f2c4e...&quot;
 </code></pre>
 <ul>
-<li>Two pipelines with the same fingerprint produce the same predictions —
+<li>Two pipelines with the same fingerprint produce the same predictions for
+  the same prediction options —
   callers can prove "this prediction came from exactly this pipeline".</li>
 <li>The digest is <strong>semantic</strong> (<code>skyulf.pipeline.seal.artifact_digest</code> walks
   hyperparameters + fitted weights, tree structures, tuned-model tuples,
@@ -3345,6 +3352,11 @@ topology <strong>and</strong> its fitted artifacts:</p>
 </ul>
 <p>The fingerprint is also part of <code>export_model_card()</code>, alongside the
 preprocessing lineage, model params, fit metrics, and a Mermaid <code>diagram</code>.</p>
+<p>Changing saved decision thresholds changes the fingerprint even when the
+trained model weights stay the same. Threshold dictionary insertion order and
+pickle protocol do not affect it. Pipelines without saved thresholds retain
+their previous fingerprint. Recompute stored fingerprints for pipelines with
+tuned thresholds when upgrading; retraining is not required.</p>
 <h2 id="security-note">Security note</h2>
 <p><code>pickle.load</code> (and <code>joblib.load</code>, which is pickle under the hood) can execute
 arbitrary code from a malicious file. Treat pipeline files like executables:</p>

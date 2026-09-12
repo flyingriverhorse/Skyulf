@@ -4048,7 +4048,7 @@
 
 <span class="sd">        Args:</span>
 <span class="sd">            data: Input frame, feature-target pair, or existing split dataset.</span>
-<span class="sd">            node_id_prefix: Prefix for the per-step transformer identifiers.</span>
+<span class="sd">            node_id_prefix (str): Prefix for the per-step transformer identifiers.</span>
 <span class="sd">            target_column: Execution target excluded from automatic feature selection.</span>
 <span class="sd">            on_split: Optional synchronous callback receiving the first actual row</span>
 <span class="sd">                split before later transformations run. Skipped splitters and</span>
@@ -4782,6 +4782,7 @@ structural rules via <code>validate_pipeline_config</code>.</p>
                 <code>node_id_prefix</code>
             </td>
             <td>
+                  <code><span title="str">str</span></code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -5010,7 +5011,7 @@ if they need a snapshot. Callback errors propagate to the caller.</p>
 
 <span class="sd">    Args:</span>
 <span class="sd">        data: Input frame, feature-target pair, or existing split dataset.</span>
-<span class="sd">        node_id_prefix: Prefix for the per-step transformer identifiers.</span>
+<span class="sd">        node_id_prefix (str): Prefix for the per-step transformer identifiers.</span>
 <span class="sd">        target_column: Execution target excluded from automatic feature selection.</span>
 <span class="sd">        on_split: Optional synchronous callback receiving the first actual row</span>
 <span class="sd">            split before later transformations run. Skipped splitters and</span>

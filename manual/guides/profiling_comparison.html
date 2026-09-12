@@ -3484,9 +3484,14 @@ descriptive statistics. Its profile can include:</p>
 <li>
 <p><strong>PCA Projection:</strong> Skyulf computes 2D/3D PCA projections colored by target class, helping you visually assess class separability before training a model.</p>
 </li>
-<li>
-<p><strong>Target Interactions with ANOVA (p-values):</strong> For categorical targets, Skyulf can compute ANOVA p-values for numeric features (when SciPy is available) and rank associations accordingly. This helps you quickly find features that differ meaningfully across target classes.</p>
-</li>
+</ul>
+<p>If all prepared numeric features are constant, including after missing-value
+  imputation, PCA has no variance to explain. The profile returns
+  <code>pca_data=null</code> and <code>pca_components=null</code>, and the UI shows its existing
+  unavailable state. A varying feature alongside a constant feature still
+  produces PCA output.</p>
+<ul>
+<li><strong>Target Interactions with ANOVA (p-values):</strong> For categorical targets, Skyulf can compute ANOVA p-values for numeric features (when SciPy is available) and rank associations accordingly. This helps you quickly find features that differ meaningfully across target classes.</li>
 </ul>
 <p><strong>3. Specialized Domain Analysis</strong></p>
 <ul>

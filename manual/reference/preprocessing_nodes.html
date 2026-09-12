@@ -2101,6 +2101,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Step schema">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#decimal-numeric-columns" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Decimal numeric columns
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -4007,6 +4024,22 @@
 }
 </code></pre>
 <p>Where <code>params</code> is passed into the node's Calculator <code>fit()</code>.</p>
+<h3 id="decimal-numeric-columns">Decimal numeric columns</h3>
+<p>Numeric auto-selection includes Polars <code>Decimal(precision, scale)</code> columns and
+pandas object columns whose non-missing values are all <code>decimal.Decimal</code>.
+Numeric strings and mixed Decimal/string columns remain outside automatic
+numeric selection. Existing exclusions for booleans, binary values, constants
+and all-missing columns still apply according to the node's selection rules.</p>
+<p>Selected Decimal values use float64 for numerical transformations such as
+scaling, power transforms and mean/median imputation. This has ordinary floating
+point precision, rather than exact decimal arithmetic. Source frames and
+unselected columns retain their original values; outlier filtering retains the
+original values of kept rows and their matching targets.</p>
+<p>For example, <code>MinMaxScaler</code> with <code>params={}</code> now scales Decimal prices
+<code>[100.00, 200.00, 300.00, 400.00]</code> to <code>[0.0, 0.3333, 0.6667, 1.0]</code> on both
+engines. An explicit <code>columns=[]</code> still makes the scaler a no-op.</p>
+<p>Refit pipelines whose previous automatic selection skipped Decimal columns.
+Existing fitted artifacts keep their original selection when replayed.</p>
 <h2 id="splitters">Splitters</h2>
 <p>Example step:</p>
 <pre><code class="language-python">{&quot;name&quot;: &quot;split&quot;, &quot;transformer&quot;: &quot;TrainTestSplitter&quot;, &quot;params&quot;: {&quot;test_size&quot;: 0.2, &quot;random_state&quot;: 42, &quot;target_column&quot;: &quot;target&quot;}}
@@ -4022,7 +4055,14 @@
 <li><code>stratify</code>: bool (default False)</li>
 <li><code>target_column</code>: str (required only when splitting a DataFrame and using stratify)</li>
 </ul>
-<p>Learned params: none (passes through config).</p>
+<p>The node copies only these six settings into its fitted artifact. Unknown
+public keys produce a warning and are ignored; they do not change the split.
+For example, <code>stratify_col="target"</code> is a <code>DataSplitter</code> constructor argument,
+not a node setting. Use <code>stratify=True</code> and <code>target_column="target"</code> here.
+The artifact's <code>type</code> field and private underscore-prefixed routing metadata
+are ignored without warnings. Canvas sends the supported settings separately
+from its editor labels and identifiers.</p>
+<p>Learned params: none (records the recognized config settings).</p>
 <h3 id="feature_target_split">feature_target_split</h3>
 <p>Splits a DataFrame into <code>(X, y)</code> (or applies the split to each <code>SplitDataset</code> split).</p>
 <p>Config:</p>
@@ -4031,6 +4071,18 @@
 </ul>
 <p>Learned params: none.</p>
 <h2 id="cleaning">Cleaning</h2>
+<p>When <code>columns</code> is omitted, <code>TextCleaning</code> and <code>AliasReplacement</code> select text-like
+columns, including pandas categorical strings and Polars <code>Enum</code> columns. An
+explicit <code>columns=[]</code> keeps both nodes as no-ops. Enum categories do not restrict
+the cleaned output: for example, trim plus lowercase changes <code>" YES "</code> to
+<code>"yes"</code>, while boolean alias replacement produces <code>"Yes"</code>. Missing values stay
+missing and source frames are unchanged. Refit saved artifacts to include Enum
+columns that older automatic selections skipped.</p>
+<p>Automatic text selection excludes pandas object columns containing Decimal
+numbers, matching native Polars Decimal behavior. Amounts such as
+<code>Decimal("12.34")</code> retain their values and dtype while nearby text is cleaned.
+Refit saved text-cleaning steps that selected Decimal columns and rerun from
+the original data; old artifacts keep their stored column selections.</p>
 <p>Example step:</p>
 <pre><code class="language-python">{
   &quot;name&quot;: &quot;clean_text&quot;,
@@ -4096,6 +4148,17 @@
 <li><code>replacement</code>: any (default NaN)</li>
 <li><code>min_value</code> / <code>max_value</code>: used by <code>custom_range</code></li>
 </ul>
+<p>Active numeric rules and infinity replacement require numeric selected columns
+on both engines. Text, categorical, Boolean and temporal selections raise a
+<code>ValueError</code> naming the columns; convert numeric text explicitly before this
+node. The same check runs when applying a fitted artifact, so inference data
+that changes a selected column to text fails clearly without coercing values.
+Automatic selection excludes temporal columns. An empty selection or a
+configuration with no active rule or infinity replacement leaves data untouched.</p>
+<p>Enabling <code>replace_inf</code> or <code>replace_neg_inf</code> alone leaves integer columns
+unchanged, including nullable signed/unsigned types and values larger than
+Float64 can represent exactly. Floating-point infinities still use the configured
+replacement, and an additional numeric rule still applies to integer columns.</p>
 <p>Learned params:</p>
 <ul>
 <li><code>columns</code>, <code>rule</code>, <code>replacement</code>, <code>min_value</code>, <code>max_value</code></li>
@@ -4125,28 +4188,45 @@
 <p>Config:</p>
 <ul>
 <li><code>subset</code>: list[str] | None</li>
-<li><code>how</code>: <code>any</code> | <code>all</code> (ignored if <code>threshold</code> provided)</li>
+<li><code>how</code>: <code>any</code> | <code>all</code> (default <code>any</code>; filtering uses <code>threshold</code> when provided)</li>
 <li><code>threshold</code>: int | None (min non-null values)</li>
 </ul>
+<p>Explicit null or unsupported <code>how</code> values raise <code>ValueError</code> during fitting
+and saved-artifact replay, even when a threshold currently takes precedence.
+Omit <code>how</code> to use the default; use only <code>any</code> or <code>all</code> when setting it explicitly.</p>
 <p>Learned params:</p>
 <ul>
 <li><code>subset</code>, <code>how</code>, <code>threshold</code></li>
 </ul>
 <h3 id="missingindicator">MissingIndicator</h3>
-<p>Adds <code>{col}_missing</code> indicator columns.</p>
+<p>Adds <code>{col}_missing</code> indicator columns by default.</p>
+<p>An explicit <code>columns</code> list selects only names present in the input. Missing
+names produce no flag in either execution or the predicted output schema.
+For example, selecting <code>ghost</code> when the input only contains <code>x</code> does not create
+<code>ghost_missing</code>; downstream references to that flag remain invalid. Automatic
+selection depends on the actual missing values and has no static output schema.</p>
+<p>Generated names must be unique and must not collide with existing columns.
+Fitting and applying raise <code>ValueError</code> on a collision, including one introduced by new inference
+data. Rename the conflicting input column or change the selected columns.</p>
 <p>Config:</p>
 <ul>
 <li><code>columns</code>: list[str] (optional; defaults to all columns with any missing values)</li>
+<li><code>flag_suffix</code>: str (default <code>_missing</code>)</li>
 </ul>
 <p>Learned params:</p>
 <ul>
-<li><code>columns</code></li>
+<li><code>columns</code>, <code>flag_suffix</code></li>
 </ul>
 <h2 id="imputation">Imputation</h2>
 <p>Example step:</p>
 <pre><code class="language-python">{&quot;name&quot;: &quot;impute&quot;, &quot;transformer&quot;: &quot;SimpleImputer&quot;, &quot;params&quot;: {&quot;strategy&quot;: &quot;median&quot;, &quot;columns&quot;: [&quot;age&quot;]}}
 </code></pre>
 <h3 id="simpleimputer">SimpleImputer</h3>
+<p>Mean and median require numeric columns. An explicit selection containing text,
+including numeric-looking strings, raises a <code>ValueError</code> naming the incompatible
+columns on both engines. Select numeric columns, cast numeric strings first,
+or choose <code>most_frequent</code>/<code>constant</code> for text. Explicit binary, constant and
+Decimal numeric selections remain supported; automatic selection is unchanged.</p>
 <p>Config:</p>
 <ul>
 <li><code>strategy</code>: <code>mean</code> | <code>median</code> | <code>most_frequent</code> | <code>constant</code> (also accepts <code>mode</code>)</li>
@@ -4188,10 +4268,19 @@
 <li><code>estimator</code></li>
 </ul>
 <h2 id="encoding">Encoding</h2>
+<p>When <code>columns</code> is omitted, the shared categorical selector includes native
+Polars <code>Enum</code> columns as well as strings and categorical columns. Refit a
+pipeline that previously skipped Enum inputs to learn their encoding.</p>
 <p>Example step:</p>
 <pre><code class="language-python">{&quot;name&quot;: &quot;encode&quot;, &quot;transformer&quot;: &quot;OneHotEncoder&quot;, &quot;params&quot;: {&quot;columns&quot;: [&quot;city&quot;], &quot;drop_original&quot;: True, &quot;handle_unknown&quot;: &quot;ignore&quot;}}
 </code></pre>
 <h3 id="onehotencoder">OneHotEncoder</h3>
+<p>Generated names must be unique and must not collide with retained input
+columns. Fitting and applying raise <code>ValueError</code> before returning ambiguous
+columns or replacing existing data. This also checks new inference columns
+and older fitted artifacts. Rename conflicting inputs or categories before
+encoding. A selected source that is removed by <code>drop_original=True</code> does not
+reserve its name; other retained columns do.</p>
 <p>Config:</p>
 <ul>
 <li><code>columns</code>: list[str] (optional; auto-detects categorical columns)</li>
@@ -4209,6 +4298,15 @@
 <li><code>drop_original</code>, <code>include_missing</code></li>
 </ul>
 <h3 id="dummyencoder">DummyEncoder</h3>
+<p>Uses the same collision checks as <code>OneHotEncoder</code>. Generated columns are
+computed from the original source values before selected sources are dropped.</p>
+<p>Newly fitted artifacts use stable Boolean and date/datetime category names on
+both engines, including nanosecond timestamps and timezone-aware instants.
+Naive midnight timestamps match equivalent dates; aware timestamps are
+normalized to UTC. Literal string categories keep their exact text.
+Older artifacts retain their original names and rendering. Refit the encoder
+and downstream model together before switching engines if a saved pipeline
+depends on the earlier Boolean or datetime names.</p>
 <p>Config:</p>
 <ul>
 <li><code>columns</code>: list[str]</li>
@@ -4219,6 +4317,7 @@
 <li><code>columns</code></li>
 <li><code>categories</code>: dict[col -&gt; list[str]]</li>
 <li><code>drop_first</code></li>
+<li><code>category_key_version</code>: identifies the rendering contract in new artifacts</li>
 </ul>
 <h3 id="ordinalencoder">OrdinalEncoder</h3>
 <p>Config:</p>
@@ -4246,6 +4345,12 @@
 <li><code>encoders</code>: dict[col or "<strong>target</strong>" -&gt; sklearn LabelEncoder]</li>
 <li><code>classes_count</code></li>
 </ul>
+<p>Targets may be lists, NumPy arrays or a Series from the feature dataframe's
+engine. Encoded targets become native integer Series; existing Series names
+and pandas indexes are preserved. For example, fitting on
+<code>["yes", "no", "yes"]</code> produces <code>[1, 0, 1]</code>. Feature-only encoding leaves
+the target container and values unchanged. Unknown target labels still use
+the configured <code>missing_code</code>.</p>
 <h3 id="targetencoder">TargetEncoder</h3>
 <p>Requires a target series (<code>y</code>).</p>
 <p>In a <code>FeatureEngineer</code> or <code>SkyulfPipeline</code>, training rows are encoded with
@@ -4259,6 +4364,11 @@ the training-row count). A one-row split, or a classification split where any
 target class appears only once, raises a clear error instead of leaking the
 row's target into its encoded value. Direct Calculator/Applier use remains an
 advanced API and uses the explicit fit/apply calls supplied by the caller.</p>
+<p>Multiclass output names must be unique and must not collide with retained
+input columns. A collision raises <code>ValueError</code> during fitting, cross-fitted
+training, or later application, including with older artifacts. Rename the
+conflicting input column before encoding. Binary and regression encodings
+continue to replace their selected source columns.</p>
 <p>Config:</p>
 <ul>
 <li><code>columns</code>: list[str]</li>
@@ -4405,6 +4515,13 @@ advanced API and uses the explicit fit/apply calls supplied by the caller.</p>
 <li><code>transformations</code> (passes through)</li>
 </ul>
 <h3 id="generaltransformation">GeneralTransformation</h3>
+<p>Rules execute in list order, including when several rules target one column.
+A power rule learns from the result of the preceding rules on that column.
+For example, <code>log</code> followed by standardized <code>yeo-johnson</code> learns from the logged
+training values and produces a training mean near zero and standard deviation
+one. Later data reuses those fitted parameters. Existing artifacts keep their
+saved parameters; refit affected transformation steps and downstream models
+to correct previously learned statistics.</p>
 <p>Config:</p>
 <ul>
 <li><code>transformations</code>: list of <code>{column, method, standardize?, clip_threshold?}</code></li>
@@ -4422,6 +4539,18 @@ advanced API and uses the explicit fit/apply calls supplied by the caller.</p>
 <h2 id="bucketing-binning">Bucketing (Binning)</h2>
 <h3 id="generalbinning">GeneralBinning</h3>
 <p>Creates binned features with configurable strategies.</p>
+<p>Generated output names must be unique and must not overwrite retained input
+columns. This is checked during fitting and later application. An empty suffix
+can replace the selected source only with <code>drop_original=True</code>; the binned
+output is retained. When duplicate edges collapse into fewer intervals, custom
+labels must describe those distinct intervals, not the discarded zero-width
+ones; otherwise fitting or applying raises <code>ValueError</code>.</p>
+<p>Newly fitted range-label artifacts save their category text so pandas and
+Polars replay identical names. If the requested rounding would give different
+bins the same name, the stored labels use exact edge text to distinguish them.
+Older artifacts keep their original formatting. Refit binning and downstream
+encoders/models together before moving an affected legacy pipeline between
+engines.</p>
 <p>Config:</p>
 <ul>
 <li><code>columns</code>: list[str] (numeric)</li>
@@ -4434,9 +4563,17 @@ advanced API and uses the explicit fit/apply calls supplied by the caller.</p>
 <li>output formatting:</li>
 <li><code>output_suffix</code>, <code>drop_original</code>, <code>label_format</code>, <code>missing_strategy</code>, <code>missing_label</code>, <code>include_lowest</code>, <code>precision</code></li>
 </ul>
+<p><code>missing_strategy="label"</code> replaces missing and out-of-range bins with
+<code>missing_label</code> (default <code>"Missing"</code>). This includes nulls, NaN and values outside
+the fitted edges during later transformations. With this strategy Polars always
+returns strings, including in batches with no missing values: ordinal/bin-index
+codes become <code>"0"</code>, <code>"1"</code>, etc. Pandas keeps numeric codes alongside the text
+label in an object column. Range and custom labels retain their text. The default
+<code>missing_strategy="keep"</code> leaves missing bins as missing values.</p>
 <p>Learned params:</p>
 <ul>
 <li><code>bin_edges</code> (dict[col -&gt; edges])</li>
+<li><code>range_labels</code> (stored range text in newly fitted range-label artifacts)</li>
 <li>output formatting settings</li>
 </ul>
 <h3 id="custombinning">CustomBinning</h3>
@@ -4471,6 +4608,10 @@ advanced API and uses the explicit fit/apply calls supplied by the caller.</p>
 <li>or <code>columns</code> + <code>target_type</code></li>
 <li><code>coerce_on_error</code>: bool (default True)</li>
 </ul>
+<p>Text-to-datetime casts preserve valid date-only and timestamp strings on both
+engines. Invalid dates become missing by default; <code>coerce_on_error=False</code>
+raises. Boolean conversion recognizes the existing text aliases in Polars
+Categorical and Enum columns too, preserving nulls and invalid-token handling.</p>
 <p>Learned params:</p>
 <ul>
 <li><code>type_map</code>, <code>coerce_on_error</code></li>
@@ -4527,6 +4668,12 @@ at least <code>degree</code> distinct columns are needed to generate products.</
 <code>ValueError</code> during fitting and when replaying saved artifacts. In particular,
 <code>polynomial</code> is not a Feature Generation operation: use the separate
 <a href="#polynomialfeatures"><code>PolynomialFeatures</code></a> node for powers and interactions.</p>
+<p>Arithmetic operations (<code>add</code>, <code>subtract</code>, <code>multiply</code>, <code>divide</code>) replace null
+and <code>NaN</code> operands with the operation's <code>fillna</code> value on both engines. Omitted
+or null <code>fillna</code> defaults to zero. For example, adding <code>2</code> to <code>[1, NaN, 3]</code>
+with <code>fillna=10</code> produces <code>[3, 12, 5]</code>. Source columns retain their values.
+Rerun affected transformations and refit downstream models if they previously
+used arithmetic features containing unfilled Polars NaNs.</p>
 <p>For <code>ratio</code>, the denominator is the sum of the selected denominator columns.
 If its absolute value is below <code>epsilon</code>, it is replaced by <code>-epsilon</code> when
 negative and <code>+epsilon</code> otherwise (including zero). This preserves the ratio's
@@ -4537,6 +4684,25 @@ engines. Other selected operands still contribute normally: <code>(NaN + 2) / 4<
 produces <code>0.5</code>. An entirely missing denominator uses positive epsilon, and an
 entirely missing numerator sums to zero. Source columns retain their values;
 this rule applies to the generated ratio.</p>
+<p>For <code>datetime_extract</code>, <code>output_column</code> names a single source/feature result
+exactly. With one source and multiple features, it becomes a prefix:
+<code>output_column="calendar"</code> with <code>["year", "month"]</code> produces <code>calendar_year</code>
+and <code>calendar_month</code>. With multiple sources, names also include the source,
+such as <code>calendar_start_year</code>. Without <code>output_column</code>, the default is
+<code>source_feature</code>; an optional <code>output_prefix</code> is prepended to that default.</p>
+<p>Datetime outputs now follow <code>allow_overwrite</code> (default <code>False</code>): a collision
+adds <code>_1</code>, <code>_2</code>, and so on until the name is available. Setting it to <code>True</code>
+permits replacement. For example, an existing <code>dt_year</code> is retained and a new
+year feature becomes <code>dt_year_1</code>. Names are resolved against the frame being
+transformed, as for other Feature Generation operations. Refit affected saved
+pipelines and downstream models if they depended on previously ignored names
+or overwritten columns.</p>
+<p>For <code>group_agg</code>, null and NaN keys share a single training group on both engines.
+Later transformations reuse that fitted aggregate, including for missing keys;
+they never calculate it from the new batch's values. Keys not seen during
+training, including missing keys when training had none, produce missing output.
+The operation groups by one column. Legacy artifacts without fitted group
+statistics must be refitted before applying them.</p>
 <p>Learned params:</p>
 <ul>
 <li><code>operations</code>, <code>epsilon</code>, <code>allow_overwrite</code></li>
@@ -4547,6 +4713,9 @@ this rule applies to the generated ratio.</p>
 between two lat/lon coordinate pairs and appends it as a new numeric column.
 Pure math — no optional geospatial dependency required, and runs natively on
 both the pandas and polars engines.</p>
+<p>Haversine calculations remain finite for valid antipodal points: opposite
+points on Earth yield approximately <code>20015.114442 km</code>. Missing coordinates
+remain missing rather than becoming a valid distance.</p>
 <p>Config:</p>
 <ul>
 <li><code>lat1_col</code>: str</li>
@@ -4619,6 +4788,11 @@ target.</p>
 <li><code>columns_to_drop</code>, <code>threshold</code>, <code>method</code>, <code>drop_columns</code></li>
 </ul>
 <h3 id="univariateselection">UnivariateSelection</h3>
+<p>With <code>problem_type="auto"</code>, string targets use classification whether stored
+as pandas object, StringDtype or string Categorical columns. Numeric targets
+retain the cardinality heuristic: up to ten distinct values means
+classification. Set <code>problem_type</code> explicitly to override inference. The same
+rules apply to ModelBasedSelection and the feature-selection facade.</p>
 <p>Config:</p>
 <ul>
 <li><code>target_column</code>: str (if <code>y</code> not passed as tuple)</li>
@@ -4659,6 +4833,12 @@ target.</p>
 <li><code>random_state</code>: int</li>
 <li>method-specific keys: <code>k_neighbors</code>, <code>m_neighbors</code>, <code>kind</code>, <code>out_step</code>, <code>cluster_balance_threshold</code>, <code>density_exponent</code>, <code>n_jobs</code></li>
 </ul>
+<p>For <code>smote_tomek</code>, <code>k_neighbors</code> configures the inner SMOTE step together with
+the chosen sampling strategy and random state. Tomek cleanup still runs after
+oversampling, so final class sizes can be smaller than the requested synthetic
+sample counts. Canvas exposes this setting as <strong>k Neighbors</strong> for
+<strong>SMOTE + Tomek</strong> and requires at least one neighbor. A class must contain more
+observations than its configured neighbor count.</p>
 <p>Learned params: none (passes through config).</p>
 <h3 id="undersampling">Undersampling</h3>
 <p>Config:</p>
@@ -4671,6 +4851,12 @@ target.</p>
 <h2 id="inspection">Inspection</h2>
 <h3 id="datasetprofile">DatasetProfile</h3>
 <p>Captures basic dataset stats without modifying data.</p>
+<p>Numeric statistics cover supported signed/unsigned integer, float and Decimal
+columns on both engines. Binary, constant and entirely missing numeric columns
+remain visible, as do typed numeric columns in an empty frame. Boolean,
+categorical and temporal columns retain their metadata but have no numeric
+statistics. Statistics still use each engine's native <code>describe()</code> metrics and
+quantile conventions. Rerun the node to refresh older profile artifacts.</p>
 <p>Config: none.</p>
 <p>Learned params:</p>
 <ul>

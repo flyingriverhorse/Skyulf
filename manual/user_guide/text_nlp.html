@@ -3420,6 +3420,14 @@ and the script <code>examples/06_text_nlp_vectorization.py</code>.</p>
 the training data and returns an artifact; the Applier <em>uses</em> that artifact to transform any
 DataFrame. Vectorizers keep the original columns and <strong>add</strong> new feature columns whose names
 are listed in <code>artifact['output_columns']</code>.</p>
+<p>Tokenizer, Count, TF-IDF, Hashing and Sentence Embedder outputs must have unique
+names that do not collide with retained input columns. Fitting and inference
+raise <code>ValueError</code> for a collision, including a column added only to inference
+data. Rename the conflicting input or adjust the node's output naming where
+supported. A name belonging to a selected source dropped by <strong>Drop original</strong>
+can be reused: all outputs are computed from the original source values before
+those source columns are removed. If an earlier run overwrote data or produced
+duplicate feature names, rerun from the original input and refit downstream models.</p>
 <p>!!! tip "Fit on train only"
     Vectorizers learn a vocabulary, so they are subject to data leakage just like scalers and
     encoders. Always <code>fit()</code> on the <strong>training</strong> split and reuse the same artifact to <code>apply()</code>

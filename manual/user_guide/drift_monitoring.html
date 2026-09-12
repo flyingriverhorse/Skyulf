@@ -3353,6 +3353,15 @@ for col, drift in report.column_drifts.items():
         print(f&quot;    {m.metric}: {m.value:.4f} (threshold={m.threshold}, drifted={m.has_drift})&quot;)
 </code></pre>
 <h2 id="drift-metrics">Drift metrics</h2>
+<p>String, Categorical, Enum and Boolean columns receive categorical drift metrics,
+including <code>psi_categorical</code>. They do not need encoding first. Rerun saved drift
+checks that previously omitted Enum columns to populate those measurements.</p>
+<p>The page's <strong>Avg PSI</strong> and <strong>Most Drifted</strong> cards include both numeric <code>psi</code>
+and categorical <code>psi_categorical</code>, with one finite PSI measurement per column.
+For example, numeric PSI <code>0.01</code> and categorical PSI <code>5</code> produce average
+<code>2.5050</code>, with the categorical feature shown as most drifted. A measured zero
+is included; unavailable measurements are excluded. If none are available,
+the cards show <code>—</code> and <strong>No PSI available</strong> rather than claiming stability.</p>
 <p>The <code>DriftCalculator</code> computes these metrics for each numeric column:</p>
 <table>
 <thead>
@@ -3451,7 +3460,7 @@ current_pl = pl.from_pandas(current_pd)
 <li>Run drift detection <strong>before</strong> prediction to catch issues early.</li>
 <li>Log drift reports over time to track gradual distribution shifts.</li>
 <li>If drift is detected, consider retraining the model on recent data.</li>
-<li>Non-numeric columns are currently skipped — encode them first if you need categorical drift detection.</li>
+<li>Keep categorical labels intact when comparing their distributions.</li>
 </ul>
 
 

@@ -813,6 +813,17 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#preview-path-labels" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Preview Path Labels
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#merge-combining-multiple-branches" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3351,6 +3362,14 @@
 
 <h1 id="multi-path-pipelines">Multi-Path Pipelines</h1>
 <p>Skyulf supports building pipelines with <strong>multiple branches</strong> that merge into a single training node or fan out into separate experiments. This guide covers both patterns.</p>
+<h2 id="preview-path-labels">Preview Path Labels</h2>
+<p>Canvas path labels identify the corresponding branches in <strong>Preview Results</strong>.
+They use the node's display name, such as <strong>Resampling</strong>, or your custom label.
+The <strong>Preview data</strong> action excludes separate Data Preview nodes; a preprocessing
+output feeding only one of those nodes still gets its own preview path. For
+example, parallel Imputation and Resampling outputs retain matching path letters
+on their Canvas connections and result tabs even when Imputation also feeds a
+Data Preview node. Rerun Preview after changing the graph to refresh the results.</p>
 <hr />
 <h2 id="merge-combining-multiple-branches">Merge: Combining Multiple Branches</h2>
 <p>When a training node has 2+ incoming edges, Skyulf <strong>automatically merges</strong> the upstream DataFrames before training.</p>

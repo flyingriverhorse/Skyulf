@@ -3428,7 +3428,20 @@
 <blockquote>
 <p><strong>Note:</strong> <code>"none"</code> (string) in the search space is automatically converted to Python <code>None</code>.</p>
 </blockquote>
+<p>For Logistic Regression searches restricted to <code>penalty=["elasticnet"]</code>, an
+omitted or null L1 ratio uses <code>0.5</code> in every candidate and the final model.
+Explicit numeric ratios are retained, and the resolved value appears in the
+best parameters. Search Elastic Net separately when combining it with other
+penalties would leave this conditional ratio unspecified.</p>
 <h2 id="configuration-reference">Configuration reference</h2>
+<p>Missing feature values are admitted using the installed estimator's
+capabilities, including supported Random Forest, Extra Trees and Decision Tree
+configurations. Search overrides that can replace an incompatible fixed default
+are considered before rejecting the input. Each candidate's actual fit still
+enforces its restrictions, such as unsupported criteria or monotonic constraints.
+Models that cannot handle missing values require imputation; fold preprocessing
+can supply that imputation using only training rows. Missing targets and numeric
+infinity remain errors.</p>
 <p>These keys go inside the <code>"modeling"</code> block when <code>"type"</code> is <code>"hyperparameter_tuner"</code>:</p>
 <table>
 <thead>
@@ -3605,7 +3618,10 @@
 <p>When using <code>time_series_split</code>, Skyulf auto-sorts your data chronologically:</p>
 <ol>
 <li>If <code>cv_time_column</code> is set, data is sorted by that column (and the column is dropped from features to prevent leakage).</li>
-<li>If omitted, the first <code>datetime64</code> column is auto-detected and used.</li>
+<li>If omitted, the first supported date/datetime column is detected in input
+   order, including native pandas <code>datetime.date</code> object columns and Polars
+   Date/Datetime. Date strings and mixed or entirely missing object columns
+   are not automatically parsed or selected.</li>
 <li>If no datetime column exists, a warning is logged and row order is assumed correct.</li>
 </ol>
 <p>In the ML Canvas UI, selecting Time Series Split reveals a date column picker.</p>

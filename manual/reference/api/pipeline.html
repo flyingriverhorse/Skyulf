@@ -4048,7 +4048,21 @@
 <span class="normal">744</span>
 <span class="normal">745</span>
 <span class="normal">746</span>
-<span class="normal">747</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">SkyulfPipeline</span><span class="p">:</span>
+<span class="normal">747</span>
+<span class="normal">748</span>
+<span class="normal">749</span>
+<span class="normal">750</span>
+<span class="normal">751</span>
+<span class="normal">752</span>
+<span class="normal">753</span>
+<span class="normal">754</span>
+<span class="normal">755</span>
+<span class="normal">756</span>
+<span class="normal">757</span>
+<span class="normal">758</span>
+<span class="normal">759</span>
+<span class="normal">760</span>
+<span class="normal">761</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">SkyulfPipeline</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""End-to-end ML Pipeline.</span>
 
 <span class="sd">    Encapsulates:</span>
@@ -4453,6 +4467,8 @@
 <span class="sd">        ``X_val`` must be raw. This method runs the pipeline's fitted</span>
 <span class="sd">        preprocessing on it exactly once, which is what makes the probabilities</span>
 <span class="sd">        it tunes against the ones ``predict()`` later reproduces.</span>
+<span class="sd">        Validation labels follow the same row sorting and filtering as the</span>
+<span class="sd">        features, so the metric scores matching observations.</span>
 <span class="sd">        ``get_fitted_split()`` is therefore *not* a source for it: that helper</span>
 <span class="sd">        returns already-preprocessed frames, so passing them here transforms</span>
 <span class="sd">        the holdout a second time and fits the cutoffs against a distribution</span>
@@ -4461,7 +4477,7 @@
 <span class="sd">        Args:</span>
 <span class="sd">            X_val: Validation features, *not* yet transformed (this method</span>
 <span class="sd">                runs the pipeline's fitted preprocessing on it internally).</span>
-<span class="sd">            y_val: Validation true labels.</span>
+<span class="sd">            y_val: Validation true labels, paired positionally with ``X_val``.</span>
 <span class="sd">            metric: Callable ``(y_true, y_pred) -&gt; float`` to maximize.</span>
 <span class="sd">            strategy: ``"grid"`` or ``"nelder-mead"``. If ``None``,</span>
 <span class="sd">                auto-selects based on the number of classes (see</span>
@@ -4476,7 +4492,8 @@
 
 <span class="sd">        Raises:</span>
 <span class="sd">            ValueError: If the pipeline isn't fitted, or the underlying</span>
-<span class="sd">                model doesn't support ``predict_proba``.</span>
+<span class="sd">                model doesn't support ``predict_proba``, or the raw validation</span>
+<span class="sd">                features and labels have different row counts.</span>
 <span class="sd">        """</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">model_estimator</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">model_estimator</span><span class="o">.</span><span class="n">model</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
@@ -4492,13 +4509,19 @@
                 <span class="s2">"threshold tuning requires a classifier."</span>
             <span class="p">)</span>
 
-        <span class="n">transformed_val</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">feature_engineer</span><span class="o">.</span><span class="n">transform</span><span class="p">(</span><span class="n">X_val</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">X_val</span><span class="p">)</span> <span class="o">!=</span> <span class="nb">len</span><span class="p">(</span><span class="n">y_val</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s2">"X_val and y_val must contain the same number of rows before preprocessing."</span>
+            <span class="p">)</span>
+
+        <span class="c1"># Array-like labels may come from a different engine than the features.</span>
+        <span class="n">transformed_val</span><span class="p">,</span> <span class="n">transformed_y</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">feature_engineer</span><span class="o">.</span><span class="n">transform</span><span class="p">((</span><span class="n">X_val</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">y_val</span><span class="p">)))</span>
         <span class="n">proba_df</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_predict_proba_transformed</span><span class="p">(</span><span class="n">transformed_val</span><span class="p">)</span>
         <span class="n">classes</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">model_classes</span><span class="p">)</span>
         <span class="n">y_proba</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">proba_df</span><span class="p">)[:,</span> <span class="p">:</span> <span class="nb">len</span><span class="p">(</span><span class="n">classes</span><span class="p">)]</span>
 
         <span class="n">thresholds</span> <span class="o">=</span> <span class="n">optimize_thresholds</span><span class="p">(</span>
-            <span class="n">y_val</span><span class="p">,</span>
+            <span class="n">transformed_y</span><span class="p">,</span>
             <span class="n">y_proba</span><span class="p">,</span>
             <span class="n">metric</span><span class="o">=</span><span class="n">metric</span><span class="p">,</span>
             <span class="n">classes</span><span class="o">=</span><span class="n">classes</span><span class="p">,</span>
@@ -4633,8 +4656,9 @@
 <span class="w">        </span><span class="sd">"""Return a deterministic SHA-256 over topology + fitted artifacts.</span>
 
 <span class="sd">        The hash covers the pipeline graph (preprocessing + modeling config) and,</span>
-<span class="sd">        once fitted, every fitted artifact and the trained model. Two pipelines</span>
-<span class="sd">        with the same hash produce the same predictions, so callers can prove</span>
+<span class="sd">        once fitted, every fitted artifact, the trained model and any stored</span>
+<span class="sd">        decision thresholds. Two pipelines with the same hash produce the same</span>
+<span class="sd">        predictions for the same prediction options, so callers can prove</span>
 <span class="sd">        "this prediction came from exactly this pipeline". The digest is</span>
 <span class="sd">        semantic (hyperparameters + fitted weights, not pickle bytes), so it is</span>
 <span class="sd">        stable across library and pickle-protocol versions.</span>
@@ -4651,6 +4675,10 @@
 
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">model_estimator</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">model_estimator</span><span class="o">.</span><span class="n">model</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
             <span class="n">hasher</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">artifact_digest</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">model_estimator</span><span class="o">.</span><span class="n">model</span><span class="p">))</span>
+
+        <span class="n">thresholds</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">"_tuned_thresholds"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">thresholds</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">hasher</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">artifact_digest</span><span class="p">({</span><span class="s2">"tuned_thresholds"</span><span class="p">:</span> <span class="n">thresholds</span><span class="p">}))</span>
 
         <span class="k">return</span> <span class="n">hasher</span><span class="o">.</span><span class="n">hexdigest</span><span class="p">()</span>
 
@@ -4827,16 +4855,7 @@ to call before or after :meth:<code>fit</code>. Handy in notebooks and CI logs.<
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>skyulf-core/skyulf/pipeline/_pipeline.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">614</span>
-<span class="normal">615</span>
-<span class="normal">616</span>
-<span class="normal">617</span>
-<span class="normal">618</span>
-<span class="normal">619</span>
-<span class="normal">620</span>
-<span class="normal">621</span>
-<span class="normal">622</span>
-<span class="normal">623</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">623</span>
 <span class="normal">624</span>
 <span class="normal">625</span>
 <span class="normal">626</span>
@@ -4857,7 +4876,16 @@ to call before or after :meth:<code>fit</code>. Handy in notebooks and CI logs.<
 <span class="normal">641</span>
 <span class="normal">642</span>
 <span class="normal">643</span>
-<span class="normal">644</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">describe</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="normal">644</span>
+<span class="normal">645</span>
+<span class="normal">646</span>
+<span class="normal">647</span>
+<span class="normal">648</span>
+<span class="normal">649</span>
+<span class="normal">650</span>
+<span class="normal">651</span>
+<span class="normal">652</span>
+<span class="normal">653</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">describe</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""Return a human-readable, multi-line summary of the pipeline.</span>
 
 <span class="sd">    Renders the preprocessing chain (in order) and the model stage with</span>
@@ -4914,21 +4942,7 @@ under <code>"diagram"</code>. Intended for audit logs and model registries.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>skyulf-core/skyulf/pipeline/_pipeline.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">705</span>
-<span class="normal">706</span>
-<span class="normal">707</span>
-<span class="normal">708</span>
-<span class="normal">709</span>
-<span class="normal">710</span>
-<span class="normal">711</span>
-<span class="normal">712</span>
-<span class="normal">713</span>
-<span class="normal">714</span>
-<span class="normal">715</span>
-<span class="normal">716</span>
-<span class="normal">717</span>
-<span class="normal">718</span>
-<span class="normal">719</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">719</span>
 <span class="normal">720</span>
 <span class="normal">721</span>
 <span class="normal">722</span>
@@ -4944,7 +4958,21 @@ under <code>"diagram"</code>. Intended for audit logs and model registries.</p>
 <span class="normal">732</span>
 <span class="normal">733</span>
 <span class="normal">734</span>
-<span class="normal">735</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">export_model_card</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+<span class="normal">735</span>
+<span class="normal">736</span>
+<span class="normal">737</span>
+<span class="normal">738</span>
+<span class="normal">739</span>
+<span class="normal">740</span>
+<span class="normal">741</span>
+<span class="normal">742</span>
+<span class="normal">743</span>
+<span class="normal">744</span>
+<span class="normal">745</span>
+<span class="normal">746</span>
+<span class="normal">747</span>
+<span class="normal">748</span>
+<span class="normal">749</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">export_model_card</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
 <span class="w">    </span><span class="sd">"""Return a structured, JSON-friendly summary of the pipeline.</span>
 
 <span class="sd">    Captures lineage (preprocessing chain), the model and its hyperparameters,</span>
@@ -4994,8 +5022,9 @@ under <code>"diagram"</code>. Intended for audit logs and model registries.</p>
 
         <p>Return a deterministic SHA-256 over topology + fitted artifacts.</p>
 <p>The hash covers the pipeline graph (preprocessing + modeling config) and,
-once fitted, every fitted artifact and the trained model. Two pipelines
-with the same hash produce the same predictions, so callers can prove
+once fitted, every fitted artifact, the trained model and any stored
+decision thresholds. Two pipelines with the same hash produce the same
+predictions for the same prediction options, so callers can prove
 "this prediction came from exactly this pipeline". The digest is
 semantic (hyperparameters + fitted weights, not pickle bytes), so it is
 stable across library and pickle-protocol versions.</p>
@@ -5003,16 +5032,7 @@ stable across library and pickle-protocol versions.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>skyulf-core/skyulf/pipeline/_pipeline.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">680</span>
-<span class="normal">681</span>
-<span class="normal">682</span>
-<span class="normal">683</span>
-<span class="normal">684</span>
-<span class="normal">685</span>
-<span class="normal">686</span>
-<span class="normal">687</span>
-<span class="normal">688</span>
-<span class="normal">689</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">689</span>
 <span class="normal">690</span>
 <span class="normal">691</span>
 <span class="normal">692</span>
@@ -5026,12 +5046,27 @@ stable across library and pickle-protocol versions.</p>
 <span class="normal">700</span>
 <span class="normal">701</span>
 <span class="normal">702</span>
-<span class="normal">703</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">fingerprint</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="normal">703</span>
+<span class="normal">704</span>
+<span class="normal">705</span>
+<span class="normal">706</span>
+<span class="normal">707</span>
+<span class="normal">708</span>
+<span class="normal">709</span>
+<span class="normal">710</span>
+<span class="normal">711</span>
+<span class="normal">712</span>
+<span class="normal">713</span>
+<span class="normal">714</span>
+<span class="normal">715</span>
+<span class="normal">716</span>
+<span class="normal">717</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">fingerprint</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""Return a deterministic SHA-256 over topology + fitted artifacts.</span>
 
 <span class="sd">    The hash covers the pipeline graph (preprocessing + modeling config) and,</span>
-<span class="sd">    once fitted, every fitted artifact and the trained model. Two pipelines</span>
-<span class="sd">    with the same hash produce the same predictions, so callers can prove</span>
+<span class="sd">    once fitted, every fitted artifact, the trained model and any stored</span>
+<span class="sd">    decision thresholds. Two pipelines with the same hash produce the same</span>
+<span class="sd">    predictions for the same prediction options, so callers can prove</span>
 <span class="sd">    "this prediction came from exactly this pipeline". The digest is</span>
 <span class="sd">    semantic (hyperparameters + fitted weights, not pickle bytes), so it is</span>
 <span class="sd">    stable across library and pickle-protocol versions.</span>
@@ -5048,6 +5083,10 @@ stable across library and pickle-protocol versions.</p>
 
     <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">model_estimator</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">model_estimator</span><span class="o">.</span><span class="n">model</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
         <span class="n">hasher</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">artifact_digest</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">model_estimator</span><span class="o">.</span><span class="n">model</span><span class="p">))</span>
+
+    <span class="n">thresholds</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">"_tuned_thresholds"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">thresholds</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">hasher</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">artifact_digest</span><span class="p">({</span><span class="s2">"tuned_thresholds"</span><span class="p">:</span> <span class="n">thresholds</span><span class="p">}))</span>
 
     <span class="k">return</span> <span class="n">hasher</span><span class="o">.</span><span class="n">hexdigest</span><span class="p">()</span>
 </code></pre></div></td></tr></table></div>
@@ -5650,11 +5689,11 @@ an invalid leakage mode.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>skyulf-core/skyulf/pipeline/_pipeline.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">674</span>
-<span class="normal">675</span>
-<span class="normal">676</span>
-<span class="normal">677</span>
-<span class="normal">678</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">is_fitted</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">683</span>
+<span class="normal">684</span>
+<span class="normal">685</span>
+<span class="normal">686</span>
+<span class="normal">687</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">is_fitted</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""True once preprocessing has been fit (or a model has been trained)."""</span>
     <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">feature_engineer</span><span class="o">.</span><span class="n">fitted_steps</span><span class="p">:</span>
         <span class="k">return</span> <span class="kc">True</span>
@@ -5685,11 +5724,11 @@ an invalid leakage mode.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>skyulf-core/skyulf/pipeline/_pipeline.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">743</span>
-<span class="normal">744</span>
-<span class="normal">745</span>
-<span class="normal">746</span>
-<span class="normal">747</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@classmethod</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">757</span>
+<span class="normal">758</span>
+<span class="normal">759</span>
+<span class="normal">760</span>
+<span class="normal">761</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@classmethod</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">load</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">path</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"SkyulfPipeline"</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""Load the pipeline from a file."""</span>
     <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="s2">"rb"</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
@@ -5721,6 +5760,8 @@ way you would for any other out-of-sample evaluation.</p>
 <p><code>X_val</code> must be raw. This method runs the pipeline's fitted
 preprocessing on it exactly once, which is what makes the probabilities
 it tunes against the ones <code>predict()</code> later reproduces.
+Validation labels follow the same row sorting and filtering as the
+features, so the metric scores matching observations.
 <code>get_fitted_split()</code> is therefore <em>not</em> a source for it: that helper
 returns already-preprocessed frames, so passing them here transforms
 the holdout a second time and fits the cutoffs against a distribution
@@ -5764,7 +5805,7 @@ runs the pipeline's fitted preprocessing on it internally).</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Validation true labels.</p>
+                <p>Validation true labels, paired positionally with <code>X_val</code>.</p>
               </div>
             </td>
             <td>
@@ -5885,7 +5926,8 @@ strategy.</p>
             <td>
               <div class="doc-md-description">
                 <p>If the pipeline isn't fitted, or the underlying
-model doesn't support <code>predict_proba</code>.</p>
+model doesn't support <code>predict_proba</code>, or the raw validation
+features and labels have different row counts.</p>
               </div>
             </td>
           </tr>
@@ -5968,7 +6010,16 @@ model doesn't support <code>predict_proba</code>.</p>
 <span class="normal">554</span>
 <span class="normal">555</span>
 <span class="normal">556</span>
-<span class="normal">557</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">optimize_thresholds</span><span class="p">(</span>
+<span class="normal">557</span>
+<span class="normal">558</span>
+<span class="normal">559</span>
+<span class="normal">560</span>
+<span class="normal">561</span>
+<span class="normal">562</span>
+<span class="normal">563</span>
+<span class="normal">564</span>
+<span class="normal">565</span>
+<span class="normal">566</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">optimize_thresholds</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">X_val</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span> <span class="o">|</span> <span class="n">SkyulfDataFrame</span><span class="p">,</span>
     <span class="n">y_val</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span> <span class="o">|</span> <span class="n">Any</span><span class="p">,</span>
@@ -5988,6 +6039,8 @@ model doesn't support <code>predict_proba</code>.</p>
 <span class="sd">    ``X_val`` must be raw. This method runs the pipeline's fitted</span>
 <span class="sd">    preprocessing on it exactly once, which is what makes the probabilities</span>
 <span class="sd">    it tunes against the ones ``predict()`` later reproduces.</span>
+<span class="sd">    Validation labels follow the same row sorting and filtering as the</span>
+<span class="sd">    features, so the metric scores matching observations.</span>
 <span class="sd">    ``get_fitted_split()`` is therefore *not* a source for it: that helper</span>
 <span class="sd">    returns already-preprocessed frames, so passing them here transforms</span>
 <span class="sd">    the holdout a second time and fits the cutoffs against a distribution</span>
@@ -5996,7 +6049,7 @@ model doesn't support <code>predict_proba</code>.</p>
 <span class="sd">    Args:</span>
 <span class="sd">        X_val: Validation features, *not* yet transformed (this method</span>
 <span class="sd">            runs the pipeline's fitted preprocessing on it internally).</span>
-<span class="sd">        y_val: Validation true labels.</span>
+<span class="sd">        y_val: Validation true labels, paired positionally with ``X_val``.</span>
 <span class="sd">        metric: Callable ``(y_true, y_pred) -&gt; float`` to maximize.</span>
 <span class="sd">        strategy: ``"grid"`` or ``"nelder-mead"``. If ``None``,</span>
 <span class="sd">            auto-selects based on the number of classes (see</span>
@@ -6011,7 +6064,8 @@ model doesn't support <code>predict_proba</code>.</p>
 
 <span class="sd">    Raises:</span>
 <span class="sd">        ValueError: If the pipeline isn't fitted, or the underlying</span>
-<span class="sd">            model doesn't support ``predict_proba``.</span>
+<span class="sd">            model doesn't support ``predict_proba``, or the raw validation</span>
+<span class="sd">            features and labels have different row counts.</span>
 <span class="sd">    """</span>
     <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">model_estimator</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">model_estimator</span><span class="o">.</span><span class="n">model</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
         <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
@@ -6027,13 +6081,19 @@ model doesn't support <code>predict_proba</code>.</p>
             <span class="s2">"threshold tuning requires a classifier."</span>
         <span class="p">)</span>
 
-    <span class="n">transformed_val</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">feature_engineer</span><span class="o">.</span><span class="n">transform</span><span class="p">(</span><span class="n">X_val</span><span class="p">)</span>
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">X_val</span><span class="p">)</span> <span class="o">!=</span> <span class="nb">len</span><span class="p">(</span><span class="n">y_val</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">"X_val and y_val must contain the same number of rows before preprocessing."</span>
+        <span class="p">)</span>
+
+    <span class="c1"># Array-like labels may come from a different engine than the features.</span>
+    <span class="n">transformed_val</span><span class="p">,</span> <span class="n">transformed_y</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">feature_engineer</span><span class="o">.</span><span class="n">transform</span><span class="p">((</span><span class="n">X_val</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">y_val</span><span class="p">)))</span>
     <span class="n">proba_df</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_predict_proba_transformed</span><span class="p">(</span><span class="n">transformed_val</span><span class="p">)</span>
     <span class="n">classes</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">model_classes</span><span class="p">)</span>
     <span class="n">y_proba</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">proba_df</span><span class="p">)[:,</span> <span class="p">:</span> <span class="nb">len</span><span class="p">(</span><span class="n">classes</span><span class="p">)]</span>
 
     <span class="n">thresholds</span> <span class="o">=</span> <span class="n">optimize_thresholds</span><span class="p">(</span>
-        <span class="n">y_val</span><span class="p">,</span>
+        <span class="n">transformed_y</span><span class="p">,</span>
         <span class="n">y_proba</span><span class="p">,</span>
         <span class="n">metric</span><span class="o">=</span><span class="n">metric</span><span class="p">,</span>
         <span class="n">classes</span><span class="o">=</span><span class="n">classes</span><span class="p">,</span>
@@ -6174,16 +6234,7 @@ has not been called since the most recent fit.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>skyulf-core/skyulf/pipeline/_pipeline.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">559</span>
-<span class="normal">560</span>
-<span class="normal">561</span>
-<span class="normal">562</span>
-<span class="normal">563</span>
-<span class="normal">564</span>
-<span class="normal">565</span>
-<span class="normal">566</span>
-<span class="normal">567</span>
-<span class="normal">568</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">568</span>
 <span class="normal">569</span>
 <span class="normal">570</span>
 <span class="normal">571</span>
@@ -6227,7 +6278,16 @@ has not been called since the most recent fit.</p>
 <span class="normal">609</span>
 <span class="normal">610</span>
 <span class="normal">611</span>
-<span class="normal">612</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">predict</span><span class="p">(</span>
+<span class="normal">612</span>
+<span class="normal">613</span>
+<span class="normal">614</span>
+<span class="normal">615</span>
+<span class="normal">616</span>
+<span class="normal">617</span>
+<span class="normal">618</span>
+<span class="normal">619</span>
+<span class="normal">620</span>
+<span class="normal">621</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">predict</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">data</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span> <span class="o">|</span> <span class="n">SkyulfDataFrame</span><span class="p">,</span>
     <span class="n">use_tuned_thresholds</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
@@ -6303,11 +6363,11 @@ has not been called since the most recent fit.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>skyulf-core/skyulf/pipeline/_pipeline.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">737</span>
-<span class="normal">738</span>
-<span class="normal">739</span>
-<span class="normal">740</span>
-<span class="normal">741</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">save</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">751</span>
+<span class="normal">752</span>
+<span class="normal">753</span>
+<span class="normal">754</span>
+<span class="normal">755</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">save</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""Save the pipeline to a file."""</span>
     <span class="c1"># We can use pickle to save the whole object since we removed external dependencies</span>
     <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="s2">"wb"</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
@@ -6336,13 +6396,13 @@ Useful in docs and PR descriptions. Pure read-only over <code>self.config</code>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>skyulf-core/skyulf/pipeline/_pipeline.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">654</span>
-<span class="normal">655</span>
-<span class="normal">656</span>
-<span class="normal">657</span>
-<span class="normal">658</span>
-<span class="normal">659</span>
-<span class="normal">660</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">to_mermaid</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">663</span>
+<span class="normal">664</span>
+<span class="normal">665</span>
+<span class="normal">666</span>
+<span class="normal">667</span>
+<span class="normal">668</span>
+<span class="normal">669</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">to_mermaid</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""Render the pipeline as a Mermaid ``flowchart`` string.</span>
 
 <span class="sd">    Produces a top-down graph ``data -&gt; [preprocessing steps] -&gt; model``.</span>
@@ -6374,17 +6434,17 @@ in Jupyter markdown cells.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>skyulf-core/skyulf/pipeline/_pipeline.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">662</span>
-<span class="normal">663</span>
-<span class="normal">664</span>
-<span class="normal">665</span>
-<span class="normal">666</span>
-<span class="normal">667</span>
-<span class="normal">668</span>
-<span class="normal">669</span>
-<span class="normal">670</span>
-<span class="normal">671</span>
-<span class="normal">672</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">to_mermaid_markdown</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">heading</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="s2">"Pipeline topology"</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">671</span>
+<span class="normal">672</span>
+<span class="normal">673</span>
+<span class="normal">674</span>
+<span class="normal">675</span>
+<span class="normal">676</span>
+<span class="normal">677</span>
+<span class="normal">678</span>
+<span class="normal">679</span>
+<span class="normal">680</span>
+<span class="normal">681</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">to_mermaid_markdown</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">heading</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="s2">"Pipeline topology"</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""Return the diagram as a Markdown snippet with a ``mermaid`` fence.</span>
 
 <span class="sd">    Includes a heading by default; pass ``heading=None`` for just the</span>
@@ -6417,13 +6477,13 @@ in Jupyter markdown cells.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>skyulf-core/skyulf/pipeline/_pipeline.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">646</span>
-<span class="normal">647</span>
-<span class="normal">648</span>
-<span class="normal">649</span>
-<span class="normal">650</span>
-<span class="normal">651</span>
-<span class="normal">652</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">validate_leakage_safety</span><span class="p">(</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">655</span>
+<span class="normal">656</span>
+<span class="normal">657</span>
+<span class="normal">658</span>
+<span class="normal">659</span>
+<span class="normal">660</span>
+<span class="normal">661</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">validate_leakage_safety</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span> <span class="n">on_leakage</span><span class="p">:</span> <span class="n">OnLeakage</span> <span class="o">=</span> <span class="s2">"raise"</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">target_column</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
 <span class="w">    </span><span class="sd">"""Diagnose preprocessing steps ordered before the train/test split."""</span>

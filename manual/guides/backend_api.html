@@ -4527,7 +4527,23 @@ See <a href="../user_guide/threshold_tuning.html">Threshold Tuning</a> for the w
 <h3 id="post-apiedareportsreport_idcancel"><code>POST /api/eda/reports/{report_id}/cancel</code></h3>
 <p>Cancel a running EDA analysis.</p>
 <h3 id="post-apiedadataset_iddecomposition"><code>POST /api/eda/{dataset_id}/decomposition</code></h3>
-<p>Run time-series decomposition on a dataset column.</p>
+<p>Aggregate a measure for one level of the EDA decomposition tree, optionally
+grouped by <code>split_col</code> and restricted by <code>filters</code>.</p>
+<p>Grouped response rows include <code>name</code> (display label), <code>filter_value</code> (the
+category identity), <code>value</code> and <code>ratio</code>. Use <code>filter_value</code> when drilling into a
+row: missing values have JSON <code>null</code>, while a real category named <code>Unknown</code>
+has the string <code>"Unknown"</code>. For example, the following filter selects missing
+values in <code>group</code>:</p>
+<pre><code class="language-json">{&quot;column&quot;: &quot;group&quot;, &quot;operator&quot;: &quot;==&quot;, &quot;value&quot;: null}
+</code></pre>
+<p>Input columns can be named <code>value</code>, <code>ratio</code>, <code>name</code> or <code>filter_value</code>; those
+names do not conflict with response fields. A numeric column can also be used
+as both the grouping column and the measure.</p>
+<p>Use <code>"!="</code> with <code>null</code> to select non-missing rows. The UI labels the missing
+bucket <code>Unknown (missing)</code> and keeps literal <code>Unknown</code> separate. Older response
+rows without <code>filter_value</code> fall back to their display name; the legacy string
+<code>"Unknown"</code> still selects missing values on numeric columns. Reload or reopen
+the tree to obtain updated group identities; no stored-data migration is needed.</p>
 <h3 id="get-apiedajobsall"><code>GET /api/eda/jobs/all</code></h3>
 <p>List all EDA jobs with status. Query params: <code>limit</code> (default 50), <code>skip</code> (default 0).</p>
 <hr />

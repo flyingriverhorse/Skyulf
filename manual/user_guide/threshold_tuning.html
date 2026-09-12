@@ -3370,9 +3370,12 @@ thresholds = pipeline.optimize_thresholds(
 tuned_predictions = pipeline.predict(new_customers, use_tuned_thresholds=True)
 </code></pre>
 <p><code>optimize_thresholds()</code> runs the pipeline's already-fitted preprocessing on
-<code>X_val</code> internally — exactly once, the same single pass <code>predict()</code> makes —
-then calls the model's <code>predict_proba</code>, searches thresholds, and stores the
-result on the pipeline. That one pass is why <code>X_val</code> has to be raw: it is what
+<code>(X_val, y_val)</code> internally — exactly once, the same single pass <code>predict()</code>
+makes on the features — then calls the model's <code>predict_proba</code>, searches
+thresholds, and stores the result on the pipeline. Labels follow any row sorting
+or filtering, so each probability is scored against its matching target. Raw
+features and labels must have equal lengths and correspond positionally.
+That one pass is why <code>X_val</code> has to be raw: it is what
 makes the probabilities the cutoffs are fitted against the same probabilities
 <code>predict(use_tuned_thresholds=True)</code> later reproduces.
 <code>predict(use_tuned_thresholds=True)</code> then applies those stored thresholds; it

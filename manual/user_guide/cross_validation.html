@@ -3428,9 +3428,16 @@ print(cv_results[&quot;aggregated_metrics&quot;])
 <p><strong>Auto-sort behavior:</strong></p>
 <ol>
 <li>If <code>time_column</code> is provided, data is sorted by that column and the column is dropped from features (prevents date leakage).</li>
-<li>If omitted, the first <code>datetime64</code> column is auto-detected.</li>
+<li>If omitted, the first supported date/datetime column in input order is used,
+   including pandas object columns of native <code>datetime.date</code> values and Polars
+   Date/Datetime columns. Native date columns may contain missing values.</li>
 <li>If no datetime column exists, a warning is logged and row order is assumed correct.</li>
 </ol>
+<p>Automatic detection does not parse date strings or select mixed date/text,
+mixed date/datetime object columns, or entirely missing object columns. Normalize
+such inputs explicitly before temporal CV. Sorting remains stable, places
+missing dates last and keeps targets aligned. Rerun temporal CV on affected
+native pandas date inputs; previous scores may have used nonchronological folds.</p>
 <h3 id="nested-cv">Nested CV</h3>
 <p>Runs a dual-loop cross-validation:</p>
 <ul>
