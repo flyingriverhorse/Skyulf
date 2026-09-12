@@ -184,6 +184,7 @@ uses, so a fixed finding stays where it was filed.
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
+| OC-121 | ⚪ | Polars Enum columns omitted by text auto-selection, unlike pandas Categorical (`preprocessing/_helpers.py`) | small | ✅ fixed 2026-09-12 — recognize parameterized Enum dtypes in the shared selector; TextCleaning and AliasReplacement now include them while preserving nulls, explicit selections and replay behavior. |
 | OC-120 | 🟠 | Decimal columns skipped by numeric auto-selection and mishandled during explicit numeric processing (`utils.py`, `preprocessing/_helpers.py` and numeric nodes) | small | ✅ fixed 2026-09-12 — recognize parameterized Polars and pandas object Decimals, normalize selected values at numeric boundaries, and preserve missingness, source values and target alignment. |
 | OC-110 | 🟠 | Semantic-type inference misclassifies small categorical columns as `Text`, so task type never inferred (`profiling/_analyzer/_utils.py`, `analyzer.py`) | small | ✅ fixed 2026-09-12 — infer repeated small string categories from non-null counts in both profiling paths, restoring statistics and classification target analysis. |
 | OC-113 | 🟠 | Near-perfect multicollinearity silently reports VIF = 1.0 — `max(1.0, …)` clamps numerical garbage (`profiling/_analyzer/numeric.py`) | small | ✅ fixed 2026-09-12 — use per-feature regression residuals for unstable correlation inversion, preserving high-VIF warnings without falsely flagging unrelated columns. |
@@ -401,6 +402,35 @@ respective fix logs; OC-167 closed with canonical artifact framing on 2026-09-09
 ---
 
 ## Log
+
+### 2026-09-12 — OC-121 fixed: Enum text auto-selection
+
+After committing OC-120 as `8425f56f`, reproduced the adjacent dtype finding
+with `status = [" YES ", "No!", null, "Maybe"]`. Polars Enum auto-detection
+returned no status column; both TextCleaning and AliasReplacement left it
+unchanged. Equivalent pandas Categorical input was selected and transformed.
+Explicitly selecting status already worked on both engines.
+
+The shared text selector now recognizes `isinstance(dtype, pl.Enum)` alongside
+the existing text dtypes. No node transformation or frontend changes were needed.
+Enum selection uses the declared dtype, so it also includes empty/all-null
+columns. Text cleaning and alias mapping keep their existing string output,
+null preservation, target exclusions and explicit-empty-selection no-op.
+
+Verification:
+
+- Before the fix, the new matrix had **10 failed / 26 passed**, isolating the
+  Polars native/wrapped automatic-selection failures from the working explicit
+  and pandas controls.
+- **341 tests passed**, including all 36 new Enum cases and the existing text,
+  alias, helper, pipeline, engine-parity and Decimal regressions.
+- Tests exercise fit/apply and held-out Enum vocabularies, preserve source frames
+  and untouched columns, and verify empty/all-null dtype discovery.
+- Ruff, formatting and full configured `ty check` pass; focused review found no
+  concrete defects or scope concerns.
+
+Docs and changelog explain the new selection and refitting previously saved
+artifacts. OC-121 moves into the archive; the live queue is **34 open / 4 parked**.
 
 ### 2026-09-12 — OC-120 fixed: Decimal numeric selection and processing
 

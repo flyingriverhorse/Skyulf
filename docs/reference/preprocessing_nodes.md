@@ -72,6 +72,14 @@ Learned params: none.
 
 ## Cleaning
 
+When `columns` is omitted, `TextCleaning` and `AliasReplacement` select text-like
+columns, including pandas categorical strings and Polars `Enum` columns. An
+explicit `columns=[]` keeps both nodes as no-ops. Enum categories do not restrict
+the cleaned output: for example, trim plus lowercase changes `" YES "` to
+`"yes"`, while boolean alias replacement produces `"Yes"`. Missing values stay
+missing and source frames are unchanged. Refit saved artifacts to include Enum
+columns that older automatic selections skipped.
+
 Example step:
 
 ```python

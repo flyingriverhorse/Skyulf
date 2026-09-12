@@ -267,14 +267,18 @@ def is_polars(X: Any) -> bool:
 
 
 def auto_detect_text_columns(df: pd.DataFrame | SkyulfDataFrame) -> list[str]:
-    """Return string-like columns from either a Pandas or Polars frame."""
+    """Return text columns, including categorical strings and Polars Enum dtypes.
+
+    Enum columns are selected even when empty or entirely null; their declared
+    categories establish the text dtype independently of observed values.
+    """
     engine = get_engine(df)
     if engine.name == EngineName.POLARS:
         polars_df = cast(PolarsBackedFrame, df)
         return [
             c
             for c, t in zip(polars_df.columns, polars_df.dtypes, strict=True)
-            if t in [pl.Utf8, pl.Categorical, pl.Object]
+            if t in [pl.Utf8, pl.Categorical, pl.Object] or isinstance(t, pl.Enum)
         ]
     return list(
         cast(PandasBackedFrame, df).select_dtypes(include=["object", "string", "category"]).columns

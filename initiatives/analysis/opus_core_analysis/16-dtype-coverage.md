@@ -113,6 +113,13 @@ path stops crashing. Add a cross-engine test with a decimal column.
 ---
 
 ### OC-121
+
+**Resolved 2026-09-12.** See the
+[verification and fix log](../opus_core_analysis-tracker.md#2026-09-12-oc-121-fixed-enum-text-auto-selection).
+The shared text selector now recognizes parameterized Enum dtypes; native and
+wrapped TextCleaning/AliasReplacement fit/apply regressions pass. The original
+reproduction below is retained as historical evidence.
+
 ### ⚪ Low — polars `Enum` columns are invisible to text auto-detection, diverging from the pandas `Categorical` equivalent
 
 **File:** `skyulf/preprocessing/_helpers.py:148-157` (`auto_detect_text_columns`)

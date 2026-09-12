@@ -27,8 +27,8 @@ detail lives in the archive's `## Log` section.
 
 ## Live — fix queue
 
-**Current status (2026-09-12): 35 open / 4 parked.** OC-110, OC-113, OC-120 and
-the newly filed OC-247 are closed in the archive.
+**Current status (2026-09-12): 34 open / 4 parked.** OC-110, OC-113, OC-120,
+OC-121 and the newly filed OC-247 are closed in the archive.
 
 Ordered by the master report's suggested fix order: **Now** (silent wrongness
 reaching users), **Next** (wrong results in realistic configs), **Then** (decide
@@ -67,7 +67,6 @@ closed that on 2026-09-07.
 | OC-101 | 🟡 | `calibrated_classifier`'s `random_state` no-op for two independent reasons (estimator rejects it AND factories hardcode the seed) | small | ⬜ open |
 | OC-111 | 🟡 | A profiling recommendation branch is unreachable | small | ⬜ open |
 | OC-102 | ⚪ | Five tunable models return an empty search space from the live `/defaults` endpoint (`hyperparameters/_registry.py`) | small | ⬜ open |
-| OC-121 | ⚪ | polars `Enum` columns invisible to text auto-detection, diverging from pandas `Categorical` (`_helpers.py:148-157`) | small | ⬜ open |
 | OC-90 | ⚪ | Unknown split config keys silently dropped instead of rejected (`preprocessing/split.py`) | small | ⬜ open |
 
 ### Remaining — file-coverage closure
