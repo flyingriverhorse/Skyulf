@@ -18,9 +18,9 @@ from skyulf.leakage import step_learns_from_data, train_test_splitters
 from skyulf.modeling.base import extract_xy
 from skyulf.preprocessing.fold_adapter import (
     SPLITTER_STEP_TYPES,
-    UNSAFE_BRANCH_STEP_TYPES,
     FeatureEngineerFoldAdapter,
     MergedBranchFoldAdapter,
+    merged_branch_step_unsafe_reason,
 )
 from skyulf.preprocessing.pipeline import FeatureEngineer
 
@@ -556,10 +556,11 @@ class FeatureEngMixin:
                 )
             for step in branch_steps:
                 transformer = step.get("transformer")
-                if transformer in UNSAFE_BRANCH_STEP_TYPES:
+                reason = merged_branch_step_unsafe_reason(step)
+                if reason is not None:
                     return (
                         None,
-                        (f"branch step '{transformer}' splits data or changes row counts"),
+                        (f"branch step '{transformer}' {reason}"),
                         "row_changing_branch_step",
                     )
             branch_lists.append(branch_steps)

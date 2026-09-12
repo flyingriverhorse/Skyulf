@@ -2,6 +2,16 @@
 
 Skyulf supports building pipelines with **multiple branches** that merge into a single training node or fan out into separate experiments. This guide covers both patterns.
 
+## Preview Path Labels
+
+Canvas path labels identify the corresponding branches in **Preview Results**.
+They use the node's display name, such as **Resampling**, or your custom label.
+The **Preview data** action excludes separate Data Preview nodes; a preprocessing
+output feeding only one of those nodes still gets its own preview path. For
+example, parallel Imputation and Resampling outputs retain matching path letters
+on their Canvas connections and result tabs even when Imputation also feeds a
+Data Preview node. Rerun Preview after changing the graph to refresh the results.
+
 ---
 
 ## Merge: Combining Multiple Branches

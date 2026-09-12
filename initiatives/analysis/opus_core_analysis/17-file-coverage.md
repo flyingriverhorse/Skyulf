@@ -41,6 +41,13 @@ reason the remaining 16 files are worth closing out.
 <a id="oc-140"></a>
 ### OC-140 🟠 High — `InvalidValueReplacement` diverges across engines on non-numeric columns
 
+**Resolved 2026-09-12.** Active numeric operations now reject selected
+nonnumeric columns consistently at fit and apply, including inference dtype
+changes. Automatic selection excludes durations, and inactive configurations
+preserve data. Numeric text must be converted explicitly before this node.
+See the [verification log](../opus_core_analysis-tracker.md#2026-09-12-oc-51101140-recommendations-calibration-seeds-and-numeric-rules).
+The original reproduction below is retained as historical evidence.
+
 **File:** `skyulf/preprocessing/cleaning/invalid_value.py`
 
 The pandas path calls `pd.to_numeric(df_out[col], errors="coerce")` before

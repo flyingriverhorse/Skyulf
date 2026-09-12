@@ -12,6 +12,7 @@ export function useInferenceRuns(activeDeployment: DeploymentInfo | null, savedT
      * update — checked synchronously before any async work starts. */
     const activeRunIdRef = useRef<string | null>(null);
     const activeAbortControllerRef = useRef<AbortController | null>(null);
+    const activeTimeoutRef = useRef<number | null>(null);
     /** Distinguishes a user-initiated Cancel from our own timeout-abort,
      * since both surface to the catch block as the same cancellation error. */
     const cancelReasonRef = useRef<'user' | 'timeout' | null>(null);
@@ -36,6 +37,34 @@ export function useInferenceRuns(activeDeployment: DeploymentInfo | null, savedT
     const [error, setError] = useState<string | null>(null);
     const [latencyMs, setLatencyMs] = useState<number | null>(null);
     const [thresholdsApplied, setThresholdsApplied] = useState<Record<string, number> | null>(null);
+
+    /** Retire a request before aborting so late transport callbacks cannot write. */
+    const invalidateRun = useCallback(() => {
+        activeRunIdRef.current = null;
+        activeAbortControllerRef.current?.abort();
+        activeAbortControllerRef.current = null;
+        cancelReasonRef.current = null;
+        if (activeTimeoutRef.current !== null) window.clearTimeout(activeTimeoutRef.current);
+        activeTimeoutRef.current = null;
+    }, []);
+
+    useEffect(() => {
+        setActiveRun(null);
+        return invalidateRun;
+    }, [activeDeployment?.job_id, invalidateRun]);
+
+    /** Clear both the displayed result and any request that could restore it. */
+    const clearResults = useCallback(() => {
+        invalidateRun();
+        clearPendingRun();
+        lastAttemptRef.current = null;
+        setActiveRun(null);
+        setPredictions(null);
+        setCurrentRunMeta(null);
+        setError(null);
+        setLatencyMs(null);
+        setThresholdsApplied(null);
+    }, [invalidateRun]);
 
     /** Append a settled run to the durable, reload-surviving history. */
     const appendRunHistory = useCallback((entry: RunRecord) => {
@@ -141,6 +170,7 @@ export function useInferenceRuns(activeDeployment: DeploymentInfo | null, savedT
                 cancelReasonRef.current = 'timeout';
                 controller.abort();
             }, PREDICT_TIMEOUT_MS);
+            activeTimeoutRef.current = timeoutId;
 
             setActiveRun({ runId, label, submittedAt: Date.now(), retryOf: opts?.retryOf ?? null });
             setError(null);
@@ -150,6 +180,8 @@ export function useInferenceRuns(activeDeployment: DeploymentInfo | null, savedT
                 const response = await deploymentApi.predict(data, overrideThresholds, {
                     signal: controller.signal,
                 });
+                if (activeRunIdRef.current !== runId) return;
+                throwIfRunCancelled(controller.signal);
                 const elapsed = Math.round(performance.now() - start);
                 setPredictions(response.predictions);
                 setLatencyMs(elapsed);
@@ -173,6 +205,7 @@ export function useInferenceRuns(activeDeployment: DeploymentInfo | null, savedT
                 setCurrentRunMeta(entry);
                 appendRunHistory(entry);
             } catch (e: unknown) {
+                if (activeRunIdRef.current !== runId) return;
                 const { status, message } = describeRunFailure(e, cancelReasonRef.current);
                 setPredictions(null);
                 setLatencyMs(null);
@@ -198,14 +231,13 @@ export function useInferenceRuns(activeDeployment: DeploymentInfo | null, savedT
                 appendRunHistory(entry);
             } finally {
                 window.clearTimeout(timeoutId);
-                cancelReasonRef.current = null;
-                activeAbortControllerRef.current = null;
-                activeRunIdRef.current = null;
-                setActiveRun(null);
-                try {
-                    localStorage.removeItem(LS_PENDING_RUN);
-                } catch {
-                    /* ignore */
+                if (activeRunIdRef.current === runId) {
+                    cancelReasonRef.current = null;
+                    activeAbortControllerRef.current = null;
+                    activeRunIdRef.current = null;
+                    activeTimeoutRef.current = null;
+                    setActiveRun(null);
+                    clearPendingRun();
                 }
             }
         },
@@ -255,8 +287,22 @@ export function useInferenceRuns(activeDeployment: DeploymentInfo | null, savedT
         lastAttemptRef, predictions, setPredictions, activeRun, currentRunMeta,
         setCurrentRunMeta, runHistory, setRunHistory, error, setError, latencyMs,
         setLatencyMs, thresholdsApplied, setThresholdsApplied, submitRun, handleRetryRun,
-        handleCancelRun, handleRestoreRun, handleClearRunHistory,
+        handleCancelRun, handleRestoreRun, handleClearRunHistory, clearResults,
     };
+}
+
+/** Remove a pending marker only while its request still owns the result state. */
+function clearPendingRun() {
+    try {
+        localStorage.removeItem(LS_PENDING_RUN);
+    } catch {
+        /* ignore */
+    }
+}
+
+/** Match transport cancellation when a response was already queued before abort. */
+function throwIfRunCancelled(signal: AbortSignal) {
+    if (signal.aborted) throw Object.assign(new Error('Run cancelled'), { code: 'ERR_CANCELED' });
 }
 
 /** Capture the threshold source in effect when a run starts. */

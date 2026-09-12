@@ -113,6 +113,51 @@ class TestHaversineDistance:
         assert "geo_distance_km" not in result.columns
 
 
+@pytest.mark.parametrize("engine", ["pandas", "polars"])
+@pytest.mark.parametrize("unit", ["km", "mi"])
+def test_haversine_antipodal_roundoff_preserves_valid_distances_and_missingness(
+    engine: str, unit: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Antipodal roundoff must not turn valid coordinates into missing distances."""
+    monkeypatch.setenv("SKYULF_ENGINE", engine)
+    coordinates = {
+        "lat1": [-89.91000888888888, 89.91000888888888, 0.0, 0.0, None, float("nan")],
+        "lon1": [0.0, 180.0, 0.0, 0.0, 0.0, 0.0],
+        "lat2": [89.91000888888888, -89.91000888888888, 0.0, 0.0, 0.0, 0.0],
+        "lon2": [180.0, 0.0, 90.0, 0.0, 0.0, 0.0],
+    }
+    original = pl.DataFrame(coordinates)
+    frame = original.to_pandas() if engine == "pandas" else original.clone()
+    config = {
+        "lat1_col": "lat1",
+        "lon1_col": "lon1",
+        "lat2_col": "lat2",
+        "lon2_col": "lon2",
+        "unit": unit,
+    }
+
+    artifact = GeoDistanceCalculator().fit(frame, config)
+    result = GeoDistanceApplier().apply(frame, artifact)
+    distance = result[f"geo_distance_{unit}"].to_numpy()
+    unit_factor = 1.0 if unit == "km" else 0.6213711922
+
+    np.testing.assert_allclose(
+        distance[:4],
+        np.array([20015.114442035923, 20015.114442035923, 10007.557221017962, 0.0]) * unit_factor,
+        rtol=1e-12,
+        atol=1e-12,
+    )
+    assert np.isnan(distance[4:]).all()
+    if isinstance(frame, pd.DataFrame):
+        pd.testing.assert_frame_equal(frame, original.to_pandas())
+        pd.testing.assert_frame_equal(result[original.columns], original.to_pandas())
+    else:
+        assert frame.equals(original)
+        assert result.select(original.columns).equals(original)
+        assert result[f"geo_distance_{unit}"][4] is None
+    assert list(result.columns) == [*original.columns, f"geo_distance_{unit}"]
+
+
 class TestGeoDistanceOutputNames:
     """Automatic names identify the unit without renaming explicit saved outputs."""
 

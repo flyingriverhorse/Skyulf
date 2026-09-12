@@ -161,6 +161,12 @@ which is the label of the row that was *dropped*. So labels are both misaligned
 <a id="oc-18"></a>
 ### OC-18 — CONFIRMED, and worse
 
+**Fixed 2026-09-12:** the public fit/apply paths now reject generated-name
+collisions consistently for one-hot, dummy, missing-indicator and multiclass
+target encoding. Valid dropped-source name reuse retains its indicators and
+original source values during encoding. The following is historical evidence;
+the archive records the new reproduction and regression results.
+
 ```
 OneHotEncoder on DataFrame({"c": ["a","b"], "c_a": [9,9]})
 output columns: ['c_a', 'c_a', 'c_b']

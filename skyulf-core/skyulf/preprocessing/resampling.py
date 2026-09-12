@@ -219,7 +219,10 @@ def _build_oversampler(method: str, params: dict[str, Any]) -> Any:
             density_exponent=params.get("density_exponent", "auto"),
         )
     # smote_tomek
-    return cls(sampling_strategy=strategy, random_state=random_state)
+    smote = classes["smote"](
+        sampling_strategy=strategy, random_state=random_state, k_neighbors=k_neighbors
+    )
+    return cls(sampling_strategy=strategy, random_state=random_state, smote=smote)
 
 
 class OversamplingApplier(BaseApplier):

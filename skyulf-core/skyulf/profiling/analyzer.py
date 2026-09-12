@@ -227,8 +227,10 @@ class EDAAnalyzer(
         for col in self.columns:
             dtype = self.df[col].dtype
             n_unique = basic_stats.get(f"{col}__unique", 0)
-            ratio = n_unique / self.row_count if self.row_count > 0 else 0
-            semantic_types[col] = _dtype_to_semantic_bucket(dtype, ratio, n_unique)
+            null_count = basic_stats.get(f"{col}__null", 0)
+            semantic_types[col] = _dtype_to_semantic_bucket(
+                dtype, n_unique, self.row_count, null_count
+            )
         return semantic_types
 
     def _numeric_advanced_aggs(self, col: str) -> list[pl.Expr]:
@@ -255,9 +257,9 @@ class EDAAnalyzer(
         ]
 
     def _categorical_advanced_aggs(self, col: str) -> list[pl.Expr]:
-        """Advanced aggregation expressions for a Categorical column."""
+        """Aggregate observed category frequencies without treating null as a label."""
         # The nested value/count struct has its own names, independent of user columns.
-        values = pl.col(col).alias("value")
+        values = pl.col(col).drop_nulls().alias("value")
         return [
             values.value_counts(sort=True).head(10).implode().alias(f"{col}__top_k"),
             (values.value_counts().struct.field("count") < 5).sum().alias(f"{col}__rare"),

@@ -12,16 +12,47 @@ as float ``NaN`` (distinct from null in Polars) where pandas stores missing —
 skyulf-core's NaN-aware operators (F-04/F-06/F-13) handle both forms.
 """
 
+from decimal import Decimal
 from io import StringIO
 
+import numpy as np
 import pandas as pd
 import polars as pl
 import pytest
 
 from backend.config import get_settings
 from backend.data.catalog import FileSystemCatalog
+from skyulf.preprocessing.pipeline import FeatureEngineer
 
 NAN_CSV = "a,b,c\n1,x,NaN\n,y,2\n3,z,\n"
+
+
+@pytest.mark.parametrize("engine", ["pandas", "polars"])
+def test_parquet_decimal_pipeline_imputes_scales_and_replays(tmp_path, monkeypatch, engine):
+    """Uploaded Decimal prices must survive ingestion and reach every automatic numeric step."""
+    monkeypatch.setattr(get_settings(), "SKYULF_ENGINE", engine)
+    source = pl.DataFrame(
+        {
+            "price": pl.Series([Decimal("1.25"), None, Decimal("3.75")], dtype=pl.Decimal(10, 2)),
+            "label": ["a", "b", "c"],
+        }
+    )
+    source.write_parquet(tmp_path / "prices.parquet")
+    frame = FileSystemCatalog(base_path=str(tmp_path)).load("prices.parquet")
+    assert frame["price"].to_list() == [Decimal("1.25"), None, Decimal("3.75")]
+    engineer = FeatureEngineer(
+        [
+            {"name": "fill", "transformer": "SimpleImputer", "params": {"strategy": "mean"}},
+            {"name": "scale", "transformer": "MinMaxScaler", "params": {}},
+        ]
+    )
+
+    out, _ = engineer.fit_transform(frame)
+    replay = engineer.transform(frame)
+    np.testing.assert_allclose(out["price"].to_numpy(), [0.0, 0.5, 1.0])
+    np.testing.assert_allclose(replay["price"].to_numpy(), [0.0, 0.5, 1.0])
+    assert out["label"].to_list() == ["a", "b", "c"]
+    assert frame["price"].to_list() == [Decimal("1.25"), None, Decimal("3.75")]
 
 
 @pytest.fixture

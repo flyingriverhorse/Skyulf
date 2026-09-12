@@ -14,6 +14,7 @@ from ...engines.sklearn_bridge import SklearnBridge
 from ...registry import NodeRegistry
 from ...utils import resolve_columns, user_picked_no_columns
 from .._artifacts import OneHotArtifact
+from .._output_names import validate_generated_column_names
 from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
 from ..dispatcher import apply_dual_engine, fit_dual_engine
 from ._common import _exclude_target_column, detect_categorical_columns
@@ -38,6 +39,12 @@ def _validate_apply_params(X: Any, params: dict[str, Any]) -> tuple[list[str], A
     valid_cols = [c for c in cols if c in X.columns]
     if not valid_cols or not encoder:
         return [], None, None
+    validate_generated_column_names(
+        X.columns,
+        cast(list[str], feature_names),
+        dropped_columns=valid_cols if params.get("drop_original", True) else (),
+        node_name="OneHotEncoder",
+    )
     return valid_cols, encoder, feature_names
 
 
@@ -66,9 +73,8 @@ def _onehot_apply_polars(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, A
     encoded = _to_dense(encoder.transform(X_np))
 
     encoded_df = pl.DataFrame(encoded, schema=feature_names)
-    X_out = pl.concat([X, encoded_df], how="horizontal")
-    if drop_original:
-        X_out = X_out.drop(valid_cols)
+    retained = X.drop(valid_cols) if drop_original else X
+    X_out = retained.hstack(encoded_df) if retained.width else encoded_df
     return X_out, y
 
 
@@ -87,9 +93,9 @@ def _onehot_apply_pandas(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, A
     X_input = X_subset.to_numpy() if hasattr(X_subset, "to_numpy") else X_subset
     encoded = _to_dense(encoder.transform(X_input))
     encoded_df = pd.DataFrame(encoded, columns=feature_names, index=X_out.index)
-    X_out = pd.concat(cast(Any, [X_out, encoded_df]), axis=1)
     if drop_original:
         X_out = X_out.drop(columns=valid_cols)
+    X_out = pd.concat(cast(Any, [X_out, encoded_df]), axis=1)
     return X_out, y
 
 
@@ -102,7 +108,8 @@ class OneHotEncoderApplier(BaseApplier):
     transforming, which only lines up when ``include_missing`` was set at fit
     time too — the encoder knows that level solely if it saw it. Indicator
     columns are concatenated on and the originals dropped unless
-    ``drop_original`` is false.
+    ``drop_original`` is false. Generated names must be unique and must not
+    collide with retained input columns; conflicts raise ``ValueError``.
     """
 
     @apply_method
@@ -169,13 +176,21 @@ def _fit_sklearn_onehot(X_subset: Any, opts: dict[str, Any], cols: list[str]) ->
 
 
 def _build_onehot_artifact(
-    encoder: OneHotEncoder, cols: list[str], opts: dict[str, Any]
+    X: Any, encoder: OneHotEncoder, cols: list[str], opts: dict[str, Any]
 ) -> Mapping[str, Any]:
+    """Validate the fitted feature names before returning the reusable artifact."""
+    feature_names = encoder.get_feature_names_out(cols).tolist()
+    validate_generated_column_names(
+        X.columns,
+        feature_names,
+        dropped_columns=cols if opts["drop_original"] else (),
+        node_name="OneHotEncoder",
+    )
     return {
         "type": "onehot",
         "columns": cols,
         "encoder_object": encoder,
-        "feature_names": encoder.get_feature_names_out(cols).tolist(),
+        "feature_names": feature_names,
         "prefix_separator": opts["prefix_separator"],
         "drop_original": opts["drop_original"],
         "include_missing": opts["include_missing"],
@@ -194,7 +209,7 @@ def _onehot_fit_polars(X: Any, y: Any, config: dict[str, Any]) -> Mapping[str, A
         X_subset = X_subset.fill_null(_MISSING_TOKEN)
 
     encoder = _fit_sklearn_onehot(X_subset, opts, cols)
-    return _build_onehot_artifact(encoder, cols, opts)
+    return _build_onehot_artifact(X, encoder, cols, opts)
 
 
 def _onehot_fit_pandas(X: Any, y: Any, config: dict[str, Any]) -> Mapping[str, Any]:
@@ -209,7 +224,7 @@ def _onehot_fit_pandas(X: Any, y: Any, config: dict[str, Any]) -> Mapping[str, A
         X_subset = X_subset.astype(object).where(X_subset.notna(), _MISSING_TOKEN)
 
     encoder = _fit_sklearn_onehot(X_subset, opts, cols)
-    return _build_onehot_artifact(encoder, cols, opts)
+    return _build_onehot_artifact(X, encoder, cols, opts)
 
 
 @NodeRegistry.register("OneHotEncoder", OneHotEncoderApplier)

@@ -22,6 +22,7 @@ from skyulf.modeling._tuning.engine import TuningCalculator
 from skyulf.modeling._tuning.schemas import TuningConfig, TuningResult
 from skyulf.profiling._analyzer.recommendations import RecommendationsMixin
 from skyulf.profiling.drift import DriftCalculator
+from skyulf.profiling.schemas import ColumnProfile, NumericStats
 
 
 def _raiser(exc: Exception):
@@ -127,11 +128,19 @@ class TestBalanceRecommendationDirections:
         assert mixin._build_balance_recommendation("target", 0.5) == []
 
     def test_skewness_threshold_both_directions(self):
+        """Transform advice must use real profile fields for both skewness branches."""
         mixin = object.__new__(RecommendationsMixin)
-        skewed = SimpleNamespace(numeric_stats=SimpleNamespace(skewness=2.0))
-        mild = SimpleNamespace(numeric_stats=SimpleNamespace(skewness=0.5))
+        skewed = ColumnProfile(
+            name="col",
+            dtype="Numeric",
+            missing_count=0,
+            missing_percentage=0,
+            numeric_stats=NumericStats(skewness=2.0, min=1.0),
+        )
+        mild = skewed.model_copy(update={"numeric_stats": NumericStats(skewness=0.5)})
 
-        recs = mixin._skewness_recommendations("col", cast("Any", skewed))
+        recs = mixin._skewness_recommendations("col", skewed)
         assert len(recs) == 1
+        assert "Log or Box-Cox" in recs[0].suggestion
 
-        assert mixin._skewness_recommendations("col", cast("Any", mild)) == []
+        assert mixin._skewness_recommendations("col", mild) == []

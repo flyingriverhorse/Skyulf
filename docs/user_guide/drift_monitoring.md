@@ -64,6 +64,17 @@ for col, drift in report.column_drifts.items():
 
 ## Drift metrics
 
+String, Categorical, Enum and Boolean columns receive categorical drift metrics,
+including `psi_categorical`. They do not need encoding first. Rerun saved drift
+checks that previously omitted Enum columns to populate those measurements.
+
+The page's **Avg PSI** and **Most Drifted** cards include both numeric `psi`
+and categorical `psi_categorical`, with one finite PSI measurement per column.
+For example, numeric PSI `0.01` and categorical PSI `5` produce average
+`2.5050`, with the categorical feature shown as most drifted. A measured zero
+is included; unavailable measurements are excluded. If none are available,
+the cards show `—` and **No PSI available** rather than claiming stability.
+
 The `DriftCalculator` computes these metrics for each numeric column:
 
 | Metric | What it measures | Default threshold |
@@ -155,4 +166,4 @@ Drift calculation requires `scipy` (installed with `skyulf-core` by default).
 - Run drift detection **before** prediction to catch issues early.
 - Log drift reports over time to track gradual distribution shifts.
 - If drift is detected, consider retraining the model on recent data.
-- Non-numeric columns are currently skipped — encode them first if you need categorical drift detection.
+- Keep categorical labels intact when comparing their distributions.

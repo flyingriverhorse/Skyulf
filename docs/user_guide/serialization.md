@@ -15,6 +15,13 @@ That includes:
 - Some preprocessing nodes store sklearn objects inside `params` (e.g., KNN/Iterative imputers, OneHotEncoder).
   Those are not JSON-serializable and require pickling.
 
+Dataframe wrappers returned by `EngineRegistry.wrap()` can be restored through
+Python `pickle` and Core's `JoblibModelSerializer`, including inside nested
+artifact containers. Restoration preserves the native dataframe, its dtypes,
+missing values and pandas index, along with normal wrapper method delegation.
+Previously saved wrappers that failed to load with `RecursionError` can be
+loaded with the corrected code; no artifact rewrite is required.
+
 ## Load and use
 
 ```python
@@ -81,13 +88,14 @@ print(preds)
 ## Reproducibility fingerprint
 
 `pipeline.fingerprint()` returns a deterministic SHA-256 over the pipeline's
-topology **and** its fitted artifacts:
+topology, fitted artifacts and stored decision thresholds:
 
 ```python
 print(pipeline.fingerprint())  # 64-char hex, e.g. "9f2c4e..."
 ```
 
-- Two pipelines with the same fingerprint produce the same predictions —
+- Two pipelines with the same fingerprint produce the same predictions for
+  the same prediction options —
   callers can prove "this prediction came from exactly this pipeline".
 - The digest is **semantic** (`skyulf.pipeline.seal.artifact_digest` walks
   hyperparameters + fitted weights, tree structures, tuned-model tuples,
@@ -98,6 +106,12 @@ print(pipeline.fingerprint())  # 64-char hex, e.g. "9f2c4e..."
 
 The fingerprint is also part of `export_model_card()`, alongside the
 preprocessing lineage, model params, fit metrics, and a Mermaid `diagram`.
+
+Changing saved decision thresholds changes the fingerprint even when the
+trained model weights stay the same. Threshold dictionary insertion order and
+pickle protocol do not affect it. Pipelines without saved thresholds retain
+their previous fingerprint. Recompute stored fingerprints for pipelines with
+tuned thresholds when upgrading; retraining is not required.
 
 ## Security note
 

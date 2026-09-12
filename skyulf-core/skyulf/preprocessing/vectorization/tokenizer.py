@@ -19,7 +19,14 @@ from ...core.meta.decorators import node_meta
 from ...registry import NodeRegistry
 from .._artifacts import TokenizerArtifact
 from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
-from ._common import _text_series, apply_text_dual_engine, resolve_fit_text_valid_columns
+from ._common import (
+    _drop_and_concat,
+    _drop_and_concat_polars,
+    _text_series,
+    apply_text_dual_engine,
+    resolve_fit_text_valid_columns,
+    validate_text_output_names,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +53,7 @@ def _build_analyzer(params: dict[str, Any]):
 def _tokenizer_apply_pandas(
     X: pd.DataFrame, y: Any, params: dict[str, Any]
 ) -> tuple[pd.DataFrame, Any]:
+    """Tokenize original sources before dropping them and attaching validated outputs."""
     cols: list[str] = params.get("columns", [])
     drop_original: bool = params.get("drop_original", False)
     add_token_count: bool = params.get("add_token_count", False)
@@ -55,18 +63,16 @@ def _tokenizer_apply_pandas(
         return X, y
 
     analyze = _build_analyzer(params)
-    X_out = X.copy()
+    outputs = pd.DataFrame(index=X.index)
 
     for col in valid_cols:
-        text = _text_series(X_out[col])
+        text = _text_series(X[col])
         tokens = text.map(analyze)
-        X_out[f"{col}__tokens"] = tokens.map(" ".join)  # ty: ignore[no-matching-overload]
+        outputs[f"{col}__tokens"] = tokens.map(" ".join)  # ty: ignore[no-matching-overload]
         if add_token_count:
-            X_out[f"{col}__token_count"] = tokens.map(len)
+            outputs[f"{col}__token_count"] = tokens.map(len)
 
-    if drop_original:
-        X_out = X_out.drop(columns=valid_cols)
-    return X_out, y
+    return _drop_and_concat(X, outputs, valid_cols, drop_original), y
 
 
 def _tokenizer_apply_polars(X: Any, params: dict[str, Any]) -> Any:
@@ -94,8 +100,7 @@ def _tokenizer_apply_polars(X: Any, params: dict[str, Any]) -> Any:
         if add_token_count:
             new_cols.append(pl.Series(f"{col}__token_count", [len(toks) for toks in tokens]))
 
-    X_out = X.drop(valid_cols) if drop_original else X
-    return X_out.hstack(new_cols)
+    return _drop_and_concat_polars(X, pl.DataFrame(new_cols), valid_cols, drop_original)
 
 
 class TokenizerApplier(BaseApplier):
@@ -193,4 +198,6 @@ class TokenizerCalculator(BaseCalculator):
         if valid_cols is None:
             return {}
 
-        return _build_tokenizer_artifact(config, valid_cols)
+        artifact = _build_tokenizer_artifact(config, valid_cols)
+        validate_text_output_names(X, artifact, valid_cols)
+        return artifact

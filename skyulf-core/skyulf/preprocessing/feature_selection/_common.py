@@ -52,9 +52,14 @@ _MAX_UNIQUE_VALUES_FOR_CLASSIFICATION = 10
 
 
 def _infer_problem_type(series: pd.Series) -> str:
+    """Recognize class-label dtypes before applying the numeric cardinality heuristic."""
     if series.empty:
         return "classification"
-    if pd.api.types.is_bool_dtype(series) or pd.api.types.is_object_dtype(series):
+    if (
+        pd.api.types.is_bool_dtype(series)
+        or pd.api.types.is_object_dtype(series)
+        or pd.api.types.is_string_dtype(series)
+    ):
         return "classification"
     unique_values = series.dropna().unique()
     if len(unique_values) <= _MAX_UNIQUE_VALUES_FOR_CLASSIFICATION:

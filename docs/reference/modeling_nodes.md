@@ -62,9 +62,50 @@ Seed** in each node's Cross Validation section. Full precedence rules:
 
 ## Classification
 
+Binary evaluation omits the ROC curve and ROC AUC when the held-out partition
+contains only one trained class, since ROC requires both classes. Finite
+precision-recall output and the other available metrics remain in the report.
+
+`class_weight` is applied consistently in direct training, every tuning
+strategy and final refitting. Models such as GradientBoosting and XGBoost that
+do not accept it natively receive equivalent per-row training weights.
+`"balanced"` weights are computed from each fold's training labels after
+preprocessing; validation labels do not influence them. Explicit weight
+dictionaries use the labels passed to model fitting. Estimators that support
+neither class weights nor sample weights reject an active weighting request.
+Previously affected tuned models must be retrained to apply these weights;
+existing saved models retain their predictions.
+
+### LightGBM row sampling
+
+The `lgbm_classifier` and `lgbm_regressor` nodes apply `subsample` during basic
+training, hyperparameter search and the final refit. With GBDT or DART,
+`subsample=0.4` uses 40% of the training rows per boosting iteration. The default
+`subsample=1.0` uses all rows. GOSS keeps its gradient-based sampling instead of
+ordinary row bagging, so this fraction does not control GOSS sampling.
+
+Skyulf resolves its automatic `subsample_freq=None` to 1 for ordinary boosting
+and 0 for GOSS after each candidate's parameters are applied. Explicit numeric
+frequencies and LightGBM's `bagging_freq` alias are preserved; `subsample_freq=0`
+disables row bagging. Explicit combinations that LightGBM rejects, such as GOSS
+with ordinary bagging enabled, continue to raise an error.
+
+Previously the default frequency was 0, so changing `subsample` had no effect.
+Existing fitted models retain their predictions. Retrain or rerun tuning to
+apply a previously ignored fraction. To reproduce the previous sampling policy
+in a new fit, set `subsample_freq=0` explicitly.
+
 ### logistic_regression
 
 Backed by `sklearn.linear_model.LogisticRegression`.
+
+With `penalty="elasticnet"` and `solver="saga"`, an omitted or null
+`l1_ratio` resolves to `0.5`. Explicit numeric ratios, including `0` and `1`,
+are preserved. The same default applies during all five tuning strategies,
+fold preprocessing and final refitting. Search results record the resolved
+ratio. Search Elastic Net separately from other penalties when its ratio is
+unspecified; such mixed searches now raise a clear error. Retrain affected
+models or rerun tuning to replace an earlier unintended L2 fit.
 
 Defaults:
 
@@ -75,6 +116,31 @@ Defaults:
 Learned params:
 
 - fitted sklearn estimator (stored in-memory and pickled when saving the pipeline)
+
+### calibrated_classifier
+
+Calibrates a selected base classifier using sigmoid or isotonic calibration.
+Defaults are `base_estimator="logistic_regression"`, `method="sigmoid"` and
+`cv=5`. Other base choices are `random_forest`, `gradient_boosting`,
+`decision_tree`, `gaussian_nb` and `svc`.
+
+In advanced mode, Base Estimator is a search choice. For example,
+`"search_space": {"base_estimator": ["random_forest"], "method": ["isotonic"],
+"cv": [3]}` tunes a calibrated random forest. Selecting multiple bases compares
+those classifier families. All five search strategies preserve this choice
+during trials and the final refit, including with preprocessing fitted inside
+each fold. The winning parameters retain the selected base name in reports.
+
+`random_state` controls randomness in base estimators that support it, including
+the models fitted inside calibration folds. It defaults to 42, accepts 0, and
+can be set to `None` (`null` in JSON) for unseeded fitting. It also applies during
+tuning and the final model refit. Deterministic estimators such as Gaussian
+Naive Bayes are unaffected. An integer `cv` retains unshuffled calibration
+folds; this seed does not change those splits.
+
+For example, `{"base_estimator": "random_forest", "random_state": 7}` now
+seeds the calibrated forest with 7. Previously the forest always used 42.
+Existing fitted models retain their predictions; retrain to apply the setting.
 
 ### random_forest_classifier
 
@@ -342,6 +408,14 @@ When an ensemble runs in **Advanced/Tuning mode** (`run_mode: "advanced"`), it i
 - Recommended outer search strategies: `optuna` or `halving_random`.
 - **Cost warning:** Stacking `cv` × outer search = nested cross-validation (outer folds × stacking `cv` × trials × base models). Keep stacking `cv` small (e.g. `3`) or reduce trials when also running an outer search.
 
+When base-model calibration is enabled, nested tuned keys address the completed
+calibration wrapper. For example, `logistic_regression__estimator__C=0.01`
+sets the underlying classifier's regularization, while
+`logistic_regression__method="isotonic"` sets its calibration method. These
+selected values remain in effect during calculator refits and post-tuning
+cross-validation. Fixed `base_estimator_params` still configure the underlying
+base model before calibration.
+
 ### Merge Strategy & Canvas Wiring
 
 The **Ensemble Node** behaves differently from ordinary fan-in on the canvas:
@@ -395,6 +469,13 @@ Config:
 Learned params:
 
 - a tuple `(best_model, tuning_result)` where `best_model` is a fitted estimator.
+
+`pr_auc_weighted` matches probability columns to the fitted model's classes,
+even when a validation partition omits a trained class. Multiclass `pr_auc`
+also resolves to this scorer. Multiclass scores use support-weighted average
+precision; binary `pr_auc_weighted` uses the model's second class as positive.
+A binary holdout without positive examples therefore scores 0, rather than
+changing which class is positive.
 
 ## Cross-validation
 

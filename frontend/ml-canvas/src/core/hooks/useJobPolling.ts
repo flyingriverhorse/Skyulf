@@ -138,12 +138,6 @@ export function useJobPolling(
   const idsRef = useRef<readonly string[]>(jobIds);
   idsRef.current = jobIds;
 
-  // Consecutive-failure counter per job id, so a persistently-erroring
-  // fetch can eventually be given up on (see MAX_CONSECUTIVE_FETCH_FAILURES
-  // above) instead of blocking `stopOnTerminal` forever. Reset whenever
-  // `jobIds` changes (new poll target set) via the idsKey-keyed effect below.
-  const failureCountsRef = useRef<Record<string, number>>({});
-
   useEffect(() => {
     if (idsRef.current.length === 0) {
       setJobs({});
@@ -152,47 +146,67 @@ export function useJobPolling(
       return undefined;
     }
 
-    // Fresh failure counters for this poll target set.
-    failureCountsRef.current = {};
-
+    const ids = idsRef.current;
+    const failureCounts: Record<string, number> = {};
+    let requestGeneration = 0;
+    let appliedGeneration = 0;
     let cancelled = false;
+    let stopped = false;
     let interval: ReturnType<typeof setInterval> | null = null;
+    let refreshTimer: ReturnType<typeof setTimeout> | null = null;
+
+    // Compare completed requests so slow APIs can still publish while a newer
+    // request is pending. A stopped or retired polling lifetime accepts none.
+    const isObsolete = (generation: number): boolean =>
+      cancelled || stopped || generation < appliedGeneration;
+
+    /** Terminal results also retire queued refreshes and socket-driven restarts. */
+    const stopPolling = (): void => {
+      stopped = true;
+      if (interval) clearInterval(interval);
+      if (refreshTimer) clearTimeout(refreshTimer);
+      interval = null;
+      refreshTimer = null;
+      setIsPolling(false);
+    };
 
     const fetchAll = async (): Promise<void> => {
-      const ids = idsRef.current;
+      if (cancelled || stopped) return;
+      const generation = ++requestGeneration;
       try {
         const results = await Promise.all(
           ids.map(async (id) => {
             try {
-              const job = await jobsApi.getJob(id);
-              failureCountsRef.current[id] = 0;
-              return job;
+              return await jobsApi.getJob(id);
             } catch (err) {
               console.error('useJobPolling: fetch failed', id, err);
-              failureCountsRef.current[id] = (failureCountsRef.current[id] ?? 0) + 1;
               return null;
             }
           }),
         );
-        if (cancelled) return;
+        if (isObsolete(generation)) return;
+        appliedGeneration = generation;
 
-        const summary = summarizeJobs(ids, results, failureCountsRef.current);
+        results.forEach((result, i) => {
+          const id = ids[i]!;
+          failureCounts[id] = result ? 0 : (failureCounts[id] ?? 0) + 1;
+        });
+        const summary = summarizeJobs(ids, results, failureCounts);
         setJobs(summary.jobs);
         setAggregateStatus(aggregateJobStatus(summary));
 
-        if (stopOnTerminal && summary.allTerminal && interval) {
-          clearInterval(interval);
-          interval = null;
-          setIsPolling(false);
-        }
+        if (stopOnTerminal && summary.allTerminal) stopPolling();
       } catch (err) {
-        if (!cancelled) {
+        if (!isObsolete(generation)) {
+          appliedGeneration = generation;
           console.error('useJobPolling: unexpected error', err);
           setAggregateStatus('error');
         }
       }
     };
 
+    setJobs({});
+    setAggregateStatus('running');
     setIsPolling(true);
     if (!skipInitialFetch) void fetchAll();
 
@@ -200,10 +214,9 @@ export function useJobPolling(
     // it matches one we're tracking we trigger an immediate (debounced)
     // refetch so the UI converges in ~250 ms instead of waiting for
     // the next interval tick.
-    let refreshTimer: ReturnType<typeof setTimeout> | null = null;
     let wsConnected = false;
     const scheduleRefresh = (): void => {
-      if (refreshTimer) return;
+      if (cancelled || stopped || refreshTimer) return;
       refreshTimer = setTimeout(() => {
         refreshTimer = null;
         void fetchAll();
@@ -211,12 +224,13 @@ export function useJobPolling(
     };
 
     const startInterval = (ms: number): void => {
+      if (cancelled || stopped) return;
       if (interval) clearInterval(interval);
       interval = setInterval(() => { void fetchAll(); }, ms);
     };
 
     const unsubscribeWs = jobEventsSocket.subscribe((evt) => {
-      if (idsRef.current.includes(evt.job_id)) scheduleRefresh();
+      if (ids.includes(evt.job_id)) scheduleRefresh();
     });
     const unsubscribeStatus = jobEventsSocket.onStatus((connected) => {
       if (connected === wsConnected) return;
@@ -226,7 +240,7 @@ export function useJobPolling(
       if (connected) scheduleRefresh();
     });
 
-    startInterval(intervalMs);
+    startInterval(wsConnected ? SAFETY_NET_INTERVAL_MS : intervalMs);
 
     return () => {
       cancelled = true;

@@ -1,7 +1,10 @@
 """Tests for skyulf.profiling._analyzer.multivariate.MultivariateMixin."""
 
+import json
+
 import numpy as np
 import polars as pl
+import pytest
 from tests.utils.dataset_loader import load_sample_dataset
 
 from skyulf.profiling._analyzer import multivariate as multivariate_mod
@@ -139,6 +142,41 @@ def test_calculate_pca_happy_path() -> None:
     assert len(components) == 3
     assert all(p.z is not None for p in points)
     assert all(p.label in ("x", "y") for p in points)
+
+
+@pytest.mark.parametrize("missing", [False, True], ids=["constant", "imputed-constant"])
+def test_public_profile_omits_pca_without_feature_variation(missing: bool) -> None:
+    """Undefined explained variance must not break strict JSON or imply useful components."""
+    x = [1.0] * 10
+    z = [2.0] * 10
+    if missing:
+        x[0] = float("nan")
+        z[1] = float("nan")
+    frame = pl.DataFrame({"x": x, "z": z})
+    original = frame.clone()
+
+    profile = EDAAnalyzer(frame).analyze()
+    payload = json.loads(json.dumps(profile.model_dump(mode="json"), allow_nan=False))
+
+    assert payload["pca_data"] is None
+    assert payload["pca_components"] is None
+    assert payload["row_count"] == 10
+    assert frame.equals(original)
+
+
+def test_public_profile_retains_pca_with_one_varying_feature() -> None:
+    """A constant companion column must not hide the variance in a useful numeric feature."""
+    frame = pl.DataFrame({"x": list(range(10)), "z": [2] * 10})
+
+    profile = EDAAnalyzer(frame).analyze()
+    payload = json.loads(json.dumps(profile.model_dump(mode="json"), allow_nan=False))
+
+    assert payload["pca_data"] is not None
+    assert len(payload["pca_data"]) == 10
+    assert [component["explained_variance_ratio"] for component in payload["pca_components"]] == (
+        pytest.approx([1.0, 0.0])
+    )
+    assert len({point["x"] for point in payload["pca_data"]}) == 10
 
 
 def test_calculate_pca_pads_when_fewer_than_three_components(monkeypatch) -> None:

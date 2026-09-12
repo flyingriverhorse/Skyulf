@@ -1,5 +1,6 @@
 """Invalid-value replacement node."""
 
+from collections.abc import Mapping
 from typing import Any
 
 import numpy as np
@@ -107,19 +108,59 @@ def _normalize_rule(
     return _RULE_ALIASES.get(raw_rule, raw_rule), min_value, max_value  # ty: ignore[no-matching-overload]
 
 
+def _has_numeric_operation(params: Mapping[str, Any]) -> bool:
+    """Identify rules and infinity flags that actually compare numeric values."""
+    rule = params.get("rule")
+    return bool(
+        params.get("replace_inf")
+        or params.get("replace_neg_inf")
+        or rule in ("negative", "negative_to_nan", "zero")
+        or (
+            rule == "custom_range"
+            and (params.get("min_value") is not None or params.get("max_value") is not None)
+        )
+    )
+
+
+def _numeric_columns(X: Any) -> list[str]:
+    """Find numeric columns without treating pandas durations as raw nanoseconds."""
+    return [
+        col for col in _auto_detect_numeric_columns(X) if getattr(X[col].dtype, "kind", None) != "m"
+    ]
+
+
+def _validate_numeric_columns(X: Any, columns: list[str]) -> None:
+    """Reject nonnumeric selections before either engine can coerce their values."""
+    if not columns:
+        return
+    numeric = set(_numeric_columns(X))
+    non_numeric = [col for col in columns if col not in numeric]
+    if non_numeric:
+        raise ValueError(
+            "InvalidValueReplacement requires numeric columns; "
+            f"non-numeric columns: {non_numeric}. "
+            "Convert these columns to a numeric type before applying numeric rules."
+        )
+
+
 class InvalidValueReplacementApplier(BaseApplier):
     """Replace values violating the configured rule — and optionally ±inf — with a sentinel.
 
     The pandas and polars paths must agree value-for-value: ``inf``/``-inf``
     are replaced first when flagged, then the rule (``negative``, ``zero`` or
     ``custom_range``, which honours a single bound when only one is given). A
-    column with neither a rule nor an inf flag configured is skipped outright,
-    so its values and dtype survive untouched.
+    configuration without an effective rule or an inf flag is skipped outright,
+    so its values and dtype survive untouched. Active operations require numeric
+    columns on both engines; text must be explicitly converted before this node.
+    Infinity-only cleanup preserves integer values and dtypes: integers cannot
+    contain infinities and must not be widened to a floating-point sentinel.
     """
 
     @apply_method
     def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
         """Dispatch the rule to the pandas or polars path; ``y`` passes through."""
+        if _has_numeric_operation(params):
+            _validate_numeric_columns(X, resolve_valid_columns(X, params.get("columns", [])))
         return apply_dual_engine(
             X, params, {"polars": self._apply_polars, "pandas": self._apply_pandas}
         )
@@ -127,7 +168,7 @@ class InvalidValueReplacementApplier(BaseApplier):
     @staticmethod
     def _apply_polars(X: Any, _y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
         valid = resolve_valid_columns(X, params.get("columns", []))
-        if not valid:
+        if not valid or not _has_numeric_operation(params):
             return X, _y
 
         replace_inf = params.get("replace_inf", False)
@@ -140,9 +181,10 @@ class InvalidValueReplacementApplier(BaseApplier):
         exprs = []
         for col in valid:
             expr = pl.col(col)
-            expr = _invalid_inf_replacement_polars(
-                expr, replace_inf, replace_neg_inf, final_replacement
-            )
+            if not X[col].dtype.is_integer():
+                expr = _invalid_inf_replacement_polars(
+                    expr, replace_inf, replace_neg_inf, final_replacement
+                )
             expr = _invalid_rule_polars(expr, rule, final_replacement, min_value, max_value)
             exprs.append(expr.alias(col))
         return X.with_columns(exprs), _y
@@ -158,7 +200,7 @@ class InvalidValueReplacementApplier(BaseApplier):
         min_value: Any,
         max_value: Any,
     ) -> None:
-        """Coerce, replace inf/-inf, and apply the invalid-value rule for a single column in-place."""
+        """Normalize numeric data, replace infinities, and apply a rule in-place."""
         to_replace = []
         if replace_inf:
             to_replace.append(np.inf)
@@ -181,7 +223,7 @@ class InvalidValueReplacementApplier(BaseApplier):
     @staticmethod
     def _apply_pandas(X: Any, _y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
         valid = resolve_valid_columns(X, params.get("columns", []))
-        if not valid:
+        if not valid or not _has_numeric_operation(params):
             return X, _y
 
         replace_inf = params.get("replace_inf", False)
@@ -234,16 +276,18 @@ class InvalidValueReplacementCalculator(BaseCalculator):
         rather than in each engine: ``percentage_bounds``/``age_bounds`` become
         a ``custom_range`` carrying their default bounds unless the user
         overrode them, and ``zero_to_nan`` becomes ``zero``.
+        Active rules reject nonnumeric selected columns with ``ValueError``;
+        the applier repeats this check when inference data changes dtype.
         """
         if user_picked_no_columns(config):
             return {}
-        cols = resolve_columns(X, config, _auto_detect_numeric_columns)
+        cols = resolve_columns(X, config, _numeric_columns)
         rule, min_value, max_value = _normalize_rule(
             config.get("rule") or config.get("mode"),
             config.get("min_value"),
             config.get("max_value"),
         )
-        return {
+        params: InvalidValueReplacementArtifact = {
             "type": "invalid_value_replacement",
             "columns": cols,
             "replace_inf": config.get("replace_inf", False),
@@ -254,3 +298,6 @@ class InvalidValueReplacementCalculator(BaseCalculator):
             "min_value": min_value,
             "max_value": max_value,
         }
+        if _has_numeric_operation(params):
+            _validate_numeric_columns(X, cols)
+        return params

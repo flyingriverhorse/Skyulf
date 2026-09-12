@@ -162,6 +162,14 @@ policy for both engines.
 ### OC-18
 ### 🟡 Medium — One-hot/dummy generated names can collide with existing columns
 
+**Fixed 2026-09-12:** one-hot, dummy, missing-indicator and multiclass target
+encoding now reject duplicate generated names and collisions with retained
+inputs at fit/apply, including cross-fitted target-encoder training and legacy
+artifacts. Names belonging only to dropped sources remain available; output
+assembly now preserves their generated values and reads original source data.
+The dedicated native/wrapper regressions changed from 78 failed / 46 passed to
+124 passed. Historical reproduction follows.
+
 **Files:** `preprocessing/encoding/one_hot.py:68-92`, `dummy.py:76-99`
 
 Generated names such as `city_a` are never checked against existing columns.

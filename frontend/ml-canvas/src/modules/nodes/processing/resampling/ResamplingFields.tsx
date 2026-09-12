@@ -113,7 +113,7 @@ export function MethodSettings(props: FieldProps) {
 /** Shared neighborhood controls for synthetic minority-sampling methods. */
 function OversamplingSettings({ config, handleChange }: FieldProps) {
   return <>
-    {['smote', 'adasyn', 'borderline_smote', 'svm_smote', 'kmeans_smote'].includes(config.method) && (
+    {['smote', 'adasyn', 'borderline_smote', 'svm_smote', 'kmeans_smote', 'smote_tomek'].includes(config.method) && (
       <div className="space-y-2">
         <span className="text-sm font-medium text-gray-700 dark:text-gray-300">k Neighbors</span>
         <ValidationField field="k_neighbors">

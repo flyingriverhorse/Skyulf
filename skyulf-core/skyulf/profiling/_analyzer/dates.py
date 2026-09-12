@@ -19,7 +19,9 @@ class DatesMixin(_AnalyzerState):
         Uses the column name as a cheap pre-filter (avoids parsing every utf8
         column), then tries generic ISO parsing and a handful of common formats,
         keeping whichever yields the most distinct months (a proxy for "this
-        actually parsed something meaningful").
+        actually parsed something meaningful"). The selected parser must accept
+        every non-null value in the full column; otherwise, the original strings
+        are retained so parse failures cannot become missing data.
         """
         for col in self.df.columns:  # type: ignore[attr-defined]
             if self.df[col].dtype not in [pl.Utf8, pl.String]:  # type: ignore[attr-defined]
@@ -143,29 +145,37 @@ class DatesMixin(_AnalyzerState):
     def _apply_date_cast(
         self, col: str, best_parsed: tuple[str | None, str], best_method_name: str
     ) -> None:
-        """Cast ``col`` in ``self.df`` in place using the winning parse method."""
+        """Apply the winning parser only when every observed value can be parsed."""
         fmt, method = best_parsed
         try:
             if method == "datetime_generic":
                 self.df = self.df.with_columns(  # type: ignore[attr-defined]
-                    pl.col(col).str.to_datetime(strict=False).alias(col)
+                    pl.col(col).str.to_datetime(strict=True).alias(col)
                 )
             elif method == "date_generic":
                 self.df = self.df.with_columns(  # type: ignore[attr-defined]
-                    pl.col(col).str.to_date(strict=False).alias(col)
+                    pl.col(col).str.to_date(strict=True).alias(col)
                 )
             elif method == "datetime_format":
                 self.df = self.df.with_columns(  # type: ignore[attr-defined]
-                    pl.col(col).str.to_datetime(format=fmt, strict=False).alias(col)
+                    pl.col(col).str.to_datetime(format=fmt, strict=True).alias(col)
                 )
         except Exception as e:  # noqa: BLE001 - parse-method cast failure is logged; column left unparsed
-            logger.warning(f"Failed to cast column {col} using {best_method_name}: {e}")
+            logger.warning(
+                f"Failed to cast column {col} using {best_method_name}; "
+                f"keeping original strings: {e}"
+            )
 
     def _analyze_date(self, col: str, row: dict) -> DateStats:
+        """Summarize temporal bounds without stringifying absent extrema."""
         min_date = row.get(f"{col}__min")
         max_date = row.get(f"{col}__max")
         duration = None
         if min_date and max_date:
             delta = max_date - min_date
             duration = delta.days if hasattr(delta, "days") else None
-        return DateStats(min_date=str(min_date), max_date=str(max_date), duration_days=duration)
+        return DateStats(
+            min_date=str(min_date) if min_date is not None else None,
+            max_date=str(max_date) if max_date is not None else None,
+            duration_days=duration,
+        )

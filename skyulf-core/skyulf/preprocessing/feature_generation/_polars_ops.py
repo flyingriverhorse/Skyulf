@@ -13,6 +13,7 @@ from ._common import (
     TIME_OF_DAY_BUCKETS,
     TIME_OF_DAY_DEFAULT,
     _compute_similarity_score,
+    _resolve_datetime_output_col,
     _resolve_group_agg_cols,
     _resolve_output_col,
     _resolve_similarity_pair,
@@ -22,11 +23,12 @@ logger = logging.getLogger(__name__)
 
 
 def _polars_arith_terms(op: dict[str, Any], existing: list[str]) -> tuple[list[Any], list[float]]:
+    """Build numeric operands with the same null and NaN replacement as pandas."""
     valid = [
         c for c in op.get("input_columns", []) + op.get("secondary_columns", []) if c in existing
     ]
     fill_val = op.get("fillna") if op.get("fillna") is not None else 0
-    col_exprs = [pl.col(c).cast(pl.Float64).fill_null(fill_val) for c in valid]
+    col_exprs = [pl.col(c).cast(pl.Float64).fill_nan(fill_val).fill_null(fill_val) for c in valid]
     const_vals = [float(c) for c in op.get("constants", [])]
     return col_exprs, const_vals
 
@@ -181,23 +183,26 @@ def _register_polars_dt() -> None:
     )
 
 
-def _build_polars_dt_exprs(col: str, base_dt: Any, features: list[str]) -> list[Any]:
+def _build_polars_dt_exprs(
+    op: dict[str, Any], col: str, base_dt: Any, existing: list[str], allow_overwrite: bool
+) -> list[Any]:
     """Return the per-feature Polars expressions for one datetime column."""
-    exprs: list[Any] = []
-    for feat in features:
+    exprs: dict[str, Any] = {}
+    for feat in op.get("datetime_features", []):
         builder = _POLARS_DT_FEATURES.get(feat)
         if builder is not None:
-            exprs.append(builder(base_dt).alias(f"{col}_{feat}"))
-    return exprs
+            output_col = _resolve_datetime_output_col(op, col, feat, existing, allow_overwrite)
+            exprs[output_col] = builder(base_dt).alias(output_col)
+            existing.append(output_col)
+    return list(exprs.values())
 
 
-def _polars_datetime_apply(op: dict[str, Any], X_out: Any) -> Any:
+def _polars_datetime_apply(op: dict[str, Any], X_out: Any, allow_overwrite: bool = False) -> Any:
     """Materialise datetime-extract feature columns onto ``X_out`` (Polars)."""
     if not _POLARS_DT_FEATURES:
         _register_polars_dt()
 
     valid = [c for c in op.get("input_columns", []) if c in X_out.columns]
-    features = op.get("datetime_features", [])
     for col in valid:
         try:
             base_dt = pl.col(col)
@@ -207,7 +212,9 @@ def _polars_datetime_apply(op: dict[str, Any], X_out: Any) -> Any:
                 )
             elif X_out.schema[col] == pl.Null:
                 base_dt = base_dt.cast(pl.Datetime)
-            col_exprs = _build_polars_dt_exprs(col, base_dt, features)
+            col_exprs = _build_polars_dt_exprs(
+                op, col, base_dt, list(X_out.columns), allow_overwrite
+            )
             if col_exprs:
                 X_out = X_out.with_columns(col_exprs)
         except Exception as e:  # noqa: BLE001 - per-column datetime feature failure is logged and skipped
@@ -284,7 +291,7 @@ def _featgen_apply_polars(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, 
         op_type = op.get("operation_type", "arithmetic")
         try:
             if op_type == "datetime_extract":
-                X_out = _polars_datetime_apply(op, X_out)
+                X_out = _polars_datetime_apply(op, X_out, allow_overwrite)
                 continue
             handler = _POLARS_OP_HANDLERS.get(op_type)
             if handler is None:

@@ -169,7 +169,7 @@ const validate = (data: ResamplingConfig): ValidationResult => {
   }
 
   if (data.type === 'oversampling') {
-    if (['smote', 'adasyn', 'borderline_smote', 'svm_smote', 'kmeans_smote'].includes(data.method)) {
+    if (['smote', 'adasyn', 'borderline_smote', 'svm_smote', 'kmeans_smote', 'smote_tomek'].includes(data.method)) {
        if ((data.k_neighbors ?? 5) < 1) {
            return { isValid: false, field: 'k_neighbors', message: 'k_neighbors must be at least 1.' };
        }

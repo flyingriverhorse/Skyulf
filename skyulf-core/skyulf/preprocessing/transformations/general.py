@@ -164,6 +164,28 @@ def _fit_power_for_column(
     return fitted
 
 
+def _fit_transformation_rule(
+    X: Any, col: str, item: dict[str, Any], is_polars: bool
+) -> dict[str, Any] | None:
+    """Fit one ordered rule, omitting power transforms that cannot fit its current input."""
+    method = item.get("method")
+    fitted_item: dict[str, Any] = {"column": col, "method": method}
+    if method not in _POWER_METHODS:
+        return fitted_item
+
+    try:
+        extras = _fit_power_for_column(
+            X, col, method, is_polars, standardize=item.get("standardize", True)
+        )
+    except Exception as e:  # noqa: BLE001 - per-column fit failure is logged; column skipped
+        logger.warning(f"Failed to fit {method} for column {col}: {e}")
+        return None
+    if not extras:
+        return None  # Box-Cox skipped on non-positive data.
+    fitted_item.update(extras)
+    return fitted_item
+
+
 @NodeRegistry.register("GeneralTransformation", GeneralTransformationApplier)
 @node_meta(
     id="GeneralTransformation",
@@ -176,6 +198,8 @@ def _fit_power_for_column(
 class GeneralTransformationCalculator(BaseCalculator):
     """Resolve configured transformations, fitting lambdas for the power methods.
 
+    Rules run in list order. Each power rule is fitted on the training values
+    produced by earlier rules on the same column, matching artifact replay.
     Each power rule accepts ``standardize`` (default ``True``). Set it to
     ``False`` to apply only the fitted Box-Cox or Yeo-Johnson transform.
     The artifact retains the choice for subsequent transforms.
@@ -203,37 +227,41 @@ class GeneralTransformationCalculator(BaseCalculator):
 
     @fit_method
     def fit(self, X: Any, _y: Any, config: dict[str, Any]) -> GeneralTransformationArtifact:  # pylint: disable=arguments-differ
-        """Fit per-column power lambdas; pass simple ops through as configured.
+        """Fit power lambdas in rule order; retain simple ops in the artifact.
 
-        Box-Cox is skipped (with a warning) for columns holding non-positive
-        values, and a per-column fit failure logs and skips that column.
+        Box-Cox is skipped (with a warning) for non-positive values at that
+        point in the rule sequence. A fit failure logs and skips that rule.
         """
         # Config: {'transformations': [{'column': 'col1', 'method': 'log'},
         #                              {'column': 'col2', 'method': 'yeo-johnson'}]}
         is_polars = get_engine(X).name == EngineName.POLARS
         fitted_transformations: list[dict[str, Any]] = []
+        transformations = config.get("transformations", [])
+        last_power_rule = {
+            item.get("column"): index
+            for index, item in enumerate(transformations)
+            if item.get("method") in _POWER_METHODS
+        }
+        working_X = X
+        applier = GeneralTransformationApplier()
 
-        for item in config.get("transformations", []):
+        for index, item in enumerate(transformations):
             col = item.get("column")
-            method = item.get("method")
             if col not in X.columns:
                 continue
 
-            fitted_item: dict[str, Any] = {"column": col, "method": method}
-
-            if method in _POWER_METHODS:
-                try:
-                    extras = _fit_power_for_column(
-                        X, col, method, is_polars, standardize=item.get("standardize", True)
-                    )
-                except Exception as e:  # noqa: BLE001 - per-column fit failure is logged; column skipped
-                    logger.warning(f"Failed to fit {method} for column {col}: {e}")
-                    continue
-                if not extras:
-                    continue  # box-cox skipped on non-positive data
-                fitted_item.update(extras)
+            fitted_item = _fit_transformation_rule(working_X, col, item, is_polars)
+            if fitted_item is None:
+                continue
 
             fitted_transformations.append(fitted_item)
+            # Only materialize rules whose output is needed by a later fit.
+            # Reuse replay semantics without mutating the caller's training data.
+            if index < last_power_rule.get(col, -1):
+                # apply_method exposes the public (data, params) call signature.
+                working_X = applier.apply(  # pylint: disable=no-value-for-parameter
+                    working_X, {"transformations": [fitted_item]}
+                )
 
         return {
             "type": "general_transformation",

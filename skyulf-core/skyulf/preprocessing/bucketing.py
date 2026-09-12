@@ -21,14 +21,60 @@ from ..registry import NodeRegistry
 from ..types import DEFAULT_RANDOM_STATE
 from ..utils import (
     detect_numeric_columns,
+    is_decimal_series,
     user_picked_no_columns,
 )
 from ._artifacts import GeneralBinningArtifact
 from ._helpers import resolve_columns_then_to_pandas
+from ._output_names import validate_generated_column_names
 from .base import BaseApplier, BaseCalculator, apply_method, fit_method
 from .dispatcher import apply_dual_engine
 
 logger = logging.getLogger(__name__)
+
+
+def _validate_binning_artifact(input_columns: Any, params: dict[str, Any]) -> None:
+    """Reject ambiguous labels and output names before fitting or applying bins."""
+    active_columns = []
+    for col, edges in params.get("bin_edges", {}).items():
+        if col not in input_columns:
+            continue
+        unique_edges = set(edges)
+        labels = params.get("custom_labels", {}).get(col)
+        if len(unique_edges) != len(edges) and labels and len(labels) != len(unique_edges) - 1:
+            raise ValueError(
+                f"Bucketing: column {col!r} custom labels must match the "
+                f"{len(unique_edges) - 1} intervals between unique bin edges. "
+                "Remove labels for zero-width bins or supply distinct edges."
+            )
+        if len(unique_edges) >= 2:
+            active_columns.append(col)
+    suffix = params.get("output_suffix", "_binned")
+    dropped = active_columns if params.get("drop_original", False) else []
+    validate_generated_column_names(
+        input_columns,
+        (f"{col}{suffix}" for col in active_columns),
+        dropped_columns=dropped,
+        node_name="Bucketing",
+    )
+
+
+def _store_range_labels(artifact: dict[str, Any]) -> None:
+    """Persist canonical range keys without changing legacy artifact rendering."""
+    if artifact.get("label_format") != "range":
+        return
+    range_labels = {}
+    for col, edges in artifact["bin_edges"].items():
+        unique_edges = [float(edge) for edge in sorted(set(edges))]
+        if len(unique_edges) < 2:
+            continue
+        labels = _range_edge_labels(unique_edges, artifact["include_lowest"], artifact["precision"])
+        if len(set(labels)) != len(labels):
+            # Display rounding must not merge categories for distinct bins.
+            labels = _range_edge_labels(unique_edges, artifact["include_lowest"], None)
+        range_labels[col] = labels
+    artifact["range_labels"] = range_labels
+
 
 # -----------------------------------------------------------------------------
 # Polars apply
@@ -52,19 +98,21 @@ def _polars_cut_expr(col: str, sorted_edges: list[float], labels: Any, include_l
 
 
 def _range_edge_labels(
-    sorted_edges: list[float], include_lowest: bool, precision: int
+    sorted_edges: list[float], include_lowest: bool, precision: int | None
 ) -> list[str]:
-    """Build pandas-style ``'[a, b]'``/``'(a, b]'`` range labels directly from bin edges.
+    """Build ``'[a, b]'``/``'(a, b]'`` range labels directly from bin edges.
 
-    Mirrors the pandas apply path (:func:`_format_one_interval`): the same
-    bracket character is used for every bin, chosen by ``include_lowest``, so
-    the label text is identical across engines for the same fitted edges.
+    New fits normalize numeric edges before persisting these keys. Legacy
+    Polars artifacts retain the original edge types and rendering. A ``None``
+    precision preserves exact edge text when rounding would merge labels.
     """
     bracket_l = "[" if include_lowest else "("
     labels = []
     for i in range(len(sorted_edges) - 1):
-        l_val = round(sorted_edges[i], precision)
-        r_val = round(sorted_edges[i + 1], precision)
+        l_val = round(sorted_edges[i], precision) if precision is not None else sorted_edges[i]
+        r_val = (
+            round(sorted_edges[i + 1], precision) if precision is not None else sorted_edges[i + 1]
+        )
         labels.append(f"{bracket_l}{l_val}, {r_val}]")
     return labels
 
@@ -77,6 +125,7 @@ def _polars_one_col_expr(
     custom_labels_map: dict[str, Any],
     include_lowest: bool,
     precision: int,
+    range_labels: Any,
 ) -> Any:
     """Build the polars cut-expression for a single column, or ``None`` if degenerate."""
     sorted_edges = sorted(set(edges))
@@ -89,9 +138,8 @@ def _polars_one_col_expr(
     )
     labels = col_custom_labels if has_valid_custom_labels else None
     if labels is None and label_format == "range":
-        # Reconstruct the same bracket-string labels pandas produces, instead
-        # of relying on pl.cut()'s own default interval-label text.
-        labels = _range_edge_labels(sorted_edges, include_lowest, precision)
+        # Reuse fitted category keys; old artifacts retain their edge rendering.
+        labels = range_labels or _range_edge_labels(sorted_edges, include_lowest, precision)
 
     cut_expr = _polars_cut_expr(col, sorted_edges, labels, include_lowest)
     target_col_name = f"{col}{output_suffix}"
@@ -111,6 +159,8 @@ def _build_polars_exprs(X: Any, params: dict[str, Any]) -> tuple[list[Any], list
     custom_labels_map = params.get("custom_labels", {})
     include_lowest = params.get("include_lowest", True)
     precision = params.get("precision", 3)
+    missing_strategy = params.get("missing_strategy", "keep")
+    missing_label = params.get("missing_label", "Missing")
 
     exprs: list[Any] = []
     cols_to_drop: list[str] = []
@@ -125,8 +175,13 @@ def _build_polars_exprs(X: Any, params: dict[str, Any]) -> tuple[list[Any], list
             custom_labels_map,
             include_lowest,
             precision,
+            params.get("range_labels", {}).get(col),
         )
         if expr is not None:
+            if missing_strategy == "label":
+                # Polars needs one dtype for bin values and a string sentinel.
+                # Widen even complete batches so train/heldout schemas agree.
+                expr = expr.cast(pl.String).fill_null(missing_label)
             exprs.append(expr)
             if drop_original:
                 cols_to_drop.append(col)
@@ -136,11 +191,13 @@ def _build_polars_exprs(X: Any, params: dict[str, Any]) -> tuple[list[Any], list
 def _bucketing_apply_polars(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
     if not params.get("bin_edges"):
         return X, y
+    _validate_binning_artifact(X.columns, params)
     exprs, cols_to_drop = _build_polars_exprs(X, params)
-    X_out = X.with_columns(exprs) if exprs else X
-    if cols_to_drop:
-        X_out = X_out.drop(cols_to_drop)
-    return X_out, y
+    if not exprs:
+        return X, y
+    binned = X.select(exprs)
+    retained = X.drop(cols_to_drop) if cols_to_drop else X
+    return (retained.hstack(binned) if retained.width else binned), y
 
 
 # -----------------------------------------------------------------------------
@@ -224,7 +281,12 @@ def _bin_one_column_pandas(
     missing_strategy = params.get("missing_strategy", "keep")
     missing_label = params.get("missing_label", "Missing")
 
-    labels = _resolve_pandas_labels(label_format, edges, custom_labels)
+    labels = _resolve_pandas_labels(label_format, sorted_edges, custom_labels)
+    range_labels = params.get("range_labels", {}).get(series.name)
+    if labels is None and range_labels:
+        labels = range_labels
+    if is_decimal_series(series):
+        series = pd.to_numeric(series)
     binned = pd.cut(series, bins=sorted_edges, labels=labels, include_lowest=include_lowest)
 
     binned = _apply_missing_strategy(binned, missing_strategy, missing_label)
@@ -232,6 +294,8 @@ def _bin_one_column_pandas(
         binned = _format_intervals_to_strings(
             binned, sorted_edges, include_lowest, precision, missing_strategy
         )
+    elif label_format == "range" and labels is range_labels:
+        binned = binned.astype(object)
     return binned
 
 
@@ -239,22 +303,23 @@ def _bucketing_apply_pandas(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any
     bin_edges_map = params.get("bin_edges", {})
     if not bin_edges_map:
         return X, y
+    _validate_binning_artifact(X.columns, params)
 
     output_suffix = params.get("output_suffix", "_binned")
     drop_original = params.get("drop_original", False)
     custom_labels_map = params.get("custom_labels", {})
 
-    df_out = X.copy()
+    binned_columns: dict[str, pd.Series] = {}
     processed_cols: list[str] = []
 
     for col, edges in bin_edges_map.items():
-        if col not in df_out.columns:
+        if col not in X.columns:
             continue
         try:
             binned_series = _bin_one_column_pandas(
-                df_out[col], edges, params, custom_labels_map.get(col)
+                X[col], edges, params, custom_labels_map.get(col)
             )
-            df_out[f"{col}{output_suffix}"] = binned_series
+            binned_columns[f"{col}{output_suffix}"] = binned_series
             processed_cols.append(col)
         except Exception:  # noqa: BLE001 - per-column bin failure is logged and column left unbinned
             # Skip columns that fail (e.g. degenerate edges, dtype mismatch),
@@ -266,8 +331,13 @@ def _bucketing_apply_pandas(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any
             )
             continue  # nosec B112
 
-    if drop_original and processed_cols:
-        df_out = df_out.drop(columns=processed_cols)
+    dropped = processed_cols if drop_original else []
+    validate_generated_column_names(
+        X.columns, binned_columns, dropped_columns=dropped, node_name="Bucketing"
+    )
+    df_out = X.drop(columns=dropped).copy()
+    for name, binned_series in binned_columns.items():
+        df_out[name] = binned_series
     return df_out, y
 
 
@@ -279,6 +349,19 @@ class BaseBinningApplier(BaseApplier):
 
     Expects ``bin_edges`` in params: ``Dict[str, List[float]]`` mapping column
     names to bin edges.
+
+    ``missing_strategy="label"`` fills null/NaN and out-of-range bins with
+    ``missing_label`` (default ``"Missing"``). Polars emits String columns for
+    this mode, including complete and empty batches; ordinal/bin-index values
+    become ``"0"``, ``"1"``, etc. Pandas retains numeric bin values alongside
+    the string sentinel in an object column. Range and custom labels keep
+    their text. The default ``"keep"`` strategy preserves missing values.
+
+    Newly fitted range artifacts store canonical ``range_labels`` so their
+    category keys remain identical across engines. Exact edge text replaces
+    rounded labels if rounding would merge distinct bins. Older artifacts retain
+    their original rendering; refit binning and downstream encoders together
+    before moving a legacy range pipeline to another engine.
     """
 
     @apply_method
@@ -290,6 +373,10 @@ class BaseBinningApplier(BaseApplier):
         column that cannot be binned (fewer than two unique edges, bad dtype) is
         left unbinned rather than failing the whole frame — warned about on the
         pandas path, silently skipped on the polars one.
+
+        Conflicting retained output names and labels that cannot describe
+        deduplicated edges raise ``ValueError`` before producing output. A
+        dropped source name can be reused safely, including an empty suffix.
         """
         return apply_dual_engine(
             X, params, {"polars": _bucketing_apply_polars, "pandas": _bucketing_apply_pandas}
@@ -480,6 +567,7 @@ class GeneralBinningCalculator(BaseCalculator):
         if user_picked_no_columns(config):
             return cast(GeneralBinningArtifact, {})
 
+        input_columns = list(X.columns)
         X, columns = resolve_columns_then_to_pandas(X, config, detect_numeric_columns)
 
         defaults = {
@@ -502,6 +590,8 @@ class GeneralBinningCalculator(BaseCalculator):
             "custom_labels": custom_labels_map,
         }
         artifact.update(_passthrough_artifact_options(config))
+        _validate_binning_artifact(input_columns, artifact)
+        _store_range_labels(artifact)
         return cast(GeneralBinningArtifact, artifact)
 
 
@@ -542,6 +632,7 @@ class CustomBinningCalculator(BaseCalculator):
         if user_picked_no_columns(config):
             return cast(GeneralBinningArtifact, {})
 
+        input_columns = list(X.columns)
         X, columns = resolve_columns_then_to_pandas(X, config, detect_numeric_columns)
         bins = config.get("bins")
 
@@ -557,6 +648,8 @@ class CustomBinningCalculator(BaseCalculator):
             "bin_edges": bin_edges_map,
         }
         artifact.update(_passthrough_artifact_options(config))
+        _validate_binning_artifact(input_columns, artifact)
+        _store_range_labels(artifact)
         return cast(GeneralBinningArtifact, artifact)
 
 

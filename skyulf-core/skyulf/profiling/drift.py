@@ -151,7 +151,7 @@ class DriftCalculator:
     def _calculate_column_drift(self, col: str, thresholds: dict[str, float]) -> ColumnDrift | None:
         """Dispatch drift calculation for a single column based on its dtype."""
         dtype = self.reference_df[col].dtype
-        is_categorical = dtype in [pl.Utf8, pl.String, pl.Categorical, pl.Boolean]
+        is_categorical = dtype in [pl.Utf8, pl.String, pl.Categorical, pl.Enum, pl.Boolean]
 
         if is_categorical:
             return self._calculate_categorical_drift(col, thresholds)

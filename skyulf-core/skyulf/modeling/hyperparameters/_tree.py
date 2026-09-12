@@ -582,7 +582,10 @@ LGBM_PARAMS = [
         min=0.1,
         max=1.0,
         step=0.1,
-        description="Fraction of training data sampled per iteration.",
+        description=(
+            "Fraction of training rows sampled each iteration for GBDT/DART. "
+            "GOSS uses gradient sampling instead."
+        ),
     ),
     HyperparameterField(
         name="colsample_bytree",

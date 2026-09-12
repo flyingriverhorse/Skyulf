@@ -93,8 +93,13 @@ The project migrated off `black` + `flake8` + `isort` to a single **Ruff** binar
 # Type check (ty is installed in the venv)
 .\\.venv\Scripts\python.exe -m ty check backend skyulf-core/skyulf skyulf-core/tests run_skyulf.py celery_worker.py
 
-# Complexity gate
-.\.venv\Scripts\python.exe -m lizard skyulf-core/skyulf -C 9 -w
+# Complexity reports: CCN > 8 is informational in CI.
+.\.venv\Scripts\python.exe -m lizard skyulf-core/skyulf --CCN 8 -w
+.\.venv\Scripts\python.exe -m lizard backend --CCN 8 -w
+
+# Complexity gates: CCN > 10 fails across all Core and backend source files.
+.\.venv\Scripts\python.exe -m lizard skyulf-core/skyulf --CCN 10 -w
+.\.venv\Scripts\python.exe -m lizard backend --CCN 10 -w
 ```
 
 <details>

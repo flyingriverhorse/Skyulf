@@ -28,6 +28,14 @@ the engine.
 ---
 
 ### OC-24
+
+**Verified already fixed 2026-09-12 at the public fit/apply boundary.** The
+training-fitted mapping introduced in `f12dde9f8` shares null/NaN groups across
+engines and prevents batch-local inference aggregation. The historical behavior
+below remains only in private unfitted compatibility helpers; the public applier
+rejects artifacts that could reach them. See the
+[verification log](../opus_core_analysis-tracker.md#2026-09-12-oc-245960-parallel-preprocessing-audit-closure).
+
 ### 🟠 High — Polars group aggregates treat null group keys differently from pandas
 
 **File:** `preprocessing/feature_generation/_polars_ops.py:222-234`
@@ -146,6 +154,14 @@ handler dict implements it, so it no-ops without error.
 
 ### OC-30
 ### 🟡 Medium — Datetime extraction ignores the UI output name and overwrites collisions
+
+**Fixed 2026-09-12:** datetime extraction now uses `output_column` exactly for
+a single result, as a feature prefix for multiple features, and as a
+source/feature prefix for multiple sources. Both engines use the existing
+numbered collision policy and honor `allow_overwrite`. Default names remain
+`source_feature`; affected saved pipelines need refitting if they depended on
+the old ignored names or overwrites. Native/wrapper fit, replay, downstream
+operations and runtime-schema regressions pass. Historical reproduction follows.
 
 **Files:** `feature_generation/_pandas_ops.py:173-184`, `_polars_ops.py:181-205`
 

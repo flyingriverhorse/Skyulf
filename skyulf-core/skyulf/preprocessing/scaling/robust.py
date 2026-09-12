@@ -11,7 +11,12 @@ from ...engines.sklearn_bridge import SklearnBridge
 from ...registry import NodeRegistry
 from ...utils import user_picked_no_columns
 from .._artifacts import RobustScalerArtifact
-from .._helpers import promote_configured_columns_to_float64, resolve_valid_columns, safe_scale
+from .._helpers import (
+    decimal_columns_to_float,
+    promote_configured_columns_to_float64,
+    resolve_valid_columns,
+    safe_scale,
+)
 from .._schema import SkyulfSchema
 from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
 from ..dispatcher import apply_dual_engine, fit_dual_engine
@@ -66,7 +71,8 @@ class RobustScalerApplier(BaseApplier):
 
         X_out = X.copy()
         col_indices = [cols.index(c) for c in valid]
-        vals = X_out[valid].values
+        subset = decimal_columns_to_float(X_out[valid], valid)
+        vals = subset.to_numpy(dtype=np.float64, na_value=np.nan)
 
         if params.get("with_centering", True) and center is not None:
             vals = vals - np.array(center)[col_indices]

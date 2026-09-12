@@ -6,8 +6,9 @@ dependencies**. Each `expect_*` function checks a single condition and raises
 [`ExpectationError`][skyulf.profiling.expect.ExpectationError] with a precise
 message when the condition is violated.
 
-It is **engine-agnostic**: Pandas frames are used directly; Polars (or any frame
-exposing `to_pandas()`) is converted first.
+It is **engine-agnostic**: Pandas frames are used directly; raw and wrapped
+Polars frames stay native for simple predicates. Boolean range checks and
+other frames exposing `to_pandas()` use Pandas conversion.
 
 ## When to use it
 
@@ -24,9 +25,33 @@ automatically. You call them yourself in two main places:
 | Function | Checks |
 | --- | --- |
 | `expect_columns_exist(df, columns)` | Every name in `columns` is present. |
-| `expect_no_nulls(df, columns=None)` | Given columns (default: all) have no nulls. |
-| `expect_value_range(df, column, *, minimum, maximum, inclusive=True)` | All values fall within `[minimum, maximum]`. |
-| `expect_unique(df, columns)` | The combination of `columns` has no duplicate rows. |
+| `expect_no_nulls(df, columns=None, *, allow_empty=False)` | Given columns (default: all) have no nulls. |
+| `expect_value_range(df, column, *, minimum=None, maximum=None, inclusive=True, allow_empty=False)` | All non-null values fall within the optional bounds. |
+| `expect_unique(df, columns, *, allow_empty=False)` | The combination of `columns` has no duplicate rows. |
+
+## Empty datasets
+
+The null, range and uniqueness checks require at least one row by default.
+An ingestion that unexpectedly returns zero rows therefore raises
+`ExpectationError`, even if the expected columns are present.
+
+If empty partitions are valid in your workflow, explicitly opt in on each check:
+
+```python
+import pandas as pd
+from skyulf import expect_no_nulls, expect_unique, expect_value_range
+
+empty = pd.DataFrame({"age": pd.Series(dtype="float64")})
+expect_no_nulls(empty, ["age"], allow_empty=True)
+expect_value_range(empty, "age", minimum=0, maximum=120, allow_empty=True)
+expect_unique(empty, ["age"], allow_empty=True)
+```
+
+Previously these checks accepted empty frames automatically; existing callers
+that rely on that behavior must add `allow_empty=True`. Requested columns must
+still exist. `expect_columns_exist` only checks the schema and accepts zero rows.
+Range checks continue to ignore null values, including an all-null column in a
+frame that has rows; combine them with `expect_no_nulls` when nulls are invalid.
 
 ## Example: a dataset contract in CI
 

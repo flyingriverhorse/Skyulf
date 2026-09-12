@@ -7,7 +7,7 @@ import polars as pl
 
 from ...core.meta.decorators import node_meta
 from ...registry import NodeRegistry
-from ...utils import detect_numeric_columns, user_picked_no_columns
+from ...utils import detect_numeric_columns, is_decimal_series, user_picked_no_columns
 from .._artifacts import WinsorizeArtifact
 from .._helpers import (
     auto_detect_numeric_columns,
@@ -61,12 +61,14 @@ class WinsorizeApplier(BaseApplier):
         for col, bound in bounds.items():
             if col not in df_out.columns:
                 continue
-            if pd.api.types.is_numeric_dtype(df_out[col]):
+            if pd.api.types.is_numeric_dtype(df_out[col]) or is_decimal_series(df_out[col]):
                 series = df_out[col]
                 # Nullable extension dtypes (Int64...) refuse float clip
                 # bounds; the Polars branch casts to Float64 first (F-10).
-                if isinstance(series.dtype, pd.api.extensions.ExtensionDtype):
-                    series = series.astype("float64")
+                if isinstance(series.dtype, pd.api.extensions.ExtensionDtype) or is_decimal_series(
+                    series
+                ):
+                    series = pd.to_numeric(series).astype("float64")
                 df_out[col] = series.clip(lower=bound["lower"], upper=bound["upper"])
         return df_out, y
 

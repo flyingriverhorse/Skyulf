@@ -60,17 +60,16 @@ jobs:
           echo "::endgroup::"
           echo "## 🧪 skyulf-core test suite" >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Complexity gate (lizard, CCN 8)
+      - name: Complexity report (lizard, CCN > 8)
         run: |
-          # Hard gate on green-field / known-clean packages so new code stays simple.
-          bash .github/scripts/run_check.sh "Lizard complexity gate (core/engines/scaling/transformations)" \
-            lizard skyulf-core/skyulf/core skyulf-core/skyulf/engines \
-                   skyulf-core/skyulf/preprocessing/scaling \
-                   skyulf-core/skyulf/preprocessing/transformations --CCN 8 -w
-          # Full-tree report (non-blocking) — surfaces legacy hotspots without failing CI.
-          echo "::group::Full-tree lizard report (informational only, non-blocking)"
+          echo "::group::Full-tree lizard report (CCN > 8, non-blocking)"
           lizard skyulf-core/skyulf --CCN 8 -w || true
           echo "::endgroup::"
+
+      - name: Complexity gate (lizard, CCN 10)
+        run: |
+          bash .github/scripts/run_check.sh "Lizard complexity gate (skyulf-core, CCN 10)" \
+            lizard skyulf-core/skyulf --CCN 10 -w
 
       - name: Run skyulf-core tests
         # --cov=skyulf-core/skyulf scopes coverage to the package itself, so

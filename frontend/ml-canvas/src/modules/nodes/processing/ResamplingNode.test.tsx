@@ -106,7 +106,7 @@ it.each([
   { type: 'oversampling', method: 'borderline_smote', fields: { 'k Neighbors': 5, 'm Neighbors': 10, Kind: 'borderline-1' } },
   { type: 'oversampling', method: 'svm_smote', fields: { 'k Neighbors': 5, 'm Neighbors': 10, 'Out Step': 0.5 } },
   { type: 'oversampling', method: 'kmeans_smote', fields: { 'k Neighbors': 5, 'Cluster Balance Threshold': 0.1, 'Density Exponent': 'auto' } },
-  { type: 'oversampling', method: 'smote_tomek', fields: {} },
+  { type: 'oversampling', method: 'smote_tomek', fields: { 'k Neighbors': 5 } },
   { type: 'undersampling', method: 'random_under_sampling', fields: { Replacement: false } },
   { type: 'undersampling', method: 'nearmiss', fields: { Version: '1' } },
   { type: 'undersampling', method: 'tomek_links', fields: {} },
@@ -140,6 +140,31 @@ it('preserves type/method selections, full update payloads and backend conversio
   expect(onChange).toHaveBeenLastCalledWith({ ...expected, type: 'oversampling', method: 'smote' });
   fireEvent.change(screen.getByRole('combobox', { name: 'Method' }), { target: { value: 'nearmiss' } });
   expect(onChange).toHaveBeenLastCalledWith({ ...expected, method: 'nearmiss' });
+});
+
+it('submits the edited SMOTE + Tomek neighbor count in the backend payload', () => {
+  /** Small minority classes need the editable neighbor count to reach the combined sampler. */
+  function Harness() {
+    const [current, setCurrent] = useState({ ...config, method: 'smote_tomek' });
+    const converted = preprocessingConverters.get('ResamplingNode')?.({
+      id: 'resample', position: { x: 0, y: 0 }, data: current,
+    });
+    return <>
+      <Settings config={current} onChange={setCurrent} nodeId="resample" />
+      <output data-testid="payload">{JSON.stringify(converted)}</output>
+    </>;
+  }
+  render(<Harness />);
+
+  const neighbors = screen.getByRole('spinbutton', { name: 'k Neighbors' });
+  fireEvent.change(neighbors, { target: { value: '1' } });
+
+  const submitted = JSON.parse(screen.getByTestId('payload').textContent ?? '{}');
+  expect(neighbors).toHaveValue(1);
+  expect(submitted).toEqual({
+    stepType: 'Oversampling', params: { ...config, method: 'smote_tomek', k_neighbors: 1 },
+  });
+  expect(ResamplingNode.validate(submitted.params)).toEqual({ isValid: true });
 });
 
 /** Integer input clearing retains the configured value, while explicit zero remains zero. */
@@ -279,6 +304,6 @@ it('retains the public node definition and method-specific validation', () => {
   expect(ResamplingNode.bodyPreview?.(config)).toBe('SMOTE → outcome');
   expect(ResamplingNode.validate({ ...config, target_column: '' })).toEqual({ isValid: false, field: 'target_column', message: 'Target column is required for resampling.' });
   expect(ResamplingNode.validate({ ...config, k_neighbors: 0 })).toEqual({ isValid: false, field: 'k_neighbors', message: 'k_neighbors must be at least 1.' });
-  expect(ResamplingNode.validate({ ...config, method: 'smote_tomek', k_neighbors: 0 })).toEqual({ isValid: true });
+  expect(ResamplingNode.validate({ ...config, method: 'smote_tomek', k_neighbors: 0 })).toEqual({ isValid: false, field: 'k_neighbors', message: 'k_neighbors must be at least 1.' });
   expect(ResamplingNode.validate({ ...config, type: 'undersampling', k_neighbors: 0 })).toEqual({ isValid: true });
 });

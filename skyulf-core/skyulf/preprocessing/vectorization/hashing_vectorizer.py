@@ -25,6 +25,7 @@ from ._common import (
     _warn_large_output,
     apply_text_dual_engine,
     resolve_fit_text_valid_columns,
+    validate_text_output_names,
 )
 
 logger = logging.getLogger(__name__)
@@ -155,4 +156,6 @@ class HashingVectorizerCalculator(BaseCalculator):
         if valid_cols is None:
             return {}
 
-        return _build_hashing_artifact(config, valid_cols)
+        artifact = _build_hashing_artifact(config, valid_cols)
+        validate_text_output_names(X, artifact, valid_cols)
+        return artifact

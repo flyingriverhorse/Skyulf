@@ -293,6 +293,16 @@ Requirements include:
 - Trunk preprocessing before the splitter is genuinely safe.
 - Branch column selection and merge order preserve the intended features.
 
+The positional merge rejects `ManualBounds`, `LagFeatures(drop_na=True)` and
+`LagFeatures`/`RollingAggregate` with a configured `sort_by`. These settings
+can filter or reorder observations in one branch independently of the others.
+Lag and rolling features with sorting and filtering disabled remain supported.
+The same check runs in the Core merged-fold adapter and backend reconstruction
+path; CV/tuning is blocked by default for an unsupported learned graph.
+An explicit `on_leakage="warn"` or `"ignore"` retains the documented legacy
+fallback and records `fold_refit_fallback="row_changing_branch_step"`.
+Single-branch adapters retain their existing sorting/filtering behavior.
+
 Overlapping columns can be replaced according to merge order. Prefer disjoint
 feature outputs where appropriate; topology support alone does not establish
 correct merge semantics.

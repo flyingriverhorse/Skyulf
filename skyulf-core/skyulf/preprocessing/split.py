@@ -33,6 +33,15 @@ from .base import BaseApplier, BaseCalculator
 
 logger = logging.getLogger(__name__)
 
+_SPLIT_CONFIG_KEYS = (
+    "test_size",
+    "validation_size",
+    "random_state",
+    "shuffle",
+    "stratify",
+    "target_column",
+)
+
 
 # -----------------------------------------------------------------------------
 # Engine-bridge helpers
@@ -177,19 +186,28 @@ class SplitCalculator(BaseCalculator):
     def fit(
         self, df: pd.DataFrame | SkyulfDataFrame | tuple[Any, ...] | Any, config: dict[str, Any]
     ) -> SplitArtifact:
-        """Return a typed ``SplitArtifact`` holding the recognized split settings."""
+        """Return a typed artifact and warn about ignored public configuration keys.
+
+        ``type`` and underscore-prefixed routing metadata are ignored quietly.
+        Use ``stratify=True`` with ``target_column`` to request stratification;
+        ``stratify_col`` belongs to ``DataSplitter``, not this node's config.
+        """
         # No learning from data; pass through known split params from config.
         # Constructed explicitly so the artifact shape matches SplitArtifact
         # rather than echoing arbitrary user keys back into the params dict.
+        unknown = sorted(
+            key
+            for key in config
+            if key not in _SPLIT_CONFIG_KEYS and key != "type" and not key.startswith("_")
+        )
+        if unknown:
+            logger.warning(
+                "TrainTestSplitter ignored unrecognized config keys: %s. Supported keys: %s.",
+                unknown,
+                ", ".join(_SPLIT_CONFIG_KEYS),
+            )
         artifact: SplitArtifact = {"type": "split"}
-        for key in (
-            "test_size",
-            "validation_size",
-            "random_state",
-            "shuffle",
-            "stratify",
-            "target_column",
-        ):
+        for key in _SPLIT_CONFIG_KEYS:
             if key in config:
                 artifact[key] = config[key]  # type: ignore[literal-required]
         return artifact

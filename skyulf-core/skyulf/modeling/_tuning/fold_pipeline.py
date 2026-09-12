@@ -25,6 +25,8 @@ import pandas as pd
 from sklearn.base import BaseEstimator, is_classifier
 from sklearn.utils.metaestimators import available_if
 
+from .._class_weights import sample_weight_for_fit
+
 
 def _fitted_model_has(attr: str) -> Callable[[Any], bool]:
     """Build the ``available_if`` predicate for one response method of the wrapped model.
@@ -55,6 +57,11 @@ class FoldAwareModelStep(BaseEstimator):
     integers), predictions and ``classes_`` are mapped back to the original
     label space so scorers compare against the untouched ``y`` the searcher
     holds; ``predict_proba`` columns stay aligned with ``classes_``.
+
+    ``class_weight`` carries nonnative weighting separately from estimator
+    parameters. It is converted after preprocessing, using only the labels
+    passed to this fold's fit. The preprocessor may be absent when only
+    class-weight conversion is needed.
     """
 
     def __init__(
@@ -62,6 +69,7 @@ class FoldAwareModelStep(BaseEstimator):
         estimator: Any = None,
         preprocessor: Any = None,
         feature_names: tuple[str, ...] | None = None,
+        class_weight: Any = None,
     ) -> None:
         """Store the wrap targets verbatim; nothing is copied or fitted here.
 
@@ -70,10 +78,12 @@ class FoldAwareModelStep(BaseEstimator):
         deferred to ``fit`` so every searcher clone gets its own fitted
         state. ``feature_names`` records the column contract used to
         rebuild named frames when the searcher hands back plain arrays.
+        ``class_weight`` is kept cloneable and evaluated only inside fit.
         """
         self.estimator = estimator
         self.preprocessor = preprocessor
         self.feature_names = feature_names
+        self.class_weight = class_weight
 
     def _ensure_frames(self, X: Any, y: Any) -> tuple[Any, Any]:
         """Rebuild named pandas frames when slicing hands non-pandas input.
@@ -155,17 +165,22 @@ class FoldAwareModelStep(BaseEstimator):
         chains leakage-free inside the searcher's own CV. A label map is
         built when the chain re-encoded ``y``, for ``predict`` to invert.
         """
-        X, y = self._ensure_frames(X, y)
+        if self.preprocessor is not None:
+            X, y = self._ensure_frames(X, y)
         worker = copy.deepcopy(self.preprocessor)
         model = copy.deepcopy(self.estimator)
-        X_t, y_t = worker.fit_transform(X, y)
-        model.fit(X_t, y_t)
+        X_t, y_t = worker.fit_transform(X, y) if worker is not None else (X, y)
+        sample_weight = sample_weight_for_fit(model, self.class_weight, y_t)
+        fit_kwargs = {"sample_weight": sample_weight} if sample_weight is not None else {}
+        model.fit(X_t, y_t, **fit_kwargs)
         self.preprocessor_ = worker
         self.model_ = model
         self.label_map_ = self._build_label_map(y, y_t, model)
         return self
 
     def _transform_x(self, X: Any) -> Any:
+        if self.preprocessor_ is None:
+            return X
         X, _y = self._ensure_frames(X, None)
         X_t, _y_t = self.preprocessor_.transform(X, None)
         return X_t

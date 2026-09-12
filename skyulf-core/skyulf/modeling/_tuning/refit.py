@@ -22,6 +22,7 @@ from sklearn.metrics import (
 )
 
 from ...engines.sklearn_bridge import SklearnBridge
+from .._class_weights import sample_weight_for_fit, split_class_weight_params
 from .._evaluation.thresholds import optimize_thresholds
 from ..base import BaseModelCalculator
 from .params import instantiate_model
@@ -61,7 +62,10 @@ def refit_best_model(
     # to the signature (when there is no **kwargs) and routes nested
     # ``a__b`` keys — e.g. an ensemble's tuned base-model params — through
     # ``set_params`` so they are not silently dropped.
-    model = instantiate_model(model_cls, final_params)
+    constructor_params, class_weight = split_class_weight_params(model_cls, final_params)
+    model = instantiate_model(model_cls, constructor_params)
+    sample_weight = sample_weight_for_fit(model, class_weight, y_np)
+    weight_kwargs = {"sample_weight": sample_weight} if sample_weight is not None else {}
     # Boosting base calculators (XGBoost/LightGBM) attach an eval set +
     # iteration callback here so the final refit streams per-round
     # progress like any other boosting fit; every other model keeps a
@@ -74,7 +78,7 @@ def refit_best_model(
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
         warnings.filterwarnings("ignore", message=".*valid feature names.*")
-        model.fit(X_np, y_np, **extra_fit_kwargs)
+        model.fit(X_np, y_np, **weight_kwargs, **extra_fit_kwargs)
     if detach_callbacks:
         model.callbacks = None
     for w in caught:

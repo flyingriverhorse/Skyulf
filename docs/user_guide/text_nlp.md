@@ -31,6 +31,15 @@ the training data and returns an artifact; the Applier *uses* that artifact to t
 DataFrame. Vectorizers keep the original columns and **add** new feature columns whose names
 are listed in `artifact['output_columns']`.
 
+Tokenizer, Count, TF-IDF, Hashing and Sentence Embedder outputs must have unique
+names that do not collide with retained input columns. Fitting and inference
+raise `ValueError` for a collision, including a column added only to inference
+data. Rename the conflicting input or adjust the node's output naming where
+supported. A name belonging to a selected source dropped by **Drop original**
+can be reused: all outputs are computed from the original source values before
+those source columns are removed. If an earlier run overwrote data or produced
+duplicate feature names, rerun from the original input and refit downstream models.
+
 !!! tip "Fit on train only"
     Vectorizers learn a vocabulary, so they are subject to data leakage just like scalers and
     encoders. Always `fit()` on the **training** split and reuse the same artifact to `apply()`

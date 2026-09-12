@@ -259,6 +259,54 @@ def test_calculate_drift_detects_categorical_distribution_shift() -> None:
     assert report.drifted_columns_count == 1
 
 
+@pytest.mark.parametrize(
+    "dtype",
+    [
+        pl.String,
+        pl.Categorical,
+        pl.Enum(["a", "b"]),
+        pl.Enum(["a", "b", *[f"unused_{i}" for i in range(60)]]),
+    ],
+    ids=["string", "categorical", "enum", "enum-unused-labels"],
+)
+@pytest.mark.parametrize("shifted", [False, True], ids=["stable", "shifted"])
+def test_categorical_dtypes_report_the_same_psi(dtype, shifted: bool) -> None:
+    """Enum labels must receive the same measured PSI as string and categorical labels."""
+    reference_values = ["a"] * 100 if shifted else ["a", "b"] * 50
+    current_values = ["b"] * 100 if shifted else reference_values
+    reference = pl.DataFrame({"category": pl.Series(reference_values, dtype=dtype)})
+    current = pl.DataFrame({"category": pl.Series(current_values, dtype=dtype)})
+
+    report = DriftCalculator(reference, current).calculate_drift()
+
+    assert "category" in report.column_drifts
+    drift = report.column_drifts["category"]
+    assert len(drift.metrics) == 1
+    psi = drift.metrics[0]
+    assert psi.metric == "psi_categorical"
+    assert psi.value == pytest.approx(10.543651559430593 if shifted else 0.0)
+    assert psi.threshold == 0.2
+    assert psi.has_drift is shifted
+    assert drift.drift_detected is shifted
+    assert report.drifted_columns_count == int(shifted)
+
+
+def test_enum_drift_respects_custom_psi_threshold() -> None:
+    """Enum dispatch must preserve the existing categorical threshold override contract."""
+    dtype = pl.Enum(["a", "b"])
+    reference = pl.DataFrame({"category": pl.Series(["a"] * 100, dtype=dtype)})
+    current = pl.DataFrame({"category": pl.Series(["b"] * 100, dtype=dtype)})
+
+    report = DriftCalculator(reference, current).calculate_drift(thresholds={"psi": 11.0})
+
+    assert "category" in report.column_drifts
+    psi = report.column_drifts["category"].metrics[0]
+    assert psi.value == pytest.approx(10.543651559430593)
+    assert psi.threshold == 11.0
+    assert psi.has_drift is False
+    assert report.drifted_columns_count == 0
+
+
 def test_calculate_drift_skips_high_cardinality_categorical_column() -> None:
     """A near-unique-per-row string column (free text / IDs) must be skipped
     rather than blowing up the PSI computation on effectively-unique values.

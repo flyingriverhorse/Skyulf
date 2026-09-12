@@ -118,6 +118,14 @@ five, or have the endpoint return an explicit `not_tunable` marker.
 
 <a id="oc-101"></a>
 ### OC-101
+
+**Resolved 2026-09-12.** The advertised seed now reaches stochastic base
+estimators through a cloneable calibration-specific wrapper, covering direct
+training, tuning and final refitting. Integer calibration folds remain
+unshuffled; the field description now states what the seed controls.
+See the [verification log](../opus_core_analysis-tracker.md#2026-09-12-oc-51101140-recommendations-calibration-seeds-and-numeric-rules).
+The original reproduction below is retained as historical evidence.
+
 ### 🟡 Medium — `calibrated_classifier` declares a `random_state` field its estimator never accepts
 
 **File:** `skyulf-core/skyulf/modeling/hyperparameters/_calibration.py`
@@ -185,6 +193,14 @@ splitter must be passed to `cv` — the field alone cannot deliver it.
 
 <a id="oc-66-root-cause-confirmed-merged-not-re-filed"></a>
 ### OC-66 root cause confirmed — *merged, not re-filed*
+
+**Follow-up correction 2026-09-12.** A field rename alone is insufficient:
+the UI sends symbolic candidate names, not sklearn estimator objects. The
+calibration wrapper now accepts those names as cloneable search parameters and
+resolves each candidate during fitting. The real Canvas configuration and
+fold-preprocessing path are covered in the
+[follow-up log](../opus_core_analysis-tracker.md#2026-09-12-oc-66-follow-up-canvas-calibrated-base-selection).
+The proposal below is historical and was not the implemented repair.
 
 > **Merged, not re-filed:** this is the mechanism behind
 > [OC-66](./08-modeling-tuning.md#oc-66) ("`CalibratedClassifierCV`'s

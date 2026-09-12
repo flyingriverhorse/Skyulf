@@ -159,6 +159,24 @@ def _resolve_output_col(
     return output_col
 
 
+def _resolve_datetime_output_col(
+    op: dict[str, Any], col: str, feature: str, existing: list[str], allow_overwrite: bool
+) -> str:
+    """Resolve a datetime name using configured output counts and collision policy."""
+    output_col = op.get("output_column")
+    if output_col:
+        if len(op.get("input_columns", [])) > 1:
+            output_col = f"{output_col}_{col}_{feature}"
+        elif len(op.get("datetime_features", [])) > 1:
+            output_col = f"{output_col}_{feature}"
+    else:
+        output_col = f"{col}_{feature}"
+        prefix = op.get("output_prefix")
+        if prefix:
+            output_col = f"{prefix}_{output_col}"
+    return _resolve_output_col({"output_column": output_col}, 0, existing, allow_overwrite)
+
+
 def _resolve_similarity_pair(op: dict[str, Any], existing: list[str]) -> tuple[str, str] | None:
     """Return ``(col_a, col_b)`` for similarity ops, or ``None`` if unresolved."""
     inputs = op.get("input_columns", [])

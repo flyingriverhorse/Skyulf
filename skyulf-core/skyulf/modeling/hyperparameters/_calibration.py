@@ -20,7 +20,8 @@ CALIBRATED_CLASSIFIER_PARAMS = [
         ],
         description=(
             "Classifier whose probabilities are calibrated. Uses sensible "
-            "defaults for the chosen estimator."
+            "defaults for the chosen estimator. During tuning, each selected "
+            "classifier is a search candidate."
         ),
     ),
     HyperparameterField(
@@ -47,5 +48,8 @@ CALIBRATED_CLASSIFIER_PARAMS = [
         max=10,
         description="Number of cross-validation folds used to fit the calibrator.",
     ),
-    random_state_field("Seed for the calibration CV split and the seeded base estimators."),
+    random_state_field(
+        "Seed for stochastic base estimators. Does not change calibration CV "
+        "splits or deterministic base estimators."
+    ),
 ]

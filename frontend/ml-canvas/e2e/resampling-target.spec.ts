@@ -43,6 +43,41 @@ async function expectAnchored(input: Locator, suggestions: Locator) {
   }).toBe(true);
 }
 
+for (const width of [1440, 390]) {
+  test(`SMOTE + Tomek neighbor count reaches Preview at ${width}px`, async ({ page }) => {
+    // The displayed control must edit the submitted configuration and reject zero neighbors.
+    await openResampling(page);
+    await page.setViewportSize({ width, height: 1000 });
+    if (width < 768) await page.getByRole('button', { name: 'Read-only', exact: true }).click();
+    let submitted: { nodes: { node_id: string; params: Record<string, unknown> }[] } | undefined;
+    await page.route('**/api/pipeline/preview?*', route => {
+      submitted = route.request().postDataJSON() as typeof submitted;
+      return route.fulfill({ json: {
+        pipeline_id: 'smote-tomek-preview', status: 'success', node_results: {},
+        preview_data: {}, recommendations: [],
+      } });
+    });
+    await page.getByLabel('Target Column', { exact: true }).fill('outcome');
+    await page.getByRole('combobox', { name: 'Method', exact: true }).selectOption('smote_tomek');
+    const neighbors = page.getByRole('spinbutton', { name: 'k Neighbors', exact: true });
+    await expect(neighbors).toHaveValue('5');
+    await neighbors.focus();
+    await neighbors.press('ArrowDown');
+    await expect(neighbors).toHaveValue('4');
+    await neighbors.fill('0');
+    await page.getByRole('button', { name: 'Preview data', exact: true }).click();
+    await expect(page.getByText('Preview blocked. Review 1 validation issue.', { exact: true }))
+      .toBeVisible();
+    await expect(page.getByRole('region', { name: 'Validation issues', exact: true }))
+      .toContainText('k_neighbors must be at least 1.');
+    expect(submitted).toBeUndefined();
+    await neighbors.fill('1');
+    await page.getByRole('button', { name: 'Preview data', exact: true }).click();
+    await expect.poll(() => submitted?.nodes.find(node => node.node_id === 'resample')?.params)
+      .toMatchObject({ method: 'smote_tomek', target_column: 'outcome', k_neighbors: 1 });
+  });
+}
+
 for (const expanded of [false, true]) {
   test(`target suggestions stay anchored and support selection in ${expanded ? 'expanded' : 'docked narrow'} settings`, async ({ page }) => {
     // Application listbox geometry is testable; the old OS-native datalist popup is outside the DOM.

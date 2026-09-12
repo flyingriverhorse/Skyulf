@@ -72,7 +72,9 @@ The analyzer automatically detects column types (Numeric, Categorical, Date, Tex
     *   *Normality Tests:* For performance, normality tests are performed on a sample of up to 5,000 rows.
         *   **Shapiro-Wilk:** Used for N < 5,000.
         *   **Kolmogorov-Smirnov:** Used for N >= 5,000 (on a 5k sample).
-*   **Categorical:** Unique count, Mode, Frequency distribution.
+*   **Categorical:** Unique count, Mode, Frequency distribution. Unique and
+    rare-label counts and the top categories exclude missing values, which
+    are reported separately in the column's missing count and percentage.
 *   **Date:** Min/Max date, Range, Year/Month distribution.
 *   **Text:** Avg length, Common words, **Sentiment Analysis** (Positive/Neutral/Negative).
 
@@ -83,6 +85,24 @@ missing percentage and quality alerts remain available, while type-specific
 statistics are omitted. An all-null column with a declared type, such as
 `Float64`, retains that type's profile.
 
+Automatic date detection converts a string column only when the selected format
+parses every non-missing value in the full column. If a later value uses another
+format or cannot be parsed, the original strings remain available for profiling;
+parse failures do not become missing cells or trigger a false missing-data Drop
+recommendation. Normalize such a column explicitly before requesting temporal
+analysis. An all-null native Date/Datetime column retains its type and reports
+actual null minimum/maximum bounds. Regenerate saved profiles to apply these
+corrections.
+
+String columns are treated as categorical when fewer than 5% of their
+non-missing values are distinct, or when they contain at most 20 distinct
+non-missing values with at least one repetition. This also recognizes small
+datasets with repeated class or city labels. Missing values do not count as
+labels or dilute the ratio; all-null strings and strings with no repeated
+values remain Text. A recognized string target receives classification
+statistics, associations and rule discovery when numeric features are available.
+Rerun saved analyses to refresh their inferred types and target results.
+
 ### 2. Smart Alerts
 Skyulf automatically flags potential data quality issues:
 *   **High Null Rate:** Columns with >50% missing values.
@@ -90,8 +110,28 @@ Skyulf automatically flags potential data quality issues:
 *   **High Cardinality:** Categorical columns with too many unique values.
 *   **High Correlation:** Pairs of features with correlation > 0.95.
 *   **Multicollinearity (VIF):** Detects features with Variance Inflation Factor > 5.0.
+    Nearly duplicated features still produce warnings when the correlation
+    matrix cannot be reliably inverted. The calculation then uses a separate
+    regression for each feature, preserving low VIF for unrelated features.
+    A value of **999** is a finite warning marker for effectively perfect
+    dependence, not a precise estimate or a cap on other VIF values. Rerun
+    saved analyses to refresh these results.
 *   **Class Imbalance:** Target variables with skewed class distributions.
 *   **Data Leakage:** Features with 1.0 correlation to the target.
+
+### Smart Recommendations
+
+For highly skewed numeric columns, transformation advice follows the observed
+value range. Log or Box-Cox is suggested for strictly positive, right-skewed
+data. Columns containing zero or negative values, left-skewed columns, and
+profiles with an unknown minimum receive Yeo-Johnson advice instead. These
+are suggestions to evaluate; EDA does not transform the source data.
+
+The clean-dataset message appears only when no drop, imputation, transformation,
+encoding or resampling action is recommended. It describes the outcome of
+these checks, without certifying that a dataset is ready for modeling. An
+informational balanced-target message can appear alongside it. Rerun saved
+analyses to refresh their recommendations.
 
 ### 3. Advanced Analysis
 *   **Outlier Detection:** Uses Isolation Forest to identify anomalous rows.

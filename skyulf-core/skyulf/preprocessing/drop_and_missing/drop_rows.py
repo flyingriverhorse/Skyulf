@@ -19,6 +19,14 @@ from ._common import (
 )
 
 
+def _validate_how(params: dict[str, Any]) -> str:
+    """Reject unknown policies before pandas and Polars can interpret them differently."""
+    how = params.get("how", "any")
+    if how not in ("any", "all"):
+        raise ValueError("DropMissingRows how must be 'any' or 'all'.")
+    return how
+
+
 def _polars_missing_expr(X: Any, col: str) -> Any:
     """Return an expression that is True when ``col`` is null or (for float dtypes) NaN.
 
@@ -118,6 +126,7 @@ class DropMissingRowsApplier(BaseApplier):
     @apply_method
     def apply(self, X: Any, y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
         """Dispatch to the engine-specific dropna, forwarding ``(X, y)`` only when ``y`` exists."""
+        _validate_how(params)
         return apply_dual_engine(
             (X, y) if y is not None else X,
             params,
@@ -155,7 +164,7 @@ class DropMissingRowsCalculator(BaseCalculator):
         return {
             "type": "drop_missing_rows",
             "subset": config.get("subset"),
-            "how": config.get("how", "any"),
+            "how": _validate_how(config),
             "threshold": config.get("threshold"),
             "missing_threshold": config.get("missing_threshold"),
         }

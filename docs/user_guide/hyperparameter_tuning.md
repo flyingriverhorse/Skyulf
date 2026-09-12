@@ -43,7 +43,22 @@ config = {
 
 > **Note:** `"none"` (string) in the search space is automatically converted to Python `None`.
 
+For Logistic Regression searches restricted to `penalty=["elasticnet"]`, an
+omitted or null L1 ratio uses `0.5` in every candidate and the final model.
+Explicit numeric ratios are retained, and the resolved value appears in the
+best parameters. Search Elastic Net separately when combining it with other
+penalties would leave this conditional ratio unspecified.
+
 ## Configuration reference
+
+Missing feature values are admitted using the installed estimator's
+capabilities, including supported Random Forest, Extra Trees and Decision Tree
+configurations. Search overrides that can replace an incompatible fixed default
+are considered before rejecting the input. Each candidate's actual fit still
+enforces its restrictions, such as unsupported criteria or monotonic constraints.
+Models that cannot handle missing values require imputation; fold preprocessing
+can supply that imputation using only training rows. Missing targets and numeric
+infinity remain errors.
 
 These keys go inside the `"modeling"` block when `"type"` is `"hyperparameter_tuner"`:
 
@@ -100,7 +115,10 @@ Pass these inside `"strategy_params"`:
 When using `time_series_split`, Skyulf auto-sorts your data chronologically:
 
 1. If `cv_time_column` is set, data is sorted by that column (and the column is dropped from features to prevent leakage).
-2. If omitted, the first `datetime64` column is auto-detected and used.
+2. If omitted, the first supported date/datetime column is detected in input
+   order, including native pandas `datetime.date` object columns and Polars
+   Date/Datetime. Date strings and mixed or entirely missing object columns
+   are not automatically parsed or selected.
 3. If no datetime column exists, a warning is logged and row order is assumed correct.
 
 In the ML Canvas UI, selecting Time Series Split reveals a date column picker.

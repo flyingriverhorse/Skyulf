@@ -101,7 +101,7 @@ class FeatureEngineer:
 
         Args:
             data: Input frame, feature-target pair, or existing split dataset.
-            node_id_prefix: Prefix for the per-step transformer identifiers.
+            node_id_prefix (str): Prefix for the per-step transformer identifiers.
             target_column: Execution target excluded from automatic feature selection.
             on_split: Optional synchronous callback receiving the first actual row
                 split before later transformations run. Skipped splitters and

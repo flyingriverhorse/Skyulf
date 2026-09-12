@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING, Any, cast
 import numpy as np
 from sklearn.model_selection import ParameterGrid, ParameterSampler
 
+from .._class_weights import sample_weight_for_fit, split_class_weight_params
 from ..base import BaseModelCalculator
 from .metrics import resolve_scorer
 from .params import clean_search_space, instantiate_model, seed_params
@@ -143,11 +144,14 @@ def fit_and_score_candidate_fold(
             X_train_fold, y_train_fold = preprocessing.fit_transform(X_train_fold, y_train_fold)
             X_val_fold, y_val_fold = preprocessing.transform(X_val_fold, y_val_fold)
 
-        model = instantiate_model(
+        constructor_params, class_weight = split_class_weight_params(
             model_class,
             {**model_calculator.default_params, **(seed_params_overlay or {}), **params},
         )
-        model.fit(X_train_fold, y_train_fold)
+        model = instantiate_model(model_class, constructor_params)
+        sample_weight = sample_weight_for_fit(model, class_weight, y_train_fold)
+        fit_kwargs = {"sample_weight": sample_weight} if sample_weight is not None else {}
+        model.fit(X_train_fold, y_train_fold, **fit_kwargs)
 
         # Score — resolved against the fold's (post-transform) labels so
         # binary scorers get a valid pos_label even for string targets.

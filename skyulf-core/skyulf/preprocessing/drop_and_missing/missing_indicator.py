@@ -7,6 +7,7 @@ import polars as pl
 from ...core.meta.decorators import node_meta
 from ...registry import NodeRegistry
 from .._artifacts import MissingIndicatorArtifact
+from .._output_names import validate_generated_column_names
 from .._schema import SkyulfSchema
 from ..base import BaseApplier, BaseCalculator, apply_method
 from ..dispatcher import apply_dual_engine, fit_dual_engine
@@ -14,11 +15,21 @@ from ..dispatcher import apply_dual_engine, fit_dual_engine
 _DEFAULT_FLAG_SUFFIX = "_missing"
 
 
+def _validate_flag_names(X: Any, cols: list[str], suffix: str) -> None:
+    """Protect retained inputs from the flags that present source columns emit."""
+    validate_generated_column_names(
+        X.columns,
+        (f"{col}{suffix}" for col in cols if col in X.columns),
+        node_name="MissingIndicator",
+    )
+
+
 def _missing_indicator_apply_polars(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
     cols = params.get("columns", [])
     if not cols:
         return X, y
     suffix = params.get("flag_suffix") or _DEFAULT_FLAG_SUFFIX
+    _validate_flag_names(X, cols, suffix)
     schema = X.schema
     exprs = []
     for c in cols:
@@ -38,6 +49,7 @@ def _missing_indicator_apply_pandas(X: Any, y: Any, params: dict[str, Any]) -> t
     if not cols:
         return X, y
     suffix = params.get("flag_suffix") or _DEFAULT_FLAG_SUFFIX
+    _validate_flag_names(X, cols, suffix)
     X_out = X.copy()
     for col in cols:
         if col in X.columns:
@@ -54,7 +66,8 @@ class MissingIndicatorApplier(BaseApplier):
     flag the same cells, which needs care on polars — it stores float NaN
     distinctly from null where pandas' ``isna()`` treats both as missing, so
     float columns get an explicit NaN test. Columns absent from the frame are
-    skipped.
+    skipped. A generated flag name matching an existing column raises
+    ``ValueError``; input values are never overwritten by flags.
     """
 
     @apply_method
@@ -88,10 +101,12 @@ def _missing_indicator_fit_polars(
 ) -> MissingIndicatorArtifact:
     explicit = config.get("columns")
     cols = [c for c in explicit if c in X.columns] if explicit else _missing_cols_polars(X)
+    suffix = config.get("flag_suffix") or _DEFAULT_FLAG_SUFFIX
+    _validate_flag_names(X, cols, suffix)
     return {
         "type": "missing_indicator",
         "columns": cols,
-        "flag_suffix": config.get("flag_suffix") or _DEFAULT_FLAG_SUFFIX,
+        "flag_suffix": suffix,
     }
 
 
@@ -100,10 +115,12 @@ def _missing_indicator_fit_pandas(
 ) -> MissingIndicatorArtifact:
     explicit = config.get("columns")
     cols = [c for c in explicit if c in X.columns] if explicit else _missing_cols_pandas(X)
+    suffix = config.get("flag_suffix") or _DEFAULT_FLAG_SUFFIX
+    _validate_flag_names(X, cols, suffix)
     return {
         "type": "missing_indicator",
         "columns": cols,
-        "flag_suffix": config.get("flag_suffix") or _DEFAULT_FLAG_SUFFIX,
+        "flag_suffix": suffix,
     }
 
 
@@ -130,8 +147,9 @@ class MissingIndicatorCalculator(BaseCalculator):
         """Predict the added flag columns, or ``None`` when the set is data-dependent.
 
         With an explicit list the output is the input plus one ``int64``
-        ``<col><flag_suffix>`` column each; otherwise which columns hold
-        missing values decides, and callers must introspect at runtime.
+        ``<col><flag_suffix>`` column for each source present in the input;
+        otherwise which columns hold missing values decides, and callers
+        must introspect at runtime.
         """
         # Adds one int64 (0/1) column "<col><flag_suffix>" per indicator
         # column. Only predictable when the user supplied an explicit column
@@ -143,7 +161,8 @@ class MissingIndicatorCalculator(BaseCalculator):
         suffix = config.get("flag_suffix") or _DEFAULT_FLAG_SUFFIX
         new_schema = input_schema
         for col in explicit:
-            new_schema = new_schema.add(f"{col}{suffix}", "int64")
+            if col in input_schema:
+                new_schema = new_schema.add(f"{col}{suffix}", "int64")
         return new_schema
 
     def fit(self, df: Any, config: dict[str, Any]) -> MissingIndicatorArtifact:

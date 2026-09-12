@@ -13,6 +13,7 @@ from ._common import (
     SEASON_BY_MONTH,
     TIME_OF_DAY_BUCKETS,
     TIME_OF_DAY_DEFAULT,
+    _resolve_datetime_output_col,
     _resolve_group_agg_cols,
     _resolve_output_col,
     _resolve_similarity_pair,
@@ -170,7 +171,7 @@ _PANDAS_DT_FEATURES: dict[str, Callable[[Any], Any]] = {
 }
 
 
-def _pandas_datetime_apply(op: dict[str, Any], df_out: Any) -> None:
+def _pandas_datetime_apply(op: dict[str, Any], df_out: Any, allow_overwrite: bool = False) -> None:
     """Materialise datetime-extract features onto ``df_out`` in place."""
     valid = [c for c in op.get("input_columns", []) if c in df_out.columns]
     features = op.get("datetime_features", [])
@@ -181,7 +182,10 @@ def _pandas_datetime_apply(op: dict[str, Any], df_out: Any) -> None:
                 builder = _PANDAS_DT_FEATURES.get(feat)
                 if builder is None:
                     continue
-                df_out[f"{col}_{feat}"] = builder(dt)
+                output_col = _resolve_datetime_output_col(
+                    op, col, feat, list(df_out.columns), allow_overwrite
+                )
+                df_out[output_col] = builder(dt)
         except Exception as e:  # noqa: BLE001 - per-column datetime feature failure is logged and skipped
             logger.warning(f"Failed to extract datetime features for column {col}: {e}")
 
@@ -234,7 +238,7 @@ def _featgen_apply_pandas(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, 
         op_type = op.get("operation_type", "arithmetic")
         try:
             if op_type == "datetime_extract":
-                _pandas_datetime_apply(op, df_out)
+                _pandas_datetime_apply(op, df_out, allow_overwrite)
                 continue
             handler = _PANDAS_OP_HANDLERS.get(op_type)
             if handler is None:

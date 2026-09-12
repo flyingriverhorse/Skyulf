@@ -1,14 +1,12 @@
 import type { Node, Edge } from '@xyflow/react';
 import type { NodeConfigModel, PipelineConfigModel } from '../api/client';
 import { convertGraphToPipelineConfig } from './pipelineConverter';
+import { getPreviewGraph } from './previewGraph';
 
 /** Inspection sinks have separate jobs and are excluded from data preview. */
 export function buildPreviewConfiguration(nodes: Node[], edges: Edge[]): PipelineConfigModel {
-  const excluded = new Set(nodes.filter(node => node.data.definitionType === 'data_preview').map(node => node.id));
-  return convertGraphToPipelineConfig(
-    nodes.filter(node => !excluded.has(node.id)),
-    edges.filter(edge => !excluded.has(edge.source) && !excluded.has(edge.target)),
-  );
+  const graph = getPreviewGraph(nodes, edges);
+  return convertGraphToPipelineConfig(graph.nodes, graph.edges);
 }
 
 /** Sort object keys without changing meaningful array/merge input order. */

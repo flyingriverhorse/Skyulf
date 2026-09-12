@@ -79,16 +79,16 @@ jobs:
           echo "::endgroup::"
           echo "## 🧪 Backend test suite" >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Complexity gate (lizard, CCN 8)
+      - name: Complexity report (lizard, CCN > 8)
         run: |
-          # Non-blocking full-tree report for now — no "known-clean" backend/
-          # subpackage has been designated as a hard gate yet (unlike
-          # skyulf-core-tests.yml's core/engines/scaling/transformations).
-          # Promote specific backend/ paths to a hard `-w` gate once they're
-          # verified clean.
-          echo "::group::Full-tree lizard report (informational only, non-blocking)"
+          echo "::group::Full-tree lizard report (CCN > 8, non-blocking)"
           lizard backend --CCN 8 -w || true
           echo "::endgroup::"
+
+      - name: Complexity gate (lizard, CCN 10)
+        run: |
+          bash .github/scripts/run_check.sh "Lizard complexity gate (backend, CCN 10)" \
+            lizard backend --CCN 10 -w
 
       - name: Run backend tests
         # Scoped to the root tests/ dir (backend API, Celery, DB, node

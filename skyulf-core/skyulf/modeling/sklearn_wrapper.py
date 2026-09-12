@@ -8,11 +8,14 @@ from typing import Any, cast
 import pandas as pd
 from sklearn.base import BaseEstimator
 from sklearn.exceptions import ConvergenceWarning
-from sklearn.utils.class_weight import compute_sample_weight
 
 from ..engines import SkyulfDataFrame
 from ..engines.sklearn_bridge import SklearnBridge
 from ..types import DEFAULT_RANDOM_STATE
+from ._class_weights import (
+    sample_weight_for_fit,
+    split_class_weight_params,
+)
 from .base import BaseModelApplier, BaseModelCalculator
 
 logger = logging.getLogger(__name__)
@@ -61,27 +64,9 @@ class SklearnCalculator(BaseModelCalculator):
         # 1. Merge Config with Defaults
         params = self._resolve_fit_params(config)
 
-        # A generic <select> UI element always submits its option value as a
-        # string, so a "None" option (e.g. "no class weighting") arrives here
-        # as the literal string "None", not Python None. Normalize that back
-        # to None before anything below decides whether class weighting was
-        # actually requested.
-        if params.get("class_weight") in ("None", "none", ""):
-            params["class_weight"] = None
-
-        # Some estimators (e.g. XGBoost's sklearn wrapper) accept arbitrary
-        # **kwargs in their constructor but have no built-in notion of class
-        # weighting: a `class_weight` kwarg is silently stored and ignored at
-        # fit time (no error — just a native warning). Detect that case up
-        # front (by checking whether `class_weight` is an explicitly named
-        # constructor parameter, not just swallowed by **kwargs) and, if the
-        # value isn't None, translate it into a `sample_weight` array passed
-        # to `.fit()` instead, so "balanced"/dict class weighting behaves the
-        # same regardless of whether the underlying library supports it
-        # natively.
-        class_weight_to_apply = None
-        if "class_weight" in params and not self._constructor_accepts_class_weight():
-            class_weight_to_apply = params.pop("class_weight")
+        # Share normalization and nonnative conversion with tuning so every
+        # fit computes class weights from its own training labels.
+        params, class_weight_to_apply = split_class_weight_params(self.model_class, params)
 
         msg = f"Initializing {self.model_class.__name__} with params: {params}"
         logger.info(msg)
@@ -218,17 +203,6 @@ class SklearnCalculator(BaseModelCalculator):
             )
         return valid_params
 
-    def _constructor_accepts_class_weight(self) -> bool:
-        """Check whether the wrapped model's constructor declares `class_weight`.
-
-        True if the parameter is explicitly named (e.g. RandomForestClassifier,
-        LGBMClassifier, LogisticRegression) — as opposed to merely accepting
-        arbitrary **kwargs (e.g. XGBoost's sklearn wrapper) that silently
-        swallow it.
-        """
-        sig = inspect.signature(self.model_class)
-        return "class_weight" in sig.parameters
-
     def _compute_sample_weight_for_fit(self, model: Any, class_weight: Any, y_np: Any) -> Any:
         """Translate a `class_weight` value into a per-sample weight array.
 
@@ -236,14 +210,7 @@ class SklearnCalculator(BaseModelCalculator):
         instead of silently no-op'ing if the model's `.fit()` doesn't accept
         `sample_weight` either.
         """
-        fit_sig = inspect.signature(model.fit)
-        if "sample_weight" not in fit_sig.parameters:
-            raise ValueError(
-                f"{self.model_class.__name__} does not support 'class_weight' natively "
-                "and its fit() method does not accept 'sample_weight' either, so "
-                "class weighting cannot be applied to this model."
-            )
-        return compute_sample_weight(class_weight, y_np)
+        return sample_weight_for_fit(model, class_weight, y_np)
 
 
 class SklearnApplier(BaseModelApplier):

@@ -5,6 +5,7 @@ from collections.abc import Mapping
 from typing import Any, cast
 
 import numpy as np
+import pandas as pd
 import polars as pl
 from sklearn.preprocessing import LabelEncoder
 
@@ -66,7 +67,7 @@ def _label_apply_polars(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, An
     missing_code = params.get("missing_code", -1)
 
     X_out = X.clone()
-    y_out = y.clone() if y is not None else None
+    y_out = y
 
     if cols:
         exprs = _build_polars_feature_exprs(
@@ -78,8 +79,7 @@ def _label_apply_polars(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, An
     if y_out is not None and "__target__" in encoders:
         mapping = _le_mapping_str(encoders["__target__"])
         y_out = (
-            y_out.cast(pl.Utf8)
-            .fill_null("nan")
+            pl.Series(getattr(y, "name", "target"), _y_to_str_array(y))
             .replace_strict(mapping, default=missing_code)
             .cast(pl.Int64)
         )
@@ -93,7 +93,7 @@ def _label_apply_pandas(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, An
     missing_code = params.get("missing_code", -1)
 
     X_out = X.copy()
-    y_out = y.copy() if y is not None else None
+    y_out = y
 
     if cols:
         for col in cols:
@@ -112,7 +112,12 @@ def _label_apply_pandas(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, An
 
     if y_out is not None and "__target__" in encoders:
         mapping = _le_mapping(encoders["__target__"])
-        y_out = y_out.astype(str).map(mapping).fillna(missing_code).astype("int64")
+        keys = pd.Series(
+            _y_to_str_array(y),
+            index=y.index if isinstance(y, pd.Series) else None,
+            name=getattr(y, "name", None),
+        )
+        y_out = keys.map(mapping).fillna(missing_code).astype("int64")
 
     return X_out, y_out
 
@@ -124,6 +129,9 @@ class LabelEncoderApplier(BaseApplier):
     integer category without matching literal numeric strings. Legacy artifacts
     retain their original string lookup. Values unseen at fit time map to
     ``missing_code``. Target encoders retain their existing string-label behavior.
+    Encoded targets are native Series for the feature engine; pandas Series keep
+    their index and all native Series keep their name. Unencoded targets pass
+    through unchanged, including lists and NumPy arrays.
     """
 
     @apply_method

@@ -11,6 +11,16 @@
 ## Findings
 
 ### OC-66
+
+**Completed 2026-09-12 after user-reported re-verification.** The earlier
+flat-configuration repair did not handle Canvas selections inside
+`search_space`. Grid/Random silently used logistic regression, while
+Optuna/halving rejected the symbolic `base_estimator` parameter. The calibration
+wrapper now accepts and resolves each candidate choice, including nested fold
+pipelines and final refitting. See the
+[follow-up log](../opus_core_analysis-tracker.md#2026-09-12-oc-66-follow-up-canvas-calibrated-base-selection).
+The original reproduction below is retained as historical evidence.
+
 ### 🟠 High — `CalibratedClassifierCV`'s user-selected base estimator is silently discarded during tuning
 
 **Files:** `skyulf/modeling/classification.py:206-282` (resolution) vs
