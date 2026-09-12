@@ -27,10 +27,9 @@ detail lives in the archive's `## Log` section.
 
 ## Live — fix queue
 
-**Current status (2026-09-12): 42 open / 4 parked.** OC-35/249/252/258/262
-are fixed; the latest Core review's OC-264–270 additions remain open.
-OC-248/250 remain the next training priorities; OC-46 remains reopened.
-Filing, reproduction and verification
+**Current status (2026-09-12): 37 open / 4 parked.** OC-46/248/250/254/263
+are fixed in the latest batch. The Now and Next tiers have no open rows;
+the remaining findings continue below by domain. Reproduction and verification
 details are in the [archive Log](opus_core_analysis-tracker.md#log).
 
 Ordered by the master report's suggested fix order: **Now** (silent wrongness
@@ -38,24 +37,18 @@ reaching users), **Next** (wrong results in realistic configs), **Then** (decide
 deployment model), **Ongoing** (remove the hiding conditions). Remaining findings
 follow, grouped by domain.
 
-The **Now** tier contains the newly reproduced training/threshold defects;
-**Next** contains the remaining PCA payload path of OC-46.
-The **Ongoing** tier has no open findings left; its completed rows are in the
-archive. The earlier fixes remain recorded there and are not undone by reopening
-these narrower cases.
+The **Now**, **Next** and **Ongoing** tiers currently have no open findings;
+their completed rows and verification history are retained in the archive.
 
 ### Now — silent wrongness reaching users
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
-| OC-248 | 🟠 | Merged fold preprocessing joins different observations: `LagFeatures`/`RollingAggregate` can sort a branch, and `LagFeatures(drop_na=True)`/`ManualBounds` can filter it, but the merge resets indexes, combines columns positionally and takes the first branch's target (`preprocessing/fold_adapter.py:28-34,52-54,181`) | medium | ⬜ open — runtime reproduction leaves times `[3,1,2]` with targets `[100,200,300]`; filtering also produces 3 feature rows / 2 targets despite `changes_row_count=False`. |
-| OC-250 | 🟠 | Tuning bypasses the calculator's nonnative `class_weight` to `sample_weight` conversion while reporting `class_weight="balanced"` in the selected parameters (`modeling/_tuning/grid_random.py:150-154`, `refit.py:77`, `params.py:60`) | medium | ⬜ open — GradientBoosting and XGBoost tuned probabilities exactly match unweighted fits; maximum differences from the corresponding balanced fits are `0.575548` and `0.631411`. |
 
 ### Next — wrong results in realistic configs
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
-| OC-46 | 🟡 | Constant numeric features still publish non-finite PCA explained-variance ratios in the public profile (`profiling/_analyzer/multivariate.py:161`, `profiling/schemas.py:PCAComponent`) | small | ⬜ reopened 2026-09-12 — ten identical rows with two constant features produce `[NaN, NaN]`; `json.dumps(profile.model_dump(mode="json"), allow_nan=False)` raises ValueError. |
 
 ### Then — decide deployment model first
 
@@ -103,7 +96,6 @@ these narrower cases.
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
-| OC-254 | 🟡 | LabelEncoder fits supported NumPy/list targets but assumes native Series methods during apply (`preprocessing/encoding/label.py:69,113-115`) | small | ⬜ open — NumPy targets raise missing `.map` on pandas and missing `.clone` on Polars; lists fail on `.astype`/`.clone`, and Polars fails even for feature-only encoding. |
 | OC-267 | 🟡 | SMOTE+Tomek stores but ignores the configured `k_neighbors`, leaving its inner SMOTE at the default five neighbors (`preprocessing/resampling.py:221-222,292`) | small | ⬜ open — with two minority observations and `k_neighbors=1`, ordinary SMOTE and a correctly configured SMOTETomek balance both classes to five rows, while Core's combined sampler raises `n_neighbors=6 > n_samples_fit=2`. |
 
 ### Remaining — feature generation / selection / vectorization / transformations
@@ -137,7 +129,6 @@ these narrower cases.
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
 | OC-255 | 🟡 | DateFeatures uses local offsets on pandas and UTC on Polars; mixed DST offsets make the pandas `.dt` access fail (`preprocessing/time_series/date_features.py:64-66,106-109`) | small | ⬜ open — identical `+02:00` strings produce different days/hours; mixed `+02:00`/`+03:00` strings raise AttributeError on pandas, so choose and enforce one timezone contract. |
-| OC-263 | 🟡 | Haversine roundoff can put the intermediate outside `[0,1]`, producing NaN for valid antipodal coordinates on both engines (`preprocessing/geo/distance.py:53-54,108-109`) | small | ⬜ open — `(-89.91000888888888,0)` to `(89.91000888888888,180)` returns NaN instead of approximately `20015.114442 km`. |
 | OC-265 | 🟡 | Polars string-to-datetime casting uses a generic cast without parsing and silently replaces valid ISO dates with nulls under default coercion (`preprocessing/casting.py:221`) | small | ⬜ open — `2024-01-01` and `2024-06-15` become two nulls while the same Casting node on pandas preserves both dates; separate from DateFeatures timezone handling in OC-255. |
 | OC-266 | 🟡 | Polars categorical-to-boolean casting invokes string methods on categorical expressions; Enum inputs fall through to an unsupported generic cast (`preprocessing/casting.py:109,177-179,221`) | small | ⬜ open — categorical and Enum `true`/`false` inputs raise SchemaError and ComputeError respectively, while plain Polars strings and pandas categorical values convert successfully. |
 

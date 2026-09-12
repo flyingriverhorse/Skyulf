@@ -317,6 +317,51 @@ def test_corrupt_raw_fold_payload_fails_before_scoring_by_default(tmp_path, monk
     assert "cv_mean_score" not in model.metrics
 
 
+@pytest.mark.parametrize("engine_name", ["pandas", "polars"])
+@pytest.mark.parametrize("mode", ["raise", "warn"])
+@pytest.mark.parametrize(
+    "operation, reason",
+    [
+        (_step("LagFeatures", columns=["x"], sort_by="x"), "changes row order"),
+        (_step("RollingAggregate", columns=["x"], sort_by="x"), "changes row order"),
+        (_step("ManualBounds", bounds={"x": {"lower": -100}}), "changes row counts"),
+    ],
+)
+def test_merged_fold_row_contract_reaches_production_scoring_gate(
+    tmp_path, monkeypatch, engine_name, mode, operation, reason
+):
+    """Unsupported positional joins must block CV unless legacy fallback is explicitly chosen."""
+    monkeypatch.setenv("SKYULF_ENGINE", engine_name)
+    result, logs, _store = _run(
+        tmp_path,
+        [
+            _node("split", "TrainTestSplitter", ["load"], target_column="target"),
+            _node("left", "WOEEncoder", ["split"], columns=["city"]),
+            _node(
+                "right",
+                "feature_engineering",
+                ["split"],
+                steps=[
+                    _step("WOEEncoder", columns=["city"]),
+                    operation,
+                    _step("SimpleImputer", strategy="mean"),
+                ],
+            ),
+        ],
+        ["left", "right"],
+        mode=mode,
+    )
+    model = result.node_results["model"]
+    if mode == "raise":
+        assert result.status == "failed"
+        assert reason in model.error
+        assert not any(name.startswith("cv_") for name in model.metrics)
+    else:
+        assert result.status == "success"
+        assert model.metrics["fold_refit_fallback"] == "row_changing_branch_step"
+        assert any(reason in message for message in logs)
+
+
 def test_shared_encoder_with_ambiguous_targets_has_no_target_only_exemption():
     """A shared encoder cannot borrow either sibling model's target when they disagree."""
     nodes = [

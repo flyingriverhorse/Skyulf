@@ -6,6 +6,7 @@ on each ``fit_transform``, so constructing a new engineer per fold *is* the
 clone operation — no fitted state is ever copied or reset.
 """
 
+from copy import deepcopy
 from typing import Any
 
 import pandas as pd
@@ -28,10 +29,29 @@ SPLITTER_STEP_TYPES = frozenset({"TrainTestSplitter", "Split", "feature_target_s
 ROW_COUNT_CHANGING_STEP_TYPES = frozenset(
     FeatureEngineer._ROW_DROPPING_TYPES
     | FeatureEngineer._RESAMPLING_TYPES
-    | {"IQR", "ZScore", "Winsorize", "EllipticEnvelope"}
+    | {"IQR", "ZScore", "Winsorize", "EllipticEnvelope", "ManualBounds"}
 )
 
 UNSAFE_BRANCH_STEP_TYPES = SPLITTER_STEP_TYPES | ROW_COUNT_CHANGING_STEP_TYPES
+
+
+def step_changes_row_count(step: dict[str, Any]) -> bool:
+    """Recognize row-changing nodes and optional filtering enabled in their config."""
+    return step.get("transformer") in ROW_COUNT_CHANGING_STEP_TYPES or (
+        step.get("transformer") == "LagFeatures" and bool(step.get("params", {}).get("drop_na"))
+    )
+
+
+def merged_branch_step_unsafe_reason(step: dict[str, Any]) -> str | None:
+    """Explain why a configured branch cannot preserve positional row alignment."""
+    transformer = step.get("transformer")
+    if transformer in SPLITTER_STEP_TYPES:
+        return "splits data"
+    if step_changes_row_count(step):
+        return "changes row counts"
+    if transformer in {"LagFeatures", "RollingAggregate"} and step.get("params", {}).get("sort_by"):
+        return "changes row order"
+    return None
 
 
 def _merge_branch_frames_columnwise(frames: list[pd.DataFrame], strategy: str) -> pd.DataFrame:
@@ -84,18 +104,17 @@ class MergedBranchFoldAdapter:
         target_column: str,
         drop_columns: list[str] | tuple[str, ...] = (),
     ):
-        """Validate every branch up front so a fold can never fail mid-run.
+        """Validate every branch against the positional merge's row contract.
 
         Each step list is trial-built as a :class:`FeatureEngineer`, screened
-        against :data:`UNSAFE_BRANCH_STEP_TYPES`, and resolved through the node
-        registry. The lists are then copied — shallowly, so the step dicts stay
-        shared — meaning a caller appending to its own list afterwards cannot
-        reach a constructed adapter.
+        for splitting, row filtering and configured sorting, and resolved
+        through the node registry. Configurations are copied in full so later
+        caller edits cannot bypass these checks.
 
         Raises:
             ValueError: If the merge strategy is unrecognized, if there is no
                 branch step list or one is empty, or if a branch step splits the
-                data or changes row counts.
+                data, changes row counts or sorts rows.
         """
         if merge_strategy not in ("last_wins", "first_wins"):
             raise ValueError(f"unknown merge strategy '{merge_strategy}'")
@@ -107,19 +126,19 @@ class MergedBranchFoldAdapter:
             FeatureEngineer(list(steps))
             for step in steps:
                 transformer = step["transformer"]
-                if transformer in UNSAFE_BRANCH_STEP_TYPES:
+                reason = merged_branch_step_unsafe_reason(step)
+                if reason is not None:
                     raise ValueError(
-                        f"branch step '{transformer}' cannot run inside a fold: "
-                        "it splits the data or changes row counts"
+                        f"branch step '{transformer}' cannot run inside a merged fold: it {reason}"
                     )
                 NodeRegistry.get_calculator(transformer)
-        self._branch_step_lists = [list(steps) for steps in branch_step_lists]
+        self._branch_step_lists = deepcopy(branch_step_lists)
         self._merge_strategy = merge_strategy
         self._target_column = target_column
         self._drop_columns = list(drop_columns)
         self._engineers: list[FeatureEngineer] | None = None
-        # Branch steps are screened against UNSAFE_BRANCH_STEP_TYPES, so the
-        # merge keeps every row.
+        # Branch configurations are screened for filtering and sorting, so
+        # the positional merge keeps every observation in its original order.
         self.changes_row_count = False
 
     def fit_transform(self, X: Any, y: Any) -> tuple[Any, Any]:
@@ -135,8 +154,9 @@ class MergedBranchFoldAdapter:
         self._validate_payload(X)
         engineers = [FeatureEngineer(list(steps)) for steps in self._branch_step_lists]
         frames, ys = self._run_branches(engineers, (X, y), fit=True)
+        result = self._finalize(frames, ys)
         self._engineers = engineers
-        return self._finalize(frames, ys)
+        return result
 
     def transform(self, X: Any, y: Any) -> tuple[Any, Any]:
         """Re-apply the branch engineers fitted by the last :meth:`fit_transform`.
@@ -155,9 +175,14 @@ class MergedBranchFoldAdapter:
     def _run_branches(
         self, engineers: list[FeatureEngineer], payload: Any, *, fit: bool
     ) -> tuple[list[pd.DataFrame], list[Any]]:
+        """Run each branch and reject row-count violations before a positional merge."""
         frames: list[pd.DataFrame] = []
         ys: list[Any] = []
         input_y = payload[1] if isinstance(payload, tuple) else None
+        input_X = payload[0] if isinstance(payload, tuple) else payload
+        expected_rows = frame_rows(input_X)
+        if input_y is not None and frame_rows(input_y) != expected_rows:
+            raise ValueError("Merged fold features and target have different row counts")
         for engineer in engineers:
             out = engineer.fit_transform(payload)[0] if fit else engineer.transform(payload)
             if isinstance(out, tuple) and len(out) == 2:
@@ -165,6 +190,12 @@ class MergedBranchFoldAdapter:
             else:
                 # Appliers that return a bare frame pass the target through.
                 frame, y_out = out, input_y
+            if frame_rows(frame) != expected_rows or (
+                y_out is not None and frame_rows(y_out) != expected_rows
+            ):
+                raise ValueError(
+                    "Merged fold branch changed row counts; positional merge is unsafe"
+                )
             if isinstance(frame, pl.DataFrame):
                 frame = frame.to_pandas()
             frames.append(frame)
@@ -172,6 +203,7 @@ class MergedBranchFoldAdapter:
         return frames, ys
 
     def _finalize(self, frames: list[pd.DataFrame], ys: list[Any]) -> tuple[Any, Any]:
+        """Apply column ownership and configured drops to validated branch outputs."""
         merged = _merge_branch_frames_columnwise(frames, self._merge_strategy)
         drop = [col for col in self._drop_columns if col in merged.columns]
         if drop:
@@ -181,6 +213,7 @@ class MergedBranchFoldAdapter:
         return merged, ys[0]
 
     def _validate_payload(self, X: Any) -> None:
+        """Reject targets embedded in the feature columns before branch execution."""
         if hasattr(X, "columns") and self._target_column in X.columns:
             raise ValueError(f"target column '{self._target_column}' already present in X")
 
@@ -217,9 +250,7 @@ class FeatureEngineerFoldAdapter:
         self._target_column = target_column
         # True when any step reshapes the rows/target (resampling, row
         # drops); documents the chain's nature for callers that need it.
-        self.changes_row_count = any(
-            step.get("transformer") in ROW_COUNT_CHANGING_STEP_TYPES for step in self._steps_config
-        )
+        self.changes_row_count = any(step_changes_row_count(step) for step in self._steps_config)
         # Validate eagerly (unknown transformer names, bad params) so a
         # misconfigured chain fails at construction, not mid-fold.
         # validate_preprocessing_steps does not check registry membership,

@@ -25,6 +25,7 @@ from sklearn.pipeline import Pipeline
 from ..._validation import raise_invalid_choice
 from ...engines import SkyulfDataFrame
 from ...engines.sklearn_bridge import SklearnBridge
+from .._class_weights import constructor_accepts_class_weight, split_class_weight_params
 from .._evaluation.thresholds import apply_thresholds
 from ..base import BaseModelApplier, BaseModelCalculator
 from ..cross_validation import _sort_by_time
@@ -542,9 +543,10 @@ class TuningCalculator(BaseModelCalculator):
 
         # ``default_params`` may carry structural args (e.g. an ensemble's
         # resolved ``estimators``); the instantiator filters/routes them safely.
-        base_estimator = instantiate_model(
+        constructor_params, class_weight = split_class_weight_params(
             model_class, {**self.model_calculator.default_params, **seed_params(config)}
         )
+        base_estimator = instantiate_model(model_class, constructor_params)
 
         # halving/optuna searchers run their CV internally, where the engine's
         # per-fold hook cannot reach; wrap preprocessing + model in one
@@ -553,6 +555,16 @@ class TuningCalculator(BaseModelCalculator):
         # fold's training rows, so chains that resample rows or re-encode
         # the target are safe here too.
         searcher_strategy = config.strategy in ("halving_grid", "halving_random", "optuna")
+        # Nonnative class weights also need a fit-time step, even without
+        # preprocessing: each clone must derive weights from its train fold.
+        weighted = (
+            searcher_strategy
+            and not constructor_accepts_class_weight(model_class)
+            and (
+                "class_weight" in self.model_calculator.default_params
+                or "class_weight" in config.search_space
+            )
+        )
         wrapped = preprocessing is not None and searcher_strategy
         if wrapped and preprocessing_frames is None:
             # Numpy-only SDK call: the preprocessor needs named frames to
@@ -580,8 +592,8 @@ class TuningCalculator(BaseModelCalculator):
                 )
         estimator: Any = base_estimator
         search_config = config
-        if wrapped and preprocessing_frames is not None:
-            frame_x = preprocessing_frames[0]
+        if wrapped or weighted:
+            frame_x = preprocessing_frames[0] if preprocessing_frames is not None else None
             feature_names = (
                 tuple(map(str, frame_x.columns)) if hasattr(frame_x, "columns") else None
             )
@@ -591,22 +603,28 @@ class TuningCalculator(BaseModelCalculator):
                         "model",
                         FoldAwareModelStep(
                             estimator=base_estimator,
-                            preprocessor=preprocessing,
+                            preprocessor=preprocessing if wrapped else None,
                             feature_names=feature_names,
+                            class_weight=class_weight,
                         ),
                     )
                 ]
             )
-            if log_callback:
+            if wrapped and log_callback:
                 log_callback(
                     "Per-fold preprocessing refit runs inside the searcher via "
                     "the fold-aware estimator."
                 )
-            # Search-space keys must route through the pipeline to the base estimator.
+            # Nonnative weights belong to the fit-time step; constructor
+            # parameters still route to the underlying estimator.
             search_config = replace(
                 config,
                 search_space={
-                    f"model__estimator__{key}": values
+                    (
+                        "model__class_weight"
+                        if weighted and key == "class_weight"
+                        else f"model__estimator__{key}"
+                    ): values
                     for key, values in (config.search_space or {}).items()
                 },
             )
@@ -700,7 +718,7 @@ class TuningCalculator(BaseModelCalculator):
 
         # Collect trials
         trials = _runner.collect_trials(searcher, config)
-        if wrapped:
+        if wrapped or weighted:
             best_params = _runner.strip_model_prefix(best_params)
             trials = [
                 {**trial, "params": _runner.strip_model_prefix(trial["params"])} for trial in trials

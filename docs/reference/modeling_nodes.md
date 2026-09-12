@@ -66,6 +66,16 @@ Binary evaluation omits the ROC curve and ROC AUC when the held-out partition
 contains only one trained class, since ROC requires both classes. Finite
 precision-recall output and the other available metrics remain in the report.
 
+`class_weight` is applied consistently in direct training, every tuning
+strategy and final refitting. Models such as GradientBoosting and XGBoost that
+do not accept it natively receive equivalent per-row training weights.
+`"balanced"` weights are computed from each fold's training labels after
+preprocessing; validation labels do not influence them. Explicit weight
+dictionaries use the labels passed to model fitting. Estimators that support
+neither class weights nor sample weights reject an active weighting request.
+Previously affected tuned models must be retrained to apply these weights;
+existing saved models retain their predictions.
+
 ### LightGBM row sampling
 
 The `lgbm_classifier` and `lgbm_regressor` nodes apply `subsample` during basic

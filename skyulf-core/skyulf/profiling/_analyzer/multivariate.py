@@ -195,7 +195,7 @@ class MultivariateMixin(_AnalyzerState):
     def _calculate_pca(
         self, numeric_cols: list[str], target_col: str | None = None
     ) -> tuple[list[PCAPoint] | None, list[PCAComponent] | None]:
-        """3-component PCA projection + per-component top loadings."""
+        """Return PCA points/loadings, or no PCA when the sample has no feature variation."""
         try:
             X_scaled, sample_df, _ = self._prepare_matrix_sample(
                 numeric_cols, target_col=target_col, limit=5000
@@ -206,6 +206,9 @@ class MultivariateMixin(_AnalyzerState):
 
             n_components = min(3, X_scaled.shape[0], X_scaled.shape[1])
             if n_components < 1:
+                return None, None
+            # Identical rows have zero total variance, so explained ratios are undefined.
+            if not np.any(X_scaled != X_scaled[0]):
                 return None, None
             pca = PCA(n_components=n_components)
             X_pca = pca.fit_transform(X_scaled)

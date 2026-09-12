@@ -359,6 +359,13 @@ Learned params:
 - `encoders`: dict[col or "__target__" -> sklearn LabelEncoder]
 - `classes_count`
 
+Targets may be lists, NumPy arrays or a Series from the feature dataframe's
+engine. Encoded targets become native integer Series; existing Series names
+and pandas indexes are preserved. For example, fitting on
+`["yes", "no", "yes"]` produces `[1, 0, 1]`. Feature-only encoding leaves
+the target container and values unchanged. Unknown target labels still use
+the configured `missing_code`.
+
 ### TargetEncoder
 
 Requires a target series (`y`).
@@ -742,6 +749,10 @@ Computes the great-circle (`haversine`) or flat-plane (`euclidean`) distance
 between two lat/lon coordinate pairs and appends it as a new numeric column.
 Pure math — no optional geospatial dependency required, and runs natively on
 both the pandas and polars engines.
+
+Haversine calculations remain finite for valid antipodal points: opposite
+points on Earth yield approximately `20015.114442 km`. Missing coordinates
+remain missing rather than becoming a valid distance.
 
 Config:
 

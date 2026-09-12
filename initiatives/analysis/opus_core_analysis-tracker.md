@@ -90,6 +90,8 @@ uses, so a fixed finding stays where it was filed.
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
+| OC-250 | 🟠 | Tuning bypasses the calculator's nonnative `class_weight` to `sample_weight` conversion while reporting `class_weight="balanced"` in the selected parameters (`modeling/_tuning/grid_random.py:150-154`, `refit.py:77`, `params.py:60`) | medium | ✅ fixed 2026-09-12 — share direct-fit weighting policy across all five tuning strategies and final refit, computing nonnative sample weights only from each fit's transformed training labels. |
+| OC-248 | 🟠 | Merged fold preprocessing joins different observations: `LagFeatures`/`RollingAggregate` can sort a branch, and `LagFeatures(drop_na=True)`/`ManualBounds` can filter it, but the merge resets indexes, combines columns positionally and takes the first branch's target (`preprocessing/fold_adapter.py:28-34,52-54,181`) | medium | ✅ fixed 2026-09-12 — enforce the existing row-preserving positional merge contract for configured sorting/filtering in Core and backend, isolate validated configs and reject runtime row-count violations. |
 | OC-249 | 🟠 | Public threshold optimization transforms only `X_val`, leaving `y_val` in its original order when preprocessing sorts or filters rows (`pipeline/_pipeline.py:543-549`) | small | ✅ fixed 2026-09-12 — validate raw row counts and carry labels through fitted preprocessing sorting/filtering before threshold scoring; both engines and failure-state preservation are covered. |
 | OC-75 | 🔴 | Dev polars 1.40.1 below declared floor ≥1.43.2 — 10 tests, every notebook, a benchmark broken; prerequisite for trusting any polars result | 1 line | ✅ done |
 | OC-12 | 🔴 | Row-dropping desyncs `X` and `y` on non-unique pandas indexes (`drop_rows.py:60-67`, `deduplicate.py:44-47`); polars path already correct | small | ✅ fixed 2026-09-03 |
@@ -100,6 +102,7 @@ uses, so a fixed finding stays where it was filed.
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
+| OC-46 | 🟡 | Constant numeric features still publish non-finite PCA explained-variance ratios in the public profile (`profiling/_analyzer/multivariate.py:161`, `profiling/schemas.py:PCAComponent`) | small | ✅ fixed 2026-09-12 — return the existing unavailable PCA state for constant prepared features, keeping strict JSON finite while retaining PCA for varying inputs. |
 | OC-35 | 🟠 | Binary evaluation still builds a ROC curve when the held-out partition contains only one class, publishing NaN coordinates (`modeling/_evaluation/classification.py:88-94`) | small | ✅ fixed 2026-09-12 — omit undefined binary ROC curves for single-class holdouts while preserving finite PR output and the earlier multiclass guard. |
 | OC-207 | 🟠 | `optimize_thresholds()` transforms its `X_val` internally (`pipeline/_pipeline.py:325`), but `docs/user_guide/threshold_tuning.md:32`, `skyulf-core/README.md:205` and the method's own docstring (`:280`) all tell callers to feed it `get_fitted_split()` output — which is **already** preprocessed. The documented workflow therefore tunes thresholds on double-transformed probabilities, and `predict(use_tuned_thresholds=True)` then applies them to singly-transformed ones (`:365`), so the cutoffs are fitted against a distribution inference never reproduces. Needs a contract decision (fix the three docs, or accept pre-transformed input) before code | decision + small | ✅ fixed 2026-09-07 — the contract decision was "keep the code, fix the prose": `optimize_thresholds` and `predict` already both took raw input and transformed exactly once, so the three narrative sites that pointed callers at `get_fitted_split()` were the defect. See the log entry |
 | OC-177 | 🟠 | Pandas `DummyEncoder` changes a known category's encoding with batch composition: after fitting `[1.0,2.0]`, `1.0` encodes as known alone but all-zero when accompanied by `2.5` (`preprocessing/encoding/dummy.py:60-64`) | small | ✅ fixed 2026-09-06 — **broader than filed**: the two engines also learned different category *strings* from the same float data (`["1","2"]` vs `["1.0","2.0"]`), so they emitted differently named indicator columns; both symptoms were one batch-dependent renderer, replaced by a per-value rule shared by the engines. See the log entry |
@@ -215,6 +218,7 @@ uses, so a fixed finding stays where it was filed.
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
+| OC-254 | 🟡 | LabelEncoder fits supported NumPy/list targets but assumes native Series methods during apply (`preprocessing/encoding/label.py:69,113-115`) | small | ✅ fixed 2026-09-12 — normalize encoded list/NumPy targets with the fitted string-label policy, preserve native Series metadata and pass feature-only targets through unchanged. |
 | OC-18 | 🟡 | One-hot/dummy generated names can collide with existing columns (`encoding/one_hot.py`, `dummy.py`) | small | ✅ fixed 2026-09-12 — reject conflicting generated names in one-hot, dummy, missing-indicator and multiclass target encoding at fit/apply, while preserving legitimate reuse of dropped source names. |
 | OC-21 | 🟡 | WOE additive smoothing not normalized over categories (`encoding/woe.py`) | small | ✅ fixed 2026-09-11 — normalize class totals by all observed-category pseudocounts in full fits and training complements, correcting WOE/IV without rewriting saved mappings. |
 | OC-172 | 🟡 | `StandardScaler` crashes on mixed pandas nullable numeric columns containing `pd.NA`; native sklearn and equivalent Polars input succeed (`preprocessing/scaling/standard.py:144,154`, `engines/sklearn_bridge.py:52`) | small | ✅ fixed 2026-09-09 - nullable numeric missing sentinels become NumPy NaN without rounding observed integers; StandardScaler applies numeric arithmetic safely. |
@@ -293,6 +297,7 @@ uses, so a fixed finding stays where it was filed.
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
+| OC-263 | 🟡 | Haversine roundoff can put the intermediate outside `[0,1]`, producing NaN for valid antipodal coordinates on both engines (`preprocessing/geo/distance.py:53-54,108-109`) | small | ✅ fixed 2026-09-12 — clamp the Haversine intermediary to its valid range on both engines, preserving missingness and finite antipodal distances. |
 | OC-59 | 🟠 | DatasetProfile selects different numeric-column sets on pandas and Polars (`preprocessing/inspection.py`) | small | ✅ fixed 2026-09-12 — use shared dtype-based selection, include supported small/unsigned integers and binary/constant/empty numeric columns, and exclude temporal columns on both engines. |
 | OC-60 | 🟠 | GeneralBinning ignores missing_strategy=label on Polars (`preprocessing/bucketing.py`) | small | ✅ fixed 2026-09-12 — fill missing and out-of-range bins with the configured label; labeled Polars outputs use a stable String dtype and the default keep strategy is preserved. |
 | OC-176 | 🟡 | Polars `LagFeatures(drop_na=True)` removes nulls but retains float NaN in source/lag columns; equivalent pandas input drops those rows (`preprocessing/time_series/lag.py:54-59`) — independent of OC-165's y desynchronization | small | ✅ fixed 2026-09-09 - Polars lag filtering removes both null and floating NaN rows with one positional selection shared by X and y. |
@@ -417,6 +422,90 @@ respective fix logs; OC-167 closed with canonical artifact framing on 2026-09-09
 ---
 
 ## Log
+
+### 2026-09-12 — OC-46/248/250/254/263: merged folds, class weights and numeric/container edge cases
+
+At the user's request, verified concrete outputs from the previous five-fix
+batch again (**97 regressions passed**) and committed it with DCO sign-off as
+`d470b871`; all commit hooks passed. Continued with five more findings using
+three implementation agents and root-owned merged-fold work, then independent
+cross-reviews. The user reviewed these fixes and requested a signed commit.
+
+- **OC-248:** re-executed the merged LagFeatures/StandardScaler example and
+  observed times `[3,1,2]` paired with targets `[100,200,300]` instead of
+  `[300,100,200]`. The adapter's existing contract rejects branches that cannot
+  preserve positional observations; its static list missed configured sorting,
+  LagFeatures `drop_na=True` and ManualBounds filtering. A shared configured
+  admission check now rejects these cases in Core and backend reconstruction.
+  Safe unsorted/unfiltered lag and rolling branches remain usable. Validated
+  configs are copied in full so caller edits cannot introduce unsafe sorting;
+  runtime row-count checks reject malformed inputs/branch outputs before
+  publishing a merge or replacing the last successful fitted state. Single
+  branch adapters still allow sorting/filtering and now flag conditional row
+  changes accurately. **21 Core cases and all 12 real backend graph cases
+  failed before repair**; five existing-behavior controls passed. Final Core
+  coverage includes four further branch-output/state regressions, for **30
+  cases**, and all 12 backend cases pass on both engines. Default learned-graph
+  scoring fails explicitly; existing `on_leakage='warn'/'ignore'` legacy
+  fallback retains its diagnostic code. This enforces the existing merged-fold
+  scope; it does not add row-identity joins or change global merge semantics.
+- **OC-250:** direct fits already converted nonnative class weights into
+  sample weights, but tuning trials and final refits bypassed that policy.
+  The shared policy now covers grid, random, both halving variants and Optuna,
+  computing weights only from the current fit's post-preprocessing training
+  labels. Native class weights remain on their estimator; the serving artifact
+  remains the native fitted model. **25 tests failed and five native controls
+  passed before repair**; all **65 new cases** pass, including resampling,
+  holdout isolation, dictionaries, None sentinels, defaults and unsupported
+  estimators. Tuned probabilities match direct balanced training exactly:
+  maximum difference **0.0** for GradientBoosting and XGBoost. Differences from
+  current unweighted controls are **0.5755483623828201** and **0.66135305**;
+  the older audit's XGBoost number used earlier defaults. XGBoost still streams
+  ten final-refit callbacks and detaches them afterward. Independent LightGBM
+  and calibrated-classifier controls across all five strategies also match
+  direct fits exactly, retain native estimator types and unprefixed parameters.
+  No explicit sample-weight API was added. Existing models need retraining to
+  apply weights previously ignored during tuning.
+- **OC-46:** constant numeric features, including constants after imputation,
+  published `[NaN, NaN]` PCA ratios and failed strict stdlib JSON serialization.
+  The prepared-matrix variance guard now returns the existing unavailable
+  contract, `pca_data=None` and `pca_components=None`. The current PCA tab
+  already handles that state; no schema or frontend change is needed. A varying
+  feature alongside a constant companion still returns ratios `[1.0, 0.0]`.
+  **Two public analyzer/strict-JSON cases failed before repair**, then passed
+  alongside the varying-input control and existing multivariate tests.
+- **OC-254:** LabelEncoder accepted list/NumPy targets at fit but applied
+  pandas `.map` or Polars `.clone` methods to those containers. Reuse the
+  existing fitted string-label conversion and return native integer Series
+  only when encoding the target. `['yes','no','yes']` becomes `[1,0,1]` on both
+  engines; native names and pandas indexes survive. Feature-only targets pass
+  through unchanged, and missing/unknown semantics plus the mixed-native-engine
+  guard remain intact. **14 cases failed and ten controls passed before repair**;
+  all **30 final regressions** pass. Independent nullable/datetime/categorical
+  target and metadata controls found no remaining issue.
+- **OC-263:** the valid antipodal pair from the audit produced Haversine
+  intermediary `1.0000000000000002`, causing `sqrt(1-a)` to return NaN.
+  Clamp that intermediary to `[0,1]` in both native engines. The reproduced
+  distance is now **20015.114442035923 km / 12436.8155228673 mi**. **Four cases
+  failed before repair and pass afterward**, covering both units and engines;
+  reverse antipodes, quarter-circumference, zero distance, missing inputs and
+  source immutability are checked within those cases.
+
+Final validation: full Core pytest passed **8,104 tests / 80 skips**, with
+**three snapshots passing** and 499 dependency/degenerate-data/legacy warnings.
+Separate backend fold-refit, execution replay and submission/leakage suites
+passed **894 tests** (121 warnings). Focused selections passed 267 modeling/
+tuning tests, 637 encoding/dispatcher/pipeline tests and 179 profiling/geo tests
+(nine optional H3 skips); these selections overlap and are not additive totals.
+Full-repository Ruff, configured backend/Core ty, formatting of the 17 changed
+Python files, strict MkDocs and diff whitespace checks passed. No model
+downloads were needed; offline Hugging Face flags were set for the Core suite.
+Independent reviews found no remaining blocking issue. User docs, method
+docstrings, changelog and both audit files record the resulting behavior.
+
+The queue decreases from **42 to 37 open**, with **four parked** findings
+unchanged (OC-71/72/73/185). The Now and Next tiers are empty again; all seven
+OC-264–270 additions remain open. No push was requested or performed.
 
 ### 2026-09-12 — OC-35/249/252/258/262: validation alignment, metrics, grouping and restoration
 

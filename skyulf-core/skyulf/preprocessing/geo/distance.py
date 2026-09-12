@@ -51,6 +51,8 @@ def _haversine_pandas(
     dlat = lat2_r - lat1_r
     dlon = lon2_r - lon1_r
     a = np.sin(dlat / 2.0) ** 2 + np.cos(lat1_r) * np.cos(lat2_r) * np.sin(dlon / 2.0) ** 2
+    # Roundoff near antipodes can put a just above one and make sqrt(1 - a) NaN.
+    a = a.clip(0.0, 1.0)
     c = 2.0 * np.arctan2(np.sqrt(a), np.sqrt(1.0 - a))
     return radius * c
 
@@ -106,6 +108,7 @@ def _geo_distance_apply_polars(X: Any, _y: Any, params: dict[str, Any]) -> tuple
         dlat = lat2_r - lat1_r
         dlon = lon2_r - lon1_r
         a = (dlat / 2.0).sin() ** 2 + lat1_r.cos() * lat2_r.cos() * (dlon / 2.0).sin() ** 2
+        a = a.clip(0.0, 1.0)
         c = 2.0 * pl.arctan2(a.sqrt(), (1.0 - a).sqrt())
         expr = radius * c
     else:
