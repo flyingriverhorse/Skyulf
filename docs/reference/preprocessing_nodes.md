@@ -543,6 +543,14 @@ Config:
 - output formatting:
   - `output_suffix`, `drop_original`, `label_format`, `missing_strategy`, `missing_label`, `include_lowest`, `precision`
 
+`missing_strategy="label"` replaces missing and out-of-range bins with
+`missing_label` (default `"Missing"`). This includes nulls, NaN and values outside
+the fitted edges during later transformations. With this strategy Polars always
+returns strings, including in batches with no missing values: ordinal/bin-index
+codes become `"0"`, `"1"`, etc. Pandas keeps numeric codes alongside the text
+label in an object column. Range and custom labels retain their text. The default
+`missing_strategy="keep"` leaves missing bins as missing values.
+
 Learned params:
 
 - `bin_edges` (dict[col -> edges])
@@ -662,6 +670,13 @@ engines. Other selected operands still contribute normally: `(NaN + 2) / 4`
 produces `0.5`. An entirely missing denominator uses positive epsilon, and an
 entirely missing numerator sums to zero. Source columns retain their values;
 this rule applies to the generated ratio.
+
+For `group_agg`, null and NaN keys share a single training group on both engines.
+Later transformations reuse that fitted aggregate, including for missing keys;
+they never calculate it from the new batch's values. Keys not seen during
+training, including missing keys when training had none, produce missing output.
+The operation groups by one column. Legacy artifacts without fitted group
+statistics must be refitted before applying them.
 
 Learned params:
 
@@ -819,6 +834,13 @@ Learned params: none.
 ### DatasetProfile
 
 Captures basic dataset stats without modifying data.
+
+Numeric statistics cover supported signed/unsigned integer, float and Decimal
+columns on both engines. Binary, constant and entirely missing numeric columns
+remain visible, as do typed numeric columns in an empty frame. Boolean,
+categorical and temporal columns retain their metadata but have no numeric
+statistics. Statistics still use each engine's native `describe()` metrics and
+quantile conventions. Rerun the node to refresh older profile artifacts.
 
 Config: none.
 

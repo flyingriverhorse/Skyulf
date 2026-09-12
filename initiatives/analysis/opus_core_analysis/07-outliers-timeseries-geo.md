@@ -58,6 +58,13 @@ any value outside `{0, 1, null}` and raise, mirroring
 ---
 
 ### OC-59
+
+**Resolved 2026-09-12.** Both profile paths now use shared dtype-based numeric
+selection, including binary, constant and empty numeric columns. Temporal
+columns remain outside numeric statistics. See the
+[verification log](../opus_core_analysis-tracker.md#2026-09-12-oc-245960-parallel-preprocessing-audit-closure).
+The original reproduction below is retained as historical evidence.
+
 ### 🟠 High — `DatasetProfile` numeric-column coverage is completely different between engines
 
 **File:** `skyulf-core/skyulf/preprocessing/inspection.py:44-58` (polars) vs `:60-71` (pandas)
@@ -95,6 +102,13 @@ to, so both paths select the same logical column set.
 ---
 
 ### OC-60
+
+**Resolved 2026-09-12.** Polars now fills missing and out-of-range bins with
+the configured label and uses String output consistently across batches;
+pandas and the default keep strategy preserve their existing behavior. See the
+[verification log](../opus_core_analysis-tracker.md#2026-09-12-oc-245960-parallel-preprocessing-audit-closure).
+The original reproduction below is retained as historical evidence.
+
 ### 🟠 High — `GeneralBinning`'s `missing_strategy: "label"` is a silent no-op on polars
 
 **File:** `skyulf-core/skyulf/preprocessing/bucketing.py:134-142` vs `:197-231`

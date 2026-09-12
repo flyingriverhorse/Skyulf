@@ -27,8 +27,9 @@ detail lives in the archive's `## Log` section.
 
 ## Live — fix queue
 
-**Current status (2026-09-12): 34 open / 4 parked.** OC-110, OC-113, OC-120,
-OC-121 and the newly filed OC-247 are closed in the archive.
+**Current status (2026-09-12): 31 open / 4 parked.** OC-59/60 are fixed and
+OC-24 is verified already fixed at the public fit/apply boundary; all three
+are recorded in the archive.
 
 Ordered by the master report's suggested fix order: **Now** (silent wrongness
 reaching users), **Next** (wrong results in realistic configs), **Then** (decide
@@ -95,7 +96,6 @@ closed that on 2026-09-07.
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
-| OC-24 | 🟠 | Polars group aggregates treat null group keys differently from pandas (`_polars_ops.py:222-234`) | small | ⬜ open |
 | OC-30 | 🟡 | Datetime extraction ignores the UI output name, overwrites collisions (`_pandas_ops.py:173-184`) | small | ⬜ open |
 
 ### Remaining — profiling (outside the OC-39–46 cluster)
@@ -120,8 +120,6 @@ closed that on 2026-09-07.
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
-| OC-59 | 🟠 | `DatasetProfile` numeric-column coverage completely different between engines (`preprocessing/inspection/`) | small | ⬜ open |
-| OC-60 | 🟠 | `GeneralBinning`'s `missing_strategy: "label"` silent no-op on polars (`preprocessing/bucketing.py`) | small | ⬜ open |
 
 ### Remaining — modeling / tuning
 

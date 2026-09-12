@@ -112,6 +112,8 @@ def _build_polars_exprs(X: Any, params: dict[str, Any]) -> tuple[list[Any], list
     custom_labels_map = params.get("custom_labels", {})
     include_lowest = params.get("include_lowest", True)
     precision = params.get("precision", 3)
+    missing_strategy = params.get("missing_strategy", "keep")
+    missing_label = params.get("missing_label", "Missing")
 
     exprs: list[Any] = []
     cols_to_drop: list[str] = []
@@ -128,6 +130,10 @@ def _build_polars_exprs(X: Any, params: dict[str, Any]) -> tuple[list[Any], list
             precision,
         )
         if expr is not None:
+            if missing_strategy == "label":
+                # Polars needs one dtype for bin values and a string sentinel.
+                # Widen even complete batches so train/heldout schemas agree.
+                expr = expr.cast(pl.String).fill_null(missing_label)
             exprs.append(expr)
             if drop_original:
                 cols_to_drop.append(col)
@@ -282,6 +288,13 @@ class BaseBinningApplier(BaseApplier):
 
     Expects ``bin_edges`` in params: ``Dict[str, List[float]]`` mapping column
     names to bin edges.
+
+    ``missing_strategy="label"`` fills null/NaN and out-of-range bins with
+    ``missing_label`` (default ``"Missing"``). Polars emits String columns for
+    this mode, including complete and empty batches; ordinal/bin-index values
+    become ``"0"``, ``"1"``, etc. Pandas retains numeric bin values alongside
+    the string sentinel in an object column. Range and custom labels keep
+    their text. The default ``"keep"`` strategy preserves missing values.
     """
 
     @apply_method

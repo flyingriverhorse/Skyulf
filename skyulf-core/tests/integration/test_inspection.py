@@ -7,6 +7,7 @@ engine), verifying artifact shapes, numeric-stats gating, snapshot row
 counts, and that apply never mutates the frame.
 """
 
+from decimal import Decimal
 from typing import Any, cast
 
 import numpy as np
@@ -15,6 +16,7 @@ import polars as pl
 import pytest
 from tests.utils.test_case_loader import TestCaseLoader
 
+from skyulf.engines.registry import EngineRegistry
 from skyulf.preprocessing.inspection import (
     DatasetProfileApplier,
     DatasetProfileCalculator,
@@ -49,6 +51,67 @@ def _make_text_only_frame(engine: str) -> pd.DataFrame | pl.DataFrame:
     if engine == "polars":
         return pl.DataFrame(data)
     return pd.DataFrame(data)
+
+
+@pytest.mark.parametrize("engine", ["pandas", "polars"])
+@pytest.mark.parametrize("wrapped", [False, True])
+def test_profile_numeric_coverage_includes_small_binary_constant_and_missing_columns(
+    engine: str,
+    wrapped: bool,
+) -> None:
+    """Changing engines must not hide numeric columns needed to diagnose a dataset."""
+    integer_dtypes = ["int8", "int16", "int32", "int64", "uint8", "uint16", "uint32", "uint64"]
+    frame = pd.DataFrame({dtype: pd.Series([2, 4, 6], dtype=dtype) for dtype in integer_dtypes})
+    frame["float32"] = pd.Series([2.0, 4.0, 6.0], dtype="float32")
+    frame["float64"] = [2.0, 4.0, 6.0]
+    frame["binary"] = [0, 1, 0]
+    frame["constant"] = [7, 7, 7]
+    frame["all_missing"] = pd.Series([pd.NA] * 3, dtype="Float64")
+    frame["decimal"] = pd.Series([Decimal("1.25"), None, Decimal("3.75")])
+    expected_columns = list(frame.columns)
+    frame["label"] = ["a", "b", "c"]
+    frame["category"] = pd.Categorical(["a", "b", "a"])
+    frame["boolean"] = [True, False, True]
+    frame["date"] = pd.to_datetime(["2026-01-01", "2026-01-02", "2026-01-03"])
+    frame["duration"] = pd.to_timedelta([1, 2, 3], unit="s")
+    original = frame.copy(deep=True)
+    data: Any = pl.from_pandas(frame) if engine == "polars" else frame
+    if wrapped:
+        data = EngineRegistry.wrap(data)
+
+    artifact = DatasetProfileCalculator().fit(data, {})
+    stats = artifact["profile"]["numeric_stats"]
+
+    assert list(stats) == expected_columns
+    for col in [*integer_dtypes, "float32", "float64"]:
+        assert stats[col]["mean"] == pytest.approx(4.0)
+        assert stats[col]["min"] == pytest.approx(2.0)
+        assert stats[col]["max"] == pytest.approx(6.0)
+    assert stats["constant"]["mean"] == pytest.approx(7.0)
+    assert stats["constant"]["std"] == pytest.approx(0.0)
+    assert stats["binary"]["mean"] == pytest.approx(1 / 3)
+    assert stats["all_missing"]["count"] == 0
+    assert pd.isna(stats["all_missing"]["mean"])
+    assert stats["decimal"]["mean"] == pytest.approx(2.5)
+    assert artifact["profile"]["missing"]["all_missing"] == 3
+    assert DatasetProfileApplier().apply(data, cast(dict[str, Any], artifact)) is data
+    pd.testing.assert_frame_equal(frame, original)
+
+
+@pytest.mark.parametrize("engine", ["pandas", "polars"])
+def test_profile_empty_typed_numeric_columns_remain_visible(engine: str) -> None:
+    """An empty input must retain numeric coverage and report zero observations."""
+    frame = pd.DataFrame(
+        {"small": pd.Series([], dtype="int8"), "unsigned": pd.Series([], dtype="uint16")}
+    )
+    data: Any = pl.from_pandas(frame) if engine == "polars" else frame
+
+    artifact = DatasetProfileCalculator().fit(data, {})
+    stats = artifact["profile"]["numeric_stats"]
+
+    assert list(stats) == ["small", "unsigned"]
+    assert stats["small"]["count"] == 0
+    assert stats["unsigned"]["count"] == 0
 
 
 def _fit_apply(

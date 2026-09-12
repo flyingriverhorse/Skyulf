@@ -28,6 +28,14 @@ the engine.
 ---
 
 ### OC-24
+
+**Verified already fixed 2026-09-12 at the public fit/apply boundary.** The
+training-fitted mapping introduced in `f12dde9f8` shares null/NaN groups across
+engines and prevents batch-local inference aggregation. The historical behavior
+below remains only in private unfitted compatibility helpers; the public applier
+rejects artifacts that could reach them. See the
+[verification log](../opus_core_analysis-tracker.md#2026-09-12-oc-245960-parallel-preprocessing-audit-closure).
+
 ### 🟠 High — Polars group aggregates treat null group keys differently from pandas
 
 **File:** `preprocessing/feature_generation/_polars_ops.py:222-234`

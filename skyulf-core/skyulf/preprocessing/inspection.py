@@ -8,14 +8,12 @@ collect engine-specific summary statistics, so they route through
 from typing import Any, cast
 
 import pandas as pd
-import polars as pl
 
 from ..core.meta.decorators import node_meta
 from ..engines import SkyulfDataFrame
 from ..registry import NodeRegistry
-from ..utils import detect_numeric_columns
 from ._artifacts import DatasetProfileArtifact, DataSnapshotArtifact
-from ._helpers import decimal_columns_to_float
+from ._helpers import auto_detect_numeric_columns, decimal_columns_to_float
 from ._schema import SkyulfSchema
 from .base import BaseApplier, BaseCalculator, fit_method
 from .dispatcher import fit_dual_engine
@@ -43,30 +41,30 @@ def _extract_polars_numeric_stats(X: Any, numeric_cols: list) -> dict[str, dict[
 
 
 def _profile_fit_polars(X: Any, _y: Any, _config: dict[str, Any]) -> DatasetProfileArtifact:
+    """Describe every supported numeric dtype, independent of observed cardinality."""
     profile: dict[str, Any] = {
         "rows": len(X),
         "columns": len(X.columns),
         "dtypes": {col: str(dtype) for col, dtype in zip(X.columns, X.dtypes, strict=True)},
         "missing": {col: X[col].null_count() for col in X.columns},
     }
-    numeric_cols = [
-        col
-        for col, dtype in zip(X.columns, X.dtypes, strict=True)
-        if dtype in (pl.Float64, pl.Float32, pl.Int64, pl.Int32) or isinstance(dtype, pl.Decimal)
-    ]
+    numeric_cols = auto_detect_numeric_columns(X)
     if numeric_cols:
         profile["numeric_stats"] = _extract_polars_numeric_stats(X, numeric_cols)
     return {"type": "dataset_profile", "profile": profile}
 
 
 def _profile_fit_pandas(X: Any, _y: Any, _config: dict[str, Any]) -> DatasetProfileArtifact:
+    """Describe numeric dtypes without filtering binary, constant or missing columns."""
     profile: dict[str, Any] = {
         "rows": len(X),
         "columns": len(X.columns),
         "dtypes": X.dtypes.astype(str).to_dict(),
         "missing": X.isna().sum().to_dict(),
     }
-    numeric_cols = detect_numeric_columns(X)
+    # pandas includes timedeltas in select_dtypes("number"); they are temporal
+    # columns, and Polars correctly leaves them outside numeric statistics.
+    numeric_cols = auto_detect_numeric_columns(X.select_dtypes(exclude=["timedelta"]))
     if numeric_cols:
         profile["numeric_stats"] = (
             decimal_columns_to_float(X[numeric_cols], numeric_cols).describe().to_dict()
@@ -97,7 +95,13 @@ class DatasetProfileApplier(BaseApplier):
     learns_from_data=False,
 )
 class DatasetProfileCalculator(BaseCalculator):
-    """Summarise shape, dtypes, missingness and numeric statistics."""
+    """Summarise shape, dtypes, missingness and numeric statistics.
+
+    Numeric statistics include supported integer, unsigned integer, float and
+    Decimal columns, even when binary, constant, entirely missing or empty.
+    Boolean, categorical and temporal columns retain their dtype/missingness
+    metadata but are not treated as numeric features.
+    """
 
     def infer_output_schema(
         self, input_schema: SkyulfSchema, config: dict[str, Any]

@@ -226,6 +226,7 @@ uses, so a fixed finding stays where it was filed.
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
+| OC-24 | 🟠 | Polars group aggregates treat missing keys differently from pandas (`feature_generation/_polars_ops.py`) | small | ✅ already fixed — verified 2026-09-12: public fitted aggregates share null/NaN training groups across engines and wrappers; unseen groups remain missing, while the public artifact guard excludes divergent private unfitted helpers. |
 | OC-230 | 🟡 | Native Polars NaN inputs propagate through feature ratios while pandas treats them as missing (`feature_generation/_polars_ops.py:_polars_ratio`, `_pandas_ops.py:_pandas_ratio`) | small | ✅ fixed 2026-09-11 - normalize native NaN and null ratio operands to zero before summing, preserving other operands, input columns and signed epsilon. |
 | OC-23 | 🟠 | Polars `ratio` flips the sign of near-zero negative denominators (`feature_generation/_polars_ops.py:97-112`) | small | ✅ fixed 2026-09-11 - preserve the sign when clamping a near-zero ratio denominator to epsilon on Polars, matching pandas. |
 | OC-211 | 🟡 | Pandas datetime features depend on prediction-batch composition: prepending a different valid date format makes the original rows' year/month/day missing in both `FeatureGeneration.datetime_extract` and `DateFeatures` (`feature_generation/_pandas_ops.py:179`, `time_series/date_features.py:64`) | small | ✅ already fixed - verified 2026-09-09: mixed-format batch companions preserve calendar features across both engines and aliases. |
@@ -282,6 +283,8 @@ uses, so a fixed finding stays where it was filed.
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
+| OC-59 | 🟠 | DatasetProfile selects different numeric-column sets on pandas and Polars (`preprocessing/inspection.py`) | small | ✅ fixed 2026-09-12 — use shared dtype-based selection, include supported small/unsigned integers and binary/constant/empty numeric columns, and exclude temporal columns on both engines. |
+| OC-60 | 🟠 | GeneralBinning ignores missing_strategy=label on Polars (`preprocessing/bucketing.py`) | small | ✅ fixed 2026-09-12 — fill missing and out-of-range bins with the configured label; labeled Polars outputs use a stable String dtype and the default keep strategy is preserved. |
 | OC-176 | 🟡 | Polars `LagFeatures(drop_na=True)` removes nulls but retains float NaN in source/lag columns; equivalent pandas input drops those rows (`preprocessing/time_series/lag.py:54-59`) — independent of OC-165's y desynchronization | small | ✅ fixed 2026-09-09 - Polars lag filtering removes both null and floating NaN rows with one positional selection shared by X and y. |
 | OC-175 | 🟡 | Polars `RollingAggregate` propagates float NaN through windows instead of ignoring missing observations like pandas — `[1,NaN,3]` with window 2 yields mean `[1,NaN,NaN]` vs `[1,1,3]` (`preprocessing/time_series/rolling.py:48`) | small | ✅ fixed 2026-09-09 - floating NaN is treated as missing inside Polars rolling expressions, preserving source values and grouped-window semantics. |
 | OC-174 | 🟡 | Polars `DateFeatures` crashes on an entirely invalid string date column despite `strict=False`; pandas produces nullable calendar features (`preprocessing/time_series/date_features.py:102`) | small | ✅ already fixed - verified 2026-09-09: wholly invalid date strings produce nullable calendar features in both engines. |
@@ -402,6 +405,52 @@ respective fix logs; OC-167 closed with canonical artifact framing on 2026-09-09
 ---
 
 ## Log
+
+### 2026-09-12 — OC-24/59/60: parallel preprocessing audit closure
+
+After committing OC-121 as `2ba4c67c`, investigated three independent findings
+with two implementation agents and a separate review of the combined change.
+
+**OC-59 — fixed.** Reproduced differing numeric profile coverage: pandas
+reported Int8/Int16/unsigned columns but excluded binary, constant and entirely
+missing columns; Polars did the reverse for those cases. Both paths now use
+shared dtype-based numeric selection, because these columns remain useful in a
+diagnostic profile regardless of cardinality. The pandas path excludes timedeltas
+from its number selector, matching the Polars temporal boundary. Decimal
+conversion and the read-only applier remain intact. Six new public regressions
+failed before the repair and pass afterward, covering all ten existing integer/
+float dtypes, Decimal, nullable/empty inputs and native/wrapped frames.
+
+**OC-60 — fixed.** With fitted edges `[0, 5, 10]`, Polars left missing and
+out-of-range bins null even when `missing_strategy="label"` selected a sentinel;
+pandas emitted the configured label. The Polars expression now widens labeled
+outputs to String and fills missing bins, including null, NaN and held-out values
+outside the fitted edges. String output applies even to complete/empty batches
+so concatenation keeps a stable schema. Pandas retains its existing numeric/text
+object values, and default `keep` behavior is unchanged. The 67-case regression
+matrix went from **25 failed / 42 passed** to all passing; it covers ordinal,
+bin-index, range/custom labels, boundary inclusion, empty/default/existing labels,
+drop/source/target preservation and wrappers. Canvas exposes neither missing
+option, so the existing Core configuration needed no frontend change.
+
+**OC-24 — verified already fixed.** The public repair dates to `f12dde9f8`
+(2026-09-08): fitting includes missing keys as a training group, replay uses its
+stored aggregate and normalizes Polars null/NaN keys, and the public applier
+rejects artifacts without a fitted mapping. Training keys `[1, null, NaN]` with
+values `[1, 2, 5]` produce `[1, 3.5, 3.5]` on both engines. Held-out keys
+`[null, NaN, 1, 2]` reuse `[3.5, 3.5, 1, missing]` independently of their values.
+Missing keys absent from training remain missing during inference. Forty added
+cases cover all seven aggregates, native/wrapped inputs and the unfitted-artifact
+guard. The retained private unfitted compatibility helpers still differ, but
+their direct callers are tests; the public path cannot reach that behavior.
+They were left unchanged. The editor/resolver supports one grouping column,
+so this closure does not introduce multi-key grouping.
+
+Combined verification: **2,169 Core tests passed / 2 skipped**, plus **65 backend
+catalog, data-service and preprocessing tests passed**. Ruff, formatting and full
+configured `ty check` pass; independent review found no blockers. Docs and
+changelog describe the profile coverage, missing-label dtype choice and existing
+fitted group semantics. The live queue now has **31 open / 4 parked** findings.
 
 ### 2026-09-12 — OC-121 fixed: Enum text auto-selection
 
