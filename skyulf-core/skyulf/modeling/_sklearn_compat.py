@@ -21,13 +21,13 @@ def normalize_logistic_regression_params(params: dict[str, Any]) -> dict[str, An
     """Translates a ``penalty`` key into sklearn's newer ``l1_ratio``/``C`` kwargs.
 
     No-op if ``penalty`` isn't present. Returns a new dict — never mutates
-    *params* in place. An explicit ``l1_ratio``/``C`` the caller already set
-    always wins over the value this function would otherwise inject.
+    *params* in place. An explicit numeric ``l1_ratio`` wins over a default;
+    an Elastic Net ratio of ``None`` uses the same mix as an omitted ratio.
 
     Mapping (matches sklearn's own deprecation-warning guidance):
       - ``penalty="l2"``        -> ``l1_ratio=0.0``
       - ``penalty="l1"``        -> ``l1_ratio=1.0``
-      - ``penalty="elasticnet"``-> ``l1_ratio=0.5`` if not already set (a real
+      - ``penalty="elasticnet"``-> ``l1_ratio=0.5`` if missing or ``None`` (a real
         elasticnet mix; sklearn's own new default of ``l1_ratio=0.0`` would
         otherwise silently degrade an "elasticnet" choice into pure L2)
       - ``penalty=None``        -> ``C=math.inf`` (no penalty at all)
@@ -41,7 +41,8 @@ def normalize_logistic_regression_params(params: dict[str, Any]) -> dict[str, An
     elif penalty == "l1":
         params.setdefault("l1_ratio", 1.0)
     elif penalty == "elasticnet":
-        params.setdefault("l1_ratio", 0.5)
+        if params.get("l1_ratio") is None:
+            params["l1_ratio"] = 0.5
     elif penalty is None:
         params["C"] = math.inf
     return params

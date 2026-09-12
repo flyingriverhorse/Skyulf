@@ -81,8 +81,16 @@ cv_type="time_series_split", n_folds=5, time_column="order_date"
 **Auto-sort behavior:**
 
 1. If `time_column` is provided, data is sorted by that column and the column is dropped from features (prevents date leakage).
-2. If omitted, the first `datetime64` column is auto-detected.
+2. If omitted, the first supported date/datetime column in input order is used,
+   including pandas object columns of native `datetime.date` values and Polars
+   Date/Datetime columns. Native date columns may contain missing values.
 3. If no datetime column exists, a warning is logged and row order is assumed correct.
+
+Automatic detection does not parse date strings or select mixed date/text,
+mixed date/datetime object columns, or entirely missing object columns. Normalize
+such inputs explicitly before temporal CV. Sorting remains stable, places
+missing dates last and keeps targets aligned. Rerun temporal CV on affected
+native pandas date inputs; previous scores may have used nonchronological folds.
 
 ### Nested CV
 

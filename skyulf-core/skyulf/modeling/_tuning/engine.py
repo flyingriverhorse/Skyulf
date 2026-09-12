@@ -39,7 +39,12 @@ from . import splitters
 from .fold_pipeline import FoldAwareModelStep
 from .grid_random import fit_and_score_candidate_fold, run_grid_or_random_search
 from .metrics import is_multiclass_target, resolve_metric, resolve_scorer
-from .params import clean_search_space, instantiate_model, seed_params
+from .params import (
+    clean_search_space,
+    instantiate_model,
+    normalize_logistic_search_config,
+    seed_params,
+)
 from .refit import refit_best_model, resolve_threshold_metric, tune_decision_thresholds
 from .reporter import ConsoleTrialReporter
 from .schemas import TuningConfig, TuningResult
@@ -564,6 +569,10 @@ class TuningCalculator(BaseModelCalculator):
 
         # `model_class` only on SklearnCalculator; `Any` keeps call sites type-clean.
         model_class: Any = self.model_calculator.model_class
+
+        config = normalize_logistic_search_config(
+            model_class, self.model_calculator.default_params, config
+        )
 
         # ``default_params`` may carry structural args (e.g. an ensemble's
         # resolved ``estimators``); the instantiator filters/routes them safely.

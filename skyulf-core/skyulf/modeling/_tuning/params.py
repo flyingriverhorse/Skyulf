@@ -1,17 +1,58 @@
 """Search-space cleaning and estimator instantiation helpers for tuning.
 
-Leaf module (F-18 split of ``engine.py``): no imports from sibling tuning
+Leaf module (``engine.py``): no imports from sibling tuning
 modules, so the refit, grid/random, and halving paths can all build
 estimators without depending on the orchestrator.
 """
 
 import inspect
+from dataclasses import replace
 from typing import Any
 
 from sklearn.linear_model import LogisticRegression
 
 from .._sklearn_compat import normalize_logistic_regression_params
 from .schemas import TuningConfig
+
+
+def normalize_logistic_search_config(
+    model_class: Any, defaults: dict[str, Any], config: TuningConfig
+) -> TuningConfig:
+    """Resolve nullable Elastic Net ratios before searchers bypass constructor normalization.
+
+    An exclusively Elastic Net search uses the same 0.5 default as direct
+    fitting. Search mixed penalties separately when their ratio is unspecified
+    to avoid applying this default to unrelated candidates. Caller settings
+    are preserved.
+    """
+    if model_class is not LogisticRegression:
+        return config
+    space = clean_search_space(config.search_space)
+    penalties = space.get("penalty", [defaults.get("penalty")])
+    penalties = getattr(penalties, "choices", penalties)
+    if not isinstance(penalties, (list, tuple)) or "elasticnet" not in penalties:
+        return config
+    ratios = space.get("l1_ratio", [defaults.get("l1_ratio")])
+    choices = getattr(ratios, "choices", ratios)
+    # Explicit numeric distributions already supply a ratio. Categorical
+    # distributions expose choices and must keep that type for CMA-ES routing.
+    if not isinstance(choices, (list, tuple)) or all(ratio is not None for ratio in choices):
+        return config
+    if any(penalty != "elasticnet" for penalty in penalties):
+        raise ValueError(
+            "Logistic Regression: search elasticnet separately from other penalties "
+            "when l1_ratio is omitted or None."
+        )
+    resolved: Any = [0.5 if ratio is None else ratio for ratio in choices]
+    if hasattr(ratios, "choices"):
+        resolved = type(ratios)(resolved)
+    return replace(
+        config,
+        search_space={
+            **config.search_space,
+            "l1_ratio": resolved,
+        },
+    )
 
 
 def clean_search_space(search_space: dict[str, Any]) -> dict[str, Any]:

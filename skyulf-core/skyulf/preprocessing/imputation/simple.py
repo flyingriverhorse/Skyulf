@@ -10,7 +10,11 @@ from ...core.meta.decorators import node_meta
 from ...registry import NodeRegistry
 from ...utils import detect_numeric_columns, is_decimal_series, user_picked_no_columns
 from .._artifacts import SimpleImputerArtifact
-from .._helpers import decimal_columns_to_float, promote_configured_columns_to_float64
+from .._helpers import (
+    auto_detect_numeric_columns,
+    decimal_columns_to_float,
+    promote_configured_columns_to_float64,
+)
 from .._schema import SkyulfSchema
 from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
 from ..dispatcher import apply_dual_engine, fit_dual_engine
@@ -115,8 +119,8 @@ class SimpleImputerCalculator(BaseCalculator):
     Supported ``strategy`` values are ``mean``, ``median``, ``most_frequent``,
     and ``constant``; ``mode`` is normalized to ``most_frequent``. Use
     ``columns`` to select columns and ``fill_value`` with ``constant``.
-    Mean and median operate on numeric columns, while the other strategies can
-    operate on all selected columns.
+    Mean and median auto-select numeric columns and reject explicitly selected
+    non-numeric columns. The other strategies can operate on all selected columns.
     """
 
     def infer_output_schema(
@@ -148,6 +152,15 @@ class SimpleImputerCalculator(BaseCalculator):
         cols = _resolve_simple_columns(X, config, strategy)
         if not cols:
             return {}
+
+        if strategy in {"mean", "median"}:
+            numeric = set(auto_detect_numeric_columns(X))
+            invalid = [col for col in cols if col not in numeric]
+            if invalid:
+                raise ValueError(
+                    f"SimpleImputer strategy '{strategy}' requires numeric columns; "
+                    f"non-numeric columns selected: {invalid}."
+                )
 
         # Stash resolved-once values into params so dispatched fits don't redo work.
         merged = dict(config)

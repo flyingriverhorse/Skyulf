@@ -271,6 +271,7 @@ def auto_detect_text_columns(df: pd.DataFrame | SkyulfDataFrame) -> list[str]:
 
     Enum columns are selected even when empty or entirely null; their declared
     categories establish the text dtype independently of observed values.
+    Pandas object columns with Decimal values are numeric and excluded.
     """
     engine = get_engine(df)
     if engine.name == EngineName.POLARS:
@@ -280,9 +281,12 @@ def auto_detect_text_columns(df: pd.DataFrame | SkyulfDataFrame) -> list[str]:
             for c, t in zip(polars_df.columns, polars_df.dtypes, strict=True)
             if t in [pl.Utf8, pl.Categorical, pl.Object] or isinstance(t, pl.Enum)
         ]
-    return list(
-        cast(PandasBackedFrame, df).select_dtypes(include=["object", "string", "category"]).columns
-    )
+    frame = to_pandas(df)
+    return [
+        col
+        for col in frame.select_dtypes(include=["object", "string", "category"]).columns
+        if not is_decimal_series(frame[col])
+    ]
 
 
 def auto_detect_numeric_columns(df: pd.DataFrame | SkyulfDataFrame) -> list[str]:

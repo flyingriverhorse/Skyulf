@@ -15,7 +15,7 @@ file deliberately carries no history.
 per-area report files `00`–`18`).
 **Baseline:** commit `93d7719e` (master), audit run 2026-08-31 → 09-01 by 15
 parallel read-only agents (Claude Opus 5). 116 findings: 5 🔴 / 45 🟠 / 44 🟡 /
-22 ⚪, plus OC-160–318 filed by later reviews. OC-100 was retracted as a false
+22 ⚪, plus OC-160–319 filed by later reviews. OC-100 was retracted as a false
 positive and is not counted; the corrections pass stays in the archive.
 
 **Status key:** ⬜ open · 🟨 in progress · ✅ done · ⏭️ parked
@@ -29,9 +29,9 @@ archive Log.
 
 ## Live — fix queue
 
-**Current status (2026-09-12): 63 open / 4 parked.**
-OC-257/290/291/293/296/300/317 are fixed in the latest seven-finding
-batch; their rows and verification are in the archive.
+**Current status (2026-09-12): 58 open / 4 parked.**
+OC-264/275/282/285/294/295 are fixed in the latest six-finding batch.
+One additional search/refit mismatch is filed as OC-319; verification is in the archive.
 The verified Qwen follow-up added **48 findings, OC-271–318**,
 grouped below by priority and domain. Qwen #1/#50/#57 reuse OC-253/65/64;
 #13 is already fixed as OC-268. #18/#41 share OC-286, which requires both
@@ -68,6 +68,7 @@ remaining findings are grouped by domain.
 | OC-289 | 🟡 | **User-controlled identifiers can inject new lines into logs** (`backend/ml_pipeline/model_registry/api.py:43-51`) — Qwen #22. Sanitize identifiers and exception text at the affected logging boundaries while retaining prior credential redaction. | small | ⬜ open — A real missing-job request containing percent-encoded LF returns 404 but writes a raw newline into the registry log; this demonstrates log-integrity loss, not code execution. |
 | OC-292 | 🟡 | **Canvas accepts Segmentation-to-Ensemble connections that convert to invalid data inputs** (`frontend/ml-canvas/src/core/utils/pipelineConversion/ensemble.ts:11-16`) — Qwen #25. Align connection validation, ensemble conversion and backend input expectations for unsupported model families. | medium | ⬜ open — Registered port validation accepts the connection and the actual converter lists the segmentation training node as Ensemble data input; the backend rejects its Model artifact where Dataset is required. |
 | OC-318 | 🟡 | **Empty scaling range fields pass validation and become null bounds** (`frontend/ml-canvas/src/modules/nodes/processing/scaling/ScalingControls.tsx:64,91`) — Qwen #55. Validate finite MinMax/Robust range inputs in the UI and reject invalid serialized bounds at the Core boundary. | small | ⬜ open — Clearing the real controls produces NaN, valid=true and JSON [null,1] or [null,75]; actual Core fitting fails with a None comparison TypeError. |
+| OC-319 | 🟡 | **Explicit Logistic Regression penalty/ratio settings describe different models during search and refit** (`skyulf-core/skyulf/modeling/_sklearn_compat.py:40-45`; `modeling/_tuning/params.py`; `modeling/_tuning/engine.py`) — Align the documented explicit-ratio precedence with penalty semantics across constructor and searcher set_params paths; keep nullable Elastic Net defaults OC-282 separate. | decision + small | ⬜ open — On sklearn 1.8.0, penalty=l2 and l1_ratio=0.5 produce maximum coefficient difference 0.10500864 between normalized construction and search-style set_params; l1 control differs by 0.81086563, while elasticnet matches. Public grid/halving_grid score the same single l2 candidate and stratified folds at -0.33013530/-0.27716182 log-loss scores, then return identical final coefficients. Reproduction and limitations are in the latest archive Log. |
 
 
 ### Then — decide deployment model first
@@ -123,9 +124,6 @@ remaining findings are grouped by domain.
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
-| OC-285 | 🟡 | **DropMissingRows accepts invalid how values with different semantics** (`skyulf-core/skyulf/preprocessing/drop_and_missing/drop_rows.py:56,94,158`) — Qwen #17. Reject unsupported how values at the public configuration boundary before engine dispatch. | small | ⬜ open — how=bad or None retains three rows on pandas and one on Polars; valid any/all controls agree, so the defect is invalid-config handling rather than the normal UI options. |
-| OC-294 | 🟡 | **Numeric imputation handles explicitly selected text columns inconsistently** (`skyulf-core/skyulf/preprocessing/imputation/simple.py:169,187`) — Qwen #27. Validate or consistently filter incompatible explicit column selections before mean/median calculation. | small | ⬜ open — Selecting num and txt makes pandas fill only num while Polars raises on string reduction; numeric-only selections work, and the older numeric-constant fix is a different case. |
-| OC-295 | 🟡 | **Automatic text cleaning converts pandas Decimal values into strings** (`skyulf-core/skyulf/preprocessing/_helpers.py:283`) — Qwen #28. Exclude semantic numeric Decimal columns from automatic text selection while retaining legitimate string cleaning. | small | ⬜ open — Decimal values 12.34 and 56.78 become strings on pandas but stay Decimal on Polars; the numeric selector and profiling OC-259 use different call sites. |
 | OC-298 | 🟡 | **Boolean alias conversion changes unmatched numeric values to strings on Polars** (`skyulf-core/skyulf/preprocessing/cleaning/alias.py:55,65,103,110`) — Qwen #31. Define consistent handling for explicitly selected non-text columns and preserve unmatched values under the supported alias contract. | small | ⬜ open — Explicit numeric input 2,3,4 remains integer on pandas but becomes strings on Polars; ordinary automatic text selection does not demonstrate this defect. |
 | OC-301 | 🟡 | **Advanced resampler settings are saved but not forwarded to sampler construction** (`skyulf-core/skyulf/preprocessing/resampling.py:205,213,298,303`) — Qwen #34. Pass supported SVC/KMeans/n_jobs settings to the appropriate sampler with capability-aware validation. | small | ⬜ open — Actual SVMSMOTE receives svm_estimator=None and KMeansSMOTE receives kmeans_estimator=None/n_jobs=None despite configured artifacts; plain SMOTE in this installation does not accept n_jobs. |
 
@@ -134,7 +132,6 @@ remaining findings are grouped by domain.
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
-| OC-264 | 🟡 | GeneralTransformation fits each power rule against the original input although apply executes same-column rules sequentially (`preprocessing/transformations/general.py:225-228`) | small | ⬜ open — a log rule followed by standardized Yeo-Johnson yields mean `-0.995375`; equivalent sequential nodes yield approximately zero on both engines, so later rules learn the wrong intermediate distribution. |
 | OC-313 | 🟡 | **SentenceEmbedder model caching permits duplicate concurrent loads** (`skyulf-core/skyulf/preprocessing/vectorization/sentence_embedder.py:33,41,53,159,209`) — Qwen #49. Coordinate same-key model construction within a process and handle loading failures without leaving waiters stuck. | medium | ⬜ open — Four threads using one model name create four model objects through a synchronized fake constructor but leave one cache entry; real model download, GPU OOM and cross-process cache sharing were not tested. |
 
 
@@ -177,8 +174,6 @@ remaining findings are grouped by domain.
 | OC-251 | 🟡 | Fold-aware Halving/Optuna scoring keeps original validation labels after preprocessing filters prediction rows (`modeling/_tuning/fold_pipeline.py:168-171`) | medium | ⬜ open — IQR yields 120 held-out labels / 110 predictions; actual halving_grid and Optuna searches fail all trials while grid scores the same chain at R2 `0.999998`. |
 | OC-253 | 🟡 | F1 tuning and evaluation/threshold tuning disagree on the positive class for labels `{1,2}` (`modeling/_tuning/metrics.py:235`, `modeling/_evaluation/classification.py:84`) | decision + small | ⬜ open — the same predictions score `0.909091` for class 1 in tuning and `0.8` for class 2 in evaluation; reconcile the documented stock-scorer exception with a shared positive-class contract. Qwen recheck: the same {1,2} predictions score 0.75 for class 1 and 0.5 for class 2; retain the documented scorer-contract decision. Qwen #1. |
 | OC-269 | 🟡 | Optuna constructs the selected pruner but never enables pruning on OptunaSearchCV (`modeling/_tuning/strategies/optuna.py:240-252`) | medium | ⬜ open — Hyperband with incremental-fit-capable SGD still has `enable_pruning=False` and no intermediate trial values; respect estimator capabilities when implementing the advertised early stopping. |
-| OC-275 | 🟡 | **Temporal CV misses pandas datetime.date columns** (`skyulf-core/skyulf/modeling/cross_validation.py:283-291,361,399`) — Qwen #6. Recognize native date objects consistently and preserve chronological folds through the public CV and fold-preprocessing path. | medium | ⬜ open — With the date removed only inside model preprocessing, pandas train-max/validation-min pairs are 8/2, 9/4, 11/5 versus Polars 3/4, 6/7, 9/10; a warning exists and leaving dates in a linear model raises TypeError. |
-| OC-282 | 🟡 | **Elasticnet with a missing l1_ratio silently behaves like L2** (`skyulf-core/skyulf/modeling/_sklearn_compat.py:43-44`) — Qwen #14. Validate or resolve the elasticnet ratio before estimator construction and cover the real pipeline/search-space contract. | small | ⬜ open — penalty=elasticnet, l1_ratio=None and solver=saga retain None and produce coefficients identical to the L2 control with a warning; OC-80 only tracks the wider test-coverage gap. |
 
 
 ### Remaining — frontend

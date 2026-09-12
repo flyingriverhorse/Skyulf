@@ -16,8 +16,8 @@ and is not counted.
 
 **Qwen follow-up (2026-09-12):** the verified findings
 filed 48 additional records, OC-271–318, after deduplication and scope
-correction. Fourteen have since closed. The live queue now has
-**63 open / 4 parked**; details
+correction. Nineteen have since closed. The live queue now has
+**58 open / 4 parked**; details
 and exclusions are in the latest Log entry. Historical baseline counts
 below are unchanged.
 
@@ -249,6 +249,9 @@ uses, so a fixed finding stays where it was filed.
 | OC-22 | ⚪ | `TargetEncoder.infer_output_schema` checks an impossible `regression` value (`encoding/target.py:340-360`) | 1 line | ✅ fixed 2026-09-06 — the `("binary", "regression")` passthrough was pinned by a test asserting a prediction for a config sklearn 1.8 rejects outright; changed to `"continuous"` and confirmed it really encodes rather than merely being reachable. See the log entry |
 | OC-299 | 🟡 | **Automatic encoder selection skips native Enum columns** (`skyulf-core/skyulf/preprocessing/encoding/_common.py:131,146`) — Qwen #32. Include supported categorical Enum types in the common selector used by all six encoders. | small | ✅ fixed — 2026-09-12: The shared categorical selector now includes native Enum for all six encoder consumers; auto-selection matches explicit encoding and persisted held-out replay, with pipeline refit needed for previously skipped columns. |
 | OC-296 | 🟡 | **MissingIndicator schema predicts output columns that execution will not create** (`skyulf-core/skyulf/preprocessing/drop_and_missing/missing_indicator.py:103,117,157`) — Qwen #29. Make inferred output schema match missing-column handling and validate downstream references against the actual result. | small | ✅ fixed — 2026-09-12: MissingIndicator predicts flags only for sources present in its original input schema; real schema-graph propagation now exposes downstream phantom references and matches both engines' runtime columns. |
+| OC-285 | 🟡 | **DropMissingRows accepts invalid how values with different semantics** (`skyulf-core/skyulf/preprocessing/drop_and_missing/drop_rows.py:56,94,158`) — Qwen #17. Reject unsupported how values at the public configuration boundary before engine dispatch. | small | ✅ fixed — 2026-09-12: DropMissingRows validates how at fit and saved-artifact replay before engine dispatch, rejecting unsupported/null values while retaining omitted-any, valid any/all and threshold precedence with aligned targets. |
+| OC-294 | 🟡 | **Numeric imputation handles explicitly selected text columns inconsistently** (`skyulf-core/skyulf/preprocessing/imputation/simple.py:169,187`) — Qwen #27. Validate or consistently filter incompatible explicit column selections before mean/median calculation. | small | ✅ fixed — 2026-09-12: Shared numeric validation rejects explicit text selections for mean/median before dispatch, preserving automatic selection and explicit binary/constant/Decimal numeric support plus most-frequent/constant text behavior. |
+| OC-295 | 🟡 | **Automatic text cleaning converts pandas Decimal values into strings** (`skyulf-core/skyulf/preprocessing/_helpers.py:283`) — Qwen #28. Exclude semantic numeric Decimal columns from automatic text selection while retaining legitimate string cleaning. | small | ✅ fixed — 2026-09-12: Automatic text detection excludes semantic Decimal object columns on pandas, preserving their values and dtype in TextCleaning and AliasReplacement; explicit selections and existing fitted artifacts keep their prior replay contract. |
 
 
 ### Remaining — feature generation / selection / vectorization / transformations
@@ -272,6 +275,7 @@ uses, so a fixed finding stays where it was filed.
 | OC-27 | 🟠 | `GeneralTransformation` ignores the UI `standardize` toggle (`transformations/general.py`) | small | ✅ fixed 2026-09-11 — retain each power rule's standardization choice through fitting and replay; older artifacts keep their previous default. |
 | OC-28 | 🟠 | Box-Cox transform failures silently return untransformed data (`transformations/power.py:97-104`) | small | ✅ fixed 2026-09-06 — the silent path was the `valid_cols` filter, not the `except` (which has logged since the node was created); both engines now share `_fitted_columns_present`, which names the fitted columns the frame lacks, and fail-open is kept by decision. See the log entry |
 | OC-300 | 🟡 | **Polars arithmetic feature fillna leaves floating-point NaN untouched** (`skyulf-core/skyulf/preprocessing/feature_generation/_polars_ops.py:30`) — Qwen #33. Apply the configured missing-value policy to both null and NaN before arithmetic operations. | small | ✅ fixed — 2026-09-12: Polars arithmetic fills both NaN and null using the configured replacement before add/subtract/multiply/divide, preserving source values and integer/null-only controls. |
+| OC-264 | 🟡 | GeneralTransformation fits each power rule against the original input although apply executes same-column rules sequentially (`preprocessing/transformations/general.py:225-228`) | small | ✅ fixed — 2026-09-12: Power rules now learn from preceding same-column transformations, matching replay; log then standardized Yeo-Johnson has mean about 4e-16 and standard deviation one on both engines, with old artifacts retaining saved statistics until refit. |
 
 ### Remaining — profiling (outside the OC-39–46 cluster)
 
@@ -359,6 +363,8 @@ uses, so a fixed finding stays where it was filed.
 | OC-202 | 🟡 | Fold-aware tuning wrapper omits `decision_function` and unconditionally advertises `predict_proba`, breaking ROC-AUC scoring for SVC without probability support (`modeling/_tuning/fold_pipeline.py:164-172`) | small | ✅ fixed 2026-09-06 — both response methods are gated by `available_if`, so the wrapper advertises exactly what the wrapped model can do. See the log entry |
 | OC-203 | 🟡 | Optuna CMA-ES treats Boolean candidates as integers, turning valid `fit_intercept=[True,False]` into invalid sklearn parameter values (`modeling/_tuning/strategies/optuna.py:113-140`) | small | ✅ fixed 2026-09-06 — one `_is_number` predicate excludes `bool`, so Boolean lists stay categorical under CMA-ES. See the log entry |
 | OC-67 | 🟡 | Tuning metrics `pr_auc`/`pr_auc_weighted`/`g_score` crash the entire search (`modeling/_tuning/metrics.py:19-36,127-146`) | small | ✅ fixed 2026-09-06 — `pr_auc` now aliases to `average_precision` and the two names sklearn has no scorer for are built locally. See the log entry |
+| OC-275 | 🟡 | **Temporal CV misses pandas datetime.date columns** (`skyulf-core/skyulf/modeling/cross_validation.py:283-291,361,399`) — Qwen #6. Recognize native date objects consistently and preserve chronological folds through the public CV and fold-preprocessing path. | medium | ✅ fixed — 2026-09-12: Temporal CV recognizes homogeneous native pandas date objects, preserving stable target-aligned sorting and missing dates last; public fold boundaries now match Polars at 3/4, 6/7 and 9/10 instead of 8/2, 9/4 and 11/5. |
+| OC-282 | 🟡 | **Elasticnet with a missing l1_ratio silently behaves like L2** (`skyulf-core/skyulf/modeling/_sklearn_compat.py:43-44`) — Qwen #14. Validate or resolve the elasticnet ratio before estimator construction and cover the real pipeline/search-space contract. | small | ✅ fixed — 2026-09-12: Omitted/null Elastic Net ratios resolve to 0.5 for direct fits, all five searches and refits, preserving numeric and Optuna distribution choices; mixed-penalty searches with unspecified ratios fail clearly. The separate explicit-ratio precedence mismatch is filed as OC-319. |
 
 ### Remaining — frontend
 
@@ -455,6 +461,112 @@ respective fix logs; OC-167 closed with canonical artifact framing on 2026-09-09
 ---
 
 ## Log
+
+### 2026-09-12 — 0.8.21 version alignment and six-fix commit verification
+
+Prepared OC-264/275/282/285/294/295, their regression tests and documentation
+for the requested commit. The app's root `pyproject.toml`, Core's `setup.py`,
+Canvas `package.json` and both root version fields in its `package-lock.json`,
+and the app entry in `uv.lock` now agree on **0.8.21**. Refreshed the local
+editable Core installation without changing dependencies and verified that
+`skyulf.__version__` reports `0.8.21`.
+
+Fresh verification passes **1,372 Core tests / three snapshots** and
+**53 backend tests / seven snapshots** in separate runs. Core Ruff, global
+Ty, frontend version checks, ESLint, complexity, TypeScript/Vite build and all
+11 bundle budgets pass. The rebuilt frontend assets match the committed
+outputs; the package and lockfile diffs contain version changes only.
+Queue status remains **58 open / 4 parked**, including the separate OC-319
+follow-up. The user's unreviewed Qwen report and local investigation artifacts
+are outside this commit's scope.
+
+### 2026-09-12 — OC-264/275/282/285/294/295: six fixes; OC-319 filed separately
+
+Committed the preceding seven-finding batch as `c9de8e7a` with DCO sign-off.
+Fresh pre-commit verification passed 207 Core regressions, 28 backend tests
+and 48 frontend tests; every applicable commit hook passed. The commit includes
+the already verified frontend assets. No push was requested or performed.
+Continued with six unparked findings using three implementation agents and
+independent reviews. This new batch remains uncommitted for review.
+
+- **OC-264:** GeneralTransformation now fits each power rule against preceding
+  transformations on that same column. The original log then standardized
+  Yeo-Johnson example gives mean `4.07081775696e-16` and standard deviation
+  one on both engines. Sixteen failing regressions preceded the repair;
+  eighteen cases cover repeated/interleaved rules, Box-Cox eligibility,
+  standardization, JSON replay, FeatureEngineer and old-artifact controls.
+  Artifact layout and legacy replay stay unchanged; refit affected steps and
+  downstream models to replace previously incorrect learned statistics.
+- **OC-275:** native pandas `datetime.date` object columns now participate in
+  temporal auto-detection. Public CV with real fold preprocessing and a fitted
+  model now records train-max/validation-min days `3/4, 6/7, 9/10`, replacing
+  `8/2, 9/4, 11/5`. Twenty-one focused cases preserve stable sorting, missing
+  dates last, target alignment, wrapper/native engines and first-column order.
+  Text, mixed date/datetime objects and entirely missing objects remain
+  outside automatic detection. Normalize such columns explicitly; rerun
+  temporal CV/tuning that previously used unordered native date objects.
+- **OC-282:** null Elastic Net ratios now resolve to the existing omitted
+  default `0.5`. A shared search-config normalization applies that same value
+  before Grid, Random, Halving Grid, Halving Random and Optuna dispatch, with
+  and without fold preprocessing; final refits retain the resolved value.
+  Explicit numeric ratios and caller settings are preserved. A search that
+  mixes Elastic Net with other penalties while leaving the ratio unspecified
+  fails with instructions to search Elastic Net separately. Independent review
+  caught a regression with supplied Optuna distributions: four additional
+  tests now protect numeric distributions, categorical penalty/ratio choices
+  and their categorical sampling semantics. All 66 focused cases pass,
+  including actual pandas/Polars SkyulfPipeline fits. The different explicit
+  ratio/penalty precedence problem below remains separate.
+- **OC-285:** DropMissingRows validates `how` before fit and artifact replay,
+  preventing invalid settings from selecting different filtering policies on
+  pandas and Polars. Unsupported values and explicit null now raise clear
+  `ValueError`, even under a threshold; omitted `how` remains `any`. Valid
+  policies preserve their row counts and target alignment. The first run
+  captured 32 invalid-policy failures alongside eight valid controls.
+- **OC-294:** shared SimpleImputer validation rejects explicit nonnumeric
+  mean/median selections before engine dispatch. Previously pandas silently
+  discarded text selections while Polars failed on reduction. Numeric-looking
+  strings remain text until explicitly cast; binary, constant, Decimal and
+  typed all-null numeric controls remain supported. The existing all-null
+  parity fixture now declares numeric dtype on both engines. Text
+  most-frequent/constant strategies and held-out replay remain covered.
+- **OC-295:** automatic text detection excludes pandas Decimal object columns
+  using the existing semantic numeric predicate. TextCleaning now preserves
+  values such as `Decimal("12.34")` and their dtype, matching Polars; the shared
+  AliasReplacement selector also excludes them. Combined OC-294/295 tests
+  reproduced 28 failures before fixing and pass 56 focused cases afterward.
+  Explicit selection and old artifacts keep their stored replay behavior;
+  refit automatic text-cleaning selections and rerun from original data.
+
+**OC-319 — new, still open:** explicit L1/L2 penalty and nonmatching numeric
+ratio have inconsistent constructor/searcher semantics. On sklearn 1.8.0,
+use `make_classification(n_samples=80, n_features=6, random_state=4)` and
+`solver="saga", l1_ratio=0.5, C=0.1, max_iter=2000, random_state=2`.
+Compare `instantiate_model(LogisticRegression, params).fit(X, y)` with an
+estimator constructed from the calculator defaults, followed by
+`set_params(**params).fit(X, y)`. Maximum coefficient differences are
+`0.10500863958311868` for `penalty="l2"`, `0.8108656276940928` for `"l1"`,
+and zero for `"elasticnet"`. Public single-candidate Grid and Halving Grid
+with stratified two-fold CV, CV seed 3, seed 2, metric `neg_log_loss`, and
+halving `min_resources=80, factor=2` score the same candidate at
+`-0.3301352967281843` and `-0.27716181751699975`, then return identical final
+coefficients. Both an independent reviewer and the root reproduced this.
+Resolve the existing documented explicit-ratio precedence against the public
+penalty contract and apply one rule to candidate fits and refitting. This
+reproduction concerns supported Core calls; frontend reachability and other
+installed sklearn versions were not established.
+
+Final verification: **1,372 tests and three snapshots passed** across 31
+affected Core suites covering transformations, imputation, cleaning, missing
+rows, CV, tuning, pipeline integration and artifacts. **53 tests and seven
+snapshots passed** in the separate backend config, fold-preprocessing,
+calibrated-tuning and feature-node suites. Scoped formatting, Core Ruff and
+global `ty check` pass; the additional model type assertion was rerun in both
+pipeline engine cases. Existing dependency warnings remain. Updated reference
+docs, temporal CV/tuning guides, and the v0.8.21 changelog. This batch changes
+Core behavior and documentation; frontend source and build assets stay at the
+preceding verified commit. Six rows closed and one new row added:
+**58 open / 4 parked** remain. R1, DRIFT-01 and the four parked items are preserved.
 
 ### 2026-09-12 — OC-257/290/291/293/296/300/317: seven verified fixes
 

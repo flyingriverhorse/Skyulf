@@ -2,6 +2,7 @@
 
 import logging
 from collections.abc import Callable
+from datetime import date, datetime
 from typing import TYPE_CHECKING, Any, cast
 
 import numpy as np
@@ -281,14 +282,23 @@ def _run_cv_fold(
 
 
 def _detect_datetime_columns(X: Any, is_polars: bool) -> list[str]:
-    """Return the list of datetime-like column names in X, for either engine."""
+    """Return datetime/date columns, including homogeneous pandas native-date objects."""
     if is_polars:
         return [
             col
             for col, dtype in zip(X.columns, X.dtypes, strict=True)
             if dtype in (pl.Datetime, pl.Date) or dtype.base_type() in (pl.Datetime, pl.Date)
         ]
-    return X.select_dtypes(include=["datetime64", "datetimetz"]).columns.tolist()
+    datetime_cols = set(X.select_dtypes(include=["datetime64", "datetimetz"]).columns)
+    for col in X.select_dtypes(include=["object"]).columns:
+        values = X[col].dropna()
+        # Native dates use object dtype in pandas. Require actual dates rather
+        # than parsing text; mixed date/datetime objects cannot be sorted safely.
+        if not values.empty and all(
+            isinstance(value, date) and not isinstance(value, datetime) for value in values
+        ):
+            datetime_cols.add(col)
+    return [col for col in X.columns if col in datetime_cols]
 
 
 def _auto_detect_sort_column(

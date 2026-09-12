@@ -88,6 +88,12 @@ the cleaned output: for example, trim plus lowercase changes `" YES "` to
 missing and source frames are unchanged. Refit saved artifacts to include Enum
 columns that older automatic selections skipped.
 
+Automatic text selection excludes pandas object columns containing Decimal
+numbers, matching native Polars Decimal behavior. Amounts such as
+`Decimal("12.34")` retain their values and dtype while nearby text is cleaned.
+Refit saved text-cleaning steps that selected Decimal columns and rerun from
+the original data; old artifacts keep their stored column selections.
+
 Example step:
 
 ```python
@@ -210,8 +216,12 @@ Learned params:
 Config:
 
 - `subset`: list[str] | None
-- `how`: `any` | `all` (ignored if `threshold` provided)
+- `how`: `any` | `all` (default `any`; filtering uses `threshold` when provided)
 - `threshold`: int | None (min non-null values)
+
+Explicit null or unsupported `how` values raise `ValueError` during fitting
+and saved-artifact replay, even when a threshold currently takes precedence.
+Omit `how` to use the default; use only `any` or `all` when setting it explicitly.
 
 Learned params:
 
@@ -249,6 +259,12 @@ Example step:
 ```
 
 ### SimpleImputer
+
+Mean and median require numeric columns. An explicit selection containing text,
+including numeric-looking strings, raises a `ValueError` naming the incompatible
+columns on both engines. Select numeric columns, cast numeric strings first,
+or choose `most_frequent`/`constant` for text. Explicit binary, constant and
+Decimal numeric selections remain supported; automatic selection is unchanged.
 
 Config:
 
@@ -578,6 +594,14 @@ Learned params:
 - `transformations` (passes through)
 
 ### GeneralTransformation
+
+Rules execute in list order, including when several rules target one column.
+A power rule learns from the result of the preceding rules on that column.
+For example, `log` followed by standardized `yeo-johnson` learns from the logged
+training values and produces a training mean near zero and standard deviation
+one. Later data reuses those fitted parameters. Existing artifacts keep their
+saved parameters; refit affected transformation steps and downstream models
+to correct previously learned statistics.
 
 Config:
 

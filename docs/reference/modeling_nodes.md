@@ -99,6 +99,14 @@ in a new fit, set `subsample_freq=0` explicitly.
 
 Backed by `sklearn.linear_model.LogisticRegression`.
 
+With `penalty="elasticnet"` and `solver="saga"`, an omitted or null
+`l1_ratio` resolves to `0.5`. Explicit numeric ratios, including `0` and `1`,
+are preserved. The same default applies during all five tuning strategies,
+fold preprocessing and final refitting. Search results record the resolved
+ratio. Search Elastic Net separately from other penalties when its ratio is
+unspecified; such mixed searches now raise a clear error. Retrain affected
+models or rerun tuning to replace an earlier unintended L2 fit.
+
 Defaults:
 
 - `max_iter=1000`

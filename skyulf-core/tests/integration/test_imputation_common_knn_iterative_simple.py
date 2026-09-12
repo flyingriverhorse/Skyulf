@@ -675,9 +675,9 @@ def test_simple_imputer_polars_apply_all_null_column_median_no_crash() -> None:
 
 def test_simple_imputer_all_null_column_engine_parity() -> None:
     """Pandas and Polars agree on an all-null column: it stays all-null, no crash."""
-    pdf = pd.DataFrame({"a": [1.0, None, 3.0], "b": [None, None, None]})
-    # pl.from_pandas infers the all-null object column as String; a genuinely
-    # numeric all-null column is Float64, which is the realistic imputation case.
+    # Declare both all-null columns numeric; an untyped object column cannot
+    # establish that the explicitly requested mean is a compatible strategy.
+    pdf = pd.DataFrame({"a": [1.0, None, 3.0], "b": [np.nan, np.nan, np.nan]})
     pl_df = pl.DataFrame(
         {"a": [1.0, None, 3.0], "b": pl.Series([None, None, None], dtype=pl.Float64)}
     )
