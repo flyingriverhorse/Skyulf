@@ -123,9 +123,10 @@ class DecompositionMixin(_AnalyzerState):
     def _aggregate_grouped(
         self, temp_df: pl.DataFrame, split_col: str, measure_col: str | None, measure_agg: str
     ) -> pl.DataFrame | None:
-        """Group ``temp_df`` by ``split_col`` and aggregate ``measure_col`` (or count rows)."""
+        """Aggregate with a separate label expression so source names remain available."""
+        group_expr = pl.col(split_col).cast(pl.Utf8).alias("name")
         if not measure_col:
-            return temp_df.group_by(split_col).agg(pl.len().alias("value"))
+            return temp_df.group_by(group_expr).agg(pl.len().alias("value"))
 
         if measure_col not in temp_df.columns:
             return None
@@ -137,7 +138,7 @@ class DecompositionMixin(_AnalyzerState):
             "max": pl.col(measure_col).max(),
         }
         value_expr = agg_exprs.get(measure_agg, pl.len())
-        return temp_df.group_by(split_col).agg(value_expr.alias("value"))
+        return temp_df.group_by(group_expr).agg(value_expr.alias("value"))
 
     def _rows_to_split_result(self, agg_df: pl.DataFrame, split_col: str) -> list[dict[str, Any]]:
         """Format labels and ratios while retaining nullable group values for filtering."""
@@ -170,14 +171,12 @@ class DecompositionMixin(_AnalyzerState):
         if split_col not in filtered_df.columns:
             return []
 
-        # Keep nulls distinct from a real "Unknown" category until display formatting.
-        temp_df = filtered_df.with_columns(pl.col(split_col).cast(pl.Utf8))
-
-        agg_df = self._aggregate_grouped(temp_df, split_col, measure_col, measure_agg)
+        # The grouped label is named separately from the generated value/ratio fields.
+        agg_df = self._aggregate_grouped(filtered_df, split_col, measure_col, measure_agg)
         if agg_df is None:
             return []
 
-        return self._rows_to_split_result(agg_df, split_col)
+        return self._rows_to_split_result(agg_df, "name")
 
     def get_decomposition_split(
         self,
@@ -192,6 +191,8 @@ class DecompositionMixin(_AnalyzerState):
         Use ``filter_value`` for subsequent equality filters: null selects missing
         rows, while the string "Unknown" selects that literal category. Numeric
         columns also accept the legacy "Unknown" missing-value filter.
+        Output field names do not reserve input column names; a numeric column
+        may serve as both the split column and the measure.
         """
         # 1. Apply filters (with numeric-vs-string coercion since FE serializes everything as strings).
         filtered_df = self._apply_decomposition_filters(filters)

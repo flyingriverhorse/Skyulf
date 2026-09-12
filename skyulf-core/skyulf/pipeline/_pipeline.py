@@ -501,6 +501,8 @@ class SkyulfPipeline:
         ``X_val`` must be raw. This method runs the pipeline's fitted
         preprocessing on it exactly once, which is what makes the probabilities
         it tunes against the ones ``predict()`` later reproduces.
+        Validation labels follow the same row sorting and filtering as the
+        features, so the metric scores matching observations.
         ``get_fitted_split()`` is therefore *not* a source for it: that helper
         returns already-preprocessed frames, so passing them here transforms
         the holdout a second time and fits the cutoffs against a distribution
@@ -509,7 +511,7 @@ class SkyulfPipeline:
         Args:
             X_val: Validation features, *not* yet transformed (this method
                 runs the pipeline's fitted preprocessing on it internally).
-            y_val: Validation true labels.
+            y_val: Validation true labels, paired positionally with ``X_val``.
             metric: Callable ``(y_true, y_pred) -> float`` to maximize.
             strategy: ``"grid"`` or ``"nelder-mead"``. If ``None``,
                 auto-selects based on the number of classes (see
@@ -524,7 +526,8 @@ class SkyulfPipeline:
 
         Raises:
             ValueError: If the pipeline isn't fitted, or the underlying
-                model doesn't support ``predict_proba``.
+                model doesn't support ``predict_proba``, or the raw validation
+                features and labels have different row counts.
         """
         if self.model_estimator is None or self.model_estimator.model is None:
             raise ValueError(
@@ -540,13 +543,19 @@ class SkyulfPipeline:
                 "threshold tuning requires a classifier."
             )
 
-        transformed_val = self.feature_engineer.transform(X_val)
+        if len(X_val) != len(y_val):
+            raise ValueError(
+                "X_val and y_val must contain the same number of rows before preprocessing."
+            )
+
+        # Array-like labels may come from a different engine than the features.
+        transformed_val, transformed_y = self.feature_engineer.transform((X_val, np.asarray(y_val)))
         proba_df = self._predict_proba_transformed(transformed_val)
         classes = np.asarray(model_classes)
         y_proba = np.asarray(proba_df)[:, : len(classes)]
 
         thresholds = optimize_thresholds(
-            y_val,
+            transformed_y,
             y_proba,
             metric=metric,
             classes=classes,

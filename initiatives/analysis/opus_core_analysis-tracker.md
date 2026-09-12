@@ -90,6 +90,7 @@ uses, so a fixed finding stays where it was filed.
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
+| OC-249 | 🟠 | Public threshold optimization transforms only `X_val`, leaving `y_val` in its original order when preprocessing sorts or filters rows (`pipeline/_pipeline.py:543-549`) | small | ✅ fixed 2026-09-12 — validate raw row counts and carry labels through fitted preprocessing sorting/filtering before threshold scoring; both engines and failure-state preservation are covered. |
 | OC-75 | 🔴 | Dev polars 1.40.1 below declared floor ≥1.43.2 — 10 tests, every notebook, a benchmark broken; prerequisite for trusting any polars result | 1 line | ✅ done |
 | OC-12 | 🔴 | Row-dropping desyncs `X` and `y` on non-unique pandas indexes (`drop_rows.py:60-67`, `deduplicate.py:44-47`); polars path already correct | small | ✅ fixed 2026-09-03 |
 | OC-58 | 🔴 | Numeric→boolean cast on polars treats any nonzero as `True` (`casting.py:143-178`) | small | ✅ fixed 2026-09-03 |
@@ -99,6 +100,7 @@ uses, so a fixed finding stays where it was filed.
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
+| OC-35 | 🟠 | Binary evaluation still builds a ROC curve when the held-out partition contains only one class, publishing NaN coordinates (`modeling/_evaluation/classification.py:88-94`) | small | ✅ fixed 2026-09-12 — omit undefined binary ROC curves for single-class holdouts while preserving finite PR output and the earlier multiclass guard. |
 | OC-207 | 🟠 | `optimize_thresholds()` transforms its `X_val` internally (`pipeline/_pipeline.py:325`), but `docs/user_guide/threshold_tuning.md:32`, `skyulf-core/README.md:205` and the method's own docstring (`:280`) all tell callers to feed it `get_fitted_split()` output — which is **already** preprocessed. The documented workflow therefore tunes thresholds on double-transformed probabilities, and `predict(use_tuned_thresholds=True)` then applies them to singly-transformed ones (`:365`), so the cutoffs are fitted against a distribution inference never reproduces. Needs a contract decision (fix the three docs, or accept pre-transformed input) before code | decision + small | ✅ fixed 2026-09-07 — the contract decision was "keep the code, fix the prose": `optimize_thresholds` and `predict` already both took raw input and transformed exactly once, so the three narrative sites that pointed callers at `get_fitted_split()` were the defect. See the log entry |
 | OC-177 | 🟠 | Pandas `DummyEncoder` changes a known category's encoding with batch composition: after fitting `[1.0,2.0]`, `1.0` encodes as known alone but all-zero when accompanied by `2.5` (`preprocessing/encoding/dummy.py:60-64`) | small | ✅ fixed 2026-09-06 — **broader than filed**: the two engines also learned different category *strings* from the same float data (`["1","2"]` vs `["1.0","2.0"]`), so they emitted differently named indicator columns; both symptoms were one batch-dependent renderer, replaced by a per-value rule shared by the engines. See the log entry |
 | OC-164 | 🟠 | `get_fitted_split()` on new data replaces a trained pipeline's preprocessing while retaining its old model — the same input's prediction changed from 50 to −950 (`pipeline/_pipeline.py:234`) | small | ✅ fixed 2026-09-06 — isolation, not invalidation: a throwaway `FeatureEngineer` over the same steps leaves the pipeline's fitted state alone, so predictions are identical before and after. See the log entry |
@@ -248,6 +250,7 @@ uses, so a fixed finding stays where it was filed.
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
+| OC-258 | 🟡 | Decomposition grouping columns named `value` or `ratio` collide with generated aggregation fields (`profiling/_analyzer/decomposition.py:140-148`) | small | ✅ fixed 2026-09-12 — separate group labels from aggregation output fields and retain native numeric measures, including when grouping and measuring the same column. |
 | OC-192 | 🟡 | Decomposition's categorical null bucket loses rows when drilled into (`profiling/_analyzer/decomposition.py`) | small | ✅ fixed 2026-09-12 — preserve nullable group identity through response/filter payloads and tree navigation, keeping actual `Unknown` categories separate. |
 | OC-48 | 🟡 | Expectations pass vacuously on empty frames (`profiling/expect.py`) | small | ✅ fixed 2026-09-12 — require at least one row by default in null/range/uniqueness checks, with explicit `allow_empty=True`, preserved schema validation and safe all-null range checks. |
 | OC-51 | 🟡 | Transform advice can be mathematically invalid and contradict the clean-dataset message | small | ✅ fixed 2026-09-12 — use domain/skew-aware transform advice and evaluate all preparation recommendations, including target resampling, before emitting a limited clean-dataset message. |
@@ -276,6 +279,7 @@ uses, so a fixed finding stays where it was filed.
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
+| OC-262 | 🟡 | Both dataframe wrappers recurse through missing `_df` during pickle/joblib restoration (`engines/pandas_engine.py:100-102`, `engines/polars_engine.py:121-123`) | small | ✅ fixed 2026-09-12 — resolve wrapper state without recursive delegation during restoration; pickle/joblib round trips preserve both native frames and their methods. |
 | OC-74 | 🟡 | `NodeRegistry.list_models()` hides all 4 Ensemble models; `category` arg dead (`registry.py:101-108`) | small | ✅ fixed 2026-09-11 - include Modeling and Ensemble in model discovery and exclude both from transformer discovery; preserve exact category filters and registration order. |
 | OC-167 | 🟡 | Ambiguous string boundaries in artifact serialization give different fitted label encoders identical pipeline fingerprints, despite encoding the same input as 0 vs −1 (`pipeline/seal.py:52,64`) — distinct from OC-62's pointer instability | small | ✅ fixed 2026-09-09 - typed length framing and canonical unordered entries distinguish different fitted values deterministically. |
 | OC-63 | 🟠 | `artifact_digest` raises `RecursionError` instead of the documented `TypeError` on cyclic graphs (`pipeline/seal.py`) | small | ✅ fixed 2026-09-09 - active-path cycle detection raises TypeError and still accepts shared acyclic state. |
@@ -302,6 +306,7 @@ uses, so a fixed finding stays where it was filed.
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
+| OC-252 | 🟡 | Weighted PR-AUC tuning derives its class axis from the holdout instead of the trained model (`modeling/_tuning/metrics.py:84-90`) | small | ✅ fixed 2026-09-12 — derive the probability class axis from the fitted estimator across all five search strategies, preserving the trained binary positive class. |
 | OC-187 | 🟡 | LightGBM's subsample control and search dimension have no effect with default frequency zero | small | ✅ fixed 2026-09-12 — resolve automatic bagging after candidate parameters, enabling ordinary row sampling while preserving GOSS, explicit frequencies, native aliases and existing artifacts. |
 | OC-218 | 🟡 | Connected model CV seed `0` is replaced by the existing ensemble seed during frontend settings synchronization | small | ✅ fixed 2026-09-09 - explicit zero now survives synchronization and both fixed/tuned request conversion; missing seeds retain the ensemble default. |
 | OC-206 | ⚪ | Ensemble configuration resolution shallow-copies nested base-model parameters, so fitting mutates the caller's configuration (`modeling/ensemble.py:473,484`) | small | ✅ fixed 2026-09-09 - inner base-model parameter maps are copied before temporary overrides, preserving caller settings and later refits. |
@@ -412,6 +417,206 @@ respective fix logs; OC-167 closed with canonical artifact framing on 2026-09-09
 ---
 
 ## Log
+
+### 2026-09-12 — OC-35/249/252/258/262: validation alignment, metrics, grouping and restoration
+
+Committed the preceding OC-90/187/192 batch as DCO-signed `f479e196` after
+fresh Core/frontend/HTTP regressions, strict docs and all commit hooks passed.
+Continued with five independent findings using three implementation agents
+and root-owned decomposition work, followed by cross-reviews. Concurrent
+audit additions OC-264–270 remain recorded and open; they were not overwritten
+by this repair batch.
+
+- **OC-249:** reproduced the reversed RollingAggregate validation case: raw
+  labels scored against sorted probabilities selected `0.4117647`, turning
+  eight correct predictions into a constant class. Threshold optimization now
+  passes both features and labels through the fitted preprocessing and uses
+  the transformed labels; the same case selects `0.5` and predicts four zeros
+  then four ones. Raw length mismatches are rejected before sorting can hide
+  them. **Fourteen cases failed and four passed before repair.** Cross-review
+  then caught a compatibility regression for pandas labels with Polars
+  features and the reverse. Two added cases failed before normalizing labels
+  to NumPy at the paired transform boundary; all **20 cases now pass**.
+  Sorting, LagFeatures/ManualBounds filtering, series/list/NumPy targets,
+  positional pandas indexes and preserving saved thresholds on failure are
+  covered. Independent controls also exercised native/wrapped inputs, fitted
+  splitters and feature-target separation. Existing saved cutoffs are not
+  changed automatically; rerun optimization for an affected pipeline.
+- **OC-35:** binary single-class holdouts emitted non-finite ROC coordinates
+  despite the earlier multiclass guard. Omit the undefined ROC curve while
+  retaining finite PR output; scalar ROC AUC was already sanitized away.
+  **Four regressions failed before repair and pass afterward**, covering
+  positive-only/negative-only holdouts with numeric and string labels. Rerun
+  evaluation to refresh previously stored reports.
+- **OC-252:** weighted PR-AUC inferred its probability class axis from the
+  holdout, so a three-class estimator and a two-class validation partition
+  failed every trial. The scorer now receives the estimator and aligns
+  targets to its trained classes; all five search strategies and the
+  multiclass `pr_auc` alias score the reproduced case at **1.0**. A binary
+  negative-only holdout now scores **0.0**, keeping the trained positive class
+  instead of relabeling the remaining class as positive. **Seventeen failed
+  and six passed before repair; all 23 pass afterward.** Missing first,
+  middle, last and multiple classes are covered. Independent grid/halving/
+  Optuna controls with fold-fitted StandardScaler passed both inner CV and
+  explicit sparse holdouts. OC-251 filtering and OC-253's stock F1 policy
+  remain separate open findings.
+- **OC-258:** grouping by `value` raised DuplicateError and grouping by
+  `ratio` replaced category identities with aggregate fractions. A label
+  expression now uses a separate name in the grouped result without casting
+  the source measure. Numeric grouping columns can also be their own measure.
+  **Fifteen regressions failed before repair; all 30 now pass**, covering all
+  aggregate modes, reserved/control names, null filters, ratios and unchanged
+  source data. Three real HTTP cases preserve null and literal `Unknown`
+  drill-down for `group`, `value` and `ratio`. Independent review passed an
+  additional 25-case split/measure-name cross-product. OC-192 remains intact;
+  the response shape and Canvas contract are unchanged.
+- **OC-262:** pickle and Core JoblibModelSerializer dumped wrappers but hit
+  RecursionError during restoration because `__getattr__` recursively looked
+  up absent `_df`. Direct object lookup now terminates those pre-state probes
+  with AttributeError and retains native delegation once state exists.
+  **All 20 regressions failed before repair and pass afterward**, including
+  both engines, pickle protocols 4/5, nested containers, schema/null/index
+  fidelity, native methods and shallow copies. Four artifacts created before
+  repair loaded afterward without rewriting. Delegated deep-copy behavior is
+  unchanged. Independent review found no remaining issue.
+
+The latest audit also identified an old recommendation test fixture missing
+the NumericStats fields required after OC-51. Reproduced its AttributeError
+and replaced the incomplete SimpleNamespace with real ColumnProfile/
+NumericStats values, retaining both threshold branches and asserting the
+domain-valid suggestion. This is test maintenance, not a sixth product fix.
+
+Focused verification passed **227 pipeline/threshold tests**, **442 evaluation/
+tuning tests**, **146 engine/serialization tests**, **73 decomposition/fixture
+tests**, and **132 separate backend tests**. These selections overlap; they
+are not an additive total. User docs, method docstrings, changelog and both
+audit files are updated. The frontend implementation and response shape do
+not change in this batch.
+
+Final verification after the mixed-label compatibility repair: full Core
+pytest passed **7,972 tests / 80 skips**, with **three snapshots passing**
+and 491 dependency/degenerate-metric/legacy-alias warnings. The earlier failing
+recommendation fixture now passes in the full suite. Full-repository Ruff,
+configured backend/Core ty, formatting for all 13 changed Python files, strict
+MkDocs and diff whitespace checks passed. Independent review confirmed the
+mixed-label blocker resolved and found no remaining actionable blockers.
+No network model downloads were needed (`HF_HUB_OFFLINE=1` and
+`TRANSFORMERS_OFFLINE=1`). The user subsequently authorized committing this
+batch after reviewing concrete output examples; its 97 regression cases
+passed again before staging.
+
+The queue has **42 open / 4 parked**: the concurrent review grew it from 40 to
+47, then this batch closed five. OC-71/72/73/185 remain parked.
+
+### 2026-09-12 — OC-264–270 filed: seven more reproduced Core defects
+
+The continuation adds seven P2 findings to the
+[live queue](opus_core_analysis-open_queue.md), bringing its recorded status to
+**47 open / 4 parked**. Existing parked decisions and prior fixes are unchanged.
+All seven symptoms were executed against current source and independently
+reproduced by the main reviewer. Paths below are relative to `skyulf-core/skyulf/`.
+
+- **OC-264 — sequential transformation fitting:** use
+  `GeneralTransformationCalculator` and its applier on
+  `x=[1.,2.,4.,8.,16.,32.]`, with rules
+  `{'column':'x','method':'log'}` then
+  `{'column':'x','method':'yeo-johnson','standardize':True}`.
+  Fitting/applying both rules together yields mean `-0.9953748450991124`;
+  fitting the second rule on the first rule's applied output yields
+  `4.070817756958907e-16`. Both pandas and Polars reproduce.
+  `preprocessing/transformations/general.py:225-228` fits the power rule on
+  original `X`, although apply receives the intermediate logged values.
+  Preserve sequential fitting semantics for overlapping rules; test equivalence
+  to separate nodes. OC-27's standardization-setting repair remains valid.
+- **OC-265 — datetime cast loses valid dates:** fit/apply `CastingCalculator`
+  and `CastingApplier` with `columns=['x'], target_type='datetime'` on
+  `x=['2024-01-01','2024-06-15']`. Pandas produces both expected timestamps;
+  Polars produces `[None,None]` under default coercion.
+  `preprocessing/casting.py:221` uses a generic String-to-Datetime cast instead
+  of parsing. Cover valid strings and invalid-value coercion/strict behavior;
+  these ordinary timezone-free inputs are separate from OC-255.
+- **OC-266 — categorical boolean cast fails:** apply Casting with
+  `columns=['x'], target_type='boolean'` to a Polars Series containing
+  `['true','false']`. String succeeds with `[True,False]`, Categorical raises
+  `SchemaError: expected String, got cat`, and
+  `pl.Enum(['true','false'])` raises a categorical-to-Boolean `ComputeError`.
+  Pandas categorical input succeeds. The explicit categorical branch at
+  `preprocessing/casting.py:177-179` calls string operations at line 109 without
+  first converting the expression to String; Enum misses that branch entirely.
+  Preserve the existing text-to-boolean vocabulary and coercion contract while
+  covering both categorical representations. OC-58's numeric boolean repair
+  concerns a different input family.
+- **OC-267 — combined SMOTE ignores neighbor count:** fit/apply
+  `OversamplingCalculator` and its applier to
+  `X.x=[0.,1.,2.,3.,4.,10.,11.]`, `y=[0,0,0,0,0,1,1]`, with
+  `k_neighbors=1, random_state=42`. Method `smote` produces ten rows and
+  `{0:5,1:5}`; method `smote_tomek` raises
+  `Expected n_neighbors <= n_samples_fit, but n_neighbors = 6,
+  n_samples_fit = 2, n_samples = 2`.
+  The control `SMOTETomek(smote=SMOTE(k_neighbors=1,random_state=42),
+  random_state=42)` succeeds with the same balanced counts.
+  `preprocessing/resampling.py:221-222` omits the configured inner SMOTE,
+  although the calculator stores the setting at line 292.
+- **OC-268 — calibrated ensemble loses tuned parameters on replay:** build
+  pandas inputs from `make_classification(n_samples=100,n_features=4,
+  random_state=7)`. Prepare `VotingClassifierCalculator` with
+  `base_estimators=['logistic_regression'], calibrate_base_models=True,
+  calibration_cv=2, voting='soft', n_jobs=1`. Run `TuningCalculator.fit` with
+  `strategy='grid', cv_folds=2` and the single-value search space
+  `{'logistic_regression__estimator__C':[0.01]}`. The returned tuned estimator
+  has `C=0.01`; `calc.fit(X,y,{'params':result.best_params})` restores `C=1.0`.
+  Predictions differ by up to `0.4102064767291098` in probability.
+  The invalid `estimator` parameter warning arises because
+  `modeling/ensemble.py:299-300,468-473` routes nested parameters to the bare
+  base estimator before wrapping it for calibration. Preserve the selected
+  configuration across tuning, subsequent fit and CV; this is separate from
+  OC-206's shared-configuration mutation.
+- **OC-269 — pruning is never activated:** build the Optuna searcher with
+  `TuningConfig(strategy='optuna', n_trials=2, search_space={'alpha':[0.001]},
+  strategy_params={'pruner':'hyperband'})`, `SGDClassifier(random_state=7)`,
+  `KFold(2)` and scoring `accuracy`. Fit the same 100-row classification input
+  used for OC-268. The study uses `HyperbandPruner`, but
+  `search.enable_pruning` is `False`, and trial intermediate values are
+  `[{},{}]`. `modeling/_tuning/strategies/optuna.py:240-252` omits the enabling
+  flag. SGD supports `partial_fit`, so this also fails for a compatible model.
+  Implement capability-aware pruning; universally enabling it would break
+  estimators without incremental fitting.
+- **OC-270 — tuning rejects natively supported NaN:** use
+  `X.x=[0.,1.,NaN,3.,4.,5.,6.,7.,8.,9.,10.,11.]`,
+  `X.z=[0.,0.,0.,0.,1.,1.,1.,1.,0.,0.,1.,1.]`, and
+  `y=[0,0,0,0,1,1,1,1,0,0,1,1]`. A direct
+  `RandomForestClassifierCalculator.fit` with
+  `params={'max_depth':2,'n_estimators':5,'n_jobs':1}` succeeds and predicts
+  all twelve labels correctly. A two-fold grid search over single-value lists
+  of those same parameters raises an imputer-required ValueError before
+  dispatch, despite the estimator's `input_tags.allow_nan=True`.
+  ExtraTrees and DecisionTree reproduce with their supported parameters.
+  `modeling/_tuning/engine.py:318,404-416` relies on a class-name allowlist
+  that omits these supported estimators; validate estimator capabilities while
+  retaining rejection for models that cannot accept missing values.
+
+Verification: inline reproductions above plus the following existing focused
+tests, **263 passed, 1 warning**:
+
+```powershell
+.venv\Scripts\python.exe -m pytest `
+  skyulf-core/tests/integration/test_transformations_general.py `
+  skyulf-core/tests/integration/test_casting.py `
+  skyulf-core/tests/unit/test_resampling.py `
+  skyulf-core/tests/integration/test_sentence_embedder.py `
+  skyulf-core/tests/unit/test_modeling_ensemble_gaps.py `
+  skyulf-core/tests/unit/test_tuning_engine_failure_branches.py `
+  -q --tb=short -p no:cacheprovider `
+  --basetemp="$env:TEMP\skyulf-core-audit-followup-20260912"
+```
+
+This continuation sampled transformations, casting, resampling, scaling,
+outliers, splitting, calibrated ensembles, nested CV, Optuna and vectorization.
+It is not proof that all remaining behavior is correct. A reproduced empty-batch
+SentenceEmbedder failure was not filed because its expected empty-input contract
+was not established. H3 was unavailable locally and was not execution-verified.
+This entry records findings and evidence; it does not claim implementation fixes
+or another full-suite run.
 
 ### 2026-09-12 — OC-248–263 filed; OC-35/46 reopened and OC-47 extended
 

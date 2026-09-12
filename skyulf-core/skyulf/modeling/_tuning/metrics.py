@@ -73,26 +73,26 @@ BINARY_POS_LABEL_METRICS: frozenset[str] = frozenset(
 )
 
 
-def _weighted_pr_auc(y_true: Any, proba: Any) -> float:
-    """Weighted PR-AUC over probabilities, as the evaluation node reports it.
+def _weighted_pr_auc(estimator: Any, X: Any, y_true: Any) -> float:
+    """Score weighted PR-AUC against the estimator's probability class axis.
 
-    A binary target arrives as a single column — sklearn hands a ``predict_proba``
-    scorer only the positive class — so it is scored directly instead of being
-    binarized, and the positive class is named because ``average_precision_score``
-    defaults to ``pos_label=1``, which a string label space does not contain.
+    Holdouts may omit trained classes, so their observed labels cannot define
+    the probability columns. Binary models score only the trained positive
+    class, including when that class is absent from the holdout.
     """
-    classes = np.unique(np.asarray(y_true))
-    proba = np.asarray(proba)
-    if proba.ndim == 1:
-        return average_precision_score(y_true, proba, pos_label=classes[-1])
+    classes = estimator.classes_
+    proba = np.asarray(estimator.predict_proba(X))
+    if len(classes) == 2:
+        pos_probs = proba if proba.ndim == 1 else proba[:, 1]
+        return average_precision_score(y_true, pos_probs, pos_label=classes[1])
     return average_precision_score(
         label_binarize(y_true, classes=classes), proba, average="weighted"
     )
 
 
 def _pr_auc_weighted_scorer() -> Any:
-    """Builds the weighted PR-AUC scorer, read off ``predict_proba``."""
-    return make_scorer(_weighted_pr_auc, response_method="predict_proba")
+    """Return an estimator-aware scorer so absent holdout classes stay aligned."""
+    return _weighted_pr_auc
 
 
 _G_SCORE_NEEDS_IMBLEARN = (

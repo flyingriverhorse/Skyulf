@@ -15,6 +15,13 @@ That includes:
 - Some preprocessing nodes store sklearn objects inside `params` (e.g., KNN/Iterative imputers, OneHotEncoder).
   Those are not JSON-serializable and require pickling.
 
+Dataframe wrappers returned by `EngineRegistry.wrap()` can be restored through
+Python `pickle` and Core's `JoblibModelSerializer`, including inside nested
+artifact containers. Restoration preserves the native dataframe, its dtypes,
+missing values and pandas index, along with normal wrapper method delegation.
+Previously saved wrappers that failed to load with `RecursionError` can be
+loaded with the corrected code; no artifact rewrite is required.
+
 ## Load and use
 
 ```python

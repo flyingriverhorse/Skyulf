@@ -84,15 +84,17 @@ def evaluate_classification_model(
             pos_label = classes[1]
             pos_probs = y_prob[:, 1]
 
-            # ROC
-            fpr, tpr, _ = roc_curve(y_test_np, pos_probs, pos_label=pos_label)
-            roc_curves.append(
-                CurveData(
-                    name=f"ROC (Class {class_names[1]})",
-                    points=downsample_curve(fpr, tpr),
-                    auc=metrics.get("roc_auc"),
+            # ROC requires both classes; a single-class holdout has an
+            # undefined axis. PR remains finite and is retained below.
+            if np.unique(y_test_np).size > 1:
+                fpr, tpr, _ = roc_curve(y_test_np, pos_probs, pos_label=pos_label)
+                roc_curves.append(
+                    CurveData(
+                        name=f"ROC (Class {class_names[1]})",
+                        points=downsample_curve(fpr, tpr),
+                        auc=metrics.get("roc_auc"),
+                    )
                 )
-            )
 
             # PR
             precision, recall, _ = precision_recall_curve(y_test_np, pos_probs, pos_label=pos_label)

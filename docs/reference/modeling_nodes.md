@@ -62,6 +62,10 @@ Seed** in each node's Cross Validation section. Full precedence rules:
 
 ## Classification
 
+Binary evaluation omits the ROC curve and ROC AUC when the held-out partition
+contains only one trained class, since ROC requires both classes. Finite
+precision-recall output and the other available metrics remain in the report.
+
 ### LightGBM row sampling
 
 The `lgbm_classifier` and `lgbm_regressor` nodes apply `subsample` during basic
@@ -439,6 +443,13 @@ Config:
 Learned params:
 
 - a tuple `(best_model, tuning_result)` where `best_model` is a fitted estimator.
+
+`pr_auc_weighted` matches probability columns to the fitted model's classes,
+even when a validation partition omits a trained class. Multiclass `pr_auc`
+also resolves to this scorer. Multiclass scores use support-weighted average
+precision; binary `pr_auc_weighted` uses the model's second class as positive.
+A binary holdout without positive examples therefore scores 0, rather than
+changing which class is positive.
 
 ## Cross-validation
 

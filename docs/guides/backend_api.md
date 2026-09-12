@@ -315,6 +315,10 @@ values in `group`:
 {"column": "group", "operator": "==", "value": null}
 ```
 
+Input columns can be named `value`, `ratio`, `name` or `filter_value`; those
+names do not conflict with response fields. A numeric column can also be used
+as both the grouping column and the measure.
+
 Use `"!="` with `null` to select non-missing rows. The UI labels the missing
 bucket `Unknown (missing)` and keeps literal `Unknown` separate. Older response
 rows without `filter_value` fall back to their display name; the legacy string

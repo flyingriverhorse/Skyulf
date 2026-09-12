@@ -4,6 +4,7 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import polars as pl
+import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
@@ -11,13 +12,16 @@ from backend.dependencies import get_db
 from backend.eda.router import router
 
 
-def test_decomposition_http_drill_down_keeps_missing_rows_separate(monkeypatch) -> None:
+@pytest.mark.parametrize("split_col", ["group", "value", "ratio"])
+def test_decomposition_http_drill_down_keeps_missing_rows_separate(
+    monkeypatch, split_col: str
+) -> None:
     """Request validation and JSON serialization must retain null-valued bucket filters."""
     frame = pl.DataFrame(
         {
-            "group": ["a", None, "Unknown", None],
+            split_col: ["a", None, "Unknown", None],
             "detail": ["normal", "missing_a", "literal", "missing_b"],
-            "value": [1, 2, 3, 4],
+            "amount": [1, 2, 3, 4],
         }
     )
     monkeypatch.setattr(
@@ -28,7 +32,7 @@ def test_decomposition_http_drill_down_keeps_missing_rows_separate(monkeypatch) 
     app = FastAPI()
     app.include_router(router)
     app.dependency_overrides[get_db] = lambda: session
-    body = {"measure_col": "value", "measure_agg": "sum", "split_col": "group", "filters": []}
+    body = {"measure_col": "amount", "measure_agg": "sum", "split_col": split_col, "filters": []}
 
     with TestClient(app) as client:
         response = client.post("/eda/192/decomposition", json=body)
@@ -50,7 +54,7 @@ def test_decomposition_http_drill_down_keeps_missing_rows_separate(monkeypatch) 
                     **body,
                     "split_col": "detail",
                     "filters": [
-                        {"column": "group", "operator": "==", "value": bucket["filter_value"]}
+                        {"column": split_col, "operator": "==", "value": bucket["filter_value"]}
                     ],
                 },
             )

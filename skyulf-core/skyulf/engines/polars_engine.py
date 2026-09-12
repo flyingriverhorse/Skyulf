@@ -120,7 +120,9 @@ class SkyulfPolarsWrapper:
 
     def __getattr__(self, name):
         """Delegate unknown attribute access to the underlying ``polars.DataFrame``."""
-        return getattr(self._df, name)
+        # Restoration probes attributes before _df exists; bypass this fallback
+        # so missing state raises AttributeError instead of recursing.
+        return getattr(object.__getattribute__(self, "_df"), name)
 
 
 class PolarsEngine(BaseEngine):
