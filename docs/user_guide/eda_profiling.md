@@ -72,7 +72,9 @@ The analyzer automatically detects column types (Numeric, Categorical, Date, Tex
     *   *Normality Tests:* For performance, normality tests are performed on a sample of up to 5,000 rows.
         *   **Shapiro-Wilk:** Used for N < 5,000.
         *   **Kolmogorov-Smirnov:** Used for N >= 5,000 (on a 5k sample).
-*   **Categorical:** Unique count, Mode, Frequency distribution.
+*   **Categorical:** Unique count, Mode, Frequency distribution. Unique and
+    rare-label counts and the top categories exclude missing values, which
+    are reported separately in the column's missing count and percentage.
 *   **Date:** Min/Max date, Range, Year/Month distribution.
 *   **Text:** Avg length, Common words, **Sentiment Analysis** (Positive/Neutral/Negative).
 
@@ -82,6 +84,15 @@ values and no declared type) is reported as `Unknown`: its missing count,
 missing percentage and quality alerts remain available, while type-specific
 statistics are omitted. An all-null column with a declared type, such as
 `Float64`, retains that type's profile.
+
+String columns are treated as categorical when fewer than 5% of their
+non-missing values are distinct, or when they contain at most 20 distinct
+non-missing values with at least one repetition. This also recognizes small
+datasets with repeated class or city labels. Missing values do not count as
+labels or dilute the ratio; all-null strings and strings with no repeated
+values remain Text. A recognized string target receives classification
+statistics, associations and rule discovery when numeric features are available.
+Rerun saved analyses to refresh their inferred types and target results.
 
 ### 2. Smart Alerts
 Skyulf automatically flags potential data quality issues:

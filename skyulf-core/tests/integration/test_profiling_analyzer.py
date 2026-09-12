@@ -738,10 +738,9 @@ class TestRealShapedDataset:
         assert profile.columns["age"].numeric_stats is not None
         assert profile.columns["age"].missing_percentage > 0
 
-        # city is a low-cardinality string, but with only 15 rows its unique
-        # ratio (4/14 non-null) is above the 5% categorical threshold, so it's
-        # classified as free-form Text rather than Categorical.
-        assert profile.columns["city"].dtype == "Text"
+        # Repeated city labels remain categorical even in this small sample.
+        assert profile.columns["city"].dtype == "Categorical"
+        assert profile.columns["city"].categorical_stats is not None
         assert profile.columns["city"].missing_percentage > 0
 
         # signup_date should be auto-detected and cast to a Date/Datetime dtype.

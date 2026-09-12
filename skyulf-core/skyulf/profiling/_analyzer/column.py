@@ -29,19 +29,10 @@ class ColumnMixin(_AnalyzerState):
     def _get_semantic_type(self, series: pl.Series) -> str:
         """Map polars dtype + cardinality heuristics to a semantic bucket."""
         dtype = series.dtype
-        if dtype in _INT_DTYPES or dtype in (pl.Utf8, pl.String):
-            n_unique = series.n_unique()
-            count = len(series)
-            ratio = n_unique / count if count > 0 else 0
-        else:
-            # Non-int/string dtypes (Float, Boolean, Date/Datetime/Duration,
-            # Categorical, Object, ...) never consult ratio/n_unique in
-            # _dtype_to_semantic_bucket, so skip n_unique() — it can be
-            # unsupported for some dtypes (e.g. Object) and is otherwise
-            # wasted work.
-            n_unique = 0
-            ratio = 0.0
-        return _dtype_to_semantic_bucket(dtype, ratio, n_unique)
+        # Only integers and strings consult cardinality; other dtypes may not
+        # support n_unique() (e.g. Object), so avoid querying it for them.
+        n_unique = series.n_unique() if dtype in _INT_DTYPES or dtype in (pl.Utf8, pl.String) else 0
+        return _dtype_to_semantic_bucket(dtype, n_unique, len(series), series.null_count())
 
     def _add_high_null_alert(self, col: str, null_pct: float, alerts: list[Alert]) -> None:
         """Flag columns with more than 5% missing values."""

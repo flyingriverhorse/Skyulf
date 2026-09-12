@@ -23,18 +23,20 @@ _INT_DTYPES = (
 )
 
 
-def _dtype_to_semantic_bucket(dtype: Any, ratio: float, n_unique: int) -> str:
-    """Map a Polars dtype + cardinality ratio/count to a semantic bucket.
+def _dtype_to_semantic_bucket(dtype: Any, n_unique: int, count: int, null_count: int = 0) -> str:
+    """Map a Polars dtype and column counts to a semantic bucket.
 
     Shared by ``ColumnMixin._get_semantic_type`` (per-series, used during the
-    main per-column analysis pass) and ``EDAAnalyzer._semantic_type_for_column``
-    (dtype-only, used by the inline/vectorized inference pass that reuses
+    main per-column analysis pass) and ``EDAAnalyzer._infer_semantic_types``
+    (used by the inline/vectorized inference pass that reuses
     already-computed ``n_unique`` counts) so the Numeric/Categorical/Boolean/
     DateTime/Text buckets never drift apart between the two call sites.
 
-    ``ratio`` is ``n_unique / row_count`` (0 when there are no rows).
-    Low-cardinality ints (``ratio < 0.05`` and ``n_unique < 20``) and
-    low-cardinality strings (``ratio < 0.05``) are treated as Categorical.
+    ``n_unique`` includes null when present; ``count`` includes every row.
+    Integers are Categorical when ``n_unique / count < 0.05`` and
+    ``n_unique < 20``. Strings use only non-null values: a unique ratio below
+    0.05, or at most 20 distinct values with repetition, is Categorical.
+    All-null strings and strings with no repeated values remain Text.
     Native Categorical/Enum dtypes remain Categorical at any cardinality.
     Null dtype has no inferable type, so Unknown preserves missing-value
     reporting without dispatching to type-specific aggregates.
@@ -44,13 +46,19 @@ def _dtype_to_semantic_bucket(dtype: Any, ratio: float, n_unique: int) -> str:
     if dtype in (pl.Float32, pl.Float64):
         return "Numeric"
     if dtype in _INT_DTYPES:
+        ratio = n_unique / count if count > 0 else 0
         return "Categorical" if (ratio < 0.05 and n_unique < 20) else "Numeric"
     if dtype == pl.Boolean:
         return "Boolean"
     if dtype in (pl.Date, pl.Datetime, pl.Duration):
         return "DateTime"
     if dtype in (pl.Utf8, pl.String):
-        return "Categorical" if ratio < 0.05 else "Text"
+        observed_unique = n_unique - int(null_count > 0)
+        observed_count = count - null_count
+        if observed_count == 0 or observed_unique == observed_count:
+            return "Text"
+        ratio = observed_unique / observed_count
+        return "Categorical" if ratio < 0.05 or observed_unique <= 20 else "Text"
     if dtype in (pl.Categorical, pl.Enum):
         return "Categorical"
     return "Text"

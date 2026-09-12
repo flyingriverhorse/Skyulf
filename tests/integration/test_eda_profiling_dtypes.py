@@ -26,3 +26,22 @@ def test_eda_report_serializes_null_and_enum_columns() -> None:
         {"value": "b", "count": 1},
     ]
     assert result["sample_data"] == df.to_dicts()
+
+
+def test_eda_report_serializes_small_string_target_analysis() -> None:
+    """Saved EDA reports must include classification results for small string targets."""
+    df = pl.DataFrame(
+        {
+            "signal": [1.0, 1.1, 2.0, 2.1, 3.0, 3.1],
+            "label": ["small", "small", "medium", "medium", "large", "large"],
+        }
+    )
+
+    result = _run_eda_analyzer(df, {"target_col": "label"}).model_dump(mode="json")
+
+    assert result["columns"]["label"]["dtype"] == "Categorical"
+    assert result["columns"]["label"]["categorical_stats"]["unique_count"] == 3
+    assert result["task_type"] == "Classification"
+    assert result["rule_tree"] is not None
+    assert 0.99 < result["target_correlations"]["signal"] <= 1.0
+    assert result["sample_data"] == df.to_dicts()

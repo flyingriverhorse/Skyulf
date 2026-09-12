@@ -184,6 +184,7 @@ uses, so a fixed finding stays where it was filed.
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
+| OC-110 | 🟠 | Semantic-type inference misclassifies small categorical columns as `Text`, so task type never inferred (`profiling/_analyzer/_utils.py`, `analyzer.py`) | small | ✅ fixed 2026-09-12 — infer repeated small string categories from non-null counts in both profiling paths, restoring statistics and classification target analysis. |
 | OC-114 | 🟡 | All-null tracked column yields 30 `NaN` autocorrelation lags as real analysis (≥1000-row datasets) (`temporal.py:167-191`) | small | ✅ fixed 2026-09-09 - undefined temporal diagnostics are omitted unless sufficient finite varying observations and finite results support them. |
 | OC-112 | ⚪ | Comment and code disagree in the categorical profiler — the comment promises a rendered missing-value marker, the code `continue`s and discards the null category (`profiling/_analyzer/categorical.py:22-30`). *Filed as "disagree about the applied threshold"; the real subject is the null-category marker* | 1 line | ✅ fixed 2026-09-06 — comment-only, no behaviour change; the reasoning for why dropping the null category is correct now lives in the code comment it rewrote. See the log entry |
 | OC-148 | 🟡 | PII detector flags ordinary 7+ digit numeric ID columns as "Email/Phone" (`profiling/_analyzer/text.py:107-128`) | small | ✅ fixed 2026-09-07 — phone detection now requires positive format evidence and repeated sample evidence; plain IDs, ZIP+4, and isolated phone-shaped IDs are excluded |
@@ -240,6 +241,7 @@ uses, so a fixed finding stays where it was filed.
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
+| OC-247 | 🟡 | Missing categorical values inflate unique/rare-label counts and consume a top-10 frequency slot (`profiling/analyzer.py`, `_analyzer/categorical.py`) | small | ✅ filed and fixed 2026-09-12 — exclude nulls before frequency ranking and rare-label aggregation, and remove the null entry from the distinct-label count. |
 | OC-235 | 🟠 | Directed causal edges are serialized backwards (`profiling/_analyzer/causal.py`) | small | ✅ fixed 2026-09-11 — preserve causal-learn endpoint order; real graph objects and public collider regressions verify both orientations. |
 | OC-236 | 🟠 | Nominal target codes feed Pearson/Fisher-Z as numeric magnitudes, making results depend on category order (`profiling/analyzer.py`) | design + medium | ✅ fixed 2026-09-11 — omit categorical targets from numeric analysis while preserving category associations; numeric task overrides and omission metadata are explicit. |
 | OC-237 | 🟡 | The causal graph cap guesses the target from column names and can omit the actual selection (`profiling/_analyzer/causal.py`) | small | ✅ fixed 2026-09-11 — retain the explicitly selected eligible numeric target and record all/target-correlation/variance selection. |
@@ -397,6 +399,63 @@ respective fix logs; OC-167 closed with canonical artifact framing on 2026-09-09
 ---
 
 ## Log
+
+### 2026-09-12 — OC-110/247 fixed: observed string categories and counts
+
+Public `EDAAnalyzer.analyze(target_col="label")` reproduced the filed failure
+for 50 rows / 3 labels and 100 rows / 5 or 10 labels: the target was `Text`,
+`task_type` and `rule_tree` were `None`, categorical statistics were absent,
+and target associations were empty. The new regressions and updated customer
+sample expectation produced **13 expected failures / 8 passing controls**
+before the production change.
+
+Both the batched and per-series inference paths now pass their column counts
+to the same helper. Strings are categorical when fewer than 5% of observed
+values are distinct, or when at most 20 distinct observed values include a
+repetition. Nulls are excluded from both the distinct count and denominator.
+Unlike the source audit's blanket small-vocabulary suggestion, the repetition
+guard preserves all-unique strings as Text. All-null strings remain Text
+regardless of frame size. Integer inference and native Categorical/Enum
+behavior are unchanged; OC-50 and OC-111 remain open.
+
+Regressions cover the 5% boundary, 20/21 distinct labels, nulls at the small
+vocabulary boundary, sparse strings, constant labels, all-unique text and
+large low-ratio vocabularies. Full target analysis verifies categorical
+statistics, classification, rules, associations and balance advice. The
+backend analysis/JSON serialization regression verifies the saved report
+contains these results without altering source rows. The checked-in customer
+sample now correctly profiles repeated city labels as Categorical.
+
+Independent review also identified **OC-247**, reproduced for both strings
+and native categoricals: `["a", "a", None]` reported two distinct and two rare
+labels; 99 copies of `"a"` plus null still reported two distinct labels and
+one rare label. A null-heavy column with ten observed categories displayed
+only nine because null occupied a top-ten slot before being removed.
+Eight new regressions failed before this correction. Category frequencies now
+drop nulls before ranking/counting, and the distinct-label count removes the
+null entry. Tests cover String/Categorical/Enum, low/high frequency labels,
+the top-ten boundary and all-null native categories. Missing counts remain
+available independently; source rows and native semantic types are preserved.
+OC-247 is filed closed here; it does not increase the live queue count.
+
+Final verification: **543 tests passed** across all `test_profiling_*.py` modules
+and the six backend EDA suites (`test_eda_api`, `test_eda_router_extra`,
+`test_eda_tasks_extra`, `test_eda_profiling_dtypes`, `test_eda_target_contract`,
+`test_eda_target_association_missing_values`). The run reports 133 dependency,
+numeric edge-case and plotting warnings, with no failures. Command: repository
+`.venv/Scripts/python.exe -m pytest` with those paths, `-q --tb=short
+-p no:cacheprovider --basetemp=tmp_repro_artifacts/oc110-oc247-final-pytest`.
+The log is `tmp_repro_artifacts/oc110-oc247-final-tests.log` (ignored).
+Repository-wide Ruff, the configured backend/Core Ty scope and formatting of
+all seven touched Python files pass. Follow-up review found no remaining issue
+in the correction. The EDA user guide and v0.8.20 release notes
+describe the heuristic and rerunning saved analyses. OC-110 moves to the
+archive; the live queue now contains **37 open / 4 parked** findings.
+
+Commit verification repeated the **543-test** run and passed Ruff/Ty again.
+`mkdocs build --strict` also passes after adding the missing docstring type
+for the existing `FeatureEngineer.fit_transform(node_id_prefix)` parameter;
+this one-line documentation repair does not change its signature or behavior.
 
 ### 2026-09-11 — Web EDA label sorting review
 

@@ -8,7 +8,8 @@ class CategoricalMixin(_AnalyzerState):
     """Categorical helpers for :class:`EDAAnalyzer`."""
 
     def _analyze_categorical(self, col: str, row: dict, basic: dict) -> CategoricalStats:
-        unique_count = basic.get(f"{col}__unique", 0)
+        """Report observed labels separately from the column's missing-value count."""
+        unique_count = basic.get(f"{col}__unique", 0) - int(basic.get(f"{col}__null", 0) > 0)
         top_k_list = row.get(f"{col}__top_k", [])
 
         top_k = []
@@ -21,8 +22,8 @@ class CategoricalMixin(_AnalyzerState):
                         continue
                     value = item[val_key]
                     if value is None:
-                        # Polars' `value_counts` includes null as a real category.
-                        # Drop it rather than stringify it: `str(None)` would put a
+                        # Defend against null entries in supplied aggregates:
+                        # `str(None)` would put a
                         # literal "None" in top_k, indistinguishable from a genuine
                         # category value of that name. Null frequency is still
                         # reported by ColumnProfile.missing_count/missing_percentage.

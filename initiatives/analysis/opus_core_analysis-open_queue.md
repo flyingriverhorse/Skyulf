@@ -15,7 +15,7 @@ file deliberately carries no history.
 per-area report files `00`–`18`).
 **Baseline:** commit `93d7719e` (master), audit run 2026-08-31 → 09-01 by 15
 parallel read-only agents (Claude Opus 5). 116 findings: 5 🔴 / 45 🟠 / 44 🟡 /
-22 ⚪, plus OC-160–246 filed by later reviews. OC-100 was retracted as a false
+22 ⚪, plus OC-160–247 filed by later reviews. OC-100 was retracted as a false
 positive and is not counted; the corrections pass stays in the archive.
 
 **Status key:** ⬜ open · 🟨 in progress · ✅ done · ⏭️ parked
@@ -26,6 +26,9 @@ detail lives in the archive's `## Log` section.
 ---
 
 ## Live — fix queue
+
+**Current status (2026-09-12): 37 open / 4 parked.** OC-110 and the newly filed
+OC-247 are closed in the archive.
 
 Ordered by the master report's suggested fix order: **Now** (silent wrongness
 reaching users), **Next** (wrong results in realistic configs), **Then** (decide
@@ -60,7 +63,6 @@ closed that on 2026-09-07.
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
-| OC-110 | 🟠 | Semantic-type inference misclassifies small categorical columns as `Text`, so task type never inferred (`profiling/_analyzer/column.py`, `analyzer.py:502`) | small | ⬜ open |
 | OC-113 | 🟠 | Near-perfect multicollinearity silently reports VIF = 1.0 — `max(1.0, …)` clamps numerical garbage (`numeric.py:32-63`) | small | ⬜ open |
 | OC-120 | 🟠 | `Decimal` columns silently skipped by every auto-numeric node; crash pandas when selected explicitly (`engines/__init__.py`, `preprocessing/_helpers.py`) | small | ⬜ open |
 | OC-91 | 🟡 | Three public `core/` seams (263 lines) have zero call sites; one duplicates a differently-shaped backend class name | small | ⬜ open |
@@ -191,8 +193,9 @@ key — also the fastest way to find drift the audit missed).
 
 **Status:** ⬜ open — specification recorded at the user's request on 2026-09-10;
 deferred for a later implementation pass. This is a cross-layer enhancement,
-not a newly reproduced OC finding. It does not change the **63 open / 4 parked**
-audit counts. OC-224 remains fixed; OC-223 is a separate alert-note lifecycle bug.
+not a newly reproduced OC finding. At filing, the audit contained **63 open /
+4 parked** findings; this enhancement did not change those counts. OC-224 remains
+fixed; OC-223 is a separate alert-note lifecycle bug.
 
 **Goal:** let the user upload one raw dataset and choose which representation
 to monitor. Both modes must compare the same preprocessing stage on each side.
