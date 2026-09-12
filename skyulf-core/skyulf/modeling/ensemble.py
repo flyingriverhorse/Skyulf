@@ -146,8 +146,8 @@ class _BaseEnsembleCalculator(SklearnCalculator):
     Per-base-model hyperparameters are supported via ``base_estimator_params``
     (a ``{name: {param: value}}`` map) and ``final_estimator_params``. Nested
     ``<name>__<param>`` / ``final_estimator__<param>`` keys (produced by the
-    hyperparameter tuner) are absorbed into the same maps so tuned values are
-    applied during basic training and post-tuning cross-validation alike.
+    hyperparameter tuner) are applied to the resolved estimators, including
+    calibration wrappers, during training and post-tuning cross-validation.
     """
 
     BASE_ESTIMATORS: ClassVar[dict[str, Callable[[], BaseEstimator]]] = {}
@@ -490,10 +490,18 @@ class _BaseEnsembleCalculator(SklearnCalculator):
         # Calibration is a structural choice (wrap base classifiers), not a sklearn
         # meta-estimator param — pop it here so it never reaches the constructor.
         calibration = self._extract_calibration(bucket)
-        self._absorb_nested_keys(bucket, base_params, final_params)
-        bucket["estimators"] = self._build_estimators(
+        base_overrides: dict[str, Any] = {}
+        self._absorb_nested_keys(bucket, base_overrides, final_params)
+        estimators = self._build_estimators(
             bucket.pop("base_estimators", None), base_params, calibration
         )
+        # Tuning keys address the final sklearn hierarchy. Fixed base params
+        # belong below calibration; e.g. a tuned ``estimator__C`` belongs on
+        # the CalibratedClassifierCV wrapper created above.
+        bucket["estimators"] = [
+            (name, self._apply_params(estimator, base_overrides.get(name), name))
+            for name, estimator in estimators
+        ]
         self._clean_meta_keys(bucket, final_params or None)
         if nested:
             resolved["params"] = bucket

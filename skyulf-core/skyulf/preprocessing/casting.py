@@ -94,7 +94,7 @@ def _resolve_polars_dtype(dtype_str: str) -> Any:
 
 
 def _bool_expr_from_string_col_polars(col: str) -> Any:
-    """Build a Polars expression casting a String/Utf8 column to Boolean.
+    """Build a Polars expression casting text or categorical labels to Boolean.
 
     Polars has no direct Utf8->Boolean cast at all (raises
     `InvalidOperationError` even with ``strict=False``), unlike pandas'
@@ -106,7 +106,7 @@ def _bool_expr_from_string_col_polars(col: str) -> Any:
     table; unrecognized values become null (the caller decides whether to
     raise on that, mirroring `coerce_on_error`).
     """
-    normalized = pl.col(col).str.strip_chars().str.to_lowercase()
+    normalized = pl.col(col).cast(pl.String).str.strip_chars().str.to_lowercase()
     return (
         pl.when(normalized.is_in(list(_BOOL_TRUE_ALIASES)))
         .then(True)
@@ -174,7 +174,19 @@ def _build_polars_cast_exprs(
                     "Polars engine."
                 )
             continue
-        if pl_dtype == pl.Boolean and X.schema[col] in (pl.String, pl.Utf8, pl.Categorical):
+        if pl_dtype == pl.Datetime and X.schema[col] in (pl.String, pl.Utf8):
+            # Share pandas' mixed-format parser: generic Polars casts lose
+            # date-only strings, and inferred parsing rejects all-invalid
+            # columns even in coercion mode. Convert only the selected column.
+            parsed = _cast_datetime(X[col].to_pandas(), coerce_on_error)
+            exprs.append(pl.lit(pl.from_pandas(parsed)).cast(pl_dtype).alias(col))
+            continue
+        if pl_dtype == pl.Boolean and X.schema[col] in (
+            pl.String,
+            pl.Utf8,
+            pl.Categorical,
+            pl.Enum,
+        ):
             exprs.append(_bool_expr_from_string_col_polars(col))
             string_bool_cols.append(col)
             continue
@@ -429,7 +441,9 @@ class CastingApplier(BaseApplier):
     pandas' ``astype`` clamps out-of-range integers where polars nulls or raises.
     Boolean targets additionally go through the shared alias table so
     "yes"/"no"-style strings coerce the same way on both engines in best-effort
-    mode. Columns missing from the frame are skipped. New categorical artifacts
+    mode, including Polars Categorical and Enum labels. Text-to-datetime casts
+    share the pandas mixed-format parser and retain the resolved engine dtype.
+    Columns missing from the frame are skipped. New categorical artifacts
     freeze the training vocabulary; unseen values become missing. Older
     artifacts without a vocabulary retain their original casting behavior.
     """

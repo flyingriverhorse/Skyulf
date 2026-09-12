@@ -1,7 +1,10 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll } from 'vitest';
 import type { Node, Edge } from '@xyflow/react';
 import { renderHook } from '@testing-library/react';
 import { useBranchColors, generateBranchColors } from './useBranchColors';
+import { buildPreviewConfiguration } from '../utils/previewConfiguration';
+import { registry } from '../registry/NodeRegistry';
+import { ResamplingNode } from '../../modules/nodes/processing/ResamplingNode';
 
 // Build a tiny linear graph: dataset → preprocessing → terminal.
 // Each test stitches its own node/edge fixture so the parallel-vs-merge
@@ -33,6 +36,48 @@ describe('generateBranchColors', () => {
 });
 
 describe('useBranchColors', () => {
+  beforeAll(() => {
+    registry.register(ResamplingNode);
+  });
+
+  it.each([
+    [{}, 'Resampling'],
+    [{ label: 'Balanced classes' }, 'Balanced classes'],
+    [{ title: 'Training resample' }, 'Training resample'],
+  ])('uses the registered display name unless the user named the node: %j', (data, name) => {
+    /** Canvas and submitted preview labels must share readable names and custom overrides. */
+    const nodes = [node('ds', 'dataset_node'), node('resample', 'ResamplingNode', data),
+      node('other', 'deduplicate')];
+    const edges = [edge('ds-resample', 'ds', 'resample'), edge('ds-other', 'ds', 'other')];
+    const config = buildPreviewConfiguration(nodes, edges);
+    const { result } = renderHook(() => useBranchColors(nodes, edges));
+    expect(config.nodes.find(node => node.node_id === 'resample')?.params._display_name).toBe(name);
+    expect(result.current.get('ds-resample')?.label).toBe(`Path A · ${name}`);
+  });
+
+  it.each(['impute', 'leaf-0'])('keeps Path L/M aligned when an inspection sink follows %s', (source) => {
+    /** Removing a separately executed inspector must not hide its upstream result path. */
+    const leaves = Array.from({ length: 11 }, (_, index) => node(`leaf-${index}`, 'deduplicate'));
+    const nodes = [node('ds', 'dataset_node'), ...leaves,
+      node('impute', 'imputation_node', { label: 'Imputation' }),
+      node('resample', 'ResamplingNode', { label: 'Resampling' }),
+      node('inspect', 'data_preview')];
+    const edges = [...leaves.map(leaf => edge(`ds-${leaf.id}`, 'ds', leaf.id)),
+      edge('ds-impute', 'ds', 'impute'), edge('ds-resample', 'ds', 'resample'),
+      edge('to-inspect', source, 'inspect')];
+    const original = structuredClone({ nodes, edges });
+    const config = buildPreviewConfiguration(nodes, edges);
+    const consumed = new Set(config.nodes.flatMap(node => node.inputs));
+    const previewLeaves = config.nodes.filter(node => !consumed.has(node.node_id));
+    expect(previewLeaves.map(node => node.node_id).slice(11)).toEqual(['impute', 'resample']);
+    const { result } = renderHook(() => useBranchColors(nodes, edges));
+    expect(result.current.get('ds-resample')?.label).toBe('Path M · Resampling');
+    expect(result.current.get('ds-impute')?.label).toBe('Path L · Imputation');
+    expect([...result.current.values()].filter(info => info.label)).toHaveLength(previewLeaves.length);
+    expect(result.current.has('to-inspect')).toBe(false);
+    expect({ nodes, edges }).toEqual(original);
+  });
+
   it('orders duplicate-model labels by graph traversal and terminates through cycles', () => {
     /** Canvas path names must follow execution order even when insertion order differs. */
     const nodes = [

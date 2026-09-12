@@ -45,6 +45,15 @@ config = {
 
 ## Configuration reference
 
+Missing feature values are admitted using the installed estimator's
+capabilities, including supported Random Forest, Extra Trees and Decision Tree
+configurations. Search overrides that can replace an incompatible fixed default
+are considered before rejecting the input. Each candidate's actual fit still
+enforces its restrictions, such as unsupported criteria or monotonic constraints.
+Models that cannot handle missing values require imputation; fold preprocessing
+can supply that imputation using only training rows. Missing targets and numeric
+infinity remain errors.
+
 These keys go inside the `"modeling"` block when `"type"` is `"hyperparameter_tuner"`:
 
 | Key | Type | Default | Description |

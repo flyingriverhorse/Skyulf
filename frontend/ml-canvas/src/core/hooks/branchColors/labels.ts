@@ -1,4 +1,5 @@
 import type { Node } from '@xyflow/react';
+import { registry } from '../../registry/NodeRegistry';
 import type { BranchDef } from './types';
 
 /** Generate distinct saturated colors with the existing golden-angle spacing. */
@@ -43,6 +44,7 @@ function getSourceName(data: Record<string, unknown>): string {
 
 function getTerminalName(data: Record<string, unknown>): string {
   return (data.label as string) || (data.title as string)
+    || registry.get(String(data.definitionType))?.label
     || (typeof data.definitionType === 'string'
       ? data.definitionType.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/_/g, ' ')
         .replace(/\b\w/g, char => char.toUpperCase()) : '');

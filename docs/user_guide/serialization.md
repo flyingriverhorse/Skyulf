@@ -88,13 +88,14 @@ print(preds)
 ## Reproducibility fingerprint
 
 `pipeline.fingerprint()` returns a deterministic SHA-256 over the pipeline's
-topology **and** its fitted artifacts:
+topology, fitted artifacts and stored decision thresholds:
 
 ```python
 print(pipeline.fingerprint())  # 64-char hex, e.g. "9f2c4e..."
 ```
 
-- Two pipelines with the same fingerprint produce the same predictions —
+- Two pipelines with the same fingerprint produce the same predictions for
+  the same prediction options —
   callers can prove "this prediction came from exactly this pipeline".
 - The digest is **semantic** (`skyulf.pipeline.seal.artifact_digest` walks
   hyperparameters + fitted weights, tree structures, tuned-model tuples,
@@ -105,6 +106,12 @@ print(pipeline.fingerprint())  # 64-char hex, e.g. "9f2c4e..."
 
 The fingerprint is also part of `export_model_card()`, alongside the
 preprocessing lineage, model params, fit metrics, and a Mermaid `diagram`.
+
+Changing saved decision thresholds changes the fingerprint even when the
+trained model weights stay the same. Threshold dictionary insertion order and
+pickle protocol do not affect it. Pipelines without saved thresholds retain
+their previous fingerprint. Recompute stored fingerprints for pipelines with
+tuned thresholds when upgrading; retraining is not required.
 
 ## Security note
 

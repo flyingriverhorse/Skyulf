@@ -400,6 +400,14 @@ When an ensemble runs in **Advanced/Tuning mode** (`run_mode: "advanced"`), it i
 - Recommended outer search strategies: `optuna` or `halving_random`.
 - **Cost warning:** Stacking `cv` × outer search = nested cross-validation (outer folds × stacking `cv` × trials × base models). Keep stacking `cv` small (e.g. `3`) or reduce trials when also running an outer search.
 
+When base-model calibration is enabled, nested tuned keys address the completed
+calibration wrapper. For example, `logistic_regression__estimator__C=0.01`
+sets the underlying classifier's regularization, while
+`logistic_regression__method="isotonic"` sets its calibration method. These
+selected values remain in effect during calculator refits and post-tuning
+cross-validation. Fixed `base_estimator_params` still configure the underlying
+base model before calibration.
+
 ### Merge Strategy & Canvas Wiring
 
 The **Ensemble Node** behaves differently from ordinary fan-in on the canvas:

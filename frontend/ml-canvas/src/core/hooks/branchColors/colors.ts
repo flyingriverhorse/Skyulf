@@ -1,4 +1,5 @@
 import type { Edge, Node } from '@xyflow/react';
+import { getPreviewGraph } from '../../utils/previewGraph';
 import { getBranches, getBranchEdges } from './branches';
 import { getIncomingEdges, getTerminals } from './graph';
 import { generateBranchColors, getBranchLabel, getTerminalSuffixes } from './labels';
@@ -31,6 +32,7 @@ function assignColors(branchEdges: Set<string>[], labeledEdges: Set<string>, lab
 
 /** Compute the edge presentation map without modifying graph inputs. */
 export function getBranchColors(nodes: Node[], edges: Edge[]): Map<string, BranchEdgeInfo> {
+  ({ nodes, edges } = getPreviewGraph(nodes, edges));
   const terminals = getTerminals(nodes, edges);
   if (terminals.length === 0) return new Map();
   const incoming = getIncomingEdges(edges);

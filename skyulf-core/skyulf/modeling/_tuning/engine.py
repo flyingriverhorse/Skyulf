@@ -11,6 +11,7 @@ kept on ``TuningCalculator`` are one-line delegates preserved for the
 existing test surface.
 """
 
+import inspect
 import logging
 import warnings
 from collections.abc import Callable
@@ -21,6 +22,11 @@ import numpy as np
 import pandas as pd
 from sklearn.exceptions import ConvergenceWarning
 from sklearn.pipeline import Pipeline
+
+try:
+    from sklearn.utils import get_tags
+except ImportError:  # sklearn 1.4/1.5 remain supported by the standalone package.
+    get_tags = None
 
 from ..._validation import raise_invalid_choice
 from ...engines import SkyulfDataFrame
@@ -100,6 +106,13 @@ def _align_time_series_validation(
         positions = [i for i, column in enumerate(original_columns) if column in feature_columns]
         return X_val[:, positions], y_val
     return payload
+
+
+def _estimator_allows_nan(estimator: Any) -> bool:
+    """Read estimator capabilities across the supported sklearn tag API versions."""
+    if get_tags is not None:
+        return get_tags(estimator).input_tags.allow_nan
+    return bool(estimator._get_tags()["allow_nan"])
 
 
 class TuningCalculator(BaseModelCalculator):
@@ -301,8 +314,8 @@ class TuningCalculator(BaseModelCalculator):
         (e.g. mixed dtypes or leftover categorical/string columns that were never encoded)
         are also scanned via pd.isna, since np.isnan/np.isinf raise on non-numeric dtypes.
 
-        ``allow_nan`` skips the NaN checks for models that handle missing values
-        natively (XGBoost, LightGBM, HistGradientBoosting); Inf is still rejected.
+        ``allow_nan`` skips the NaN checks for models whose configured estimator
+        reports native missing-value support; Inf is still rejected.
         """
         if not isinstance(arr, np.ndarray):
             return
@@ -314,20 +327,34 @@ class TuningCalculator(BaseModelCalculator):
         elif arr.dtype == object and not allow_nan and pd.isna(arr).any():
             raise ValueError(object_nan_msg)
 
-    # Model classes that natively handle missing values in X; NaN must not be
-    # rejected for these (y still is — no estimator accepts missing targets).
-    _MISSING_NATIVE_MODEL_CLASSES = frozenset(
-        {
-            "XGBClassifier",
-            "XGBRegressor",
-            "LGBMClassifier",
-            "LGBMRegressor",
-            "_SamplingLGBMClassifier",
-            "_SamplingLGBMRegressor",
-            "HistGradientBoostingClassifier",
-            "HistGradientBoostingRegressor",
+    def _allows_missing_features(self, config: TuningConfig) -> bool:
+        """Check configured capabilities without fixing parameters that will be searched."""
+        model_class = getattr(self.model_calculator, "model_class", None)
+        if model_class is None:
+            return False
+        constructor_params, _ = split_class_weight_params(
+            model_class, {**self.model_calculator.default_params, **seed_params(config)}
+        )
+        estimator = instantiate_model(model_class, constructor_params)
+        if _estimator_allows_nan(estimator):
+            return True
+        # A search can replace a NaN-incompatible default (e.g. a regression
+        # tree's absolute_error criterion). Check the library baseline for
+        # searched axes rather than rejecting on a value that need not be used.
+        # Candidate fits remain authoritative; no search product is enumerated.
+        required_params = {
+            name
+            for name, parameter in inspect.signature(model_class).parameters.items()
+            if parameter.default is inspect.Parameter.empty
         }
-    )
+        fixed_params = {
+            key: value
+            for key, value in constructor_params.items()
+            if key not in config.search_space or key in required_params
+        }
+        if fixed_params.keys() == constructor_params.keys():
+            return False
+        return _estimator_allows_nan(instantiate_model(model_class, fixed_params))
 
     def fit(
         self,
@@ -398,14 +425,11 @@ class TuningCalculator(BaseModelCalculator):
         X_np, y_np = SklearnBridge.to_sklearn((X, y))
 
         # --- VALIDATION: Check for NaNs/Inf in Data ---
-        # Models with native missing-value support (XGBoost, LightGBM,
-        # HistGradientBoosting) accept NaN in X; forcing an Imputer on them
-        # would wrongly block a legitimate configuration. y is always checked.
-        model_cls = getattr(self.model_calculator, "model_class", None)
-        x_allows_nan = (
-            model_cls is not None
-            and getattr(model_cls, "__name__", "") in self._MISSING_NATIVE_MODEL_CLASSES
-        )
+        # Query the installed estimator rather than a model-name allowlist:
+        # support can depend on its configuration (e.g. a tree's criterion).
+        # Each candidate's fit still enforces its own constraints, including
+        # restrictions not expressed in tags such as tree monotonicity.
+        x_allows_nan = self._allows_missing_features(tuning_config)
         # With per-fold refit, X is the pre-transform payload: NaN there is
         # legitimate when the pipeline carries an imputer, which re-runs on
         # each fold's training rows before the model ever sees the data.

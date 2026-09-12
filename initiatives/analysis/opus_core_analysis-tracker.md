@@ -218,6 +218,7 @@ uses, so a fixed finding stays where it was filed.
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
+| OC-267 | 🟡 | SMOTE+Tomek stores but ignores the configured `k_neighbors`, leaving its inner SMOTE at the default five neighbors (`preprocessing/resampling.py:221-222,292`) | small | ✅ fixed 2026-09-12 — configure inner SMOTE neighbors, strategy and seed, and expose/validate k Neighbors for SMOTE + Tomek in Canvas. |
 | OC-254 | 🟡 | LabelEncoder fits supported NumPy/list targets but assumes native Series methods during apply (`preprocessing/encoding/label.py:69,113-115`) | small | ✅ fixed 2026-09-12 — normalize encoded list/NumPy targets with the fitted string-label policy, preserve native Series metadata and pass feature-only targets through unchanged. |
 | OC-18 | 🟡 | One-hot/dummy generated names can collide with existing columns (`encoding/one_hot.py`, `dummy.py`) | small | ✅ fixed 2026-09-12 — reject conflicting generated names in one-hot, dummy, missing-indicator and multiclass target encoding at fit/apply, while preserving legitimate reuse of dropped source names. |
 | OC-21 | 🟡 | WOE additive smoothing not normalized over categories (`encoding/woe.py`) | small | ✅ fixed 2026-09-11 — normalize class totals by all observed-category pseudocounts in full fits and training complements, correcting WOE/IV without rewriting saved mappings. |
@@ -234,6 +235,7 @@ uses, so a fixed finding stays where it was filed.
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
+| OC-256 | 🟡 | Feature-selection task inference treats pandas StringDtype/Categorical targets with more than ten classes as regression (`preprocessing/feature_selection/_common.py:54-69`) | small | ✅ fixed 2026-09-12 — recognize StringDtype and string categorical targets before the numeric cardinality heuristic. |
 | OC-30 | 🟡 | Datetime extraction ignores the UI output name and overwrites collisions (`feature_generation/_pandas_ops.py`, `_polars_ops.py`) | small | ✅ fixed 2026-09-12 — honor exact/prefix output naming and the shared numbered collision policy on both engines, including fitted operation replay. |
 | OC-24 | 🟠 | Polars group aggregates treat missing keys differently from pandas (`feature_generation/_polars_ops.py`) | small | ✅ already fixed — verified 2026-09-12: public fitted aggregates share null/NaN training groups across engines and wrappers; unseen groups remain missing, while the public artifact guard excludes divergent private unfitted helpers. |
 | OC-230 | 🟡 | Native Polars NaN inputs propagate through feature ratios while pandas treats them as missing (`feature_generation/_polars_ops.py:_polars_ratio`, `_pandas_ops.py:_pandas_ratio`) | small | ✅ fixed 2026-09-11 - normalize native NaN and null ratio operands to zero before summing, preserving other operands, input columns and signed epsilon. |
@@ -283,6 +285,7 @@ uses, so a fixed finding stays where it was filed.
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
+| OC-261 | 🟡 | Pipeline fingerprints omit stored decision thresholds, allowing identical fingerprints for different predictions under the same `use_tuned_thresholds=True` call (`pipeline/_pipeline.py:695-701`) | small | ✅ fixed 2026-09-12 — include stored decision thresholds in the semantic pipeline fingerprint while preserving untuned and legacy identities. |
 | OC-262 | 🟡 | Both dataframe wrappers recurse through missing `_df` during pickle/joblib restoration (`engines/pandas_engine.py:100-102`, `engines/polars_engine.py:121-123`) | small | ✅ fixed 2026-09-12 — resolve wrapper state without recursive delegation during restoration; pickle/joblib round trips preserve both native frames and their methods. |
 | OC-74 | 🟡 | `NodeRegistry.list_models()` hides all 4 Ensemble models; `category` arg dead (`registry.py:101-108`) | small | ✅ fixed 2026-09-11 - include Modeling and Ensemble in model discovery and exclude both from transformer discovery; preserve exact category filters and registration order. |
 | OC-167 | 🟡 | Ambiguous string boundaries in artifact serialization give different fitted label encoders identical pipeline fingerprints, despite encoding the same input as 0 vs −1 (`pipeline/seal.py:52,64`) — distinct from OC-62's pointer instability | small | ✅ fixed 2026-09-09 - typed length framing and canonical unordered entries distinguish different fitted values deterministically. |
@@ -297,6 +300,8 @@ uses, so a fixed finding stays where it was filed.
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
+| OC-266 | 🟡 | Polars categorical-to-boolean casting invokes string methods on categorical expressions; Enum inputs fall through to an unsupported generic cast (`preprocessing/casting.py:109,177-179,221`) | small | ✅ fixed 2026-09-12 — cast categorical and Enum labels through the existing boolean string alias table. |
+| OC-265 | 🟡 | Polars string-to-datetime casting uses a generic cast without parsing and silently replaces valid ISO dates with nulls under default coercion (`preprocessing/casting.py:221`) | small | ✅ fixed 2026-09-12 — parse textual dates with the shared mixed-format parser, retaining coercion, strict errors and the resolved engine dtype. |
 | OC-263 | 🟡 | Haversine roundoff can put the intermediate outside `[0,1]`, producing NaN for valid antipodal coordinates on both engines (`preprocessing/geo/distance.py:53-54,108-109`) | small | ✅ fixed 2026-09-12 — clamp the Haversine intermediary to its valid range on both engines, preserving missingness and finite antipodal distances. |
 | OC-59 | 🟠 | DatasetProfile selects different numeric-column sets on pandas and Polars (`preprocessing/inspection.py`) | small | ✅ fixed 2026-09-12 — use shared dtype-based selection, include supported small/unsigned integers and binary/constant/empty numeric columns, and exclude temporal columns on both engines. |
 | OC-60 | 🟠 | GeneralBinning ignores missing_strategy=label on Polars (`preprocessing/bucketing.py`) | small | ✅ fixed 2026-09-12 — fill missing and out-of-range bins with the configured label; labeled Polars outputs use a stable String dtype and the default keep strategy is preserved. |
@@ -311,6 +316,8 @@ uses, so a fixed finding stays where it was filed.
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
+| OC-270 | 🟡 | Tuning's hardcoded missing-value allowlist rejects tree estimators that natively accept NaN in the installed sklearn version (`modeling/_tuning/engine.py:318,404-416`) | small | ✅ fixed 2026-09-12 — use configured estimator capabilities for missing-feature admission, preserving search overrides, required structure and legacy sklearn tags. |
+| OC-268 | 🟡 | Calibrated ensemble fitting applies nested calibration-estimator parameters before creating the calibration wrapper, losing selected base-model settings during subsequent fit/CV (`modeling/ensemble.py:299-300,468-473`) | small | ✅ fixed 2026-09-12 — apply tuned nested parameters after calibration wrappers are constructed so refits and CV preserve selected values. |
 | OC-252 | 🟡 | Weighted PR-AUC tuning derives its class axis from the holdout instead of the trained model (`modeling/_tuning/metrics.py:84-90`) | small | ✅ fixed 2026-09-12 — derive the probability class axis from the fitted estimator across all five search strategies, preserving the trained binary positive class. |
 | OC-187 | 🟡 | LightGBM's subsample control and search dimension have no effect with default frequency zero | small | ✅ fixed 2026-09-12 — resolve automatic bagging after candidate parameters, enabling ordinary row sampling while preserving GOSS, explicit frequencies, native aliases and existing artifacts. |
 | OC-218 | 🟡 | Connected model CV seed `0` is replaced by the existing ensemble seed during frontend settings synchronization | small | ✅ fixed 2026-09-09 - explicit zero now survives synchronization and both fixed/tuned request conversion; missing seeds retain the ensemble default. |
@@ -422,6 +429,134 @@ respective fix logs; OC-167 closed with canonical artifact framing on 2026-09-09
 ---
 
 ## Log
+
+### 2026-09-12 — reported Canvas/Preview path-letter and display-name mismatch
+
+The user reported a Resampling connection labeled Path L while Preview Results
+used Path M and showed Imputation under Path L. Reproduced the exact letter
+shift with thirteen preprocessing leaves and a separate Data Preview sink:
+Preview submission removes that sink, but Canvas previously counted its
+upstream node as consumed and omitted that result branch. One shared graph
+filter now drives submission and Canvas branch presentation. The submitted
+configuration retains its existing behavior. Tests cover the sink attached to
+Imputation and, following the user's clarification, to a different earlier leaf.
+
+The user also requested **Resampling**, without **Node**, in the path label.
+Canvas now consults the registered display name before formatting a technical
+type name, preserving custom labels/titles and model names. A failing test
+confirmed `Path A · Resampling Node` versus the already-correct submitted
+`Resampling` name before this repair.
+
+Verification:
+
+- Path-letter regression failed with actual **Path L · Resampling** versus
+  expected **Path M · Resampling** before repair. Final focused coverage:
+  **19 passed**, including both sink positions and custom name overrides.
+- Real HTTP Preview plus PipelineEngine: Path L Imputation returns six rows
+  with its missing value filled to -9; Path M Resampling returns eight balanced
+  rows, retaining the original missing value. Branch membership, totals and
+  bulk node-inspection receipts match those outputs. Relevant backend suites:
+  **119 passed** (three existing deprecation warnings).
+- Full frontend suite: **2,498 passed in 193 files**. The additional alternate
+  sink-position case passed in the subsequent focused run above.
+- Desktop 1440px and mobile 390px Playwright checks verify visible connection
+  labels, matching Preview buttons, distinct rows when switching branches and
+  omission of the inspection sink from the actual submitted request. The two
+  new browser cases and existing Preview smoke test passed (**3 total**).
+- Frontend lint, CCN, TypeScript/production build, bundle-size limits, targeted
+  Python Ruff/format/ty and scoped diff checks passed. Rebuilt static Canvas assets.
+
+This is an additional user-reported fix; the audit queue remains **30 open /
+4 parked**. The user subsequently approved committing this fix with the seven
+Core fixes below. Delivery checks repeated **118 Core regressions, 56 focused
+frontend tests and the real Preview branch-output test**, all passing.
+
+### 2026-09-12 — OC-256/261/265/266/267/268/270: seven verified fixes with parallel agents
+
+After the previous five findings were committed as DCO-signed `61d62726`, the
+user requested more than five open findings using subagents. Three agents owned
+casting, selection/resampling and modeling; root owned threshold fingerprints,
+shared documentation and full verification. Independent reviews checked the
+selection/resampling and fingerprint changes. The user reviewed these seven
+fixes and approved a DCO-signed commit together with the Canvas path fix above;
+no push was requested or performed.
+
+- **OC-265/266:** reproduced valid ISO dates becoming null, categorical boolean
+  strings raising SchemaError and Enum strings raising ComputeError. The new
+  regression module initially had **15 failures / 21 passing controls**. Only
+  selected textual date columns reuse the existing pandas mixed-format parser;
+  the resolved Polars datetime dtype, strict/coerce policy, valid dates and
+  missingness remain intact. Categorical and Enum boolean labels reuse the
+  existing alias table through String expressions. **36 new cases** and the
+  existing casting coverage passed (**121 total**). DateFeatures timezone
+  semantics (OC-255) remain separate and unchanged.
+- **OC-256:** eleven string labels stored as StringDtype or string Categorical
+  were inferred as regression, breaking both feature selectors. The dtype
+  inference now recognizes those representations before the numeric heuristic.
+  Python/Arrow string targets match object targets; numeric categoricals retain
+  the ten-value cutoff and explicit problem types remain authoritative. An
+  independent review also verified missing string labels and numeric-category
+  boundaries. No new target encoding policy was introduced.
+- **OC-267:** SMOTE+Tomek ignored `k_neighbors=1` and failed with two minority
+  observations because its inner SMOTE used five neighbors. The inner sampler
+  now receives the configured neighbors, seed and strategy. Tomek cleanup is
+  unchanged: an independent Polars/string-target check exactly matched separate
+  SMOTE then TomekLinks(all), reducing 104 generated rows to 92. The two
+  selection/resampling regression modules went from **16 failures / 29 controls**
+  to **45 passing cases**; related Core coverage passed **266 tests**.
+  Canvas had also hidden the neighbor input and accepted zero for this method.
+  Its existing controls and validator now include SMOTE+Tomek. UI regressions
+  went from **3 failures / 34 controls** to **37 passing tests**, including a
+  changed value of 1 reaching the Oversampling payload and zero being rejected.
+- **OC-268:** real tuned voting/stacking ensembles returned selected nested
+  parameters, but calculator refit and post-tuning CV rebuilt calibrated bases
+  with fixed `C=2.0` instead of selected `C=0.01`. Apply tuned base overrides
+  after constructing calibration wrappers, preserving fixed base settings,
+  seeds and caller-owned mappings. Four public tuning/refit/CV regressions
+  prove predictions and log loss match the tuned model, including a selected
+  calibration method of isotonic and both flat/nested config shapes.
+- **OC-270:** tree/forest tuning rejected valid missing-feature data before
+  search although the installed estimators could fit it directly. Admission
+  now reads estimator tags instead of a class-name allowlist. A bounded
+  baseline check avoids pinning defaults replaced by search axes and retains
+  required structural constructor arguments. Candidate fits still enforce
+  criterion/monotonic restrictions; numeric infinity and missing targets remain
+  rejected, and fold imputation remains available for nonnative models. The
+  standalone sklearn >=1.4 contract is retained through the legacy tag API;
+  that fallback was tested by simulation, not a separate old sklearn install.
+  **23 new missing-feature cases** plus the four ensemble cases passed.
+  Actual XGBoost, LightGBM and HistGradientBoosting classifier/regressor smoke
+  checks all returned finite tuned scores and predictions. Related modeling
+  coverage passed 312 tests before the final capability guards; the final full
+  Core run below includes every guard.
+- **OC-261:** two copies of one fitted classifier learned positive thresholds
+  **0.4803921568627451** and **0.5196078431372549**, disagreed on four of eight
+  predictions and still shared a fingerprint. The seal now includes stored
+  thresholds through the existing canonical artifact digest. Four regressions
+  failed before repair; **10 final cases** pass, covering numeric/string labels,
+  refit clearing, dictionary order, pickle protocols and legacy absent state.
+  Related pipeline/seal/threshold coverage passed **101 tests**. Untuned
+  fingerprints are unchanged; stored fingerprints for pipelines with tuned
+  thresholds need recomputing, without retraining the model.
+
+Final root verification: **8,222 Core tests passed / 80 skipped**, three
+snapshots passed, 499 existing dependency/degenerate-data/legacy warnings.
+Separate relevant backend tests passed **920 cases** and seven snapshots
+(121 warnings), covering casting, resampling, feature selection, calibrated
+tuning, fold replay, graph/submission leakage and config schemas. Frontend
+Vitest passed **2,494 tests in 193 files**. Four Playwright checks passed,
+including real control edits, keyboard input, blocked zero-neighbor Preview and
+the submitted neighbor value at desktop and mobile widths; mobile editing was
+enabled through its existing read-only toggle. Earlier browser failures were
+test expectations about mobile mode and the Preview issue-panel presentation.
+Full Ruff, configured backend/Core ty, frontend ESLint/CCN, production build,
+bundle-size checks and strict MkDocs passed. Generated static assets were rebuilt.
+User docs, docstrings, changelog and both audit records describe the changes.
+
+The queue decreases from **37 to 30 open**, with four parked findings unchanged
+(OC-71/72/73/185). OC-264 and OC-269 remain open from the latest audit additions.
+The unrelated `tmp_eda_shots/` directory and ignored investigation logs are
+outside the delivery scope.
 
 ### 2026-09-12 — OC-46/248/250/254/263: merged folds, class weights and numeric/container edge cases
 

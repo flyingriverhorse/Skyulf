@@ -637,6 +637,11 @@ Config:
   - or `columns` + `target_type`
 - `coerce_on_error`: bool (default True)
 
+Text-to-datetime casts preserve valid date-only and timestamp strings on both
+engines. Invalid dates become missing by default; `coerce_on_error=False`
+raises. Boolean conversion recognizes the existing text aliases in Polars
+Categorical and Enum columns too, preserving nulls and invalid-token handling.
+
 Learned params:
 
 - `type_map`, `coerce_on_error`
@@ -835,6 +840,12 @@ Learned params:
 
 ### UnivariateSelection
 
+With `problem_type="auto"`, string targets use classification whether stored
+as pandas object, StringDtype or string Categorical columns. Numeric targets
+retain the cardinality heuristic: up to ten distinct values means
+classification. Set `problem_type` explicitly to override inference. The same
+rules apply to ModelBasedSelection and the feature-selection facade.
+
 Config:
 
 - `target_column`: str (if `y` not passed as tuple)
@@ -879,6 +890,13 @@ Config:
 - `sampling_strategy`: `auto` or dict
 - `random_state`: int
 - method-specific keys: `k_neighbors`, `m_neighbors`, `kind`, `out_step`, `cluster_balance_threshold`, `density_exponent`, `n_jobs`
+
+For `smote_tomek`, `k_neighbors` configures the inner SMOTE step together with
+the chosen sampling strategy and random state. Tomek cleanup still runs after
+oversampling, so final class sizes can be smaller than the requested synthetic
+sample counts. Canvas exposes this setting as **k Neighbors** for
+**SMOTE + Tomek** and requires at least one neighbor. A class must contain more
+observations than its configured neighbor count.
 
 Learned params: none (passes through config).
 

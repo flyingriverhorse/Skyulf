@@ -690,8 +690,9 @@ class SkyulfPipeline:
         """Return a deterministic SHA-256 over topology + fitted artifacts.
 
         The hash covers the pipeline graph (preprocessing + modeling config) and,
-        once fitted, every fitted artifact and the trained model. Two pipelines
-        with the same hash produce the same predictions, so callers can prove
+        once fitted, every fitted artifact, the trained model and any stored
+        decision thresholds. Two pipelines with the same hash produce the same
+        predictions for the same prediction options, so callers can prove
         "this prediction came from exactly this pipeline". The digest is
         semantic (hyperparameters + fitted weights, not pickle bytes), so it is
         stable across library and pickle-protocol versions.
@@ -708,6 +709,10 @@ class SkyulfPipeline:
 
         if self.model_estimator is not None and self.model_estimator.model is not None:
             hasher.update(artifact_digest(self.model_estimator.model))
+
+        thresholds = getattr(self, "_tuned_thresholds", None)
+        if thresholds is not None:
+            hasher.update(artifact_digest({"tuned_thresholds": thresholds}))
 
         return hasher.hexdigest()
 

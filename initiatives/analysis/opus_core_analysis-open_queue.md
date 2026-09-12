@@ -27,9 +27,9 @@ detail lives in the archive's `## Log` section.
 
 ## Live — fix queue
 
-**Current status (2026-09-12): 37 open / 4 parked.** OC-46/248/250/254/263
-are fixed in the latest batch. The Now and Next tiers have no open rows;
-the remaining findings continue below by domain. Reproduction and verification
+**Current status (2026-09-12): 30 open / 4 parked.**
+OC-256/261/265/266/267/268/270 are fixed in the latest seven-finding batch.
+The remaining findings continue below by domain. Reproduction and verification
 details are in the [archive Log](opus_core_analysis-tracker.md#log).
 
 Ordered by the master report's suggested fix order: **Now** (silent wrongness
@@ -96,13 +96,11 @@ their completed rows and verification history are retained in the archive.
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
-| OC-267 | 🟡 | SMOTE+Tomek stores but ignores the configured `k_neighbors`, leaving its inner SMOTE at the default five neighbors (`preprocessing/resampling.py:221-222,292`) | small | ⬜ open — with two minority observations and `k_neighbors=1`, ordinary SMOTE and a correctly configured SMOTETomek balance both classes to five rows, while Core's combined sampler raises `n_neighbors=6 > n_samples_fit=2`. |
 
 ### Remaining — feature generation / selection / vectorization / transformations
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
-| OC-256 | 🟡 | Feature-selection task inference treats pandas StringDtype/Categorical targets with more than ten classes as regression (`preprocessing/feature_selection/_common.py:54-69`) | small | ⬜ open — 11 labels repeated four times work as object dtype but make UnivariateSelection and ModelBasedSelection fail as string/category; explicit classification is a workaround. |
 | OC-264 | 🟡 | GeneralTransformation fits each power rule against the original input although apply executes same-column rules sequentially (`preprocessing/transformations/general.py:225-228`) | small | ⬜ open — a log rule followed by standardized Yeo-Johnson yields mean `-0.995375`; equivalent sequential nodes yield approximately zero on both engines, so later rules learn the wrong intermediate distribution. |
 
 ### Remaining — profiling (outside the OC-39–46 cluster)
@@ -122,15 +120,12 @@ their completed rows and verification history are retained in the archive.
 |---|---|---|---|---|
 | OC-64 | 🟠 | **F-14 only partially fixed** — engine registry global still an unlocked race (`engines/registry.py:60,86-91`) | small | ⬜ open |
 | OC-65 | 🟡 | polars `to_numpy()` zero-width "parity fix" does not achieve parity (`engines/polars_engine.py`) | small | ⬜ open |
-| OC-261 | 🟡 | Pipeline fingerprints omit stored decision thresholds, allowing identical fingerprints for different predictions under the same `use_tuned_thresholds=True` call (`pipeline/_pipeline.py:695-701`) | small | ⬜ open — two copies of one fitted classifier learn positive thresholds `0.480392` and `0.519608`, disagree on four of eight predictions, and retain equal fingerprints. |
 
 ### Remaining — outliers / casting / binning / timeseries / geo
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
 | OC-255 | 🟡 | DateFeatures uses local offsets on pandas and UTC on Polars; mixed DST offsets make the pandas `.dt` access fail (`preprocessing/time_series/date_features.py:64-66,106-109`) | small | ⬜ open — identical `+02:00` strings produce different days/hours; mixed `+02:00`/`+03:00` strings raise AttributeError on pandas, so choose and enforce one timezone contract. |
-| OC-265 | 🟡 | Polars string-to-datetime casting uses a generic cast without parsing and silently replaces valid ISO dates with nulls under default coercion (`preprocessing/casting.py:221`) | small | ⬜ open — `2024-01-01` and `2024-06-15` become two nulls while the same Casting node on pandas preserves both dates; separate from DateFeatures timezone handling in OC-255. |
-| OC-266 | 🟡 | Polars categorical-to-boolean casting invokes string methods on categorical expressions; Enum inputs fall through to an unsupported generic cast (`preprocessing/casting.py:109,177-179,221`) | small | ⬜ open — categorical and Enum `true`/`false` inputs raise SchemaError and ComputeError respectively, while plain Polars strings and pandas categorical values convert successfully. |
 
 ### Remaining — modeling / tuning
 
@@ -138,9 +133,7 @@ their completed rows and verification history are retained in the archive.
 |---|---|---|---|---|
 | OC-251 | 🟡 | Fold-aware Halving/Optuna scoring keeps original validation labels after preprocessing filters prediction rows (`modeling/_tuning/fold_pipeline.py:168-171`) | medium | ⬜ open — IQR yields 120 held-out labels / 110 predictions; actual halving_grid and Optuna searches fail all trials while grid scores the same chain at R2 `0.999998`. |
 | OC-253 | 🟡 | F1 tuning and evaluation/threshold tuning disagree on the positive class for labels `{1,2}` (`modeling/_tuning/metrics.py:235`, `modeling/_evaluation/classification.py:84`) | decision + small | ⬜ open — the same predictions score `0.909091` for class 1 in tuning and `0.8` for class 2 in evaluation; reconcile the documented stock-scorer exception with a shared positive-class contract. |
-| OC-268 | 🟡 | Calibrated ensemble fitting applies nested calibration-estimator parameters before creating the calibration wrapper, losing selected base-model settings during subsequent fit/CV (`modeling/ensemble.py:299-300,468-473`) | small | ⬜ open — tuning selects `logistic_regression__estimator__C=0.01`, but fitting the returned best parameters restores `C=1.0`, with a maximum probability difference of `0.410206`. |
 | OC-269 | 🟡 | Optuna constructs the selected pruner but never enables pruning on OptunaSearchCV (`modeling/_tuning/strategies/optuna.py:240-252`) | medium | ⬜ open — Hyperband with incremental-fit-capable SGD still has `enable_pruning=False` and no intermediate trial values; respect estimator capabilities when implementing the advertised early stopping. |
-| OC-270 | 🟡 | Tuning's hardcoded missing-value allowlist rejects tree estimators that natively accept NaN in the installed sklearn version (`modeling/_tuning/engine.py:318,404-416`) | small | ⬜ open — RandomForest, ExtraTrees and DecisionTree fit the same missing-value data directly but fail before tuning with an imputer-required ValueError despite `allow_nan=True`. |
 
 ### Remaining — frontend
 
