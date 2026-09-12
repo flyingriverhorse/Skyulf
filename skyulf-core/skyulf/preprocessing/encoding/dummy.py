@@ -2,6 +2,8 @@
 
 import logging
 from collections.abc import Mapping
+from datetime import datetime
+from functools import partial
 from typing import Any, cast
 
 import pandas as pd
@@ -11,6 +13,7 @@ from ...core.meta.decorators import node_meta
 from ...registry import NodeRegistry
 from ...utils import resolve_columns, user_picked_no_columns
 from .._artifacts import DummyEncoderArtifact
+from .._category_keys import uses_category_keys
 from .._output_names import validate_generated_column_names
 from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
 from ..dispatcher import apply_dual_engine, fit_dual_engine
@@ -57,7 +60,25 @@ def _validate_dummy_names(
 _INTEGRAL_FLOAT_SUFFIX = r"\.0$"
 
 
-def _pandas_col_to_str(series: Any) -> Any:
+def _dummy_scalar_to_str(value: Any) -> str:
+    """Render datetime scalars without batch formatting or timezone dependence."""
+    if isinstance(value, datetime) and not pd.isna(value):
+        timestamp = pd.Timestamp(value)
+        if timestamp.tzinfo is not None:
+            timestamp = timestamp.tz_convert("UTC")
+        elif timestamp == timestamp.normalize():
+            # Date columns can become midnight Datetime columns at the engine boundary.
+            return timestamp.date().isoformat()
+        return timestamp.isoformat(sep=" ")
+    return str(value)
+
+
+def _dummy_datetime_epoch_to_str(value: int, *, unit: str, time_zone: str | None) -> str:
+    """Retain nanoseconds that Polars' Python datetime scalar conversion would truncate."""
+    return _dummy_scalar_to_str(pd.Timestamp(value, unit=unit, tz=time_zone))
+
+
+def _pandas_col_to_str(series: Any, canonical: bool = False) -> Any:
     """Render a pandas Series as strings, matching the Polars path's output.
 
     The rendering is per value, never per batch: ``1.0`` must yield the same
@@ -73,23 +94,45 @@ def _pandas_col_to_str(series: Any) -> Any:
     ``float64`` ``.astype(str)`` would otherwise produce — callers rely on
     ``.dropna()`` to exclude them from the learned category list, same as
     the Polars fit path's ``if c is not None`` filter.
+
+    ``canonical`` enables per-scalar datetime formatting for new artifacts.
+    The default keeps the historical pandas rendering for saved artifacts.
     """
     null_mask = series.isna()
     rendered = series.astype(str)
+    if canonical:
+        # Keep dtype-aware numeric rendering: mapping Float32 scalars first
+        # expands their precision and no longer matches Polars' short strings.
+        datetime_mask = pd.Series(
+            [isinstance(value, datetime) for value in series], index=series.index, dtype=bool
+        )
+        if datetime_mask.any():
+            rendered.loc[datetime_mask] = series.loc[datetime_mask].map(_dummy_scalar_to_str)
     if pd.api.types.is_float_dtype(series):
         rendered = rendered.str.replace(_INTEGRAL_FLOAT_SUFFIX, "", regex=True)
     return rendered.mask(null_mask)
 
 
-def _polars_col_to_str_expr(X: Any, col: str) -> Any:
+def _polars_col_to_str_expr(X: Any, col: str, canonical: bool = False) -> Any:
     """Build the Polars expression rendering ``col`` to strings, matching pandas.
 
     Same rule as :func:`_pandas_col_to_str`: a trailing ``.0`` comes off float
     columns so ``1.0`` and ``1`` are one category on either engine, and nulls
     stay null rather than becoming a ``"null"`` string the fit path would then
     have to filter out of the category list.
+
+    ``canonical`` aligns boolean and datetime scalars with the pandas renderer;
+    unversioned artifacts keep the historical native string cast.
     """
     expr = pl.col(col).cast(pl.Utf8)
+    dtype = X.schema[col]
+    if canonical and dtype == pl.Boolean:
+        expr = expr.str.replace("^true$", "True").str.replace("^false$", "False")
+    elif canonical and isinstance(dtype, pl.Datetime):
+        renderer = partial(
+            _dummy_datetime_epoch_to_str, unit=dtype.time_unit, time_zone=dtype.time_zone
+        )
+        expr = pl.col(col).cast(pl.Int64).map_elements(renderer, return_dtype=pl.String)
     if X.schema[col].is_float():
         expr = expr.str.replace(_INTEGRAL_FLOAT_SUFFIX, "")
     return expr
@@ -101,12 +144,13 @@ def _dummy_apply_polars(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, An
         return X, y
 
     categories = params.get("categories", {})
+    canonical = uses_category_keys(params)
     drop_first = params.get("drop_first", False)
     _validate_dummy_names(X, valid_cols, categories, drop_first)
     exprs = []
     for col in valid_cols:
         cats = _drop_first_if_needed(categories.get(col, []), drop_first)
-        rendered = _polars_col_to_str_expr(X, col)
+        rendered = _polars_col_to_str_expr(X, col, canonical)
         exprs.extend(
             (rendered == str(cat)).cast(pl.Int8).fill_null(0).alias(f"{col}_{cat}") for cat in cats
         )
@@ -123,12 +167,15 @@ def _dummy_apply_pandas(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, An
         return X, y
 
     categories = params.get("categories", {})
+    canonical = uses_category_keys(params)
     drop_first = params.get("drop_first", False)
     _validate_dummy_names(X, valid_cols, categories, drop_first)
     X_out = X.copy()
     for col in valid_cols:
         known_cats = categories.get(col, [])
-        X_out[col] = pd.Categorical(_pandas_col_to_str(X_out[col]), categories=known_cats)
+        X_out[col] = pd.Categorical(
+            _pandas_col_to_str(X_out[col], canonical), categories=known_cats
+        )
 
     # Match the Polars engine's compact binary indicator dtype.
     dummies = pd.get_dummies(X_out[valid_cols], drop_first=drop_first, dtype="int8")
@@ -147,6 +194,12 @@ class DummyEncoderApplier(BaseApplier):
     value unseen at fit time yields an all-zero row rather than raising.
     Generated names that duplicate another indicator or a retained input
     column raise ``ValueError`` before output construction.
+
+    Version 1 artifacts render booleans and datetimes consistently across engines,
+    including nanoseconds and timezone-aware instants. Midnight naive datetimes
+    share date keys. Literal strings are unchanged. Unversioned artifacts retain
+    their original rendering; refit the encoder and downstream model to obtain
+    the portable category contract.
     """
 
     @apply_method
@@ -177,6 +230,7 @@ def _build_dummy_artifact(
         "columns": cols,
         "categories": categories,
         "drop_first": config.get("drop_first", False),
+        "category_key_version": 1,
     }
 
 
@@ -186,7 +240,11 @@ def _dummy_fit_polars(X: Any, y: Any, config: dict[str, Any]) -> Mapping[str, An
 
     categories: dict[str, list[str]] = {}
     for col in cols:
-        rendered = X.select(_polars_col_to_str_expr(X, col).unique().sort()).to_series().to_list()
+        rendered = (
+            X.select(_polars_col_to_str_expr(X, col, canonical=True).unique().sort())
+            .to_series()
+            .to_list()
+        )
         categories[col] = [str(c) for c in rendered if c is not None]
     return _build_dummy_artifact(X, cols, categories, config)
 
@@ -196,7 +254,8 @@ def _dummy_fit_pandas(X: Any, y: Any, config: dict[str, Any]) -> Mapping[str, An
     cols = _exclude_target_column(cols, config, "DummyEncoder", y)
 
     categories: dict[str, list[str]] = {
-        col: sorted(_pandas_col_to_str(X[col]).dropna().unique().tolist()) for col in cols
+        col: sorted(_pandas_col_to_str(X[col], canonical=True).dropna().unique().tolist())
+        for col in cols
     }
     return _build_dummy_artifact(X, cols, categories, config)
 

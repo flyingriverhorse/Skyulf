@@ -14,6 +14,13 @@ read-only agents (Claude Opus 5). 116 findings: 5 🔴 / 45 🟠 / 44 🟡 / 22 
 OC-12/18/40/42; 2 corrected: OC-01, OC-46). OC-100 was retracted as a false positive
 and is not counted.
 
+**Qwen follow-up (2026-09-12):** the verified findings
+filed 48 additional records, OC-271–318, after deduplication and scope
+correction. Eight have since closed. The live queue now has
+**70 open / 4 parked**; details
+and exclusions are in the latest Log entry. Historical baseline counts
+below are unchanged.
+
 **Supplemental review (2026-09-05):** OC-163–168 add six execution-reproduced
 findings (2 🟠 / 4 🟡) outside the source audit. OC-169 (1 🟡) was filed the same
 day out of the OC-150 fix pass. They are tracked in the queue — closed rows below,
@@ -97,6 +104,12 @@ uses, so a fixed finding stays where it was filed.
 | OC-12 | 🔴 | Row-dropping desyncs `X` and `y` on non-unique pandas indexes (`drop_rows.py:60-67`, `deduplicate.py:44-47`); polars path already correct | small | ✅ fixed 2026-09-03 |
 | OC-58 | 🔴 | Numeric→boolean cast on polars treats any nonzero as `True` (`casting.py:143-178`) | small | ✅ fixed 2026-09-03 |
 | OC-62 | 🔴 | `fingerprint()` not reproducible for any artifact holding an object-dtype array (`pipeline/seal.py:57-59`) | small | ✅ fixed 2026-09-03 |
+| OC-271 | 🟠 | **DummyEncoder bool/date categories do not survive engine changes** (`skyulf-core/skyulf/preprocessing/encoding/dummy.py:78,92,183`) — Qwen #2. Use one category-key contract when fitting and replaying across engines; cover the Polars-training/pandas-serving path. | medium | ✅ fixed — 2026-09-12: Versioned Dummy artifacts preserve bool/date/datetime categories and saved predictions across engines, including Float32 controls; legacy artifacts retain their names and require encoder/model refit for portable replay. |
+| OC-273 | 🟠 | **Mixed valid date formats become missing values during profiling** (`skyulf-core/skyulf/profiling/_analyzer/dates.py:31,143-159`) — Qwen #4. Preserve valid mixed-format dates or report parsing uncertainty without inventing missing data and a Drop recommendation. | medium | ✅ fixed — 2026-09-12: Automatic date conversion now requires every non-null value to parse, retaining original strings otherwise; the 50/950 mixed-format profile has zero fabricated missing values and no false Drop. |
+| OC-276 | 🟠 | **Binning interval labels differ between training and replay engines** (`skyulf-core/skyulf/preprocessing/bucketing.py:55,67,170,179`) — Qwen #7. Canonicalize integral bin-edge labels across engines and verify an actual downstream DummyEncoder replay. | medium | ✅ fixed — 2026-09-12: New range artifacts persist identical labels for both engines, using exact edge text when rounding merges names; serialized binning-to-Dummy replay preserves all four indicators, with legacy formatting retained until coordinated refit. |
+| OC-283 | 🟠 | **Binning can overwrite an existing output column or delete its source** (`skyulf-core/skyulf/preprocessing/bucketing.py:98,138,266,279`) — Qwen #15. Validate generated-name collisions and define safe same-name output/drop behavior before mutating either engine. | small | ✅ fixed — 2026-09-12: Fit and inference reject retained-name collisions and build outputs from original source values, so empty-suffix replacement preserves its binned output and other dropped source names can be reused safely. |
+| OC-297 | 🟠 | **Replacing infinity can silently round large Polars integers** (`skyulf-core/skyulf/preprocessing/cleaning/invalid_value.py:67,182,213`) — Qwen #30. Preserve exact integer values and avoid widening integer columns merely to inspect or replace floating-point infinities. | small | ✅ fixed — 2026-09-12: Infinity-only cleanup skips impossible integer matches, preserving exact signed/unsigned values and dtypes at fit/apply boundaries while configured numeric rules and float replacements remain effective. |
+
 
 ### Next — wrong results in realistic configs
 
@@ -230,6 +243,8 @@ uses, so a fixed finding stays where it was filed.
 | OC-181 | ð¡ | `ValueReplacement` coerces every unrecognized boolean mapping key to `False`: mapping `{"banana": true}` changes `[true,false]` to `[true,true]` on both engines (`preprocessing/cleaning/value_replacement.py:31-32`) | small | â fixed 2026-09-08 |
 | OC-182 | ð¡ | Encoder auto-detection ignores pandas `StringDtype` columns: Dummy/Hash encoding silently leaves strings untouched unless columns are selected explicitly (`preprocessing/encoding/_common.py:140`) | small | â fixed 2026-09-08 |
 | OC-22 | ⚪ | `TargetEncoder.infer_output_schema` checks an impossible `regression` value (`encoding/target.py:340-360`) | 1 line | ✅ fixed 2026-09-06 — the `("binary", "regression")` passthrough was pinned by a test asserting a prediction for a config sklearn 1.8 rejects outright; changed to `"continuous"` and confirmed it really encodes rather than merely being reachable. See the log entry |
+| OC-299 | 🟡 | **Automatic encoder selection skips native Enum columns** (`skyulf-core/skyulf/preprocessing/encoding/_common.py:131,146`) — Qwen #32. Include supported categorical Enum types in the common selector used by all six encoders. | small | ✅ fixed — 2026-09-12: The shared categorical selector now includes native Enum for all six encoder consumers; auto-selection matches explicit encoding and persisted held-out replay, with pipeline refit needed for previously skipped columns. |
+
 
 ### Remaining — feature generation / selection / vectorization / transformations
 
@@ -280,6 +295,8 @@ uses, so a fixed finding stays where it was filed.
 | OC-190 | 🟡 | A categorical column named `count` crashes profiling and categorical drift because `value_counts()` generates the same column name (`profiling/analyzer.py:286-290`, `profiling/drift.py:380-381`) | small | ✅ fixed 2026-09-09 - profiling, categorical drift and rule target counts use distinct value/count names. |
 | OC-189 | 🟡 | Classification rule text reports `Samples: 1` for leaves containing multiple rows: it sums sklearn's normalized class proportions instead of using the leaf sample count (`profiling/_analyzer/rules.py:299-301`) | small | ✅ fixed 2026-09-09 - classification rule support uses the fitted tree row count while confidence retains class proportions. |
 | OC-188 | 🟠 | Rule discovery decodes sklearn class positions against Polars' shared category dictionary, publishing labels absent from the target while reporting perfect accuracy (`profiling/_analyzer/rules.py:169-170,196-198,295-298`) | small | ✅ fixed 2026-09-09 - target-local codes map every rule prediction to the actual observed class label. |
+| OC-305 | 🟡 | **All-null temporal profile bounds serialize as the string None** (`skyulf-core/skyulf/profiling/_analyzer/dates.py:164-171`) — Qwen #40. Return actual nullable bounds in the profile schema instead of stringifying absent temporal extrema. | small | ✅ fixed — 2026-09-12: Missing Date/Datetime extrema remain actual nulls in profile dictionaries and JSON while native units, timezones and nonmissing bounds retain their existing behavior. |
+
 
 ### Remaining — core / engines / pipeline
 
@@ -311,6 +328,8 @@ uses, so a fixed finding stays where it was filed.
 | OC-173 | 🟡 | Duplicate pandas indexes reintroduce missing rows during EllipticEnvelope prediction, disabling outlier filtering (`preprocessing/outliers/elliptic.py`) | small | ✅ fixed 2026-09-08 in `f12dde9f8`; reverified 2026-09-09 — finite-row selection and prediction scatter are positional, preserving indexes and X/y alignment. |
 | OC-165 | 🟡 | Pandas `LagFeatures(drop_na=True)` removes X rows but leaves tuple y untouched — 3 rows become 2 features / 3 targets even with a unique index (`preprocessing/time_series/lag.py:85-87`) | small | ✅ fixed 2026-09-06 — with OC-163; `drop_na` now filters y through the same positional keep-mask as X, duplicate-index case included. See the log entry |
 | OC-166 | 🟡 | Polars `IQR`, `ZScore`, and `ManualBounds` filter X but leave NumPy y untouched — 5 rows become 4 features / 5 targets; Polars Series y works (`preprocessing/outliers/_common.py:9-15`) | small | ✅ fixed 2026-09-06 — with OC-163, and **broader than filed**: a fourth copy of the same silent pass-through sat inline in `EllipticEnvelope`, and list targets failed too (crashing on pandas, no-opping on polars). See the log entry |
+| OC-284 | 🟡 | **Duplicate bin edges produce incompatible results and discard custom labels** (`skyulf-core/skyulf/preprocessing/bucketing.py:88,162,224,234,267`) — Qwen #16. Validate or normalize duplicate edges and their labels together with one explicit policy for both engines. | small | ✅ fixed — 2026-09-12: Duplicate-edge labels must match distinct intervals on both engines, preserving unambiguous labels and rejecting labels for zero-width bins while retaining established unique-edge fallbacks. |
+
 
 ### Remaining — modeling / tuning
 
@@ -429,6 +448,104 @@ respective fix logs; OC-167 closed with canonical artifact framing on 2026-09-09
 ---
 
 ## Log
+
+### 2026-09-12 — OC-271/273/276/283/284/297/299/305: eight Core fixes
+
+Continued the user-approved queue with three implementation agents owning
+binning, date profiling and categorical encoding; the primary agent handled
+integer precision and integration. A separate read-only reviewer inspected
+the combined changes, and the date agent independently checked integer cleanup.
+
+- **OC-271/299, categorical encoding:** newly fitted Dummy artifacts record
+  category-key version 1. Booleans and date/datetime instants render consistently
+  across engines, retaining nanoseconds and normalizing aware instants to UTC;
+  literal strings and dtype-aware numeric rendering are preserved. A persisted
+  linear pipeline that returned `[20,20,20,20]` on the other engine now retains
+  `[10,30,10,30]`. The common selector includes native Enum for all six encoder
+  consumers, with persisted artifacts and held-out vocabulary controls.
+- **OC-276, range replay:** newly fitted range artifacts store their label text.
+  Serialized binning-to-Dummy pipelines preserve all four active indicators in
+  both engine directions, including wrappers. If requested rounding duplicates
+  labels for distinct bins, exact edge text is stored instead.
+- **OC-283/284, binning validation:** validate against the complete original
+  schema during fit and apply; build all outputs before dropping source names.
+  Retained-column collisions raise, and an empty suffix with source dropping
+  keeps the binned output. Duplicate edges accept labels for distinct intervals;
+  `[0,5,5,10]` with three labels now raises while two labels remain intact.
+- **OC-273/305, date profiling:** only commit an inferred cast when the chosen
+  existing parser accepts the entire non-null column. Mixed formats retain
+  their original strings and accurate missing counts, without false Drop or
+  temporal metadata. The 50 ISO/950 other-format example no longer invents
+  950 missing values. All-null Date/Datetime bounds serialize as actual nulls;
+  native temporal units/timezones and real missingness remain covered.
+- **OC-297, integer precision:** skip infinity comparisons on integer columns
+  rather than widening them to the replacement sentinel's float dtype. Values
+  such as `9007199254740993` and UInt64 maxima remain exact with nullable/native/
+  wrapped inputs and inference dtype changes. Float infinity replacement and
+  separately configured integer rules still execute.
+
+Compatibility: unversioned Dummy and range-binning artifacts retain their
+previous category names and rendering. Refit affected encoders/binning and
+dependent models together to obtain portable replay before changing engines;
+also refit automatically selected pipelines to encode previously skipped Enum
+columns. Regenerate saved profiles, and normalize retained mixed date formats
+explicitly when temporal analysis is needed. Reprocess integer data from its
+original source if an earlier run rounded it. User guidance, source docstrings
+and the v0.8.21 release notes record these behaviors; no Canvas change is needed.
+
+Verification:
+
+- Failing-first results: binning **82 failed / 18 passed**; dates **10 failed /
+  5 passed**; initial encoding **22 failed / 26 passed**; integer precision
+  **8 failed / 10 passed**. Follow-up tests reproduced eight tiny-range failures.
+- Independent review caught a new Float32 key expansion introduced by the
+  first encoding patch. Seven of thirteen added controls failed before the
+  correction. The final renderer retains original non-temporal dtype formatting;
+  the reviewer independently verified Float32/nullable/categorical replay in
+  both directions and found no remaining actionable issue in the bounded review.
+- Final integrated run across **33 Core files: 1,574 passed**, including
+  **233 new regression cases**, registry/artifact contracts, persisted pipelines,
+  preprocessing dispatch, semantic seals, encoding and profiling controls.
+  Its 89 warnings are dependency deprecations and expected edge-data diagnostics.
+- Root project binning suite ran separately: **7 passed**, one existing Windows
+  physical-core-count warning. The integer reviewer also checked 32 additional
+  signed/unsigned-width, null, empty-frame and replacement combinations.
+- Full-repository Ruff and backend/Core/tests type checks passed. All ten
+  changed/new Python files pass format checks, and `git diff --check` is clean.
+
+The user confirmed removing the standalone Qwen source/report after filing;
+dead links were removed and the measured evidence stays in each queue/archive
+row. These eight completed rows moved to the archive: **70 open / 4 parked**
+remain, with OC-71/72/73/185 still parked and R1/DRIFT-01 unchanged.
+
+### 2026-09-12 — verified Qwen review filed as OC-271–318
+
+At the user's request, filed the actionable scope of all 57 Qwen claims after
+verification. The original verdicts remain
+**41 confirmed / 12 partial / 3 not established as runtime bugs / 1 already fixed**.
+The production-code baseline is DCO-signed **b0fd13b8**, containing the earlier
+seven Core fixes and the reported Canvas path/display-name repair.
+
+- Added **48 open records, OC-271–318**, with trigger, affected source,
+  measured evidence, repair scope and the individual Qwen claim number.
+- Reused **OC-253/65/64** for #1/#50/#57 and added the new evidence to those
+  existing rows; #13 remains closed as **OC-268**.
+- Combined #18/#41 into **OC-286** for the non-finite JSON persistence contract.
+  Both EDA profile writes and background preview/job metrics must be verified
+  before closure; a repair of just one path is incomplete.
+- Retained policy-only #36 outside the OC defect count. #20/#35/#56 do not
+  acquire standalone runtime-bug records, with their disposition preserved
+  in the queue's decision notes.
+- **30 + 48 = 78 open / 4 parked** after filing; parked OC-71/72/73/185,
+  historical closures, R1 and DRIFT-01 remain unchanged.
+
+This filing was a documentation/queue update, not a product fix or a new
+execution review. Filing verification checked ID uniqueness, all 57 claim
+dispositions, existing-row preservation, report links/anchors, counts and
+Markdown whitespace. The user subsequently removed the standalone Qwen
+source/report files after their actionable content was transferred to the
+queue. Dead links were removed; measured evidence, scope limitations and claim
+numbers remain in the OC records, with completed repairs documented in this Log.
 
 ### 2026-09-12 — reported Canvas/Preview path-letter and display-name mismatch
 

@@ -85,6 +85,15 @@ missing percentage and quality alerts remain available, while type-specific
 statistics are omitted. An all-null column with a declared type, such as
 `Float64`, retains that type's profile.
 
+Automatic date detection converts a string column only when the selected format
+parses every non-missing value in the full column. If a later value uses another
+format or cannot be parsed, the original strings remain available for profiling;
+parse failures do not become missing cells or trigger a false missing-data Drop
+recommendation. Normalize such a column explicitly before requesting temporal
+analysis. An all-null native Date/Datetime column retains its type and reports
+actual null minimum/maximum bounds. Regenerate saved profiles to apply these
+corrections.
+
 String columns are treated as categorical when fewer than 5% of their
 non-missing values are distinct, or when they contain at most 20 distinct
 non-missing values with at least one repetition. This also recognizes small

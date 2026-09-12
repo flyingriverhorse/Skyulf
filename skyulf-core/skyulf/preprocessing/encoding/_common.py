@@ -133,8 +133,8 @@ def detect_categorical_columns(df: Any) -> list[str]:
 
     The fallback every encoder passes to ``resolve_columns`` when the user
     configured no explicit column list: polars frames are matched on
-    ``Utf8``/``Categorical``/``Object`` dtypes, pandas frames via
-    ``select_dtypes`` on ``object``/``category`` — so "encode categoricals"
+    ``Utf8``/``Categorical``/``Enum``/``Object`` dtypes, pandas frames via
+    ``select_dtypes`` on ``object``/``category``/``string`` — so "encode categoricals"
     means the same thing on either engine.
     """
     engine = get_engine(df)
@@ -143,6 +143,6 @@ def detect_categorical_columns(df: Any) -> list[str]:
         return [
             c
             for c, t in zip(df_pl.columns, df_pl.dtypes, strict=True)
-            if t in [pl.Utf8, pl.Categorical, pl.Object]
+            if t in [pl.Utf8, pl.Categorical, pl.Object] or isinstance(t, pl.Enum)
         ]
     return df.select_dtypes(include=["object", "category", "string"]).columns.tolist()

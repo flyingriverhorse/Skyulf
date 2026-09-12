@@ -172,6 +172,11 @@ that changes a selected column to text fails clearly without coercing values.
 Automatic selection excludes temporal columns. An empty selection or a
 configuration with no active rule or infinity replacement leaves data untouched.
 
+Enabling `replace_inf` or `replace_neg_inf` alone leaves integer columns
+unchanged, including nullable signed/unsigned types and values larger than
+Float64 can represent exactly. Floating-point infinities still use the configured
+replacement, and an additional numeric rule still applies to integer columns.
+
 Learned params:
 
 - `columns`, `rule`, `replacement`, `min_value`, `max_value`
@@ -283,6 +288,10 @@ Learned params:
 
 ## Encoding
 
+When `columns` is omitted, the shared categorical selector includes native
+Polars `Enum` columns as well as strings and categorical columns. Refit a
+pipeline that previously skipped Enum inputs to learn their encoding.
+
 Example step:
 
 ```python
@@ -319,6 +328,14 @@ Learned params:
 Uses the same collision checks as `OneHotEncoder`. Generated columns are
 computed from the original source values before selected sources are dropped.
 
+Newly fitted artifacts use stable Boolean and date/datetime category names on
+both engines, including nanosecond timestamps and timezone-aware instants.
+Naive midnight timestamps match equivalent dates; aware timestamps are
+normalized to UTC. Literal string categories keep their exact text.
+Older artifacts retain their original names and rendering. Refit the encoder
+and downstream model together before switching engines if a saved pipeline
+depends on the earlier Boolean or datetime names.
+
 Config:
 
 - `columns`: list[str]
@@ -329,6 +346,7 @@ Learned params:
 - `columns`
 - `categories`: dict[col -> list[str]]
 - `drop_first`
+- `category_key_version`: identifies the rendering contract in new artifacts
 
 ### OrdinalEncoder
 
@@ -575,6 +593,20 @@ Learned params:
 
 Creates binned features with configurable strategies.
 
+Generated output names must be unique and must not overwrite retained input
+columns. This is checked during fitting and later application. An empty suffix
+can replace the selected source only with `drop_original=True`; the binned
+output is retained. When duplicate edges collapse into fewer intervals, custom
+labels must describe those distinct intervals, not the discarded zero-width
+ones; otherwise fitting or applying raises `ValueError`.
+
+Newly fitted range-label artifacts save their category text so pandas and
+Polars replay identical names. If the requested rounding would give different
+bins the same name, the stored labels use exact edge text to distinguish them.
+Older artifacts keep their original formatting. Refit binning and downstream
+encoders/models together before moving an affected legacy pipeline between
+engines.
+
 Config:
 
 - `columns`: list[str] (numeric)
@@ -598,6 +630,7 @@ label in an object column. Range and custom labels retain their text. The defaul
 Learned params:
 
 - `bin_edges` (dict[col -> edges])
+- `range_labels` (stored range text in newly fitted range-label artifacts)
 - output formatting settings
 
 ### CustomBinning

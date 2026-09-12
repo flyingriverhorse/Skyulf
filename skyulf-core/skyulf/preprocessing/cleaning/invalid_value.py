@@ -152,6 +152,8 @@ class InvalidValueReplacementApplier(BaseApplier):
     configuration without an effective rule or an inf flag is skipped outright,
     so its values and dtype survive untouched. Active operations require numeric
     columns on both engines; text must be explicitly converted before this node.
+    Infinity-only cleanup preserves integer values and dtypes: integers cannot
+    contain infinities and must not be widened to a floating-point sentinel.
     """
 
     @apply_method
@@ -179,9 +181,10 @@ class InvalidValueReplacementApplier(BaseApplier):
         exprs = []
         for col in valid:
             expr = pl.col(col)
-            expr = _invalid_inf_replacement_polars(
-                expr, replace_inf, replace_neg_inf, final_replacement
-            )
+            if not X[col].dtype.is_integer():
+                expr = _invalid_inf_replacement_polars(
+                    expr, replace_inf, replace_neg_inf, final_replacement
+                )
             expr = _invalid_rule_polars(expr, rule, final_replacement, min_value, max_value)
             exprs.append(expr.alias(col))
         return X.with_columns(exprs), _y

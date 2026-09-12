@@ -268,6 +268,7 @@ class GeneralBinningArtifact(TypedDict, total=False):
     type: str
     bin_edges: dict[str, list[float]]
     custom_labels: dict[str, list[Any]]
+    range_labels: dict[str, list[str]]
     output_suffix: str
     drop_original: bool
     label_format: str
@@ -591,6 +592,7 @@ class DummyEncoderArtifact(TypedDict, total=False):
     columns: list[str]
     categories: dict[str, list[str]]
     drop_first: bool
+    category_key_version: int
 
 
 # ── Splitters ────────────────────────────────────────────────────────────────
