@@ -147,13 +147,6 @@ remaining findings are grouped by domain.
 | OC-255 | 🟡 | DateFeatures uses local offsets on pandas and UTC on Polars; mixed DST offsets make the pandas `.dt` access fail (`preprocessing/time_series/date_features.py:64-66,106-109`) | small | ⬜ open — identical `+02:00` strings produce different days/hours; mixed `+02:00`/`+03:00` strings raise AttributeError on pandas, so choose and enforce one timezone contract. |
 
 
-### Remaining — modeling / tuning
-
-| ID | Sev | Item | Effort | Status |
-|---|---|---|---|---|
-| OC-251 | 🟡 | Fold-aware Halving/Optuna scoring keeps original validation labels after preprocessing filters prediction rows (`modeling/_tuning/fold_pipeline.py:168-171`) | medium | ⬜ open — Original IQR reproduction: 120 held-out labels / 110 predictions; Halving and Optuna failed while grid scored R2 `0.999998`. The extended Optuna pruning loop now transforms validation X/y together; ordinary Optuna and Halving still need the shared scoring repair. |
-
-
 ### Remaining — frontend
 
 The frontend CCN inventory recorded **0 functions in 0 files above CCN 10**;

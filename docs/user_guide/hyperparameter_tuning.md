@@ -56,6 +56,14 @@ sorted-last training class, matching evaluation and decision-threshold tuning's
 callables and explicit positive-label choices in threshold metrics retain the
 caller's choice. Multiclass metrics keep their existing weighted behavior.
 
+When fold preprocessing filters validation rows, every tuning strategy scores
+the retained features and their matching targets. For example, if an IQR filter
+keeps 110 of 120 validation rows, the scorer compares 110 predictions with those
+110 target values. This score describes the retained population. Preprocessing
+is learned only from the training fold and is applied once per score, including
+when a custom scorer requests several prediction methods. Target encoding keeps
+classification labels and probability columns in the scorer's original space.
+
 ## Configuration reference
 
 Missing feature values are admitted using the installed estimator's

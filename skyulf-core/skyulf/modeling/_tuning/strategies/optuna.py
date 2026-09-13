@@ -21,6 +21,7 @@ from collections.abc import Callable
 from typing import Any
 
 from ...pruning import PruningPlan, resolve_pruning_plan
+from ..fold_scoring import wrap_fold_scorer
 from ..params import clean_search_space
 from ..schemas import TuningConfig
 
@@ -297,6 +298,7 @@ def build_optuna_searcher(
         )
 
     enable_pruning = plan.kind == "incremental"
+    scoring = wrap_fold_scorer(base_estimator, scoring)
 
     with warnings.catch_warnings():
         warnings.filterwarnings(

@@ -373,6 +373,7 @@ uses, so a fixed finding stays where it was filed.
 | OC-270 | 🟡 | Tuning's hardcoded missing-value allowlist rejects tree estimators that natively accept NaN in the installed sklearn version (`modeling/_tuning/engine.py:318,404-416`) | small | ✅ fixed 2026-09-12 — use configured estimator capabilities for missing-feature admission, preserving search overrides, required structure and legacy sklearn tags. |
 | OC-268 | 🟡 | Calibrated ensemble fitting applies nested calibration-estimator parameters before creating the calibration wrapper, losing selected base-model settings during subsequent fit/CV (`modeling/ensemble.py:299-300,468-473`) | small | ✅ fixed 2026-09-12 — apply tuned nested parameters after calibration wrappers are constructed so refits and CV preserve selected values. |
 | OC-252 | 🟡 | Weighted PR-AUC tuning derives its class axis from the holdout instead of the trained model (`modeling/_tuning/metrics.py:84-90`) | small | ✅ fixed 2026-09-12 — derive the probability class axis from the fitted estimator across all five search strategies, preserving the trained binary positive class. |
+| OC-251 | 🟡 | Fold-aware Halving/Optuna scoring keeps original validation labels after preprocessing filters prediction rows (`modeling/_tuning/fold_pipeline.py`; `fold_scoring.py`) | medium | ✅ fixed 2026-09-13 — ordinary Optuna and both Halving searchers transform held-out X/y together and score a temporary view without applying preprocessing twice. Preserve original labels/probability columns, fitted state, and parallel/multiple-round scoring. |
 | OC-187 | 🟡 | LightGBM's subsample control and search dimension have no effect with default frequency zero | small | ✅ fixed 2026-09-12 — resolve automatic bagging after candidate parameters, enabling ordinary row sampling while preserving GOSS, explicit frequencies, native aliases and existing artifacts. |
 | OC-218 | 🟡 | Connected model CV seed `0` is replaced by the existing ensemble seed during frontend settings synchronization | small | ✅ fixed 2026-09-09 - explicit zero now survives synchronization and both fixed/tuned request conversion; missing seeds retain the ensemble default. |
 | OC-206 | ⚪ | Ensemble configuration resolution shallow-copies nested base-model parameters, so fitting mutates the caller's configuration (`modeling/ensemble.py:473,484`) | small | ✅ fixed 2026-09-09 - inner base-model parameter maps are copied before temporary overrides, preserving caller settings and later refits. |
@@ -501,6 +502,36 @@ respective fix logs; OC-167 closed with canonical artifact framing on 2026-09-09
 
 
 ## Log
+
+### 2026-09-13 — OC-251: align filtered validation targets in all tuning searches
+
+Reproduced IQR -> Ridge (`alpha=1`, `y=2*x+1`) on 120 rows containing ten
+interspersed outliers and duplicate, unordered indexes. Seven of twelve public
+strategy/holdout cases failed before repair: both Halving strategies, ordinary
+Optuna, and Optuna's single-holdout fallback. Grid/random and the new Optuna
+fold-pruning control already passed. All twelve now agree with independently
+computed retained-row scores: **R2 0.9999981339595826** for three CV folds and
+**0.999999175054302** for the explicit holdout fixture.
+
+The shared scorer adapter transforms validation X/y together, restores original
+classification labels, then uses a shallow scoring view with preprocessing
+already applied. It preserves the real fitted pipeline even if a custom scorer
+raises, and handles prediction/probability/decision calls without refiltering.
+It wraps only the owned Skyulf fold adapter on the remaining searcher paths.
+No frontend or wire-format change is required. Prediction-time row provenance
+remains the separately scoped OC-281 finding.
+
+Added **22 regressions** covering all five search strategies, explicit holdouts,
+encoded labels, F1/PR-AUC/ROC-AUC, repeated responses, scorer failure, duplicate
+indexes, and real two-worker Halving with 4 -> 2 -> 1 candidates. Independent
+review passed **102 focused cases** including class weights and class-axis
+alignment. The backend fold/pipeline/calibrated selection suite passed **165**
+tests. Queue counts are now **24 open / 4 parked**; Qwen remains **41/48 closed**.
+
+Final full Core verification on sklearn 1.9.1: **9,282 passed / 80 skipped**,
+three snapshots passed. The 22 new regressions also pass on sklearn 1.8.0.
+Repository Ruff and ty checks and the Core/backend production CCN <=10 gate
+pass. No frontend code or generated asset changes were needed for OC-251.
 
 ### 2026-09-13 — Optuna pruning across native iterations and CV folds
 
