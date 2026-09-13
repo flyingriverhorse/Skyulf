@@ -573,3 +573,132 @@ Beş ajanın hepsi döndü ve en kritik 7 yeni bulguyu kendim doğruladım. HEAD
    için dördüncü bir seçenek var: SimpleImputer/StandardScaler'da polars yolunu pandas ile bit-bit aynı toplamaya zorlamak
    — ama bu performans maliyeti getirir ve float non-associativity tamamen çözülebilir bir şey değil, o yüzden orada
    "düzelt" yerine "belgele + tol-bazlı learner'lar için uyar" daha gerçekçi olabilir.
+
+
+qwen ucuncu test turu:
+
+Üçüncü tur tamam. En önemli şey: kod tabanı altımda değişmiş, o yüzden her şeyi yeni duruma karşı baştan koştum.
+
+   HEAD değişmiş — önceki sonuçlar farklı bir kod durumuna aitti
+    oturum başı : branch 0822, HEAD 7966d0e9
+    şimdi       : branch 0823, HEAD d2959e0f, dirty=0
+   Test ettiğim yollarda değişenler: engines/sklearn_bridge.py (+22), preprocessing/scaling/_common.py (+26), scaling/minmax.py, scaling/robust.py,
+   pipeline/seal.py (+48), ayrıca tuning/optuna/pruning. Scaling değişiklikleri sadece validasyon (validate_scaling_range), aritmetik değil;
+   imputation/simple.py hiç değişmemiş → P2'nin kök nedeni etkilenmemiş.
+
+   Yeni HEAD'de hepsi birebir reproduce oldu
+   ┌──────────────────────┬─────────────────────────────────────────────────────────────────────────────────────────────────┬───────────┐
+   │ Probe                │ Sonuç                                                                                           │ Öncekiyle │
+   ├──────────────────────┼─────────────────────────────────────────────────────────────────────────────────────────────────┼───────────┤
+   │ pipeline_repro       │ pandas TypeError / polars fitted; config 2-3 parite 1.110e-16 / 1.303e-15                       │ aynı      │
+   ├──────────────────────┼─────────────────────────────────────────────────────────────────────────────────────────────────┼───────────┤
+   │ robustness_probe 2×2 │ 32/32 divergent, pandas raised 32/32, polars fitted 32/32, dejenere 23/32                       │ aynı      │
+   ├──────────────────────┼─────────────────────────────────────────────────────────────────────────────────────────────────┼───────────┤
+   │ sgd_fit_probe        │ 132 hücre, kolon başına [100, 32, 0, 0], max|d| 4.441e-16, y equal, params equal                │ aynı      │
+   ├──────────────────────┼─────────────────────────────────────────────────────────────────────────────────────────────────┼───────────┤
+   │ bridge_probe A       │ max_abs_dev 3.553e-15, lr/rf diff 0.0                                                           │ aynı      │
+   ├──────────────────────┼─────────────────────────────────────────────────────────────────────────────────────────────────┼───────────┤
+   │ bridge_probe B       │ 181→180→137→137→112→112→89, iki engine'de de hizalı                                             │ aynı      │
+   ├──────────────────────┼─────────────────────────────────────────────────────────────────────────────────────────────────┼───────────┤
+   │ bridge_probe C/D     │ aynı 4 DIFF, aynı D satırları                                                                   │ aynı      │
+   ├──────────────────────┼─────────────────────────────────────────────────────────────────────────────────────────────────┼───────────┤
+   │ Core test suite      │ 395 passed (registry contract, sklearn bridge, polars engine, wrapped polars, xy row alignment) │ yeni      │
+   └──────────────────────┴─────────────────────────────────────────────────────────────────────────────────────────────────┴───────────┘
+   395 passed önemli: mevcut güvenlik ağı iki bulguyu da yakalamıyor.
+
+   Yeni açı: pl.from_pandas artifact'i değil
+
+   Native kurulmuş polars frame'lerle test ettim (dönüşümden geçmemiş):
+    input                       bridge on date_col      pandas fit   this-engine fit
+    pandas datetime64[ns]       datetime64[ns]          raised       RAISED TypeError
+    polars Datetime(ns) native  datetime64[ns]          raised       fit auc=0.457 mcc=+0.000
+    polars Datetime(us) native  datetime64[us]          raised       fit auc=0.457 mcc=+0.000
+    polars Datetime(ms) native  datetime64[ms]          raised       fit auc=0.457 mcc=+0.000
+    polars Date native          datetime64[D]           raised       fit auc=0.653 mcc=+0.101
+    polars via from_pandas      datetime64[ns]          raised       fit auc=0.457 mcc=+0.000
+   Üç şey netleşti:
+
+   1. Native frame'ler from_pandas ile aynı davranıyor → bulgu dönüşüm artifact'i değil, bridge'in kendisinde.
+   2. Birim fark etmiyor: ns (1.67e18), us (1.67e15), ms (1.67e12) → üçü de aynı dejenere sonuç (auc 0.457, mcc +0.000). Yani magnitude değil, yüksek
+   kardinaliteli temporal kolonun kendisi.
+   3. pl.Date dejenere olmuyor: auc 0.653 / mcc +0.101 — date-dropped clean baseline ile birebir aynı. Nedenini izole edemedim: kardinalite/magnitude
+   ayrımı için yazdığım script hatalı bir pl.Series kurulumunda polars ComputeError verdi, o yüzden bu doğrulanmamış bir gözlem olarak kalsın.
+
+   Ayrıca trigger'ı daraltan bir detay: bridge sadece temporal bir frame'de iki engine'de de datetime64 koruyor (float'a çevirmiyor). Supertype cast
+   yalnızca temporal sayısal kolonlarla karışık olduğunda oluyor. Yani hata "datetime varsa" değil, "datetime + sayısal karışık frame modele gidiyorsa".
+
+   Değişmeyenler
+
+   - P1 — temporal karışık frame: 32/32 divergence, linear/distance'ta 20/20 dejenere model, tamamen sessiz; pandas TypeError veriyor.
+   - P2 — son-bit float gürültüsü: SimpleImputer mean 1.39e-17 → StandardScaler 2.22e-16 → SGD'nin tol-bazlı durması epoch 15 vs 49'a kayıyor → farklı
+   model. Stabil learner'larda görünmez (LR 1.3e-15).
+   - Sağlam: 55 adımlık zincir, engine korunumu, X/y hizalama, temiz sayısal numpy paritesi.
+
+   Probe'lar tmp_polars_e2e/ altında 10 dosya (untracked). İsterseniz sonuçları bir commit'e pinleyip bulguları
+   initiatives/analysis/opus_core_analysis-open_queue.md'ye OC kaydı olarak yazabilirim — ama ağaç paralel bir oturum tarafından aktif değiştirildiği
+   için, düzeltmeye başlamadan önce o oturumun bitmesini beklemek daha güvenli olur.
+
+
+qwen dorduncu test turu:
+
+Çelişki tamamen çözüldü ve P2'nin kök nedeni artık nedensel olarak kanıtlı. Bu arada kendi önceki iki çıkarımımın yanlış olduğunu da gördüm.
+
+   1. Capture sadıkmış — probe 8'in hatası bende
+    skyulf fitted [pandas]   coef=[17.47038, 3.242125, -4.348287, 11.216]  n_iter_=15
+    offline refit [pandas]   coef=[17.47038, 3.242125, -4.348287, 11.216]  n_iter_=15   bit-identical: True
+    skyulf fitted [polars]   coef=[5.926827, -0.031015, -2.412544, 5.174093] n_iter_=49
+    offline refit [polars]   coef=[5.926827, -0.031015, -2.412544, 5.174093] n_iter_=49   bit-identical: True
+   Probe 8'de SGDClassifier(random_state=42, shuffle=True) ile refit etmiştim — yani default parametrelerle, oysa skyulf loss='log_loss' kullanıyor (probe
+    8'in kendi param dökümünde görünüyordu, ben kullanmadım). O yüzden 9.11/n_iter 50 çıkmıştı. Gerçek parametrelerle (SGDClassifier(**captured_params))
+   refit, skyulf'ün modelini iki engine'de de bit-bit üretiyor. Yani "skyulf farklı bir yoldan fit ediyor" şüphesi boştu.
+
+   2. 1e-16 gürültü tek başına modeli değiştiriyor
+    X max|d| between engines : 4.441e-16
+    coef max|d|              : 1.154e+01     n_iter_ 15 vs 49
+   3. Nedensel kanıt: girdiyi bit-bit eşitleyince fark sıfırlanıyor
+    differing cells per column BEFORE: [100, 32, 0, 0]
+    differing cells per column AFTER : [0, 0, 0, 0]     (polars X'in 0-1 kolonları pandas'ınkiyle değiştirildi)
+
+    polars params on bit-exact-pandas X : coef=[17.47038, ...] n_iter_=15
+    pandas refit (reference)            : coef=[17.47038, ...] n_iter_=15   --> MATCHES: True
+    polars refit (reference)            : coef=[5.926827, ...] n_iter_=49   --> matches: False
+   Ve ters yön:
+    pandas params on polars X (float64) : coef=[5.926827, ...] n_iter_=49  --> matches polars refit: True
+   Yani sonucu belirleyen tek şey dizinin bitleri. Parametreler, dtype (object vs float64), engine kimliği — hepsi irrelevant. İki yönde de çapraz test
+   bunu doğruluyor.
+
+   Kendi önceki iki çıkarımımı düzeltiyorum
+
+   1. "SGD 1e-16'ya duyarsız" demiştim (pertürbasyon testinde coef değişimi 5e-14 çıkmıştı). Bu veri için yanlış. Sentetik testim iyi koşullu rasgele
+   veriydi ve iki taraf da aynı epoch'ta durmuştu. Gerçek veri loss='log_loss' + tol=1e-3 ile bir durma-kriteri uçurumunun kenarında: 1e-16 fark epoch'u
+   15'ten 49'a atlatıyor. Yani bu genel bir amplifikasyon değil, veriye bağlı bir cliff — ama cliff'te olduğunda sonuç felaket.
+   2. Probe 8'in "offline refit aynı sonucu verdi" çıkarımı geçersizdi; default parametrelerle koşmuştu.
+
+   Konsolide nihai durum (HEAD d2959e0f, branch 0823)
+   ┌─────────────────────────┬─────────────────┬───────────────────────────────────────────────────────────────────────────────────────────────────┐
+   │                         │ Durum           │ Kanıt                                                                                             │
+   ├─────────────────────────┼─────────────────┼───────────────────────────────────────────────────────────────────────────────────────────────────┤
+   │ 55 adımlık polars       │ Sağlam          │ engine flip yok, row/col/NA paritesi tam, 52/55 adım iki engine'de de başarılı, 3'ü ikisinde de   │
+   │ zinciri                 │                 │ aynı hatayla                                                                                      │
+   ├─────────────────────────┼─────────────────┼───────────────────────────────────────────────────────────────────────────────────────────────────┤
+   │ X/y hizalama (satır     │ Sağlam          │ 181→180→137→137→112→112→89, iki engine'de de birebir                                              │
+   │ düşüren node'lar)       │                 │                                                                                                   │
+   ├─────────────────────────┼─────────────────┼───────────────────────────────────────────────────────────────────────────────────────────────────┤
+   │ Temiz sayısal → numpy → │ Sağlam          │ X max dev 3.553e-15, lr_auc/rf_acc farkı 0.0                                                      │
+   │ model                   │                 │                                                                                                   │
+   ├─────────────────────────┼─────────────────┼───────────────────────────────────────────────────────────────────────────────────────────────────┤
+   │ P1: temporal + sayısal  │ Kırık           │ 32/32 divergent; pandas TypeError, polars sessizce fit; linear/distance 20/20 dejenere (mcc tam   │
+   │ karışık frame           │                 │ 0.000, auc≈0.5); ns/us/ms fark etmiyor; native polars'ta da aynı                                  │
+   ├─────────────────────────┼─────────────────┼───────────────────────────────────────────────────────────────────────────────────────────────────┤
+   │ P2: son-bit float       │ Kırık (kanıtlı) │ SimpleImputer mean 1.39e-17 → StandardScaler 2.22e-16 → 132/600 hücre → SGD n_iter 15 vs 49 → mcc │
+   │ gürültüsü               │                 │ +0.184 vs −0.177                                                                                  │
+   ├─────────────────────────┼─────────────────┼───────────────────────────────────────────────────────────────────────────────────────────────────┤
+   │ Mevcut test ağı         │ İkisini de      │ 395 passed                                                                                        │
+   │                         │ yakalamıyor     │                                                                                                   │
+   └─────────────────────────┴─────────────────┴───────────────────────────────────────────────────────────────────────────────────────────────────┘
+   P2 için düzeltme yönü artık net: sorun bridge'de ya da dtype'ta değil, imputer/scaler'ın iki engine'de farklı toplama sırası kullanmasında. Bit-bit
+   eşitlik isteniyorsa polars yolunda da pandas ile aynı indirgeme yapılmalı (maliyetli), ya da bu "tol-bazlı iterative learner'larda engine seçimi modeli
+    değiştirir" diye belgelenmeli.
+
+   Probe dosyaları tmp_polars_e2e/ altında 11 dosya (untracked). İsterseniz P1 ve P2'yi initiatives/analysis/opus_core_analysis-open_queue.md'ye
+   reproduction kanıtlarıyla OC kaydı olarak yazabilirim — repo'nun mevcut formatına (tek cümlelik status + ## Log girişi archive'da) uygun şekilde.
