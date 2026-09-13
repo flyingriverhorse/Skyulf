@@ -91,6 +91,10 @@ export interface OutlierAnalysis {
   total_outliers: number;
   outlier_percentage: number;
   top_outliers: OutlierPoint[];
+  /** Denominator for the reported outlier count and percentage; unknown in legacy reports. */
+  analyzed_rows?: number | null;
+  /** Input rows after active filters, before sampling for outlier analysis. */
+  total_rows?: number | null;
   plot_data?: Array<Record<string, unknown>> | null;
 }
 

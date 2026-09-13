@@ -586,6 +586,7 @@ class EDAAnalyzer(
         # calls per column. Wins ~3–10× on wide frames.
         basic_stats = self._compute_basic_stats()
         semantic_types = self._infer_semantic_types(basic_stats)
+        task_type = self._resolve_target_task_type(target_col, task_type)
         advanced_stats = self._compute_advanced_stats(semantic_types)
 
         # Build per-column profiles from the batched stats.
@@ -644,7 +645,9 @@ class EDAAnalyzer(
         rule_tree, final_task_type = self._compute_rule_tree(feature_cols, target_col, task_type)
 
         # 11. Recommendations.
-        recommendations = self._generate_recommendations(col_profiles, alerts, target_col)
+        recommendations = self._generate_recommendations(
+            col_profiles, alerts, target_col, task_type
+        )
 
         return DatasetProfile(
             row_count=self.row_count,

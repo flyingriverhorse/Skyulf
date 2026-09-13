@@ -378,7 +378,7 @@ class MultivariateMixin(_AnalyzerState):
         return top_outliers
 
     def _detect_outliers(self, numeric_cols: list[str]) -> OutlierAnalysis | None:
-        """Detect outliers with zero-based row positions in the current filtered input."""
+        """Detect sampled outliers, retaining their denominator and filtered row positions."""
         try:
             limit = 50000
             df_numeric, row_positions = self._sample_numeric_for_outliers(numeric_cols, limit)
@@ -409,6 +409,8 @@ class MultivariateMixin(_AnalyzerState):
                 total_outliers=total_outliers,
                 outlier_percentage=(total_outliers / len(X)) * 100,
                 top_outliers=top_outliers,
+                analyzed_rows=len(X),
+                total_rows=self.df.height,
             )
 
         except Exception as e:  # noqa: BLE001 - outlier analysis is optional; logged, returns None

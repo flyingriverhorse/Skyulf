@@ -140,13 +140,17 @@ export const JobsDrawer: React.FC = () => {
         ref={panelRef}
         role="dialog"
         aria-modal="true"
-        aria-labelledby={titleId}
+        aria-labelledby={selectedJob ? undefined : titleId}
+        aria-label={selectedJob ? 'Job Details' : undefined}
         tabIndex={-1}
         className="relative w-[1200px] max-w-[95vw] h-[85vh] bg-white dark:bg-gray-800 shadow-2xl rounded-lg flex flex-col border border-gray-200 dark:border-gray-700 overflow-hidden transition-all outline-none"
       >
 
         {selectedJob ? (
-          <JobDetailsView job={selectedJob} onBack={() => { setSelectedJob(null); }} onClose={() => toggleDrawer(false)} />
+          <JobDetailsView job={selectedJob} onBack={() => {
+            setSelectedJob(null);
+            panelRef.current?.focus();
+          }} onClose={() => toggleDrawer(false)} />
         ) : (
           <>
             {/* Header */}
@@ -187,7 +191,10 @@ export const JobsDrawer: React.FC = () => {
             </>}
 
             <HistoryList filteredJobs={filteredJobs} registryItems={registryItems}
-              setSelectedJob={setSelectedJob} hasMore={hasMore} inspectedRun={inspectedRun}
+              setSelectedJob={job => {
+                setSelectedJob(job);
+                panelRef.current?.focus();
+              }} hasMore={hasMore} inspectedRun={inspectedRun}
               isLoading={isLoading} loadMoreJobs={loadMoreJobs} emptyMessage={emptyMessage} />
           </>
         )}

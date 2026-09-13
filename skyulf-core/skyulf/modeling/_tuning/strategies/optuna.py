@@ -20,6 +20,7 @@ import warnings
 from collections.abc import Callable
 from typing import Any
 
+from ...pruning import unsupported_pruning_reason as _unsupported_pruning_reason
 from ..params import clean_search_space
 from ..schemas import TuningConfig
 
@@ -175,6 +176,25 @@ def build_optuna_pruner(pruner_name: str) -> Any:
     return optuna_mod.pruners.MedianPruner()
 
 
+def _enable_optuna_pruning(
+    estimator: Any,
+    config: TuningConfig,
+    pruner_name: str,
+    log_callback: Callable[[str], None] | None,
+) -> bool:
+    """Enable supported incremental fitting and explain requested but unavailable pruning."""
+    if pruner_name == "none" or config.strategy_params.get("pruning") is False:
+        return False
+    reason = _unsupported_pruning_reason(estimator, config.search_space)
+    if reason is not None:
+        message = f"Optuna pruning disabled: {reason}. Trials use ordinary fit."
+        logger.warning(message)
+        if log_callback:
+            log_callback(message)
+        return False
+    return True
+
+
 def build_optuna_searcher(
     config: TuningConfig,
     base_estimator: Any,
@@ -183,7 +203,12 @@ def build_optuna_searcher(
     progress_callback: Callable[[int, int, float | None, dict | None], None] | None,
     log_callback: Callable[[str], None] | None,
 ) -> Any:
-    """Builds an OptunaSearchCV searcher, wiring up distributions, sampler, pruner, and callbacks."""
+    """Build OptunaSearchCV with pruning only when the outer estimator supports it.
+
+    Incremental trials require a fixed positive integer ``max_iter`` epoch
+    budget. Pipelines and fold preprocessors are never unwrapped: an unsupported
+    outer estimator keeps ordinary fitting and logs the reason.
+    """
     if not _ensure_optuna_loaded():
         raise ImportError(
             "Optuna is not installed. Please install 'optuna' and 'optuna-integration'."
@@ -226,6 +251,7 @@ def build_optuna_searcher(
     # Pruner Selection
     pruner_name = strategy_params.get("pruner", "median")
     pruner = build_optuna_pruner(pruner_name)
+    enable_pruning = _enable_optuna_pruning(base_estimator, config, pruner_name, log_callback)
 
     study = _optuna_state.optuna_module.create_study(
         sampler=sampler, pruner=pruner, direction="maximize"
@@ -249,4 +275,6 @@ def build_optuna_searcher(
             verbose=0,
             callbacks=callbacks,
             study=study,
+            enable_pruning=enable_pruning,
+            max_iter=base_estimator.max_iter if enable_pruning else 1000,
         )

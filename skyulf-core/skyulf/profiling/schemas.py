@@ -322,12 +322,21 @@ class OutlierPoint(BaseModel):
 
 
 class OutlierAnalysis(BaseModel):
-    """Result of an outlier sweep: which method ran, and what it flagged."""
+    """Result of an outlier sweep over the analyzed rows.
+
+    Counts and percentages describe ``analyzed_rows``, which may be a sample
+    of ``total_rows`` after active filters. Older reports omit both counts;
+    their analyzed population is unknown.
+    """
 
     method: str  # "IsolationForest" or "IQR"
     total_outliers: int
     outlier_percentage: float
     top_outliers: list[OutlierPoint]
+    # Counts and percentages describe analyzed rows, not unsampled input rows.
+    analyzed_rows: int | None = None
+    # Population after active filters; absent in older saved reports.
+    total_rows: int | None = None
     plot_data: list[dict[str, Any]] | None = (
         None  # For visualization (e.g. PCA projection of outliers)
     )

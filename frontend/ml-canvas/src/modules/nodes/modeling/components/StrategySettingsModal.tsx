@@ -2,6 +2,7 @@ import React, { useState, useEffect, useId } from 'react';
 import { Save, RotateCcw, AlertTriangle } from 'lucide-react';
 import { HelpTooltip } from './HelpTooltip';
 import { ModalShell } from '../../../../components/shared';
+import { useOptunaPruningSupport, type PruningSupport } from '../../../../core/hooks/useOptunaPruningSupport';
 
 // Models whose search spaces contain string/boolean/None params that CMA-ES
 // cannot optimize natively — it falls back to random sampling for those params.
@@ -42,6 +43,8 @@ interface StrategySettingsModalProps {
     strategy: string;
     initialConfig?: StrategyConfig | undefined;
     modelKey?: string | undefined;
+    nodeId?: string | undefined;
+    searchSpace?: Record<string, unknown> | undefined;
 }
 
 interface StrategyControlsProps {
@@ -119,7 +122,7 @@ function HalvingControls({ config, setConfig, fieldId, strategy }: StrategyContr
     );
 }
 
-function OptunaControls({ config, setConfig, fieldId, showCmaesWarning }: StrategyControlsProps & { showCmaesWarning: boolean }) {
+function OptunaControls({ config, setConfig, fieldId, showCmaesWarning, pruning }: StrategyControlsProps & { showCmaesWarning: boolean; pruning: PruningSupport }) {
     return (
         <>
             <div>
@@ -155,11 +158,13 @@ function OptunaControls({ config, setConfig, fieldId, showCmaesWarning }: Strate
                     <label htmlFor={`${fieldId}-pruner`} className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                         Pruner
                     </label>
-                    <HelpTooltip placement="bottom-left" text="Median prunes trials worse than the median of previous runs. Hyperband is an aggressively fast early-stopping algorithm. None disables early stopping." />
+                    <HelpTooltip placement="bottom-left" text="Median and Hyperband can stop poor trials early when the model supports incremental fitting. Pipelines and fold preprocessing use normal fitting and report why pruning is unavailable. None disables pruning." />
                 </div>
                 <select
                     id={`${fieldId}-pruner`}
-                    value={config.pruner ?? 'median'}
+                    value={pruning.supported === false ? 'none' : config.pruner ?? 'median'}
+                    disabled={pruning.supported !== true}
+                    aria-describedby={`${fieldId}-pruning-support`}
                     onChange={(e) => setConfig({ ...config, pruner: e.target.value as 'median' | 'hyperband' | 'none' })}
                     className="w-full text-sm border-gray-300 dark:border-gray-600 rounded-lg p-2.5 bg-gray-50 dark:bg-gray-900 dark:text-white border focus:ring-2 focus:ring-blue-500"
                 >
@@ -167,7 +172,7 @@ function OptunaControls({ config, setConfig, fieldId, showCmaesWarning }: Strate
                     <option value="hyperband">Hyperband Pruner</option>
                     <option value="none">None (No Pruning)</option>
                 </select>
-                <p className="text-xs text-gray-500 mt-1">Algorithm to kill bad trials early.</p>
+                <p id={`${fieldId}-pruning-support`} role="status" className="text-xs text-gray-500 dark:text-gray-400 mt-1">{pruning.reason}</p>
             </div>
 
             <div>
@@ -199,6 +204,8 @@ export const StrategySettingsModal: React.FC<StrategySettingsModalProps> = ({
     strategy,
     initialConfig,
     modelKey,
+    nodeId,
+    searchSpace,
 }) => {
     const fieldId = useId();
     const showCmaesWarning =
@@ -207,6 +214,10 @@ export const StrategySettingsModal: React.FC<StrategySettingsModalProps> = ({
         CMAES_PARTIAL_MODELS.has(modelKey);
     const isHalving = strategy === 'halving_grid' || strategy === 'halving_random';
     const isOptuna = strategy === 'optuna';
+    const pruning = useOptunaPruningSupport({
+        enabled: isOpen && isOptuna, nodeId, modelType: modelKey,
+        searchSpace, strategyParams: initialConfig as Record<string, unknown> | undefined,
+    });
 
     const defaultHalving: StrategyConfig = { factor: 3, min_resources: 'exhaust', resource: 'n_samples' };
     const defaultOptuna: StrategyConfig = { pruner: 'median', sampler: 'tpe', timeout: '' };
@@ -228,6 +239,7 @@ export const StrategySettingsModal: React.FC<StrategySettingsModalProps> = ({
 
     const handleSave = () => {
         const finalConfig = { ...config };
+        if (isOptuna && pruning.supported === false) finalConfig.pruner = 'none';
         if (isOptuna && (finalConfig.timeout === '' || finalConfig.timeout === undefined)) {
             delete finalConfig.timeout;
         } else if (isOptuna && typeof finalConfig.timeout === 'string') {
@@ -271,7 +283,7 @@ export const StrategySettingsModal: React.FC<StrategySettingsModalProps> = ({
         >
             <div className="p-5 space-y-4">
                     {isHalving && <HalvingControls config={config} setConfig={setConfig} fieldId={fieldId} strategy={strategy} />}
-                    {isOptuna && <OptunaControls config={config} setConfig={setConfig} fieldId={fieldId} showCmaesWarning={showCmaesWarning} />}
+                    {isOptuna && <OptunaControls config={config} setConfig={setConfig} fieldId={fieldId} showCmaesWarning={showCmaesWarning} pruning={pruning} />}
                 </div>
         </ModalShell>
     );

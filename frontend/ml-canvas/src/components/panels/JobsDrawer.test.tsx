@@ -160,6 +160,7 @@ describe('JobsDrawer submitted runs', () => {
     await renderDrawer();
     fireEvent.click(screen.getByText('first'));
     expect(screen.getByRole('heading', { name: 'Details for first' })).toBeInTheDocument();
+    expect(screen.getByRole('dialog')).toHaveAccessibleName('Job Details');
     fireEvent.click(screen.getByRole('button', { name: 'Back to history' }));
     fireEvent.click(screen.getByText('first'));
 

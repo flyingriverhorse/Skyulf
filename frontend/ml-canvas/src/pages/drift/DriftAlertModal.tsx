@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import type { DriftAlertDetail, DriftDispositionAction } from '../../core/api/monitoring';
 import { ErrorState, LoadingState, ModalShell } from '../../components/shared';
 import { AlertIdentity } from './alertDetail/AlertIdentity';
@@ -42,6 +42,10 @@ export const DriftAlertModal: React.FC<DriftAlertModalProps> = ({
     const [actor, setActor] = useState('');
     const [note, setNote] = useState('');
     const [actionError, setActionError] = useState<string | null>(null);
+    const lifetime = useRef(0);
+    const currentNote = useRef(note);
+    currentNote.current = note;
+    useEffect(() => () => { lifetime.current += 1; }, [alertId]);
 
     const handleAction = async (action: DriftDispositionAction) => {
         if (!actor.trim()) {
@@ -49,8 +53,9 @@ export const DriftAlertModal: React.FC<DriftAlertModalProps> = ({
             return;
         }
         setActionError(null);
+        const requestLifetime = lifetime.current;
         const result = await onApplyDisposition(action, actor.trim(), note.trim() || undefined);
-        if (result) setNote('');
+        if (result && requestLifetime === lifetime.current && currentNote.current === note) setNote('');
     };
 
     const evidenceRows = prepareEvidenceRows(detail);

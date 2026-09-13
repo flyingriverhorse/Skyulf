@@ -6,7 +6,7 @@ import { StrategySettingsModal } from '../components/StrategySettingsModal';
 import { metricOptions, SEARCH_STRATEGIES, type UpdateFn } from './modelOptions';
 
 /** Tuning controls shown in Advanced mode: search strategy, trial budget, metric. */
-export function AdvancedTuningOptions({ config, update }: { config: EnsembleConfig; update: UpdateFn }) {
+export function AdvancedTuningOptions({ config, update, nodeId }: { config: EnsembleConfig; update: UpdateFn; nodeId?: string | undefined }) {
   const fieldId = useId();
   const [showStrategyModal, setShowStrategyModal] = useState(false);
   const [showBaseTuningDetails, setShowBaseTuningDetails] = useState(false);
@@ -137,6 +137,7 @@ export function AdvancedTuningOptions({ config, update }: { config: EnsembleConf
           strategy={config.search_strategy}
           initialConfig={config.strategy_params}
           modelKey={config.model_type}
+          nodeId={nodeId}
         />
       )}
     </div>

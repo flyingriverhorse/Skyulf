@@ -1,3 +1,4 @@
+import { ValidationField } from '../../../../components/shared/ValidationField';
 import type { ScalingConfig, ScalingSettingsProps } from './types';
 
 function ScalingMethod({ config, onChange }: ScalingSettingsProps) {
@@ -50,9 +51,15 @@ function StandardOptions({ config, onChange }: ScalingSettingsProps) {
   );
 }
 
+/** Keep missing defaults distinct from explicitly emptied or nonfinite drafts. */
+function rangeInput(value: number | null | undefined, fallback: number): number | string {
+  if (value === undefined) return fallback;
+  return value !== null && Number.isFinite(value) ? value : '';
+}
+
 function MinmaxOptions({ config, onChange }: ScalingSettingsProps) {
   return (
-    <div className="space-y-2 border-t pt-2">
+    <ValidationField field="feature_range" className="space-y-2 border-t pt-2">
       <span className="block text-sm font-medium">Feature Range</span>
       <div className="flex gap-2 items-center">
         <input
@@ -60,8 +67,8 @@ function MinmaxOptions({ config, onChange }: ScalingSettingsProps) {
           type="number"
           className="w-full p-2 border rounded bg-background text-sm"
           placeholder="Min (0)"
-          value={config.feature_range_min ?? 0}
-          onChange={(e) => onChange({ ...config, feature_range_min: Number.parseFloat(e.target.value) })}
+          value={rangeInput(config.feature_range_min, 0)}
+          onChange={(e) => onChange({ ...config, feature_range_min: Number.isFinite(e.target.valueAsNumber) ? e.target.valueAsNumber : null })}
         />
         <span className="text-muted-foreground">-</span>
         <input
@@ -69,17 +76,17 @@ function MinmaxOptions({ config, onChange }: ScalingSettingsProps) {
           type="number"
           className="w-full p-2 border rounded bg-background text-sm"
           placeholder="Max (1)"
-          value={config.feature_range_max ?? 1}
-          onChange={(e) => onChange({ ...config, feature_range_max: Number.parseFloat(e.target.value) })}
+          value={rangeInput(config.feature_range_max, 1)}
+          onChange={(e) => onChange({ ...config, feature_range_max: Number.isFinite(e.target.valueAsNumber) ? e.target.valueAsNumber : null })}
         />
       </div>
-    </div>
+    </ValidationField>
   );
 }
 
 function RobustOptions({ config, onChange }: ScalingSettingsProps) {
   return (
-    <div className="space-y-2 border-t pt-2">
+    <ValidationField field="quantile_range" className="space-y-2 border-t pt-2">
       <span className="block text-sm font-medium">Quantile Range</span>
       <div className="flex gap-2 items-center">
         <input
@@ -87,8 +94,8 @@ function RobustOptions({ config, onChange }: ScalingSettingsProps) {
           type="number"
           className="w-full p-2 border rounded bg-background text-sm"
           placeholder="Min (25.0)"
-          value={config.quantile_range_min ?? 25.0}
-          onChange={(e) => onChange({ ...config, quantile_range_min: Number.parseFloat(e.target.value) })}
+          value={rangeInput(config.quantile_range_min, 25.0)}
+          onChange={(e) => onChange({ ...config, quantile_range_min: Number.isFinite(e.target.valueAsNumber) ? e.target.valueAsNumber : null })}
         />
         <span className="text-muted-foreground">-</span>
         <input
@@ -96,8 +103,8 @@ function RobustOptions({ config, onChange }: ScalingSettingsProps) {
           type="number"
           className="w-full p-2 border rounded bg-background text-sm"
           placeholder="Max (75.0)"
-          value={config.quantile_range_max ?? 75.0}
-          onChange={(e) => onChange({ ...config, quantile_range_max: Number.parseFloat(e.target.value) })}
+          value={rangeInput(config.quantile_range_max, 75.0)}
+          onChange={(e) => onChange({ ...config, quantile_range_max: Number.isFinite(e.target.valueAsNumber) ? e.target.valueAsNumber : null })}
         />
       </div>
       <div className="space-y-2 mt-2">
@@ -120,7 +127,7 @@ function RobustOptions({ config, onChange }: ScalingSettingsProps) {
           <span>Scale Data (IQR)</span>
         </label>
       </div>
-    </div>
+    </ValidationField>
   );
 }
 

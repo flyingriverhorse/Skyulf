@@ -112,10 +112,10 @@ const scalerTypes = new Map([
 /** Translate scalar UI bounds into the backend's tuple parameters. */
 function scalerRanges(method: unknown, config: Record<string, unknown>): Record<string, unknown> {
   if (method === 'minmax') {
-    return { feature_range: [config.feature_range_min ?? 0, config.feature_range_max ?? 1] };
+    return { feature_range: [config.feature_range_min === undefined ? 0 : config.feature_range_min, config.feature_range_max === undefined ? 1 : config.feature_range_max] };
   }
   if (method === 'robust') {
-    return { quantile_range: [config.quantile_range_min ?? 25, config.quantile_range_max ?? 75] };
+    return { quantile_range: [config.quantile_range_min === undefined ? 25 : config.quantile_range_min, config.quantile_range_max === undefined ? 75 : config.quantile_range_max] };
   }
   return {};
 }

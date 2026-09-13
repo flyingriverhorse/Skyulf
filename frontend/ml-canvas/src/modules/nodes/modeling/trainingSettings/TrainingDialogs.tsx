@@ -10,7 +10,7 @@ type TrainingDialogsProps = Pick<TrainingSettingsState,
   | 'setShowParamsModal'
   | 'availableModels'
   | 'showStrategyModal'
-  | 'setShowStrategyModal'>;
+  | 'setShowStrategyModal'> & { nodeId?: string | undefined };
 
 export function TrainingDialogs({
   config,
@@ -21,6 +21,7 @@ export function TrainingDialogs({
   availableModels,
   showStrategyModal,
   setShowStrategyModal,
+  nodeId,
 }: TrainingDialogsProps) {
   return (
     <>
@@ -56,6 +57,8 @@ export function TrainingDialogs({
                   strategy={config.search_strategy || 'random'}
                   initialConfig={config.strategy_params as StrategyConfig | undefined}
                   modelKey={config.model_type}
+                  nodeId={nodeId}
+                  searchSpace={config.search_space}
                   onSave={(newStrategyParams) => {
                       onChange({ ...config, strategy_params: newStrategyParams as Record<string, unknown> });
                   }}

@@ -16,8 +16,8 @@ and is not counted.
 
 **Qwen follow-up (2026-09-12):** the verified findings
 filed 48 additional records, OC-271–318, after deduplication and scope
-correction. Thirty-nine have since closed. The live queue now has
-**34 open / 4 parked**; the subsequent OC-320 pipeline finding is now fixed. Details
+correction. Forty-one have since closed. The live queue now has
+**25 open / 4 parked**; the subsequent OC-320 pipeline finding is now fixed. Details
 and exclusions are in the latest Log entry. Historical baseline counts
 below are unchanged.
 
@@ -148,6 +148,7 @@ uses, so a fixed finding stays where it was filed.
 | OC-278 | 🟠 | **Deployment promotion deactivates a working model before validating the replacement** (`backend/ml_pipeline/deployment/service.py:131-175,260-272`) — Qwen #9. Verify artifact usability before atomic promotion and preserve the active deployment if validation fails. | medium | ✅ fixed 2026-09-13 — Validate loading, predictor/preprocessor interfaces and sklearn fitted state before promotion; failed validation or database replacement preserves the active model. |
 | OC-279 | 🟠 | **Synchronous Preview execution blocks its API event loop** (`backend/ml_pipeline/_internal/_routers/preview.py:767-776,815-865`) — Qwen #10. Move synchronous graph work off the request event loop and verify concurrency with the actual Preview path. | medium | ✅ fixed 2026-09-13 — Move synchronous preview work to a worker which owns its ORM session and artifacts; real HTTP concurrency and cancellation cleanup are covered. |
 | OC-272 | 🟡 | **Supported fitted models cannot produce fingerprints or model cards** (`skyulf-core/skyulf/pipeline/seal.py:174-185`) — Qwen #3. Canonicalize supported fitted Cython loss and NumPy Generator state while continuing to reject unknown state explicitly. | medium | ✅ fixed 2026-09-13 — Canonicalize exact supported compiled-loss identities/parameters and built-in Generator state; model cards and save/load pass for boosting and SGD on both engines, with sklearn 1.8/1.9 compatibility and unknown-state rejection. |
+| OC-318 | 🟡 | **Empty scaling range fields pass validation and become null bounds** (`frontend/ml-canvas/src/modules/nodes/processing/scaling/ScalingControls.tsx:64,91`) — Qwen #55. Validate finite MinMax/Robust range inputs in the UI and reject invalid serialized bounds at the Core boundary. | small | ✅ fixed 2026-09-13 — Keep blank scaling drafts invalid through editing and JSON reload, navigate Issues to the range, and reject malformed/nonfinite Core bounds with named errors; valid numeric iterables, Decimal bounds and fitted-artifact types remain compatible. |
 
 ### Ongoing — remove the hiding conditions
 
@@ -223,6 +224,7 @@ uses, so a fixed finding stays where it was filed.
 | OC-112 | ⚪ | Comment and code disagree in the categorical profiler — the comment promises a rendered missing-value marker, the code `continue`s and discards the null category (`profiling/_analyzer/categorical.py:22-30`). *Filed as "disagree about the applied threshold"; the real subject is the null-category marker* | 1 line | ✅ fixed 2026-09-06 — comment-only, no behaviour change; the reasoning for why dropping the null category is correct now lives in the code comment it rewrote. See the log entry |
 | OC-148 | 🟡 | PII detector flags ordinary 7+ digit numeric ID columns as "Email/Phone" (`profiling/_analyzer/text.py:107-128`) | small | ✅ fixed 2026-09-07 — phone detection now requires positive format evidence and repeated sample evidence; plain IDs, ZIP+4, and isolated phone-shaped IDs are excluded |
 | OC-122 | ð¡ | `TextCleaning` silently ignores unrecognised operation name (`cleaning/text.py:151-153`) | small | â fixed 2026-09-08 |
+| OC-111 | 🟡 | A profiling recommendation branch is unreachable | small | ✅ fixed 2026-09-13 — Use observed repeated integer cardinality for conditional category-code advice; preserve numeric measurement semantics and exclude targets, unique IDs, floats and unsupported types. |
 
 ### Remaining — file-coverage closure
 
@@ -326,6 +328,8 @@ uses, so a fixed finding stays where it was filed.
 | OC-260 | 🟡 | Time-series plotting builds unequal timestamp/value arrays when metrics have different missingness (`profiling/visualizer.py:823-827,846`) | small | ✅ fixed 2026-09-13 — Align each metric to the common valid timestamps and insert NaN gaps, including metrics absent from the first point; public plotting retains independent missingness. |
 | OC-288 | 🟡 | **Temporal decomposition buckets cannot be used as drill-down filters** (`skyulf-core/skyulf/profiling/_analyzer/decomposition.py:72-83,127,153-158`) — Qwen #21. Round-trip serialized date/time bucket values through dtype-aware filtering and verify reachable Date/Datetime UI paths. | medium | ✅ fixed 2026-09-13 — Parse serialized Date/Datetime/Time filters using native precision/timezones and preserve fractional Time bucket labels; real-file HTTP and desktop/mobile drill-down regressions pass. |
 | OC-303 | 🟡 | **Correlation truncation is hidden from the normal frontend warning path** (`skyulf-core/skyulf/profiling/correlations.py:31-45`) — Qwen #38. Include omission metadata with capped matrices and render it even when the returned matrix is within the cap. | small | ✅ fixed 2026-09-13 — Persist optional total/omitted-column metadata with capped matrices and display the warning for normal 20-of-25 responses; older reports remain readable. |
+| OC-50 | 🟡 | Binary targets miss class-balance advice or flip to regression by sample size (`recommendations.py:147-152`) | small | ✅ fixed 2026-09-13 — Resolve supplied Boolean/binary integer targets independently of sample size, preserve explicit Regression, and keep numeric-transform advice away from class labels; public target/rule/balance tests pass. |
+| OC-302 | 🟡 | **Outlier results omit the sample population behind their counts and percentages** (`skyulf-core/skyulf/profiling/_analyzer/multivariate.py:383-410`) — Qwen #37. Expose the sampled row count and make UI labels distinguish sampled results from the entire dataset. | medium | ✅ fixed 2026-09-13 — Persist optional analyzed_rows/total_rows and identify sampled counts/percentages in UI and console; real 200000-row analysis samples 50000, while legacy denominators stay unknown without population extrapolation. |
 
 
 ### Remaining — core / engines / pipeline
@@ -385,6 +389,8 @@ uses, so a fixed finding stays where it was filed.
 | OC-67 | 🟡 | Tuning metrics `pr_auc`/`pr_auc_weighted`/`g_score` crash the entire search (`modeling/_tuning/metrics.py:19-36,127-146`) | small | ✅ fixed 2026-09-06 — `pr_auc` now aliases to `average_precision` and the two names sklearn has no scorer for are built locally. See the log entry |
 | OC-275 | 🟡 | **Temporal CV misses pandas datetime.date columns** (`skyulf-core/skyulf/modeling/cross_validation.py:283-291,361,399`) — Qwen #6. Recognize native date objects consistently and preserve chronological folds through the public CV and fold-preprocessing path. | medium | ✅ fixed — 2026-09-12: Temporal CV recognizes homogeneous native pandas date objects, preserving stable target-aligned sorting and missing dates last; public fold boundaries now match Polars at 3/4, 6/7 and 9/10 instead of 8/2, 9/4 and 11/5. |
 | OC-282 | 🟡 | **Elasticnet with a missing l1_ratio silently behaves like L2** (`skyulf-core/skyulf/modeling/_sklearn_compat.py:43-44`) — Qwen #14. Validate or resolve the elasticnet ratio before estimator construction and cover the real pipeline/search-space contract. | small | ✅ fixed — 2026-09-12: Omitted/null Elastic Net ratios resolve to 0.5 for direct fits, all five searches and refits, preserving numeric and Optuna distribution choices; mixed-penalty searches with unspecified ratios fail clearly. The separate explicit-ratio precedence mismatch is filed as OC-319. |
+| OC-253 | 🟡 | F1 tuning and evaluation/threshold tuning disagree on the positive class for labels `{1,2}` (`modeling/_tuning/metrics.py:235`, `modeling/_evaluation/classification.py:84`) | decision + small | ✅ fixed 2026-09-13 — Named binary F1/precision/recall/PR-AUC follow sorted-last classes_[1], matching evaluation and threshold tuning; all five searches score the example 0.8, while explicit class-1 scorers retain 10/11. |
+| OC-269 | 🟡 | Optuna constructs the selected pruner but never enables pruning on OptunaSearchCV (`modeling/_tuning/strategies/optuna.py:240-252`) | medium | ✅ fixed 2026-09-13 — Enable real incremental Optuna pruning only with outer partial_fit and a fixed positive integer epoch budget; unsupported wrappers/options and GaussianNB retain ordinary fit with an explanatory log, without bypassing fold preprocessing. |
 
 ### Remaining — frontend
 
@@ -409,6 +415,9 @@ uses, so a fixed finding stays where it was filed.
 | OC-314 | 🟡 | **Keyboard paste mutates a read-only Canvas** (`frontend/ml-canvas/src/core/hooks/useClipboard.ts:43-76`) — Qwen #51. Enforce the effective read-only state in clipboard mutation paths while retaining permitted copy behavior. | small | ✅ fixed 2026-09-13 — Check the current effective read-only mode at paste time while retaining copy; hook/store and real keyboard browser regressions pass. |
 | OC-315 | 🟡 | **Edge selection adds structural undo-history entries** (`frontend/ml-canvas/src/core/store/graphStore/historyEquality.ts:15-16`) — Qwen #52. Ignore selection-only edge changes when comparing graph history while preserving real edits; cover this alongside the separate missing-drag snapshot in OC-227. | small | ✅ fixed 2026-09-13 — Exclude selection-only edge changes from structural history while preserving actual edge edits and redo; store and browser controls pass. |
 | OC-316 | 🟡 | **Canvas source links duplicate datasets already present in the graph** (`frontend/ml-canvas/src/pages/CanvasPage.tsx:153-157`) — Qwen #53. Recognize dataset nodes through their registered definition and source identity before automatically inserting from source_id. | small | ✅ fixed 2026-09-13 — Recognize existing dataset nodes through data.definitionType and datasetId when following source links; repeated navigation reuses the original node. |
+| OC-223 | 🟡 | Completing a pending drift disposition clears the newly typed note after switching to another alert | small | ✅ fixed 2026-09-13 — Guard modal drafts and parent GET/disposition lifetimes; late responses cannot clear newer notes or overwrite current detail, loading, error or pending state, including same-alert read/action races. |
+| OC-225 | 🟡 | Selecting a job removes the Jobs drawer's accessible name; the detail Back button is also unnamed | small | ✅ fixed 2026-09-13 — Retain valid history/detail dialog names, label Back and Close, and keep focus within the drawer during real job-card keyboard navigation. |
+| OC-226 | 🟡 | Late Segmentation hyperparameter definitions can restore an old model/reference column and call its old update callback after unmount | small | ✅ fixed 2026-09-13 — Cancel stale model/node definition requests and merge defaults into current config through the current callback; reference edits, user parameters, reversed responses and unmount remain safe. |
 
 ---
 
@@ -492,6 +501,31 @@ respective fix logs; OC-167 closed with canonical artifact framing on 2026-09-09
 
 
 ## Log
+
+### 2026-09-13 — 0.8.23: nine more queue findings repaired
+
+Committed the previous twelve findings and equivalent-settings undo repair as
+`8a745e1c`, with DCO sign-off and passing hooks. Closed
+OC-50/111/223/225/226/253/269/302/318 after reproduction and regression tests.
+Canvas async responses now respect active alerts/models/nodes, the Jobs drawer
+retains accessible names, and empty scaling bounds remain invalid through
+serialization. Core preserves valid scaler inputs and artifact types. Named
+binary metrics share evaluation's positive class; supported Optuna estimators
+can actually prune while unsupported paths preserve ordinary fold-safe fitting.
+The follow-up Optuna settings check shares runtime model and fold rules, disables
+unsupported pruners with a reason, and changes the saved choice only on Apply.
+Model/search/connection changes invalidate stale replies; merely opening or
+closing settings leaves both configuration and undo history alone.
+EDA keeps binary target advice consistent and integer-code advice conditional;
+outlier results expose their analyzed population without extrapolation.
+
+The live count is now **25 open / 4 parked**, from 34/4. Qwen OC-271–318 has
+**41/48 closed**. OC-71/72/73/185 stay parked. The additional browser history
+check confirms a real setting change produces one undo/redo step and reopening
+its panel adds none. Full validation, compatibility examples and limits are in
+[`queue_verification_0.8.23_batch3.md`](queue_verification_0.8.23_batch3.md).
+Changelog entries remain under v0.8.23; package metadata remains 0.8.22.
+
 
 ### 2026-09-13 — Canvas history follow-up: equivalent settings after selection
 

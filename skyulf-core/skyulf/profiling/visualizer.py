@@ -216,6 +216,7 @@ class EDAVisualizer:
             console.print("[italic]No text columns found.[/italic]")
 
     def _render_outliers(self, console, Table):
+        """Print outlier results with their measured population rather than implying full coverage."""
         if not self.profile.outliers:
             return
         console.print("\n[bold]5. Outlier Detection[/bold]")
@@ -223,6 +224,16 @@ class EDAVisualizer:
             f"Detected [red]{self.profile.outliers.total_outliers}[/red] outliers "
             f"({self.profile.outliers.outlier_percentage:.2f}%)"
         )
+        analyzed_rows = self.profile.outliers.analyzed_rows
+        total_rows = self.profile.outliers.total_rows
+        if analyzed_rows is None or total_rows is None:
+            console.print("Analyzed row count is unavailable for this saved report.")
+        elif analyzed_rows < total_rows:
+            console.print(
+                f"Results describe {analyzed_rows:,} sampled rows out of {total_rows:,} rows."
+            )
+        else:
+            console.print(f"Results describe all {analyzed_rows:,} rows.")
 
         outlier_table = Table(title="Top Anomalies")
         outlier_table.add_column("Index", justify="right")

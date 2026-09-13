@@ -223,18 +223,31 @@ describe('DriftAlertModal characterization', () => {
         expect(screen.getByText(/Enter your name so/)).toBeInTheDocument();
     });
 
-    it('retains asynchronous truthy-result semantics across an alert switch', async () => {
-        /** A pending callback clears the current note on completion as before extraction. */
+    it.each([false, true])('preserves a new note after an alert switch or reopen: %s', async reopen => {
+        /** An earlier disposition must never clear the next alert investigation's draft. */
         let resolve: (value: unknown) => void = () => undefined;
         const pending = new Promise(complete => { resolve = complete; });
         const view = setup({ onApplyDisposition: vi.fn().mockReturnValue(pending) });
         fill('alice', 'first');
         fireEvent.click(screen.getByRole('button', { name: 'Acknowledge' }));
         expect(screen.getByRole('textbox', { name: 'Note' })).toHaveValue('first');
-        view.rerender({ alertId: 8, detail: detail({ id: 8 }) });
+        if (reopen) view.rerender({ alertId: null, detail: null });
+        const id = reopen ? 7 : 8;
+        view.rerender({ alertId: id, detail: detail({ id }) });
         fill('alice', 'second');
         await act(async () => resolve(true));
-        expect(screen.getByRole('textbox', { name: 'Note' })).toHaveValue('');
+        expect(screen.getByRole('textbox', { name: 'Note' })).toHaveValue('second');
+    });
+
+    it('preserves note edits made while the current alert disposition is pending', async () => {
+        /** Success clears the submitted draft only, keeping text written for the next action. */
+        let resolve!: (value: unknown) => void;
+        setup({ onApplyDisposition: () => new Promise(done => { resolve = done; }) });
+        fill('alice', 'submitted');
+        fireEvent.click(screen.getByRole('button', { name: 'Acknowledge' }));
+        fill('alice', 'new context');
+        await act(async () => resolve(true));
+        expect(screen.getByRole('textbox', { name: 'Note' })).toHaveValue('new context');
     });
 
     it('keeps owner attribution and history order, timestamp truncation and optional quoted notes', () => {

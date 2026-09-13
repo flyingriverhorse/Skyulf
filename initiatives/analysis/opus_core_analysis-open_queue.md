@@ -29,11 +29,12 @@ archive Log.
 
 ## Live — fix queue
 
-**Current status (2026-09-13): 34 open / 4 parked.**
-The second 0.8.23 batch closes 12 findings: OC-227/259/260/272/288/303/306/309/313/314/315/316.
-Verification and compatibility notes are in [the second batch report](queue_verification_0.8.23_batch2.md);
-the [first batch report](queue_verification_0.8.23.md) records the preceding 13 closures.
-The archive Log retains both batches. OC-319 remains open.
+**Current status (2026-09-13): 25 open / 4 parked.**
+The third 0.8.23 batch closes nine findings: OC-50/111/223/225/226/253/269/302/318.
+Verification and limits are in [the third batch report](queue_verification_0.8.23_batch3.md);
+the [second](queue_verification_0.8.23_batch2.md) and [first](queue_verification_0.8.23.md)
+reports retain the preceding 25 closures. The archive Log keeps all three batches.
+OC-319 remains open.
 The verified Qwen follow-up added **48 findings, OC-271–318**,
 grouped below by priority and domain. Qwen #1/#50/#57 reuse OC-253/65/64;
 #13 is already fixed as OC-268. #18/#41 share OC-286, which requires both
@@ -66,7 +67,6 @@ remaining findings are grouped by domain.
 | OC-286 | 🟠 | **Non-finite profile and preview metrics cross JSON persistence boundaries** (`skyulf-core/skyulf/profiling/schemas.py:259-273`; `backend/ml_pipeline/_execution/strategies.py:130-163`) — Qwen #18 / #41. Enforce a consistent finite-or-null JSON contract for both EDA profile persistence and background preview/job metrics; closure requires coverage of both write paths. | medium | ⬜ open — Qwen #18 typed profile fields retain inf/NaN and #41 actual preview success persists Infinity to SQLite; PostgreSQL/MySQL JSON binders emit non-standard JSON, but live server rejection was not tested and orjson/model_dump_json controls sanitize it. |
 | OC-289 | 🟡 | **User-controlled identifiers can inject new lines into logs** (`backend/ml_pipeline/model_registry/api.py:43-51`) — Qwen #22. Sanitize identifiers and exception text at the affected logging boundaries while retaining prior credential redaction. | small | ⬜ open — A real missing-job request containing percent-encoded LF returns 404 but writes a raw newline into the registry log; this demonstrates log-integrity loss, not code execution. |
 | OC-292 | 🟡 | **Canvas accepts Segmentation-to-Ensemble connections that convert to invalid data inputs** (`frontend/ml-canvas/src/core/utils/pipelineConversion/ensemble.ts:11-16`) — Qwen #25. Align connection validation, ensemble conversion and backend input expectations for unsupported model families. | medium | ⬜ open — Registered port validation accepts the connection and the actual converter lists the segmentation training node as Ensemble data input; the backend rejects its Model artifact where Dataset is required. |
-| OC-318 | 🟡 | **Empty scaling range fields pass validation and become null bounds** (`frontend/ml-canvas/src/modules/nodes/processing/scaling/ScalingControls.tsx:64,91`) — Qwen #55. Validate finite MinMax/Robust range inputs in the UI and reject invalid serialized bounds at the Core boundary. | small | ⬜ open — Clearing the real controls produces NaN, valid=true and JSON [null,1] or [null,75]; actual Core fitting fails with a None comparison TypeError. |
 | OC-319 | 🟡 | **Explicit Logistic Regression penalty/ratio settings describe different models during search and refit** (`skyulf-core/skyulf/modeling/_sklearn_compat.py:40-45`; `modeling/_tuning/params.py`; `modeling/_tuning/engine.py`) — Align the documented explicit-ratio precedence with penalty semantics across constructor and searcher set_params paths; keep nullable Elastic Net defaults OC-282 separate. | decision + small | ⬜ open — On sklearn 1.8.0, penalty=l2 and l1_ratio=0.5 produce maximum coefficient difference 0.10500864 between normalized construction and search-style set_params; l1 control differs by 0.81086563, while elasticnet matches. Public grid/halving_grid score the same single l2 candidate and stratified folds at -0.33013530/-0.27716182 log-loss scores, then return identical final coefficients. Reproduction and limitations are in the latest archive Log. |
 
 
@@ -96,7 +96,6 @@ remaining findings are grouped by domain.
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
 | OC-91 | 🟡 | Three public `core/` seams (263 lines) have zero call sites; one duplicates a differently-shaped backend class name | small | ⬜ open |
-| OC-111 | 🟡 | A profiling recommendation branch is unreachable | small | ⬜ open |
 | OC-102 | ⚪ | Five tunable models return an empty search space from the live `/defaults` endpoint (`hyperparameters/_registry.py`) | small | ⬜ open |
 
 ### Remaining — file-coverage closure
@@ -131,8 +130,6 @@ remaining findings are grouped by domain.
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
 | OC-47 | 🟡 | Common-column dtype drift can silently disappear or be erased by a successful lossy cast to the reference dtype (`profiling/drift.py:192`) | small | ⬜ open — besides the original uncastable-to-null case, integer reference `[0]*50+[1]*50` against fractional current `[0.9]*50+[1.9]*50 reports all distances zero; a Float64 reference control detects drift with normalized Wasserstein `1.8`. |
-| OC-50 | 🟡 | Binary targets miss class-balance advice or flip to regression by sample size (`recommendations.py:147-152`) | small | ⬜ open |
-| OC-302 | 🟡 | **Outlier results omit the sample population behind their counts and percentages** (`skyulf-core/skyulf/profiling/_analyzer/multivariate.py:383-410`) — Qwen #37. Expose the sampled row count and make UI labels distinguish sampled results from the entire dataset. | medium | ⬜ open — A 200000-row dataset yields 2500 outliers and 5% from a 50000-row sample without that denominator in the payload/UI; a full-data count of 10000 or exact fourfold undercount was not established. |
 
 
 ### Remaining — core / engines / pipeline
@@ -155,14 +152,12 @@ remaining findings are grouped by domain.
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
 | OC-251 | 🟡 | Fold-aware Halving/Optuna scoring keeps original validation labels after preprocessing filters prediction rows (`modeling/_tuning/fold_pipeline.py:168-171`) | medium | ⬜ open — IQR yields 120 held-out labels / 110 predictions; actual halving_grid and Optuna searches fail all trials while grid scores the same chain at R2 `0.999998`. |
-| OC-253 | 🟡 | F1 tuning and evaluation/threshold tuning disagree on the positive class for labels `{1,2}` (`modeling/_tuning/metrics.py:235`, `modeling/_evaluation/classification.py:84`) | decision + small | ⬜ open — the same predictions score `0.909091` for class 1 in tuning and `0.8` for class 2 in evaluation; reconcile the documented stock-scorer exception with a shared positive-class contract. Qwen recheck: the same {1,2} predictions score 0.75 for class 1 and 0.5 for class 2; retain the documented scorer-contract decision. Qwen #1. |
-| OC-269 | 🟡 | Optuna constructs the selected pruner but never enables pruning on OptunaSearchCV (`modeling/_tuning/strategies/optuna.py:240-252`) | medium | ⬜ open — Hyperband with incremental-fit-capable SGD still has `enable_pruning=False` and no intermediate trial values; respect estimator capabilities when implementing the advertised early stopping. |
 
 
 ### Remaining — frontend
 
-The separate [frontend CCN inventory](frontend_ccn_remaining_2026-09-10.md) now
-has **0 functions in 0 files above CCN 10**: the source-wide strict gate passes.
+The frontend CCN inventory recorded **0 functions in 0 files above CCN 10**;
+its separate report was removed. The source-wide strict gate still passes.
 The informational report stays at 8, listing 133 optional CCN 9/10 functions in
 96 files. Complexity cleanup is complete under the accepted limit; the functional
 findings below remain open and their audit counts are unchanged.
@@ -180,9 +175,6 @@ The separately reported lockfile issue still needs its exact advisory details.
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
 | OC-54 | 🟡 | `DebugNode` is dead code that would silently no-op if wired up (`nodes/DebugNode.tsx`) | small | ⬜ open |
-| OC-223 | 🟡 | Completing a pending drift disposition clears the newly typed note after switching to another alert | small | ⬜ open — original modal characterization submits on one alert, switches IDs, types a new note and resolves the old callback; the new note becomes empty. Review modal and parent request lifetimes together before repair. |
-| OC-225 | 🟡 | Selecting a job removes the Jobs drawer's accessible name; the detail Back button is also unnamed | small | ⬜ open — the drawer keeps `aria-labelledby="jobs-drawer-title"` after its history heading unmounts. Keep a valid dialog label in both views and label the icon-only Back action; verify real-card keyboard navigation and screen-reader names. |
-| OC-226 | 🟡 | Late Segmentation hyperparameter definitions can restore an old model/reference column and call its old update callback after unmount | small | ⬜ open — original-source tests resolve defaults after newer config/model changes and observe the captured old config being emitted. Scope requests to the active model/settings lifetime and merge defaults into current config; cover reference edits, reversed responses and unmount. |
 | OC-56 | ⚪ | `useSchemaPreview` does not cancel in-flight requests on unmount (`hooks/useSchemaPreview.ts`) | small | ⬜ open |
 | OC-57 | ⚪ | `any`-typed chart props bypass type safety in EDA components (`modules/eda/`) | small | ⬜ open |
 
@@ -361,8 +353,8 @@ their reproduction detail in the archive's `## Log` entries instead.
 
 ### 2026-09-08 — OC-213–215: Problems panel review
 
-Source: [the complete diagnostic disposition](problems_panel_review-2026-09-08.md),
-against working tree `f12dde9f`. The repeated export contains 105 distinct
+Source: the diagnostic disposition against working tree `f12dde9f` (the separate
+`problems_panel_review-2026-09-08.md` report was removed). The export contains 105 distinct
 file/rule/locations, including external type stubs, obsolete rules, and optional
 style suggestions. Only the actionable example/dependency findings are filed here.
 OC-214 and OC-215 are now closed in the archive; OC-213 remains open.

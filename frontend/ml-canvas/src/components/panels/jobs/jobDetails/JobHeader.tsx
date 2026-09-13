@@ -114,7 +114,7 @@ export function JobHeader({ job, onBack, onClose }: { job: JobInfo; onBack: () =
   return (
     <div className="p-4 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center bg-gray-50 dark:bg-gray-800/50">
       <div className="flex items-center gap-3">
-        <button onClick={onBack} className="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded text-gray-500">
+        <button onClick={onBack} aria-label="Back to jobs" className="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded text-gray-500">
           <ArrowLeft className="w-4 h-4" />
         </button>
         <div>
@@ -148,7 +148,7 @@ export function JobHeader({ job, onBack, onClose }: { job: JobInfo; onBack: () =
           </button>
         )}
         <JobRetryAction job={job} actions={actions} />
-        <button onClick={onClose} className="p-1.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400">
+        <button onClick={onClose} aria-label="Close job details" className="p-1.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400">
           <X className="w-4 h-4" />
         </button>
       </div>

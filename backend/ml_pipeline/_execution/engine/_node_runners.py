@@ -37,9 +37,9 @@ from skyulf.modeling.clustering import _select_numeric_features
 from skyulf.modeling.cross_validation import _detect_datetime_columns
 from skyulf.preprocessing import AuditedFoldPreprocessor, frame_rows
 from skyulf.preprocessing.pipeline import FeatureEngineer
-from skyulf.registry import NodeRegistry
 from skyulf.types import DEFAULT_RANDOM_STATE
 
+from ..model_components import get_model_components
 from ..schemas import NodeConfig
 
 if TYPE_CHECKING:
@@ -1192,48 +1192,7 @@ class NodeRunnersMixin:
 
     def _get_model_components(self, algorithm: str, *, task_type: str | None = None):
         """Factory for model components, resolving ambiguous aliases by task."""
-        # Normalize algorithm name to match registry IDs
-        algo = algorithm.lower().replace(" ", "_").replace("-", "_")
-
-        # Map legacy aliases to registry IDs
-        alias_map = {
-            "logisticregression": "logistic_regression",
-            "randomforestclassifier": "random_forest_classifier",
-            "ridgeregression": "ridge_regression",
-            "ridge": "ridge_regression",
-            "randomforestregressor": "random_forest_regressor",
-        }
-        task_alias_map = {
-            "classification": "random_forest_classifier",
-            "regression": "random_forest_regressor",
-        }
-
-        if algo == "random_forest":
-            if task_type not in task_alias_map:
-                raise ValueError(
-                    "Ambiguous algorithm alias 'random_forest'; provide "
-                    "task_type='classification' or task_type='regression'"
-                )
-            registry_id = task_alias_map[task_type]
-        else:
-            registry_id = alias_map.get(algo, algo)
-
-        try:
-            calculator_cls = NodeRegistry.get_calculator(registry_id)
-            applier_cls = NodeRegistry.get_applier(registry_id)
-        except ValueError:
-            # Fallback: Raise original error if not found in registry
-            raise ValueError(
-                f"Unknown algorithm: {algorithm} (Registry ID: {registry_id})"
-            ) from None
-
-        calculator = calculator_cls()
-        if task_type and getattr(calculator, "problem_type", None) != task_type:
-            raise ValueError(
-                f"Algorithm '{algorithm}' resolves to a {calculator.problem_type} "
-                f"model, incompatible with task_type='{task_type}'"
-            )
-        return calculator, applier_cls()
+        return get_model_components(algorithm, task_type=task_type)
 
     def _data_preview_df_info(self, df: Any, name: str) -> dict[str, Any]:
         """Build the preview payload (shape/columns/sample) for a single DataFrame."""

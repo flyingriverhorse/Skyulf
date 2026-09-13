@@ -35,6 +35,7 @@ from .._class_weights import constructor_accepts_class_weight, split_class_weigh
 from .._evaluation.thresholds import apply_thresholds
 from ..base import BaseModelApplier, BaseModelCalculator
 from ..cross_validation import _sort_by_time
+from ..pruning import unsupported_pruning_reason
 from . import splitters
 from .fold_pipeline import FoldAwareModelStep
 from .grid_random import fit_and_score_candidate_fold, run_grid_or_random_search
@@ -300,6 +301,25 @@ class TuningCalculator(BaseModelCalculator):
 
     def _clean_search_space(self, search_space: dict[str, Any]) -> dict[str, Any]:
         return clean_search_space(search_space)
+
+    def pruning_support_reason(self, config: TuningConfig) -> str | None:
+        """Inspect Optuna's model capabilities without fitting or loading any data.
+
+        Uses calculator defaults and the same estimator preparation as tuning,
+        including nonnative class-weight wrappers. Callers with graph preprocessing
+        must also account for its outer fold wrapper. The current pruner selection
+        does not affect capability; the explicit ``pruning=False`` opt-out does.
+        """
+        if config.strategy_params.get("pruning") is False:
+            return "pruning=False explicitly disables incremental trial pruning"
+        model_class = getattr(self.model_calculator, "model_class", None)
+        if model_class is None:
+            return "The model does not expose a tunable estimator class"
+        optuna_config = replace(config, strategy="optuna")
+        estimator, search_config, _, _ = self._prepare_search_estimator(
+            model_class, optuna_config, None, None, None, None, None
+        )
+        return unsupported_pruning_reason(estimator, clean_search_space(search_config.search_space))
 
     @staticmethod
     def _instantiate_model(model_class: Any, params: dict[str, Any]) -> Any:

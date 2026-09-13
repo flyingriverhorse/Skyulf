@@ -134,10 +134,12 @@ for (const width of [1440, 1100]) {
     const card = drawer.getByRole('button').filter({ hasText: 'regression-done' });
     await expect(card).toContainText('0.812');
     await card.press('Enter');
-    const details = page.getByRole('dialog').filter({ has: page.getByRole('heading', { name: /^Job Details/ }) });
+    const details = page.getByRole('dialog', { name: 'Job Details', exact: true });
     await expect(details).toBeVisible();
-    await details.getByRole('button').first().click();
+    await expect(details).toBeFocused();
+    await details.getByRole('button', { name: 'Back to jobs', exact: true }).press('Enter');
     await expect(card).toBeVisible();
+    await expect(drawer).toBeFocused();
     await drawer.getByRole('button', { name: 'Ensemble', exact: true }).click();
     await expect(drawer.getByText('ensemble-done', { exact: true })).toBeVisible();
     await drawer.getByRole('button', { name: 'Regression', exact: true }).last().click();

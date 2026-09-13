@@ -1,7 +1,7 @@
 """Heuristic data-cleaning recommendations derived from column profiles."""
 
 from ..schemas import Alert, ColumnProfile, Recommendation
-from ._utils import _AnalyzerState
+from ._utils import _INT_DTYPES, _AnalyzerState
 
 # |skew| above this triggers domain-aware transform advice.
 SKEWNESS_TRANSFORM_THRESHOLD = 1.5
@@ -19,25 +19,54 @@ class RecommendationsMixin(_AnalyzerState):
         profiles: dict[str, ColumnProfile],
         alerts: list[Alert],
         target_col: str | None,
+        task_type: str | None = None,
     ) -> list[Recommendation]:
         """Collect actionable advice before deciding whether a clean message applies."""
         recs: list[Recommendation] = []
+        task_type = self._resolve_target_task_type(target_col, task_type)
 
         for col, profile in profiles.items():
             recs.extend(self._missing_value_recommendations(col, profile))
-        for col, profile in profiles.items():
-            recs.extend(self._skewness_recommendations(col, profile))
-        for col, profile in profiles.items():
-            recs.extend(self._cardinality_recommendations(col, profile))
+        recs.extend(self._value_preparation_recommendations(profiles, target_col, task_type))
         for col, profile in profiles.items():
             recs.extend(self._constant_column_recommendations(col, profile))
         for col, profile in profiles.items():
             recs.extend(self._id_column_recommendations(col, profile))
 
-        recs.extend(self._target_balance_recommendations(profiles, target_col))
+        recs.extend(self._target_balance_recommendations(profiles, target_col, task_type))
         recs.extend(self._clean_dataset_recommendation(recs))
 
         return recs
+
+    def _value_preparation_recommendations(
+        self, profiles: dict[str, ColumnProfile], target_col: str | None, task_type: str | None
+    ) -> list[Recommendation]:
+        """Keep feature encoding and numeric transforms away from target class labels."""
+        recs = []
+        for col, profile in profiles.items():
+            if col != target_col or task_type != "Classification":
+                recs.extend(self._skewness_recommendations(col, profile))
+            if col != target_col:
+                recs.extend(self._cardinality_recommendations(col, profile))
+        return recs
+
+    def _resolve_target_task_type(
+        self, target_col: str | None, task_type: str | None
+    ) -> str | None:
+        """Infer binary integer targets independently of frame size, honoring explicit tasks.
+
+        Only a supplied target gets this override; ordinary feature typing
+        and fractional numeric measurements retain their existing semantics.
+        """
+        if task_type or not target_col or target_col not in self.columns:
+            return task_type
+        target = self.df[target_col]
+        if target.dtype in _INT_DTYPES and target.drop_nulls().n_unique() == 2:
+            return "Classification"
+        semantic_type = self._get_semantic_type(target)
+        if semantic_type in ("Categorical", "Boolean"):
+            return "Classification"
+        return "Regression" if semantic_type == "Numeric" else None
 
     def _missing_value_recommendations(
         self, col: str, profile: ColumnProfile
@@ -99,21 +128,38 @@ class RecommendationsMixin(_AnalyzerState):
     def _cardinality_recommendations(
         self, col: str, profile: ColumnProfile
     ) -> list[Recommendation]:
-        """Recommend alternative encodings for high-cardinality categorical columns."""
-        if (
-            profile.categorical_stats
-            and profile.dtype == "Categorical"
-            and profile.categorical_stats.unique_count > 50
-        ):
+        """Recommend categorical encoding, conditionally for repeated integer codes."""
+        if profile.dtype not in ("Numeric", "Categorical"):
+            return []
+        unique_count = (
+            profile.categorical_stats.unique_count
+            if profile.dtype == "Categorical" and profile.categorical_stats
+            else self._integer_code_cardinality(col)
+        )
+        if unique_count > 50:
+            suggestion = f"Use Target Encoding or Hashing for '{col}' instead of One-Hot."
+            if profile.dtype == "Numeric":
+                suggestion = (
+                    f"If '{col}' contains category codes, consider Target Encoding or Hashing "
+                    "instead of One-Hot. Keep numeric measurements numeric."
+                )
             return [
                 Recommendation(
                     column=col,
                     action="Encode",
-                    reason=f"High cardinality ({profile.categorical_stats.unique_count})",
-                    suggestion=f"Use Target Encoding or Hashing for '{col}' instead of One-Hot.",
+                    reason=f"High cardinality ({unique_count})",
+                    suggestion=suggestion,
                 )
             ]
         return []
+
+    def _integer_code_cardinality(self, col: str) -> int:
+        """Count repeated integer values without asserting they are categorical."""
+        if col not in self.columns or not self.df[col].dtype.is_integer():
+            return 0
+        observed = self.df[col].drop_nulls()
+        unique_count = observed.n_unique()
+        return unique_count if unique_count < len(observed) else 0
 
     def _constant_column_recommendations(
         self, col: str, profile: ColumnProfile
@@ -157,13 +203,16 @@ class RecommendationsMixin(_AnalyzerState):
         return []
 
     def _target_balance_recommendations(
-        self, profiles: dict[str, ColumnProfile], target_col: str | None
+        self,
+        profiles: dict[str, ColumnProfile],
+        target_col: str | None,
+        task_type: str | None = None,
     ) -> list[Recommendation]:
-        """Recommend resampling or note balance for a categorical target column."""
-        if not target_col or target_col not in profiles:
+        """Recommend resampling or note balance for classification target labels."""
+        if not target_col or target_col not in profiles or task_type == "Regression":
             return []
         target_profile = profiles[target_col]
-        if target_profile.dtype != "Categorical" or not target_profile.categorical_stats:
+        if task_type != "Classification" and target_profile.dtype not in ("Categorical", "Boolean"):
             return []
 
         counts = self._target_class_counts(target_col, target_profile)
@@ -211,11 +260,13 @@ class RecommendationsMixin(_AnalyzerState):
         be meaningful (e.g. an ID-like column mistakenly typed as target).
         """
         cat_stats = target_profile.categorical_stats
-        unique_count = cat_stats.unique_count if cat_stats else 0
+        unique_count = (
+            cat_stats.unique_count if cat_stats else self.df[target_col].drop_nulls().n_unique()
+        )
         # Guard against accidentally high-cardinality "targets" (e.g. an ID
         # column): a full group-by over thousands of distinct values isn't a
         # meaningful class-imbalance signal, so fall back to top_k.
-        if unique_count == 0 or unique_count > 1000 or cat_stats is None:
+        if unique_count == 0 or unique_count > 1000:
             return [item["count"] for item in cat_stats.top_k] if cat_stats else []
 
         counts_df = (

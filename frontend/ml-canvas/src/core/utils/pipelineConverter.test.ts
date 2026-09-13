@@ -811,6 +811,16 @@ describe('convertGraphToPipelineConfig — SegmentationNode', () => {
 });
 
 describe('scale_numeric_features range mapping (OC-15)', () => {
+  it.each([
+    ['minmax', 'feature_range_min', 'feature_range', 1],
+    ['robust', 'quantile_range_min', 'quantile_range', 75],
+  ])('preserves an explicitly cleared %s bound for boundary validation', (method, field, range, max) => {
+    // Invalid persisted drafts must never silently run with replacement defaults.
+    const nodes = [node('ds', 'dataset_node', { datasetId: 'd1' }),
+      node('scale', 'scale_numeric_features', { method, columns: ['x'], [field as string]: null })];
+    const cfg = convertGraphToPipelineConfig(nodes, [edge('ds', 'scale')]);
+    expect(cfg.nodes.find((n) => n.node_id === 'scale')?.params[range as string]).toEqual([null, max]);
+  });
   it('maps minmax scalar range fields to the feature_range tuple key', () => {
     const nodes = [
       node('ds', 'dataset_node', { datasetId: 'd1' }),

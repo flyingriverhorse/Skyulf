@@ -35,7 +35,7 @@ config = {
         "metric": "accuracy",
         "strategy_params": {
             "sampler": "tpe",
-            "pruning": True,
+            "pruner": "none",  # Random Forest does not support incremental fitting.
         },
     },
 }
@@ -48,6 +48,13 @@ omitted or null L1 ratio uses `0.5` in every candidate and the final model.
 Explicit numeric ratios are retained, and the resolved value appears in the
 best parameters. Search Elastic Net separately when combining it with other
 penalties would leave this conditional ratio unspecified.
+
+Named binary `f1`, `precision`, `recall`, and `pr_auc` metrics score the
+sorted-last training class, matching evaluation and decision-threshold tuning's
+`classes_[1]` probability column. For example, labels `{1, 2}` use class `2`,
+`{0, 1}` use class `1`, and `{"no", "yes"}` use `"yes"`. Explicit scorer
+callables and explicit positive-label choices in threshold metrics retain the
+caller's choice. Multiclass metrics keep their existing weighted behavior.
 
 ## Configuration reference
 
@@ -87,7 +94,39 @@ Pass these inside `"strategy_params"`:
 | Key | Default | Description |
 |---|---|---|
 | `sampler` | `"tpe"` | Optuna sampler: `tpe`, `random`, or `cmaes` |
-| `pruning` | `false` | Enable Optuna pruning (early stopping of bad trials) |
+| `pruner` | `"median"` | `median` or `hyperband` enables pruning for supported incremental estimators; `none` disables it |
+| `pruning` | `true` | Optional compatibility switch: explicitly setting `false` disables pruning regardless of `pruner` |
+
+Pruning requires the **outer estimator** to support `partial_fit` and have a
+fixed positive integer `max_iter` epoch budget, as direct SGD estimators do.
+Each trial reports validation scores after each incremental epoch and the
+selected pruner may stop it early. Statistical accumulators without an epoch
+budget, such as Gaussian Naive Bayes, keep ordinary fitting so the same
+observations are not counted repeatedly.
+
+Ordinary scikit-learn pipelines and Skyulf's fold preprocessing/weight wrappers
+do not expose incremental fitting. They keep normal fitting with preprocessing
+refitted inside each training fold; Skyulf logs why pruning is unavailable.
+The same fallback applies when fixed settings or candidate values include
+`early_stopping=True`, `class_weight="balanced"` or the MLP `lbfgs` solver, which
+incremental fitting does not support, or when `max_iter` itself is searched.
+Disabling pruning does not change the sampler or skip any candidate evaluation.
+
+In Canvas, **Optuna Settings → Pruner** checks the selected model, candidate
+values and connected pipeline. Unsupported configurations show **None** in a
+disabled dropdown with the reason. Applying settings saves None while retaining
+the sampler and timeout. Opening or closing the dialog does not alter saved
+settings or undo history. If the check is loading or fails, the saved choice is
+preserved; reopen the dialog to retry. Model, search-space and connection changes
+trigger a fresh check, and late replies cannot replace the current result.
+
+For example, a direct SGD model with a fixed epoch budget can use Median or
+Hyperband. The default SGD search includes `max_iter` candidates, so it is
+disabled there; the supported example uses a custom search without that key.
+Random Forest cannot use this incremental pruning loop. Preprocessing
+that must run inside each validation fold also disables pruning. Merged inputs
+are reported as unconfirmed, so the UI does not promise support it cannot verify
+without executing the graph.
 
 ### Halving (grid / random)
 

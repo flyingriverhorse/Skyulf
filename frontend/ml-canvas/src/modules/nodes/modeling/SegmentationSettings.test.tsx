@@ -343,8 +343,8 @@ it('preserves values while discarding uncommitted drafts on tab and width change
   expect(jobsApi.getHyperparameters).toHaveBeenCalledTimes(1);
 });
 
-/** Pending definitions intentionally use the callback and config captured by the model effect. */
-it('keeps the original callback and config when definitions resolve after same-model changes', async () => {
+/** Defaults must preserve the current reference, execution mode and owning settings callback. */
+it('uses the latest callback and config when definitions resolve after same-model changes', async () => {
   let resolve!: (value: HyperparameterDef[]) => void;
   vi.mocked(jobsApi.getHyperparameters).mockReturnValue(new Promise(done => { resolve = done; }));
   const original = { ...config, hyperparameters: {}, reference_column: 'old', execution_mode: 'parallel' as const };
@@ -354,24 +354,103 @@ it('keeps the original callback and config when definitions resolve after same-m
   await act(async () => undefined);
   view.rerender(<SegmentationSettings config={{ ...original, reference_column: 'new', execution_mode: 'merge' }} onChange={nextChange} nodeId="segment-a" />);
   await act(async () => resolve(definitions));
-  expect(firstChange).toHaveBeenCalledExactlyOnceWith({ ...original, hyperparameters: { n_clusters: 4, init: 'random', copy_x: true } });
-  expect(nextChange).not.toHaveBeenCalled();
+  expect(firstChange).not.toHaveBeenCalled();
+  expect(nextChange).toHaveBeenCalledExactlyOnceWith({ ...original, reference_column: 'new', execution_mode: 'merge',
+    hyperparameters: { n_clusters: 4, init: 'random', copy_x: true } });
   expect(jobsApi.getHyperparameters).toHaveBeenCalledTimes(1);
 });
 
-/** The original request lifetime permits stale responses after model changes and unmounts. */
-it('retains out-of-order definitions and completion after unmount', async () => {
+/** Older model definitions must not restore the previous algorithm after the user changes it. */
+it('ignores out-of-order definitions after a controlled model change', async () => {
   const resolves: ((value: HyperparameterDef[]) => void)[] = [];
   vi.mocked(jobsApi.getHyperparameters).mockImplementation(() => new Promise(done => { resolves.push(done); }));
+  vi.mocked(registryApi.getAllNodes).mockResolvedValue(['kmeans', 'dbscan'].map(id => ({
+    id, name: id, category: 'Modeling', description: '', params: {}, tags: ['clustering'],
+  })));
+  await act(async () => render(<ControlledSettings initial={{ ...config, hyperparameters: {} }} />));
+  fireEvent.change(screen.getByLabelText('Clustering Algorithm'), { target: { value: 'dbscan' } });
+  await act(async () => resolves[1]!([{ name: 'eps', label: 'Epsilon', type: 'number', default: 0.5 }]));
+  await act(async () => resolves[0]!(definitions));
+  fireEvent.click(screen.getByRole('button', { name: 'Hyperparameters' }));
+  expect(screen.getByLabelText('Epsilon')).toHaveValue('0.5');
+  expect(screen.queryByLabelText('Clusters')).not.toBeInTheDocument();
+  expect(JSON.parse(screen.getByLabelText('Current config').textContent!)).toEqual({ model_type: 'dbscan', hyperparameters: { eps: 0.5 } });
+});
+
+/** Editing a reference column while defaults load must persist in the controlled inspector. */
+it('keeps the user reference edit when defaults finish loading', async () => {
+  let resolve!: (value: HyperparameterDef[]) => void;
+  vi.mocked(jobsApi.getHyperparameters).mockReturnValue(new Promise(done => { resolve = done; }));
+  presentation.schema.mockReturnValue({ data: { columns: { label: { name: 'species' } } } });
+  await act(async () => render(<ControlledSettings initial={{ ...config, hyperparameters: {} }} />));
+  fireEvent.change(screen.getByLabelText('Reference Column (optional)'), { target: { value: 'species' } });
+  await act(async () => resolve(definitions));
+  expect(screen.getByLabelText('Reference Column (optional)')).toHaveValue('species');
+  expect(JSON.parse(screen.getByLabelText('Current config').textContent!)).toMatchObject({ reference_column: 'species' });
+});
+
+/** A failed old request cannot announce an empty parameter list while the new model loads. */
+it('keeps the newer model loading after old definitions fail', async () => {
+  const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+  let reject!: (reason: Error) => void;
+  let resolve!: (value: HyperparameterDef[]) => void;
+  vi.mocked(jobsApi.getHyperparameters)
+    .mockReturnValueOnce(new Promise((_, fail) => { reject = fail; }))
+    .mockReturnValueOnce(new Promise(done => { resolve = done; }));
+  vi.mocked(registryApi.getAllNodes).mockResolvedValue(['kmeans', 'dbscan'].map(id => ({
+    id, name: id, category: 'Modeling', description: '', params: {}, tags: ['clustering'],
+  })));
+  await act(async () => render(<ControlledSettings initial={{ ...config, hyperparameters: {} }} />));
+  fireEvent.change(screen.getByLabelText('Clustering Algorithm'), { target: { value: 'dbscan' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Hyperparameters' }));
+  await act(async () => reject(new Error('old model definitions failed')));
+  expect(screen.queryByText('No parameters available.')).not.toBeInTheDocument();
+  expect(error).not.toHaveBeenCalled();
+  await act(async () => resolve([{ name: 'eps', label: 'Epsilon', type: 'number', default: 0.5 }]));
+  expect(screen.getByLabelText('Epsilon')).toHaveValue('0.5');
+});
+
+/** Config restored during definition loading takes precedence over fetched defaults. */
+it('keeps current false and zero values supplied before definitions arrive', async () => {
+  let resolve!: (value: HyperparameterDef[]) => void;
+  vi.mocked(jobsApi.getHyperparameters).mockReturnValue(new Promise(done => { resolve = done; }));
   const onChange = vi.fn();
   const view = render(<SegmentationSettings config={{ ...config, hyperparameters: {} }} onChange={onChange} nodeId="segment-a" />);
-  await act(async () => undefined);
-  view.rerender(<SegmentationSettings config={{ model_type: 'dbscan', hyperparameters: {} }} onChange={onChange} nodeId="segment-a" />);
-  await act(async () => resolves[1]!([{ name: 'eps', label: 'Epsilon', type: 'number', default: 0.5 }]));
-  expect(onChange).toHaveBeenLastCalledWith({ model_type: 'dbscan', hyperparameters: { eps: 0.5 } });
+  view.rerender(<SegmentationSettings config={{ ...config, hyperparameters: { n_clusters: 0, copy_x: false } }} onChange={onChange} nodeId="segment-a" />);
+  await act(async () => resolve(definitions));
+  fireEvent.click(screen.getByRole('button', { name: 'Hyperparameters' }));
+  expect(screen.getByLabelText('Clusters')).toHaveValue('0');
+  expect(screen.getByLabelText('Copy data')).toHaveValue('false');
+  expect(onChange).not.toHaveBeenCalled();
+});
+
+/** An unmounted settings request cannot write defaults into the graph it used to control. */
+it('does not update the original graph node after unmount', async () => {
+  let resolve!: (value: HyperparameterDef[]) => void;
+  vi.mocked(jobsApi.getHyperparameters).mockReturnValue(new Promise(done => { resolve = done; }));
+  const before = useGraphStore.getState().nodes;
+  const view = render(<SegmentationSettings config={{ ...config, hyperparameters: {} }}
+    onChange={value => useGraphStore.getState().updateNodeData('segment-a', value)} nodeId="segment-a" />);
   view.unmount();
+  await act(async () => resolve(definitions));
+  expect(useGraphStore.getState().nodes).toBe(before);
+});
+
+/** Switching to another node with the same algorithm starts a separate settings lifetime. */
+it('discards the previous node request even when both nodes use the same model', async () => {
+  const resolves: ((value: HyperparameterDef[]) => void)[] = [];
+  vi.mocked(jobsApi.getHyperparameters).mockImplementation(() => new Promise(done => { resolves.push(done); }));
+  const firstChange = vi.fn();
+  const nextChange = vi.fn();
+  const initial = { ...config, hyperparameters: {} };
+  const view = render(<SegmentationSettings config={initial} onChange={firstChange} nodeId="segment-a" />);
+  view.rerender(<SegmentationSettings config={initial} onChange={nextChange} nodeId="segment-b" />);
   await act(async () => resolves[0]!(definitions));
-  expect(onChange).toHaveBeenLastCalledWith({ model_type: 'kmeans', hyperparameters: { n_clusters: 4, init: 'random', copy_x: true } });
+  expect(firstChange).not.toHaveBeenCalled();
+  expect(nextChange).not.toHaveBeenCalled();
+  expect(jobsApi.getHyperparameters).toHaveBeenCalledTimes(2);
+  await act(async () => resolves[1]!(definitions));
+  expect(nextChange).toHaveBeenCalledExactlyOnceWith({ ...initial, hyperparameters: { n_clusters: 4, init: 'random', copy_x: true } });
 });
 
 /** A rejected definitions request releases the spinner without replacing configured values. */
