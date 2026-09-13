@@ -295,6 +295,7 @@ async def _drift_report(session, store, current):
         )
 
 
+@pytest.mark.parametrize("trained_customer", [False, True], indirect=True)
 async def test_tuning_preview_deployment_reload_and_drift(
     trained_customer, pipeline_session, tmp_path
 ):
@@ -365,21 +366,11 @@ def test_branched_tuning_and_preview(trained_customer, tmp_path):
 
 
 @pytest.mark.parametrize("trained_customer", [True], indirect=True)
-@pytest.mark.xfail(
-    strict=True,
-    raises=ValueError,
-    reason="Pre-existing: serving drops raw city/note before fitted branch encoders consume them; reproduced on e1bc7b44.",
-)
 def test_branched_inference_keeps_inputs_needed_by_encoders(trained_customer):
-    """Pin the reproduced serving failure independently of successful model training."""
+    """Raw inputs must reach branch encoders before the fitted column-drop step executes."""
     store, _, _ = trained_customer
     inference, labels = _held_out(store)
-    try:
-        predictions, _ = DeploymentService._predict_with_bundled_artifact(
-            store.load("customer-job"), inference
-        )
-    except ValueError as error:
-        assert "missing after transform:" in str(error)
-        assert "city_Ankara" in str(error) and "note__tfidf__annual" in str(error)
-        raise
+    predictions, _ = DeploymentService._predict_with_bundled_artifact(
+        store.load("customer-job"), inference[inference.columns[::-1]]
+    )
     np.testing.assert_array_equal(predictions, labels)

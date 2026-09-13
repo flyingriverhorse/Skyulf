@@ -9,24 +9,28 @@ from unittest.mock import patch
 
 import pytest
 import pytest_asyncio
+from sklearn.dummy import DummyRegressor
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 
 from backend.database.models import Base
+from backend.ml_pipeline.artifacts.local import LocalArtifactStore
 from backend.ml_pipeline.deployment.service import DeploymentService
 
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
 
 
 @pytest_asyncio.fixture
-async def async_session():
+async def async_session(tmp_path):
+    """Keep deployment history and its usable model artifacts isolated per test."""
     engine = create_async_engine(TEST_DATABASE_URL, echo=False)
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
     async_session_maker = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
     async with async_session_maker() as session:
+        session.info["artifact_store"] = LocalArtifactStore(str(tmp_path / "models"))
         yield session
 
     await engine.dispose()
@@ -35,6 +39,9 @@ async def async_session():
 async def _insert_training_job(
     session, job_id: str, pipeline_id: str, dataset_id: str, version: int
 ):
+    """Create a completed job backed by a real fitted artifact for promotion."""
+    store = session.info["artifact_store"]
+    store.save(job_id, DummyRegressor().fit([[1.0]], [2.0]))
     await session.execute(
         text(
             """
@@ -53,7 +60,7 @@ async def _insert_training_job(
             "version": version,
             "model_type": "random_forest",
             "graph": "{}",
-            "artifact_uri": job_id,
+            "artifact_uri": store.get_artifact_uri(job_id),
             "error_message": None,
             "progress": 0,
             "current_step": None,

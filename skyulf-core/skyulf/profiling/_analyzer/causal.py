@@ -1,6 +1,7 @@
 """Causal discovery via the PC algorithm (causal-learn)."""
 
 import logging
+import math
 from typing import Literal
 
 import polars as pl
@@ -14,6 +15,19 @@ logger = logging.getLogger(__name__)
 class CausalMixin(_AnalyzerState):
     """Causal-discovery helpers for :class:`EDAAnalyzer`."""
 
+    def _eligible_causal_columns(self, numeric_cols: list[str]) -> list[str]:
+        """Keep measurements with finite, positive variance before spending the PC cap."""
+        if not numeric_cols:
+            return []
+        variances = self.df.select(  # type: ignore[attr-defined]
+            [pl.col(col).var() for col in numeric_cols]
+        ).row(0, named=True)
+        return [
+            col
+            for col, variance in variances.items()
+            if variance is not None and math.isfinite(variance) and variance > 0
+        ]
+
     def _select_target_correlated_columns(
         self, numeric_cols: list[str], primary_target: str
     ) -> list[str]:
@@ -23,9 +37,9 @@ class CausalMixin(_AnalyzerState):
             if col == primary_target:
                 continue
             c = self.df.select(pl.corr(col, primary_target)).item()  # type: ignore[attr-defined]
-            if c is not None:
-                corrs.append((col, abs(c)))
-        corrs.sort(key=lambda x: x[1], reverse=True)
+            score = abs(c) if c is not None and math.isfinite(c) else -1.0
+            corrs.append((col, score))
+        corrs.sort(key=lambda x: (-x[1], x[0]))
         selected_cols = [x[0] for x in corrs[:14]]
         selected_cols.append(primary_target)
         return selected_cols
@@ -35,9 +49,9 @@ class CausalMixin(_AnalyzerState):
         variances = []
         for col in numeric_cols:
             var = self.df.select(pl.col(col).var()).item()  # type: ignore[attr-defined]
-            if var is not None:
+            if var is not None and math.isfinite(var) and var > 0:
                 variances.append((col, var))
-        variances.sort(key=lambda x: x[1], reverse=True)
+        variances.sort(key=lambda x: (-x[1], x[0]))
         return [x[0] for x in variances[:15]]
 
     def _limit_columns_for_pc(
@@ -47,7 +61,9 @@ class CausalMixin(_AnalyzerState):
 
         With the explicit target present we pick "target + top-14 by |corr|";
         otherwise we fall back to the 15 highest-variance columns.
+        Columns without finite, positive variance never consume the cap.
         """
+        numeric_cols = self._eligible_causal_columns(numeric_cols)
         if len(numeric_cols) <= 15:
             return numeric_cols
 
@@ -102,6 +118,9 @@ class CausalMixin(_AnalyzerState):
         we fall back to the 15 highest-variance columns.
         """
         try:
+            numeric_cols = self._eligible_causal_columns(numeric_cols)
+            if len(numeric_cols) < 2:
+                return None
             selection_method: Literal["all", "target_correlation", "variance"] = "all"
             if len(numeric_cols) > 15:
                 selection_method = (

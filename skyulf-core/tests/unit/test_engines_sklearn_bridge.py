@@ -5,6 +5,7 @@ import pandas as pd
 import polars as pl
 import pytest
 
+from skyulf.data.dataset import SplitDataset
 from skyulf.engines.registry import EngineRegistry
 from skyulf.engines.sklearn_bridge import SklearnBridge
 
@@ -151,3 +152,40 @@ def test_to_sklearn_preserves_nonmissing_nullable_integer_object_array() -> None
     _, labels = SklearnBridge.to_sklearn((np.array([[1], [2]]), frame))
 
     assert labels.tolist() == [[2**53, 1], [2**53 + 1, 2]]
+
+
+@pytest.mark.parametrize(
+    "bad",
+    [object(), {"a": [1, 2]}, SplitDataset(train=pd.DataFrame(), test=pd.DataFrame()), "abc", 42],
+)
+@pytest.mark.parametrize("as_target", [False, True])
+def test_to_sklearn_rejects_unsupported_containers(bad: object, as_target: bool) -> None:
+    """Invalid inputs must fail at the adapter instead of becoming 0-D object arrays."""
+    data = (pd.DataFrame({"a": [1, 2]}), bad) if as_target else bad
+
+    with pytest.raises(TypeError, match="Unsupported.*pandas.*Polars.*NumPy"):
+        SklearnBridge.to_sklearn(data)
+
+
+@pytest.mark.parametrize("wrapped", [False, True])
+@pytest.mark.parametrize("reverse", [False, True])
+def test_to_sklearn_keeps_mixed_engine_conversion(wrapped: bool, reverse: bool) -> None:
+    """Container validation must not require features and labels to use the same engine."""
+    frame = pl.DataFrame({"x": [3, 4]}) if reverse else pd.DataFrame({"x": [3, 4]})
+    target = pd.Series([0, 1]) if reverse else pl.Series([0, 1])
+    if wrapped:
+        frame = EngineRegistry.wrap(frame)
+
+    values, labels = SklearnBridge.to_sklearn((frame, target))
+
+    np.testing.assert_array_equal(values, [[3], [4]])
+    np.testing.assert_array_equal(labels, [0, 1])
+
+
+@pytest.mark.parametrize("target", [[0, 1], (0, 1)])
+def test_to_sklearn_preserves_python_sequences(target: object) -> None:
+    """Plain feature matrices and target sequences remain valid array-like inputs."""
+    values, labels = SklearnBridge.to_sklearn(([[3], [4]], target))
+
+    np.testing.assert_array_equal(values, [[3], [4]])
+    np.testing.assert_array_equal(labels, [0, 1])

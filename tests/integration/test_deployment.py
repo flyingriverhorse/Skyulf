@@ -8,6 +8,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 
+from backend.config import get_settings
 from backend.database.models import Base
 from backend.ml_pipeline.artifacts.local import LocalArtifactStore
 from backend.ml_pipeline.deployment.service import DeploymentService
@@ -40,6 +41,14 @@ class _FixedPredictor:
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
 
 
+@pytest.fixture(autouse=True)
+def artifact_root(tmp_path, monkeypatch):
+    """Exercise the same configured artifact root in promotion and prediction."""
+    monkeypatch.setattr(
+        get_settings(), "TRAINING_ARTIFACT_DIR", str(tmp_path / "uploads" / "models")
+    )
+
+
 @pytest_asyncio.fixture
 async def async_session():
     engine = create_async_engine(TEST_DATABASE_URL, echo=False)
@@ -69,10 +78,10 @@ async def test_deployment_flow(async_session, tmp_path):
     model.fit(X, y)
 
     # Create directory structure matching what DeploymentService expects
-    # It expects exports/models/{pipeline_id} relative to os.getcwd()
+    # It expects uploads/models/{pipeline_id} relative to os.getcwd()
     # We will mock os.getcwd() to return tmp_path
 
-    models_dir = tmp_path / "exports" / "models" / pipeline_id
+    models_dir = tmp_path / "uploads" / "models" / pipeline_id
     models_dir.mkdir(parents=True, exist_ok=True)
 
     store = LocalArtifactStore(str(models_dir))
@@ -138,7 +147,7 @@ async def test_deployment_predict_decodes_label_encoded_target(async_session, tm
     engineer = _IdentityEngineer(target_le)
     predictor = _FixedPredictor([0, 1])
 
-    models_dir = tmp_path / "exports" / "models" / pipeline_id
+    models_dir = tmp_path / "uploads" / "models" / pipeline_id
     models_dir.mkdir(parents=True, exist_ok=True)
     store = LocalArtifactStore(str(models_dir))
     store.save(job_id, {"feature_engineer": engineer, "model": predictor, "job_id": job_id})
@@ -242,7 +251,7 @@ async def _deploy_proba_artifact(session, tmp_path, pipeline_id, job_id, tuned=N
     # proba [0.6, 0.4] -> default argmax picks class 0
     predictor = _ProbaPredictor([0, 1], [[0.6, 0.4]])
 
-    models_dir = tmp_path / "exports" / "models" / pipeline_id
+    models_dir = tmp_path / "uploads" / "models" / pipeline_id
     models_dir.mkdir(parents=True, exist_ok=True)
     store = LocalArtifactStore(str(models_dir))
     store.save(job_id, {"feature_engineer": engineer, "model": predictor, "job_id": job_id})

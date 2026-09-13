@@ -4,8 +4,10 @@ from typing import Any
 
 import numpy as np
 import pandas as pd
+import polars as pl
 
 from .pandas_engine import SkyulfPandasWrapper
+from .polars_engine import SkyulfPolarsWrapper
 from .registry import get_engine
 
 
@@ -21,6 +23,10 @@ class SklearnBridge:
 
         Returns:
             Tuple (X_numpy, y_numpy_or_None)
+
+        Raises:
+            TypeError: If either input is not a supported frame, array or sequence.
+            ValueError: If the feature input is None.
         """
         y = None
 
@@ -42,6 +48,7 @@ class SklearnBridge:
 
     @staticmethod
     def _convert_single(data: Any) -> np.ndarray | None:
+        """Convert supported array-like containers without accepting arbitrary scalars."""
         if data is None:
             return None
 
@@ -49,13 +56,26 @@ class SklearnBridge:
         if isinstance(data, np.ndarray):
             return data
 
+        native = (
+            data.to_native()
+            if isinstance(data, SkyulfPandasWrapper | SkyulfPolarsWrapper)
+            else data
+        )
+        if not isinstance(
+            native, pd.DataFrame | pd.Series | pl.DataFrame | pl.Series | list | tuple
+        ):
+            raise TypeError(
+                f"Unsupported input container {type(data).__name__}. "
+                "Expected a pandas or Polars DataFrame/Series (or Skyulf wrapper), "
+                "a NumPy array, or a Python list/tuple. Select a split before conversion."
+            )
+
         # Use engine to convert
         engine = get_engine(data)
         values = engine.to_numpy(data)
         if values.dtype != object:
             return values
 
-        native = data.to_native() if isinstance(data, SkyulfPandasWrapper) else data
         if isinstance(native, pd.DataFrame | pd.Series):
             return SklearnBridge._normalize_nullable_numeric(native, values)
         return values

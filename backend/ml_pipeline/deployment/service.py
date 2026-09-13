@@ -7,6 +7,8 @@ from typing import Any, cast
 
 import pandas as pd
 import sklearn
+from sklearn.base import BaseEstimator
+from sklearn.utils.validation import check_is_fitted
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -14,7 +16,7 @@ from backend.config import get_settings
 from backend.database.models import Deployment, TrainingJob
 from backend.ml_pipeline._services.job_service import JobService
 from backend.ml_pipeline._services.prediction_utils import extract_target_label_encoder
-from backend.ml_pipeline.artifacts.local import LocalArtifactStore
+from backend.ml_pipeline.artifacts.factory import ArtifactFactory
 from backend.ml_pipeline.artifacts.s3 import S3ArtifactStore
 from backend.utils import sanitize_for_log
 
@@ -100,7 +102,7 @@ class DeploymentService:
             return str(Path(artifact_uri) / f"{job_id}.joblib")
         elif not artifact_uri.endswith(".joblib") and not artifact_uri.endswith(".pkl"):
             # Not a directory, and no extension. Assume it's a node_id or job_id.
-            # Construct the abstract URI for exports/models
+            # Resolve this legacy reference under the configured artifact root.
             return f"{pipeline_id}/{job_id}"
         else:
             # It's a file path (relative or absolute)
@@ -113,9 +115,9 @@ class DeploymentService:
         """Promotes a completed job's artifact to the active deployment.
 
         Resolves ``artifact_uri`` — falling back to ``node_id`` for legacy jobs —
-        down to the specific bundled artifact file, captures the currently active
-        deployment as the one this replaces, deactivates it, then inserts the new
-        row as active and commits.
+        down to the specific bundled artifact file and validates it before changing
+        the active deployment. Deactivation and replacement share one transaction,
+        rolled back if promotion fails.
 
         Args:
             session: Async database session.
@@ -126,7 +128,7 @@ class DeploymentService:
             The committed ``Deployment`` row.
 
         Raises:
-            ValueError: If the job doesn't exist or hasn't completed successfully.
+            ValueError: If the job is incomplete or its artifact cannot be served.
         """
         # 1. Get Job Entity
         db_job = await JobService.get_job_by_id(session, job_id)
@@ -149,16 +151,7 @@ class DeploymentService:
                 f"falling back to node_id: {sanitize_for_log(artifact_uri)}"
             )
 
-        # 3. Record the currently active deployment (if any) as the one this
-        # new deployment replaces, then deactivate it. Capturing the id before
-        # the UPDATE keeps the replacement chain traceable across the deploy.
-        previous_deployment = await DeploymentService.get_active_deployment(session)
-        await session.execute(
-            update(Deployment).where(Deployment.is_active).values(is_active=False)
-        )
-
-        # 4. Create Deployment — the artifact URI must encode pipeline_id so it can
-        # be resolved back to the export path (exports/models/<pipeline_id>/...).
+        # Validate the candidate before touching the working deployment.
         final_uri = DeploymentService._resolve_final_deployment_uri(
             artifact_uri, job_id, pipeline_id
         )
@@ -169,13 +162,41 @@ class DeploymentService:
             artifact_uri=final_uri,
             is_active=True,
             deployed_by=user_id,
-            previous_deployment_id=previous_deployment.id if previous_deployment else None,
         )
-        session.add(deployment)
-        await session.commit()
+        artifact = DeploymentService._load_predict_artifact(deployment)
+        DeploymentService._validate_predict_artifact(artifact)
+        try:
+            previous_deployment = await DeploymentService.get_active_deployment(session)
+            deployment.previous_deployment_id = (
+                previous_deployment.id if previous_deployment else None
+            )
+            await session.execute(
+                update(Deployment).where(Deployment.is_active).values(is_active=False)
+            )
+            session.add(deployment)
+            await session.commit()
+        except Exception:
+            await session.rollback()
+            raise
         await session.refresh(deployment)
 
         return deployment
+
+    @staticmethod
+    def _validate_predict_artifact(artifact: Any) -> None:
+        """Reject malformed or unfitted artifacts before they can replace a serving model."""
+        estimator = artifact
+        if isinstance(artifact, dict):
+            engineer = artifact.get("feature_engineer")
+            if not callable(getattr(engineer, "transform", None)):
+                raise ValueError("Model artifact has no usable feature engineer")
+            if isinstance(engineer, BaseEstimator):
+                check_is_fitted(engineer)
+            estimator = DeploymentService._unwrap_tuple_estimator(artifact.get("model"))
+        if not callable(getattr(estimator, "predict", None)):
+            raise ValueError("Model artifact has no usable predictor")
+        if isinstance(estimator, BaseEstimator):
+            check_is_fitted(estimator)
 
     @staticmethod
     async def get_active_deployment(session: AsyncSession) -> Deployment | None:
@@ -222,8 +243,9 @@ class DeploymentService:
 
     @staticmethod
     def _resolve_pipeline_node_path(pipeline_id: str, node_id: str) -> tuple[str, str]:
-        """Builds the default exports/models store path for a pipeline_id/node_id pair."""
-        store_uri = str(Path.cwd() / "exports" / "models" / pipeline_id)
+        """Resolve a legacy pipeline/node reference under the configured artifact root."""
+        root = ArtifactFactory._resolve_artifact_root(get_settings().TRAINING_ARTIFACT_DIR)
+        store_uri = str(Path(root) / pipeline_id)
         return store_uri, node_id
 
     @staticmethod
@@ -260,8 +282,6 @@ class DeploymentService:
     def _load_predict_artifact(deployment: Deployment) -> Any:
         """Loads and unwraps the deployed artifact used by predict(), wrapping load failures in ValueError."""
         try:
-            from backend.ml_pipeline.artifacts.factory import ArtifactFactory
-
             store_uri, artifact_key = DeploymentService._resolve_predict_store_and_key(
                 deployment.artifact_uri
             )
@@ -449,7 +469,9 @@ class DeploymentService:
         # Clean Data
         target_col = artifact.get("target_column")
         dropped_cols = artifact.get("dropped_columns", [])
-        df = DeploymentService._drop_target_and_dropped_columns(df, target_col, dropped_cols)
+        # A drop summary describes final features, not when a raw column can be
+        # removed. Fitted encoders may still need it before their configured drop.
+        df = DeploymentService._drop_target_and_dropped_columns(df, target_col, [])
 
         # Validate against the feature engineer's expected input columns
         # (pre-transform), not the model's feature_columns (post-transform).
@@ -462,6 +484,10 @@ class DeploymentService:
         estimator = DeploymentService._unwrap_tuple_estimator(estimator)
 
         X_transformed = DeploymentService._transform_bundled_features(feature_engineer, df)
+        if isinstance(X_transformed, pd.DataFrame):
+            X_transformed = DeploymentService._drop_target_and_dropped_columns(
+                X_transformed, target_col, dropped_cols
+            )
 
         # F-02: Reindex to the recorded training feature order so that
         # positional consumers (sklearn on bare numpy, no feature_names_in_)
@@ -614,10 +640,7 @@ class DeploymentService:
             if not Path(artifact_uri).exists() and not Path(artifact_uri).parent.exists():
                 parts = artifact_uri.replace("\\", "/").split("/")
                 if len(parts) == 2:
-                    pipeline_id = parts[0]
-                    node_id = parts[1]
-                    base_path = str(Path.cwd() / "exports" / "models" / pipeline_id)
-                    return base_path, node_id
+                    return DeploymentService._resolve_pipeline_node_path(parts[0], parts[1])
             return str(Path(artifact_uri).parent), Path(artifact_uri).name
         else:
             # Fallback
@@ -627,14 +650,14 @@ class DeploymentService:
     def _load_artifact_for_details(artifact_uri: str) -> Any:
         """Loads the deployed artifact for schema inspection, mirroring predict()'s URI resolution.
 
-        Unlike predict(), this instantiates S3ArtifactStore/LocalArtifactStore directly and
-        returns None (rather than raising) when the artifact does not exist locally.
+        Local paths use the same permitted root as prediction. Missing local
+        artifacts return None rather than raising.
         """
         if artifact_uri.startswith("s3://"):
             return DeploymentService._load_artifact_from_s3_for_details(artifact_uri)
 
         base_path, node_id = DeploymentService._resolve_local_base_and_key_for_details(artifact_uri)
-        store = LocalArtifactStore(base_path)
+        store = ArtifactFactory.get_artifact_store(base_path)
         return store.load(node_id) if store.exists(node_id) else None
 
     @staticmethod

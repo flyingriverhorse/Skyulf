@@ -25,12 +25,17 @@ from uuid import uuid4
 import pandas as pd
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
+from starlette.concurrency import run_in_threadpool
 
 import backend.database.engine as db_engine
 from backend.data.catalog import create_catalog_from_options
 from backend.data_ingestion.service import DataIngestionService
 from backend.database.engine import get_async_session
 from backend.exceptions.core import SkyulfException
+from backend.ml_pipeline._execution._cycle_validation import (
+    PipelineCycleError,
+    validate_no_cycles,
+)
 from backend.ml_pipeline._execution.engine import PipelineEngine
 from backend.ml_pipeline._execution.engine._inspection import (
     MAX_RUN_SAMPLE_BYTES,
@@ -428,11 +433,9 @@ def _partition_preview_pipeline(
     Either way, training/tuning nodes are stripped before execution
     because preview never fits models.
 
-    DataPreview is a separate evaluation node with its own background
-    job — it must NOT appear as a Preview Results tab. Filter it out
-    at every stage so neither partition_parallel_pipeline (which treats
-    it as a parallel terminal) nor partition_for_preview (which treats
-    it as a data leaf) can leak it into the tab list.
+    DataPreview runs as a separate background job. Remove its sinks before
+    partitioning, just as the Canvas toolbar does, so their upstream data
+    becomes a preview leaf without creating a tab for the skipped sink.
     """
     from backend.ml_pipeline._execution.graph_utils import (
         partition_for_preview,
@@ -440,6 +443,11 @@ def _partition_preview_pipeline(
     )
 
     training_types = {StepType.TRAINING}
+    pipeline_config = PipelineConfig(
+        pipeline_id=pipeline_config.pipeline_id,
+        nodes=[node for node in pipeline_config.nodes if node.step_type != "data_preview"],
+        metadata=pipeline_config.metadata,
+    )
     has_training = any(n.step_type in training_types for n in nodes)
 
     if not has_training:
@@ -775,19 +783,44 @@ async def preview_pipeline(
 ):
     """Run the pipeline in Preview Mode.
 
-    - Uses a temporary artifact store (cleaned up after request).
-    - Resolves dataset paths from IDs.
+    Resolve dataset paths asynchronously, then run synchronous preview work
+    with its own session and temporary artifact store in a worker thread.
     """
-    # 1. Create Temporary Artifact Store
+    try:
+        nodes, pipeline_config = await run_in_threadpool(_prepare_preview_config, config)
+        ingestion_service = DataIngestionService(session)
+        resolved_s3_options = await resolve_pipeline_nodes(nodes, ingestion_service)
+        return await run_in_threadpool(
+            _execute_preview,
+            pipeline_config,
+            resolved_s3_options,
+            inspect_node_id,
+            inspect_all,
+        )
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Pipeline preview failed")
+        raise SkyulfException(message="Pipeline preview failed") from None
+
+
+def _execute_preview(
+    pipeline_config: PipelineConfig,
+    resolved_s3_options: dict[str, Any],
+    inspect_node_id: str | None,
+    inspect_all: bool,
+) -> PreviewResponse:
+    """Own synchronous execution and resource cleanup within the worker thread.
+
+    The request may be cancelled while this work finishes. Keeping the session
+    and artifact directory here prevents request cleanup from removing files
+    or closing a connection that the worker still needs.
+    """
     temp_dir = tempfile.mkdtemp(prefix="skyulf_preview_")
     sync_session = None
     try:
         artifact_store = LocalArtifactStore(temp_dir)
-        # Resolution also owns temporary resources, including when it raises
-        # a dataset-not-found response before any branch starts.
-        ingestion_service = DataIngestionService(session)
-        resolved_s3_options = await resolve_pipeline_nodes(config.nodes, ingestion_service)
-        nodes, pipeline_config = _prepare_preview_config(config)
+        nodes = pipeline_config.nodes
 
         # 3. Run Engine
         # SmartCatalog uses sync ORM (`self.session.query()`), so we must
@@ -801,7 +834,7 @@ async def preview_pipeline(
         sub_results = _run_preview_sub_pipelines(
             pipeline_config,
             nodes,
-            config.nodes,
+            nodes,
             resolved_s3_options,
             sync_session,
             artifact_store,
@@ -845,11 +878,6 @@ async def preview_pipeline(
             node_warnings=deduped_node_warnings,
         )
 
-    except HTTPException:
-        raise
-    except Exception:
-        logger.exception("Pipeline preview failed")
-        raise SkyulfException(message="Pipeline preview failed") from None
     finally:
         # 5. Cleanup — close sync session before removing temp artefacts.
         try:
@@ -1004,6 +1032,10 @@ def _prepare_preview_config(config: PipelineConfigModel) -> tuple[list[NodeConfi
 
     # 2. Adapt Config for Preview
     nodes = _build_preview_nodes(config.nodes)
+    try:
+        validate_no_cycles(nodes)
+    except PipelineCycleError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from None
 
     pipeline_config = PipelineConfig(
         pipeline_id=config.pipeline_id, nodes=nodes, metadata=config.metadata

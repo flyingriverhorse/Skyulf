@@ -80,6 +80,7 @@ class EDAAnalyzer(
         self.lazy_df = self.df.lazy()
         self.row_count = self.df.height
         self.columns = self.df.columns
+        self._active_filters: list[Filter] = []
 
     _NUMERIC_DTYPES = POLARS_NUMERIC_DTYPES
 
@@ -141,17 +142,16 @@ class EDAAnalyzer(
         return Filter(column=str(col), operator=str(op), value=val)
 
     def _apply_analyze_filters(self, filters: list[dict[str, Any]] | None) -> list[Filter]:
-        """Apply all user filters, mutating `self.df` / `self.lazy_df` / `self.row_count`."""
-        active_filters: list[Filter] = []
+        """Apply filters cumulatively and return an independent snapshot of their metadata."""
         if filters:
             for f in filters:
                 applied = self._apply_single_analyze_filter(f)
                 if applied:
-                    active_filters.append(applied)
+                    self._active_filters.append(applied.model_copy(deep=True))
 
             self.lazy_df = self.df.lazy()
             self.row_count = self.df.height
-        return active_filters
+        return [applied.model_copy(deep=True) for applied in self._active_filters]
 
     def _empty_profile(
         self, target_col: str | None, active_filters: list[Filter]
@@ -554,6 +554,10 @@ class EDAAnalyzer(
     ) -> DatasetProfile:
         """Produce the full profile.
 
+        Filters and column exclusions accumulate on this analyzer. Each
+        returned profile records the filters still applied to its rows.
+        Construct a new analyzer to profile the original frame again.
+
         Pipeline (each step is a mixin call when non-trivial):
         1. Filters → exclusions → basic frame stats.
         2. Two batched polars aggregations (basic + advanced) feed
@@ -600,7 +604,7 @@ class EDAAnalyzer(
         # 3. Correlations + VIF.
         correlations = calculate_correlations(self.lazy_df, feature_cols)
 
-        vif_data = self._calculate_vif(feature_cols)
+        vif_data = self._calculate_vif(feature_cols, alerts=alerts)
         self._add_vif_alerts(vif_data, alerts)
 
         # 3a. Feature-vs-target correlations (separate matrix).

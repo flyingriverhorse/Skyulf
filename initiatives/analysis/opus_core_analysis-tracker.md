@@ -16,8 +16,8 @@ and is not counted.
 
 **Qwen follow-up (2026-09-12):** the verified findings
 filed 48 additional records, OC-271–318, after deduplication and scope
-correction. Nineteen have since closed. The live queue now has
-**59 open / 4 parked**, including the subsequent OC-320 pipeline finding; details
+correction. Thirty have since closed. The live queue now has
+**46 open / 4 parked**; the subsequent OC-320 pipeline finding is now fixed. Details
 and exclusions are in the latest Log entry. Historical baseline counts
 below are unchanged.
 
@@ -144,6 +144,9 @@ uses, so a fixed finding stays where it was filed.
 | OC-44 | 🟠 | Wasserstein drift thresholds normalized value but reports raw one (`drift.py:181-195`) | small | ✅ fixed 2026-09-05 |
 | OC-45 | 🟠 | Schema drift computed but never counted or rendered as drift (`drift.py:76-98`) | small | ✅ fixed 2026-09-05 |
 | OC-291 | 🟡 | **Out-of-order polling responses restore stale non-terminal job state** (`frontend/ml-canvas/src/core/hooks/useJobPolling.ts:161-197`) — Qwen #24. Scope response writes to the active polling generation and keep terminal state consistent with scheduling. | small | ✅ fixed — 2026-09-12: Polling ignores responses older than its newest applied snapshot and stops queued/socket refreshes after terminal results; slow APIs still publish progress and stale failures cannot corrupt retry accounting. |
+| OC-320 | 🟡 | **Serving drops raw inputs before upstream encoders can consume them** (`backend/ml_pipeline/deployment/service.py:450-463`) — Preserve inputs needed by fitted preprocessing until their configured drop step runs; keep the final model feature order enforced. | medium | ✅ fixed 2026-09-13 — Preserve raw columns through fitted preprocessing, then enforce final drops/order; all four pandas/Polars and Grid/Halving serving regressions now pass. |
+| OC-278 | 🟠 | **Deployment promotion deactivates a working model before validating the replacement** (`backend/ml_pipeline/deployment/service.py:131-175,260-272`) — Qwen #9. Verify artifact usability before atomic promotion and preserve the active deployment if validation fails. | medium | ✅ fixed 2026-09-13 — Validate loading, predictor/preprocessor interfaces and sklearn fitted state before promotion; failed validation or database replacement preserves the active model. |
+| OC-279 | 🟠 | **Synchronous Preview execution blocks its API event loop** (`backend/ml_pipeline/_internal/_routers/preview.py:767-776,815-865`) — Qwen #10. Move synchronous graph work off the request event loop and verify concurrency with the actual Preview path. | medium | ✅ fixed 2026-09-13 — Move synchronous preview work to a worker which owns its ORM session and artifacts; real HTTP concurrency and cancellation cleanup are covered. |
 
 ### Ongoing — remove the hiding conditions
 
@@ -199,6 +202,9 @@ uses, so a fixed finding stays where it was filed.
 | OC-157 | ⚪ | `first_wins` merge strategy reverses output column order, contradicting its docstring (`_merge.py:221-236`) — fixed by dropping the reversed iteration, so order is strategy-independent by construction | small | ✅ fixed 2026-09-05 — with OC-153 |
 | OC-159 | ⚪ | Empty filter dict compiles to WHERE-less `DELETE FROM data_sources`/`UPDATE`; dead call path today (`async_sqlite_queries.py:129-146`) | 1 line | ✅ fixed 2026-09-06 — all four sites (sqlite + postgres × delete + update) raise `ValueError` before opening a session; the path is dead today, but `_normalize_filter(None) → {}` means the signature itself accepts the table-wiping input. See the log entry |
 | OC-186 | 🟠 | `S3Catalog.exists` skips the option-name mapping that every sibling method applies. `catalog.py:521` builds a throwaway `s3fs.S3FileSystem(**self.storage_options)` from the raw instance options, while `__init__`:275, `load`:452 and `save`:491 all pass through `_prepare_s3fs_options`, which maps `aws_access_key_id`→`key` and `aws_secret_access_key`→`secret` and moves region into `client_kwargs['region_name']`. With AWS-named credentials `exists()` therefore authenticates differently from the methods it is supposed to agree with, and reports `False` for (or errors on) an object `load()` reads fine — so callers that gate on `exists` before `load` take the wrong branch | 1 line | ✅ fixed 2026-09-06 — `S3Catalog.exists` goes through `_prepare_s3fs_options` like the methods it must agree with, which also brings it under the SSRF guard. See the log entry |
+| OC-307 | 🟡 | **A direct Preview request ending at Data Preview succeeds without executing upstream work** (`backend/ml_pipeline/_internal/_routers/preview.py:357-359,445-448`) — Qwen #43. Make terminal-sink handling in the API execute the intended upstream graph or reject an unsupported request explicitly. | small | ✅ fixed 2026-09-13 — Remove Data Preview sinks before partitioning so their upstream loader/scalers execute while retaining branch identities. |
+| OC-308 | 🟡 | **Invalid cyclic Preview graphs are recorded as critical server failures** (`backend/ml_pipeline/_internal/_routers/preview.py:919-923`) — Qwen #44. Validate cyclic input as a client error before graph execution and avoid recording it as an internal critical incident. | small | ✅ fixed 2026-09-13 — Reject cyclic preview configurations with HTTP 400 before resolution/execution; no critical ErrorEvent is persisted. |
+| OC-311 | 🟡 | **Legacy deployment artifact resolution disagrees with the default permitted root** (`backend/ml_pipeline/deployment/service.py:101-104,142-144,224-239`) — Qwen #47. Resolve supported legacy artifact references consistently with configured storage while preserving path containment checks. | small | ✅ fixed 2026-09-13 — Prediction and schema inspection resolve legacy artifacts through the configured permitted root and shared containment checks. |
 
 ### Remaining — direct-audit modules
 
@@ -231,7 +237,7 @@ uses, so a fixed finding stays where it was filed.
 |---|---|---|---|---|
 | OC-05 | 🟡 | `PowerTransformer` triggers a pandas deprecation that will become an error (`transformations/power.py:101`) | 1 line | ✅ fixed 2026-09-06 — **worse than filed**: casting each destination column to `float64` before the `.loc` write removes a per-column pandas FutureWarning that the surrounding bare `except` would otherwise swallow into a silent no-op, i.e. OC-28's failure mode arriving through OC-05. See the log entry |
 
-### Remaining — encoding / cleaning / imputation / scaling / drop
+### Remaining — encoding / cleaning / imputation / scaling / drop / resampling
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
@@ -252,6 +258,8 @@ uses, so a fixed finding stays where it was filed.
 | OC-285 | 🟡 | **DropMissingRows accepts invalid how values with different semantics** (`skyulf-core/skyulf/preprocessing/drop_and_missing/drop_rows.py:56,94,158`) — Qwen #17. Reject unsupported how values at the public configuration boundary before engine dispatch. | small | ✅ fixed — 2026-09-12: DropMissingRows validates how at fit and saved-artifact replay before engine dispatch, rejecting unsupported/null values while retaining omitted-any, valid any/all and threshold precedence with aligned targets. |
 | OC-294 | 🟡 | **Numeric imputation handles explicitly selected text columns inconsistently** (`skyulf-core/skyulf/preprocessing/imputation/simple.py:169,187`) — Qwen #27. Validate or consistently filter incompatible explicit column selections before mean/median calculation. | small | ✅ fixed — 2026-09-12: Shared numeric validation rejects explicit text selections for mean/median before dispatch, preserving automatic selection and explicit binary/constant/Decimal numeric support plus most-frequent/constant text behavior. |
 | OC-295 | 🟡 | **Automatic text cleaning converts pandas Decimal values into strings** (`skyulf-core/skyulf/preprocessing/_helpers.py:283`) — Qwen #28. Exclude semantic numeric Decimal columns from automatic text selection while retaining legitimate string cleaning. | small | ✅ fixed — 2026-09-12: Automatic text detection excludes semantic Decimal object columns on pandas, preserving their values and dtype in TextCleaning and AliasReplacement; explicit selections and existing fitted artifacts keep their prior replay contract. |
+| OC-298 | 🟡 | **Boolean alias conversion changes unmatched numeric values to strings on Polars** (`skyulf-core/skyulf/preprocessing/cleaning/alias.py:55,65,103,110`) — Qwen #31. Define consistent handling for explicitly selected non-text columns and preserve unmatched values under the supported alias contract. | small | ✅ fixed 2026-09-13 — Apply text aliases without reinterpreting selected numbers/bools/dates or rounding large integers in nullable object columns; cast 0/1 to text explicitly to map Yes/No. |
+| OC-301 | 🟡 | **Advanced resampler settings are saved but not forwarded to sampler construction** (`skyulf-core/skyulf/preprocessing/resampling.py:205,213,298,303`) — Qwen #34. Pass supported SVC/KMeans/n_jobs settings to the appropriate sampler with capability-aware validation. | small | ✅ fixed 2026-09-13 — Forward custom SVC/KMeans estimators, NearMiss neighbor counts and n_jobs only to supporting methods; real output matches directly configured samplers. |
 
 
 ### Remaining — feature generation / selection / vectorization / transformations
@@ -307,6 +315,9 @@ uses, so a fixed finding stays where it was filed.
 | OC-188 | 🟠 | Rule discovery decodes sklearn class positions against Polars' shared category dictionary, publishing labels absent from the target while reporting perfect accuracy (`profiling/_analyzer/rules.py:169-170,196-198,295-298`) | small | ✅ fixed 2026-09-09 - target-local codes map every rule prediction to the actual observed class label. |
 | OC-305 | 🟡 | **All-null temporal profile bounds serialize as the string None** (`skyulf-core/skyulf/profiling/_analyzer/dates.py:164-171`) — Qwen #40. Return actual nullable bounds in the profile schema instead of stringifying absent temporal extrema. | small | ✅ fixed — 2026-09-12: Missing Date/Datetime extrema remain actual nulls in profile dictionaries and JSON while native units, timezones and nonmissing bounds retain their existing behavior. |
 | OC-257 | 🟡 | Native Enum columns bypass categorical drift dispatch and disappear from the report (`profiling/drift.py:154-162`) | small | ✅ fixed — 2026-09-12: Native Enum uses categorical drift dispatch; the 100 a to 100 b shift yields PSI 10.543651559430593 and one drifted column, matching String/Categorical controls. |
+| OC-274 | 🟡 | **Causal feature selection spends its cap on constant columns** (`skyulf-core/skyulf/profiling/_analyzer/causal.py:25-30`) — Qwen #5. Handle non-finite ranking values deterministically and retain eligible variable features before applying the cap. | small | ✅ fixed 2026-09-13 — Exclude noninformative columns before spending the causal feature cap; retain eligible targets and deterministic ranking. |
+| OC-287 | 🟡 | **One constant column suppresses VIF diagnostics for all other features** (`skyulf-core/skyulf/profiling/_analyzer/numeric.py:54-59`) — Qwen #19. Retain useful diagnostics for variable columns and explain excluded constants or unavailable calculations. | small | ✅ fixed 2026-09-13 — Exclude constants before complete-case filtering and VIF calculation; retain variable-feature diagnostics with existing alerts explaining omissions. |
+| OC-304 | 🟡 | **Reused EDAAnalyzer loses metadata for filters still applied to its data** (`skyulf-core/skyulf/profiling/analyzer.py:128,143-154,646,672`) — Qwen #39. Keep active-filter metadata consistent with the documented stateful analyzer behavior across repeated analyze calls. | small | ✅ fixed 2026-09-13 — Persist cumulative filter metadata on reused analyzers and copy snapshots so earlier profiles and caller values remain independent. |
 
 
 ### Remaining — core / engines / pipeline
@@ -323,6 +334,7 @@ uses, so a fixed finding stays where it was filed.
 | OC-161 | 🟡 | Polars clustering evaluation overwrites a numeric feature named `__skyulf_cluster__`, then fails while computing centroids (`modeling/_evaluation/clustering.py`) | small | ✅ fixed 2026-09-09 — centroid subsets use positional label masks without creating a helper column. |
 | OC-160 | 🟡 | DropMissingRows and Deduplicate collide with valid `__idx__` feature or target columns (`preprocessing/drop_and_missing/`) | small | ✅ fixed 2026-09-09 — collision-free X row-position names and direct target gathering preserve user columns and positional alignment. |
 | OC-162 | 🟡 | Polars time-series CV overwrites feature columns with temporary or real target names (`modeling/cross_validation.py`) | small | ✅ fixed 2026-09-09 — a shared positional permutation sorts X/y separately without materializing target columns. |
+| OC-312 | 🟡 | **The sklearn bridge returns zero-dimensional object arrays for unsupported containers** (`skyulf-core/skyulf/engines/sklearn_bridge.py:28,44`) — Qwen #48. Reject unsupported input containers clearly at the public adapter boundary while preserving valid mixed-engine X/y conversion. | small | ✅ fixed 2026-09-13 — Reject unsupported X/y containers at the sklearn adapter while retaining mixed-engine frames, wrappers, NumPy arrays and Python sequences. |
 
 ### Remaining — outliers / casting / binning / timeseries / geo
 
@@ -460,7 +472,42 @@ respective fix logs; OC-167 closed with canonical artifact framing on 2026-09-09
 
 ---
 
+### Remaining — tests / packaging / CI (outside the Ongoing tier)
+
+| ID | Sev | Item | Effort | Status |
+|---|---|---|---|---|
+| OC-246 | 🟡 | Local-only full-inference smoke returns a passing result before inference when the current model artifact is a tuple; remaining checks only print success/failure (`tests/integration/test_full_inference_pipeline.py:180-187`) | small | ✅ fixed 2026-09-13 — Replace the external-workspace smoke with tmp_path-based preprocessing, artifact, reload, promotion and prediction assertions on both engines. |
+
+
 ## Log
+
+### 2026-09-13 — 0.8.23: thirteen queue findings repaired
+
+Closed OC-246/274/278/279/287/298/301/304/307/308/311/312/320 after reproducing
+the current failures and adding executable regressions. Deployment retains raw
+encoder inputs, validates replacement artifacts before deactivation, rolls back
+failed promotion and uses the configured artifact root. Preview runs in a
+worker with owned resources, preserves upstream data for direct preview sinks
+and rejects cycles as client errors. Profiling keeps useful VIF/causal features
+and accurate cumulative filter metadata. Core preserves non-text alias values,
+honors advanced resampler settings and rejects unsupported sklearn containers.
+The external inference smoke is now isolated and asserts actual predictions.
+
+Focused checks: 173 Core conversion/resampling tests, 614 profiling tests,
+151 preview tests and 175 deployment tests. Full suites pass: Core 8,949 tests
+(80 skips, 97.40% statement/branch coverage) and backend 3,694 tests per engine.
+Final extension-text, array-output and profiling fallback subsets also pass;
+combined Core coverage is 97.44%, with 139/139 changed executable source lines covered.
+Normal
+Ruff/Ty and full production CCN 10 gates are clean. Durable test paths and
+compatibility requirements are recorded in
+[`queue_verification_0.8.23.md`](queue_verification_0.8.23.md).
+
+The live count is now **46 open / 4 parked**, from 59/4. Eleven of this batch
+belong to Qwen OC-271–318, bringing that group's closed count to 30/48.
+Parked OC-71/72/73/185 remain parked. The 0.8.23 changelog section is open;
+package versions remain 0.8.22. This batch does not close the entire queue.
+
 
 ### 2026-09-13 — 0.8.22: CI rate-limit isolation and patch coverage
 

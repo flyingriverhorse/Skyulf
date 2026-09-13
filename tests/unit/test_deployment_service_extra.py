@@ -14,13 +14,23 @@ import numpy as np
 import pandas as pd
 import pytest
 import pytest_asyncio
+from sklearn.linear_model import LinearRegression
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 
+from backend.config import get_settings
 from backend.database.models import Base, Deployment
 from backend.ml_pipeline.deployment.service import DeploymentService, _maybe_decode_predictions
 
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
+
+
+@pytest.fixture(autouse=True)
+def artifact_root(tmp_path, monkeypatch):
+    """Keep local resolver tests inside the configured artifact directory."""
+    monkeypatch.setattr(
+        get_settings(), "TRAINING_ARTIFACT_DIR", str(tmp_path / "uploads" / "models")
+    )
 
 
 @pytest_asyncio.fixture
@@ -162,7 +172,14 @@ def test_resolve_final_deployment_uri_file_path_returned_as_is(tmp_path):
 
 
 @pytest.mark.asyncio
-async def test_deploy_model_falls_back_to_node_id_when_no_artifact_uri(async_session):
+async def test_deploy_model_falls_back_to_node_id_when_no_artifact_uri(async_session, tmp_path):
+    """Legacy jobs must resolve a real fitted artifact before promotion."""
+    from sklearn.dummy import DummyRegressor
+
+    from backend.ml_pipeline.artifacts.local import LocalArtifactStore
+
+    store = LocalArtifactStore(str(tmp_path / "uploads" / "models" / "pipe1"))
+    store.save("job1", DummyRegressor().fit([[1.0]], [2.0]))
     db_job = SimpleNamespace(
         artifact_uri=None,
         pipeline_id="pipe1",
@@ -233,7 +250,7 @@ def test_resolve_predict_store_and_key_s3_without_suffix():
 
 def test_resolve_pipeline_node_path():
     store_uri, key = DeploymentService._resolve_pipeline_node_path("pipe1", "node1")
-    assert Path(store_uri).parts[-3:] == ("exports", "models", "pipe1")
+    assert Path(store_uri).parts[-3:] == ("uploads", "models", "pipe1")
     assert key == "node1"
 
 
@@ -246,7 +263,7 @@ def test_resolve_predict_store_and_key_local_absolute(tmp_path):
 
 def test_resolve_predict_store_and_key_local_two_parts_nonexistent():
     store_uri, key = DeploymentService._resolve_predict_store_and_key_local("pipeA/nodeB")
-    assert Path(store_uri).parts[-3:] == ("exports", "models", "pipeA")
+    assert Path(store_uri).parts[-3:] == ("uploads", "models", "pipeA")
     assert key == "nodeB"
 
 
@@ -301,7 +318,7 @@ def test_load_predict_artifact_wraps_failure_in_value_error():
 
 def test_load_predict_artifact_unwraps_tuple(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
-    models_dir = tmp_path / "exports" / "models" / "pipe1"
+    models_dir = tmp_path / "uploads" / "models" / "pipe1"
     models_dir.mkdir(parents=True)
     from backend.ml_pipeline.artifacts.local import LocalArtifactStore
 
@@ -498,7 +515,7 @@ def test_resolve_local_base_and_key_for_details_absolute(tmp_path):
 
 def test_resolve_local_base_and_key_for_details_two_part_relative():
     base, key = DeploymentService._resolve_local_base_and_key_for_details("pipeA/nodeB")
-    assert Path(base).parts[-3:] == ("exports", "models", "pipeA")
+    assert Path(base).parts[-3:] == ("uploads", "models", "pipeA")
     assert key == "nodeB"
 
 
@@ -542,7 +559,7 @@ def test_load_artifact_for_details_local_exists(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     from backend.ml_pipeline.artifacts.local import LocalArtifactStore
 
-    models_dir = tmp_path / "exports" / "models" / "pipeX"
+    models_dir = tmp_path / "uploads" / "models" / "pipeX"
     models_dir.mkdir(parents=True)
     store = LocalArtifactStore(str(models_dir))
     store.save("nodeX", "my_artifact")
@@ -654,6 +671,35 @@ def test_predict_with_bundled_artifact_reorders_columns_to_match_training():
 
     # Should succeed with correct reordering
     assert result == [8]  # a + b = 3 + 5
+
+
+def test_predict_with_bundled_array_transform_preserves_positional_features():
+    """Custom preprocessors returning arrays must remain usable after deferred column drops."""
+
+    class ArrayEngineer:
+        """Select one feature without sklearn's optional pandas output wrapping."""
+
+        feature_names_in_ = ["x"]
+
+        def transform(self, frame):
+            """Drop raw metadata during preprocessing and return the model's numeric matrix."""
+            return frame[["x"]].to_numpy()
+
+    model = LinearRegression().fit(np.array([[1], [2], [3]]), [2, 4, 6])
+    artifact = {
+        "feature_engineer": ArrayEngineer(),
+        "model": model,
+        "feature_columns": ["x"],
+        "target_column": None,
+        "dropped_columns": ["note"],
+    }
+
+    predictions, thresholds = DeploymentService._predict_with_bundled_artifact(
+        artifact, pd.DataFrame({"x": [3, 5], "note": ["north", "south"]})
+    )
+
+    assert predictions == pytest.approx([6, 10])
+    assert thresholds is None
 
 
 def test_predict_with_bundled_artifact_validates_pre_transform_columns():
@@ -880,7 +926,7 @@ def test_build_input_schema_from_artifact_tuple_unwrapped_no_features(tmp_path, 
     monkeypatch.chdir(tmp_path)
     from backend.ml_pipeline.artifacts.local import LocalArtifactStore
 
-    models_dir = tmp_path / "exports" / "models" / "pipeY"
+    models_dir = tmp_path / "uploads" / "models" / "pipeY"
     models_dir.mkdir(parents=True)
     store = LocalArtifactStore(str(models_dir))
     store.save("nodeY", (SimpleNamespace(), "meta"))
@@ -893,7 +939,7 @@ def test_build_input_schema_from_artifact_with_features(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     from backend.ml_pipeline.artifacts.local import LocalArtifactStore
 
-    models_dir = tmp_path / "exports" / "models" / "pipeZ"
+    models_dir = tmp_path / "uploads" / "models" / "pipeZ"
     models_dir.mkdir(parents=True)
     model = SimpleNamespace(feature_names_in_=np.array(["f1", "f2"]))
     store = LocalArtifactStore(str(models_dir))
