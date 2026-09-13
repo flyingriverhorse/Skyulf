@@ -462,6 +462,24 @@ respective fix logs; OC-167 closed with canonical artifact framing on 2026-09-09
 
 ## Log
 
+### 2026-09-13 — 0.8.22: CI rate-limit isolation and patch coverage
+
+Reproduced the three reported drift-target failures by running the new pipeline,
+drift-reference and drift-target tests in one process: their requests shared the
+same client-address budget and crossed the existing 20/minute limit. The root
+test fixture now resets the shared limiter between test cases. It leaves
+throttling enabled; a new two-case regression reaches the real decorated drift
+route, verifies 20 allowed attempts, a blocked 21st attempt and an independent
+second client. The second case failed before the fixture and now receives its
+own full budget.
+
+Added 35 Core cases around the refactored SHAP, casting, text fallback, tuning,
+refit and leakage paths. Production behavior and coverage exclusions are
+unchanged. Full-suite results and remaining branch evidence are in
+[`ccn_ci_followup_0.8.22.md`](ccn_ci_followup_0.8.22.md).
+OC-320 retains its four strict expected failures; the queue remains
+**59 open / 4 parked**.
+
 ### 2026-09-13 — 0.8.22: actual pipeline verification and OC-320
 
 Added real CSV-to-training-to-serving coverage for the CCN refactor: mixed

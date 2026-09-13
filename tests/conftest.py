@@ -35,6 +35,16 @@ if isinstance(allowed, list) and "testserver" not in allowed:
     allowed.append("testserver")
 
 
+@pytest.fixture(autouse=True)
+def isolate_rate_limit_counters():
+    """Keep throttling active within each test without sharing request budgets across tests."""
+    from backend.middleware.rate_limiter import limiter
+
+    limiter.reset()
+    yield
+    limiter.reset()
+
+
 @pytest.fixture(scope="session", autouse=True)
 def cleanup_resources():
     """Explicitly close connections (Celery, DB) at the end of the test session.
