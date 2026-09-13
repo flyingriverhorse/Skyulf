@@ -543,6 +543,18 @@ describe('convertGraphToPipelineConfig', () => {
 });
 
 describe('convertGraphToPipelineConfig — ensemble wiring (Phase 2)', () => {
+  it.each(['SegmentationNode', 'EnsembleNode'])('excludes an unsupported %s output from legacy ensemble data inputs', sourceType => {
+    // A saved invalid wire must never serialize a Model artifact as a Dataset dependency.
+    const nodes = [node('ds', 'dataset_node', { datasetId: 'd1' }),
+      node('source', sourceType, { model_type: sourceType === 'SegmentationNode' ? 'kmeans' : 'voting_classifier' }),
+      node('ens', 'EnsembleNode', { task: 'classification', model_type: 'voting_classifier' })];
+    const edges = [edge('ds', 'source'), edge('source', 'ens')];
+    const unsupportedOnly = convertGraphToPipelineConfig(nodes, edges);
+    expect(unsupportedOnly.nodes.find(n => n.node_id === 'ens')?.inputs).toEqual([]);
+    const withData = convertGraphToPipelineConfig(nodes, [...edges, edge('ds', 'ens')]);
+    expect(withData.nodes.find(n => n.node_id === 'ens')?.inputs).toEqual(['ds']);
+  });
+
   it('derives base learners from connected model nodes and overrides the in-node selection', () => {
     const nodes = [
       node('ds', 'dataset_node', { datasetId: 'd1' }),

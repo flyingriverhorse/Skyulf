@@ -27,10 +27,12 @@ export interface SchemaPreviewResponse {
 
 export const previewPipelineSchema = async (
   payload: PipelineConfigModel,
+  signal?: AbortSignal,
 ): Promise<SchemaPreviewResponse> => {
   const response = await apiClient.post<SchemaPreviewResponse>(
     '/pipeline/schema-preview',
     payload,
+    signal ? { signal } : undefined,
   );
   return response.data;
 };

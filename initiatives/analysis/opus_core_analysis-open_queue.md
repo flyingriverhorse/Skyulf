@@ -29,12 +29,11 @@ archive Log.
 
 ## Live — fix queue
 
-**Current status (2026-09-13): 25 open / 4 parked.**
-The third 0.8.23 batch closes nine findings: OC-50/111/223/225/226/253/269/302/318.
-Verification and limits are in [the third batch report](queue_verification_0.8.23_batch3.md);
-the [second](queue_verification_0.8.23_batch2.md) and [first](queue_verification_0.8.23.md)
-reports retain the preceding 25 closures. The archive Log keeps all three batches.
-OC-319 remains open.
+**Current status (2026-09-13): 19 open / 4 parked.**
+The latest fixes close OC-251 and OC-56/102/213/292/319. Verification and
+limitations are recorded in the [archive Log](opus_core_analysis-tracker.md#log).
+The earlier batch reports were removed by the user; their closure summaries
+remain in that Log.
 The verified Qwen follow-up added **48 findings, OC-271–318**,
 grouped below by priority and domain. Qwen #1/#50/#57 reuse OC-253/65/64;
 #13 is already fixed as OC-268. #18/#41 share OC-286, which requires both
@@ -66,8 +65,6 @@ remaining findings are grouped by domain.
 | OC-280 | 🟡 | **Configured default rate limits are not applied to undecorated routes** (`backend/middleware/rate_limiter.py:10-19`) — Qwen #11. Wire default limiting into the actual app and retain explicit per-route limits; authentication decisions remain separately parked. | medium | ⬜ open — An undecorated mutation route accepts 230/230 requests while an explicit-limit control returns 429 after 60; the current inventory has 34 mutation routes, eight decorated and 26 without default enforcement. |
 | OC-286 | 🟠 | **Non-finite profile and preview metrics cross JSON persistence boundaries** (`skyulf-core/skyulf/profiling/schemas.py:259-273`; `backend/ml_pipeline/_execution/strategies.py:130-163`) — Qwen #18 / #41. Enforce a consistent finite-or-null JSON contract for both EDA profile persistence and background preview/job metrics; closure requires coverage of both write paths. | medium | ⬜ open — Qwen #18 typed profile fields retain inf/NaN and #41 actual preview success persists Infinity to SQLite; PostgreSQL/MySQL JSON binders emit non-standard JSON, but live server rejection was not tested and orjson/model_dump_json controls sanitize it. |
 | OC-289 | 🟡 | **User-controlled identifiers can inject new lines into logs** (`backend/ml_pipeline/model_registry/api.py:43-51`) — Qwen #22. Sanitize identifiers and exception text at the affected logging boundaries while retaining prior credential redaction. | small | ⬜ open — A real missing-job request containing percent-encoded LF returns 404 but writes a raw newline into the registry log; this demonstrates log-integrity loss, not code execution. |
-| OC-292 | 🟡 | **Canvas accepts Segmentation-to-Ensemble connections that convert to invalid data inputs** (`frontend/ml-canvas/src/core/utils/pipelineConversion/ensemble.ts:11-16`) — Qwen #25. Align connection validation, ensemble conversion and backend input expectations for unsupported model families. | medium | ⬜ open — Registered port validation accepts the connection and the actual converter lists the segmentation training node as Ensemble data input; the backend rejects its Model artifact where Dataset is required. |
-| OC-319 | 🟡 | **Explicit Logistic Regression penalty/ratio settings describe different models during search and refit** (`skyulf-core/skyulf/modeling/_sklearn_compat.py:40-45`; `modeling/_tuning/params.py`; `modeling/_tuning/engine.py`) — Align the documented explicit-ratio precedence with penalty semantics across constructor and searcher set_params paths; keep nullable Elastic Net defaults OC-282 separate. | decision + small | ⬜ open — On sklearn 1.8.0, penalty=l2 and l1_ratio=0.5 produce maximum coefficient difference 0.10500864 between normalized construction and search-style set_params; l1 control differs by 0.81086563, while elasticnet matches. Public grid/halving_grid score the same single l2 candidate and stratified folds at -0.33013530/-0.27716182 log-loss scores, then return identical final coefficients. Reproduction and limitations are in the latest archive Log. |
 
 
 ### Then — decide deployment model first
@@ -96,7 +93,6 @@ remaining findings are grouped by domain.
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
 | OC-91 | 🟡 | Three public `core/` seams (263 lines) have zero call sites; one duplicates a differently-shaped backend class name | small | ⬜ open |
-| OC-102 | ⚪ | Five tunable models return an empty search space from the live `/defaults` endpoint (`hyperparameters/_registry.py`) | small | ⬜ open |
 
 ### Remaining — file-coverage closure
 
@@ -168,7 +164,6 @@ The separately reported lockfile issue still needs its exact advisory details.
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
 | OC-54 | 🟡 | `DebugNode` is dead code that would silently no-op if wired up (`nodes/DebugNode.tsx`) | small | ⬜ open |
-| OC-56 | ⚪ | `useSchemaPreview` does not cancel in-flight requests on unmount (`hooks/useSchemaPreview.ts`) | small | ⬜ open |
 | OC-57 | ⚪ | `any`-typed chart props bypass type safety in EDA components (`modules/eda/`) | small | ⬜ open |
 
 
@@ -177,7 +172,6 @@ The separately reported lockfile issue still needs its exact advisory details.
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
 | OC-80 | 🟡 | 3 weakest-covered modules untested exactly where silence is dangerous (`_sklearn_compat.py`, `value_replacement.py`, `config_validation.py`) | ~1 day | ⬜ open |
-| OC-213 | ⚪ | Leakage examples produce 22 ty diagnostics: 16 in the notebook and six in the Python script, caused by heterogeneous configuration inference and un-narrowed `SplitDataset` slots (`skyulf-core/examples/09_leakage_safety.ipynb`, `09_leakage_safety.py`) | small | ⬜ open — both examples execute successfully; type information needs correction |
 
 ### Qwen review — decisions outside the defect count
 
@@ -343,28 +337,6 @@ source read when the finding was filed, so they may have moved.
 
 Findings filed before 2026-09-05 — OC-169 and OC-178–182 among them — keep
 their reproduction detail in the archive's `## Log` entries instead.
-
-### 2026-09-08 — OC-213–215: Problems panel review
-
-Source: the diagnostic disposition against working tree `f12dde9f` (the separate
-`problems_panel_review-2026-09-08.md` report was removed). The export contains 105 distinct
-file/rule/locations, including external type stubs, obsolete rules, and optional
-style suggestions. Only the actionable example/dependency findings are filed here.
-OC-214 and OC-215 are now closed in the archive; OC-213 remains open.
-
-**OC-213 — leakage examples have inaccurate inferred types.** Run
-`.venv\Scripts\python.exe -m ty check skyulf-core/examples/09_leakage_safety.ipynb
-skyulf-core/examples/09_leakage_safety.py --output-format concise`: 22 diagnostics.
-The notebook's unannotated configuration conflates modeling dictionaries with
-preprocessing lists; `SplitDataset` slots also admit several frame types and
-`(X,y)` tuples, so pandas indexing, subtraction, and `.drop(columns=...)` are
-not justified by their declared types. Executing all 12 notebook code cells in
-order and running the Python example succeeds, including assertions. This is
-an example typing defect, not a reproduced training failure.
-**Fix/verification target:** annotate the configuration appropriately and retain
-named pandas partition variables, or narrow slot types explicitly. Preserve
-the general `SplitDataset` contract and the example assertions. Rerun the
-explicit example ty command and execute both examples.
 
 ### 2026-09-06 — remaining-source continuation (findings added as verified)
 

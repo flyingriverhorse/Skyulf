@@ -23,10 +23,29 @@ def _default_elasticnet_ratios(ratios: Any, choices: Any) -> Any:
     return resolved
 
 
+def _logistic_penalty_search_defaults(
+    defaults: dict[str, Any], config: TuningConfig
+) -> TuningConfig:
+    """Retain penalty semantics after constructor translation and searcher set_params.
+
+    A fixed public penalty must survive a searched ratio. Entering Elastic Net
+    restores the configured ratio, while leaving an unpenalized default restores
+    C rather than inheriting the constructor's translated infinity.
+    """
+    space = dict(config.search_space)
+    if "penalty" in defaults:
+        space.setdefault("penalty", [defaults["penalty"]])
+    if "l1_ratio" in defaults and "penalty" in space:
+        space.setdefault("l1_ratio", [defaults["l1_ratio"]])
+    if defaults.get("penalty", "l2") is None and "penalty" in space:
+        space.setdefault("C", [defaults.get("C", 1.0)])
+    return replace(config, search_space=space)
+
+
 def normalize_logistic_search_config(
     model_class: Any, defaults: dict[str, Any], config: TuningConfig
 ) -> TuningConfig:
-    """Resolve nullable Elastic Net ratios before searchers bypass constructor normalization.
+    """Preserve public penalties and resolve nullable Elastic Net search ratios.
 
     An exclusively Elastic Net search uses the same 0.5 default as direct
     fitting. Search mixed penalties separately when their ratio is unspecified
@@ -35,6 +54,7 @@ def normalize_logistic_search_config(
     """
     if model_class is not LogisticRegression:
         return config
+    config = _logistic_penalty_search_defaults(defaults, config)
     space = clean_search_space(config.search_space)
     penalties = space.get("penalty", [defaults.get("penalty")])
     penalties = getattr(penalties, "choices", penalties)

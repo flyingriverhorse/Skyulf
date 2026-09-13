@@ -16,8 +16,8 @@ and is not counted.
 
 **Qwen follow-up (2026-09-12):** the verified findings
 filed 48 additional records, OC-271–318, after deduplication and scope
-correction. Forty-one have since closed. The live queue now has
-**25 open / 4 parked**; the subsequent OC-320 pipeline finding is now fixed. Details
+correction. Forty-two have since closed. The live queue now has
+**19 open / 4 parked**; the subsequent OC-320 pipeline finding is now fixed. Details
 and exclusions are in the latest Log entry. Historical baseline counts
 below are unchanged.
 
@@ -118,6 +118,8 @@ uses, so a fixed finding stays where it was filed.
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
+| OC-292 | 🟡 | **Canvas accepts Segmentation-to-Ensemble connections that convert to invalid data inputs** (`frontend/ml-canvas/src/core/utils/pipelineConversion/ensemble.ts:11-16`) — Qwen #25. Align connection validation, ensemble conversion and backend input expectations for unsupported model families. | medium | ✅ fixed 2026-09-13 — Reject clustering and nested Ensemble sources, report legacy wires in graph validation and block affected training/tuning submissions. Conversion never forwards their Model artifacts as Dataset inputs. |
+| OC-319 | 🟡 | **Explicit Logistic Regression penalty/ratio settings describe different models during search and refit** (`skyulf-core/skyulf/modeling/_sklearn_compat.py:40-45`; `modeling/_tuning/params.py`; `modeling/_tuning/engine.py`) — Align the documented explicit-ratio precedence with penalty semantics across constructor and searcher set_params paths; keep nullable Elastic Net defaults OC-282 separate. | decision + small | ✅ fixed 2026-09-13 — L1/L2 now determine the effective ratio; preserve raw fixed ratio/C across penalty searches, retain Elastic Net defaults and reject unknown penalty names. Independent CV and refits agree across all five strategies. |
 | OC-46 | 🟡 | Constant numeric features still publish non-finite PCA explained-variance ratios in the public profile (`profiling/_analyzer/multivariate.py:161`, `profiling/schemas.py:PCAComponent`) | small | ✅ fixed 2026-09-12 — return the existing unavailable PCA state for constant prepared features, keeping strict JSON finite while retaining PCA for varying inputs. |
 | OC-35 | 🟠 | Binary evaluation still builds a ROC curve when the held-out partition contains only one class, publishing NaN coordinates (`modeling/_evaluation/classification.py:88-94`) | small | ✅ fixed 2026-09-12 — omit undefined binary ROC curves for single-class holdouts while preserving finite PR output and the earlier multiclass guard. |
 | OC-207 | 🟠 | `optimize_thresholds()` transforms its `X_val` internally (`pipeline/_pipeline.py:325`), but `docs/user_guide/threshold_tuning.md:32`, `skyulf-core/README.md:205` and the method's own docstring (`:280`) all tell callers to feed it `get_fitted_split()` output — which is **already** preprocessed. The documented workflow therefore tunes thresholds on double-transformed probabilities, and `predict(use_tuned_thresholds=True)` then applies them to singly-transformed ones (`:365`), so the cutoffs are fitted against a distribution inference never reproduces. Needs a contract decision (fix the three docs, or accept pre-transformed input) before code | decision + small | ✅ fixed 2026-09-07 — the contract decision was "keep the code, fix the prose": `optimize_thresholds` and `predict` already both took raw input and transformed exactly once, so the three narrative sites that pointed callers at `get_fitted_split()` were the defect. See the log entry |
@@ -214,6 +216,7 @@ uses, so a fixed finding stays where it was filed.
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
+| OC-102 | ⚪ | Five tunable models return an empty search space from the live `/defaults` endpoint (`hyperparameters/_registry.py`) | small | ✅ fixed 2026-09-13 — Supply random/grid defaults for four clustering estimators; Voting Regressor has intentionally fixed top-level fields and preserves opt-in tuning of selected base learners. Canvas explains the empty meta-search. |
 | OC-90 | ⚪ | Unknown split config keys silently dropped (`preprocessing/split.py`) | small | ✅ fixed 2026-09-12 — warn once about ignored public keys and list supported settings, preserving existing split semantics and quiet routing metadata; Canvas emits only supported settings. |
 | OC-101 | 🟡 | `calibrated_classifier`'s `random_state` is dropped and its factories hardcode the seed | small | ✅ fixed 2026-09-12 — a cloneable calibration wrapper seeds supported base estimators during training, tuning and final refitting; defaults, explicit 0/None, unshuffled integer CV and saved predictions are covered. |
 | OC-121 | ⚪ | Polars Enum columns omitted by text auto-selection, unlike pandas Categorical (`preprocessing/_helpers.py`) | small | ✅ fixed 2026-09-12 — recognize parameterized Enum dtypes in the shared selector; TextCleaning and AliasReplacement now include them while preserving nulls, explicit selections and replay behavior. |
@@ -397,6 +400,7 @@ uses, so a fixed finding stays where it was filed.
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
+| OC-56 | ⚪ | `useSchemaPreview` does not cancel in-flight requests on unmount (`hooks/useSchemaPreview.ts`) | small | ✅ fixed 2026-09-13 — Effect-owned AbortController cancels on graph changes/unmount and prevents stale success/error writes during replacement debounce or empty-graph transitions. |
 | OC-234 | 🟡 | 3D scatter legends promise triangle/star markers that Plotly silently renders as circles (`chartMarkerShapes.ts`, `ThreeDScatterPlot.tsx`) | small | ✅ fixed 2026-09-11 - use five shapes supported by both scatter engines and render matching plus/X legend symbols; real browser regressions verify resolved Plotly markers. |
 | OC-242 | 🟠 | Causal graph ID sanitization merges distinct column names (`components/eda/CausalGraph.tsx`) | small | ✅ fixed 2026-09-11 — map original identities to distinct opaque IDs and preserve edge endpoints; Chromium covers spaces, punctuation, Unicode and prototype-like names. |
 | OC-243 | 🟡 | Bidirected causal edges render only one arrowhead (`components/eda/CausalGraph.tsx`) | small | ✅ fixed 2026-09-11 — render both endpoint markers for bidirected edges and retain directed/undirected behavior. |
@@ -498,10 +502,70 @@ respective fix logs; OC-167 closed with canonical artifact framing on 2026-09-09
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
+| OC-213 | ⚪ | Leakage examples produce 22 ty diagnostics: 16 in the notebook and six in the Python script, caused by heterogeneous configuration inference and un-narrowed `SplitDataset` slots (`skyulf-core/examples/09_leakage_safety.ipynb`, `09_leakage_safety.py`) | small | ✅ fixed 2026-09-13 — Fresh baseline was seven notebook diagnostics; annotate the dynamic config and narrow the pandas validation partition. Example ty is clean; script and all 12 notebook cells execute with assertions retained. |
 | OC-246 | 🟡 | Local-only full-inference smoke returns a passing result before inference when the current model artifact is a tuple; remaining checks only print success/failure (`tests/integration/test_full_inference_pipeline.py:180-187`) | small | ✅ fixed 2026-09-13 — Replace the external-workspace smoke with tmp_path-based preprocessing, artifact, reload, promotion and prediction assertions on both engines. |
 
 
 ## Log
+
+### 2026-09-13 — 0.8.23: five queue findings closed after OC-251
+
+- **OC-319:** reproduced constructor/searcher disagreement with explicit L1/L2
+  penalties and a stale `l1_ratio=0.5`. The first regression run had 51 failures
+  and one passing control. The public penalty now determines pure L1/L2;
+  Elastic Net keeps its supplied/default ratio, and ratio-only native settings
+  still work. Preserve raw fixed ratio/C when candidates switch penalties so
+  constructor translation cannot leak into another candidate's model. Reject
+  unknown penalty names instead of silently fitting L2. Added 67 regressions
+  for direct fits, all five strategies, ordinary/fold-pruned Optuna, fold-local
+  scaling, mixed candidates and fixed-default transitions. Combined with the
+  existing Elastic Net suite, **133 tests pass on sklearn 1.9.1**. Independent
+  review exercised **48 default/candidate transitions** on sklearn 1.8 and
+  reran six counterexample regressions. Selected-model coefficients and scores
+  agree with independent sklearn fits/CV. Existing fitted artifacts are
+  unchanged; rerun searches with conflicting settings to obtain valid scores.
+- **OC-102:** the live defaults route returned `{}` for four clustering models
+  and Voting Regressor. Added executable random/grid spaces for KMeans,
+  MiniBatchKMeans, Gaussian Mixture and Birch. All **146 candidate combinations**
+  fit and predict with their real estimators; grid products are 3/6/6/6. Voting
+  regression has no useful top-level quality parameter: its base selection and
+  parallelism fields are explicitly fixed, and Canvas explains use of Ensemble
+  base-model tuning. Actual random/grid CV with custom Linear Regression/Lasso
+  bases still works; disabling base tuning leaves the intentional empty space.
+  Red evidence: 10 Core failures, 21 mounted API failures and missing frontend
+  guidance. Focused green: 145 Core, 25 API/registry and 20 TrainingSettings
+  tests. This adds search defaults, not an unsupervised Canvas tuning workflow.
+- **OC-56:** seven new failures pinned uncanceled requests and late success/error
+  writes after unmount, empty graphs and graph replacement during debounce.
+  An effect-owned AbortController now cancels Axios transport and invalidates
+  stale writes. All nine focused request-lifetime tests pass.
+- **OC-292:** eight new failures pinned accepted clustering/nested-ensemble
+  sources, invalid converted data inputs and missed submission guards. Shared
+  validation now rejects new wires, reports saved invalid wires in Issues and
+  blocks the affected training/tuning branch. Conversion remains safe during
+  rendering and never passes those Model artifacts as Dataset inputs. It does
+  not silently choose different learners. Unrelated valid branches can run.
+  Browser checks cover real connection gestures, disabled Run all submission,
+  persistent Train ensemble feedback and zero submitted requests.
+- **OC-213:** the recorded 22-diagnostic baseline had drifted: the script was
+  already clean and the notebook had seven diagnostics. Annotated its dynamic
+  config and narrowed its pandas validation partition. Explicit example ty is
+  clean. The script executes (predictions 21/23, split shapes 9/3), and nbclient
+  executes **12/12 notebook code cells**, including tuning and CV MSE
+  **0.0264831787108028**. Preserve all 23 assertion calls and existing outputs.
+
+Final combined verification: full Core on sklearn 1.9.1 **9,361 passed / 80
+skipped**, three snapshots; separate backend defaults/calibrated/fold-refit
+integration suite **65 passed**; frontend **2,618 tests in 199 files** and
+**10 browser tests**. Repository Ruff, full backend/Core ty, production CCN <=10,
+frontend lint/complexity/build/size checks and whitespace checks pass. Rebuilt
+the shipped Canvas assets. Existing dependency/build warnings remain; no new
+database or wire-format changes were needed.
+
+Queue rows now count **19 open / 4 parked**; Qwen is **42/48 closed**.
+Corrected the stale queue header left at 25 after OC-251 closed to 24. R1 and
+DRIFT-01 remain separately planned enhancements; the four user-parked
+authentication/config findings remain parked.
 
 ### 2026-09-13 — OC-251: align filtered validation targets in all tuning searches
 

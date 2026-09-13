@@ -2,8 +2,29 @@ import { beforeAll, expect, it } from 'vitest';
 import type { Node } from '@xyflow/react';
 import { initializeRegistry } from '../registry/init';
 import { connectionIssue } from './connectionValidation';
+import { collectGraphValidationIssues, useGraphStore } from '../store/useGraphStore';
 
 beforeAll(() => { initializeRegistry(); });
+
+it.each(['SegmentationNode', 'EnsembleNode'])('rejects %s model outputs in ensemble drag guidance and graph mutations', sourceType => {
+  // Unsupported model families must not become Dataset inputs through the shared any port.
+  const nodes = [node('source', sourceType), node('ensemble', 'EnsembleNode')];
+  const connection = { source: 'source', sourceHandle: 'model', target: 'ensemble', targetHandle: 'in' };
+  expect(connectionIssue(nodes, [], connection)).toContain('cannot be used as base models');
+  useGraphStore.setState({ nodes, edges: [] });
+  useGraphStore.getState().onConnect(connection);
+  expect(useGraphStore.getState().edges).toEqual([]);
+});
+
+it.each(['SegmentationNode', 'EnsembleNode'])('shows an actionable graph issue for an imported %s-to-Ensemble edge', sourceType => {
+  // Saved invalid connections need visible feedback before Run all and Preview validation.
+  const nodes = [node('data', 'dataset_node'), node('source', sourceType), node('ensemble', 'EnsembleNode')];
+  const edges = [{ id: 'data-source', source: 'data', target: 'source' },
+    { id: 'source-ensemble', source: 'source', target: 'ensemble' }];
+  expect(collectGraphValidationIssues(nodes, edges)).toContainEqual(expect.objectContaining({
+    nodeId: 'ensemble', category: 'connection', message: expect.stringContaining('cannot be used as base models'),
+  }));
+});
 
 it('retains rejection precedence when endpoints, cycles and handles are invalid together', () => {
   // Drag guidance and mutation rejection must give the same first actionable failure.

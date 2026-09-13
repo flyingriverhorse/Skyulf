@@ -5,6 +5,7 @@ import type { GraphValidationIssue } from '../useGraphStore';
 import { convertGraphToPipelineConfig } from '../../utils/pipelineConverter';
 import { findCycleIssues } from '../../utils/pipelineCycleValidation';
 import { findPreprocessingBeforeSplitIssues } from '../../utils/pipelineLeakageValidation';
+import { findEnsembleConnectionIssues } from '../../utils/ensembleConnections';
 
 const prettifyDefinitionType = (definitionType: string): string =>
   definitionType.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
@@ -33,6 +34,10 @@ export function collectGraphValidationIssues(nodes: Node[], edges: Edge[]): Grap
   const issues: GraphValidationIssue[] = [];
 
   for (const node of activeNodes) collectNodeIssues(node, activeEdges, issues);
+  for (const issue of findEnsembleConnectionIssues(activeNodes, activeEdges)) {
+    const target = activeNodes.find(node => node.id === issue.targetId)!;
+    issues.push({ nodeId: target.id, nodeLabel: getNodeLabel(target), category: 'connection', message: issue.message });
+  }
   const pipelineConfig = convertGraphToPipelineConfig(activeNodes, activeEdges);
   collectLeakageIssues(pipelineConfig.nodes, activeNodes, issues);
   collectCycleIssues(pipelineConfig.nodes, activeNodes, issues);

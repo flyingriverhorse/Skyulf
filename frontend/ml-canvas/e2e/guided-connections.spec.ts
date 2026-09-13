@@ -112,6 +112,23 @@ test('drag guidance rejects model-to-data and accepts the ensemble shared input'
   await expect(valid).not.toHaveAttribute('data-connection-state');
 });
 
+for (const sourceType of ['SegmentationNode', 'EnsembleNode']) {
+  test(`drag guidance rejects ${sourceType} as an ensemble base model`, async ({ page }) => {
+    // Unsupported model families must be rejected before the any-typed ensemble input can accept them.
+    await seed(page, [sourceType, 'EnsembleNode']);
+    const source = page.locator('[data-id="node-0"] .react-flow__handle.source');
+    const target = page.locator('[data-id="node-1"] .react-flow__handle.target');
+    await moveTo(page, source);
+    await page.mouse.down();
+    await moveTo(page, target);
+    await expect(target).toHaveAttribute('data-connection-state', 'incompatible');
+    await expect(page.getByRole('tooltip', { name: 'Connection guidance', exact: true }))
+      .toContainText('cannot be used as base models');
+    await page.mouse.up();
+    await expect(page.locator('.react-flow__edge')).toHaveCount(0);
+  });
+}
+
 test('reverse dragging explains a cycle and does not commit the rejected edge', async ({ page }) => {
   // Starting at an input must not reverse the source/target used by the validator.
   await seed(page, ['imputation_node', 'encoding'], [{ id: 'back', source: 'node-1', sourceHandle: 'out', target: 'node-0', targetHandle: 'in', type: 'custom' }]);

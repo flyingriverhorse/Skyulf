@@ -250,6 +250,8 @@ DEFAULT_SEARCH_SPACES: dict[str, Any] = {
     "voting_classifier": {
         "voting": ["soft", "hard"],
     },
+    # Voting regression tunes the selected learners via build_ensemble_search_space.
+    "voting_regressor": {},
     "stacking_classifier": {
         "cv": [3, 5, 10],
     },
@@ -311,6 +313,24 @@ DEFAULT_SEARCH_SPACES: dict[str, Any] = {
         "reg_alpha": [0.0, 0.01, 0.1, 1.0],
         "reg_lambda": [0.0, 0.01, 0.1, 1.0],
         "boosting_type": ["gbdt", "dart", "goss"],
+    },
+    "kmeans": {
+        "n_clusters": [2, 3, 5, 8, 10],
+        "n_init": [5, 10, 20],
+    },
+    "minibatch_kmeans": {
+        "n_clusters": [2, 3, 5, 8, 10],
+        "batch_size": [256, 1024, 2048],
+        "n_init": [5, 10, 20],
+    },
+    "gaussian_mixture": {
+        "n_components": [2, 3, 5, 8, 10],
+        "covariance_type": ["full", "tied", "diag", "spherical"],
+    },
+    "birch": {
+        "n_clusters": [2, 3, 5, 8, 10],
+        "threshold": [0.1, 0.5, 1.0],
+        "branching_factor": [25, 50, 100],
     },
 }
 
@@ -458,6 +478,7 @@ GRID_SEARCH_SPACES: dict[str, Any] = {
     "voting_classifier": {
         "voting": ["soft", "hard"],
     },
+    "voting_regressor": {},
     "stacking_classifier": {
         "cv": [3, 5],
     },
@@ -502,6 +523,24 @@ GRID_SEARCH_SPACES: dict[str, Any] = {
         "max_depth": [-1, 5, 10],
         "subsample": [0.8, 1.0],
     },
+    "kmeans": {
+        "n_clusters": [2, 3, 5],
+        "n_init": [10],
+    },
+    "minibatch_kmeans": {
+        "n_clusters": [2, 3, 5],
+        "batch_size": [256, 1024],
+        "n_init": [10],
+    },
+    "gaussian_mixture": {
+        "n_components": [2, 3, 5],
+        "covariance_type": ["full", "diag"],
+    },
+    "birch": {
+        "n_clusters": [2, 3, 5],
+        "threshold": [0.1, 0.5],
+        "branching_factor": [50],
+    },
 }
 
 _GRID_STRATEGIES = {"grid", "halving_grid"}
@@ -514,6 +553,9 @@ def get_default_search_space(model_key: str, strategy: str = "random") -> dict[s
     ``GRID_SEARCH_SPACES`` dict is used so the cartesian product stays
     manageable. All other strategies (``random``, ``halving_random``,
     ``optuna``) use the richer ``DEFAULT_SEARCH_SPACES``.
+
+    Voting regression has no tunable meta-parameters. Its empty space can
+    be expanded with the selected learners by ``build_ensemble_search_space``.
     """
     if strategy in _GRID_STRATEGIES:
         return GRID_SEARCH_SPACES.get(model_key, DEFAULT_SEARCH_SPACES.get(model_key, {}))

@@ -6,6 +6,8 @@ classifier only) round out the per-family options. The string keys map to the
 factory tables in :mod:`skyulf.modeling.ensemble`.
 """
 
+from dataclasses import replace
+
 from ._field import HyperparameterField
 
 # Selectable base learners, mirrored from ``ensemble.BASE_ESTIMATORS_*``.
@@ -174,10 +176,17 @@ STACKING_CLASSIFIER_PARAMS = [
 ]
 
 VOTING_REGRESSOR_PARAMS = [
-    _base_estimators_field(
-        _REG_OPTIONS, ["linear_regression", "random_forest", "gradient_boosting"]
+    replace(
+        _base_estimators_field(
+            _REG_OPTIONS, ["linear_regression", "random_forest", "gradient_boosting"]
+        ),
+        tunable=False,
+        description=(
+            "Fixed base learners combined by the ensemble; enable base model tuning "
+            "to search their parameters."
+        ),
     ),
-    _N_JOBS_FIELD,
+    replace(_N_JOBS_FIELD, tunable=False),
 ]
 
 STACKING_REGRESSOR_PARAMS = [

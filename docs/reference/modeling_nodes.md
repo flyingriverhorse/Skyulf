@@ -99,6 +99,15 @@ in a new fit, set `subsample_freq=0` explicitly.
 
 Backed by `sklearn.linear_model.LogisticRegression`.
 
+An explicit `penalty="l1"` or `penalty="l2"` selects pure L1 or L2 even if
+the configuration also contains an Elastic Net ratio. `penalty=None` disables
+regularization regardless of `C`. Only Elastic Net uses the supplied mixing
+ratio; when `penalty` is omitted entirely, native `l1_ratio` configuration is
+preserved. These rules apply to direct fits, tuning candidates and final refits.
+Unknown penalty names fail instead of silently selecting another model.
+Rerun searches made with conflicting penalty/ratio settings: their earlier
+scores may describe a different model from the one returned after refitting.
+
 With `penalty="elasticnet"` and `solver="saga"`, an omitted or null
 `l1_ratio` resolves to `0.5`. Explicit numeric ratios, including `0` and `1`,
 are preserved. The same default applies during all five tuning strategies,

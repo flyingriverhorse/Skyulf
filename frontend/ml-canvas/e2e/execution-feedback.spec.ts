@@ -45,6 +45,37 @@ async function review(page: Page) {
   }
 }
 
+test('imported segmentation-to-ensemble wiring blocks both Run all and Train ensemble', async ({ page }) => {
+  // Legacy saved edges must remain visible and actionable instead of silently changing the trained model.
+  await seed(page);
+  let requests = 0;
+  await page.route('**/api/pipeline/run', route => {
+    requests++;
+    return route.fulfill({ json: { job_id: 'unexpected', job_ids: ['unexpected'] } });
+  });
+  await page.evaluate(() => {
+    const state = window.__skyulfTest!.graphStore.getState();
+    const split = state.nodes[1]!;
+    const ensemble = state.addNode('EnsembleNode', { x: 600, y: 240 });
+    state.updateNodeData(ensemble, { target_column: 'species' });
+    const id = state.addNode('SegmentationNode', { x: 300, y: 240 });
+    const updated = window.__skyulfTest!.graphStore.getState();
+    updated.setGraph(updated.nodes, [...updated.edges,
+      { id: 'split-ens', source: split.id, sourceHandle: 'train', target: ensemble, targetHandle: 'in' },
+      { id: 'split-seg', source: split.id, sourceHandle: 'train', target: id, targetHandle: 'in' },
+      { id: 'seg-ens', source: id, sourceHandle: 'model', target: ensemble, targetHandle: 'in' }]);
+  });
+  await review(page);
+  const dialog = page.getByRole('dialog', { name: 'Run all experiments?', exact: true });
+  await expect(dialog).toContainText('cannot be used as base models');
+  await expect(dialog.getByRole('button', { name: 'Queue experiments', exact: true })).toBeDisabled();
+  await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
+  await selectModel(page, 4);
+  await page.getByRole('button', { name: 'Train ensemble', exact: true }).click();
+  await expect(page.getByRole('status').filter({ hasText: 'blocked.' })).toContainText('cannot be used as base models');
+  expect(requests).toBe(0);
+});
+
 test('app errors remain accessible in the bell outside canvas without toast popups', async ({ page }) => {
   // Removing the global toast surface must not hide errors on pages without the canvas navbar.
   await mockBackend(page);

@@ -2,6 +2,7 @@ import type { Connection, Edge, Node } from '@xyflow/react';
 import type { PortDefinition } from '../types/nodes';
 import { registry } from '../registry/NodeRegistry';
 import { splitOutputHandles } from './splitConnections';
+import { ensembleSourceIssue } from './ensembleConnections';
 
 /**
  * True if adding the edge source→target would create a cycle: either a
@@ -59,7 +60,8 @@ export function connectionIssue(nodes: Node[], edges: Edge[], connection: Connec
   const sourceType = String(source.data.definitionType);
   const targetType = String(target.data.definitionType);
   if (isModelEndpointViolation(sourceType, targetType)) return MODEL_ENDPOINT_CONNECTION_MESSAGE;
-  return portConnectionIssue(source, target, sourceType, targetType, edges, connection);
+  return (targetType === 'EnsembleNode' ? ensembleSourceIssue(sourceType) : null)
+    ?? portConnectionIssue(source, target, sourceType, targetType, edges, connection);
 }
 
 /** Resolve registered ports before checking split, type and duplicate policies. */

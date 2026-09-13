@@ -100,6 +100,24 @@ it('reloads search defaults only when changing strategy class and clears customi
   expect(screen.getByRole('spinbutton', { name: 'Trials' })).toBeDisabled();
 });
 
+/** Fixed ensemble metadata must explain base-model tuning without exposing meaningless candidates. */
+it('explains voting regression tuning when all top-level controls are fixed', async () => {
+  vi.mocked(jobsApi.getHyperparameters).mockResolvedValue([
+    { name: 'base_estimators', label: 'Base Models', type: 'multiselect', default: ['linear_regression', 'random_forest', 'gradient_boosting'], tunable: false },
+    { name: 'n_jobs', label: 'Parallel Jobs', type: 'number', default: 1, min: -1, max: 32, tunable: false },
+  ]);
+  await act(async () => render(<SettingsHarness initial={{ ...config, model_type: 'voting_regressor', run_mode: 'advanced' }} />));
+  fireEvent.click(screen.getByRole('button', { name: 'Search Space' }));
+  expect(screen.getByText(/Use an Ensemble node to tune the base models of a voting regressor/)).toBeVisible();
+  expect(screen.queryByText('Base Models')).not.toBeInTheDocument();
+  expect(screen.queryByText('Parallel Jobs')).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Configuration' }));
+  await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Basic' })));
+  fireEvent.click(screen.getByRole('button', { name: 'Hyperparameters' }));
+  fireEvent.click(screen.getByRole('checkbox', { name: 'Customize' }));
+  expect(screen.getByRole('textbox', { name: 'Parallel Jobs' })).toHaveValue('1');
+});
+
 /** CV expansion survives tab switches, temporal columns sort first, and a zero seed is preserved. */
 it('preserves CV controls across tabs and time-series selection', async () => {
   vi.mocked(useTrainingNodeContext).mockReturnValue(trainingContext({ availableColumns: [
