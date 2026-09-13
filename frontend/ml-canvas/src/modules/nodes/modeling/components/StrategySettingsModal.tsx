@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useId } from 'react';
-import { Save, RotateCcw, AlertTriangle } from 'lucide-react';
+import { Save, RotateCcw, AlertTriangle, Info } from 'lucide-react';
 import { HelpTooltip } from './HelpTooltip';
 import { ModalShell } from '../../../../components/shared';
 import { useOptunaPruningSupport, type PruningSupport } from '../../../../core/hooks/useOptunaPruningSupport';
@@ -159,6 +159,12 @@ function OptunaControls({ config, setConfig, fieldId, showCmaesWarning, pruning 
                         Pruner
                     </label>
                     <HelpTooltip placement="bottom-left" text="Median and Hyperband can stop poor trials early when the model supports incremental fitting. Pipelines and fold preprocessing use normal fitting and report why pruning is unavailable. None disables pruning." />
+                    <HelpTooltip
+                        placement="bottom-left"
+                        label="Models with pruning support"
+                        icon={Info}
+                        text="Supported Canvas model: SGD Classifier (text / linear), in Text Classification. Its default max_iter search disables pruning. A compatible custom search with a fixed epoch budget and no per-fold preprocessing can enable it. See the current reason below."
+                    />
                 </div>
                 <select
                     id={`${fieldId}-pruner`}

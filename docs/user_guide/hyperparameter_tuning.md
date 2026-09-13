@@ -128,6 +128,11 @@ that must run inside each validation fold also disables pruning. Merged inputs
 are reported as unconfirmed, so the UI does not promise support it cannot verify
 without executing the graph.
 
+The information icon beside **Pruner** lists the currently eligible Canvas model:
+**SGD Classifier (text / linear)**, offered in **Text Classification**. Other
+incremental sklearn estimators can be supplied through the Core API, subject to
+the same capability checks; they are not additional Canvas model choices.
+
 ### Halving (grid / random)
 
 | Key | Default | Description |

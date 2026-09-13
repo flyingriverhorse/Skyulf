@@ -51,7 +51,8 @@ executable lines are covered. No artificial unsupported configuration was added
 solely to increase coverage.
 
 The complete frontend output is rebuilt in `static/ml_canvas`. The main chunk
-is **326.2 KiB gzip**, up from 325.6 KiB before the requested pruning controls.
+is **326.3 KiB gzip**, up from 325.6 KiB before the requested pruning controls
+and separate model-support information tooltip.
 Its explicit budget moves from **326 to 327 KiB** for the capability request and
 UI state; other chunk limits are unchanged. Package metadata remains 0.8.22,
 and these release notes remain under v0.8.23 as previously requested.
@@ -136,3 +137,23 @@ investigations for this verification; no application/test lint exemptions were
 added. Existing expected-error tests may print jsdom network/error-boundary
 messages while passing. The user's Qwen report and temporary investigation
 folders were left outside the preceding commit.
+
+## Model-support tooltip follow-up
+
+The nine-finding batch and dynamic pruning controls were committed as
+`e221f3de` with DCO sign-off and all hooks passing. The requested separate
+information tooltip names the eligible supervised Canvas model found by a live
+registry/capability check: SGD Classifier (text / linear), offered under Text
+Classification. Its default max_iter search disables pruning; the supported
+case requires a compatible custom search and pipeline. Core MLP regression
+tests do not imply an MLP option exists in Canvas, and MiniBatchKMeans belongs
+to Segmentation's fixed-mode workflow.
+
+The shared help component retains its existing default icon and accessible
+name. The additional icon has the distinct name "Models with pruning support".
+The follow-up passes 77 focused modeling tests, ESLint, CCN <=10,
+TypeScript/Vite build and the existing 327 KiB bundle budget.
+The existing modeling accessibility and pruning browser suites pass 11 cases.
+A separate real-browser probe confirms focus/hover show the new information,
+Escape dismisses the tooltip before its modal, and graph/history stay unchanged
+with zero undo entries. The screenshot/probe artifacts remain ignored.

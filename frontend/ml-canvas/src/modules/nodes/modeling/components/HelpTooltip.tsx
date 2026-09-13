@@ -1,24 +1,26 @@
 import React from 'react';
 import * as Tooltip from '@radix-ui/react-tooltip';
-import { HelpCircle } from 'lucide-react';
+import { HelpCircle, type LucideIcon } from 'lucide-react';
 
 export interface HelpTooltipProps {
     text: string;
     /** Where the tooltip card appears relative to the help icon. Defaults to "top". */
     placement?: 'top' | 'bottom-left';
+    label?: string;
+    icon?: LucideIcon;
 }
 
 /**
  * Compact help tooltip used in modeling settings panels.
  * Two placements: above the icon (Basic Training style) or below-left (Advanced Tuning style).
  */
-export const HelpTooltip: React.FC<HelpTooltipProps> = ({ text, placement = 'top' }) => {
+export const HelpTooltip: React.FC<HelpTooltipProps> = ({ text, placement = 'top', label = 'Help', icon: Icon = HelpCircle }) => {
     return (
         <Tooltip.Provider delayDuration={0}>
             <Tooltip.Root>
                 <Tooltip.Trigger asChild>
-                    <button type="button" aria-label="Help" className="inline-flex shrink-0 rounded focus-ring">
-                        <HelpCircle aria-hidden="true" className="w-3 h-3 text-gray-400 cursor-help" />
+                    <button type="button" aria-label={label} className="inline-flex shrink-0 rounded focus-ring">
+                        <Icon aria-hidden="true" className="w-3 h-3 text-gray-400 cursor-help" />
                     </button>
                 </Tooltip.Trigger>
                 <Tooltip.Portal>
