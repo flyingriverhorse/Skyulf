@@ -105,7 +105,8 @@ def _submission_process(
         if index == 0 and scenario == "version_retry":
             ModelRegistryService._compute_seed_version = staticmethod(conflicting_seed)
         try:
-            assert _advisory_key(("dataset", "node", 0)) == advisory_key
+            if _advisory_key(("dataset", "node", 0)) != advisory_key:
+                raise RuntimeError("Child process computed a different advisory lock key")
             if index == 1 and not await asyncio.to_thread(first_checked.wait, 20):
                 raise AssertionError("First process never checked for an existing job")
             async with AsyncSession(engine, expire_on_commit=False) as session:

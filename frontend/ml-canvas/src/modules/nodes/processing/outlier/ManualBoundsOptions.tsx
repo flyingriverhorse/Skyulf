@@ -3,7 +3,7 @@ import type { ManualColumnBounds, OutlierSettingsProps } from './types';
 
 /** Keep an omitted endpoint empty, and preserve malformed numeric input for validation. */
 function readBound(input: HTMLInputElement): number | null {
-  if (input.validity.badInput) return NaN;
+  if (input.validity.badInput) return Number.NaN;
   return input.value === '' ? null : Number(input.value);
 }
 
