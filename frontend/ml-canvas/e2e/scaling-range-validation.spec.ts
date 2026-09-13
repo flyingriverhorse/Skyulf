@@ -21,7 +21,10 @@ test('a real scaling setting changes once in history while opening and closing d
   await page.keyboard.press('Control+z');
   expect(await page.evaluate(id => window.__skyulfTest!.graphStore.getState().nodes.find(node => node.id === id)!.data.with_mean, id)).toBeUndefined();
   await page.keyboard.press('Control+Shift+z');
-  await page.locator(`.react-flow__node[data-id="${id}"]`).click();
+  // Click the header label, not the card centre: the centre can land on the
+  // output port's "Next step" trigger (layout-dependent), which opens the
+  // connect dialog and leaves the node unselected, so the panel stays empty.
+  await page.locator(`.react-flow__node[data-id="${id}"] [title="Scaling"]`).click();
   await expect(page.getByRole('checkbox', { name: 'Center Data (with_mean)' })).not.toBeChecked();
   expect(await page.evaluate(() => window.__skyulfTest!.graphStore.temporal.getState().pastStates.length)).toBe(1);
 });
