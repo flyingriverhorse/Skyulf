@@ -1981,6 +1981,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#explicit-core-persistence-utilities" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Explicit Core persistence utilities
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#reproducibility-fingerprint" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3274,6 +3285,16 @@ artifact containers. Restoration preserves the native dataframe, its dtypes,
 missing values and pandas index, along with normal wrapper method delegation.
 Previously saved wrappers that failed to load with <code>RecursionError</code> can be
 loaded with the corrected code; no artifact rewrite is required.</p>
+<p>Polars wrapper projections preserve row count even after selecting or dropping
+all columns: a three-row input remains shape <code>(3, 0)</code> through wrapper chaining,
+NumPy/pandas/Arrow conversion and pickle reload. A native Polars operation run
+before wrapping can already discard that height; wrapping cannot reconstruct it.</p>
+<p><code>EngineRegistry.set_active_engine(name)</code> sets the fallback in the current thread
+or async context. The default is Polars. New async tasks inherit their parent's
+selection; independent threads start with Polars unless a context is explicitly
+copied. This selection does not override
+the engine detected from a loaded dataframe or wrapper, and concurrent callers
+cannot change one another's fallback selection.</p>
 <h2 id="load-and-use">Load and use</h2>
 <pre><code class="language-python">import tempfile
 from pathlib import Path
@@ -3334,6 +3355,43 @@ with tempfile.TemporaryDirectory() as tmp:
 
 print(preds)
 </code></pre>
+<h2 id="explicit-core-persistence-utilities">Explicit Core persistence utilities</h2>
+<p><code>skyulf.core.get_model_serializer()</code> returns a context-local serializer, backed
+by joblib by default. Call its <code>dump()</code> and <code>load()</code> methods explicitly to use
+it. <code>set_model_serializer()</code> and <code>model_serializer()</code> change the provider for
+callers of that getter. They do not change <code>SkyulfPipeline.save()</code> or <code>load()</code>,
+which call pickle directly, or the backend's local/S3 artifact stores, which
+call joblib directly.</p>
+<p><code>InMemoryModelRegistry</code> is also an explicit utility. Each instance holds model
+objects and metadata in the current process, with versions starting at 1 for
+each name. Training a pipeline does not register it here automatically, and
+these entries are not added to the backend's persisted model registry.</p>
+<p>For example, using the fitted <code>pipeline</code> from above:</p>
+<pre><code class="language-python">from skyulf.core import InMemoryModelRegistry, get_model_serializer
+
+registry = InMemoryModelRegistry()
+entry = registry.register(&quot;classifier&quot;, pipeline, metadata={&quot;purpose&quot;: &quot;example&quot;})
+
+with tempfile.TemporaryDirectory() as tmp:
+    artifact_path = Path(tmp) / &quot;classifier.joblib&quot;
+    serializer = get_model_serializer()
+    serializer.dump(entry.model, artifact_path)
+    restored_pipeline = serializer.load(artifact_path)
+
+assert registry.get(&quot;classifier&quot;).version == 1
+</code></pre>
+<p>The two <code>ModelVersion</code> types describe different data. For code that works with
+both Core and the full backend installation, qualify the modules explicitly:</p>
+<pre><code class="language-python">from skyulf.core import model_registry as core_registry
+from backend.ml_pipeline.model_registry import schemas as backend_registry
+
+# A dataclass containing name, version, model and metadata.
+core_version_type = core_registry.ModelVersion
+# A Pydantic API schema containing job, pipeline and artifact information.
+backend_version_type = backend_registry.ModelVersion
+</code></pre>
+<p>Neither type converts into the other automatically. The backend import is part
+of the platform application and is not provided by the standalone Core package.</p>
 <h2 id="reproducibility-fingerprint">Reproducibility fingerprint</h2>
 <p><code>pipeline.fingerprint()</code> returns a deterministic SHA-256 over the pipeline's
 topology, fitted artifacts and stored decision thresholds:</p>

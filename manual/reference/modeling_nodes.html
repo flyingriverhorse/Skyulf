@@ -3697,6 +3697,14 @@ apply a previously ignored fraction. To reproduce the previous sampling policy
 in a new fit, set <code>subsample_freq=0</code> explicitly.</p>
 <h3 id="logistic_regression">logistic_regression</h3>
 <p>Backed by <code>sklearn.linear_model.LogisticRegression</code>.</p>
+<p>An explicit <code>penalty="l1"</code> or <code>penalty="l2"</code> selects pure L1 or L2 even if
+the configuration also contains an Elastic Net ratio. <code>penalty=None</code> disables
+regularization regardless of <code>C</code>. Only Elastic Net uses the supplied mixing
+ratio; when <code>penalty</code> is omitted entirely, native <code>l1_ratio</code> configuration is
+preserved. These rules apply to direct fits, tuning candidates and final refits.
+Unknown penalty names fail instead of silently selecting another model.
+Rerun searches made with conflicting penalty/ratio settings: their earlier
+scores may describe a different model from the one returned after refitting.</p>
 <p>With <code>penalty="elasticnet"</code> and <code>solver="saga"</code>, an omitted or null
 <code>l1_ratio</code> resolves to <code>0.5</code>. Explicit numeric ratios, including <code>0</code> and <code>1</code>,
 are preserved. The same default applies during all five tuning strategies,

@@ -3648,7 +3648,7 @@ and hold no state between calls.</p>
 <span class="sd">        can be derived purely from ``input_schema`` and ``config`` (i.e.</span>
 <span class="sd">        without seeing data). Examples:</span>
 
-<span class="sd">        * Scalers — pass through (output == input).</span>
+<span class="sd">        * Scalers — preserve column names and predict output dtype promotion.</span>
 <span class="sd">        * Drop columns by name — drop the configured names.</span>
 <span class="sd">        * One-hot — adds K columns per categorical (K is data-dependent →</span>
 <span class="sd">          return ``None``).</span>
@@ -3740,7 +3740,7 @@ subclasses are valid LSP-substitutable returns.</p>
 can be derived purely from <code>input_schema</code> and <code>config</code> (i.e.
 without seeing data). Examples:</p>
 <ul>
-<li>Scalers — pass through (output == input).</li>
+<li>Scalers — preserve column names and predict output dtype promotion.</li>
 <li>Drop columns by name — drop the configured names.</li>
 <li>One-hot — adds K columns per categorical (K is data-dependent →
   return <code>None</code>).</li>
@@ -3777,7 +3777,7 @@ callers should fall back to runtime introspection.</p>
 <span class="sd">    can be derived purely from ``input_schema`` and ``config`` (i.e.</span>
 <span class="sd">    without seeing data). Examples:</span>
 
-<span class="sd">    * Scalers — pass through (output == input).</span>
+<span class="sd">    * Scalers — preserve column names and predict output dtype promotion.</span>
 <span class="sd">    * Drop columns by name — drop the configured names.</span>
 <span class="sd">    * One-hot — adds K columns per categorical (K is data-dependent →</span>
 <span class="sd">      return ``None``).</span>

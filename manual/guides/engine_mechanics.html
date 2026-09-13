@@ -3423,7 +3423,10 @@ def fit(self, df: SkyulfDataFrame, ...):
         # Run standard Pandas logic
 </code></pre>
 <h2 id="3-choosing-the-engine-skyulf_engine">3. Choosing the engine: <code>SKYULF_ENGINE</code></h2>
-<p>Inside <code>skyulf-core</code>, the engine always follows the <strong>data</strong> (detection above).
+<p>Inside <code>skyulf-core</code>, recognized dataframe types determine their own engine
+(detection above). Without a recognized dataframe, the fallback is <strong>Polars</strong>.
+<code>EngineRegistry.set_active_engine("pandas")</code> explicitly changes that fallback
+for the current thread or async context; it does not convert recognized frames.
 The Skyulf backend additionally has one explicit switch, <code>SKYULF_ENGINE</code>
 (<code>polars</code> | <code>pandas</code>, settable as an environment variable), which decides
 which engine pipelines run on — it governs dataset ingestion and the engine's

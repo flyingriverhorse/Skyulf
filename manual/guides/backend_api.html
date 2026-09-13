@@ -4340,7 +4340,14 @@ Returns <code>503</code> if the ML dependencies are broken.</p>
   &quot;job_ids&quot;: [&quot;...&quot;]
 }
 </code></pre>
-<p>Multiple <code>job_ids</code> are returned when the pipeline is split into parallel branches.</p>
+<p>Multiple <code>job_ids</code> are returned when the pipeline is split into parallel branches.
+Concurrent submissions for the same dataset, terminal node and branch reuse a
+recent queued/running job within <code>JOB_IDEMPOTENCY_WINDOW_SECONDS</code>; the duplicate
+does not dispatch another task. Reservation covers the duplicate lookup, version
+allocation and committed insertion across API processes. SQLite serializes writers
+during this short transaction; PostgreSQL uses transaction advisory locks with
+the configured default READ COMMITTED isolation. Unsupported job types return
+HTTP 400. Completed jobs and requests outside the window can create new versions.</p>
 <h3 id="post-apipipelinepreview"><code>POST /api/pipeline/preview</code></h3>
 <p>Run the pipeline in preview mode (synchronous, limited to 1000 rows). Returns per-node output samples.</p>
 <h3 id="post-apipipelineschema-preview"><code>POST /api/pipeline/schema-preview</code></h3>
@@ -4499,7 +4506,12 @@ See <a href="../user_guide/threshold_tuning.html">Threshold Tuning</a> for the w
 <p><strong>Response:</strong></p>
 <pre><code class="language-json">{ &quot;predictions&quot;: [...], &quot;model_version&quot;: &quot;job-id-here&quot; }
 </code></pre>
-<p>Returns <code>404</code> if no deployment is active.</p>
+<p>Returns <code>404</code> if no deployment is active.
+Returns <code>400</code> if preprocessing changes the number of input rows, or a built-in
+LagFeatures/RollingAggregate step changes their order. The error names the stage;
+no partial prediction list is returned. Filter or sort inputs explicitly while
+retaining their mapping, or use row-preserving preprocessing such as Winsorize.
+External transformers and predictors are also checked for matching row counts.</p>
 <hr />
 <h2 id="model-registry">Model Registry</h2>
 <p>The model registry is <strong>read-only</strong> — models are auto-registered when jobs complete and promoted via the jobs API.</p>
@@ -4644,7 +4656,11 @@ ws.onmessage = (msg) =&gt; {
 </blockquote>
 <hr />
 <h2 id="rate-limiting">Rate Limiting</h2>
-<p>The following endpoints are rate-limited by client IP address:</p>
+<p>Undecorated application routes use <code>RATE_LIMIT_DEFAULT</code> (<strong>200/minute</strong> by
+default), counted by client IP and URL path. Requests beyond the budget return
+HTTP 429 before the endpoint runs. The current in-memory counters are local to
+each API process; this is not a shared quota across workers.</p>
+<p>Routes with explicit limits use their own budget instead of the default:</p>
 <table>
 <thead>
 <tr>
@@ -4679,7 +4695,10 @@ ws.onmessage = (msg) =&gt; {
 </tr>
 </tbody>
 </table>
-<p>Requests over the limit receive <strong>HTTP 429 Too Many Requests</strong>.</p>
+<p>Requests over the limit receive <strong>HTTP 429 Too Many Requests</strong>.
+Explicit exemptions remain exempt. CORS preflight, mounted static files and
+WebSocket connections do not consume an application route's default budget.
+Streaming response bodies and the existing security/CORS headers are preserved.</p>
 <hr />
 <h2 id="error-responses">Error Responses</h2>
 <p>Error responses share a common shape, though some fields may be absent depending on the handler:</p>

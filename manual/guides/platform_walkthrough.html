@@ -662,6 +662,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#manual-bounds-and-geographic-distance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Manual bounds and geographic distance
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#recommended-pipeline-order" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3560,11 +3571,11 @@ skyulf-core (ML engine)
 </tr>
 <tr>
 <td><strong>Outliers</strong></td>
-<td>IQR, ZScore, Winsorize, EllipticEnvelope</td>
+<td>IQR, ZScore, Winsorize, EllipticEnvelope, Manual Bounds</td>
 </tr>
 <tr>
 <td><strong>Feature Engineering</strong></td>
-<td>PolynomialFeatures, FeatureGeneration, FeatureSelection</td>
+<td>PolynomialFeatures, FeatureGeneration, FeatureSelection, Geo Distance</td>
 </tr>
 <tr>
 <td><strong>Resampling</strong></td>
@@ -3598,6 +3609,27 @@ The icon button is disabled when all available columns already have rules.
 To change an existing type, use that rule's type selector. Removing a rule
 makes its column available to add again; other rules keep their selected types.
 Columns dropped upstream are excluded from the available choices.</p>
+<h3 id="manual-bounds-and-geographic-distance">Manual bounds and geographic distance</h3>
+<p>In <strong>Outlier Removal</strong>, choose <strong>Manual Bounds</strong> and select numeric columns.
+Set a lower bound, an upper bound, or both for each selected column. For example,
+an <code>age</code> interval of 18 to 65 keeps both endpoints and removes rows outside that
+interval. Zero is a valid bound; an empty endpoint means no limit. Missing values
+remain available for a separate missing-value operation. The method filters rows
+and keeps their targets aligned. Targets already separated by a splitter cannot
+be selected as feature bounds. Removing a column from the selection stops its
+rule from being submitted; changing methods retains its settings for later use.</p>
+<p>Under <strong>Preprocessing → Feature engineering</strong>, add <strong>Geo Distance</strong>. Choose
+latitude/longitude columns, in degrees, for each of two points. <strong>Haversine</strong>
+computes a great-circle distance; <strong>Euclidean</strong> is a local geographic approximation
+suited to nearby points. Choose kilometres or miles. Leaving the output name
+blank creates <code>geo_distance_km</code> or <code>geo_distance_mi</code>; an explicit existing name
+replaces that column. Other input columns remain available.</p>
+<p>For example, <code>(0°, 0°)</code> to <code>(0°, 1°)</code> produces approximately <strong>111.195 km</strong> or
+<strong>69.093 miles</strong>. The generated numeric column appears in schema preview and
+can be selected by a downstream Outlier Removal node before running the graph.
+Both operations use fixed configuration and can precede the train/test split;
+choose bounds independently of held-out results. H3 indexing remains a Core
+capability and is not offered in Canvas.</p>
 <h3 id="recommended-pipeline-order">Recommended pipeline order:</h3>
 <pre><code>Dataset → TrainTestSplitter → Imputer → Encoder → Scaler → Model
 </code></pre>

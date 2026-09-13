@@ -1903,6 +1903,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#prediction-row-alignment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Prediction row alignment
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#read-the-placement-labels" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3353,6 +3364,22 @@ validation or test population.</p>
 <p><strong>Feature-Target Split is not Train-Test Split.</strong> Separating X from y does not
 reserve any rows for evaluation. <code>TrainTestSplitter</code> and its legacy <code>Split</code> alias
 create the row boundary checked by the leakage gate.</p>
+<h2 id="prediction-row-alignment">Prediction row alignment</h2>
+<p><code>SkyulfPipeline.predict()</code> and deployment prediction require one result per
+submitted row. If an applied step filters or adds rows, prediction stops with
+the step name and before/after counts. For example, an IQR step that reduces
+<code>[2, 1000, 4]</code> to two rows cannot return an ambiguous two-element prediction list.
+Use row-preserving handling such as Winsorize, or filter the raw input yourself
+and retain its row mapping before submitting it.</p>
+<p>LagFeatures and RollingAggregate can reorder rows through <code>sort_by</code>. Prediction
+also rejects a batch whose order changes in either built-in step; sort the input
+as required before submitting it. Temporary position checks stay outside feature
+columns and are removed before the next step. Custom transformers remain
+responsible for preserving order; the generic guard checks their row counts.</p>
+<p>Ordinary <code>FeatureEngineer.transform()</code> and CV/threshold scoring retain configured
+filtering and sorting. The prediction guard uses <code>preserve_rows=True</code> and does
+not change training, fitted artifacts or validation-label alignment. Existing
+splitter, resampling, Deduplicate and DropMissingRows inference skips remain.</p>
 <h2 id="read-the-placement-labels">Read the placement labels</h2>
 <table>
 <thead>
@@ -3566,6 +3593,13 @@ history protocol. A rolling aggregate includes the current row: a current-target
 input can expose the answer directly. A lagged target is useful only when that
 target observation is actually available at the intended prediction time. Merely
 moving a temporal node after a random split does not establish a valid protocol.</p>
+<p>Newly fitted <code>DateFeatures</code> steps extract calendar parts in UTC. For example,
+<code>2024-01-01 00:30+02:00</code> produces year 2023, day 31 and hour 22. Naive dates
+are interpreted as UTC without moving their clock time; mixed offsets and DST
+transitions follow the same rule on both engines. The original column remains
+unchanged unless <code>drop_original</code> is enabled. Saved older artifacts retain their
+original engine-specific behavior so an existing model's features do not change
+on reload. Refit the complete pipeline to adopt UTC for those models.</p>
 <h2 id="complete-registered-node-catalog">Complete registered-node catalog</h2>
 <p>The placement of learned entries below describes active feature processing. The
 explicit-empty and target-only exceptions above still apply. Aliases remain separate.</p>

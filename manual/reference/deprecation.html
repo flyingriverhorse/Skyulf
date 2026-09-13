@@ -3288,6 +3288,12 @@
 <h1 id="deprecation-policy-helpers">Deprecation Policy &amp; Helpers</h1>
 <p><code>skyulf.core.deprecation</code> provides a small, consistent way to retire public
 symbols without breaking callers overnight.</p>
+<p>These are opt-in helpers: apply the decorator or call <code>warn_deprecated()</code> at
+the relevant call site. Importing the module does not install a global policy
+hook, mark existing Core/backend APIs deprecated, or rewrite pipeline node ids.
+Existing warnings can be implemented independently; for example,
+<code>NodeRegistry</code> emits its legacy <code>"Split"</code> warning directly through Python's
+<code>warnings</code> module.</p>
 <h2 id="policy">Policy</h2>
 <p>A public symbol marked deprecated in minor <strong><code>X.Y</code></strong> keeps working through
 <strong><code>X.(Y+1)</code></strong> and may be removed in <strong><code>X.(Y+2)</code></strong>. Deprecating a symbol emits a
@@ -3353,6 +3359,9 @@ def test_old_transform_warns():
 :class:<code>DeprecationWarning</code> (so it is silent by default but visible under
 <code>python -W default</code> and in test suites) describing the replacement and the
 version in which removal is planned.</p>
+<p>These helpers act only when explicitly called or applied as a decorator.
+Importing this module does not apply the policy to Core or backend symbols
+automatically. Other APIs may issue their own warnings independently.</p>
 
 
 <details class="usage" open>
@@ -3407,11 +3416,7 @@ behaviour and return value are preserved.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>skyulf-core/skyulf/core/deprecation.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">61</span>
-<span class="normal">62</span>
-<span class="normal">63</span>
-<span class="normal">64</span>
-<span class="normal">65</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">65</span>
 <span class="normal">66</span>
 <span class="normal">67</span>
 <span class="normal">68</span>
@@ -3435,7 +3440,11 @@ behaviour and return value are preserved.</p>
 <span class="normal">86</span>
 <span class="normal">87</span>
 <span class="normal">88</span>
-<span class="normal">89</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">deprecated</span><span class="p">[</span><span class="n">F</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="n">Any</span><span class="p">]](</span>
+<span class="normal">89</span>
+<span class="normal">90</span>
+<span class="normal">91</span>
+<span class="normal">92</span>
+<span class="normal">93</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">deprecated</span><span class="p">[</span><span class="n">F</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="n">Any</span><span class="p">]](</span>
     <span class="o">*</span><span class="p">,</span>
     <span class="n">since</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">removed_in</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -3488,11 +3497,7 @@ key or a positional argument).</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>skyulf-core/skyulf/core/deprecation.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">41</span>
-<span class="normal">42</span>
-<span class="normal">43</span>
-<span class="normal">44</span>
-<span class="normal">45</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">45</span>
 <span class="normal">46</span>
 <span class="normal">47</span>
 <span class="normal">48</span>
@@ -3505,7 +3510,11 @@ key or a positional argument).</p>
 <span class="normal">55</span>
 <span class="normal">56</span>
 <span class="normal">57</span>
-<span class="normal">58</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">warn_deprecated</span><span class="p">(</span>
+<span class="normal">58</span>
+<span class="normal">59</span>
+<span class="normal">60</span>
+<span class="normal">61</span>
+<span class="normal">62</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">warn_deprecated</span><span class="p">(</span>
     <span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="o">*</span><span class="p">,</span>
     <span class="n">since</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>

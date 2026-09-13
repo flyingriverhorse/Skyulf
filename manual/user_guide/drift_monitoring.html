@@ -3423,8 +3423,24 @@ that threshold at its default.</p>
 <ul>
 <li><code>report.missing_columns</code> — columns present in reference but absent in current data.</li>
 <li><code>report.new_columns</code> — columns in current data that were not in the reference.</li>
+<li><code>type_drift</code> — a shared column whose current values cannot be compared under
+  the reference column's numeric or categorical interpretation.</li>
 </ul>
-<p>Both count toward <code>report.drifted_columns_count</code>, which therefore covers
+<p>Numeric comparisons preserve fractional values and wider numeric types. For
+example, comparing integer reference values <code>0, 1</code> with current values <code>0.9, 1.9</code>
+measures the shift without truncating the current values to integers. Numeric
+text is accepted only when every non-null value can be parsed; a column containing
+<code>"unknown"</code> receives type drift instead of silently discarding those observations.
+Decimal values and parsed numeric text use Float64 precision for measurement.
+Infinite values, including text that overflows to infinity such as <code>"1e400"</code>,
+stop the comparison with an error naming the affected column. Replace them with
+finite or missing values and rerun; the monitoring history records a failed check
+with that explanation.</p>
+<p>Type drift counts as a drifted column and includes a dtype-specific suggestion.
+It has no numerical PSI measurement, so changing distribution thresholds does
+not remove that verdict. Columns with no non-null observations retain the
+existing policy of reporting no distribution measurement.</p>
+<p>These changes count toward <code>report.drifted_columns_count</code>, which therefore covers
 distribution drift <em>and</em> schema drift. A vanished feature has no values left to
 compare, so it never appears in <code>column_drifts</code> — the count is the only place it
 shows up, and it used to be omitted entirely, leaving a report that claimed zero

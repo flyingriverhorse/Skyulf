@@ -3617,9 +3617,16 @@ viz.summary()  # Prints Data Quality, Stats, Outliers, Target Analysis, Alerts t
 viz.plot()     # Opens Matplotlib plots (Distributions, Correlations, PCA, etc.)
 </code></pre>
 <h3 id="the-manual-way-accessing-raw-stats">The Manual Way (Accessing Raw Stats)</h3>
-<p>If you want to build custom reports or integrate into a pipeline, you can access the raw <code>DatasetProfile</code> object.</p>
+<p>For custom reports or application integrations, use <code>EDAProfile</code> for the raw
+result returned by <code>EDAAnalyzer.analyze()</code>. This is the recommended public name,
+available from both <code>skyulf</code> and <code>skyulf.profiling</code>.</p>
+<p>The older <code>DatasetProfile</code> import remains the exact same Pydantic class:
+<code>EDAProfile is DatasetProfile</code>. Existing JSON schemas retain the
+<code>DatasetProfile</code> title, and saved profiles retain their original pickle path.
+The pipeline transformer id <code>"DatasetProfile"</code> still identifies the separate
+inspection node; use that unchanged id in pipeline configurations.</p>
 <pre><code class="language-python">import polars as pl
-from skyulf import EDAAnalyzer
+from skyulf import EDAAnalyzer, EDAProfile
 
 # 1. Load your data into a Polars DataFrame
 df = pl.read_csv(&quot;your_dataset.csv&quot;)
@@ -3629,7 +3636,7 @@ analyzer = EDAAnalyzer(df)
 
 # 3. Run the analysis
 # You can optionally specify a target column for supervised analysis
-profile = analyzer.analyze(target_col=&quot;target_variable&quot;)
+profile: EDAProfile = analyzer.analyze(target_col=&quot;target_variable&quot;)
 
 # 4. Access the results
 print(f&quot;Rows: {profile.row_count}&quot;)
