@@ -23,6 +23,42 @@ _MODELING_FAMILIES = {"train", "tune"}
 _HIDDEN_FAMILIES = {"loader"}
 
 
+def _preprocessing_entry(
+    step_type: str, metadata: Mapping[str, Any], summary: str | None
+) -> dict[str, Any]:
+    """Build one preprocessing label using its optional human display name."""
+    display = metadata.get("display_name")
+    entry: dict[str, Any]
+    if display and display != step_type:
+        entry = {"name": display, "transformer": step_type}
+    else:
+        entry = {"name": step_type}
+    entry["details"] = summary
+    return entry
+
+
+def _diagram_stages(
+    node_results: dict[str, NodeExecutionResult],
+    model_type: str | None,
+    node_params: Mapping[str, Mapping[str, Any]] | None,
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    """Collect visible preprocessing and the first modeling stage in execution order."""
+    steps: list[dict[str, Any]] = []
+    modeling: dict[str, Any] = {}
+    for result in node_results.values():
+        step_type = result.step_type or "unknown"
+        family = _family_of(step_type)
+        if family in _HIDDEN_FAMILIES:
+            continue
+        metadata = result.metadata or {}
+        summary = metadata.get("summary") or params_summary((node_params or {}).get(result.node_id))
+        if family in _MODELING_FAMILIES and not modeling:
+            modeling = {"type": model_type or step_type, "details": summary}
+            continue
+        steps.append(_preprocessing_entry(step_type, metadata, summary))
+    return steps, modeling
+
+
 def build_pipeline_diagram(
     node_results: dict[str, NodeExecutionResult],
     model_type: str | None = None,
@@ -40,28 +76,7 @@ def build_pipeline_diagram(
     the build fails — the diagram is advisory and must never block a run.
     """
     try:
-        steps: list[dict[str, Any]] = []
-        modeling: dict[str, Any] = {}
-        for result in node_results.values():
-            step_type = result.step_type or "unknown"
-            family = _family_of(step_type)
-            if family in _HIDDEN_FAMILIES:
-                continue
-            metadata = result.metadata or {}
-            summary = metadata.get("summary") or params_summary(
-                (node_params or {}).get(result.node_id)
-            )
-            if family in _MODELING_FAMILIES and not modeling:
-                modeling = {"type": model_type or step_type, "details": summary}
-                continue
-            display = metadata.get("display_name")
-            entry: dict[str, Any]
-            if display and display != step_type:
-                entry = {"name": display, "transformer": step_type}
-            else:
-                entry = {"name": step_type}
-            entry["details"] = summary
-            steps.append(entry)
+        steps, modeling = _diagram_stages(node_results, model_type, node_params)
         if not steps and not modeling:
             return None
         return build_mermaid_diagram(steps, modeling)

@@ -281,6 +281,13 @@ def _run_cv_fold(
     }
 
 
+def _contains_native_dates(values: Any) -> bool:
+    """Require nonempty native date values, excluding mixed datetime objects."""
+    return not values.empty and all(
+        isinstance(value, date) and not isinstance(value, datetime) for value in values
+    )
+
+
 def _detect_datetime_columns(X: Any, is_polars: bool) -> list[str]:
     """Return datetime/date columns, including homogeneous pandas native-date objects."""
     if is_polars:
@@ -294,9 +301,7 @@ def _detect_datetime_columns(X: Any, is_polars: bool) -> list[str]:
         values = X[col].dropna()
         # Native dates use object dtype in pandas. Require actual dates rather
         # than parsing text; mixed date/datetime objects cannot be sorted safely.
-        if not values.empty and all(
-            isinstance(value, date) and not isinstance(value, datetime) for value in values
-        ):
+        if _contains_native_dates(values):
             datetime_cols.add(col)
     return [col for col in X.columns if col in datetime_cols]
 

@@ -17,7 +17,7 @@ and is not counted.
 **Qwen follow-up (2026-09-12):** the verified findings
 filed 48 additional records, OC-271–318, after deduplication and scope
 correction. Nineteen have since closed. The live queue now has
-**58 open / 4 parked**; details
+**59 open / 4 parked**, including the subsequent OC-320 pipeline finding; details
 and exclusions are in the latest Log entry. Historical baseline counts
 below are unchanged.
 
@@ -461,6 +461,71 @@ respective fix logs; OC-167 closed with canonical artifact framing on 2026-09-09
 ---
 
 ## Log
+
+### 2026-09-13 — 0.8.22: CI rate-limit isolation and patch coverage
+
+Reproduced the three reported drift-target failures by running the new pipeline,
+drift-reference and drift-target tests in one process: their requests shared the
+same client-address budget and crossed the existing 20/minute limit. The root
+test fixture now resets the shared limiter between test cases. It leaves
+throttling enabled; a new two-case regression reaches the real decorated drift
+route, verifies 20 allowed attempts, a blocked 21st attempt and an independent
+second client. The second case failed before the fixture and now receives its
+own full budget.
+
+Added 35 Core cases around the refactored SHAP, casting, text fallback, tuning,
+refit and leakage paths. Production behavior and coverage exclusions are
+unchanged. Full-suite results and remaining branch evidence are in
+[`ccn_ci_followup_0.8.22.md`](ccn_ci_followup_0.8.22.md).
+OC-320 retains its four strict expected failures; the queue remains
+**59 open / 4 parked**.
+
+### 2026-09-13 — 0.8.22: actual pipeline verification and OC-320
+
+Added real CSV-to-training-to-serving coverage for the CCN refactor: mixed
+numeric/category/text classification, a three-branch training/preview control,
+and public Core regression tuning with save/load and fingerprint checks.
+All scenarios run with pandas/Polars and Grid/Halving Grid. The backend checks
+use an isolated SQLite database for actual deployment records and drift alerts;
+the real scalers are observed to exclude outer test rows from every fit.
+
+The branched graph exposed OC-320: serving removes explicitly dropped raw
+city/note inputs before the earlier fitted encoders consume them. Training
+succeeds, but serving raises a feature-alignment error. The same test fails
+against untouched production sources exported from `e1bc7b44`, establishing
+that it predates the CCN refactor. Four strict expected-failure cases keep it
+visible; no production fix or inference-success claim is made for that graph.
+
+Results and reproduction commands are in
+[`ccn_pipeline_verification_0.8.22.md`](ccn_pipeline_verification_0.8.22.md).
+OC-246 remains open: these new tests do not repair the old local-only smoke
+test. Queue count: **59 open / 4 parked**; no existing finding was closed.
+
+### 2026-09-13 — 0.8.22: complete Core/backend CCN refactor
+
+The user brought forward the 59 function refactors previously deferred to the
+next release and requested version **0.8.22**. All **26 Core / 33 backend**
+functions now meet CCN 10; every new helper is included in the same full-tree
+scan. The committed workflow steps execute successfully: both blocking gates
+return zero findings, while informational reports above 8 show **55 Core / 40
+backend** functions. Thresholds and scanning scope were not changed.
+
+Three implementation agents handled modeling, Core pipeline/preprocessing/
+profiling, and backend execution. The primary handled leakage, API routes,
+monitoring, version synchronization and integration verification. Named helper
+boundaries preserve training/fold order, target alignment, warnings, artifact
+encoding, query filters and preview provenance. Independent review caught and
+corrected a serializer recursion-depth regression before completion; new frozen
+digest and deep-container vectors protect the compatibility contract.
+
+The app, Core setup, frontend manifests and uv lock now declare **0.8.22**;
+the local editable Core distribution also reports that version. The frontend
+was rebuilt and its generated assets match the existing output. The release
+does not require a frontend workflow change or model retraining.
+
+Per-function measurements and verification evidence are recorded in
+[`ccn_refactor_0.8.22.md`](ccn_refactor_0.8.22.md). This is a complexity refactor;
+no audit-queue finding is closed by it. The queue remains **58 open / 4 parked**.
 
 ### 2026-09-13 — complexity thresholds: error above 10, report above 8
 

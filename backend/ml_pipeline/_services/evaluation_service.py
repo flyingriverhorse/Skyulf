@@ -142,6 +142,35 @@ class EvaluationService:
         return dict(zip((str(k) for k in decoded_keys), crosstab.values(), strict=True))
 
     @staticmethod
+    def _find_reference_column(splits: dict[str, Any]) -> str | None:
+        """Find the first reference-column declaration across evaluation splits."""
+        reference_column: str | None = None
+        for split_data in splits.values():
+            if isinstance(split_data, dict):
+                clustering = split_data.get("clustering")
+                if isinstance(clustering, dict) and clustering.get("reference_column"):
+                    reference_column = clustering["reference_column"]
+                    break
+        return reference_column
+
+    @staticmethod
+    def _decode_reference_splits(splits: dict[str, Any], label_encoder: Any) -> None:
+        """Decode each valid reference crosstab while retaining malformed split entries."""
+        for split_data in splits.values():
+            if not isinstance(split_data, dict):
+                continue
+            clustering = split_data.get("clustering")
+            if not isinstance(clustering, dict):
+                continue
+            crosstab = clustering.get("reference_crosstab")
+            if isinstance(crosstab, dict):
+                clustering["reference_crosstab"] = {
+                    cluster_id: EvaluationService._decode_reference_crosstab(counts, label_encoder)
+                    for cluster_id, counts in crosstab.items()
+                    if isinstance(counts, dict)
+                }
+
+    @staticmethod
     def _decode_reference_column(data: Any, artifact_store: Any, job_id: str) -> None:
         """Best-effort decode of clustering's reference-column crosstab labels in-place.
 
@@ -157,13 +186,7 @@ class EvaluationService:
             if not isinstance(splits, dict):
                 return
 
-            reference_column: str | None = None
-            for split_data in splits.values():
-                if isinstance(split_data, dict):
-                    clustering = split_data.get("clustering")
-                    if isinstance(clustering, dict) and clustering.get("reference_column"):
-                        reference_column = clustering["reference_column"]
-                        break
+            reference_column = EvaluationService._find_reference_column(splits)
             if not reference_column:
                 return
 
@@ -175,21 +198,7 @@ class EvaluationService:
             if label_encoder is None:
                 return
 
-            for split_data in splits.values():
-                if not isinstance(split_data, dict):
-                    continue
-                clustering = split_data.get("clustering")
-                if not isinstance(clustering, dict):
-                    continue
-                crosstab = clustering.get("reference_crosstab")
-                if isinstance(crosstab, dict):
-                    clustering["reference_crosstab"] = {
-                        cluster_id: EvaluationService._decode_reference_crosstab(
-                            counts, label_encoder
-                        )
-                        for cluster_id, counts in crosstab.items()
-                        if isinstance(counts, dict)
-                    }
+            EvaluationService._decode_reference_splits(splits, label_encoder)
         except Exception as e:  # noqa: BLE001 - best-effort decode; failure silently skipped
             logger.debug(f"Reference column decode skipped/failed: {e}")
 

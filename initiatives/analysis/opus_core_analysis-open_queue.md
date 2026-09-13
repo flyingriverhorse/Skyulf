@@ -15,7 +15,7 @@ file deliberately carries no history.
 per-area report files `00`–`18`).
 **Baseline:** commit `93d7719e` (master), audit run 2026-08-31 → 09-01 by 15
 parallel read-only agents (Claude Opus 5). 116 findings: 5 🔴 / 45 🟠 / 44 🟡 /
-22 ⚪, plus OC-160–319 filed by later reviews. OC-100 was retracted as a false
+22 ⚪, plus OC-160–320 filed by later reviews. OC-100 was retracted as a false
 positive and is not counted; the corrections pass stays in the archive.
 
 **Status key:** ⬜ open · 🟨 in progress · ✅ done · ⏭️ parked
@@ -29,9 +29,10 @@ archive Log.
 
 ## Live — fix queue
 
-**Current status (2026-09-12): 58 open / 4 parked.**
+**Current status (2026-09-13): 59 open / 4 parked.**
 OC-264/275/282/285/294/295 are fixed in the latest six-finding batch.
 One additional search/refit mismatch is filed as OC-319; verification is in the archive.
+The 0.8.22 pipeline exercise reproduced a pre-existing serving failure as OC-320.
 The verified Qwen follow-up added **48 findings, OC-271–318**,
 grouped below by priority and domain. Qwen #1/#50/#57 reuse OC-253/65/64;
 #13 is already fixed as OC-268. #18/#41 share OC-286, which requires both
@@ -59,6 +60,7 @@ remaining findings are grouped by domain.
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
+| OC-320 | 🟡 | **Serving drops raw inputs before upstream encoders can consume them** (`backend/ml_pipeline/deployment/service.py:450-463`) — Preserve inputs needed by fitted preprocessing until their configured drop step runs; keep the final model feature order enforced. | medium | ⬜ open — A shared split feeds numeric, OneHot and TF-IDF branches; the numeric branch explicitly drops city/note before merging into tuned Random Forest. Training and CV score 1.0, but bundled inference drops city/note before replay and fails with seven missing encoded features. Reproduced on both engines and both Grid/Halving Grid in the current tree, and on untouched e1bc7b44 production sources with pandas/Grid. Strict expected-failure tests and the independent linear control are in `tests/integration/test_ccn_release_pipeline.py`; see [pipeline evidence](ccn_pipeline_verification_0.8.22.md). |
 | OC-272 | 🟡 | **Supported fitted models cannot produce fingerprints or model cards** (`skyulf-core/skyulf/pipeline/seal.py:174-185`) — Qwen #3. Canonicalize supported fitted Cython loss and NumPy Generator state while continuing to reject unknown state explicitly. | medium | ⬜ open — Actual fitted GradientBoosting, HistGB and SGD pipelines raise TypeError in both public APIs; LR/RF controls pass, and the claimed 10/38 catalog ratio was not remeasured. |
 | OC-277 | 🟠 | **Concurrent submissions bypass duplicate-job protection** (`backend/ml_pipeline/_execution/jobs.py:104-119`) — Qwen #8. Make job reservation atomic across API processes and preserve one lock for an in-process key while waiters exist; coordinate lock cleanup with OC-310. | medium | ⬜ open — Two controlled OS processes create two queued jobs with versions 1/2 after the same absent-row check, and waiting coroutines reach two simultaneous entries for one key; one request alone does not duplicate a job and PostgreSQL was not exercised. |
 | OC-278 | 🟠 | **Deployment promotion deactivates a working model before validating the replacement** (`backend/ml_pipeline/deployment/service.py:131-175,260-272`) — Qwen #9. Verify artifact usability before atomic promotion and preserve the active deployment if validation fails. | medium | ⬜ open — A missing-artifact deploy returns 200 and disables a working deployment, then predict returns 400; schema loading does run after commit, so the defect is the validation order rather than a complete absence of loading. |

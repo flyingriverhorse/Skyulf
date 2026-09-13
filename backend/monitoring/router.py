@@ -580,14 +580,9 @@ async def calculate_drift(
     )
     effective_thresholds = _effective_drift_thresholds(custom_thresholds)
     try:
-        comparison_key, excluded = resolve_drift_reference(artifact_store, db_job, reference_key)
-        ref_df = _load_reference_dataframe(artifact_store, comparison_key, job_id)
-        ref_excluded = excluded | {"", target_col} if target_col else excluded
-        current_excluded = excluded | {target_col} if target_col else excluded
-        ref_df = ref_df.drop([col for col in ref_df.columns if col in ref_excluded])
-        curr_df = curr_df.drop([col for col in curr_df.columns if col in current_excluded])
-        calculator = DriftCalculator(ref_df, curr_df)
-        report = calculator.calculate_drift(thresholds=custom_thresholds or None)
+        report = _calculate_reference_drift(
+            artifact_store, db_job, reference_key, job_id, target_col, curr_df, custom_thresholds
+        )
     except Exception as exc:
         logger.exception("Drift calculation failed for job %s", sanitize_for_log(job_id))
         await _save_drift_alert(
@@ -1026,27 +1021,7 @@ async def list_error_events(
         except ValueError:
             since_dt = None  # ignore malformed since param
 
-    conditions = []
-    if not show_resolved:
-        conditions.append(ErrorEvent.resolved_at.is_(None))
-    if since_dt is not None:
-        conditions.append(ErrorEvent.created_at >= _normalize_since_for_naive_column(since_dt))
-    if severity == "critical":
-        conditions.append(ErrorEvent.status_code >= 500)
-    elif severity == "warning":
-        conditions.append(ErrorEvent.status_code.between(400, 499))
-    elif severity == "info":
-        conditions.append(ErrorEvent.status_code < 400)
-    if error_type is not None:
-        conditions.append(ErrorEvent.error_type == error_type)
-    if job_id is not None:
-        conditions.append(sa_func.coalesce(ErrorEvent.job_id, "") == job_id)
-    if q:
-        conditions.append(
-            _q_like_condition(
-                q, ErrorEvent.message, ErrorEvent.route, ErrorEvent.error_type, ErrorEvent.job_id
-            )
-        )
+    conditions = _error_event_conditions(since_dt, show_resolved, severity, error_type, job_id, q)
 
     total_unfiltered_result = await db.execute(select(sa_func.count()).select_from(ErrorEvent))
     total_unfiltered = int(total_unfiltered_result.scalar() or 0)
@@ -1733,23 +1708,7 @@ async def list_pipeline_logs(
 
     limit = min(max(1, limit), 500)
 
-    conditions = []
-    if since_dt is not None:
-        conditions.append(PipelineRunLog.run_at >= _normalize_since_for_naive_column(since_dt))
-    if pipeline_id is not None:
-        conditions.append(PipelineRunLog.pipeline_id == pipeline_id)
-    if level is not None:
-        conditions.append(PipelineRunLog.level == level)
-    if node_type is not None:
-        conditions.append(PipelineRunLog.node_type == node_type)
-    if node_id is not None:
-        conditions.append(sa_func.coalesce(PipelineRunLog.node_id, "") == node_id)
-    if q:
-        conditions.append(
-            _q_like_condition(
-                q, PipelineRunLog.message, PipelineRunLog.node_type, PipelineRunLog.node_id
-            )
-        )
+    conditions = _pipeline_log_conditions(since_dt, pipeline_id, level, node_type, node_id, q)
 
     total_unfiltered_result = await db.execute(select(sa_func.count()).select_from(PipelineRunLog))
     total_unfiltered = int(total_unfiltered_result.scalar() or 0)
@@ -1922,15 +1881,7 @@ def _parse_inspector_node(node: dict[str, Any]) -> tuple[str, str, dict[str, Any
         params = node.get("params") or {}
         inputs = node.get("inputs") or []
     else:
-        node_id = str(node.get("id") or "")
-        step_type = str(node.get("type") or node.get("data", {}).get("catalogType") or "unknown")
-        params = (
-            node.get("data", {}).get("config")
-            or node.get("parameters")
-            or node.get("data", {})
-            or {}
-        )
-        inputs = node.get("inputs") or []
+        node_id, step_type, params, inputs = _parse_legacy_inspector_node(node)
     return (
         node_id,
         step_type,
@@ -2011,24 +1962,7 @@ async def _build_node_inspector_response(
     node_map = _build_node_map(graph)
     entry = node_map.get(node_id)
 
-    node_detail: NodeInspectorDetail | None = None
-    if entry is not None:
-        step_type, params, inputs = entry
-        metrics: dict[str, Any] = cast(dict[str, Any], job.metrics or {})
-        execution_seconds, execution_status = _extract_node_execution(metrics, node_id)
-        node_detail = NodeInspectorDetail(
-            node_id=node_id,
-            step_type=step_type,
-            label=_humanize_step_type(step_type),
-            params=params,
-            upstream=[_build_node_neighbor(nid, node_map) for nid in inputs if nid],
-            downstream=[
-                _build_node_neighbor(nid, node_map)
-                for nid in _find_downstream_ids(node_id, node_map)
-            ],
-            execution_seconds=execution_seconds,
-            execution_status=execution_status,
-        )
+    node_detail = _node_inspector_detail(job, node_id, node_map, entry)
 
     dataset_name = await resolve_dataset_name(db, job.dataset_source_id)
 
@@ -2113,3 +2047,132 @@ async def get_pipeline_run_node(
     if job is None:
         raise HTTPException(status_code=404, detail=f"No job found for pipeline run {pipeline_id}")
     return await _build_node_inspector_response(db, job, node_id)
+
+
+def _error_event_conditions(
+    since_dt: datetime | None,
+    show_resolved: bool,
+    severity: str | None,
+    error_type: str | None,
+    job_id: str | None,
+    q: str | None,
+) -> list[Any]:
+    """Build error search predicates without loading or filtering rows in Python."""
+    from sqlalchemy import func as sa_func
+
+    conditions = []
+    if not show_resolved:
+        conditions.append(ErrorEvent.resolved_at.is_(None))
+    if since_dt is not None:
+        conditions.append(ErrorEvent.created_at >= _normalize_since_for_naive_column(since_dt))
+    if severity == "critical":
+        conditions.append(ErrorEvent.status_code >= 500)
+    elif severity == "warning":
+        conditions.append(ErrorEvent.status_code.between(400, 499))
+    elif severity == "info":
+        conditions.append(ErrorEvent.status_code < 400)
+    if error_type is not None:
+        conditions.append(ErrorEvent.error_type == error_type)
+    if job_id is not None:
+        conditions.append(sa_func.coalesce(ErrorEvent.job_id, "") == job_id)
+    if q:
+        conditions.append(
+            _q_like_condition(
+                q, ErrorEvent.message, ErrorEvent.route, ErrorEvent.error_type, ErrorEvent.job_id
+            )
+        )
+
+    return conditions
+
+
+def _pipeline_log_conditions(
+    since_dt: datetime | None,
+    pipeline_id: str | None,
+    level: str | None,
+    node_type: str | None,
+    node_id: str | None,
+    q: str | None,
+) -> list[Any]:
+    """Build bounded log search predicates with exact facets and escaped text."""
+    from sqlalchemy import func as sa_func
+
+    conditions = []
+    if since_dt is not None:
+        conditions.append(PipelineRunLog.run_at >= _normalize_since_for_naive_column(since_dt))
+    if pipeline_id is not None:
+        conditions.append(PipelineRunLog.pipeline_id == pipeline_id)
+    if level is not None:
+        conditions.append(PipelineRunLog.level == level)
+    if node_type is not None:
+        conditions.append(PipelineRunLog.node_type == node_type)
+    if node_id is not None:
+        conditions.append(sa_func.coalesce(PipelineRunLog.node_id, "") == node_id)
+    if q:
+        conditions.append(
+            _q_like_condition(
+                q, PipelineRunLog.message, PipelineRunLog.node_type, PipelineRunLog.node_id
+            )
+        )
+
+    return conditions
+
+
+def _calculate_reference_drift(
+    artifact_store: Any,
+    db_job: Any,
+    reference_key: str,
+    job_id: str,
+    target_col: str | None,
+    curr_df: Any,
+    custom_thresholds: dict[str, float],
+) -> Any:
+    """Compare the chosen reference after excluding target and dropped columns."""
+    comparison_key, excluded = resolve_drift_reference(artifact_store, db_job, reference_key)
+    ref_df = _load_reference_dataframe(artifact_store, comparison_key, job_id)
+    ref_excluded = excluded | {"", target_col} if target_col else excluded
+    current_excluded = excluded | {target_col} if target_col else excluded
+    ref_df = ref_df.drop([col for col in ref_df.columns if col in ref_excluded])
+    curr_df = curr_df.drop([col for col in curr_df.columns if col in current_excluded])
+    calculator = DriftCalculator(ref_df, curr_df)
+    report = calculator.calculate_drift(thresholds=custom_thresholds or None)
+    return report
+
+
+def _parse_legacy_inspector_node(node: dict[str, Any]) -> tuple[str, str, Any, Any]:
+    """Read rescued React Flow nodes using the existing config fallback order."""
+    node_id = str(node.get("id") or "")
+    step_type = str(node.get("type") or node.get("data", {}).get("catalogType") or "unknown")
+    params = (
+        node.get("data", {}).get("config") or node.get("parameters") or node.get("data", {}) or {}
+    )
+    inputs = node.get("inputs") or []
+    return node_id, step_type, params, inputs
+
+
+def _node_inspector_detail(
+    job: TrainingJob,
+    node_id: str,
+    node_map: dict[str, _GraphNodeEntry],
+    entry: _GraphNodeEntry | None,
+) -> NodeInspectorDetail | None:
+    """Assemble one recorded node with its neighbors and measured execution."""
+    node_detail: NodeInspectorDetail | None = None
+    if entry is not None:
+        step_type, params, inputs = entry
+        metrics: dict[str, Any] = cast(dict[str, Any], job.metrics or {})
+        execution_seconds, execution_status = _extract_node_execution(metrics, node_id)
+        node_detail = NodeInspectorDetail(
+            node_id=node_id,
+            step_type=step_type,
+            label=_humanize_step_type(step_type),
+            params=params,
+            upstream=[_build_node_neighbor(nid, node_map) for nid in inputs if nid],
+            downstream=[
+                _build_node_neighbor(nid, node_map)
+                for nid in _find_downstream_ids(node_id, node_map)
+            ],
+            execution_seconds=execution_seconds,
+            execution_status=execution_status,
+        )
+
+    return node_detail

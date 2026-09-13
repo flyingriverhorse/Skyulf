@@ -373,7 +373,53 @@ def validate_no_preprocessing_before_split(
     splitter_ids = {n.node_id for n in nodes if n.step_type in train_test_split_step_types()}
     descendants = _build_descendant_map(nodes)
     nodes_by_id = {n.node_id: n for n in nodes}
-    execution_ids = (
+    execution_ids = _execution_node_ids(nodes, nodes_by_id, descendants, target_node_id)
+    execution_splitters = splitter_ids & execution_ids
+    execution_nodes = [n for n in nodes if n.node_id in execution_ids]
+    data_dependent = data_dependent_step_types()
+
+    checked, exempted, messages = _inspect_pre_split_nodes(
+        nodes,
+        execution_ids,
+        execution_nodes,
+        nodes_by_id,
+        descendants,
+        splitter_ids,
+        execution_splitters,
+        data_dependent,
+        on_leakage,
+    )
+
+    detail = {"splitters": sorted(execution_splitters), "checked": checked, "exempted": exempted}
+    if not splitter_ids:
+        if on_leakage != "ignore":
+            logger.warning(NO_SPLIT_DIAGNOSTIC)
+        return {"status": "no_split", "messages": [NO_SPLIT_DIAGNOSTIC], **detail}
+    training_leaves = _training_leaves(nodes, execution_ids)
+    _inspect_training_branches(
+        training_leaves,
+        nodes_by_id,
+        splitter_ids,
+        data_dependent,
+        execution_nodes,
+        checked,
+        messages,
+        on_leakage,
+    )
+
+    if messages:
+        return {"status": "warnings", "messages": messages, **detail}
+    return {"status": "passed", "messages": [], **detail}
+
+
+def _execution_node_ids(
+    nodes: list[NodeConfig],
+    nodes_by_id: dict[str, NodeConfig],
+    descendants: dict[str, set[str]],
+    target_node_id: str | None,
+) -> set[str]:
+    """Limit admission checks to the selected node and its ancestors."""
+    return (
         {
             n.node_id
             for n in nodes
@@ -382,10 +428,20 @@ def validate_no_preprocessing_before_split(
         if target_node_id in nodes_by_id
         else set(nodes_by_id)
     )
-    execution_splitters = splitter_ids & execution_ids
-    execution_nodes = [n for n in nodes if n.node_id in execution_ids]
-    data_dependent = data_dependent_step_types()
 
+
+def _inspect_pre_split_nodes(
+    nodes: list[NodeConfig],
+    execution_ids: set[str],
+    execution_nodes: list[NodeConfig],
+    nodes_by_id: dict[str, NodeConfig],
+    descendants: dict[str, set[str]],
+    splitter_ids: set[str],
+    execution_splitters: set[str],
+    data_dependent: frozenset[str],
+    on_leakage: OnLeakage,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[str]]:
+    """Collect ordered exemptions and violations before reachable splitters."""
     checked: list[dict[str, Any]] = []
     exempted: list[dict[str, Any]] = []
     messages: list[str] = []
@@ -421,24 +477,50 @@ def validate_no_preprocessing_before_split(
                 "FeatureTargetSplitter before it if you only need to separate "
                 "the target column (that does not create a train/test boundary)."
             )
-            if on_leakage == "raise":
-                raise ValueError(message)
-            if on_leakage == "warn":
-                logger.warning(message)
-            messages.append(message)
+            _report_violation(message, on_leakage, messages)
 
-    detail = {"splitters": sorted(execution_splitters), "checked": checked, "exempted": exempted}
-    if not splitter_ids:
-        if on_leakage != "ignore":
-            logger.warning(NO_SPLIT_DIAGNOSTIC)
-        return {"status": "no_split", "messages": [NO_SPLIT_DIAGNOSTIC], **detail}
-    training_leaves = [
+    return checked, exempted, messages
+
+
+def _training_leaves(nodes: list[NodeConfig], execution_ids: set[str]) -> list[NodeConfig]:
+    """Find terminal trainers inside the requested execution subgraph."""
+    return [
         n
         for n in nodes
         if n.node_id in execution_ids
         and n.step_type in _TRAINING_LEAF_STEP_TYPES
         and not any(n.node_id in other.inputs for other in nodes if other.node_id in execution_ids)
     ]
+
+
+def _mark_branch_learners(branch_learners: list[NodeConfig], checked: list[dict[str, Any]]) -> None:
+    """Update existing verdict rows without changing their order or split flags."""
+    for learner in branch_learners:
+        existing = next((item for item in checked if item["node_id"] == learner.node_id), None)
+        if existing is None:
+            checked.append(
+                {
+                    "node_id": learner.node_id,
+                    "step_type": learner.step_type,
+                    "before_split": False,
+                    "violation": True,
+                }
+            )
+        else:
+            existing["violation"] = True
+
+
+def _inspect_training_branches(
+    training_leaves: list[NodeConfig],
+    nodes_by_id: dict[str, NodeConfig],
+    splitter_ids: set[str],
+    data_dependent: frozenset[str],
+    execution_nodes: list[NodeConfig],
+    checked: list[dict[str, Any]],
+    messages: list[str],
+    on_leakage: OnLeakage,
+) -> None:
+    """Check unsplit trainer branches and preserve fold-refit exemptions."""
     for training_node in training_leaves:
         branch_learners = _find_unprotected_learners(
             training_node,
@@ -461,25 +543,14 @@ def validate_no_preprocessing_before_split(
             "these nodes, or enable cross-validation with a linear preprocessing "
             "path that can be refitted per fold."
         )
-        for learner in branch_learners:
-            existing = next((item for item in checked if item["node_id"] == learner.node_id), None)
-            if existing is None:
-                checked.append(
-                    {
-                        "node_id": learner.node_id,
-                        "step_type": learner.step_type,
-                        "before_split": False,
-                        "violation": True,
-                    }
-                )
-            else:
-                existing["violation"] = True
-        if on_leakage == "raise":
-            raise ValueError(message)
-        if on_leakage == "warn":
-            logger.warning(message)
-        messages.append(message)
+        _mark_branch_learners(branch_learners, checked)
+        _report_violation(message, on_leakage, messages)
 
-    if messages:
-        return {"status": "warnings", "messages": messages, **detail}
-    return {"status": "passed", "messages": [], **detail}
+
+def _report_violation(message: str, on_leakage: OnLeakage, messages: list[str]) -> None:
+    """Apply the requested error policy while retaining diagnostic messages."""
+    if on_leakage == "raise":
+        raise ValueError(message)
+    if on_leakage == "warn":
+        logger.warning(message)
+    messages.append(message)

@@ -42,17 +42,19 @@ class NodeInspectionCapture:
     input_resolved: bool = False
 
 
+def _split_parts(value: Any) -> list[tuple[str | None, Any]]:
+    """Resolve supported split containers in the fixed train/test/validation order."""
+    if isinstance(value, SplitDataset):
+        return [(split, getattr(value, split)) for split in SPLITS]
+    if isinstance(value, dict) and any(split in value for split in SPLITS):
+        return [(split, value.get(split)) for split in SPLITS]
+    return [(None, value)]
+
+
 def _table_parts(value: Any, port: str) -> list[tuple[Any, str, str | None]]:
     """Flatten only the supported split and feature/target containers, at most six tables."""
-    if isinstance(value, SplitDataset):
-        parts = [(split, getattr(value, split)) for split in SPLITS]
-    elif isinstance(value, dict) and any(split in value for split in SPLITS):
-        parts = [(split, value.get(split)) for split in SPLITS]
-    else:
-        parts = [(None, value)]
-
     tables = []
-    for split, part in parts:
+    for split, part in _split_parts(value):
         if part is None:
             continue
         if isinstance(part, tuple) and len(part) == 2:
@@ -82,16 +84,8 @@ def _as_frame(value: Any, port: str) -> pd.DataFrame | pl.DataFrame | None:
     return None
 
 
-def _cell(value: Any, limit: int) -> tuple[Any, bool]:
-    """Return a JSON-safe scalar or bounded display string, detached from source cells."""
-    if value is None or value is pd.NA or value is pd.NaT:
-        return None, False
-    if isinstance(value, np.generic):
-        value = value.item()
-    if isinstance(value, bool | int):
-        return value, False
-    if isinstance(value, float):
-        return (value if math.isfinite(value) else None), False
+def _display_cell(value: Any, limit: int) -> tuple[str, bool]:
+    """Render non-numeric cells with bounded strings and no arbitrary object repr."""
     if isinstance(value, (datetime, date, time)):
         value = value.isoformat()
     elif isinstance(value, (timedelta, Decimal)):
@@ -106,6 +100,29 @@ def _cell(value: Any, limit: int) -> tuple[Any, bool]:
     else:
         display = f"<{type(value).__name__}>"
     return display[:limit], True
+
+
+def _cell(value: Any, limit: int) -> tuple[Any, bool]:
+    """Return a JSON-safe scalar or bounded display string, detached from source cells."""
+    if value is None or value is pd.NA or value is pd.NaT:
+        return None, False
+    if isinstance(value, np.generic):
+        value = value.item()
+    if isinstance(value, bool | int):
+        return value, False
+    if isinstance(value, float):
+        return (value if math.isfinite(value) else None), False
+    return _display_cell(value, limit)
+
+
+def _sample_row(names: list[str], cells: tuple, cell_limit: int) -> tuple[dict, bool]:
+    """Detach one sampled row and report whether any cell was shortened."""
+    row = {}
+    truncated = False
+    for name, value in zip(names, cells, strict=True):
+        row[name], shortened = _cell(value, cell_limit)
+        truncated = truncated or shortened
+    return row, truncated
 
 
 def _snapshot_table(
@@ -135,10 +152,8 @@ def _snapshot_table(
     # Leave room for JSON escaping and row keys even for six wide split tables.
     cell_limit = min(MAX_CELL_CHARACTERS, max(16, budget // (max(1, len(names)) * 8)))
     for cells in values:
-        row = {}
-        for name, value in zip(names, cells, strict=True):
-            row[name], shortened = _cell(value, cell_limit)
-            truncated = truncated or shortened
+        row, shortened = _sample_row(names, cells, cell_limit)
+        truncated = truncated or shortened
         size = len(json.dumps(row, separators=(",", ":"), allow_nan=False)) + 1
         if size > budget:
             truncated = True

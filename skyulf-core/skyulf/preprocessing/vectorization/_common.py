@@ -33,6 +33,24 @@ TextApplyFn = Callable[[pd.DataFrame, Any, dict[str, Any]], tuple[pd.DataFrame, 
 PolarsTextApplyFn = Callable[[Any, dict[str, Any]], Any]
 
 
+def _is_polars_wrapper(X: Any) -> bool:
+    """Recognize public wrappers by their native frame without relying on its module."""
+    return (
+        type(X).__module__.startswith("skyulf")
+        and hasattr(X, "to_native")
+        and type(X.to_native()).__module__.startswith("polars")
+    )
+
+
+def _restore_text_output_engine(X: Any, was_polars: bool, was_wrapped: bool) -> Any:
+    """Restore pandas fallback output to the input's Polars frame or wrapper type."""
+    if was_polars and isinstance(X, pd.DataFrame):
+        X = pl.from_pandas(X)
+        if was_wrapped:
+            X = SkyulfPolarsWrapper(X)
+    return X
+
+
 def apply_text_dual_engine(
     df: Any,
     params: dict[str, Any],
@@ -65,11 +83,7 @@ def apply_text_dual_engine(
     # under `skyulf.*` and exposes the real frame via `to_native()`, so a
     # plain module check misses it and would hand the wrapper itself to `fn`
     # (F-09).
-    was_wrapped = (
-        type(X).__module__.startswith("skyulf")
-        and hasattr(X, "to_native")
-        and type(X.to_native()).__module__.startswith("polars")
-    )
+    was_wrapped = _is_polars_wrapper(X)
     was_polars = (
         hasattr(X, "to_pandas") and type(X).__module__.startswith("polars")
     ) or was_wrapped
@@ -86,13 +100,27 @@ def apply_text_dual_engine(
 
     X_out_pd, y_out = pandas_fn(X_pd, y, params)
 
-    X_out: Any = X_out_pd
-    if was_polars and isinstance(X_out_pd, pd.DataFrame):
-        X_out = pl.from_pandas(X_out_pd)
-        if was_wrapped:
-            X_out = SkyulfPolarsWrapper(X_out)
-
+    X_out = _restore_text_output_engine(X_out_pd, was_polars, was_wrapped)
     return pack_pipeline_output(X_out, y_out, is_tuple)
+
+
+def _exclude_text_target_columns(
+    valid_cols: list[str], config: dict[str, Any], y: Any
+) -> list[str]:
+    """Exclude configured and named targets while retaining the requested column order."""
+    target_columns = {
+        name
+        for name in (config.get("target_column"), getattr(y, "name", None))
+        if isinstance(name, str) and name
+    }
+    excluded = [col for col in valid_cols if col in target_columns]
+    if excluded:
+        logger.warning(
+            "Text feature nodes exclude target columns %s to prevent target-derived features.",
+            excluded,
+        )
+        valid_cols = [col for col in valid_cols if col not in target_columns]
+    return valid_cols
 
 
 def resolve_fit_text_valid_columns(
@@ -115,18 +143,7 @@ def resolve_fit_text_valid_columns(
         return None
 
     valid_cols = resolve_valid_columns(X, cols)
-    target_columns = {
-        name
-        for name in (config.get("target_column"), getattr(y, "name", None))
-        if isinstance(name, str) and name
-    }
-    excluded = [col for col in valid_cols if col in target_columns]
-    if excluded:
-        logger.warning(
-            "Text feature nodes exclude target columns %s to prevent target-derived features.",
-            excluded,
-        )
-        valid_cols = [col for col in valid_cols if col not in target_columns]
+    valid_cols = _exclude_text_target_columns(valid_cols, config, y)
     if not valid_cols:
         return None
 

@@ -357,14 +357,7 @@ async def resubmit_job_from_graph(
 
     settings = get_settings()
     payload: dict[str, Any] = dict(branch_graph)
-    if settings.USE_CELERY:
-        task = run_pipeline_batch_task.delay([(new_job_id, payload)])
-        try:
-            await JobManager.attach_celery_task_id(db, new_job_id, task.id)
-        except Exception:  # noqa: BLE001 - task-id bookkeeping must not block resubmit
-            logger.warning("Failed to attach celery task id for retried job %s", new_job_id)
-    else:
-        background_tasks.add_task(run_pipeline_task, new_job_id, payload)
+    await _dispatch_retried_job(db, new_job_id, payload, settings, background_tasks)
 
     return new_job_id
 
@@ -449,3 +442,21 @@ async def run_pipeline(
 
 
 __all__ = ["router", "resubmit_job_from_graph"]
+
+
+async def _dispatch_retried_job(
+    db: AsyncSession,
+    new_job_id: str,
+    payload: dict[str, Any],
+    settings: Any,
+    background_tasks: BackgroundTasks,
+) -> None:
+    """Dispatch a newly created retry and attach its task id when available."""
+    if settings.USE_CELERY:
+        task = run_pipeline_batch_task.delay([(new_job_id, payload)])
+        try:
+            await JobManager.attach_celery_task_id(db, new_job_id, task.id)
+        except Exception:  # noqa: BLE001 - task-id bookkeeping must not block resubmit
+            logger.warning("Failed to attach celery task id for retried job %s", new_job_id)
+    else:
+        background_tasks.add_task(run_pipeline_task, new_job_id, payload)

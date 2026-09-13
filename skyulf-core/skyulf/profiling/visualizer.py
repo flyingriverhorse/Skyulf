@@ -735,6 +735,23 @@ class EDAVisualizer:
         label_map = EDAVisualizer._label_color_map(labels)
         return [label_map.get(lbl, -1) for lbl in labels if lbl is not None]
 
+    def _plot_labeled_pca_points(self, labeled):
+        """Plot PCA points with numeric or categorical target colors and a colorbar."""
+        if not labeled:
+            return
+
+        import matplotlib.pyplot as plt  # ty: ignore[unresolved-import]  # noqa: PLC0415 - optional viz extra
+
+        c_values = self._pca_color_values([p.label for p in labeled])
+        scatter = plt.scatter(
+            [p.x for p in labeled],
+            [p.y for p in labeled],
+            c=c_values,
+            cmap="viridis",
+            alpha=0.8,
+        )
+        plt.colorbar(scatter, label="Target")
+
     def _plot_pca(self):
         """Plot every PCA point, distinguishing missing labels from colored targets."""
         if not self.profile.pca_data:
@@ -746,16 +763,7 @@ class EDAVisualizer:
         unlabeled = [p for p in self.profile.pca_data if p.label is None]
 
         plt.figure(figsize=(8, 6))
-        if labeled:
-            c_values = self._pca_color_values([p.label for p in labeled])
-            scatter = plt.scatter(
-                [p.x for p in labeled],
-                [p.y for p in labeled],
-                c=c_values,
-                cmap="viridis",
-                alpha=0.8,
-            )
-            plt.colorbar(scatter, label="Target")
+        self._plot_labeled_pca_points(labeled)
         if unlabeled:
             plt.scatter(
                 [p.x for p in unlabeled],

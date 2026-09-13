@@ -18,6 +18,13 @@ from .sklearn_wrapper import SklearnApplier, SklearnCalculator
 logger = logging.getLogger(__name__)
 
 
+def _select_numeric_pandas_features(X: pd.DataFrame) -> tuple[pd.DataFrame, list[str]]:
+    """Select numeric pandas columns and report the excluded column names."""
+    numeric = X.select_dtypes(include=["number", "bool"])
+    dropped = [c for c in X.columns if c not in numeric.columns]
+    return numeric, dropped
+
+
 def _select_numeric_features(X: Any) -> tuple[Any, list[str]]:
     """Drop non-numeric (e.g. text/id) columns before feeding a DataFrame to sklearn.
 
@@ -43,13 +50,9 @@ def _select_numeric_features(X: Any) -> tuple[Any, list[str]]:
     drop every column, including numeric ones.
     """
     if isinstance(X, pd.DataFrame):
-        numeric = X.select_dtypes(include=["number", "bool"])
-        dropped = [c for c in X.columns if c not in numeric.columns]
-        return numeric, dropped
+        return _select_numeric_pandas_features(X)
     if isinstance(X, SkyulfPandasWrapper):
-        native = X.to_pandas()
-        numeric = native.select_dtypes(include=["number", "bool"])
-        dropped = [c for c in native.columns if c not in numeric.columns]
+        numeric, dropped = _select_numeric_pandas_features(X.to_pandas())
         return SkyulfPandasWrapper(numeric), dropped
     if isinstance(X, pl.DataFrame | SkyulfPolarsWrapper):
         numeric_cols = [

@@ -87,6 +87,18 @@ def __getattr__(name: str) -> Any:
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
+def _is_raw_validation_array(
+    X_val: Any, original_columns: list[str], array_is_preprocessed: bool
+) -> bool:
+    """Identify an untransformed validation array that still has the time column."""
+    return (
+        not array_is_preprocessed
+        and isinstance(X_val, np.ndarray)
+        and X_val.ndim == 2
+        and X_val.shape[1] == len(original_columns)
+    )
+
+
 def _align_time_series_validation(
     payload: tuple[Any, Any] | None,
     original_columns: list[str],
@@ -102,12 +114,7 @@ def _align_time_series_validation(
         removed = set(original_columns) - set(feature_columns)
         columns = [column for column in X_val.columns if column not in removed]
         return X_val[columns], y_val
-    if (
-        not array_is_preprocessed
-        and isinstance(X_val, np.ndarray)
-        and X_val.ndim == 2
-        and X_val.shape[1] == len(original_columns)
-    ):
+    if _is_raw_validation_array(X_val, original_columns, array_is_preprocessed):
         positions = [i for i, column in enumerate(original_columns) if column in feature_columns]
         return X_val[:, positions], y_val
     return payload
@@ -118,6 +125,138 @@ def _estimator_allows_nan(estimator: Any) -> bool:
     if get_tags is not None:
         return get_tags(estimator).input_tags.allow_nan
     return bool(estimator._get_tags()["allow_nan"])
+
+
+def _prepare_time_series_data(
+    X: Any,
+    y: Any,
+    tuning_config: TuningConfig,
+    validation_data: tuple[Any, Any] | None,
+    validation_frames: tuple[Any, Any] | None,
+    preprocessing: "FoldPreprocessor | None",
+    log_callback: Callable[[str], None] | None,
+) -> tuple[Any, Any, tuple[Any, Any] | None, tuple[Any, Any] | None]:
+    """Sort named time-series features and align validation columns without row sorting."""
+    if tuning_config.cv_type == "time_series_split" and hasattr(X, "columns"):
+        original_columns = list(X.columns)
+        X, y = _sort_by_time(X, y, tuning_config.cv_time_column, log_callback, logger)
+        feature_columns = list(X.columns)
+        validation_data = _align_time_series_validation(
+            validation_data,
+            original_columns,
+            feature_columns,
+            # With raw validation frames supplied separately, an array is
+            # already transformed; its width cannot identify raw columns.
+            array_is_preprocessed=preprocessing is not None and validation_frames is not None,
+        )
+        validation_frames = _align_time_series_validation(
+            validation_frames, original_columns, feature_columns
+        )
+    return X, y, validation_data, validation_frames
+
+
+def _report_search_warnings(
+    caught: list[warnings.WarningMessage], log_callback: Callable[[str], None] | None
+) -> None:
+    """Summarize search convergence failures and re-emit unrelated warnings."""
+    convergence_count = 0
+    for w in caught:
+        if issubclass(w.category, ConvergenceWarning):
+            convergence_count += 1
+        else:
+            warnings.warn_explicit(w.message, w.category, w.filename, w.lineno)
+    if convergence_count:
+        conv_msg = (
+            f"{convergence_count} candidate fit(s) during hyperparameter search did not "
+            "fully converge (max_iter reached). Consider increasing max_iter, scaling "
+            "features, or picking a different solver."
+        )
+        logger.warning(conv_msg)
+        if log_callback:
+            log_callback(conv_msg)
+
+
+def _can_wrap_preprocessing(
+    preprocessing: "FoldPreprocessor | None",
+    searcher_strategy: bool,
+    preprocessing_frames: tuple[Any, Any] | None,
+    validation_data: tuple[Any, Any] | None,
+    validation_frames: tuple[Any, Any] | None,
+    log_callback: Callable[[str], None] | None,
+) -> bool:
+    """Check whether the searcher has named frames for preprocessing every fold."""
+    wrapped = preprocessing is not None and searcher_strategy
+    if wrapped and preprocessing_frames is None:
+        # Numpy-only SDK call: the preprocessor needs named frames to
+        # run, so the wrap cannot be built. Keep today's behaviour —
+        # score the raw pre-transform payload — with an explicit log.
+        wrapped = False
+        if log_callback:
+            log_callback(
+                "Per-fold preprocessing refit skipped for this tuning strategy: "
+                "no named frames are available to run the preprocessing chain "
+                "inside the searcher's folds. Scores are computed on the raw "
+                "pre-transform payload."
+            )
+    if wrapped and validation_data is not None and validation_frames is None:
+        # Holdout tuning needs the validation rows as named frames too
+        # (the searcher scores them in the original pre-transform space).
+        # Without them the wrap would score misaligned rows, so fall back
+        # to raw-payload scoring with an explicit log instead.
+        wrapped = False
+        if log_callback:
+            log_callback(
+                "Per-fold preprocessing refit skipped for holdout tuning: "
+                "no named validation frames are available to score against. "
+                "Scores are computed on the raw pre-transform payload."
+            )
+    return wrapped
+
+
+def _wrap_search_estimator(
+    base_estimator: Any,
+    config: TuningConfig,
+    preprocessing: "FoldPreprocessor | None",
+    preprocessing_frames: tuple[Any, Any] | None,
+    class_weight: Any,
+    wrapped: bool,
+    weighted: bool,
+    log_callback: Callable[[str], None] | None,
+) -> tuple[Any, TuningConfig]:
+    """Wrap fold preprocessing and weights, routing search parameters to their owners."""
+    frame_x = preprocessing_frames[0] if preprocessing_frames is not None else None
+    feature_names = tuple(map(str, frame_x.columns)) if hasattr(frame_x, "columns") else None
+    estimator = Pipeline(
+        [
+            (
+                "model",
+                FoldAwareModelStep(
+                    estimator=base_estimator,
+                    preprocessor=preprocessing if wrapped else None,
+                    feature_names=feature_names,
+                    class_weight=class_weight,
+                ),
+            )
+        ]
+    )
+    if wrapped and log_callback:
+        log_callback(
+            "Per-fold preprocessing refit runs inside the searcher via the fold-aware estimator."
+        )
+    # Nonnative weights belong to the fit-time step; constructor
+    # parameters still route to the underlying estimator.
+    search_config = replace(
+        config,
+        search_space={
+            (
+                "model__class_weight"
+                if weighted and key == "class_weight"
+                else f"model__estimator__{key}"
+            ): values
+            for key, values in (config.search_space or {}).items()
+        },
+    )
+    return estimator, search_config
 
 
 class TuningCalculator(BaseModelCalculator):
@@ -410,21 +549,9 @@ class TuningCalculator(BaseModelCalculator):
         # Mirrors the same fix already applied to perform_cross_validation();
         # without it, tuning with cv_type="time_series_split" silently leaks
         # the time column and evaluates folds out of chronological order.
-        if tuning_config.cv_type == "time_series_split" and hasattr(X, "columns"):
-            original_columns = list(X.columns)
-            X, y = _sort_by_time(X, y, tuning_config.cv_time_column, log_callback, logger)
-            feature_columns = list(X.columns)
-            validation_data = _align_time_series_validation(
-                validation_data,
-                original_columns,
-                feature_columns,
-                # With raw validation frames supplied separately, an array is
-                # already transformed; its width cannot identify raw columns.
-                array_is_preprocessed=preprocessing is not None and validation_frames is not None,
-            )
-            validation_frames = _align_time_series_validation(
-                validation_frames, original_columns, feature_columns
-            )
+        X, y, validation_data, validation_frames = _prepare_time_series_data(
+            X, y, tuning_config, validation_data, validation_frames, preprocessing, log_callback
+        )
 
         # Convert data to Numpy for tuning
         X_np, y_np = SklearnBridge.to_sklearn((X, y))
@@ -479,21 +606,7 @@ class TuningCalculator(BaseModelCalculator):
                 preprocessing_frames=(X, y) if preprocessing is not None else None,
                 validation_frames=validation_frames,
             )
-        convergence_count = 0
-        for w in caught:
-            if issubclass(w.category, ConvergenceWarning):
-                convergence_count += 1
-            else:
-                warnings.warn_explicit(w.message, w.category, w.filename, w.lineno)
-        if convergence_count:
-            conv_msg = (
-                f"{convergence_count} candidate fit(s) during hyperparameter search did not "
-                "fully converge (max_iter reached). Consider increasing max_iter, scaling "
-                "features, or picking a different solver."
-            )
-            logger.warning(conv_msg)
-            if log_callback:
-                log_callback(conv_msg)
+        _report_search_warnings(caught, log_callback)
 
         # Refit the best model on the full dataset. With per-fold refit
         # enabled, the full dataset is the full-split frame run once through
@@ -537,43 +650,17 @@ class TuningCalculator(BaseModelCalculator):
         """Converts a pandas object to a numpy array, leaving numpy arrays unchanged."""
         return data.to_numpy() if hasattr(data, "to_numpy") else data
 
-    def tune(
+    def _prepare_search_estimator(
         self,
-        X: Any,
-        y: Any,
+        model_class: Any,
         config: TuningConfig,
-        progress_callback: Callable[[int, int, float | None, dict | None], None] | None = None,
-        log_callback: Callable[[str], None] | None = None,
-        validation_data: tuple[Any, Any] | None = None,
-        preprocessing: "FoldPreprocessor | None" = None,
-        preprocessing_frames: tuple[Any, Any] | None = None,
-        validation_frames: tuple[Any, Any] | None = None,
-    ) -> TuningResult:
-        """Runs hyperparameter tuning."""
-        # Holdout tuning with per-fold preprocessing refit: the train and
-        # validation frames are concatenated (train rows masked -1 in a
-        # PredefinedSplit) so every strategy refits the chain on train rows
-        # only and scores candidates against the untouched validation split.
-        holdout_refit = (
-            preprocessing is not None
-            and validation_data is not None
-            and preprocessing_frames is not None
-            and validation_frames is not None
-        )
-        # 1. Prepare Estimator
-        # We need a base estimator. Since our Calculator wraps the class,
-        # we need to instantiate the underlying sklearn model with default params.
-        # Assuming model_calculator is SklearnCalculator
-        if not hasattr(self.model_calculator, "model_class"):
-            raise ValueError("Tuner currently only supports SklearnCalculator")
-
-        # `model_class` only on SklearnCalculator; `Any` keeps call sites type-clean.
-        model_class: Any = self.model_calculator.model_class
-
-        config = normalize_logistic_search_config(
-            model_class, self.model_calculator.default_params, config
-        )
-
+        preprocessing: "FoldPreprocessor | None",
+        preprocessing_frames: tuple[Any, Any] | None,
+        validation_data: tuple[Any, Any] | None,
+        validation_frames: tuple[Any, Any] | None,
+        log_callback: Callable[[str], None] | None,
+    ) -> tuple[Any, TuningConfig, bool, bool]:
+        """Prepare the estimator and parameter routing for the requested search strategy."""
         # ``default_params`` may carry structural args (e.g. an ensemble's
         # resolved ``estimators``); the instantiator filters/routes them safely.
         constructor_params, class_weight = split_class_weight_params(
@@ -598,73 +685,50 @@ class TuningCalculator(BaseModelCalculator):
                 or "class_weight" in config.search_space
             )
         )
-        wrapped = preprocessing is not None and searcher_strategy
-        if wrapped and preprocessing_frames is None:
-            # Numpy-only SDK call: the preprocessor needs named frames to
-            # run, so the wrap cannot be built. Keep today's behaviour —
-            # score the raw pre-transform payload — with an explicit log.
-            wrapped = False
-            if log_callback:
-                log_callback(
-                    "Per-fold preprocessing refit skipped for this tuning strategy: "
-                    "no named frames are available to run the preprocessing chain "
-                    "inside the searcher's folds. Scores are computed on the raw "
-                    "pre-transform payload."
-                )
-        if wrapped and validation_data is not None and validation_frames is None:
-            # Holdout tuning needs the validation rows as named frames too
-            # (the searcher scores them in the original pre-transform space).
-            # Without them the wrap would score misaligned rows, so fall back
-            # to raw-payload scoring with an explicit log instead.
-            wrapped = False
-            if log_callback:
-                log_callback(
-                    "Per-fold preprocessing refit skipped for holdout tuning: "
-                    "no named validation frames are available to score against. "
-                    "Scores are computed on the raw pre-transform payload."
-                )
+        wrapped = _can_wrap_preprocessing(
+            preprocessing,
+            searcher_strategy,
+            preprocessing_frames,
+            validation_data,
+            validation_frames,
+            log_callback,
+        )
         estimator: Any = base_estimator
         search_config = config
         if wrapped or weighted:
-            frame_x = preprocessing_frames[0] if preprocessing_frames is not None else None
-            feature_names = (
-                tuple(map(str, frame_x.columns)) if hasattr(frame_x, "columns") else None
-            )
-            estimator = Pipeline(
-                [
-                    (
-                        "model",
-                        FoldAwareModelStep(
-                            estimator=base_estimator,
-                            preprocessor=preprocessing if wrapped else None,
-                            feature_names=feature_names,
-                            class_weight=class_weight,
-                        ),
-                    )
-                ]
-            )
-            if wrapped and log_callback:
-                log_callback(
-                    "Per-fold preprocessing refit runs inside the searcher via "
-                    "the fold-aware estimator."
-                )
-            # Nonnative weights belong to the fit-time step; constructor
-            # parameters still route to the underlying estimator.
-            search_config = replace(
+            estimator, search_config = _wrap_search_estimator(
+                base_estimator,
                 config,
-                search_space={
-                    (
-                        "model__class_weight"
-                        if weighted and key == "class_weight"
-                        else f"model__estimator__{key}"
-                    ): values
-                    for key, values in (config.search_space or {}).items()
-                },
+                preprocessing,
+                preprocessing_frames,
+                class_weight,
+                wrapped,
+                weighted,
+                log_callback,
             )
+        return estimator, search_config, wrapped, weighted
 
-        # 2. Prepare Splitter
-        # If validation data is provided, use PredefinedSplit to train on X and validate on validation_data
-        # Otherwise use CV
+    def _prepare_search_splitter(
+        self,
+        X: Any,
+        y: Any,
+        config: TuningConfig,
+        preprocessing: "FoldPreprocessor | None",
+        preprocessing_frames: tuple[Any, Any] | None,
+        validation_data: tuple[Any, Any] | None,
+        validation_frames: tuple[Any, Any] | None,
+    ) -> tuple[Any, Any, Any]:
+        """Build holdout frame splits when available, otherwise the configured CV splitter."""
+        # Holdout tuning with per-fold preprocessing refit: the train and
+        # validation frames are concatenated (train rows masked -1 in a
+        # PredefinedSplit) so every strategy refits the chain on train rows
+        # only and scores candidates against the untouched validation split.
+        holdout_refit = (
+            preprocessing is not None
+            and validation_data is not None
+            and preprocessing_frames is not None
+            and validation_frames is not None
+        )
         if holdout_refit and preprocessing_frames is not None and validation_frames is not None:
             cv, X_for_search, y_for_search = splitters.build_predefined_split_cv_frames(
                 preprocessing_frames, validation_frames
@@ -673,6 +737,104 @@ class TuningCalculator(BaseModelCalculator):
             cv, X_for_search, y_for_search = splitters.build_cv_splitter(
                 X, y, config, validation_data, self.model_calculator.problem_type
             )
+        return cv, X_for_search, y_for_search
+
+    def _run_searcher_and_collect_results(
+        self,
+        searcher: Any,
+        config: TuningConfig,
+        metric: str,
+        search_data: tuple[Any, Any],
+        wrapped: bool,
+        weighted: bool,
+        validation_data: tuple[Any, Any] | None,
+        preprocessing_frames: tuple[Any, Any] | None,
+        log_callback: Callable[[str], None] | None,
+    ) -> TuningResult:
+        """Execute the searcher and restore public parameter names in its results."""
+        X_for_search, y_for_search = search_data
+        # 4. Run Search
+        # The wrapped pipeline needs named frames (the adapter rebuilds a real
+        # FeatureEngineer); numpy conversion would strip column names. In
+        # holdout mode the splitter stage already produced the concatenated
+        # train+validation frames the PredefinedSplit mask is aligned to.
+        if wrapped:
+            if validation_data is None and preprocessing_frames is not None:
+                X_for_search, y_for_search = preprocessing_frames
+            X_arr, y_arr = X_for_search, y_for_search
+        else:
+            X_arr = self._to_numpy(X_for_search)
+            y_arr = self._to_numpy(y_for_search)
+        trial_errors = _runner.execute_search(searcher, X_arr, y_arr, config, log_callback)
+
+        # 5. Extract Results
+        first_trial_error = trial_errors[0] if trial_errors else None
+        best_params, best_score = _runner.extract_best_result(searcher, first_trial_error)
+
+        # Collect trials
+        trials = _runner.collect_trials(searcher, config)
+        if wrapped or weighted:
+            best_params = _runner.strip_model_prefix(best_params)
+            trials = [
+                {**trial, "params": _runner.strip_model_prefix(trial["params"])} for trial in trials
+            ]
+
+        # Final completion log for strategies that don't emit per-trial callbacks
+        # (halving_grid / halving_random / optuna). The grid/random branch above
+        # already logs completion inside its custom loop.
+        _runner.log_final_completion(log_callback, config, trials, best_score, best_params)
+
+        return TuningResult(
+            best_params=best_params,
+            best_score=best_score,
+            n_trials=len(trials),
+            trials=trials,
+            scoring_metric=metric,
+        )
+
+    def tune(
+        self,
+        X: Any,
+        y: Any,
+        config: TuningConfig,
+        progress_callback: Callable[[int, int, float | None, dict | None], None] | None = None,
+        log_callback: Callable[[str], None] | None = None,
+        validation_data: tuple[Any, Any] | None = None,
+        preprocessing: "FoldPreprocessor | None" = None,
+        preprocessing_frames: tuple[Any, Any] | None = None,
+        validation_frames: tuple[Any, Any] | None = None,
+    ) -> TuningResult:
+        """Runs hyperparameter tuning."""
+        # 1. Prepare Estimator
+        # We need a base estimator. Since our Calculator wraps the class,
+        # we need to instantiate the underlying sklearn model with default params.
+        # Assuming model_calculator is SklearnCalculator
+        if not hasattr(self.model_calculator, "model_class"):
+            raise ValueError("Tuner currently only supports SklearnCalculator")
+
+        # `model_class` only on SklearnCalculator; `Any` keeps call sites type-clean.
+        model_class: Any = self.model_calculator.model_class
+
+        config = normalize_logistic_search_config(
+            model_class, self.model_calculator.default_params, config
+        )
+
+        estimator, search_config, wrapped, weighted = self._prepare_search_estimator(
+            model_class,
+            config,
+            preprocessing,
+            preprocessing_frames,
+            validation_data,
+            validation_frames,
+            log_callback,
+        )
+
+        # 2. Prepare Splitter
+        # If validation data is provided, use PredefinedSplit to train on X and validate on validation_data
+        # Otherwise use CV
+        cv, X_for_search, y_for_search = self._prepare_search_splitter(
+            X, y, config, preprocessing, preprocessing_frames, validation_data, validation_frames
+        )
 
         # 3. Select Search Strategy
         # Handle multiclass metrics and map user-friendly names
@@ -731,43 +893,16 @@ class TuningCalculator(BaseModelCalculator):
                 "tuning strategy",
             )
 
-        # 4. Run Search
-        # The wrapped pipeline needs named frames (the adapter rebuilds a real
-        # FeatureEngineer); numpy conversion would strip column names. In
-        # holdout mode the splitter stage already produced the concatenated
-        # train+validation frames the PredefinedSplit mask is aligned to.
-        if wrapped:
-            if validation_data is None and preprocessing_frames is not None:
-                X_for_search, y_for_search = preprocessing_frames
-            X_arr, y_arr = X_for_search, y_for_search
-        else:
-            X_arr = self._to_numpy(X_for_search)
-            y_arr = self._to_numpy(y_for_search)
-        trial_errors = _runner.execute_search(searcher, X_arr, y_arr, config, log_callback)
-
-        # 5. Extract Results
-        first_trial_error = trial_errors[0] if trial_errors else None
-        best_params, best_score = _runner.extract_best_result(searcher, first_trial_error)
-
-        # Collect trials
-        trials = _runner.collect_trials(searcher, config)
-        if wrapped or weighted:
-            best_params = _runner.strip_model_prefix(best_params)
-            trials = [
-                {**trial, "params": _runner.strip_model_prefix(trial["params"])} for trial in trials
-            ]
-
-        # Final completion log for strategies that don't emit per-trial callbacks
-        # (halving_grid / halving_random / optuna). The grid/random branch above
-        # already logs completion inside its custom loop.
-        _runner.log_final_completion(log_callback, config, trials, best_score, best_params)
-
-        return TuningResult(
-            best_params=best_params,
-            best_score=best_score,
-            n_trials=len(trials),
-            trials=trials,
-            scoring_metric=metric,
+        return self._run_searcher_and_collect_results(
+            searcher,
+            config,
+            metric,
+            (X_for_search, y_for_search),
+            wrapped,
+            weighted,
+            validation_data,
+            preprocessing_frames,
+            log_callback,
         )
 
 
