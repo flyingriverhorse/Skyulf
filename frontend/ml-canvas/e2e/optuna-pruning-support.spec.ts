@@ -1,6 +1,7 @@
 import { expect, test, type Page, type Route } from '@playwright/test';
 import type { PipelineConfigModel } from '../src/core/api/client';
 import { mockBackend } from './fixtures/mockApi';
+import { pruningSearchSpaces } from './fixtures/pruningSearchSpaces';
 
 interface SupportRequest {
   model_type: string;
@@ -10,15 +11,15 @@ interface SupportRequest {
   strategy_params: Record<string, unknown>;
 }
 
-const FOREST_REASON = 'Random Forest does not support incremental fitting.';
-const FOLD_REASON = 'Fold preprocessing requires normal fitting; pruning is unavailable.';
+const FOREST_REASON = 'Random Forest requires at least two CV folds for pruning; a single holdout cannot stop trials early.';
+const FOLD_REASON = 'A single holdout offers no between-fold pruning for this model and preprocessing.';
+const FOLD_SUPPORT = { supported: true, mode: 'folds', reason: 'Early stopping is available between CV folds.' };
+const ITERATION_SUPPORT = { supported: true, mode: 'iterations', reason: 'Early stopping is available during training.' };
 const SAVED_STRATEGY = { pruner: 'hyperband', sampler: 'random', timeout: 73 };
 
 /** Keep saved search defaults valid for each algorithm without replacing Canvas settings. */
 function searchSpace(model: string): Record<string, unknown[]> {
-  return model === 'random_forest_classifier'
-    ? { n_estimators: [10, 30] }
-    : { alpha: [0.0001, 0.01] };
+  return pruningSearchSpaces[model] ?? {};
 }
 
 test.beforeEach(async ({ page }) => {
@@ -27,7 +28,9 @@ test.beforeEach(async ({ page }) => {
   await page.route('**/api/pipeline/registry', route => route.fulfill({ json: [
     { id: 'random_forest_classifier', name: 'Random Forest', tags: ['classification'] },
     { id: 'sgd_classifier', name: 'SGD Classifier', tags: ['classification', 'text'] },
-    { id: 'sgd_regressor', name: 'SGD Regressor', tags: ['regression'] },
+    { id: 'ridge_regression', name: 'Ridge Regression', tags: ['regression'] },
+    { id: 'xgboost_classifier', name: 'XGBoost Classifier', tags: ['classification'] },
+    { id: 'lgbm_classifier', name: 'LightGBM Classifier', tags: ['classification'] },
   ].map(model => ({ ...model, category: 'Modeling', description: '', params: {} })) }));
   await page.route('**/api/pipeline/hyperparameters/*', route => route.fulfill({ json: [] }));
   await page.route('**/api/pipeline/hyperparameters/*/defaults*', route => {
@@ -42,21 +45,21 @@ test.beforeEach(async ({ page }) => {
 });
 
 /** Seed a saved graph through real graph actions and wait for ordinary settings initialization. */
-async function prepareModel(page: Page, model = 'random_forest_classifier', type = 'classification', pruner = 'hyperband') {
+async function prepareModel(page: Page, model = 'random_forest_classifier', type = 'classification', pruner = 'hyperband', cvEnabled = model !== 'random_forest_classifier') {
   await page.goto('/canvas');
   await page.waitForFunction(() => '__skyulfTest' in window);
-  const ids = await page.evaluate(({ model, type, strategy }) => {
+  const ids = await page.evaluate(({ model, type, strategy, cvEnabled }) => {
     const store = window.__skyulfTest!.graphStore;
     const state = store.getState();
     state.setGraph([], []);
     const dataset = state.addNode('dataset_node', { x: 0, y: 0 }, { datasetId: 'pruning-data', datasetName: 'Pruning data' });
     const modelId = state.addNode(type, { x: 260, y: 0 }, {
       run_mode: 'advanced', model_type: model, target_column: 'target', search_strategy: 'optuna',
-      strategy_params: strategy, search_space: {},
+      strategy_params: strategy, search_space: {}, cv_enabled: cvEnabled, cv_folds: 3, cv_type: 'k_fold',
     });
     state.onConnect({ source: dataset, sourceHandle: 'data', target: modelId, targetHandle: 'in' });
     return { dataset, model: modelId };
-  }, { model, type, strategy: { ...SAVED_STRATEGY, pruner } });
+  }, { model, type, strategy: { ...SAVED_STRATEGY, pruner }, cvEnabled });
   await expect(page.getByRole('button', { name: 'Search strategy settings', exact: true })).toBeVisible();
   if (type !== 'EnsembleNode') {
     await expect.poll(() => page.evaluate(id => window.__skyulfTest!.graphStore.getState().nodes.find(node => node.id === id)!.data.search_space, ids.model))
@@ -89,7 +92,7 @@ test('unsupported saved Hyperband remains unchanged until Apply and submits None
   await page.route('**/api/pipeline/pruning-support', route => {
     expect(route.request().method()).toBe('POST');
     requests.push(route.request().postDataJSON() as SupportRequest);
-    return route.fulfill({ json: { supported: false, reason: FOREST_REASON } });
+    return route.fulfill({ json: { supported: false, mode: 'none', reason: FOREST_REASON } });
   });
   const ids = await prepareModel(page);
   const before = await savedState(page, ids.model);
@@ -127,7 +130,7 @@ test('unsupported saved Hyperband remains unchanged until Apply and submits None
 
 for (const [type, model, choice] of [
   ['classification', 'sgd_classifier', 'median'],
-  ['regression', 'sgd_regressor', 'hyperband'],
+  ['regression', 'ridge_regression', 'hyperband'],
   ['text_classification', 'sgd_classifier', 'hyperband'],
 ]) {
   test(`${type} sends its model, node and search space while retaining supported ${choice}`, async ({ page }) => {
@@ -135,7 +138,7 @@ for (const [type, model, choice] of [
     const requests: SupportRequest[] = [];
     await page.route('**/api/pipeline/pruning-support', route => {
       requests.push(route.request().postDataJSON() as SupportRequest);
-      return route.fulfill({ json: { supported: true, reason: null } });
+      return route.fulfill({ json: FOLD_SUPPORT });
     });
     const ids = await prepareModel(page, model, type, choice);
     const before = await savedState(page, ids.model);
@@ -173,17 +176,17 @@ async function replaceModelInput(page: Page, model: string, source: string, sour
   }, { model, source, sourceHandle });
 }
 
-test('scaling affects only its connected model and support recovery restores the unapplied pruner choice', async ({ page }) => {
-  // Eligibility must follow the converted graph while temporary fallback leaves the user's draft intact.
+test('Random Forest keeps fold pruning with scaling and CV changes restore its unapplied choice', async ({ page }) => {
+  // Preprocessing remains eligible, while holdout changes must not erase a local pruner draft.
   const requests: SupportRequest[] = [];
   await page.route('**/api/pipeline/pruning-support', route => {
     const request = route.request().postDataJSON() as SupportRequest;
     requests.push(request);
     const target = request.pipeline.nodes.find(node => node.node_id === request.node_id)!;
-    const blocked = target.inputs.some(id => request.pipeline.nodes.find(node => node.node_id === id)!.step_type !== 'data_loader');
-    return route.fulfill({ json: { supported: !blocked, reason: blocked ? FOLD_REASON : null } });
+    const tuning = target.params.tuning_config as { cv_enabled: boolean };
+    return route.fulfill({ json: tuning.cv_enabled ? FOLD_SUPPORT : { supported: false, mode: 'none', reason: FOLD_REASON } });
   });
-  const ids = await prepareModel(page, 'sgd_classifier');
+  const ids = await prepareModel(page, 'random_forest_classifier', 'classification', 'hyperband', true);
   const dialog = await openSettings(page);
   const pruner = dialog.getByRole('combobox', { name: 'Pruner', exact: true });
   await expect(pruner).toBeEnabled();
@@ -195,13 +198,17 @@ test('scaling affects only its connected model and support recovery restores the
   expect(requests.at(-1)!.pipeline.nodes.find(node => node.node_id === ids.model)!.inputs).toEqual([ids.dataset]);
 
   await replaceModelInput(page, ids.model, scaling, 'out');
+  await expect.poll(() => requests.at(-1)!.pipeline.nodes.find(node => node.node_id === ids.model)!.inputs).toEqual([scaling]);
+  await expect(pruner).toBeEnabled();
+  await expect(pruner).toHaveAccessibleDescription(/between CV folds/);
+  await page.evaluate(id => window.__skyulfTest!.graphStore.getState().updateNodeData(id, { cv_enabled: false }), ids.model);
   await expect(pruner).toBeDisabled();
   await expect(pruner).toHaveValue('none');
   await expect(pruner).toHaveAccessibleDescription(FOLD_REASON);
   expect(requests.at(-1)!.pipeline.nodes.find(node => node.node_id === ids.model)!.inputs).toEqual([scaling]);
   const beforeRecovery = await savedState(page, ids.model);
   expect(beforeRecovery.config).toEqual(SAVED_STRATEGY);
-  await replaceModelInput(page, ids.model, ids.dataset, 'data');
+  await page.evaluate(id => window.__skyulfTest!.graphStore.getState().updateNodeData(id, { cv_enabled: true }), ids.model);
   const afterRewire = await savedState(page, ids.model);
   await expect(pruner).toBeEnabled();
   await expect(pruner).toHaveValue('median');
@@ -211,6 +218,38 @@ test('scaling affects only its connected model and support recovery restores the
     config: { ...SAVED_STRATEGY, pruner: 'median' }, past: afterRewire.past + 1 });
 });
 
+for (const model of ['xgboost_classifier', 'lgbm_classifier']) {
+  test(`${model} keeps pruning during training with a real scaling node and holdout`, async ({ page }) => {
+    // Boosting callbacks support fold preprocessing even when only one validation split is used.
+    const requests: SupportRequest[] = [];
+    await page.route('**/api/pipeline/pruning-support', route => {
+      requests.push(route.request().postDataJSON() as SupportRequest);
+      return route.fulfill({ json: ITERATION_SUPPORT });
+    });
+    const ids = await prepareModel(page, model, 'classification', 'hyperband', false);
+    const scaling = await addScalingBranch(page, ids);
+    await replaceModelInput(page, ids.model, scaling, 'out');
+    const before = await savedState(page, ids.model);
+    const dialog = await openSettings(page);
+    const pruner = dialog.getByRole('combobox', { name: 'Pruner', exact: true });
+    await expect(pruner).toBeEnabled();
+    await expect(pruner).toHaveValue('hyperband');
+    await expect(pruner).toHaveAccessibleDescription(/during training/);
+    expect(requests.at(-1)).toMatchObject({ model_type: model, search_space: searchSpace(model) });
+    expect(requests.at(-1)!.pipeline.nodes.find(node => node.node_id === ids.model)).toMatchObject({
+      inputs: [scaling], params: { tuning_config: { cv_enabled: false, cv_folds: 3 } },
+    });
+    await dialog.getByRole('button', { name: 'Models with pruning support', exact: true }).focus();
+    const tooltip = page.getByRole('tooltip');
+    await expect(tooltip).toContainText('XGBoost and LightGBM');
+    await expect(tooltip).toContainText('Random Forest, Logistic Regression, SVC');
+    await expect(tooltip).toContainText('single holdout');
+    await tooltip.press('Escape');
+    await expect(dialog).toBeVisible();
+    expect(await savedState(page, ids.model)).toEqual(before);
+  });
+}
+
 test('late unsupported response cannot replace a reopened supported model selection', async ({ page }) => {
   // A closed model's HTTP response must not disable the next model or silently alter saved choices.
   const pending: Route[] = [];
@@ -219,7 +258,7 @@ test('late unsupported response cannot replace a reopened supported model select
     const request = route.request().postDataJSON() as SupportRequest;
     requests.push(request);
     if (request.model_type === 'random_forest_classifier') { pending.push(route); return; }
-    return route.fulfill({ json: { supported: true, reason: null } });
+    return route.fulfill({ json: ITERATION_SUPPORT });
   });
   const ids = await prepareModel(page);
   const dialog = await openSettings(page);
@@ -228,14 +267,14 @@ test('late unsupported response cannot replace a reopened supported model select
   await expect(pruner).toBeDisabled();
   await expect(pruner).toHaveValue('hyperband');
   await dialog.press('Escape');
-  await page.getByRole('combobox', { name: 'Model Type', exact: true }).selectOption('sgd_classifier');
+  await page.getByRole('combobox', { name: 'Model Type', exact: true }).selectOption('xgboost_classifier');
   await expect.poll(() => page.evaluate(id => window.__skyulfTest!.graphStore.getState().nodes.find(node => node.id === id)!.data.search_space, ids.model))
-    .toEqual(searchSpace('sgd_classifier'));
+    .toEqual(searchSpace('xgboost_classifier'));
   const before = await savedState(page, ids.model);
   await openSettings(page);
   await expect(pruner).toBeEnabled();
-  expect(requests.at(-1)?.model_type).toBe('sgd_classifier');
-  await Promise.all(pending.map(route => route.fulfill({ json: { supported: false, reason: FOREST_REASON } })));
+  expect(requests.at(-1)?.model_type).toBe('xgboost_classifier');
+  await Promise.all(pending.map(route => route.fulfill({ json: { supported: false, mode: 'none', reason: FOREST_REASON } })));
   await expect(pruner).toBeEnabled();
   await expect(pruner).toHaveValue('hyperband');
   await expect(dialog.getByText(FOREST_REASON, { exact: true })).toHaveCount(0);
@@ -250,11 +289,11 @@ test('restored graph waits for its new check and ignores the previous graph resp
   const dialog = await openSettings(page);
   const pruner = dialog.getByRole('combobox', { name: 'Pruner', exact: true });
   await expect.poll(() => pending.length).toBe(1);
-  await pending[0]!.fulfill({ json: { supported: true, reason: null } });
+  await pending[0]!.fulfill({ json: FOLD_SUPPORT });
   await expect(pruner).toBeEnabled();
   const scaling = await addScalingBranch(page, ids);
   await expect.poll(() => pending.length).toBe(2);
-  await pending[1]!.fulfill({ json: { supported: true, reason: null } });
+  await pending[1]!.fulfill({ json: FOLD_SUPPORT });
   await expect(pruner).toBeEnabled();
   await replaceModelInput(page, ids.model, scaling, 'out');
   await expect.poll(() => pending.length).toBe(3);
@@ -265,9 +304,9 @@ test('restored graph waits for its new check and ignores the previous graph resp
   await expect(pruner).toBeDisabled();
   await expect(pruner).toHaveValue('hyperband');
   await expect(pruner).toHaveAccessibleDescription(/checking/i);
-  await pending[3]!.fulfill({ json: { supported: true, reason: null } });
+  await pending[3]!.fulfill({ json: FOLD_SUPPORT });
   await expect(pruner).toBeEnabled();
-  await pending[2]!.fulfill({ json: { supported: false, reason: FOLD_REASON } });
+  await pending[2]!.fulfill({ json: { supported: false, mode: 'none', reason: FOLD_REASON } });
   await expect(pruner).toBeEnabled();
   await expect(pruner).toHaveValue('hyperband');
   await expect(dialog.getByText(FOLD_REASON, { exact: true })).toHaveCount(0);
@@ -297,22 +336,23 @@ test('pending and failed support checks keep saved Hyperband while disabling onl
   expect(await savedState(page, ids.model)).toEqual(before);
 });
 
-test('ensemble settings also show an explained disabled None without rewriting saved Hyperband', async ({ page }) => {
+test('ensemble settings retain Hyperband for supported CV without rewriting saved settings', async ({ page }) => {
   // The ensemble consumer must pass its own model and node context to the shared capability UI.
-  const reason = 'VotingClassifier does not support incremental fitting.';
   const requests: SupportRequest[] = [];
   await page.route('**/api/pipeline/pruning-support', route => {
     requests.push(route.request().postDataJSON() as SupportRequest);
-    return route.fulfill({ json: { supported: false, reason } });
+    return route.fulfill({ json: FOLD_SUPPORT });
   });
   const ids = await prepareModel(page, 'voting_classifier', 'EnsembleNode');
   const before = await savedState(page, ids.model);
   const dialog = await openSettings(page);
   const pruner = dialog.getByRole('combobox', { name: 'Pruner', exact: true });
-  await expect(pruner).toBeDisabled();
-  await expect(pruner).toHaveValue('none');
-  await expect(pruner).toHaveAccessibleDescription(reason);
+  await expect(pruner).toBeEnabled();
+  await expect(pruner).toHaveValue('hyperband');
+  await expect(pruner).toHaveAccessibleDescription(/between CV folds/);
   expect(requests.at(-1)).toMatchObject({ model_type: 'voting_classifier', node_id: ids.model, strategy_params: SAVED_STRATEGY });
-  expect(requests.at(-1)!.pipeline.nodes.some(node => node.node_id === ids.model)).toBe(true);
+  expect(requests.at(-1)!.pipeline.nodes.find(node => node.node_id === ids.model)).toMatchObject({
+    params: { tuning_config: { cv_enabled: true, cv_folds: 3 } },
+  });
   expect(await savedState(page, ids.model)).toEqual(before);
 });

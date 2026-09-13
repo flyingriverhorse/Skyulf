@@ -1,4 +1,4 @@
-"""The Optuna search strategy: lazy loader + OptunaSearchCV builder.
+"""The Optuna search strategy: lazy dependencies and pruning-aware dispatch.
 
 Leaf module (F-18 split of ``engine.py``). Optuna is an optional,
 heavyweight dependency only needed when a caller actually requests
@@ -20,7 +20,7 @@ import warnings
 from collections.abc import Callable
 from typing import Any
 
-from ...pruning import unsupported_pruning_reason as _unsupported_pruning_reason
+from ...pruning import PruningPlan, resolve_pruning_plan
 from ..params import clean_search_space
 from ..schemas import TuningConfig
 
@@ -176,23 +176,64 @@ def build_optuna_pruner(pruner_name: str) -> Any:
     return optuna_mod.pruners.MedianPruner()
 
 
-def _enable_optuna_pruning(
+def _pruning_plan(
     estimator: Any,
     config: TuningConfig,
+    cv: Any,
     pruner_name: str,
     log_callback: Callable[[str], None] | None,
-) -> bool:
-    """Enable supported incremental fitting and explain requested but unavailable pruning."""
+) -> PruningPlan:
+    """Select the real iteration or fold loop and explain its available checkpoints."""
     if pruner_name == "none" or config.strategy_params.get("pruning") is False:
-        return False
-    reason = _unsupported_pruning_reason(estimator, config.search_space)
-    if reason is not None:
-        message = f"Optuna pruning disabled: {reason}. Trials use ordinary fit."
+        return PruningPlan("none", "Pruning explicitly disabled.")
+    plan = resolve_pruning_plan(
+        estimator, clean_search_space(config.search_space), n_splits=_split_count(cv)
+    )
+    if plan.mode == "none":
+        message = f"Optuna pruning disabled: {plan.reason} Trials use ordinary fit."
         logger.warning(message)
+    else:
+        message = f"Optuna pruning enabled ({plan.mode}): {plan.reason}"
+        logger.info(message)
+    if log_callback:
+        log_callback(message)
+    return plan
+
+
+def _split_count(cv: Any) -> int:
+    """Inspect concrete splitters without consuming a caller's split generator."""
+    if isinstance(cv, int):
+        return cv
+    if hasattr(cv, "get_n_splits"):
+        try:
+            return cv.get_n_splits()
+        except TypeError:
+            pass  # Data-dependent splitters are materialized when fit receives X/y.
+    if isinstance(cv, (list, tuple)):
+        return len(cv)
+    # The fold loop checks its actual materialized splits before pruning, so a
+    # generator yielding one split cannot discard a fully evaluated candidate.
+    return 2
+
+
+def _progress_callbacks(config: TuningConfig, progress_callback: Any, log_callback: Any) -> list:
+    """Keep partial pruned values out of completed-score progress and trial logs."""
+    if not progress_callback and not log_callback:
+        return []
+
+    def callback(study: Any, trial: Any) -> None:
+        """Report terminal trial state without presenting an unfinished CV mean."""
+        complete = trial.state == _optuna_state.optuna_module.trial.TrialState.COMPLETE
+        score = trial.value if complete else None
         if log_callback:
+            message = f"Optuna Trial {trial.number + 1}: {trial.state.name.lower()}."
+            if complete:
+                message += f" Mean CV Score: {score}"
             log_callback(message)
-        return False
-    return True
+        if progress_callback:
+            progress_callback(trial.number + 1, config.n_trials, score, trial.params)
+
+    return [callback]
 
 
 def build_optuna_searcher(
@@ -203,12 +244,7 @@ def build_optuna_searcher(
     progress_callback: Callable[[int, int, float | None, dict | None], None] | None,
     log_callback: Callable[[str], None] | None,
 ) -> Any:
-    """Build OptunaSearchCV with pruning only when the outer estimator supports it.
-
-    Incremental trials require a fixed positive integer ``max_iter`` epoch
-    budget. Pipelines and fold preprocessors are never unwrapped: an unsupported
-    outer estimator keeps ordinary fitting and logs the reason.
-    """
+    """Build a search using native iterations, direct partial_fit, or CV fold pruning."""
     if not _ensure_optuna_loaded():
         raise ImportError(
             "Optuna is not installed. Please install 'optuna' and 'optuna-integration'."
@@ -228,21 +264,7 @@ def build_optuna_searcher(
     # left ``max_depth=['none']`` reaching the estimator as the string 'none'.
     distributions = build_optuna_distributions(clean_search_space(config.search_space), use_cmaes)
 
-    # Optuna callbacks
-    callbacks = []
-    if progress_callback:
-
-        def _optuna_callback(study, trial):
-            # Optuna doesn't know total trials upfront easily if not set, but we have config.n_trials
-            # trial.value is the score (or None if failed/pruned)
-            score = trial.value if trial.value is not None else None
-
-            if log_callback:
-                log_callback(f"Optuna Trial {trial.number + 1} finished. Mean CV Score: {score}")
-
-            progress_callback(trial.number + 1, config.n_trials, score, trial.params)
-
-        callbacks.append(_optuna_callback)
+    callbacks = _progress_callbacks(config, progress_callback, log_callback)
 
     # Sampler Selection
     sampler_name = strategy_params.get("sampler", "tpe")
@@ -251,11 +273,30 @@ def build_optuna_searcher(
     # Pruner Selection
     pruner_name = strategy_params.get("pruner", "median")
     pruner = build_optuna_pruner(pruner_name)
-    enable_pruning = _enable_optuna_pruning(base_estimator, config, pruner_name, log_callback)
+    plan = _pruning_plan(base_estimator, config, cv, pruner_name, log_callback)
 
     study = _optuna_state.optuna_module.create_study(
         sampler=sampler, pruner=pruner, direction="maximize"
     )
+
+    if plan.mode == "folds" or plan.kind in {"xgboost", "lightgbm"}:
+        from .optuna_search import OptunaPruningSearchCV  # noqa: PLC0415 - optional dependency
+
+        return OptunaPruningSearchCV(
+            estimator=base_estimator,
+            param_distributions=distributions,
+            n_trials=config.n_trials,
+            timeout=config.timeout,
+            cv=cv,
+            scoring=scoring,
+            n_jobs=config.n_jobs,
+            callbacks=callbacks,
+            study=study,
+            mode=plan.mode,
+            iteration_budget=plan.iteration_budget,
+        )
+
+    enable_pruning = plan.kind == "incremental"
 
     with warnings.catch_warnings():
         warnings.filterwarnings(
@@ -276,5 +317,5 @@ def build_optuna_searcher(
             callbacks=callbacks,
             study=study,
             enable_pruning=enable_pruning,
-            max_iter=base_estimator.max_iter if enable_pruning else 1000,
+            max_iter=plan.iteration_budget if enable_pruning else 1000,
         )

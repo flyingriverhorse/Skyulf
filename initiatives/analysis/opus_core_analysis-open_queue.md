@@ -151,7 +151,7 @@ remaining findings are grouped by domain.
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
-| OC-251 | 🟡 | Fold-aware Halving/Optuna scoring keeps original validation labels after preprocessing filters prediction rows (`modeling/_tuning/fold_pipeline.py:168-171`) | medium | ⬜ open — IQR yields 120 held-out labels / 110 predictions; actual halving_grid and Optuna searches fail all trials while grid scores the same chain at R2 `0.999998`. |
+| OC-251 | 🟡 | Fold-aware Halving/Optuna scoring keeps original validation labels after preprocessing filters prediction rows (`modeling/_tuning/fold_pipeline.py:168-171`) | medium | ⬜ open — Original IQR reproduction: 120 held-out labels / 110 predictions; Halving and Optuna failed while grid scored R2 `0.999998`. The extended Optuna pruning loop now transforms validation X/y together; ordinary Optuna and Halving still need the shared scoring repair. |
 
 
 ### Remaining — frontend

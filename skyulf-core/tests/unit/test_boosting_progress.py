@@ -276,36 +276,39 @@ class TestEndToEndStreaming:
         assert points, "a plain XGB regression fit must stream iteration points"
         assert [p[0] for p in points] == list(range(1, 13))
 
-    def test_optuna_trial_failures_are_forwarded_to_log_callback(self, monkeypatch):
+    @pytest.mark.parametrize("pruner", ["none", "hyperband"])
+    def test_optuna_trial_failures_are_forwarded_to_log_callback(self, monkeypatch, pruner):
+        """Ordinary and pruning searches must forward trial failures to job logs."""
         pytest.importorskip("optuna")
 
         from sklearn.datasets import make_classification
 
         from skyulf.modeling._tuning.engine import TuningCalculator
-        from skyulf.modeling._tuning.fold_pipeline import FoldAwareModelStep
         from skyulf.modeling._tuning.schemas import TuningConfig
         from skyulf.modeling.classification import LogisticRegressionCalculator
 
         def _explode(self, X, y=None):
+            """Fail the underlying model so every supported fold path sees the error."""
             raise RuntimeError("synthetic fold failure")
 
-        monkeypatch.setattr(FoldAwareModelStep, "fit", _explode)
+        calculator = LogisticRegressionCalculator()
+        monkeypatch.setattr(calculator.model_class, "fit", _explode)
 
         class _PassthroughAdapter:
-            """Never runs in practice — the exploded step.fit raises first —
-            but its presence switches tune() onto the wrapped searcher path.
-            """
+            """Exercise fold preprocessing before the underlying model fails."""
 
             def fit_transform(self, X, y):
+                """Keep training rows unchanged while exercising wrapper preparation."""
                 return X, y
 
             def transform(self, X, y):
+                """Keep validation rows aligned on both tuning execution paths."""
                 return X, y
 
         X_arr, y_arr = make_classification(n_samples=90, n_features=4, random_state=1)
         logs: list[str] = []
         with pytest.raises(ValueError, match="All trials failed"):
-            TuningCalculator(LogisticRegressionCalculator()).fit(
+            TuningCalculator(calculator).fit(
                 pd.DataFrame(X_arr),
                 pd.Series(y_arr, name="target"),
                 config=TuningConfig(
@@ -314,9 +317,12 @@ class TestEndToEndStreaming:
                     n_trials=2,
                     search_space={"C": [0.5, 1.0]},
                     cv_folds=3,
+                    strategy_params={"pruner": pruner},
                 ),
                 log_callback=logs.append,
                 preprocessing=_PassthroughAdapter(),
             )
 
         assert any("failed" in message for message in logs), logs
+        if pruner != "none":
+            assert any("synthetic fold failure" in message for message in logs), logs

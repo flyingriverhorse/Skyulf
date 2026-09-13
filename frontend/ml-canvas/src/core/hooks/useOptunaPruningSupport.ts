@@ -14,7 +14,15 @@ interface PruningContext {
 
 export interface PruningSupport {
   supported?: boolean;
+  mode?: 'iterations' | 'folds' | 'none';
   reason: string;
+}
+
+/** Explain the stopping boundary when no more specific backend reason is supplied. */
+function supportReason(mode: PruningSupport['mode']): string {
+  if (mode === 'folds') return 'Early stopping is available between CV folds.';
+  if (mode === 'iterations') return 'Early stopping is available during training.';
+  return 'Early stopping is unavailable for this model and pipeline.';
 }
 
 /** Use executable graph/configuration changes, ignoring pointer positions and selection. */
@@ -45,12 +53,13 @@ export function useOptunaPruningSupport(context: PruningContext): PruningSupport
     if (key === null) return;
     const controller = new AbortController();
     let active = true;
-    apiClient.post<{ supported: boolean; reason: string | null }>(
+    apiClient.post<{ supported: boolean; mode: NonNullable<PruningSupport['mode']>; reason: string | null }>(
       '/pipeline/pruning-support', JSON.parse(key), { signal: controller.signal },
     ).then(({ data }) => {
       if (active) setResult({ key, support: {
         supported: data.supported,
-        reason: data.reason ?? 'Early stopping is available for this model and pipeline.',
+        mode: data.mode,
+        reason: data.reason ?? supportReason(data.mode),
       } });
     }).catch(() => {
       if (active) setResult({ key, support: {

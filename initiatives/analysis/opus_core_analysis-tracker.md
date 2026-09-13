@@ -390,7 +390,7 @@ uses, so a fixed finding stays where it was filed.
 | OC-275 | 🟡 | **Temporal CV misses pandas datetime.date columns** (`skyulf-core/skyulf/modeling/cross_validation.py:283-291,361,399`) — Qwen #6. Recognize native date objects consistently and preserve chronological folds through the public CV and fold-preprocessing path. | medium | ✅ fixed — 2026-09-12: Temporal CV recognizes homogeneous native pandas date objects, preserving stable target-aligned sorting and missing dates last; public fold boundaries now match Polars at 3/4, 6/7 and 9/10 instead of 8/2, 9/4 and 11/5. |
 | OC-282 | 🟡 | **Elasticnet with a missing l1_ratio silently behaves like L2** (`skyulf-core/skyulf/modeling/_sklearn_compat.py:43-44`) — Qwen #14. Validate or resolve the elasticnet ratio before estimator construction and cover the real pipeline/search-space contract. | small | ✅ fixed — 2026-09-12: Omitted/null Elastic Net ratios resolve to 0.5 for direct fits, all five searches and refits, preserving numeric and Optuna distribution choices; mixed-penalty searches with unspecified ratios fail clearly. The separate explicit-ratio precedence mismatch is filed as OC-319. |
 | OC-253 | 🟡 | F1 tuning and evaluation/threshold tuning disagree on the positive class for labels `{1,2}` (`modeling/_tuning/metrics.py:235`, `modeling/_evaluation/classification.py:84`) | decision + small | ✅ fixed 2026-09-13 — Named binary F1/precision/recall/PR-AUC follow sorted-last classes_[1], matching evaluation and threshold tuning; all five searches score the example 0.8, while explicit class-1 scorers retain 10/11. |
-| OC-269 | 🟡 | Optuna constructs the selected pruner but never enables pruning on OptunaSearchCV (`modeling/_tuning/strategies/optuna.py:240-252`) | medium | ✅ fixed 2026-09-13 — Enable real incremental Optuna pruning only with outer partial_fit and a fixed positive integer epoch budget; unsupported wrappers/options and GaussianNB retain ordinary fit with an explanatory log, without bypassing fold preprocessing. |
+| OC-269 | 🟡 | Optuna constructs the selected pruner but never enables pruning on OptunaSearchCV (`modeling/_tuning/strategies/optuna.py`) | medium | ✅ fixed 2026-09-13 — Native XGBoost/LightGBM iteration callbacks, eligible direct incremental epochs and ordinary-model CV-fold pruning share runtime/UI capability rules. Preserve fold preprocessing and the selected scorer; only complete trials may win/refit. Single holdouts require an iteration hook. |
 
 ### Remaining — frontend
 
@@ -501,6 +501,43 @@ respective fix logs; OC-167 closed with canonical artifact framing on 2026-09-09
 
 
 ## Log
+
+### 2026-09-13 — Optuna pruning across native iterations and CV folds
+
+Extended OC-269 after checking Optuna's integration contracts and exercising
+real XGBoost, LightGBM and Random Forest fits. Native boosting reports the
+selected signed sklearn scorer after each round, including multiclass and
+encoded targets. Other models retain ordinary fitting inside each fold and
+can skip remaining folds. Direct compatible SGD retains its incremental loop.
+Fold workers are isolated, validation X/y transformations stay aligned, native
+callbacks and sample/class weights are retained, and only complete trials can
+win or reach full-data refit. Native tree-count searches share a reporting
+stride; alternate LightGBM round aliases use the conservative fold fallback.
+
+Canvas and the capability API now distinguish iteration/fold/unsupported modes,
+prepare configured ensembles through the same Advanced tuning defaults, and
+honor actual holdout precedence. Model/search/graph/CV changes refresh the check.
+The Pruner information tooltip explains the model families. Tests preserve
+saved choices, stale-response protection and no-op undo/history behavior.
+
+Real public RF/XGBoost/LightGBM exercises used 36 rows and two CV folds: one
+candidate completed both 18-row fits, the next was pruned during its first
+18-row fit or immediately after that fold, and only the completed winner was
+refitted on all 36 rows. All-pruned runs performed no final refit. In the native
+fold tests, F1/AUC and negative MSE matched ordinary full fitting, including
+train-only scaling and original target labels.
+
+OC-251 remains open for ordinary Optuna and Halving scoring. Its new pruning
+path is covered for validation row alignment; that does not close the shared
+legacy-path finding. Queue counts remain **25 open / 4 parked**.
+
+Final verification: full Core on sklearn 1.9.1 **9,260 passed / 80 skipped**
+with three snapshots; full backend on sklearn 1.8.0 **3,810 passed** with seven
+snapshots; full Canvas **2,599 passed / 198 files** and **11 Chromium tests**.
+The 252 focused Core cases also passed on sklearn 1.8.0, and all 60 pruning API
+cases passed on sklearn 1.9.1. Ruff, ty, production CCN <=10, frontend lint,
+complexity, build and bundle limits passed. Rebuilt main bundle: **326.3 KiB
+gzip / 327 KiB budget**. Core statement/branch coverage combined: **97.35%**.
 
 ### 2026-09-13 — 0.8.23: nine more queue findings repaired
 

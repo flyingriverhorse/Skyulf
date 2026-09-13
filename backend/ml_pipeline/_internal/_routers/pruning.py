@@ -1,6 +1,6 @@
 """Inspect Optuna pruning eligibility without executing or loading a pipeline."""
 
-from typing import Any
+from typing import Any, Literal
 
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
@@ -14,8 +14,10 @@ from backend.ml_pipeline._execution.model_components import get_model_components
 from backend.ml_pipeline._execution.schemas import NodeConfig
 from backend.ml_pipeline._internal._schemas import PipelineConfigModel
 from backend.ml_pipeline.constants import StepType
+from skyulf.leakage import train_test_splitters
 from skyulf.modeling._tuning.engine import TuningCalculator
 from skyulf.modeling._tuning.schemas import TuningConfig
+from skyulf.modeling._tuning.splitters import select_cv_by_type
 
 router = APIRouter(tags=["ML Pipeline"])
 
@@ -31,10 +33,11 @@ class PruningSupportRequest(BaseModel):
 
 
 class PruningSupportResponse(BaseModel):
-    """Whether incremental pruning is available, with its disabling reason."""
+    """Whether trials can stop during training or between CV folds, with a reason."""
 
     supported: bool
-    reason: str | None
+    mode: Literal["iterations", "folds", "none"]
+    reason: str
 
 
 def _validated_nodes(request: PruningSupportRequest) -> dict[str, NodeConfig]:
@@ -62,26 +65,33 @@ def _has_merged_ancestors(node: NodeConfig, nodes: dict[str, NodeConfig]) -> boo
     return False
 
 
-def _graph_pruning_reason(node: NodeConfig, nodes: dict[str, NodeConfig]) -> str | None:
+def _graph_pruning_context(node: NodeConfig, nodes: dict[str, NodeConfig]) -> tuple[bool, bool]:
     """Mirror fold replay selection while leaving saved artifacts and data untouched."""
     if _has_merged_ancestors(node, nodes):
-        return "Cannot confirm incremental pruning support for merged pipeline inputs"
+        raise ValueError("Cannot confirm pruning support for merged pipeline inputs")
     inspector = FeatureEngMixin()
     inspector._node_configs = nodes
     resolved = inspector._upstream_fe_chain(node)
     if resolved is None:
-        return "Cannot confirm pruning support: connect a supported path from a data source"
+        raise ValueError("Connect a supported path from a data source")
     _loader_id, chain = resolved
     steps = [step for _node_id, node_steps in chain for step in node_steps]
     _first, unsafe, replay = partition_fold_steps(steps, node.params.get("target_column"))
     if unsafe:
-        return "Data-dependent preprocessing before the first split cannot be refitted safely"
-    if replay:
-        return "Pruning is unavailable when preprocessing runs inside each validation fold"
-    return None
+        raise ValueError(
+            "Data-dependent preprocessing before the first split cannot be refitted safely"
+        )
+    holdout = any(
+        float((step.get("params") or {}).get("validation_size", 0.0)) > 0
+        for step in steps
+        if step.get("transformer") in train_test_splitters()
+    )
+    return bool(replay), holdout
 
 
-def _model_pruning_reason(request: PruningSupportRequest, node: NodeConfig) -> str | None:
+def _model_pruning_support(
+    request: PruningSupportRequest, node: NodeConfig, preprocessing: bool, holdout: bool
+) -> PruningSupportResponse:
     """Use Advanced tuning defaults and the real Core estimator/wrapper preparation."""
     task_type = (
         node.params.get("task_type") or node.params.get("problem_type") or node.params.get("task")
@@ -89,27 +99,39 @@ def _model_pruning_reason(request: PruningSupportRequest, node: NodeConfig) -> s
     calculator, _applier = get_model_components(
         request.model_type, task_type=task_type if isinstance(task_type, str) else None
     )
+    tuning = dict(node.params.get("tuning_config") or {})
+    calculator.prepare_tuning_params(tuning)
+    search_space = request.search_space or calculator.build_tuning_search_space(tuning, "optuna")
     config = TuningConfig(
         strategy="optuna",
-        search_space=request.search_space,
+        search_space=search_space,
         strategy_params=request.strategy_params,
+        cv_enabled=tuning.get("cv_enabled", True),
+        cv_folds=tuning.get("cv_folds", 5),
+        cv_type=tuning.get("cv_type", "k_fold"),
     )
-    return TuningCalculator(calculator).pruning_support_reason(config)
+    n_splits = 1 if holdout else select_cv_by_type(config, calculator.problem_type).get_n_splits()
+    return PruningSupportResponse(
+        **TuningCalculator(calculator).pruning_support(
+            config, n_splits=n_splits, preprocessing=preprocessing
+        )
+    )
 
 
 @router.post("/pruning-support", response_model=PruningSupportResponse)
 def get_pruning_support(request: PruningSupportRequest) -> PruningSupportResponse:
-    """Return configuration eligibility; the current selected pruner does not disable itself.
+    """Return pruning capability; the selected pruner does not disable itself.
 
     Model defaults match Advanced tuning, so Basic-mode hyperparameters are not
-    applied. Graph inspection shares runtime fold selection, independent of the
-    post-tuning CV toggle. Merged graphs conservatively require confirmation;
+    applied. An upstream validation split overrides tuning CV just as it does
+    during execution. Merged graphs conservatively require confirmation;
     this route never fits models or reads data, artifacts, files, or the database.
     """
     try:
         nodes = _validated_nodes(request)
         node = nodes[request.node_id]
-        reason = _model_pruning_reason(request, node) or _graph_pruning_reason(node, nodes)
+        preprocessing, holdout = _graph_pruning_context(node, nodes)
+        return _model_pruning_support(request, node, preprocessing, holdout)
     except (ValueError, TypeError, AttributeError, KeyError) as exc:
         reason = f"Cannot confirm pruning support: {exc}"
-    return PruningSupportResponse(supported=reason is None, reason=reason)
+    return PruningSupportResponse(supported=False, mode="none", reason=reason)

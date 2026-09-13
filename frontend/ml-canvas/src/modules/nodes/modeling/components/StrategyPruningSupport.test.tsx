@@ -18,14 +18,27 @@ beforeEach(() => {
 const props = { isOpen: true, strategy: 'optuna', nodeId: 'train', modelKey: 'sgd_classifier',
   searchSpace: { alpha: [0.001] }, onSave: vi.fn(), onClose: vi.fn() };
 
+it.each([
+  ['iterations', 'Early stopping is available during training.'],
+  ['folds', 'Early stopping is available between CV folds.'],
+])('explains the %s pruning mode when the backend gives no additional detail', async (mode, reason) => {
+  // Users must know whether a trial can stop inside one fit or only after a full CV fold.
+  post.mockResolvedValue({ data: { supported: true, mode, reason: null } });
+  render(<StrategySettingsModal {...props} initialConfig={{ pruner: 'hyperband' }} />);
+  const pruner = screen.getByRole('combobox', { name: 'Pruner' });
+  await waitFor(() => expect(pruner).toHaveAccessibleDescription(reason));
+  expect(pruner).toBeEnabled();
+  expect(pruner).toHaveValue('hyperband');
+});
+
 it('disables unavailable pruning, explains why, and applies None without discarding other options', async () => {
   // Unsupported saved choices must be honest on screen and in the applied configuration.
-  post.mockResolvedValue({ data: { supported: false, reason: 'Random Forest does not support incremental training.' } });
+  post.mockResolvedValue({ data: { supported: false, mode: 'none', reason: 'Random Forest requires at least two CV folds; a single holdout cannot stop trials early.' } });
   const onSave = vi.fn();
   render(<StrategySettingsModal {...props} modelKey="random_forest_classifier" onSave={onSave}
     initialConfig={{ pruner: 'hyperband', sampler: 'random', timeout: 120 }} />);
   const pruner = screen.getByRole('combobox', { name: 'Pruner' });
-  await waitFor(() => expect(pruner).toHaveAccessibleDescription(/Random Forest does not support/));
+  await waitFor(() => expect(pruner).toHaveAccessibleDescription(/Random Forest requires at least two CV folds/));
   expect(pruner).toBeDisabled();
   expect(pruner).toHaveValue('none');
   expect(useGraphStore.temporal.getState().pastStates).toHaveLength(0);
@@ -36,7 +49,7 @@ it('disables unavailable pruning, explains why, and applies None without discard
 
 it('checks current model, search options and executable graph while retaining supported choices', async () => {
   // The frontend must ask the same configuration that the backend will train.
-  post.mockResolvedValue({ data: { supported: true, reason: null } });
+  post.mockResolvedValue({ data: { supported: true, mode: 'iterations', reason: null } });
   render(<StrategySettingsModal {...props} initialConfig={{ pruner: 'hyperband' }} />);
   const pruner = screen.getByRole('combobox', { name: 'Pruner' });
   await waitFor(() => expect(post).toHaveBeenCalled());
@@ -51,18 +64,18 @@ it('checks current model, search options and executable graph while retaining su
 
 it('rechecks graph changes but ignores moves and selection without losing the saved pruner', async () => {
   // Capability follows pipeline semantics, and opening/checking must not create hidden edits.
-  post.mockResolvedValueOnce({ data: { supported: true, reason: null } });
+  post.mockResolvedValueOnce({ data: { supported: true, mode: 'iterations', reason: null } });
   const { rerender } = render(<StrategySettingsModal {...props} initialConfig={{ pruner: 'hyperband' }} />);
   const pruner = screen.getByRole('combobox', { name: 'Pruner' });
   await waitFor(() => expect(pruner).toBeEnabled());
   const calls = post.mock.calls.length;
   act(() => useGraphStore.setState({ nodes: useGraphStore.getState().nodes.map(node => ({ ...node, selected: true, position: { x: 30, y: 40 } })) }));
   expect(post).toHaveBeenCalledTimes(calls);
-  post.mockResolvedValueOnce({ data: { supported: false, reason: 'Preprocessing is fitted inside each validation fold.' } });
+  post.mockResolvedValueOnce({ data: { supported: false, mode: 'none', reason: 'A searched epoch budget needs multiple CV folds to prune.' } });
   rerender(<StrategySettingsModal {...props} searchSpace={{ max_iter: [5, 10] }} initialConfig={{ pruner: 'hyperband' }} />);
   await waitFor(() => expect(pruner).toHaveValue('none'));
   expect(pruner).toBeDisabled();
-  post.mockResolvedValueOnce({ data: { supported: true, reason: null } });
+  post.mockResolvedValueOnce({ data: { supported: true, mode: 'iterations', reason: null } });
   rerender(<StrategySettingsModal {...props} initialConfig={{ pruner: 'hyperband' }} />);
   await waitFor(() => expect(pruner).toBeEnabled());
   expect(pruner).toHaveValue('hyperband');
@@ -75,10 +88,10 @@ it('ignores a stale success after model switch and aborts its request', async ()
   const { rerender } = render(<StrategySettingsModal {...props} />);
   await waitFor(() => expect(post).toHaveBeenCalledTimes(1));
   const signal = post.mock.calls[0]?.[2]?.signal;
-  post.mockResolvedValueOnce({ data: { supported: false, reason: 'This model cannot train incrementally.' } });
+  post.mockResolvedValueOnce({ data: { supported: false, mode: 'none', reason: 'A single holdout cannot stop this model early.' } });
   rerender(<StrategySettingsModal {...props} modelKey="random_forest_classifier" />);
-  await waitFor(() => expect(screen.getByRole('combobox', { name: 'Pruner' })).toHaveAccessibleDescription(/cannot train incrementally/));
-  await act(async () => resolveOld({ data: { supported: true, reason: null } }));
+  await waitFor(() => expect(screen.getByRole('combobox', { name: 'Pruner' })).toHaveAccessibleDescription(/single holdout/));
+  await act(async () => resolveOld({ data: { supported: true, mode: 'iterations', reason: null } }));
   expect(signal?.aborted).toBe(true);
   expect(screen.getByRole('combobox', { name: 'Pruner' })).toBeDisabled();
 });
@@ -101,7 +114,7 @@ it('preserves saved pruning on a check failure and aborts on close', async () =>
 
 it('checks again on reopen without exposing the previous supported result while loading', async () => {
   // Reopening must wait for fresh capability instead of briefly enabling a stale choice.
-  post.mockResolvedValueOnce({ data: { supported: true, reason: null } });
+  post.mockResolvedValueOnce({ data: { supported: true, mode: 'iterations', reason: null } });
   const initialConfig = { pruner: 'hyperband' as const };
   const { rerender } = render(<StrategySettingsModal {...props} initialConfig={initialConfig} />);
   await waitFor(() => expect(screen.getByRole('combobox', { name: 'Pruner' })).toBeEnabled());

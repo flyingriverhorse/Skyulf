@@ -1,4 +1,4 @@
-"""Optuna prunes only estimator paths that can incrementally fit the real fold input."""
+"""Optuna preserves incremental epochs and safe ordinary fits between CV folds."""
 
 import numpy as np
 import pandas as pd
@@ -18,6 +18,12 @@ from skyulf.modeling._tuning.strategies import optuna as strategy
 from skyulf.modeling.classification import SGDClassifierCalculator
 
 optuna = pytest.importorskip("optuna")
+
+
+@pytest.fixture
+def never_prune(monkeypatch):
+    """Keep all folds observable when checking dispatch and ordinary fit equivalence."""
+    monkeypatch.setattr(strategy, "build_optuna_pruner", lambda name: optuna.pruners.NopPruner())
 
 
 def _search(estimator, *, pruner="hyperband", search_space=None, strategy_params=None):
@@ -97,16 +103,19 @@ def test_explicitly_disabled_pruning_keeps_regular_fit(params):
         FoldAwareModelStep(estimator=SGDClassifier(max_iter=3, random_state=7)),
     ],
 )
-def test_unsupported_outer_estimators_keep_fit_and_explain_skipped_pruning(estimator):
+def test_outer_estimators_keep_ordinary_fit_and_prune_between_folds(estimator, never_prune):
     """An incremental inner model must never bypass a pipeline or fold wrapper."""
-    search, messages = _search(estimator)
+    search, _ = _search(estimator)
     X, y = _classification_data()
     search.fit(X, y)
-    assert search.enable_pruning is False
+    assert search.enable_pruning is True
+    assert search.mode == "folds"
     assert all(trial.state == optuna.trial.TrialState.COMPLETE for trial in search.study_.trials)
-    assert any(
-        "pruning disabled" in message.lower() and "incremental training" in message
-        for message in messages
+    assert all(list(trial.intermediate_values) == [0, 1] for trial in search.study_.trials)
+    assert search.best_score_ == pytest.approx(
+        cross_val_score(
+            estimator, X, y, cv=StratifiedKFold(2, shuffle=True, random_state=7), scoring="accuracy"
+        ).mean()
     )
 
 
@@ -120,19 +129,18 @@ def test_unsupported_outer_estimators_keep_fit_and_explain_skipped_pruning(estim
         ({}, {"max_iter": [2, 3]}),
     ],
 )
-def test_incompatible_partial_fit_options_disable_pruning(fixed, space):
+def test_incompatible_partial_fit_options_keep_safe_fold_pruning(fixed, space, never_prune):
     """Partial-fit restrictions must not turn previously valid fit candidates into failed trials."""
-    search, messages = _search(
-        SGDClassifier(max_iter=3, random_state=7, **fixed), search_space=space
-    )
+    search, _ = _search(SGDClassifier(max_iter=3, random_state=7, **fixed), search_space=space)
     X, y = _classification_data()
     search.fit(X, y)
-    assert search.enable_pruning is False
-    assert any("pruning disabled" in message.lower() for message in messages)
+    assert search.enable_pruning is True
+    assert search.mode == "folds"
+    assert all(list(trial.intermediate_values) == [0, 1] for trial in search.study_.trials)
     assert all(trial.state == optuna.trial.TrialState.COMPLETE for trial in search.study_.trials)
 
 
-def test_sgd_tuning_preserves_fold_preprocessing_and_reports_unavailable_pruning():
+def test_sgd_tuning_preserves_fold_preprocessing_with_fold_pruning(never_prune):
     """Selecting Hyperband must preserve scaler refits inside each original training fold."""
     fit_rows = []
 
@@ -176,12 +184,10 @@ def test_sgd_tuning_preserves_fold_preprocessing_and_reports_unavailable_pruning
     assert len(fit_rows) == 4
     assert result.n_trials == 2
     assert np.isfinite(result.best_score)
-    assert any(
-        "pruning disabled" in message.lower() and "Pipeline" in message for message in messages
-    )
+    assert any("pruning" in message.lower() and "fold" in message.lower() for message in messages)
 
 
-def test_incremental_statistics_models_keep_single_fit_per_fold():
+def test_incremental_statistics_models_keep_single_fit_per_fold(never_prune):
     """GaussianNB must not count every fold's observations another 1,000 times."""
     fitted_counts = []
     partial_calls = []
@@ -200,8 +206,9 @@ def test_incremental_statistics_models_keep_single_fit_per_fold():
             partial_calls.append(len(X))
             return super().partial_fit(X, y, classes=classes, sample_weight=sample_weight)
 
-    search, messages = _search(ObservedGaussianNB())
-    assert search.enable_pruning is False
+    search, _ = _search(ObservedGaussianNB())
+    assert search.enable_pruning is True
+    assert search.mode == "folds"
     X, y = _classification_data()
     search.fit(X, y)
     expected = cross_val_score(
@@ -210,9 +217,7 @@ def test_incremental_statistics_models_keep_single_fit_per_fold():
     assert search.best_score_ == pytest.approx(expected)
     assert fitted_counts == [20, 20, 20, 20]
     assert partial_calls == []
-    assert any(
-        "pruning disabled" in message.lower() and "max_iter" in message for message in messages
-    )
+    assert all(list(trial.intermediate_values) == [0, 1] for trial in search.study_.trials)
 
 
 def test_public_tuning_calculator_activates_sgd_pruning(monkeypatch):
@@ -247,15 +252,15 @@ def test_public_tuning_calculator_activates_sgd_pruning(monkeypatch):
     assert all(trial.intermediate_values for trial in searches[0].study_.trials)
 
 
-def test_mlp_solver_search_uses_regular_fit_for_lbfgs_candidates():
+def test_mlp_solver_search_uses_regular_fit_for_lbfgs_candidates(never_prune):
     """A solver choice that removes partial_fit must not crash incremental trials."""
-    search, messages = _search(
+    search, _ = _search(
         MLPClassifier(hidden_layer_sizes=(3,), max_iter=3, random_state=7),
         search_space={"solver": ["lbfgs"]},
     )
-    assert search.enable_pruning is False
+    assert search.enable_pruning is True
+    assert search.mode == "folds"
     X, y = _classification_data()
     search.fit(X, y)
     assert all(trial.state == optuna.trial.TrialState.COMPLETE for trial in search.study_.trials)
-    assert all(not trial.intermediate_values for trial in search.study_.trials)
-    assert any("lbfgs" in message for message in messages)
+    assert all(list(trial.intermediate_values) == [0, 1] for trial in search.study_.trials)

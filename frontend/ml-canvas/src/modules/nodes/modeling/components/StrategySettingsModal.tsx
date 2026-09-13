@@ -158,12 +158,12 @@ function OptunaControls({ config, setConfig, fieldId, showCmaesWarning, pruning 
                     <label htmlFor={`${fieldId}-pruner`} className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                         Pruner
                     </label>
-                    <HelpTooltip placement="bottom-left" text="Median and Hyperband can stop poor trials early when the model supports incremental fitting. Pipelines and fold preprocessing use normal fitting and report why pruning is unavailable. None disables pruning." />
+                    <HelpTooltip placement="bottom-left" text="Median and Hyperband stop unpromising trials during training or between CV folds, depending on the model and validation settings. None disables pruning." />
                     <HelpTooltip
                         placement="bottom-left"
                         label="Models with pruning support"
                         icon={Info}
-                        text="Supported Canvas model: SGD Classifier (text / linear), in Text Classification. Its default max_iter search disables pruning. A compatible custom search with a fixed epoch budget and no per-fold preprocessing can enable it. See the current reason below."
+                        text="XGBoost and LightGBM can stop during boosting. Eligible SGD settings can stop during incremental training. Random Forest, Logistic Regression, SVC and other models can stop between CV folds. A single holdout may offer no early stopping."
                     />
                 </div>
                 <select

@@ -1,6 +1,7 @@
 """Pruning metadata must match the training graph without reading or fitting its data."""
 
 from copy import deepcopy
+from unittest.mock import MagicMock
 
 import pandas as pd
 import pytest
@@ -55,30 +56,31 @@ def _body(model_type="sgd_classifier", steps=None, **params):
 
 
 @pytest.mark.parametrize(
-    ("model_type", "space", "supported", "reason"),
+    ("model_type", "space", "mode", "reason"),
     [
-        ("sgd_classifier", {}, True, None),
-        ("SGD Classifier", {}, True, None),
-        ("sgd-classifier", {}, True, None),
-        ("random_forest_classifier", {}, False, "incremental training"),
-        ("RandomForestClassifier", {}, False, "incremental training"),
-        ("random_forest", {}, False, "Ambiguous"),
-        ("gaussian_nb", {}, False, "epoch budget"),
-        ("missing_model", {}, False, "Unknown algorithm"),
-        ("sgd_classifier", {"max_iter": [5]}, False, "searched max_iter"),
-        ("sgd_classifier", {"early_stopping": [True, False]}, False, "early_stopping"),
-        ("sgd_classifier", {"class_weight": ["balanced"]}, False, "balanced"),
+        ("sgd_classifier", {}, "iterations", "incremental training"),
+        ("SGD Classifier", {}, "iterations", "incremental training"),
+        ("sgd-classifier", {}, "iterations", "incremental training"),
+        ("random_forest_classifier", {}, "folds", "folds"),
+        ("RandomForestClassifier", {}, "folds", "folds"),
+        ("random_forest", {}, "none", "Ambiguous"),
+        ("gaussian_nb", {}, "folds", "folds"),
+        ("missing_model", {}, "none", "Unknown algorithm"),
+        ("sgd_classifier", {"max_iter": [5]}, "folds", "folds"),
+        ("sgd_classifier", {"early_stopping": [True, False]}, "folds", "folds"),
+        ("sgd_classifier", {"class_weight": ["balanced"]}, "folds", "folds"),
     ],
 )
-def test_model_and_search_support(client, model_type, space, supported, reason):
+def test_model_and_search_support(client, model_type, space, mode, reason):
     """The API must expose runtime eligibility and registry aliases, not a second model list."""
     body = _body(model_type)
     body["search_space"] = space
     response = client.post("/pipeline/pruning-support", json=body)
     assert response.status_code == 200
     result = response.json()
-    assert result["supported"] is supported
-    assert result["reason"] is None if reason is None else reason in result["reason"]
+    assert result["supported"] is (mode != "none")
+    assert result["mode"] == mode
+    assert reason in result["reason"]
 
 
 @pytest.mark.parametrize("cv_enabled", [False, True])
@@ -102,10 +104,10 @@ def test_graph_support_matches_actual_fold_resolution(client, steps, cv_enabled)
     from skyulf.data.dataset import SplitDataset
     from skyulf.modeling._tuning.engine import TuningCalculator
     from skyulf.modeling._tuning.schemas import TuningConfig
-    from skyulf.modeling._tuning.strategies.optuna import _unsupported_pruning_reason
+    from skyulf.modeling._tuning.splitters import select_cv_by_type
     from skyulf.modeling.classification import SGDClassifierCalculator
 
-    body = _body(steps=steps, cv_enabled=cv_enabled)
+    body = _body(steps=steps, tuning_config={"cv_enabled": cv_enabled})
     frame = pd.DataFrame({"x": [1.0, 2.0, 3.0, 4.0], "target": [0, 1, 0, 1]})
 
     class Store:
@@ -113,28 +115,24 @@ def test_graph_support_matches_actual_fold_resolution(client, steps, cv_enabled)
 
         def load(self, key):
             """Keep raw and split snapshots consistent without fitting any transformers."""
-            return frame if key == "load" else SplitDataset(train=frame, test=None)
+            return frame if key == "load" else SplitDataset(train=frame, test=frame.iloc[:0])
 
-    engine = PipelineEngine(Store(), None)
+    engine = PipelineEngine(MagicMock(load=Store().load), MagicMock())
     engine._node_configs = {row["node_id"]: NodeConfig(**row) for row in body["pipeline"]["nodes"]}
     resolved, fallback = engine._resolve_fold_preprocessing(engine._node_configs["model"], "target")
     assert fallback is None
     preprocessing, frames, validation = resolved if resolved else (None, None, None)
     calculator = SGDClassifierCalculator()
     config = TuningConfig(strategy="optuna", cv_enabled=cv_enabled)
-    estimator, search_config, _, _ = TuningCalculator(calculator)._prepare_search_estimator(
-        calculator.model_class,
+    assert frames is not None if preprocessing is not None else validation is None
+    runtime_support = TuningCalculator(calculator).pruning_support(
         config,
-        preprocessing,
-        frames,
-        None,
-        validation,
-        None,
+        preprocessing=preprocessing is not None,
+        n_splits=select_cv_by_type(config, "classification").get_n_splits(),
     )
-    runtime_reason = _unsupported_pruning_reason(estimator, search_config.search_space)
     response = client.post("/pipeline/pruning-support", json=body)
     assert response.status_code == 200
-    assert response.json()["supported"] is (runtime_reason is None)
+    assert response.json() == runtime_support
 
 
 def test_query_preserves_saved_values_and_uses_advanced_defaults(client, monkeypatch):
@@ -159,7 +157,8 @@ def test_query_preserves_saved_values_and_uses_advanced_defaults(client, monkeyp
     before = deepcopy(body)
     response = client.post("/pipeline/pruning-support", json=body)
     assert response.status_code == 200
-    assert response.json() == {"supported": True, "reason": None}
+    assert response.json()["supported"] is True
+    assert response.json()["mode"] == "iterations"
     assert body == before
     request = PruningSupportRequest(**body)
     saved_request = deepcopy(request.model_dump())
@@ -210,8 +209,8 @@ def test_ambiguous_alias_uses_the_same_task_resolution_as_training(client, task_
     body = _body("random_forest", task_type=task_type)
     response = client.post("/pipeline/pruning-support", json=body)
     assert response.status_code == 200
-    assert response.json()["supported"] is False
-    assert "incremental training" in response.json()["reason"]
+    assert response.json()["supported"] is True
+    assert response.json()["mode"] == "folds"
     assert "Ambiguous" not in response.json()["reason"]
 
 
@@ -244,6 +243,99 @@ def test_learned_pre_split_graph_has_a_visible_safety_reason(client):
     assert "before the first split" in response.json()["reason"]
 
 
+@pytest.mark.parametrize(
+    ("model_type", "cv_enabled", "mode"),
+    [
+        ("random_forest_classifier", True, "folds"),
+        ("random_forest_classifier", False, "none"),
+        ("logistic_regression", True, "folds"),
+        ("svc", True, "folds"),
+        ("gaussian_nb", True, "folds"),
+        ("xgboost_classifier", False, "iterations"),
+        ("lgbm_classifier", False, "iterations"),
+    ],
+)
+def test_cv_and_preprocessing_select_the_actual_pruning_mode(client, model_type, cv_enabled, mode):
+    """Ordinary preprocessing must retain native boosting or between-fold pruning."""
+    body = _body(
+        model_type,
+        steps=["Split", "StandardScaler"],
+        tuning_config={"cv_enabled": cv_enabled, "cv_folds": 3, "cv_type": "k_fold"},
+    )
+    body["strategy_params"] = {"pruner": "none"}
+    response = client.post("/pipeline/pruning-support", json=body)
+    assert response.status_code == 200
+    result = response.json()
+    assert result["mode"] == mode
+    assert result["supported"] is (mode != "none")
+    assert result["reason"]
+
+
+@pytest.mark.parametrize("validation_size", [0.0, 0.2])
+def test_validation_holdout_takes_precedence_over_post_tuning_cv(client, validation_size):
+    """A single validation split cannot advertise between-fold stopping from the CV toggle."""
+    body = _body(
+        "random_forest_classifier",
+        steps=["Split", "StandardScaler"],
+        tuning_config={"cv_enabled": True, "cv_folds": 3},
+    )
+    body["pipeline"]["nodes"][1]["params"]["steps"][0]["params"]["validation_size"] = (
+        validation_size
+    )
+    response = client.post("/pipeline/pruning-support", json=body)
+    assert response.status_code == 200
+    result = response.json()
+    assert result["supported"] is (validation_size == 0)
+    assert result["mode"] == ("folds" if validation_size == 0 else "none")
+
+
+@pytest.mark.parametrize("model_type", ["voting_classifier", "stacking_classifier"])
+def test_ensemble_structure_is_prepared_like_advanced_training(client, model_type):
+    """Ensemble choices must be resolved before inspecting their required estimator list."""
+    body = _body(
+        model_type,
+        tuning_config={
+            "cv_enabled": True,
+            "cv_folds": 3,
+            "base_estimators": ["random_forest", "svc"],
+            "voting": "hard",
+            "tune_base_models": True,
+        },
+    )
+    before = deepcopy(body)
+    response = client.post("/pipeline/pruning-support", json=body)
+    assert response.status_code == 200
+    assert response.json()["mode"] == "folds"
+    assert response.json()["supported"] is True
+    assert body == before
+
+
+@pytest.mark.parametrize(
+    ("model_type", "mode"),
+    [
+        ("random_forest_classifier", "folds"),
+        ("ridge_regression", "folds"),
+        ("sgd_classifier", "folds"),
+        ("xgboost_classifier", "iterations"),
+        ("lgbm_classifier", "iterations"),
+    ],
+)
+def test_canvas_default_search_candidates_match_runtime_capability(client, model_type, mode):
+    """The real provider's candidate lists must remain eligible with CV and preprocessing."""
+    from skyulf.modeling.hyperparameters import get_default_search_space
+
+    body = _body(
+        model_type,
+        steps=["Split", "StandardScaler"],
+        tuning_config={"cv_enabled": True, "cv_folds": 3},
+    )
+    body["search_space"] = get_default_search_space(model_type, "optuna")
+    response = client.post("/pipeline/pruning-support", json=body)
+    assert response.status_code == 200
+    assert response.json()["mode"] == mode
+    assert response.json()["supported"] is True
+
+
 @pytest.mark.parametrize("transformer", ["DropMissingRows", "StandardScaler"])
 def test_separate_transformer_nodes_also_require_fold_preprocessing(client, transformer):
     """Ordinary converted Canvas nodes must match composite feature-engineering steps."""
@@ -253,5 +345,5 @@ def test_separate_transformer_nodes_also_require_fold_preprocessing(client, tran
     nodes[-1]["inputs"] = ["feature"]
     response = client.post("/pipeline/pruning-support", json=body)
     assert response.status_code == 200
-    assert response.json()["supported"] is False
-    assert "preprocessing runs inside each validation fold" in response.json()["reason"]
+    assert response.json()["supported"] is True
+    assert response.json()["mode"] == "folds"
