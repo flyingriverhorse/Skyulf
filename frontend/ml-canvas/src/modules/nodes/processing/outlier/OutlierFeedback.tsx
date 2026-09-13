@@ -1,4 +1,4 @@
-import type { OutlierConfig } from './types';
+import type { ManualColumnBounds, OutlierConfig } from './types';
 
 function getTargetExplanation(config: OutlierConfig) {
   switch (config.method) {
@@ -6,6 +6,7 @@ function getTargetExplanation(config: OutlierConfig) {
     case 'zscore': return "Removes deviations > 3σ";
     case 'winsorize': return "Clips extreme values";
     case 'elliptic_envelope': return "Detects multivariate anomalies";
+    case 'manual_bounds': return "Filters rows using configured bounds";
     default: return "";
   }
 }
@@ -71,19 +72,19 @@ function OutlierRowSummary({ config, metrics }: { config: OutlierConfig; metrics
   </>;
 }
 
-function OutlierColumnStatistics({ metrics }: { metrics: Record<string, unknown> }) {
-  const bounds = metrics.bounds as Record<string, { lower: number; upper: number }> | undefined;
+function OutlierColumnStatistics({ config, metrics }: { config: OutlierConfig; metrics: Record<string, unknown> }) {
+  const bounds = metrics.bounds as Record<string, ManualColumnBounds> | undefined;
   const stats = metrics.stats as Record<string, { mean: number; std: number }> | undefined;
   return <>
     {bounds && (
       <div>
-        <div className="font-medium text-muted-foreground mb-1">Calculated Bounds</div>
+        <div className="font-medium text-muted-foreground mb-1">{config.method === 'manual_bounds' ? 'Configured Bounds' : 'Calculated Bounds'}</div>
         <div className="max-h-32 overflow-y-auto bg-background p-2 rounded border space-y-1">
           {Object.entries(bounds).map(([col, bound]) => (
             <div key={col} className="flex justify-between items-center border-b border-border/50 last:border-0 pb-1 last:pb-0">
               <span className="truncate max-w-[100px] font-medium" title={col}>{col}</span>
               <span className="font-mono text-[10px] text-muted-foreground">
-                [{bound.lower.toFixed(2)}, {bound.upper.toFixed(2)}]
+                [{bound.lower?.toFixed(2) ?? 'no lower limit'}, {bound.upper?.toFixed(2) ?? 'no upper limit'}]
               </span>
             </div>
           ))}
@@ -138,7 +139,7 @@ export function OutlierFeedback({ config, metrics }: { config: OutlierConfig; me
         </div>
       )}
 
-      <OutlierColumnStatistics metrics={metrics} />
+      <OutlierColumnStatistics config={config} metrics={metrics} />
     </div>
   );
 }

@@ -87,8 +87,8 @@ This is the core of Skyulf. The canvas is a React Flow-based visual editor where
 | **Imputation** | SimpleImputer, KNNImputer, IterativeImputer |
 | **Encoding** | OneHotEncoder, OrdinalEncoder, LabelEncoder, TargetEncoder |
 | **Scaling** | StandardScaler, MinMaxScaler, RobustScaler |
-| **Outliers** | IQR, ZScore, Winsorize, EllipticEnvelope |
-| **Feature Engineering** | PolynomialFeatures, FeatureGeneration, FeatureSelection |
+| **Outliers** | IQR, ZScore, Winsorize, EllipticEnvelope, Manual Bounds |
+| **Feature Engineering** | PolynomialFeatures, FeatureGeneration, FeatureSelection, Geo Distance |
 | **Resampling** | SMOTE, ADASYN, RandomUndersampling |
 | **Modeling** | All 20 classifiers and regressors |
 | **Tuning** | Hyperparameter tuner (grid, random, Optuna, halving) |
@@ -112,6 +112,31 @@ The icon button is disabled when all available columns already have rules.
 To change an existing type, use that rule's type selector. Removing a rule
 makes its column available to add again; other rules keep their selected types.
 Columns dropped upstream are excluded from the available choices.
+
+### Manual bounds and geographic distance
+
+In **Outlier Removal**, choose **Manual Bounds** and select numeric columns.
+Set a lower bound, an upper bound, or both for each selected column. For example,
+an `age` interval of 18 to 65 keeps both endpoints and removes rows outside that
+interval. Zero is a valid bound; an empty endpoint means no limit. Missing values
+remain available for a separate missing-value operation. The method filters rows
+and keeps their targets aligned. Targets already separated by a splitter cannot
+be selected as feature bounds. Removing a column from the selection stops its
+rule from being submitted; changing methods retains its settings for later use.
+
+Under **Preprocessing → Feature engineering**, add **Geo Distance**. Choose
+latitude/longitude columns, in degrees, for each of two points. **Haversine**
+computes a great-circle distance; **Euclidean** is a local geographic approximation
+suited to nearby points. Choose kilometres or miles. Leaving the output name
+blank creates `geo_distance_km` or `geo_distance_mi`; an explicit existing name
+replaces that column. Other input columns remain available.
+
+For example, `(0°, 0°)` to `(0°, 1°)` produces approximately **111.195 km** or
+**69.093 miles**. The generated numeric column appears in schema preview and
+can be selected by a downstream Outlier Removal node before running the graph.
+Both operations use fixed configuration and can precede the train/test split;
+choose bounds independently of held-out results. H3 indexing remains a Core
+capability and is not offered in Canvas.
 
 ### Recommended pipeline order:
 

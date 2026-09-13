@@ -1,6 +1,14 @@
+export interface ManualColumnBounds {
+  lower?: number | null;
+  upper?: number | null;
+}
+
 export interface OutlierConfig {
-  method: 'iqr' | 'zscore' | 'winsorize' | 'elliptic_envelope';
+  method: 'iqr' | 'zscore' | 'winsorize' | 'elliptic_envelope' | 'manual_bounds';
   columns: string[];
+
+  // Manual Bounds
+  bounds?: Record<string, ManualColumnBounds>;
 
   // IQR
   multiplier?: number;

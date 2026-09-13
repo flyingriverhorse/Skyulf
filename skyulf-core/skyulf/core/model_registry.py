@@ -1,9 +1,9 @@
-"""Model registry seam with versioning.
+"""Explicit, in-process model registration with versioning.
 
-Additive, non-breaking seam ahead of the Databricks/MLflow phases. The default
-:class:`InMemoryModelRegistry` keeps fitted models in-process keyed by
-``(name, version)``. An artifact-store backed registry (MLflow / Unity Catalog)
-can later subclass :class:`ModelRegistry` without changing call sites.
+Instantiate :class:`InMemoryModelRegistry` and register models directly to use
+this API. Each instance keeps object references keyed by ``(name, version)``;
+pipeline training does not register models here automatically. This registry
+has no connection to the backend's persisted job and model registry.
 """
 
 from abc import ABC, abstractmethod
@@ -20,7 +20,12 @@ __all__ = [
 
 @dataclass
 class ModelVersion:
-    """A single registered model version."""
+    """An in-memory model reference with its local name, version and metadata.
+
+    ``skyulf.core.model_registry.ModelVersion`` is this dataclass.
+    ``backend.ml_pipeline.model_registry.schemas.ModelVersion`` is a separate
+    Pydantic response schema describing backend jobs and model artifacts.
+    """
 
     name: str
     version: int
@@ -50,7 +55,7 @@ class ModelRegistry(ABC):
 
 
 class InMemoryModelRegistry(ModelRegistry):
-    """Default in-process registry. Versions auto-increment from 1."""
+    """Registry instantiated by callers; per-name versions auto-increment from 1."""
 
     def __init__(self) -> None:
         """Create an empty registry plus the lock that serialises concurrent version assignment."""

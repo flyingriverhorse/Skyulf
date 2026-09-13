@@ -1,6 +1,19 @@
 import { StepType as BackendStepType } from '../../constants/stepTypes';
 import type { NodeConverter } from './types';
 
+/** Keep optional bounds absent without turning a cleared input into numeric zero. */
+function selectedManualBounds(data: Record<string, unknown>): Record<string, unknown> {
+  const columns = Array.isArray(data.columns) ? data.columns as string[] : [];
+  const bounds = (data.bounds ?? {}) as Record<string, { lower?: number | null; upper?: number | null }>;
+  return Object.fromEntries(columns.map(column => {
+    const bound = bounds[column];
+    return [column, {
+      ...(bound?.lower != null ? { lower: bound.lower } : {}),
+      ...(bound?.upper != null ? { upper: bound.upper } : {}),
+    }];
+  }));
+}
+
 const convertDatasetNode: NodeConverter = (node) => {
   return {
     stepType: BackendStepType.DATA_LOADER,
@@ -179,6 +192,9 @@ const convertOutlier: NodeConverter = (node) => {
   let stepType = 'unknown';
   let params: Record<string, unknown> = {};
   const method = node.data.method || 'iqr';
+  if (method === 'manual_bounds') {
+    return { stepType: 'ManualBounds', params: { bounds: selectedManualBounds(node.data) } };
+  }
   if (method === 'iqr') stepType = 'IQR';
   else if (method === 'zscore') stepType = 'ZScore';
   else if (method === 'winsorize') stepType = 'Winsorize';
@@ -186,6 +202,14 @@ const convertOutlier: NodeConverter = (node) => {
   else stepType = 'IQR';
   params = node.data;
   return { stepType, params };
+};
+
+const convertGeoDistance: NodeConverter = (node) => {
+  const { lat1_col, lon1_col, lat2_col, lon2_col, method, unit, output_column } = node.data;
+  return {
+    stepType: 'GeoDistance',
+    params: { lat1_col, lon1_col, lat2_col, lon2_col, method, unit, output_column },
+  };
 };
 
 const convertTransformationNode: NodeConverter = (node) => {
@@ -360,6 +384,7 @@ export const preprocessingConverters = new Map<string, NodeConverter>([
   ['feature_target_split', convertFeatureTargetSplit],
   ['feature_selection', convertFeatureSelection],
   ['outlier', convertOutlier],
+  ['GeoDistance', convertGeoDistance],
   ['TransformationNode', convertTransformationNode],
   ['BinningNode', convertBinningNode],
   ['ResamplingNode', convertResamplingNode],

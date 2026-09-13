@@ -97,6 +97,53 @@ with tempfile.TemporaryDirectory() as tmp:
 print(preds)
 ```
 
+## Explicit Core persistence utilities
+
+`skyulf.core.get_model_serializer()` returns a context-local serializer, backed
+by joblib by default. Call its `dump()` and `load()` methods explicitly to use
+it. `set_model_serializer()` and `model_serializer()` change the provider for
+callers of that getter. They do not change `SkyulfPipeline.save()` or `load()`,
+which call pickle directly, or the backend's local/S3 artifact stores, which
+call joblib directly.
+
+`InMemoryModelRegistry` is also an explicit utility. Each instance holds model
+objects and metadata in the current process, with versions starting at 1 for
+each name. Training a pipeline does not register it here automatically, and
+these entries are not added to the backend's persisted model registry.
+
+For example, using the fitted `pipeline` from above:
+
+```python
+from skyulf.core import InMemoryModelRegistry, get_model_serializer
+
+registry = InMemoryModelRegistry()
+entry = registry.register("classifier", pipeline, metadata={"purpose": "example"})
+
+with tempfile.TemporaryDirectory() as tmp:
+    artifact_path = Path(tmp) / "classifier.joblib"
+    serializer = get_model_serializer()
+    serializer.dump(entry.model, artifact_path)
+    restored_pipeline = serializer.load(artifact_path)
+
+assert registry.get("classifier").version == 1
+```
+
+The two `ModelVersion` types describe different data. For code that works with
+both Core and the full backend installation, qualify the modules explicitly:
+
+```python
+from skyulf.core import model_registry as core_registry
+from backend.ml_pipeline.model_registry import schemas as backend_registry
+
+# A dataclass containing name, version, model and metadata.
+core_version_type = core_registry.ModelVersion
+# A Pydantic API schema containing job, pipeline and artifact information.
+backend_version_type = backend_registry.ModelVersion
+```
+
+Neither type converts into the other automatically. The backend import is part
+of the platform application and is not provided by the standalone Core package.
+
 ## Reproducibility fingerprint
 
 `pipeline.fingerprint()` returns a deterministic SHA-256 over the pipeline's

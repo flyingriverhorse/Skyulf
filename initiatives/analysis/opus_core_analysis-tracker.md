@@ -16,8 +16,8 @@ and is not counted.
 
 **Qwen follow-up (2026-09-12):** the verified findings
 filed 48 additional records, OC-271–318, after deduplication and scope
-correction. Forty-seven have since closed. The live queue now has
-**6 open / 4 parked**; the subsequent OC-320 pipeline finding is now fixed. Details
+correction. All 48 have since closed. The live queue now has
+**1 open / 4 parked**; the subsequent OC-320 pipeline finding is now fixed. Details
 and exclusions are in the latest Log entry. Historical baseline counts
 below are unchanged.
 
@@ -119,6 +119,7 @@ uses, so a fixed finding stays where it was filed.
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
+| OC-280 | 🟡 | **Configured default rate limits are not applied to undecorated routes** (`backend/middleware/rate_limiter.py`) — Qwen #11. | medium | ✅ fixed 2026-09-13 — Enforce defaults before undecorated app handlers while preserving explicit/dynamic budgets, exemptions, route ordering, streaming, headers and WebSockets; quotas remain process-local. |
 | OC-292 | 🟡 | **Canvas accepts Segmentation-to-Ensemble connections that convert to invalid data inputs** (`frontend/ml-canvas/src/core/utils/pipelineConversion/ensemble.ts:11-16`) — Qwen #25. Align connection validation, ensemble conversion and backend input expectations for unsupported model families. | medium | ✅ fixed 2026-09-13 — Reject clustering and nested Ensemble sources, report legacy wires in graph validation and block affected training/tuning submissions. Conversion never forwards their Model artifacts as Dataset inputs. |
 | OC-319 | 🟡 | **Explicit Logistic Regression penalty/ratio settings describe different models during search and refit** (`skyulf-core/skyulf/modeling/_sklearn_compat.py:40-45`; `modeling/_tuning/params.py`; `modeling/_tuning/engine.py`) — Align the documented explicit-ratio precedence with penalty semantics across constructor and searcher set_params paths; keep nullable Elastic Net defaults OC-282 separate. | decision + small | ✅ fixed 2026-09-13 — L1/L2 now determine the effective ratio; preserve raw fixed ratio/C across penalty searches, retain Elastic Net defaults and reject unknown penalty names. Independent CV and refits agree across all five strategies. |
 | OC-46 | 🟡 | Constant numeric features still publish non-finite PCA explained-variance ratios in the public profile (`profiling/_analyzer/multivariate.py:161`, `profiling/schemas.py:PCAComponent`) | small | ✅ fixed 2026-09-12 — return the existing unavailable PCA state for constant prepared features, keeping strict JSON finite while retaining PCA for varying inputs. |
@@ -221,6 +222,7 @@ uses, so a fixed finding stays where it was filed.
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
+| OC-91 | 🟡 | Three public Core utilities have no production consumers; Core and backend expose different `ModelVersion` types. | small | ✅ clarified 2026-09-13 — Document explicit-use serializer/registry/deprecation contracts and qualified type namespaces; verified no runtime name collision or promised automatic backend integration. Existing APIs remain available. |
 | OC-102 | ⚪ | Five tunable models return an empty search space from the live `/defaults` endpoint (`hyperparameters/_registry.py`) | small | ✅ fixed 2026-09-13 — Supply random/grid defaults for four clustering estimators; Voting Regressor has intentionally fixed top-level fields and preserves opt-in tuning of selected base learners. Canvas explains the empty meta-search. |
 | OC-90 | ⚪ | Unknown split config keys silently dropped (`preprocessing/split.py`) | small | ✅ fixed 2026-09-12 — warn once about ignored public keys and list supported settings, preserving existing split semantics and quiet routing metadata; Canvas emits only supported settings. |
 | OC-101 | 🟡 | `calibrated_classifier`'s `random_state` is dropped and its factories hardcode the seed | small | ✅ fixed 2026-09-12 — a cloneable calibration wrapper seeds supported base estimators during training, tuning and final refitting; defaults, explicit 0/None, unshuffled integer CV and saved predictions are covered. |
@@ -248,6 +250,9 @@ uses, so a fixed finding stays where it was filed.
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
+| OC-07 | 🟡 | Node-id naming split 55 PascalCase / 45 snake_case + redundant aliases (`registry.py`) | half day | ✅ re-verified 2026-09-13 — README already defines naming exceptions; 100 registrations resolve to 96 logical nodes and API cards deduplicate aliases. Existing Canvas aliases remain valid compatibility contracts; no runtime defect or ID rename required. |
+| OC-08 | 🟡 | Public-API name collision: `DatasetProfile` means an EDA schema and an inspection node. | small | ✅ fixed 2026-09-13 — Recommend additive `EDAProfile` exports for the result schema; preserve the identical legacy class, wire schema, pickle path and registered inspection node ID. |
+| OC-10 | ⚪ | Five text-node `infer_output_schema` overrides only return the inherited `None`. | mechanical | ✅ cleaned up 2026-09-13 — Remove all five overrides, retain per-node reasons in class docstrings and pin the unchanged unknown-schema contract across 20 node/config combinations; OC-03 is already closed. |
 | OC-05 | 🟡 | `PowerTransformer` triggers a pandas deprecation that will become an error (`transformations/power.py:101`) | 1 line | ✅ fixed 2026-09-06 — **worse than filed**: casting each destination column to `float64` before the `.loc` write removes a per-column pandas FutureWarning that the surrounding bare `except` would otherwise swallow into a silent no-op, i.e. OC-28's failure mode arriving through OC-05. See the log entry |
 | OC-11 | ⚪ | Mega smoke test silently skips nodes with empty params (`tests/unit/test_all_nodes_smoke.py`) | small | ✅ fixed 2026-09-13 — Require nonempty fitted artifacts, supply target/configuration inputs and execute all 34 selected appliers; two resampler exclusions remain explicit skips. |
 
@@ -520,6 +525,172 @@ respective fix logs; OC-167 closed with canonical artifact framing on 2026-09-09
 
 
 ## Log
+
+### 2026-09-13 — 0.8.23 version alignment and commit preparation
+
+At the user's request, aligned the app pyproject, Core setup metadata, uv lock
+and frontend package/lock versions to **0.8.23**. Refreshed the editable Core
+installation and verified `skyulf.__version__ == "0.8.23"`. The lock refresh
+changes only the app version; dependency versions are unchanged. Rebuilt the
+production Canvas and passed its bundle budgets. Fresh release checks passed
+**235 Core tests** and **43 backend tests** on the combined pending changes.
+The full-suite and browser evidence for those changes is recorded below.
+
+The local backend still reports its existing `0.0.0-dev` fallback because the
+root app distribution is not installed. An attempted editable root install
+fails on setuptools' existing flat-layout package discovery; no packaging or
+runtime fallback behavior was changed for this version bump. H3 remains
+deferred, with **1 open / 4 parked** in the live audit queue.
+
+### 2026-09-13 — OC-06: Canvas Manual Bounds and Geo Distance
+
+At the user's request, exposed ManualBounds through the existing Outlier
+Removal node and added a Geo Distance component. H3 remains outside Canvas
+by explicit user choice. The earlier uncommitted five-record batch is retained;
+no commit or version bump was requested in this pass.
+
+- **Manual Bounds:** optional lower/upper endpoints per selected numeric column,
+  inclusive boundaries and valid zero/equal endpoints. Reject missing pairs,
+  nonfinite values and reversed intervals with keyboard-navigable settings
+  anchors. Retain inactive settings while submitting only selected bounds;
+  a removed rule cannot silently filter rows. Missing values retain the Core
+  contract and remain available for later missing-value processing. Feedback
+  renders one-sided intervals safely.
+- **Geo Distance:** registered in Feature engineering and the graph converter,
+  with four numeric coordinate selectors, degree-input guidance, Haversine or
+  the existing equirectangular local approximation, km/mi and optional output
+  naming. Blank output names follow the selected unit; explicit existing names
+  overwrite that column. No optional geospatial dependency is required. Core
+  schema prediction exposes the float output before execution, including
+  in-place overwrites; Outlier settings can select this generated feature.
+  Branch conflict diagnostics recognize generated distance columns.
+- **References and target separation:** numeric selectors preserve unavailable
+  saved selections for correction. Both new feature-only controls exclude labels
+  already separated by an upstream splitter. Stale target selections produce
+  blocking Canvas configuration issues before any Preview request. Backend schema
+  validation reports missing coordinate/bounds references and separated labels
+  for these operations, retaining other node types' existing target policies.
+- **Review-found Polars defect:** when every configured bound named a missing
+  feature, the scalar true mask preserved three X rows but truncated y to one.
+  Initializing the mask with the input height fixes raw/wrapped and empty-frame
+  cases while preserving the existing ignore-missing-column behavior. Sixteen
+  failures reproduced the defect; 48 new tests cover both engines and four y
+  containers, including mixed valid/missing rules and null/NaN retention.
+
+Concrete runtime checks use real backend CSV ingestion, graph execution,
+preview receipts and saved artifacts. Bounds 18..65 retain their endpoints and
+paired labels. Equatorial longitude separation of one degree produces
+111.1950802 km (about 69.093 miles); zero distance, latitude-60 geometry,
+both methods, both engines and frozen replay are independently asserted.
+
+Final verification:
+
+- **Core: 9664 passed, 82 skipped**, sklearn 1.9.1 overlay; three snapshots.
+- **Backend: 3925 passed**, sklearn 1.8.0; seven snapshots, including 29 new
+  graph/preview/replay cases and seven target-reference cases.
+- **Frontend: 2695 passed** in 205 files. A test fixture's overly narrow
+  inferred data type initially failed `tsc`; its explicit record annotation
+  fixed the build and all 55 Outlier tests passed again afterward.
+- **Playwright: 14 passed**, covering both controls' Preview payloads,
+  stale-target submission blocking/removal, keyboard Issues navigation,
+  desktop/expanded/compact/mobile presentation and node discovery. HTTP is
+  mocked in browser tests; real backend execution is covered separately above.
+  The generated Geo Distance expanded screenshot was visually inspected.
+  The Geo Distance scenario also passed again after its settings became lazy.
+- Ruff, Ty, full frontend lint, source-wide frontend/Core/backend **CCN <= 10**,
+  production build, bundle size and scoped whitespace checks passed. Geo
+  Distance settings load on demand in a separate 1.6 KiB gzip chunk with a
+  3 KiB budget. The main chunk measures 328.8 KiB gzip; its budget was
+  deliberately raised from 327 to 330 KiB for the new controls and graph
+  validation, with the reason recorded beside the limit. Rebuilt
+  `static/ml_canvas` assets are included in the working changes.
+  No MkDocs build was run, following the repository's CI preference.
+
+The live count remains **1 open / 4 parked**: OC-06 now only tracks the
+unresolved intermediate-stage profile inspection scope. Manual Bounds and
+Geo Distance are implemented; H3 is deferred by choice. This does not declare
+source EDA equivalent to arbitrary intermediate profiles. R1, DRIFT-01, PCA
+policy and the four parked authentication/configuration records are unchanged.
+
+### 2026-09-13 — 0.8.23: default throttling, public API clarity and queue re-verification
+
+Committed the preceding seven-finding batch as DCO-signed `5710c7f4` after
+fresh verification and passing pre-commit hooks. Continued with five queue
+records using separate Core and schema agents plus an independent UI/registry
+review. This pass distinguishes repaired behavior from cleanup and obsolete
+audit claims; it does not count five newly discovered runtime bugs.
+
+- **OC-280:** with an isolated 3/minute limiter, the real app previously accepted
+  the fourth undecorated request. `DefaultRateLimitMiddleware` now rejects it
+  before mutation. It follows the first matching app route, including the newer
+  FastAPI nested-router representation, and leaves explicit/static or dynamic
+  route decorators in charge of their own budgets. It forwards a single ASGI
+  response-start and every body frame without buffering; CORS/security headers,
+  duplicate cookies, exemptions, mounted static files and `/ws/jobs` retain their
+  contracts. The actual `/api/pipeline/schema-preview` route is covered with
+  separate client addresses. Defaults are per IP and URL path within one API
+  process; this does not introduce shared worker quotas or authentication.
+- **OC-08:** `EDAProfile` is an additive public alias for the existing Pydantic
+  `DatasetProfile` result class. Both root/profiling imports work, while the
+  existing class name/module, JSON schema title, serialized fields, pickle/joblib
+  artifacts and `DatasetProfile` inspection node ID remain unchanged.
+- **OC-10:** the five text/vectorization overrides only repeated the base
+  `return None`. Removed them while preserving their reasons in calculator
+  docstrings: learned vocabulary, model-defined embedding width, or conservative
+  source/target/retained-column resolution. Twenty node/config combinations pass
+  both before and after this behavior-neutral cleanup. OC-03 was already closed,
+  so the queue's recommendation to wait for it was obsolete.
+- **OC-91:** Core serializer, in-memory registry and deprecation helpers are
+  explicit-use public utilities. No current production consumer or runtime
+  `ModelVersion` collision was found. Docs/docstrings now distinguish these
+  utilities from pipeline pickle persistence and backend joblib/registry paths.
+  The two `ModelVersion` classes can be imported through qualified modules.
+  Existing `Split` warnings already work independently of the common helper.
+  No automatic backend wiring or additional unused aliases were introduced.
+- **OC-07:** naming is already documented, including the seven preprocessing
+  snake_case exceptions. Runtime inspection found 100 registrations, 96 logical
+  nodes and 97 API cards including the loader; aliases do not duplicate cards.
+  FeatureMath/FeatureGeneration, PolynomialFeaturesNode and Split resolve to
+  their existing implementations. Renaming supported saved-graph IDs would not
+  repair a demonstrated defect, so this finding closes by re-verification.
+
+**OC-06 remains open with corrected scope.** Segmentation dynamically exposes
+Birch, Gaussian Mixture and MiniBatchKMeans; FeatureMath and GeneralBinning make
+feature generation/custom binning available. Real missing transformation controls
+are ManualBounds, GeoDistance and H3Index. Add bounds to the existing Outlier UI
+and expose geographic coordinates/options with an optional-H3 dependency state.
+Data Preview overlaps snapshot inspection; source EDA is not an equivalent saved
+profile for any intermediate graph stage. That inspection scope stays explicit.
+No arbitrary headless allow-list was invented to make this record disappear.
+
+Focused verification: seven real-app rate-limit integration tests passed after
+four reproduced failures; independent ASGI probes also checked older flat-route
+fallback, cancellation cleanup, duplicate headers and one response-start.
+Related Core suites passed 385 API/serialization/profile tests and 425 schema/
+vectorization tests, with nine backend schema tests. Registry re-verification
+passed 19 Core, three backend HTTP and 196 frontend tests. Installed routing
+compatibility was checked against FastAPI 0.138.2, Starlette 1.3.1 and SlowAPI
+0.1.9; the middleware reuses SlowAPI's internal check/header helpers.
+
+Final verification on the combined changes:
+
+- Complete Core suite with the sklearn 1.9.1 overlay: **9598 passed, 82 skipped**,
+  including three schema snapshots (160.59 seconds).
+- Complete backend suite, run separately with sklearn 1.8.0: **3889 passed**,
+  including seven schema snapshots (180.00 seconds).
+- Ruff, formatting on all 16 changed/new Python files, full Core/backend Ty and
+  source-wide Lizard **CCN <= 10** passed. Repository-wide Ruff finds only
+  pre-existing issues in the user's untracked `tmp_polars_e2e/` probes; the check
+  passed with that directory excluded for this invocation. No lint configuration
+  or user probe was changed. Scoped `git diff --check` passed; unrelated user
+  report edits were left alone.
+- Queue/archive checks confirm five rows moved, no lost or duplicate finding IDs,
+  and unchanged parked rows, R1, DRIFT-01 and PCA policy. No frontend code or
+  generated assets changed in this batch; no MkDocs build was run.
+
+The live queue now has **1 open / 4 parked**; all **48/48** Qwen-derived records
+are closed. OC-71/72/73/185 remain parked, and R1, DRIFT-01 and the PCA input
+policy stay separately tracked. Versions remain 0.8.22 with notes under v0.8.23.
 
 ### 2026-09-13 — archive completed review notes from the live queue
 

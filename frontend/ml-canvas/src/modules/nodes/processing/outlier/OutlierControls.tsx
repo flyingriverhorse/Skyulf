@@ -1,4 +1,5 @@
 import type { OutlierConfig, OutlierSettingsProps } from './types';
+import { ManualBoundsOptions } from './ManualBoundsOptions';
 
 function OutlierMethod({ config, onChange }: OutlierSettingsProps) {
   return (
@@ -14,12 +15,14 @@ function OutlierMethod({ config, onChange }: OutlierSettingsProps) {
         <option value="zscore">Z-Score (Standard Deviation)</option>
         <option value="winsorize">Winsorize (Clip Values)</option>
         <option value="elliptic_envelope">Elliptic Envelope (Multivariate)</option>
+        <option value="manual_bounds">Manual Bounds (Filter Rows)</option>
       </select>
       <p className="text-[10px] text-muted-foreground mt-1">
         {config.method === 'iqr' && 'Removes rows with values outside Q1/Q3 ± multiplier * IQR.'}
         {config.method === 'zscore' && 'Removes rows with values more than N standard deviations from mean.'}
         {config.method === 'winsorize' && 'Clips values to specified percentiles instead of removing rows.'}
         {config.method === 'elliptic_envelope' && 'Fits a robust covariance estimate to detect outliers.'}
+        {config.method === 'manual_bounds' && 'Rows outside these bounds are removed. Values are not clipped.'}
       </p>
     </div>
   );
@@ -116,6 +119,7 @@ export function OutlierControls({ config, onChange }: OutlierSettingsProps) {
       {config.method === 'zscore' && <ZscoreOptions config={config} onChange={onChange} />}
       {config.method === 'winsorize' && <WinsorizeOptions config={config} onChange={onChange} />}
       {config.method === 'elliptic_envelope' && <EllipticEnvelopeOptions config={config} onChange={onChange} />}
+      {config.method === 'manual_bounds' && <ManualBoundsOptions config={config} onChange={onChange} />}
     </>
   );
 }

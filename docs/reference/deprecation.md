@@ -3,6 +3,13 @@
 `skyulf.core.deprecation` provides a small, consistent way to retire public
 symbols without breaking callers overnight.
 
+These are opt-in helpers: apply the decorator or call `warn_deprecated()` at
+the relevant call site. Importing the module does not install a global policy
+hook, mark existing Core/backend APIs deprecated, or rewrite pipeline node ids.
+Existing warnings can be implemented independently; for example,
+`NodeRegistry` emits its legacy `"Split"` warning directly through Python's
+`warnings` module.
+
 ## Policy
 
 A public symbol marked deprecated in minor **`X.Y`** keeps working through

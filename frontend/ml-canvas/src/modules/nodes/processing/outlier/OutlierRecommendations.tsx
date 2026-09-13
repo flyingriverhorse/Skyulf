@@ -7,6 +7,7 @@ function getMetricPrefix(method: OutlierConfig['method']): string {
     case 'elliptic_envelope': return 'EllipticEnvelope';
     case 'zscore': return 'ZScore';
     case 'winsorize': return 'Winsorize';
+    case 'manual_bounds': return 'ManualBounds';
     default: return 'IQR';
   }
 }

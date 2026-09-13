@@ -1,15 +1,14 @@
-"""Model serialization seam.
+"""Explicit model serialization utilities with a context-local provider.
 
-Additive, non-breaking seam ahead of the Databricks/MLflow phases. The default
-:class:`JoblibModelSerializer` preserves today's joblib behaviour; an MLflow or
-cloud-object serializer can later implement the same interface without changing
-call sites.
+Call :func:`get_model_serializer` or instantiate a serializer to use this API.
+Changing its provider affects only callers that resolve that provider;
+``SkyulfPipeline.save/load`` use pickle directly, and the backend artifact
+stores use joblib directly. Neither automatically consumes this selection.
 
-The active serializer is held in a :class:`contextvars.ContextVar`: a
-change is visible to the current thread/asyncio task and anything spawned
-from it afterwards, but concurrent pipelines in other contexts cannot
-reconfigure each other mid-run. Use :func:`model_serializer` to scope an
-override to a single block.
+The provider is held in a :class:`contextvars.ContextVar`. New asyncio tasks
+inherit the current selection; independent threads start with the joblib
+default unless a context is explicitly copied. Use :func:`model_serializer`
+to restore the previous selection when leaving an override block.
 """
 
 from abc import ABC, abstractmethod
@@ -49,7 +48,7 @@ class ModelSerializer(ABC):
 
 
 class JoblibModelSerializer(ModelSerializer):
-    """Default joblib-backed serializer (matches current backend behaviour)."""
+    """Joblib implementation returned by the provider unless explicitly overridden."""
 
     format = "joblib"
 
@@ -78,7 +77,9 @@ def set_model_serializer(serializer: ModelSerializer) -> None:
 
     Prefer the :func:`model_serializer` context manager for overrides that
     should end with the enclosing block; this setter keeps the serializer
-    for the lifetime of the current context.
+    for the lifetime of the current context. Only explicit callers of
+    :func:`get_model_serializer` observe this selection; pipeline persistence
+    and backend artifact stores do not use it.
     """
     _DEFAULT_SERIALIZER.set(serializer)
 

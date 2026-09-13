@@ -457,7 +457,12 @@ ws.onmessage = (msg) => {
 
 ## Rate Limiting
 
-The following endpoints are rate-limited by client IP address:
+Undecorated application routes use `RATE_LIMIT_DEFAULT` (**200/minute** by
+default), counted by client IP and URL path. Requests beyond the budget return
+HTTP 429 before the endpoint runs. The current in-memory counters are local to
+each API process; this is not a shared quota across workers.
+
+Routes with explicit limits use their own budget instead of the default:
 
 | Endpoint | Limit |
 |---|---|
@@ -469,6 +474,9 @@ The following endpoints are rate-limited by client IP address:
 | `POST /api/deployment/predict` | 60/minute |
 
 Requests over the limit receive **HTTP 429 Too Many Requests**.
+Explicit exemptions remain exempt. CORS preflight, mounted static files and
+WebSocket connections do not consume an application route's default budget.
+Streaming response bodies and the existing security/CORS headers are preserved.
 
 ---
 

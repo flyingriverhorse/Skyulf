@@ -1,14 +1,28 @@
 import { useDatasetSchema } from '../../../../core/hooks/useDatasetSchema';
 import { useGraphStore } from '../../../../core/store/useGraphStore';
-import { getIncomers } from '@xyflow/react';
+import { getIncomers, type Edge, type Node } from '@xyflow/react';
 import { useUpstreamDroppedColumns } from '../../../../core/hooks/useUpstreamDroppedColumns';
 import { useRecommendations } from '../../../../core/hooks/useRecommendations';
 import { getNodeMetricDetails } from '../../../../core/utils/preprocessingMetrics';
+import type { PredictedSchema } from '../../../../core/api/schemaPreview';
+import { upstreamTargetColumns } from '../../../../core/utils/upstreamTargetColumns';
+import { useMemo } from 'react';
 
-export function useOutlierData(nodeId?: string) {
+/** Use a known direct-input schema so generated numeric features are selectable. */
+function predictedInputColumns(nodeId: string | undefined, nodes: Node[], edges: Edge[], schemas: Record<string, PredictedSchema | null>) {
+  const node = nodes.find(item => item.id === nodeId);
+  if (!node) return undefined;
+  const schema = getIncomers(node, nodes, edges).map(input => schemas[input.id]).find(input => input != null);
+  return schema?.columns.map(name => ({ name, dtype: schema.dtypes[name] ?? '' }));
+}
+
+export function useOutlierData(nodeId?: string, excludeSeparatedTarget = false) {
   // Recursive search for datasetId
   const nodes = useGraphStore((state) => state.nodes);
   const edges = useGraphStore((state) => state.edges);
+  const predictedSchemas = useGraphStore((state) => state.predictedSchemas);
+  const separatedTargets = useMemo(() => excludeSeparatedTarget
+    ? upstreamTargetColumns(nodeId, nodes, edges) : new Set<string>(), [excludeSeparatedTarget, nodeId, nodes, edges]);
 
   const findUpstreamDatasetId = (currentNodeId: string): string | undefined => {
     const visited = new Set<string>();
@@ -51,12 +65,13 @@ export function useOutlierData(nodeId?: string) {
   const metrics = getNodeMetricDetails(nodeResult?.metrics);
 
   // Filter for numeric columns only
-  const numericColumns = schema
-    ? Object.values(schema.columns)
+  const availableColumns = predictedInputColumns(nodeId, nodes, edges, predictedSchemas)
+    ?? Object.values(schema?.columns ?? {});
+  const numericColumns = availableColumns
       .filter(c => ['int', 'float', 'number'].some(t => c.dtype.toLowerCase().includes(t)))
       .filter(c => !droppedUpstream.has(c.name))
-      .map(c => c.name)
-    : [];
+      .filter(c => !separatedTargets.has(c.name))
+      .map(c => c.name);
 
   return { datasetId, isLoading, numericColumns, metrics, nodeResult, backendRecommendations };
 }

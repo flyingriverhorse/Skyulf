@@ -45,7 +45,9 @@ const BUDGETS = [
   // grouped split outputs, and component discovery improvements (v0.8.16).
   // 325→326 KB for type-preserving config equality in undo history (v0.8.23).
   // 326→327 KB for graph-aware Optuna pruning support and request state (v0.8.23).
-  { prefix: 'index',         maxGzipBytes: 327 * 1024,  label: 'index (main)',  kind: 'vendor' },
+  // 327→330 KB for Manual Bounds controls and Geo Distance graph validation
+  // (v0.8.23). Geo Distance settings remain lazy; measured main: 328.8 KB gzip.
+  { prefix: 'index',         maxGzipBytes: 330 * 1024,  label: 'index (main)',  kind: 'vendor' },
   // Lazy route chunks — keep tight so an EDA-only regression surfaces
   // here rather than getting absorbed by the global index ceiling.
   { prefix: 'EDAPage',       maxGzipBytes: 140 * 1024,  label: 'route:EDA',         kind: 'route' },
@@ -53,6 +55,7 @@ const BUDGETS = [
   { prefix: 'ModelRegistry', maxGzipBytes: 15 * 1024,   label: 'route:ModelRegistry', kind: 'route' },
   { prefix: 'DeploymentsPage', maxGzipBytes: 10 * 1024, label: 'route:Deployments', kind: 'route' },
   { prefix: 'InferencePage', maxGzipBytes: 20 * 1024, label: 'view:Inference', kind: 'route' },
+  { prefix: 'GeoDistanceSettings', maxGzipBytes: 3 * 1024, label: 'settings:GeoDistance', kind: 'route' },
 ];
 
 function listAssets() {

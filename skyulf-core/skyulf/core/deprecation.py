@@ -6,6 +6,10 @@ Policy: a public symbol marked deprecated in minor ``X.Y`` keeps working through
 ``python -W default`` and in test suites) describing the replacement and the
 version in which removal is planned.
 
+These helpers act only when explicitly called or applied as a decorator.
+Importing this module does not apply the policy to Core or backend symbols
+automatically. Other APIs may issue their own warnings independently.
+
 Usage:
     >>> from skyulf.core.deprecation import deprecated
     >>> @deprecated(since="0.2", removed_in="0.4", replacement="new_func")

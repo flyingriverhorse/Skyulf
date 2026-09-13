@@ -1,15 +1,5 @@
 # Opus core audit — open fix queue
 
-The live half of the Opus core audit: every finding still open, with the
-reproduction evidence needed to fix it. Closed findings, the corrections pass and
-the whole fix Log stay in [the archive](opus_core_analysis-tracker.md).
-
-**Split 2026-09-06:** 100 open rows moved here; the archive keeps its 63 closed
-rows in the same tier and domain grouping, so a finding stays where it was filed.
-When one is fixed, move its row back to the archive with a one-sentence status
-note and write the Log entry there — the Log is one unbroken stream, and this
-file deliberately carries no history.
-
 **Source audit:** [`opus_core_analysis.md`](opus_core_analysis.md) (master report)
 + [`opus_core_analysis/README.md`](opus_core_analysis/README.md) (index of the 19
 per-area report files `00`–`18`).
@@ -29,14 +19,12 @@ archive Log.
 
 ## Live — fix queue
 
-**Current status (2026-09-13): 6 open / 4 parked.**
-The latest fixes close OC-54/57/64/65/277/281/310. Verification and
-limitations are recorded in the [archive Log](opus_core_analysis-tracker.md#log).
-
-Ordered by the master report's suggested fix order: **Now** (silent wrongness
-reaching users), **Next** (wrong results in realistic configs), **Then** (decide
-deployment model), **Ongoing** (remove the hiding conditions). Remaining findings
-follow, grouped by domain.
+**Current status (2026-09-13): 1 open / 4 parked.**
+OC-07/08/10/91/280 are resolved. The latest OC-06 work exposes Manual Bounds
+and Geo Distance in Canvas. H3 is deferred by user choice; intermediate-stage
+profile inspection remains the unresolved scope of OC-06.
+Verification and limitations are recorded in the
+[archive Log](opus_core_analysis-tracker.md#log).
 
 Completed findings and their verification history remain in the archive.
 
@@ -50,7 +38,6 @@ Completed findings and their verification history remain in the archive.
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
-| OC-280 | 🟡 | **Configured default rate limits are not applied to undecorated routes** (`backend/middleware/rate_limiter.py:10-19`). Wire default limiting into the actual app and retain explicit per-route limits; authentication decisions remain separately parked. | medium | ⬜ open — An undecorated mutation route accepts 230/230 requests while an explicit-limit control returns 429 after 60; the current inventory has 34 mutation routes, eight decorated and 26 without default enforcement. |
 
 
 ### Then — decide deployment model first
@@ -77,7 +64,6 @@ Completed findings and their verification history remain in the archive.
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
-| OC-91 | 🟡 | Three public `core/` seams (263 lines) have zero call sites; one duplicates a differently-shaped backend class name | small | ⬜ open |
 
 ### Remaining — file-coverage closure
 
@@ -88,10 +74,7 @@ Completed findings and their verification history remain in the archive.
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
-| OC-06 | 🟡 | 6 registered nodes unreachable from the UI (incl. all of `geo/`) — `registry.py` vs `frontend/` | small | ⬜ open — R1 step 3 catches this class |
-| OC-07 | 🟡 | Node-id naming split 55 PascalCase / 45 snake_case + redundant aliases (`registry.py`) | half day | ⬜ open |
-| OC-08 | 🟡 | Public-API name collision: `DatasetProfile` means two things (`skyulf/__init__.py:32-46`) | small | ⬜ open |
-| OC-10 | ⚪ | 4 dead `infer_output_schema` overrides that only `return None` (`vectorization/*`) | mechanical | ⬜ open — **re-measured 2026-09-06: five, not four** (`count_vectorizer.py:147`, `hashing_vectorizer.py:135`, `tfidf_vectorizer.py:141`, `tokenizer.py:179`, `sentence_embedder.py:204`). `BaseCalculator.infer_output_schema` already ends in `return None` (`preprocessing/base.py:129`), so all five are behaviourally identical to inheriting. **Recommend folding into OC-03 rather than deleting standalone:** each override carries the per-node *reason* the schema is unknowable (learned vocabulary, model-loaded embedding width, data-dependent column survival), which is exactly the documentation OC-03's parametrized "predicted == actual for every node" test needs beside it, and OC-03 will touch these same five files |
+| OC-06 | 🟡 | **Intermediate-stage profile inspection needs an explicit Canvas scope.** | medium | ⬜ open — ManualBounds and GeoDistance added and tested on 2026-09-13; user explicitly deferred H3 in Canvas. Clustering, feature generation and custom binning were already reachable through existing nodes. Data Preview covers snapshot inspection, but source EDA is not an equivalent arbitrary intermediate-stage profile artifact. Remaining work is this inspection scope; R1 tracks future registry/UI drift separately. |
 
 ### Remaining — encoding / cleaning / imputation / scaling / drop / resampling
 
@@ -298,45 +281,3 @@ Each block is the executed reproduction behind the row above it: the input, the
 observed behaviour, and the fix/verification target. Source paths are relative
 to `skyulf-core/skyulf/` unless written out, and line numbers refer to the
 source read when the finding was filed, so they may have moved.
-
-Findings filed before 2026-09-05 — OC-169 and OC-178–182 among them — keep
-their reproduction detail in the archive's `## Log` entries instead.
-
-### 2026-09-06 — remaining-source continuation (findings added as verified)
-
-All entries below have executed reproduction evidence. Source paths are
-relative to `skyulf-core/skyulf/`; line numbers refer to the source read during
-the review and may move with concurrent edits. The main reviewer independently
-reproduced the filed symptoms before completing the source ledger.
-
-Each finding's queue row — severity, effort, status — now lives in the
-**Live — fix queue** above, under the domain table it belongs to. What follows
-here is the reproduction detail those rows deliberately do not repeat.
-
-**OC-195 — wrapped pandas clustering loses numeric filtering.** Executed
-`KMeansCalculator().fit(X,None,{'n_clusters':2})` for pandas
-`x=[0.,.1,.2,10.,10.1,10.2]`, `text=['name']*6`: it fits one feature.
-Passing `SkyulfPandasWrapper(X)` instead raises
-`ValueError: could not convert string to float: 'name'`.
-**Fix/verification target:** recognize both supported wrappers through the
-public adapter interface and preserve the raw-frame behavior for every
-clustering calculator/applier sharing the helper.
-
-**OC-196 — GaussianMixture fit/predict/probability feature mismatch.** Fit
-`GaussianMixtureCalculator` on pandas
-`x=[0.,.1,.2,10.,10.1,10.2]`, `ref=[0,0,0,1,1,1]`, with
-`reference_column='ref', n_components=2`. On that same frame, the public
-applier's `predict` succeeds, while `predict_proba` raises
-`X has 2 features, but GaussianMixture is expecting 1 features as input`.
-**Fix/verification target:** share fitted feature selection between prediction
-methods; verify probabilities also work with excluded text/reference columns.
-
-**OC-197 — reference-crosstab internal names collide.** Executed
-`_compute_reference_crosstab_polars` with labels `[0,0,1,1]` and reference
-values `['a','b','a','b']`: a Series named `species` yields the expected four
-counts. Naming it `count` raises `DuplicateError`; naming it
-`__skyulf_cluster__` raises a duplicate-group-key error. The review also
-reproduced `count` through public clustering evaluation. **Fix/verification
-target:** choose independent collision-safe names for cluster, reference and
-count columns. OC-161 concerns centroid features; this is the separate
-reference-label aggregation path.

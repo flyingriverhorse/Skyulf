@@ -228,11 +228,11 @@ class SentenceEmbedderCalculator(BaseCalculator):
     ``learns_from_data=False`` — the weights come pretrained and are never
     adjusted here — but fitting is not free: it performs the lazy
     ``sentence-transformers`` import and, on a cold cache, downloads the model.
-    """
 
-    def infer_output_schema(self, input_schema: Any, config: dict[str, Any]) -> None:
-        """Return ``None``: the embedding width is only known once the model is loaded."""
-        return None
+    Schema inference inherits the base ``None`` result because the embedding
+    width is only known after loading the model. Previewing the schema therefore
+    does not load model weights and leaves the output unknown until runtime.
+    """
 
     @fit_method
     def fit(self, X: Any, _y: Any, config: dict[str, Any]) -> SentenceEmbedderArtifact:  # pylint: disable=arguments-differ

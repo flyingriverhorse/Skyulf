@@ -136,13 +136,12 @@ class HashingVectorizerCalculator(BaseCalculator):
 
     Normalization defaults to ``"l2"``; ``"l1"`` selects L1 normalization.
     The Canvas value ``"none"`` and Python ``None`` both disable normalization.
-    """
 
-    def infer_output_schema(self, input_schema: Any, config: dict[str, Any]) -> None:
-        """Return ``None``: the output width is fixed, the source columns are not known."""
-        # n_features is fixed by config, but we still return None because the
-        # source column list may not be known without seeing data.
-        return None
+    Schema inference conservatively inherits the base ``None`` result. A fixed
+    ``n_features`` does not describe the whole output: fitting resolves source
+    columns and excludes the target, including a separately supplied ``y``.
+    Runtime introspection determines the retained and generated columns.
+    """
 
     @fit_method
     def fit(self, X: Any, _y: Any, config: dict[str, Any]) -> HashingVectorizerArtifact:  # pylint: disable=arguments-differ
