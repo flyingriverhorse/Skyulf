@@ -424,14 +424,15 @@ def test_scipy_missing_disables_flag_and_blocks_drift_calculation() -> None:
         importlib.reload(drift_module)
 
 
-def test_calculate_drift_skips_column_when_cast_fails() -> None:
-    """A current column that cannot be cast to the reference dtype should be skipped."""
+def test_calculate_drift_reports_incompatible_nested_column() -> None:
+    """An incompatible nested column must remain visible as type drift."""
     reference = pl.DataFrame({"a": [1, 2, 3]})
     current = pl.DataFrame({"a": [[1], [2], [3]]})  # List(Int64) can't cast to Int64.
 
     report = DriftCalculator(reference, current).calculate_drift()
 
-    assert "a" not in report.column_drifts
+    assert report.column_drifts["a"].metrics[0].metric == "type_drift"
+    assert report.column_drifts["a"].drift_detected is True
 
 
 def test_calculate_drift_moderate_psi_shift_suggestion() -> None:
@@ -562,31 +563,17 @@ def test_calculate_kl_handles_unexpected_exception(
     assert "RuntimeError: boom" in caplog.text
 
 
-def test_uncastable_column_is_dropped_from_the_report_loudly(
-    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
-) -> None:
-    """A column that cannot be cast is dropped whole, so the log must name it.
-
-    This is the worst of the three fail-open paths: an absent column reads as
-    "no drift" to anyone consuming the report, which is a stronger claim than
-    the 0.0 a PSI failure produces.
-    """
-    import skyulf.profiling.drift as drift_module
-
+def test_uncastable_column_is_reported_as_type_drift() -> None:
+    """Uncastable data must be reported to clients rather than only appearing in logs."""
     reference = pl.DataFrame({"a": [1.0, 2.0, 3.0]})
     current = pl.DataFrame({"a": ["x", "y", "z"]})
 
-    def boom(self: object, *args: object, **kwargs: object) -> None:
-        raise RuntimeError("cannot cast")
+    report = DriftCalculator(reference, current).calculate_drift()
 
-    monkeypatch.setattr(pl.Series, "cast", boom)
-    with caplog.at_level(logging.WARNING, logger=drift_module.__name__):
-        report = DriftCalculator(reference, current).calculate_drift()
-
-    assert "a" not in report.column_drifts
-    assert report.drifted_columns_count == 0
-    assert "Could not cast current column 'a'" in caplog.text
-    assert "RuntimeError: cannot cast" in caplog.text
+    assert report.column_drifts["a"].metrics[0].metric == "type_drift"
+    assert report.drifted_columns_count == 1
+    assert "Float64" in report.column_drifts["a"].suggestions[0]
+    assert "String" in report.column_drifts["a"].suggestions[0]
 
 
 class TestRealShapedDataset:

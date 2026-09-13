@@ -16,8 +16,8 @@ and is not counted.
 
 **Qwen follow-up (2026-09-12):** the verified findings
 filed 48 additional records, OC-271–318, after deduplication and scope
-correction. Forty-two have since closed. The live queue now has
-**19 open / 4 parked**; the subsequent OC-320 pipeline finding is now fixed. Details
+correction. Forty-four have since closed. The live queue now has
+**13 open / 4 parked**; the subsequent OC-320 pipeline finding is now fixed. Details
 and exclusions are in the latest Log entry. Historical baseline counts
 below are unchanged.
 
@@ -151,6 +151,8 @@ uses, so a fixed finding stays where it was filed.
 | OC-279 | 🟠 | **Synchronous Preview execution blocks its API event loop** (`backend/ml_pipeline/_internal/_routers/preview.py:767-776,815-865`) — Qwen #10. Move synchronous graph work off the request event loop and verify concurrency with the actual Preview path. | medium | ✅ fixed 2026-09-13 — Move synchronous preview work to a worker which owns its ORM session and artifacts; real HTTP concurrency and cancellation cleanup are covered. |
 | OC-272 | 🟡 | **Supported fitted models cannot produce fingerprints or model cards** (`skyulf-core/skyulf/pipeline/seal.py:174-185`) — Qwen #3. Canonicalize supported fitted Cython loss and NumPy Generator state while continuing to reject unknown state explicitly. | medium | ✅ fixed 2026-09-13 — Canonicalize exact supported compiled-loss identities/parameters and built-in Generator state; model cards and save/load pass for boosting and SGD on both engines, with sklearn 1.8/1.9 compatibility and unknown-state rejection. |
 | OC-318 | 🟡 | **Empty scaling range fields pass validation and become null bounds** (`frontend/ml-canvas/src/modules/nodes/processing/scaling/ScalingControls.tsx:64,91`) — Qwen #55. Validate finite MinMax/Robust range inputs in the UI and reject invalid serialized bounds at the Core boundary. | small | ✅ fixed 2026-09-13 — Keep blank scaling drafts invalid through editing and JSON reload, navigate Issues to the range, and reject malformed/nonfinite Core bounds with named errors; valid numeric iterables, Decimal bounds and fitted-artifact types remain compatible. |
+| OC-286 | 🟠 | **Non-finite profile and preview metrics cross JSON persistence boundaries** (`skyulf-core/skyulf/profiling/schemas.py:259-273`; `backend/ml_pipeline/_execution/strategies.py:130-163`) — Qwen #18 / #41. Enforce a consistent finite-or-null JSON contract for both EDA profile persistence and background preview/job metrics; closure requires coverage of both write paths. | medium | ✅ fixed 2026-09-13 — Normalize nonfinite profile and job-result JSON at actual persistence boundaries; durable EDA/preview/training/tuning writes and report reads retain finite-or-null values. |
+| OC-289 | 🟡 | **User-controlled identifiers can inject new lines into logs** (`backend/ml_pipeline/model_registry/api.py:43-51`) — Qwen #22. Sanitize identifiers and exception text at the affected logging boundaries while retaining prior credential redaction. | small | ✅ fixed 2026-09-13 — Escape user-controlled identifiers and fully rendered exception text without raw exc_info; real HTTP/database regressions preserve credential redaction and status behavior. |
 
 ### Ongoing — remove the hiding conditions
 
@@ -244,6 +246,7 @@ uses, so a fixed finding stays where it was filed.
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
 | OC-05 | 🟡 | `PowerTransformer` triggers a pandas deprecation that will become an error (`transformations/power.py:101`) | 1 line | ✅ fixed 2026-09-06 — **worse than filed**: casting each destination column to `float64` before the `.loc` write removes a per-column pandas FutureWarning that the surrounding bare `except` would otherwise swallow into a silent no-op, i.e. OC-28's failure mode arriving through OC-05. See the log entry |
+| OC-11 | ⚪ | Mega smoke test silently skips nodes with empty params (`tests/unit/test_all_nodes_smoke.py`) | small | ✅ fixed 2026-09-13 — Require nonempty fitted artifacts, supply target/configuration inputs and execute all 34 selected appliers; two resampler exclusions remain explicit skips. |
 
 ### Remaining — encoding / cleaning / imputation / scaling / drop / resampling
 
@@ -333,6 +336,7 @@ uses, so a fixed finding stays where it was filed.
 | OC-303 | 🟡 | **Correlation truncation is hidden from the normal frontend warning path** (`skyulf-core/skyulf/profiling/correlations.py:31-45`) — Qwen #38. Include omission metadata with capped matrices and render it even when the returned matrix is within the cap. | small | ✅ fixed 2026-09-13 — Persist optional total/omitted-column metadata with capped matrices and display the warning for normal 20-of-25 responses; older reports remain readable. |
 | OC-50 | 🟡 | Binary targets miss class-balance advice or flip to regression by sample size (`recommendations.py:147-152`) | small | ✅ fixed 2026-09-13 — Resolve supplied Boolean/binary integer targets independently of sample size, preserve explicit Regression, and keep numeric-transform advice away from class labels; public target/rule/balance tests pass. |
 | OC-302 | 🟡 | **Outlier results omit the sample population behind their counts and percentages** (`skyulf-core/skyulf/profiling/_analyzer/multivariate.py:383-410`) — Qwen #37. Expose the sampled row count and make UI labels distinguish sampled results from the entire dataset. | medium | ✅ fixed 2026-09-13 — Persist optional analyzed_rows/total_rows and identify sampled counts/percentages in UI and console; real 200000-row analysis samples 50000, while legacy denominators stay unknown without population extrapolation. |
+| OC-47 | 🟡 | Common-column dtype drift can silently disappear or be erased by a successful lossy cast to the reference dtype (`profiling/drift.py:192`) | small | ✅ fixed 2026-09-13 — Retain current numeric precision and report incompatible or partly unparseable columns as explicit type drift; Core, backend and UI regressions verify measurements and counts. |
 
 
 ### Remaining — core / engines / pipeline
@@ -367,6 +371,7 @@ uses, so a fixed finding stays where it was filed.
 | OC-165 | 🟡 | Pandas `LagFeatures(drop_na=True)` removes X rows but leaves tuple y untouched — 3 rows become 2 features / 3 targets even with a unique index (`preprocessing/time_series/lag.py:85-87`) | small | ✅ fixed 2026-09-06 — with OC-163; `drop_na` now filters y through the same positional keep-mask as X, duplicate-index case included. See the log entry |
 | OC-166 | 🟡 | Polars `IQR`, `ZScore`, and `ManualBounds` filter X but leave NumPy y untouched — 5 rows become 4 features / 5 targets; Polars Series y works (`preprocessing/outliers/_common.py:9-15`) | small | ✅ fixed 2026-09-06 — with OC-163, and **broader than filed**: a fourth copy of the same silent pass-through sat inline in `EllipticEnvelope`, and list targets failed too (crashing on pandas, no-opping on polars). See the log entry |
 | OC-284 | 🟡 | **Duplicate bin edges produce incompatible results and discard custom labels** (`skyulf-core/skyulf/preprocessing/bucketing.py:88,162,224,234,267`) — Qwen #16. Validate or normalize duplicate edges and their labels together with one explicit policy for both engines. | small | ✅ fixed — 2026-09-12: Duplicate-edge labels must match distinct intervals on both engines, preserving unambiguous labels and rejecting labels for zero-width bins while retaining established unique-edge fallbacks. |
+| OC-255 | 🟡 | DateFeatures uses local offsets on pandas and UTC on Polars; mixed DST offsets make the pandas `.dt` access fail (`preprocessing/time_series/date_features.py:64-66,106-109`) | small | ✅ fixed 2026-09-13 — New artifacts record UTC extraction across engines and mixed DST offsets; legacy artifacts retain their prior behavior, with refitting documented for migration. |
 
 
 ### Remaining — modeling / tuning
@@ -504,9 +509,98 @@ respective fix logs; OC-167 closed with canonical artifact framing on 2026-09-09
 |---|---|---|---|---|
 | OC-213 | ⚪ | Leakage examples produce 22 ty diagnostics: 16 in the notebook and six in the Python script, caused by heterogeneous configuration inference and un-narrowed `SplitDataset` slots (`skyulf-core/examples/09_leakage_safety.ipynb`, `09_leakage_safety.py`) | small | ✅ fixed 2026-09-13 — Fresh baseline was seven notebook diagnostics; annotate the dynamic config and narrow the pandas validation partition. Example ty is clean; script and all 12 notebook cells execute with assertions retained. |
 | OC-246 | 🟡 | Local-only full-inference smoke returns a passing result before inference when the current model artifact is a tuple; remaining checks only print success/failure (`tests/integration/test_full_inference_pipeline.py:180-187`) | small | ✅ fixed 2026-09-13 — Replace the external-workspace smoke with tmp_path-based preprocessing, artifact, reload, promotion and prediction assertions on both engines. |
+| OC-80 | 🟡 | 3 weakest-covered modules untested exactly where silence is dangerous (`_sklearn_compat.py`, `value_replacement.py`, `config_validation.py`) | ~1 day | ✅ fixed 2026-09-13 — Reproduce the current coverage gaps, add public configuration/mapping regressions and repair invalid numeric JSON-key handling; branch-inclusive coverage is 100%/99%/95%. |
 
 
 ## Log
+
+### 2026-09-13 — 0.8.23: six queue findings on drift, dates, persistence and coverage
+
+Committed the preceding five-finding batch as DCO-signed `5e3b2928` after
+fresh verification and passing pre-commit hooks, then repaired six more findings.
+
+- **OC-47:** integer reference `[0]*50+[1]*50` versus fractional current
+  `[0.9]*50+[1.9]*50` previously produced zero distances after narrowing the
+  current dtype. Preserve native numeric arrays; the same data now produces
+  raw Wasserstein **0.9**, normalized Wasserstein **1.8**, KS **0.5**, PSI
+  **4.60431846666895** and KL **0.6921262436166087**. Strictly parse numeric
+  text without scoring a partially surviving population. Incompatible columns
+  receive `type_drift` with a dtype-specific suggestion through the existing
+  metric shape. The UI keeps that verdict during threshold changes, counts
+  the column and shows unavailable PSI. New regressions failed in **17 cases**
+  before repair; **66 Core**, **106 backend** and **22 frontend** drift tests
+  pass. Decimal and parsed text measurements use Float64 precision. Existing
+  all-null/no-measurement handling and missing/new-column accounting remain.
+  Independent review additionally reproduced Infinity in durable drift-alert
+  JSON when the newly preserved current data contained `inf` or numeric text
+  `1e400`. Five failing regressions now pin an explicit column-specific ValueError
+  before scoring infinite reference/current inputs, without dropping those rows.
+  Monitoring retains its existing generic error response and records the
+  actionable explanation in failed-check history.
+- **OC-255:** new DateFeatures artifacts record `timezone="UTC"`; pandas now
+  agrees with Polars for offset strings, native aware timestamps and mixed DST
+  offsets. `2024-01-01 00:30+02:00` yields UTC year **2023**, day **31**, hour
+  **22**. Naive clock values and original columns retain their behavior.
+  Regressions cover all twelve date features, invalid/null observations, JSON
+  artifacts and a real DateFeatures -> DecisionTree pipeline with in-memory
+  pickle reload. Equivalent UTC input previously predicted `[0,0,0,1]` instead
+  of `[0,1,2,3]`. **Three failures** before repair become **62 passing** date
+  and time-series tests. Legacy artifacts without the policy deliberately
+  preserve their earlier engine-specific behavior; refit the complete pipeline
+  to adopt UTC. The user guide documents this compatibility boundary.
+- **OC-286:** profile JSON projections now normalize nested typed statistics
+  and free-form numeric leaves to finite values or `null`, while Python-mode
+  statistics and validation/serialization JSON schemas remain unchanged.
+  Job completion and both status managers sanitize result copies before JSON
+  persistence; Decimal infinity/overflow also becomes null. **35 Core** and
+  **five persistence** regressions failed before repair. Broader focused runs
+  pass **149 Core** and **119 backend** tests. Real EDA task, preview/tuned
+  completion and both status-manager writes are reloaded from fresh SQLite
+  sessions and checked with strict JSON serialization. A separate persisted
+  required-float probe (`HistogramBin.start: null`) returns **HTTP 200** from
+  both report-detail and latest-report routes. Live PostgreSQL/MySQL were not
+  exercised; old stored JSON rows are not migrated.
+- **OC-289:** a real missing-job HTTP request with encoded CR/LF/control bytes
+  reproduced raw multiline logging while retaining HTTP 404. Escape identifiers
+  and rendered exception chains after credential redaction, without passing raw
+  `exc_info` to a handler. Redaction also recognizes literal Python control
+  escapes before secret assignments in traceback source lines. Tests use an
+  isolated database and real registry/service routing, with failures injected
+  only at the external artifact store. Explicit/implicit causes, notes and
+  ExceptionGroup controls retain diagnostics without leaking secret values.
+  **Six regressions failed** before repair; **41 related security/registry**
+  tests now pass. HTTP status and generic server-error responses are preserved.
+- **OC-11/80:** the smoke selected 34 nodes but reached only 29 appliers because
+  empty fit artifacts returned success. Supply real target/configuration inputs
+  and fail unexpected empty artifacts; all **34 selected appliers** now execute.
+  Two resampler exclusions are visible skips with reasons. Current coverage was
+  partly better than the historical finding: branch-inclusive coverage changes
+  from **100/91/74%** to **100/99/95%** for sklearn compatibility, value replacement
+  and configuration validation. New tests cover malformed inputs, aggregated
+  diagnostics, extension fields, nullable numeric/boolean JSON keys and input/y
+  preservation. They exposed three Polars failures for unmatchable numeric keys;
+  ignore those keys while preserving valid mappings, matching pandas behavior.
+  This defect is repaired within OC-80's specified coverage scope. The combined
+  selected suite passes **231 tests / two explicit skips**; remaining coverage
+  gaps are defensive fallback paths.
+
+Final combined verification: full Core on sklearn 1.9.1 **9,467 passed / 82
+skipped**, three snapshots; separate full backend suite **3,845 passed**, seven
+snapshots. After the infinity guard, the backend drift/monitoring suite passes
+**110 tests**, including two new real artifact/Parquet/SQLite failed-alert
+regressions. The first full Core run exposed an old new-fit calendar expectation;
+updated it to UTC while retaining the separate legacy-artifact controls, then
+reran the full Core suite successfully. Frontend drift tests **22 passed**, with
+focused ESLint and a successful production build; shipped assets are unchanged.
+Repository Ruff, full backend/Core ty, changed-Python formatting, production
+CCN <=10 and scoped whitespace checks pass. Independent review found no remaining
+blocker after the infinity guard and verified all **66 profiling JSON-schema
+comparisons** against HEAD. Existing dependency warnings remain.
+
+Queue rows now count **13 open / 4 parked**; Qwen is **44/48 closed**.
+R1 and DRIFT-01 remain separately planned enhancements. OC-71/72/73/185 retain
+their user-parked status. Changelog entries are under v0.8.23; package versions
+remain 0.8.22.
 
 ### 2026-09-13 — 0.8.23: five queue findings closed after OC-251
 

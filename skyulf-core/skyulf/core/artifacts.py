@@ -650,3 +650,4 @@ class DateFeaturesArtifact(TypedDict, total=False):
     columns: list[str]
     features: list[str]
     drop_original: bool
+    timezone: str

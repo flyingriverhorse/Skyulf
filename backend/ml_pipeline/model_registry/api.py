@@ -1,11 +1,13 @@
 """Read-only model-registry endpoints: stats, models, versions and job artifacts."""
 
 import logging
+import traceback
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.exceptions.core import SkyulfException
+from backend.utils.logging_utils import redact_credentials, sanitize_for_log
 
 logger = logging.getLogger(__name__)
 
@@ -45,8 +47,20 @@ async def list_job_artifacts(job_id: str, session: AsyncSession = Depends(get_as
     try:
         return await ModelRegistryService.get_job_artifacts(session, job_id)
     except ValueError as e:
-        logger.warning("Artifact lookup failed for job %s: %s", job_id, e)
+        logger.warning(
+            "Artifact lookup failed for job %s: %s",
+            sanitize_for_log(redact_credentials(job_id)),
+            sanitize_for_log(redact_credentials(e)),
+        )
         raise HTTPException(status_code=404, detail="Job artifacts not found") from e
-    except Exception:
-        logger.exception("Failed to list artifacts for job %s", job_id)
+    except Exception as e:  # noqa: BLE001 - final artifact HTTP boundary, sanitized and redacted
+        # Format and scrub the complete chain before any handler can render it.
+        safe_traceback = sanitize_for_log(
+            redact_credentials("".join(traceback.format_exception(type(e), e, e.__traceback__)))
+        )
+        logger.error(
+            "Failed to list artifacts for job %s: %s",
+            sanitize_for_log(redact_credentials(job_id)),
+            safe_traceback,
+        )
         raise SkyulfException(message="Failed to retrieve job artifacts") from None

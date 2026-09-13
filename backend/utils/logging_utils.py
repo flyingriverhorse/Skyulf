@@ -83,7 +83,9 @@ _SECRET_NAMES = (
 # by an earlier pass is not matched again, and so the scrub cannot run past the
 # credential into the surrounding prose.
 _SECRET_ASSIGNMENT_RE = re.compile(
-    r"\b(?P<name>" + "|".join(_SECRET_NAMES) + r")\b"
+    # Traceback source lines contain literal Python escapes such as \\nsecret=.
+    # Treat those control escapes as separators too, without rewriting the log.
+    r"(?:\b|(?<=\\[abfnrtv])|(?<=\\x[01][0-9a-f]))(?P<name>" + "|".join(_SECRET_NAMES) + r")\b"
     r"(?P<sep>['\"]?\s*[:=]\s*['\"]?)"
     r"(?P<value>[^\s,&'\"<>{}\[\]()]+)",
     re.IGNORECASE,

@@ -152,6 +152,14 @@ input can expose the answer directly. A lagged target is useful only when that
 target observation is actually available at the intended prediction time. Merely
 moving a temporal node after a random split does not establish a valid protocol.
 
+Newly fitted `DateFeatures` steps extract calendar parts in UTC. For example,
+`2024-01-01 00:30+02:00` produces year 2023, day 31 and hour 22. Naive dates
+are interpreted as UTC without moving their clock time; mixed offsets and DST
+transitions follow the same rule on both engines. The original column remains
+unchanged unless `drop_original` is enabled. Saved older artifacts retain their
+original engine-specific behavior so an existing model's features do not change
+on reload. Refit the complete pipeline to adopt UTC for those models.
+
 ## Complete registered-node catalog
 
 The placement of learned entries below describes active feature processing. The

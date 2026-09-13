@@ -29,15 +29,15 @@ archive Log.
 
 ## Live — fix queue
 
-**Current status (2026-09-13): 19 open / 4 parked.**
-The latest fixes close OC-251 and OC-56/102/213/292/319. Verification and
+**Current status (2026-09-13): 13 open / 4 parked.**
+The latest fixes close OC-11/47/80/255/286/289. Verification and
 limitations are recorded in the [archive Log](opus_core_analysis-tracker.md#log).
 The earlier batch reports were removed by the user; their closure summaries
 remain in that Log.
 The verified Qwen follow-up added **48 findings, OC-271–318**,
 grouped below by priority and domain. Qwen #1/#50/#57 reuse OC-253/65/64;
-#13 is already fixed as OC-268. #18/#41 share OC-286, which requires both
-persistence paths to be repaired. Policy-only #36 is recorded separately
+#13 is already fixed as OC-268. #18/#41 share OC-286, now closed with both
+profile and job-result persistence covered. Policy-only #36 is recorded separately
 below, outside the defect count. Reproduction and filing history are in
 the [archive Log](opus_core_analysis-tracker.md#log).
 
@@ -63,8 +63,6 @@ remaining findings are grouped by domain.
 |---|---|---|---|---|
 | OC-277 | 🟠 | **Concurrent submissions bypass duplicate-job protection** (`backend/ml_pipeline/_execution/jobs.py:104-119`) — Qwen #8. Make job reservation atomic across API processes and preserve one lock for an in-process key while waiters exist; coordinate lock cleanup with OC-310. | medium | ⬜ open — Two controlled OS processes create two queued jobs with versions 1/2 after the same absent-row check, and waiting coroutines reach two simultaneous entries for one key; one request alone does not duplicate a job and PostgreSQL was not exercised. |
 | OC-280 | 🟡 | **Configured default rate limits are not applied to undecorated routes** (`backend/middleware/rate_limiter.py:10-19`) — Qwen #11. Wire default limiting into the actual app and retain explicit per-route limits; authentication decisions remain separately parked. | medium | ⬜ open — An undecorated mutation route accepts 230/230 requests while an explicit-limit control returns 429 after 60; the current inventory has 34 mutation routes, eight decorated and 26 without default enforcement. |
-| OC-286 | 🟠 | **Non-finite profile and preview metrics cross JSON persistence boundaries** (`skyulf-core/skyulf/profiling/schemas.py:259-273`; `backend/ml_pipeline/_execution/strategies.py:130-163`) — Qwen #18 / #41. Enforce a consistent finite-or-null JSON contract for both EDA profile persistence and background preview/job metrics; closure requires coverage of both write paths. | medium | ⬜ open — Qwen #18 typed profile fields retain inf/NaN and #41 actual preview success persists Infinity to SQLite; PostgreSQL/MySQL JSON binders emit non-standard JSON, but live server rejection was not tested and orjson/model_dump_json controls sanitize it. |
-| OC-289 | 🟡 | **User-controlled identifiers can inject new lines into logs** (`backend/ml_pipeline/model_registry/api.py:43-51`) — Qwen #22. Sanitize identifiers and exception text at the affected logging boundaries while retaining prior credential redaction. | small | ⬜ open — A real missing-job request containing percent-encoded LF returns 404 but writes a raw newline into the registry log; this demonstrates log-integrity loss, not code execution. |
 
 
 ### Then — decide deployment model first
@@ -107,7 +105,6 @@ remaining findings are grouped by domain.
 | OC-07 | 🟡 | Node-id naming split 55 PascalCase / 45 snake_case + redundant aliases (`registry.py`) | half day | ⬜ open |
 | OC-08 | 🟡 | Public-API name collision: `DatasetProfile` means two things (`skyulf/__init__.py:32-46`) | small | ⬜ open |
 | OC-10 | ⚪ | 4 dead `infer_output_schema` overrides that only `return None` (`vectorization/*`) | mechanical | ⬜ open — **re-measured 2026-09-06: five, not four** (`count_vectorizer.py:147`, `hashing_vectorizer.py:135`, `tfidf_vectorizer.py:141`, `tokenizer.py:179`, `sentence_embedder.py:204`). `BaseCalculator.infer_output_schema` already ends in `return None` (`preprocessing/base.py:129`), so all five are behaviourally identical to inheriting. **Recommend folding into OC-03 rather than deleting standalone:** each override carries the per-node *reason* the schema is unknowable (learned vocabulary, model-loaded embedding width, data-dependent column survival), which is exactly the documentation OC-03's parametrized "predicted == actual for every node" test needs beside it, and OC-03 will touch these same five files |
-| OC-11 | ⚪ | Mega smoke test silently skips nodes with empty params (`tests/unit/test_all_nodes_smoke.py`) | small | ⬜ open |
 
 ### Remaining — encoding / cleaning / imputation / scaling / drop / resampling
 
@@ -125,7 +122,6 @@ remaining findings are grouped by domain.
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
-| OC-47 | 🟡 | Common-column dtype drift can silently disappear or be erased by a successful lossy cast to the reference dtype (`profiling/drift.py:192`) | small | ⬜ open — besides the original uncastable-to-null case, integer reference `[0]*50+[1]*50` against fractional current `[0.9]*50+[1.9]*50 reports all distances zero; a Float64 reference control detects drift with normalized Wasserstein `1.8`. |
 
 
 ### Remaining — core / engines / pipeline
@@ -140,7 +136,6 @@ remaining findings are grouped by domain.
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
-| OC-255 | 🟡 | DateFeatures uses local offsets on pandas and UTC on Polars; mixed DST offsets make the pandas `.dt` access fail (`preprocessing/time_series/date_features.py:64-66,106-109`) | small | ⬜ open — identical `+02:00` strings produce different days/hours; mixed `+02:00`/`+03:00` strings raise AttributeError on pandas, so choose and enforce one timezone contract. |
 
 
 ### Remaining — frontend
@@ -171,7 +166,6 @@ The separately reported lockfile issue still needs its exact advisory details.
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
-| OC-80 | 🟡 | 3 weakest-covered modules untested exactly where silence is dangerous (`_sklearn_compat.py`, `value_replacement.py`, `config_validation.py`) | ~1 day | ⬜ open |
 
 ### Qwen review — decisions outside the defect count
 

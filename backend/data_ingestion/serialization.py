@@ -493,7 +493,7 @@ class JSONSafeSerializer:
         if hasattr(obj, "__float__"):
             try:
                 value = float(obj)
-                return None if value != value else value
+                return value if math.isfinite(value) else None
             except Exception:  # noqa: BLE001 - capability probe, next handler follows
                 logger.debug("float conversion failed for %s", type(obj))
                 return JSONSafeSerializer._NOT_HANDLED

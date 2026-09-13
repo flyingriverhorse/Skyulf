@@ -70,6 +70,24 @@ describe('useDriftReport threshold re-evaluation', () => {
         vi.clearAllMocks();
     });
 
+    it('preserves type drift when adjustable distribution thresholds change', async () => {
+        /** Incompatible common types must stay counted alongside missing/new columns after slider changes. */
+        const loaded = report({
+            changed: column('changed', [{ metric: 'type_drift', value: 1, threshold: 0, has_drift: true }]),
+            stable: column('stable', [{ metric: 'psi', value: 0, threshold: 0.2, has_drift: false }]),
+        }, { missing_columns: ['missing'], new_columns: ['new'], drifted_columns_count: 3 });
+        const { result, rerender } = await loadReport(loaded);
+        rerender({ thresholds: { psi: 100, ks: 100, wasserstein: 100, kl: 100 } });
+
+        const evaluated = result.current.evaluatedReport!;
+        expect(evaluated.column_drifts.changed!.drift_detected).toBe(true);
+        expect(evaluated.column_drifts.changed!.metrics[0]).toMatchObject({
+            metric: 'type_drift', value: 1, threshold: 0, has_drift: true,
+        });
+        expect(evaluated.column_drifts.stable!.drift_detected).toBe(false);
+        expect(evaluated.drifted_columns_count).toBe(3);
+    });
+
     it('keeps zero thresholds, diagnostic fallback and non-finite metric comparisons', async () => {
         /** Slider evaluation must preserve unknown flags, categorical PSI and KS diagnostic rules. */
         const loaded = report({

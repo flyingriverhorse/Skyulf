@@ -63,6 +63,9 @@ async def test_dataframe_text_survives_both_serializers(records_format):
         np.float32("inf"),
         np.float64("-inf"),
         Decimal("NaN"),
+        Decimal("Infinity"),
+        Decimal("-Infinity"),
+        Decimal("1e9999"),
         np.datetime64("NaT"),
     ],
 )

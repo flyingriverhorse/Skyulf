@@ -149,18 +149,55 @@ class DriftCalculator:
         )
 
     def _calculate_column_drift(self, col: str, thresholds: dict[str, float]) -> ColumnDrift | None:
-        """Dispatch drift calculation for a single column based on its dtype."""
-        dtype = self.reference_df[col].dtype
-        is_categorical = dtype in [pl.Utf8, pl.String, pl.Categorical, pl.Enum, pl.Boolean]
+        """Compare compatible representations and report incompatible column types explicitly."""
+        reference = self.reference_df[col]
+        current = self.current_df[col]
+        # Preserve the existing no-data policy, including inferred Null columns.
+        if reference.null_count() == len(reference) or current.null_count() == len(current):
+            return None
 
-        if is_categorical:
+        dtype = reference.dtype
+        categorical_types = [pl.String, pl.Categorical, pl.Enum, pl.Boolean]
+        if dtype in categorical_types:
+            if current.dtype not in categorical_types:
+                return self._type_drift(col)
             return self._calculate_categorical_drift(col, thresholds)
 
         if not dtype.is_numeric():
-            # Unsupported dtype (e.g. nested/struct columns) — skip.
+            if dtype != current.dtype:
+                return self._type_drift(col)
+            # Equal unsupported dtypes (e.g. nested/struct columns) remain unscored.
             return None
 
-        return self._calculate_numeric_column_drift(col, dtype, thresholds)
+        return self._calculate_numeric_column_drift(col, thresholds)
+
+    def _type_drift(self, col: str) -> ColumnDrift:
+        """Keep an incompatible common column visible through the existing metric contract."""
+        return ColumnDrift(
+            column=col,
+            metrics=[DriftMetric(metric="type_drift", value=1.0, threshold=0.0, has_drift=True)],
+            drift_detected=True,
+            suggestions=[
+                f"Column type changed from {self.reference_df[col].dtype} to "
+                f"{self.current_df[col].dtype}; values cannot be compared consistently. "
+                "Check the source schema and preprocessing."
+            ],
+        )
+
+    @staticmethod
+    def _numeric_values(series: pl.Series) -> np.ndarray:
+        """Remove missing observations while preserving native numeric precision where possible."""
+        # Decimal arrays use Python objects, which cannot mix with scipy's float
+        # distances. Integer/float arrays retain their own widths and fractions.
+        if series.dtype.is_decimal():
+            series = series.cast(pl.Float64)
+        values = series.drop_nans().drop_nulls().to_numpy()
+        if not np.isfinite(values).all():
+            raise ValueError(
+                f"Drift column '{series.name}' contains infinite values; replace them with "
+                "finite or missing values before comparison."
+            )
+        return values
 
     def _merge_thresholds(self, thresholds: dict[str, float] | None) -> dict[str, float]:
         """Merge user-supplied drift thresholds over the defaults."""
@@ -181,31 +218,30 @@ class DriftCalculator:
         return missing_columns, new_columns
 
     def _calculate_numeric_column_drift(
-        self, col: str, dtype: pl.DataType, thresholds: dict[str, float]
+        self, col: str, thresholds: dict[str, float]
     ) -> ColumnDrift | None:
-        """Compute drift metrics, suggestions, and distribution for a numeric column."""
-        # Ensure current data is also numeric or castable to the reference type
+        """Measure numeric distributions without narrowing current values to the reference dtype.
+
+        Numeric text is accepted only when every non-null value parses. A
+        failed conversion produces type drift instead of scoring a partial
+        population. Boolean and nested values are incompatible with numbers.
+        """
         curr_series = self.current_df[col]
-        if curr_series.dtype != dtype:
+        if not curr_series.dtype.is_numeric():
+            if curr_series.dtype not in [pl.String, pl.Categorical, pl.Enum]:
+                return self._type_drift(col)
             try:
-                # Try to cast current to match reference (e.g. Int to Float, or String to Float)
-                curr_series = curr_series.cast(dtype, strict=False)
-            except Exception:  # noqa: BLE001 - uncastable column contributes no drift metric
-                # If casting fails completely (unlikely with strict=False), skip.
-                # Logged because skipping drops the column from the report whole:
-                # an absent column reads as "no drift measured", not as "not measured".
-                logger.warning(
-                    "Could not cast current column %r to the reference dtype; skipping it",
-                    col,
-                    exc_info=True,
-                )
-                return None  # nosec B112
+                # Decode categorical labels before parsing; a direct numeric cast
+                # can yield category codes instead of the values users supplied.
+                curr_series = curr_series.cast(pl.String).cast(pl.Float64, strict=True)
+            except pl.exceptions.PolarsError:
+                return self._type_drift(col)
 
         # drop_nans() first: pl.read_csv turns literal 'NaN' tokens into float
         # NaN (not null), and NaN-poisoned stats make every comparison below
         # silently vote "no drift" (F-13). No-op on integer series.
-        ref_data = self.reference_df[col].drop_nans().drop_nulls().to_numpy()
-        curr_data = curr_series.drop_nans().drop_nulls().to_numpy()
+        ref_data = self._numeric_values(self.reference_df[col])
+        curr_data = self._numeric_values(curr_series)
 
         if len(ref_data) == 0 or len(curr_data) == 0:
             return None

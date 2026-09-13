@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session
 
 from backend.config import get_settings
+from backend.data_ingestion.serialization import JSONSafeSerializer
 from backend.database.models import TrainingJob
 from backend.ml_pipeline._execution.graph_utils import (
     determine_search_strategy,
@@ -170,6 +171,8 @@ class AdvancedTuningManager(TrainingJobManagerBase):
 
     @staticmethod
     def _update_tuning_result(job: TrainingJob, result: dict[str, Any]):
+        """Persist a JSON-safe tuning result copy, including dedicated score columns."""
+        result = JSONSafeSerializer.clean_for_json(result)
         if "best_params" in result:
             job.best_params = result["best_params"]
         if "best_score" in result:
