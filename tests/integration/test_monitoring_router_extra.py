@@ -11,7 +11,7 @@ from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from fastapi import HTTPException
+from fastapi import HTTPException, UploadFile
 
 from backend.monitoring.router import (
     _UNRESOLVED_TRAINING_KEY,
@@ -292,14 +292,10 @@ def test_load_reference_dataframe_raises_skyulf_exception_on_failure():
 
 
 def _make_upload_file(filename: str, content: bytes, max_read: int | None = None):
-    upload = MagicMock()
-    upload.filename = filename
+    """Use a real seekable upload so repeated bounded reads eventually reach EOF."""
+    import io
 
-    async def _read(n=-1):
-        return content
-
-    upload.read = AsyncMock(side_effect=_read)
-    return upload
+    return UploadFile(filename=filename, file=io.BytesIO(content))
 
 
 async def test_load_current_dataframe_csv():
@@ -323,15 +319,8 @@ async def test_load_current_dataframe_parquet():
     assert df.columns == ["a"]
 
 
-async def test_load_current_dataframe_too_large_raises_400():
-    """Content exceeding MAX_UPLOAD_SIZE is rejected.
-
-    Note: the inner HTTPException(413) is raised inside the function's own
-    try block, so it gets caught by the broad `except Exception` alongside
-    genuine parse failures and re-raised as a 400 - this is the real,
-    existing behavior of the endpoint (not something this test suite
-    should silently "fix").
-    """
+async def test_load_current_dataframe_too_large_preserves_413():
+    """Content exceeding MAX_UPLOAD_SIZE remains 413 rather than a parse failure."""
     fake_settings = MagicMock()
     fake_settings.MAX_UPLOAD_SIZE = 5
     upload = _make_upload_file("data.csv", b"1234567890")
@@ -342,7 +331,7 @@ async def test_load_current_dataframe_too_large_raises_400():
     ):
         await _load_current_dataframe(upload)
 
-    assert exc_info.value.status_code == 400
+    assert exc_info.value.status_code == 413
 
 
 async def test_load_current_dataframe_parse_failure_raises_400():

@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { toPng } from 'html-to-image';
 import { VariableRow } from './VariableRow';
+import { AlertsSection } from './AlertsSection';
 import { toast } from '../../core/toast';
 import type { ColumnProfile } from '../../core/types/edaProfile';
 import type { DistributionDatum } from './DistributionChart';
@@ -24,6 +25,18 @@ const baseProps = { profile, isExpanded: true, onToggleExpand: vi.fn(), onToggle
 afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); document.documentElement.classList.remove('dark'); });
 
 describe('VariableRow contracts', () => {
+  it('keeps unknown native columns visible with missing counts and an unavailable-statistics warning', () => {
+    const message = "Statistics for column 'amount' with dtype 'Decimal(precision=38, scale=2)' are unavailable. Missing counts and sample values are retained.";
+    render(<>
+      <AlertsSection alerts={[{ column: 'amount', type: 'Unsupported Type', severity: 'warning', message }]} />
+      <VariableRow {...baseProps} profile={{ name: 'amount', dtype: 'Unknown', missing_count: 1, missing_percentage: 100 / 3 }} />
+    </>);
+    expect(screen.getByText('Unknown')).toBeInTheDocument();
+    expect(screen.getByText('1 (33.33%)')).toBeInTheDocument();
+    expect(screen.getByText(message)).toBeInTheDocument();
+    expect(screen.queryByText('Avg Length')).not.toBeInTheDocument();
+    expect(screen.queryByText('Mean')).not.toBeInTheDocument();
+  });
   it('preserves zero and absent statistics, variance fallback and shape boundaries', () => {
     render(<VariableRow {...baseProps} profile={{ ...profile, numeric_stats: { mean: 0, std: 2, q25: null, skewness: 0.5, kurtosis: -0.5, zeros_count: 0, negatives_count: 0 }, vif: 5 }} />);
     expect(screen.getByText('Mean').nextSibling).toHaveTextContent('0.0000');

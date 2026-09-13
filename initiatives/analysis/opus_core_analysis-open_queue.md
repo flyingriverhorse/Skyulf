@@ -29,10 +29,11 @@ archive Log.
 
 ## Live — fix queue
 
-**Current status (2026-09-13): 46 open / 4 parked.**
-The first 0.8.23 batch closes 13 findings: OC-246/274/278/279/287/298/301/304/307/308/311/312/320.
-Verification and compatibility notes are in [the batch report](queue_verification_0.8.23.md)
-and the archive Log. OC-319 remains open.
+**Current status (2026-09-13): 34 open / 4 parked.**
+The second 0.8.23 batch closes 12 findings: OC-227/259/260/272/288/303/306/309/313/314/315/316.
+Verification and compatibility notes are in [the second batch report](queue_verification_0.8.23_batch2.md);
+the [first batch report](queue_verification_0.8.23.md) records the preceding 13 closures.
+The archive Log retains both batches. OC-319 remains open.
 The verified Qwen follow-up added **48 findings, OC-271–318**,
 grouped below by priority and domain. Qwen #1/#50/#57 reuse OC-253/65/64;
 #13 is already fixed as OC-268. #18/#41 share OC-286, which requires both
@@ -60,7 +61,6 @@ remaining findings are grouped by domain.
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
-| OC-272 | 🟡 | **Supported fitted models cannot produce fingerprints or model cards** (`skyulf-core/skyulf/pipeline/seal.py:174-185`) — Qwen #3. Canonicalize supported fitted Cython loss and NumPy Generator state while continuing to reject unknown state explicitly. | medium | ⬜ open — Actual fitted GradientBoosting, HistGB and SGD pipelines raise TypeError in both public APIs; LR/RF controls pass, and the claimed 10/38 catalog ratio was not remeasured. |
 | OC-277 | 🟠 | **Concurrent submissions bypass duplicate-job protection** (`backend/ml_pipeline/_execution/jobs.py:104-119`) — Qwen #8. Make job reservation atomic across API processes and preserve one lock for an in-process key while waiters exist; coordinate lock cleanup with OC-310. | medium | ⬜ open — Two controlled OS processes create two queued jobs with versions 1/2 after the same absent-row check, and waiting coroutines reach two simultaneous entries for one key; one request alone does not duplicate a job and PostgreSQL was not exercised. |
 | OC-280 | 🟡 | **Configured default rate limits are not applied to undecorated routes** (`backend/middleware/rate_limiter.py:10-19`) — Qwen #11. Wire default limiting into the actual app and retain explicit per-route limits; authentication decisions remain separately parked. | medium | ⬜ open — An undecorated mutation route accepts 230/230 requests while an explicit-limit control returns 429 after 60; the current inventory has 34 mutation routes, eight decorated and 26 without default enforcement. |
 | OC-286 | 🟠 | **Non-finite profile and preview metrics cross JSON persistence boundaries** (`skyulf-core/skyulf/profiling/schemas.py:259-273`; `backend/ml_pipeline/_execution/strategies.py:130-163`) — Qwen #18 / #41. Enforce a consistent finite-or-null JSON contract for both EDA profile persistence and background preview/job metrics; closure requires coverage of both write paths. | medium | ⬜ open — Qwen #18 typed profile fields retain inf/NaN and #41 actual preview success persists Infinity to SQLite; PostgreSQL/MySQL JSON binders emit non-standard JSON, but live server rejection was not tested and orjson/model_dump_json controls sanitize it. |
@@ -88,8 +88,6 @@ remaining findings are grouped by domain.
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
 | OC-185 | 🟡 | Authorization is stubbed in three mutually inconsistent pieces. `database/models.py:157 has_permission` is `return True  # Placeholder` with **zero callers**; `data_ingestion/dependencies.py:26,31 require_data_access`/`require_data_admin` are async no-ops wired to no route; and `data_ingestion/router.py:148,169` hardcode `user_id = 1` under an explicit `# KNOWN-GAP: Auth not implemented yet`, so every source belongs to one user and is visible to everyone. Nothing is exploitable *through* `has_permission` today precisely because nothing calls it — the risk is that the first caller gets an always-yes check shaped like a real API. Needs an authz decision before code | decision + ~1 week | ⏭️ parked — user requested pause |
-| OC-306 | 🟡 | **Monitoring upload parsing masks size-limit errors and allows a very large eager read** (`backend/monitoring/router.py:262-282`) — Qwen #42. Preserve HTTP 413 and enforce an appropriate bounded upload/read policy before parsing. | small | ⬜ open — Seventeen bytes against a sixteen-byte limit becomes HTTP 400 Failed to parse uploaded file instead of 413; the default read requests 10 GiB plus one byte, but an actual huge allocation or OOM was not attempted. |
-| OC-309 | 🟡 | **Sampling and job-list endpoints accept invalid or excessive pagination bounds** (`backend/data_ingestion/connectors/file.py:192-215`) — Qwen #45. Validate non-negative offsets and bounded positive limits before eager reads or large metric serialization. | medium | ⬜ open — limit=-1 eagerly reads a 25-row source and returns 24 rows; job endpoints accept large limits/negative skip, while the combined route has a skip cap; 243 KB times 1000 is about 243 MB, not 24 GB. |
 | OC-310 | 🟡 | **Failed job submission leaks entries in the per-key lock registry** (`backend/ml_pipeline/_internal/_routers/run_pipeline.py:190-212`) — Qwen #46. Validate job types and clean up reservation failures without evicting locks still owned or awaited; coordinate with OC-277. | small | ⬜ open — Four actual run requests with schema-accepted unknown job types return 500 and leave four unlocked registry entries; the UI does not submit those values and the route has an explicit 20/min rate limit. |
 
 
@@ -126,7 +124,6 @@ remaining findings are grouped by domain.
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
-| OC-313 | 🟡 | **SentenceEmbedder model caching permits duplicate concurrent loads** (`skyulf-core/skyulf/preprocessing/vectorization/sentence_embedder.py:33,41,53,159,209`) — Qwen #49. Coordinate same-key model construction within a process and handle loading failures without leaving waiters stuck. | medium | ⬜ open — Four threads using one model name create four model objects through a synchronized fake constructor but leave one cache entry; real model download, GPU OOM and cross-process cache sharing were not tested. |
 
 
 ### Remaining — profiling (outside the OC-39–46 cluster)
@@ -135,11 +132,7 @@ remaining findings are grouped by domain.
 |---|---|---|---|---|
 | OC-47 | 🟡 | Common-column dtype drift can silently disappear or be erased by a successful lossy cast to the reference dtype (`profiling/drift.py:192`) | small | ⬜ open — besides the original uncastable-to-null case, integer reference `[0]*50+[1]*50` against fractional current `[0.9]*50+[1.9]*50 reports all distances zero; a Float64 reference control detects drift with normalized Wasserstein `1.8`. |
 | OC-50 | 🟡 | Binary targets miss class-balance advice or flip to regression by sample size (`recommendations.py:147-152`) | small | ⬜ open |
-| OC-259 | 🟡 | Decimal columns are classified as Text and abort the entire EDA profile when batched string aggregates run (`profiling/_analyzer/_utils.py:64`, `profiling/analyzer.py:278`) | small | ⬜ open — a two-row Decimal amount column raises SchemaError from `str.len_bytes()`; Time/List columns hit the same unsupported-dtype fallback, while Float64 succeeds. |
-| OC-260 | 🟡 | Time-series plotting builds unequal timestamp/value arrays when metrics have different missingness (`profiling/visualizer.py:823-827,846`) | small | ⬜ open — a native profile with 1000 timestamps and only 500 observed values for one metric makes public `EDAVisualizer.plot()` raise an x/y dimension mismatch. |
-| OC-288 | 🟡 | **Temporal decomposition buckets cannot be used as drill-down filters** (`skyulf-core/skyulf/profiling/_analyzer/decomposition.py:72-83,127,153-158`) — Qwen #21. Round-trip serialized date/time bucket values through dtype-aware filtering and verify reachable Date/Datetime UI paths. | medium | ⬜ open — All six returned Date/Datetime/Time bucket values fail when reused as filters, while String/int controls pass; HTTP error mapping is source-traced and the full Time profiling path also has separate OC-259. |
 | OC-302 | 🟡 | **Outlier results omit the sample population behind their counts and percentages** (`skyulf-core/skyulf/profiling/_analyzer/multivariate.py:383-410`) — Qwen #37. Expose the sampled row count and make UI labels distinguish sampled results from the entire dataset. | medium | ⬜ open — A 200000-row dataset yields 2500 outliers and 5% from a 50000-row sample without that denominator in the payload/UI; a full-data count of 10000 or exact fourfold undercount was not established. |
-| OC-303 | 🟡 | **Correlation truncation is hidden from the normal frontend warning path** (`skyulf-core/skyulf/profiling/correlations.py:31-45`) — Qwen #38. Include omission metadata with capped matrices and render it even when the returned matrix is within the cap. | small | ⬜ open — A real 25-column profile returns a 20-column matrix, leaving the frontend greater-than-20 check false; a server warning exists but does not reach the user. |
 
 
 ### Remaining — core / engines / pipeline
@@ -190,12 +183,8 @@ The separately reported lockfile issue still needs its exact advisory details.
 | OC-223 | 🟡 | Completing a pending drift disposition clears the newly typed note after switching to another alert | small | ⬜ open — original modal characterization submits on one alert, switches IDs, types a new note and resolves the old callback; the new note becomes empty. Review modal and parent request lifetimes together before repair. |
 | OC-225 | 🟡 | Selecting a job removes the Jobs drawer's accessible name; the detail Back button is also unnamed | small | ⬜ open — the drawer keeps `aria-labelledby="jobs-drawer-title"` after its history heading unmounts. Keep a valid dialog label in both views and label the icon-only Back action; verify real-card keyboard navigation and screen-reader names. |
 | OC-226 | 🟡 | Late Segmentation hyperparameter definitions can restore an old model/reference column and call its old update callback after unmount | small | ⬜ open — original-source tests resolve defaults after newer config/model changes and observe the captured old config being emitted. Scope requests to the active model/settings lifetime and merge defaults into current config; cover reference edits, reversed responses and unmount. |
-| OC-227 | 🟡 | A completed node drag creates no undo entry because history ignores positions when either the previous or next node is dragging | small | ⬜ open — original public-store characterization sends two `dragging: true` positions followed by `dragging: false`; history stays empty. Capture one pre-drag snapshot and one completed move without recording each frame; cover single/group drags, undo/redo and selection-only changes. |
 | OC-56 | ⚪ | `useSchemaPreview` does not cancel in-flight requests on unmount (`hooks/useSchemaPreview.ts`) | small | ⬜ open |
 | OC-57 | ⚪ | `any`-typed chart props bypass type safety in EDA components (`modules/eda/`) | small | ⬜ open |
-| OC-314 | 🟡 | **Keyboard paste mutates a read-only Canvas** (`frontend/ml-canvas/src/core/hooks/useClipboard.ts:43-76`) — Qwen #51. Enforce the effective read-only state in clipboard mutation paths while retaining permitted copy behavior. | small | ⬜ open — The actual store and clipboard hook with readOnlyOverride enabled allow Ctrl+C/Ctrl+V to increase the node count from one to two; this is a UI editing contract, not an authorization boundary. |
-| OC-315 | 🟡 | **Edge selection adds structural undo-history entries** (`frontend/ml-canvas/src/core/store/graphStore/historyEquality.ts:15-16`) — Qwen #52. Ignore selection-only edge changes when comparing graph history while preserving real edits; cover this alongside the separate missing-drag snapshot in OC-227. | small | ⬜ open — The public onEdgesChange(select=true) call increases undo history from zero to one without a structural edit; the open OC-227 concerns a completed node drag creating no entry. |
-| OC-316 | 🟡 | **Canvas source links duplicate datasets already present in the graph** (`frontend/ml-canvas/src/pages/CanvasPage.tsx:153-157`) — Qwen #53. Recognize dataset nodes through their registered definition and source identity before automatically inserting from source_id. | small | ⬜ open — Opening CanvasPage with the same source_id and an existing custom/dataset_node creates two dataset nodes because the check reads n.type instead of data.definitionType. |
 
 
 ### Remaining — tests / packaging / CI (outside the Ongoing tier)

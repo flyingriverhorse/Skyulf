@@ -295,6 +295,22 @@ class ColumnMixin(_AnalyzerState):
                 )
             )
 
+    def _add_unsupported_dtype_alert(self, col: str, alerts: list[Alert]) -> None:
+        """Explain unavailable statistics without treating native values as text."""
+        dtype = self.df.schema[col]
+        if dtype != pl.Null:
+            alerts.append(
+                Alert(
+                    column=col,
+                    type="Unsupported Type",
+                    message=(
+                        f"Statistics for column '{col}' with dtype '{dtype}' are unavailable. "
+                        "Missing counts and sample values are retained."
+                    ),
+                    severity="warning",
+                )
+            )
+
     def _analyze_column(
         self,
         col: str,
@@ -332,6 +348,8 @@ class ColumnMixin(_AnalyzerState):
             self._process_datetime_column(col, profile, advanced_stats)
         elif semantic_type == "Text":
             self._process_text_column(col, profile, alerts, advanced_stats)
+        elif semantic_type == "Unknown":
+            self._add_unsupported_dtype_alert(col, alerts)
 
         self._add_generic_unique_alert(col, profile, alerts, basic_stats, semantic_type)
 

@@ -16,6 +16,7 @@ from backend.database.models import TrainingJob
 from backend.ml_pipeline._execution.advanced_tuning_manager import AdvancedTuningManager
 from backend.ml_pipeline._execution.basic_training_manager import BasicTrainingManager
 from backend.ml_pipeline._execution.schemas import JobInfo, JobStatus
+from backend.pagination import validate_page_bounds
 
 logger = logging.getLogger(__name__)
 
@@ -189,6 +190,7 @@ class JobManager:
         need deep pagination should prefer cursor-based pagination or date-range
         filtering.
         """
+        validate_page_bounds(limit, skip)
         jobs = []
 
         if job_type == "training":
@@ -335,6 +337,7 @@ class JobManager:
         store. We expose the same one-liner the inline preview path
         already shows for non-trainer nodes.
         """
+        validate_page_bounds(limit)
         train_jobs = await BasicTrainingManager.list_training_jobs(session, limit, 0)
         tune_jobs = await AdvancedTuningManager.list_tuning_jobs(session, limit, 0)
         # Newest first so the first hit per node_id wins for the

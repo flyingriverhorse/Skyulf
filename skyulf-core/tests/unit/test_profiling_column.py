@@ -47,11 +47,11 @@ def test_get_semantic_type_string_low_ratio_is_categorical() -> None:
     assert analyzer._get_semantic_type(df["s"]) == "Categorical"
 
 
-def test_get_semantic_type_unhandled_dtype_falls_back_to_text() -> None:
-    """An Object dtype falls through every branch to the final 'Text' fallback (line 53)."""
+def test_get_semantic_type_unhandled_dtype_reports_unknown() -> None:
+    """Unsupported native values must not be routed into string-only statistics."""
     df = pl.DataFrame({"o": pl.Series([object(), object(), object()], dtype=pl.Object)})
     analyzer = _basic_analyzer(df)
-    assert analyzer._get_semantic_type(df["o"]) == "Text"
+    assert analyzer._get_semantic_type(df["o"]) == "Unknown"
 
 
 def test_analyze_column_normality_test_uses_kstest_for_large_samples(

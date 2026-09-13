@@ -54,8 +54,8 @@ def _dtype_to_semantic_bucket(dtype: Any, n_unique: int, count: int, null_count:
     0.05, or at most 20 distinct values with repetition, is Categorical.
     All-null strings and strings with no repeated values remain Text.
     Native Categorical/Enum dtypes remain Categorical at any cardinality.
-    Null dtype has no inferable type, so Unknown preserves missing-value
-    reporting without dispatching to type-specific aggregates.
+    Null and unsupported dtypes use Unknown to preserve missing-value
+    reporting without dispatching to incompatible type-specific aggregates.
     """
     if dtype == pl.Null:
         return "Unknown"
@@ -71,7 +71,7 @@ def _dtype_to_semantic_bucket(dtype: Any, n_unique: int, count: int, null_count:
         return _string_semantic_bucket(n_unique, count, null_count)
     if dtype in (pl.Categorical, pl.Enum):
         return "Categorical"
-    return "Text"
+    return "Unknown"
 
 
 @runtime_checkable

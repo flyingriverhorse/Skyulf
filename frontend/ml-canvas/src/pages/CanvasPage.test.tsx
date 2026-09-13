@@ -1,11 +1,13 @@
 import { render, screen, fireEvent } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
-import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { StrictMode } from 'react';
+import { MemoryRouter, useLocation } from 'react-router-dom';
+import { describe, expect, it, vi, beforeAll, beforeEach } from 'vitest';
 import type { Node } from '@xyflow/react';
 
 import { CanvasPage } from './CanvasPage';
 import { useGraphStore } from '../core/store/useGraphStore';
 import { FOCUS_NODE_EVENT } from '../core/hooks/useKeyboardShortcuts';
+import { initializeRegistry } from '../core/registry/init';
 
 // MainLayout mounts the full canvas app (React Flow, Sidebar, Toolbar,
 // autosave, ...) which is unrelated to the deep-link selection/notice
@@ -30,8 +32,44 @@ function renderCanvas(initialEntry: string) {
   );
 }
 
+/** Expose the router's resulting URL without mocking its navigation behavior. */
+function CurrentSearch() {
+  return <output aria-label="Current query">{useLocation().search}</output>;
+}
+
 beforeEach(() => {
   useGraphStore.setState({ nodes: [], edges: [] } as never);
+});
+
+describe('CanvasPage dataset source links', () => {
+  beforeAll(() => initializeRegistry());
+
+  it('reuses an existing registered dataset and removes source_id in StrictMode', () => {
+    // React Flow custom wrappers must not hide an existing source from duplicate detection.
+    const id = useGraphStore.getState().addNode('dataset_node', { x: 30, y: 40 }, { datasetId: 'source-1' });
+    useGraphStore.temporal.getState().clear();
+    render(<StrictMode><MemoryRouter initialEntries={['/canvas?view=canvas&source_id=source-1&keep=yes']}>
+      <CanvasPage /><CurrentSearch />
+    </MemoryRouter></StrictMode>);
+    expect(useGraphStore.getState().nodes).toHaveLength(1);
+    expect(useGraphStore.getState().nodes[0]).toMatchObject({ id, position: { x: 30, y: 40 } });
+    expect(useGraphStore.temporal.getState().pastStates).toHaveLength(0);
+    expect(screen.getByLabelText('Current query')).toHaveTextContent('?view=canvas&keep=yes');
+  });
+
+  it.each([
+    { definitionType: 'dataset_node', datasetId: 'different-source' },
+    { definitionType: 'imputation_node', datasetId: 'source-1' },
+  ])('inserts the requested source alongside $definitionType using $datasetId', ({ definitionType, datasetId }) => {
+    // Matching needs both the registered dataset definition and the requested source identity.
+    useGraphStore.getState().addNode(definitionType, { x: 30, y: 40 }, { datasetId });
+    render(<StrictMode><MemoryRouter initialEntries={['/canvas?view=canvas&source_id=source-1']}>
+      <CanvasPage /><CurrentSearch />
+    </MemoryRouter></StrictMode>);
+    expect(useGraphStore.getState().nodes).toHaveLength(2);
+    expect(useGraphStore.getState().nodes[1]?.data).toMatchObject({ definitionType: 'dataset_node', datasetId: 'source-1' });
+    expect(screen.getByLabelText('Current query')).toHaveTextContent('?view=canvas');
+  });
 });
 
 describe('CanvasPage node RecordLink handling (OPS-007)', () => {

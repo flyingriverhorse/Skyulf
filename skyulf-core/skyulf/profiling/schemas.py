@@ -189,6 +189,10 @@ class CorrelationMatrix(BaseModel):
 
     columns: list[str]
     values: list[list[float]]  # 2D array
+    # Requested numeric columns before the cap and constant-column exclusion.
+    total_columns: int | None = None
+    # Only cap omissions; constant columns are excluded independently.
+    omitted_columns: list[str] = Field(default_factory=list)
 
 
 class ScatterSample(BaseModel):

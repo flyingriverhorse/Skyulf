@@ -10,9 +10,9 @@ is a pure HTTP veneer.
 """
 
 import logging
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -26,6 +26,7 @@ from backend.ml_pipeline._services.threshold_tuning_service import (
     ThresholdTuningError,
     ThresholdTuningService,
 )
+from backend.pagination import validate_query_limit
 from backend.realtime.events import JobEvent, publish_job_event
 from backend.realtime.trial_buffer import get_iterations, get_trials
 
@@ -85,7 +86,10 @@ class ThresholdTuningGetResponse(BaseModel):
 
 
 @router.get("/jobs/node-summaries", response_model=dict[str, list[dict[str, Any]]])
-async def get_node_summaries(limit: int = 200, session: AsyncSession = Depends(get_async_session)):
+async def get_node_summaries(
+    limit: Annotated[int, Query(ge=1)] = 200,
+    session: AsyncSession = Depends(get_async_session),
+):
     """Per-node card summaries from the latest completed run group.
 
     Returns ``{ node_id: [entry, ...] }`` where each entry carries a
@@ -103,6 +107,7 @@ async def get_node_summaries(limit: int = 200, session: AsyncSession = Depends(g
     never reaches the FE store through the regular ``/preview`` path
     (which strips trainers).
     """
+    validate_query_limit(limit, get_settings().MAX_PAGE_SIZE)
     return await JobManager.get_node_summaries(session, limit=limit)
 
 
@@ -311,13 +316,14 @@ async def clear_thresholds(job_id: str, session: AsyncSession = Depends(get_asyn
 
 @router.get("/jobs", response_model=list[JobInfo])
 async def list_jobs(
-    limit: int | None = None,
-    skip: int = 0,
+    limit: Annotated[int | None, Query(ge=1)] = None,
+    skip: Annotated[int, Query(ge=0)] = 0,
     job_type: Literal["training", "tuning"] | None = None,
     session: AsyncSession = Depends(get_async_session),
 ):
-    """List recent jobs."""
+    """List jobs with a positive limit up to MAX_PAGE_SIZE and a non-negative skip."""
     effective_limit = limit if limit is not None else get_settings().DEFAULT_PAGE_SIZE
+    validate_query_limit(effective_limit, get_settings().MAX_PAGE_SIZE)
     return await JobManager.list_jobs(session, effective_limit, skip, job_type)
 
 

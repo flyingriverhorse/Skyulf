@@ -84,4 +84,24 @@ describe('decomposition missing bucket identity', () => {
       { column: 'group', operator: '==', value: 'Unknown' },
     ]);
   });
+
+  it.each([
+    ['Date', '2026-01-01', 2591],
+    ['Datetime', '2026-01-01 11:30:00.123456+02:00', 2592],
+    ['Time', '09:30:00', 2593],
+  ])('sends the serialized %s bucket unchanged when drilling through normal controls', async (_dtype, value, datasetId) => {
+    const getDecomposition = vi.spyOn(EDAService, 'getDecomposition')
+      .mockResolvedValueOnce([{ name: 'Total', value: 2, ratio: 1 }])
+      .mockResolvedValueOnce([{ name: value, filter_value: value, value: 2, ratio: 1 }])
+      .mockResolvedValueOnce([{ name: 'matching detail', value: 2, ratio: 1 }]);
+    render(<DecompositionTree {...baseProps} datasetId={Number(datasetId)} />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Total 2 (100%)' }));
+    splitBy('group');
+    fireEvent.click(await screen.findByRole('button', { name: `${value} 2 (100%)` }));
+    splitBy('detail');
+    await screen.findByText('matching detail');
+    expect(getDecomposition).toHaveBeenLastCalledWith(Number(datasetId), null, 'count', 'detail', [
+      { column: 'group', operator: '==', value },
+    ]);
+  });
 });

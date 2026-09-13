@@ -251,15 +251,98 @@ describe('history equality public characterization', () => {
     useGraphStore.temporal.getState().clear();
   });
 
-  it('tracks a new edge array even if its contents are unchanged', () => {
-    // Edge identity is the history contract, unlike node selection equality.
-    const before = useGraphStore.getState().edges;
-    useGraphStore.setState({ edges: [...before] });
+  it('ignores repeated equivalent settings without notifying subscribers or losing redo', () => {
+    // Reopened settings can reload fresh nested defaults without any user edit.
+    const store = useGraphStore.getState();
+    store.updateNodeData('a', { search_space: { depth: [2, 4], rate: { min: 0.1, max: 0.5 } } });
+    useGraphStore.temporal.getState().clear();
+    store.updateNodeData('a', { label: 'Renamed' });
+    useGraphStore.temporal.getState().undo();
+    const notify = vi.fn();
+    const unsubscribe = useGraphStore.subscribe(notify);
+    try {
+      for (let index = 0; index < 10; index++) {
+        store.updateNodeData('a', { search_space: { rate: { max: 0.5, min: 0.1 }, depth: [2, 4] } });
+      }
+      expect(notify).not.toHaveBeenCalled();
+      expect(useGraphStore.temporal.getState().pastStates).toHaveLength(0);
+      expect(useGraphStore.temporal.getState().futureStates).toHaveLength(1);
+    } finally {
+      unsubscribe();
+    }
+    useGraphStore.temporal.getState().redo();
+    expect(useGraphStore.getState().nodes[0]?.data.label).toBe('Renamed');
+  });
+
+  it.each([
+    { before: [1, 2], after: [2, 1] },
+    { before: { value: 1 }, after: { value: '1' } },
+    { before: { value: NaN }, after: { value: null } },
+    { before: {}, after: { value: undefined } },
+    { before: [1], after: Object.assign(new Array<unknown>(2), [1]) },
+    { before: [], after: {} },
+    { before: new Date('2026-01-01'), after: new Date('2026-01-02') },
+  ])('keeps a meaningful settings change reversible: $before to $after', ({ before, after }) => {
+    // No-op detection must not flatten order, types, missing fields, or unsupported values.
+    useGraphStore.getState().updateNodeData('a', { settings: before });
+    useGraphStore.temporal.getState().clear();
+    useGraphStore.getState().updateNodeData('a', { settings: after });
     expect(useGraphStore.temporal.getState().pastStates).toHaveLength(1);
     useGraphStore.temporal.getState().undo();
-    expect(useGraphStore.getState().edges).toBe(before);
+    expect(useGraphStore.getState().nodes[0]?.data.settings).toEqual(before);
     useGraphStore.temporal.getState().redo();
-    expect(useGraphStore.getState().edges).not.toBe(before);
+    expect(useGraphStore.getState().nodes[0]?.data.settings).toEqual(after);
+  });
+
+  it('ignores a new edge array when its contents are unchanged', () => {
+    // Replacing an equivalent edge array must not consume a structural undo step.
+    const before = useGraphStore.getState().edges;
+    useGraphStore.setState({ edges: [...before] });
+    expect(useGraphStore.temporal.getState().pastStates).toHaveLength(0);
+  });
+
+  it('ignores edge selection without discarding a pending redo', () => {
+    // Selecting a wire must neither add undo entries nor erase the next real edit.
+    useGraphStore.getState().setGraph(useGraphStore.getState().nodes, [{ id: 'a-b', source: 'a', target: 'b' }]);
+    useGraphStore.temporal.getState().clear();
+    useGraphStore.getState().updateNodeData('a', { label: 'Changed' });
+    useGraphStore.temporal.getState().undo();
+    useGraphStore.getState().onEdgesChange([{ id: 'a-b', type: 'select', selected: true }]);
+    useGraphStore.getState().onEdgesChange([{ id: 'a-b', type: 'select', selected: false }]);
+    expect(useGraphStore.temporal.getState().pastStates).toHaveLength(0);
+    expect(useGraphStore.temporal.getState().futureStates).toHaveLength(1);
+    useGraphStore.temporal.getState().redo();
+    expect(useGraphStore.getState().nodes[0]?.data.label).toBe('Changed');
+  });
+
+  it.each(['source', 'target', 'sourceHandle', 'targetHandle', 'data', 'type', 'id', 'style'])('records edge %s edits', field => {
+    // Wire configuration changes still need their own reversible history entry.
+    const edge: Edge = { id: 'a-b', source: 'a', target: 'b' };
+    useGraphStore.setState({ edges: [edge] });
+    useGraphStore.temporal.getState().clear();
+    const values: Record<string, unknown> = { data: { value: 1 }, style: { stroke: 'red' } };
+    const changed = { ...edge, [field]: values[field] ?? 'changed' };
+    useGraphStore.getState().onEdgesChange([{ id: 'a-b', type: 'replace', item: changed }]);
+    expect(useGraphStore.temporal.getState().pastStates).toHaveLength(1);
+    useGraphStore.temporal.getState().undo();
+    expect(useGraphStore.getState().edges).toEqual([edge]);
+    useGraphStore.temporal.getState().redo();
+    expect(useGraphStore.getState().edges).toEqual([changed]);
+  });
+
+  it('records edge removal together with selection changes', () => {
+    // A mixed React Flow batch must retain actual deletion while ignoring its selection event.
+    const edges: Edge[] = [{ id: 'first', source: 'a', target: 'b' }, { id: 'second', source: 'b', target: 'a' }];
+    useGraphStore.setState({ edges });
+    useGraphStore.temporal.getState().clear();
+    useGraphStore.getState().onEdgesChange([
+      { id: 'first', type: 'select', selected: true }, { id: 'second', type: 'remove' },
+    ]);
+    expect(useGraphStore.temporal.getState().pastStates).toHaveLength(1);
+    useGraphStore.temporal.getState().undo();
+    expect(useGraphStore.getState().edges).toEqual(edges);
+    useGraphStore.temporal.getState().redo();
+    expect(useGraphStore.getState().edges).toEqual([{ ...edges[0], selected: true }]);
   });
 
   it.each(['reorder', 'data', 'type', 'id', 'length', 'x', 'y'])('records and restores node %s changes', change => {
@@ -295,21 +378,51 @@ describe('history equality public characterization', () => {
     expect(useGraphStore.getState().nodes[0]?.selected).toBe(true);
   });
 
-  it('currently ignores both in-progress drag positions and the drag-end transition', () => {
-    // Pin the existing either-side-dragging rule, including its drag-end behavior.
+  it.each([{ ids: ['a'] }, { ids: ['a', 'b'] }])('records one complete drag for $ids and restores its original positions', ({ ids }) => {
+    // Undo must restore the gesture start, and redo must never restore a dragging node.
     const onNodesChange = useGraphStore.getState().onNodesChange;
-    onNodesChange([{ id: 'a', type: 'position', position: { x: 10, y: 20 }, dragging: true }]);
-    onNodesChange([{ id: 'a', type: 'position', position: { x: 30, y: 40 }, dragging: true }]);
-    onNodesChange([{ id: 'a', type: 'position', position: { x: 50, y: 60 }, dragging: false }]);
+    onNodesChange(ids.map(id => ({ id, type: 'position', position: { x: 10, y: 20 }, dragging: true })));
+    onNodesChange(ids.map(id => ({ id, type: 'position', position: { x: 50, y: 60 }, dragging: true })));
     expect(useGraphStore.temporal.getState().pastStates).toHaveLength(0);
-    onNodesChange([{ id: 'a', type: 'position', position: { x: 70, y: 80 }, dragging: false }]);
+    onNodesChange(ids.map(id => ({ id, type: 'position', position: { x: 50, y: 60 }, dragging: false })));
     expect(useGraphStore.temporal.getState().pastStates).toHaveLength(1);
     useGraphStore.temporal.getState().undo();
-    expect(useGraphStore.getState().nodes[0]?.position).toEqual({ x: 50, y: 60 });
+    expect(useGraphStore.getState().nodes.map(node => node.position)).toEqual([{ x: 0, y: 0 }, { x: 0, y: 0 }]);
+    expect(useGraphStore.getState().nodes.some(node => node.dragging)).toBe(false);
+    useGraphStore.temporal.getState().redo();
+    for (const id of ids) expect(useGraphStore.getState().nodes.find(node => node.id === id)?.position).toEqual({ x: 50, y: 60 });
+    expect(useGraphStore.getState().nodes.some(node => node.dragging)).toBe(false);
+  });
+
+  it('groups staggered drag-end updates and keeps subsequent gestures separate', () => {
+    // Group members can finish in separate batches without creating intermediate undo states.
+    const change = useGraphStore.getState().onNodesChange;
+    change(['a', 'b'].map(id => ({ id, type: 'position', position: { x: 10, y: 20 }, dragging: true })));
+    change([{ id: 'a', type: 'position', dragging: false }]);
+    expect(useGraphStore.temporal.getState().pastStates).toHaveLength(0);
+    change([{ id: 'b', type: 'position', dragging: false }]);
+    expect(useGraphStore.temporal.getState().pastStates).toHaveLength(1);
+    change([{ id: 'a', type: 'position', position: { x: 30, y: 40 }, dragging: true }]);
+    change([{ id: 'a', type: 'position', dragging: false }]);
+    expect(useGraphStore.temporal.getState().pastStates).toHaveLength(2);
+    useGraphStore.temporal.getState().undo();
+    expect(useGraphStore.getState().nodes.map(node => node.position)).toEqual([{ x: 10, y: 20 }, { x: 10, y: 20 }]);
+    useGraphStore.temporal.getState().undo();
+    expect(useGraphStore.getState().nodes.map(node => node.position)).toEqual([{ x: 0, y: 0 }, { x: 0, y: 0 }]);
+  });
+
+  it('ignores a drag returning to its start and selection-only node changes', () => {
+    // A no-op gesture must leave redo available and avoid a phantom undo entry.
+    const change = useGraphStore.getState().onNodesChange;
+    change([{ id: 'a', type: 'select', selected: true }]);
+    change([{ id: 'a', type: 'position', position: { x: 10, y: 20 }, dragging: true }]);
+    change([{ id: 'a', type: 'position', position: { x: 0, y: 0 }, dragging: false }]);
+    change([{ id: 'a', type: 'select', selected: false }]);
+    expect(useGraphStore.temporal.getState().pastStates).toHaveLength(0);
   });
 
   it('still records data changes on a dragging node', () => {
-    // Drag suppression applies only after identity, data, and type comparisons.
+    // Configuration edits remain reversible during a drag without reviving transient drag state.
     const before = useGraphStore.getState().nodes;
     const node = before[0]!;
     const changedData = { ...node.data };
@@ -321,7 +434,7 @@ describe('history equality public characterization', () => {
     expect(useGraphStore.getState().nodes).toBe(before);
     expect(useGraphStore.getState().nodes[0]?.data).toBe(node.data);
     useGraphStore.temporal.getState().redo();
-    expect(useGraphStore.getState().nodes).toBe(next);
+    expect(useGraphStore.getState().nodes).toEqual(next.map(node => ({ ...node, dragging: false })));
     expect(useGraphStore.getState().nodes[0]?.data).toBe(changedData);
   });
 

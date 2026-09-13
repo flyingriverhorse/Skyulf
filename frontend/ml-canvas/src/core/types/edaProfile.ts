@@ -128,12 +128,22 @@ export interface CausalGraphData {
 
 export type CausalTargetExclusionReason = 'categorical' | 'excluded' | 'unsupported';
 
+export interface CorrelationMatrix {
+  columns: string[];
+  values: number[][];
+  /** Numeric columns considered before the backend's correlation cap. */
+  total_columns?: number | null;
+  /** Columns omitted by the backend cap, absent in older saved profiles. */
+  omitted_columns?: string[];
+}
+
 export interface EDAProfile {
   row_count: number;
   column_count: number;
   columns: Record<string, ColumnProfile>;
   outliers?: OutlierAnalysis | null;
-  correlations?: Record<string, Record<string, number>> | null;
+  correlations?: CorrelationMatrix | null;
+  correlations_with_target?: CorrelationMatrix | null;
   alerts?: EDAAlert[];
   sample_data?: Array<Record<string, unknown>>;
   /** Aggregate dataset-level health metrics surfaced in the Overview tab. */

@@ -16,8 +16,8 @@ and is not counted.
 
 **Qwen follow-up (2026-09-12):** the verified findings
 filed 48 additional records, OC-271–318, after deduplication and scope
-correction. Thirty have since closed. The live queue now has
-**46 open / 4 parked**; the subsequent OC-320 pipeline finding is now fixed. Details
+correction. Thirty-nine have since closed. The live queue now has
+**34 open / 4 parked**; the subsequent OC-320 pipeline finding is now fixed. Details
 and exclusions are in the latest Log entry. Historical baseline counts
 below are unchanged.
 
@@ -147,6 +147,7 @@ uses, so a fixed finding stays where it was filed.
 | OC-320 | 🟡 | **Serving drops raw inputs before upstream encoders can consume them** (`backend/ml_pipeline/deployment/service.py:450-463`) — Preserve inputs needed by fitted preprocessing until their configured drop step runs; keep the final model feature order enforced. | medium | ✅ fixed 2026-09-13 — Preserve raw columns through fitted preprocessing, then enforce final drops/order; all four pandas/Polars and Grid/Halving serving regressions now pass. |
 | OC-278 | 🟠 | **Deployment promotion deactivates a working model before validating the replacement** (`backend/ml_pipeline/deployment/service.py:131-175,260-272`) — Qwen #9. Verify artifact usability before atomic promotion and preserve the active deployment if validation fails. | medium | ✅ fixed 2026-09-13 — Validate loading, predictor/preprocessor interfaces and sklearn fitted state before promotion; failed validation or database replacement preserves the active model. |
 | OC-279 | 🟠 | **Synchronous Preview execution blocks its API event loop** (`backend/ml_pipeline/_internal/_routers/preview.py:767-776,815-865`) — Qwen #10. Move synchronous graph work off the request event loop and verify concurrency with the actual Preview path. | medium | ✅ fixed 2026-09-13 — Move synchronous preview work to a worker which owns its ORM session and artifacts; real HTTP concurrency and cancellation cleanup are covered. |
+| OC-272 | 🟡 | **Supported fitted models cannot produce fingerprints or model cards** (`skyulf-core/skyulf/pipeline/seal.py:174-185`) — Qwen #3. Canonicalize supported fitted Cython loss and NumPy Generator state while continuing to reject unknown state explicitly. | medium | ✅ fixed 2026-09-13 — Canonicalize exact supported compiled-loss identities/parameters and built-in Generator state; model cards and save/load pass for boosting and SGD on both engines, with sklearn 1.8/1.9 compatibility and unknown-state rejection. |
 
 ### Ongoing — remove the hiding conditions
 
@@ -205,6 +206,8 @@ uses, so a fixed finding stays where it was filed.
 | OC-307 | 🟡 | **A direct Preview request ending at Data Preview succeeds without executing upstream work** (`backend/ml_pipeline/_internal/_routers/preview.py:357-359,445-448`) — Qwen #43. Make terminal-sink handling in the API execute the intended upstream graph or reject an unsupported request explicitly. | small | ✅ fixed 2026-09-13 — Remove Data Preview sinks before partitioning so their upstream loader/scalers execute while retaining branch identities. |
 | OC-308 | 🟡 | **Invalid cyclic Preview graphs are recorded as critical server failures** (`backend/ml_pipeline/_internal/_routers/preview.py:919-923`) — Qwen #44. Validate cyclic input as a client error before graph execution and avoid recording it as an internal critical incident. | small | ✅ fixed 2026-09-13 — Reject cyclic preview configurations with HTTP 400 before resolution/execution; no critical ErrorEvent is persisted. |
 | OC-311 | 🟡 | **Legacy deployment artifact resolution disagrees with the default permitted root** (`backend/ml_pipeline/deployment/service.py:101-104,142-144,224-239`) — Qwen #47. Resolve supported legacy artifact references consistently with configured storage while preserving path containment checks. | small | ✅ fixed 2026-09-13 — Prediction and schema inspection resolve legacy artifacts through the configured permitted root and shared containment checks. |
+| OC-306 | 🟡 | **Monitoring upload parsing masks size-limit errors and allows a very large eager read** (`backend/monitoring/router.py:262-282`) — Qwen #42. Preserve HTTP 413 and enforce an appropriate bounded upload/read policy before parsing. | small | ✅ fixed 2026-09-13 — Check upload sizes with reads at most 1 MiB and parse the existing spool after rewind; seventeen bytes against a sixteen-byte limit now retains HTTP 413, without a second whole-upload byte buffer. |
+| OC-309 | 🟡 | **Sampling and job-list endpoints accept invalid or excessive pagination bounds** (`backend/data_ingestion/connectors/file.py:192-215`) — Qwen #45. Validate non-negative offsets and bounded positive limits before eager reads or large metric serialization. | medium | ✅ fixed 2026-09-13 — Validate positive bounded row counts and nonnegative offsets at HTTP/service/connector boundaries; explicit samples cap at 50000, pages follow MAX_PAGE_SIZE, and full ingestion with limit=None remains supported. |
 
 ### Remaining — direct-audit modules
 
@@ -284,6 +287,7 @@ uses, so a fixed finding stays where it was filed.
 | OC-28 | 🟠 | Box-Cox transform failures silently return untransformed data (`transformations/power.py:97-104`) | small | ✅ fixed 2026-09-06 — the silent path was the `valid_cols` filter, not the `except` (which has logged since the node was created); both engines now share `_fitted_columns_present`, which names the fitted columns the frame lacks, and fail-open is kept by decision. See the log entry |
 | OC-300 | 🟡 | **Polars arithmetic feature fillna leaves floating-point NaN untouched** (`skyulf-core/skyulf/preprocessing/feature_generation/_polars_ops.py:30`) — Qwen #33. Apply the configured missing-value policy to both null and NaN before arithmetic operations. | small | ✅ fixed — 2026-09-12: Polars arithmetic fills both NaN and null using the configured replacement before add/subtract/multiply/divide, preserving source values and integer/null-only controls. |
 | OC-264 | 🟡 | GeneralTransformation fits each power rule against the original input although apply executes same-column rules sequentially (`preprocessing/transformations/general.py:225-228`) | small | ✅ fixed — 2026-09-12: Power rules now learn from preceding same-column transformations, matching replay; log then standardized Yeo-Johnson has mean about 4e-16 and standard deviation one on both engines, with old artifacts retaining saved statistics until refit. |
+| OC-313 | 🟡 | **SentenceEmbedder model caching permits duplicate concurrent loads** (`skyulf-core/skyulf/preprocessing/vectorization/sentence_embedder.py:33,41,53,159,209`) — Qwen #49. Coordinate same-key model construction within a process and handle loading failures without leaving waiters stuck. | medium | ✅ fixed 2026-09-13 — Coordinate one in-process load per model name with shared success/failure; remove failed entries before notifying waiters so immediate retries work, without blocking distinct model keys. |
 
 ### Remaining — profiling (outside the OC-39–46 cluster)
 
@@ -318,6 +322,10 @@ uses, so a fixed finding stays where it was filed.
 | OC-274 | 🟡 | **Causal feature selection spends its cap on constant columns** (`skyulf-core/skyulf/profiling/_analyzer/causal.py:25-30`) — Qwen #5. Handle non-finite ranking values deterministically and retain eligible variable features before applying the cap. | small | ✅ fixed 2026-09-13 — Exclude noninformative columns before spending the causal feature cap; retain eligible targets and deterministic ranking. |
 | OC-287 | 🟡 | **One constant column suppresses VIF diagnostics for all other features** (`skyulf-core/skyulf/profiling/_analyzer/numeric.py:54-59`) — Qwen #19. Retain useful diagnostics for variable columns and explain excluded constants or unavailable calculations. | small | ✅ fixed 2026-09-13 — Exclude constants before complete-case filtering and VIF calculation; retain variable-feature diagnostics with existing alerts explaining omissions. |
 | OC-304 | 🟡 | **Reused EDAAnalyzer loses metadata for filters still applied to its data** (`skyulf-core/skyulf/profiling/analyzer.py:128,143-154,646,672`) — Qwen #39. Keep active-filter metadata consistent with the documented stateful analyzer behavior across repeated analyze calls. | small | ✅ fixed 2026-09-13 — Persist cumulative filter metadata on reused analyzers and copy snapshots so earlier profiles and caller values remain independent. |
+| OC-259 | 🟡 | Decimal columns are classified as Text and abort the entire EDA profile when batched string aggregates run (`profiling/_analyzer/_utils.py:64`, `profiling/analyzer.py:278`) | small | ✅ fixed 2026-09-13 — Unsupported Decimal/Time/List statistics use Unknown with a visible alert instead of crashing text aggregation; missing counts and original samples remain available. |
+| OC-260 | 🟡 | Time-series plotting builds unequal timestamp/value arrays when metrics have different missingness (`profiling/visualizer.py:823-827,846`) | small | ✅ fixed 2026-09-13 — Align each metric to the common valid timestamps and insert NaN gaps, including metrics absent from the first point; public plotting retains independent missingness. |
+| OC-288 | 🟡 | **Temporal decomposition buckets cannot be used as drill-down filters** (`skyulf-core/skyulf/profiling/_analyzer/decomposition.py:72-83,127,153-158`) — Qwen #21. Round-trip serialized date/time bucket values through dtype-aware filtering and verify reachable Date/Datetime UI paths. | medium | ✅ fixed 2026-09-13 — Parse serialized Date/Datetime/Time filters using native precision/timezones and preserve fractional Time bucket labels; real-file HTTP and desktop/mobile drill-down regressions pass. |
+| OC-303 | 🟡 | **Correlation truncation is hidden from the normal frontend warning path** (`skyulf-core/skyulf/profiling/correlations.py:31-45`) — Qwen #38. Include omission metadata with capped matrices and render it even when the returned matrix is within the cap. | small | ✅ fixed 2026-09-13 — Persist optional total/omitted-column metadata with capped matrices and display the warning for normal 20-of-25 responses; older reports remain readable. |
 
 
 ### Remaining — core / engines / pipeline
@@ -397,6 +405,10 @@ uses, so a fixed finding stays where it was filed.
 | OC-221 | 🟡 | Error Log applies an older search response after a newer response, displaying rows that disagree with the current search | small | ✅ fixed 2026-09-10 — request generations guard HTTP/pipeline results, errors and loading; refresh and effect cleanup invalidate obsolete work. |
 | OC-220 | 🟡 | Resampling Target Column native suggestions open away from the input in the user's browser | small | ✅ fixed 2026-09-09 — use an anchored editable listbox; docked/expanded browser geometry and keyboard selection are covered. |
 | OC-55 | 🟡 | `tsc --noEmit` fails: `mermaid` declared but not installed (`frontend/ml-canvas/package.json`) | 1 line | ✅ verified stale 2026-09-06 — `mermaid@11.17.2` is in `dependencies`, in the lockfile, installed and lazy-imported into its own chunk; the exact CI `tsc --noEmit` exits 0, `npm run build` succeeds, and the 5 real-parser tests pass. No change needed |
+| OC-227 | 🟡 | A completed node drag creates no undo entry because history ignores positions when either the previous or next node is dragging | small | ✅ fixed 2026-09-13 — Keep settled positions during live drag frames and record one completed single/group gesture; real pointer undo/redo and selection controls pass. |
+| OC-314 | 🟡 | **Keyboard paste mutates a read-only Canvas** (`frontend/ml-canvas/src/core/hooks/useClipboard.ts:43-76`) — Qwen #51. Enforce the effective read-only state in clipboard mutation paths while retaining permitted copy behavior. | small | ✅ fixed 2026-09-13 — Check the current effective read-only mode at paste time while retaining copy; hook/store and real keyboard browser regressions pass. |
+| OC-315 | 🟡 | **Edge selection adds structural undo-history entries** (`frontend/ml-canvas/src/core/store/graphStore/historyEquality.ts:15-16`) — Qwen #52. Ignore selection-only edge changes when comparing graph history while preserving real edits; cover this alongside the separate missing-drag snapshot in OC-227. | small | ✅ fixed 2026-09-13 — Exclude selection-only edge changes from structural history while preserving actual edge edits and redo; store and browser controls pass. |
+| OC-316 | 🟡 | **Canvas source links duplicate datasets already present in the graph** (`frontend/ml-canvas/src/pages/CanvasPage.tsx:153-157`) — Qwen #53. Recognize dataset nodes through their registered definition and source identity before automatically inserting from source_id. | small | ✅ fixed 2026-09-13 — Recognize existing dataset nodes through data.definitionType and datasetId when following source links; repeated navigation reuses the original node. |
 
 ---
 
@@ -480,6 +492,42 @@ respective fix logs; OC-167 closed with canonical artifact framing on 2026-09-09
 
 
 ## Log
+
+### 2026-09-13 — Canvas history follow-up: equivalent settings after selection
+
+User-reported excess undo after node selection reproduced as ten invisible
+entries from five advanced Classification panel open/close cycles in Chromium.
+Defaults were unchanged but each response created a new data object. Skip
+equivalent merged configurations in `updateNodeData` before publishing state;
+preserve existing redo and real nested/order/type changes. Mouse hover, zoom,
+pan and ordinary selection produced zero entries; completed single/group drags
+still produce one entry. Added browser and store regressions: 80 store tests,
+six Canvas browser cases and all 2,555 frontend tests pass. Static checks and
+the rebuilt frontend pass, with the documented main bundle budget adjusted
+325→326 KiB for the added equality logic. Queue remains **34 open / 4 parked**;
+this extends OC-227 verification rather than closing another finding. Details:
+[`queue_verification_0.8.23_batch2.md`](queue_verification_0.8.23_batch2.md).
+
+### 2026-09-13 — 0.8.23: twelve more queue findings repaired
+
+Closed OC-227/259/260/272/288/303/306/309/313/314/315/316 after reproducing
+the failures and adding asserted regressions. Canvas records completed drags,
+ignores edge selection in history, enforces read-only paste and reuses source
+nodes. Monitoring retains upload size errors without a second full byte buffer;
+pagination validates bounds before eager operations. Core fingerprints support
+known compiled-loss and RNG state, including sklearn 1.8/1.9 build differences;
+embedding loads share in-process work and support immediate failure retries.
+EDA retains unsupported-type profiles with explicit unavailable statistics,
+aligns sparse time-series plots, round-trips temporal drill-down values and
+shows capped-correlation omissions in the UI.
+
+The live count is now **34 open / 4 parked**, from 46/4. Nine closures belong
+to Qwen OC-271–318, bringing that group's closed count to **39/48**. Parked
+OC-71/72/73/185 retain their status. Changelog entries remain in v0.8.23;
+package metadata remains 0.8.22. Full tests, coverage, browser checks,
+durable regression paths and limitations are recorded in
+[`queue_verification_0.8.23_batch2.md`](queue_verification_0.8.23_batch2.md).
+
 
 ### 2026-09-13 — 0.8.23: thirteen queue findings repaired
 

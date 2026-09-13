@@ -14,6 +14,23 @@ class DecompositionMixin(_AnalyzerState):
 
     _NUMERIC_DTYPES = POLARS_NUMERIC_DTYPES
 
+    @staticmethod
+    def _coerce_temporal_filter_value(dtype: Any, val: Any) -> Any:
+        """Parse serialized temporal buckets with native precision and timezone semantics."""
+        if not isinstance(val, (str, list)):
+            return val
+        values = pl.Series("filter_value", val if isinstance(val, list) else [val])
+        if values.dtype != pl.String:
+            return val
+        if dtype == pl.Date:
+            parsed = values.str.to_date()
+        elif dtype == pl.Time:
+            parsed = values.str.to_time()
+        else:
+            parsed = values.str.to_datetime(time_unit=dtype.time_unit, time_zone=dtype.time_zone)
+        # Extracting a Python datetime would truncate nanoseconds to microseconds.
+        return pl.lit(parsed).implode() if isinstance(val, list) else pl.lit(parsed).first()
+
     def _coerce_filter_value(self, dtype: pl.DataType, val: Any) -> Any:
         """Coerce a string filter value to numeric when the target column is numeric.
 
@@ -71,6 +88,8 @@ class DecompositionMixin(_AnalyzerState):
 
         dtype = filtered_df.schema[col]
         is_numeric = dtype in self._NUMERIC_DTYPES
+        if dtype in (pl.Date, pl.Datetime, pl.Time):
+            val = self._coerce_temporal_filter_value(dtype, val)
 
         if is_numeric and isinstance(val, str):
             if val == "Unknown":
@@ -124,7 +143,13 @@ class DecompositionMixin(_AnalyzerState):
         self, temp_df: pl.DataFrame, split_col: str, measure_col: str | None, measure_agg: str
     ) -> pl.DataFrame | None:
         """Aggregate with a separate label expression so source names remain available."""
-        group_expr = pl.col(split_col).cast(pl.Utf8).alias("name")
+        # Time.cast(String) omits fractional seconds and would merge distinct buckets.
+        labels = (
+            pl.col(split_col).dt.to_string("%H:%M:%S%.f")
+            if temp_df.schema[split_col] == pl.Time
+            else pl.col(split_col).cast(pl.Utf8)
+        )
+        group_expr = labels.alias("name")
         if not measure_col:
             return temp_df.group_by(group_expr).agg(pl.len().alias("value"))
 

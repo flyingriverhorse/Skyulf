@@ -43,7 +43,8 @@ const BUDGETS = [
   // then 260→275 KB for slow-nodes observability instrumentation + concurrent
   // execution rendering (v0.7.x). Raised 300→325 KB for canvas connection guidance,
   // grouped split outputs, and component discovery improvements (v0.8.16).
-  { prefix: 'index',         maxGzipBytes: 325 * 1024,  label: 'index (main)',  kind: 'vendor' },
+  // 325→326 KB for type-preserving config equality in undo history (v0.8.23).
+  { prefix: 'index',         maxGzipBytes: 326 * 1024,  label: 'index (main)',  kind: 'vendor' },
   // Lazy route chunks — keep tight so an EDA-only regression surfaces
   // here rather than getting absorbed by the global index ceiling.
   { prefix: 'EDAPage',       maxGzipBytes: 140 * 1024,  label: 'route:EDA',         kind: 'route' },

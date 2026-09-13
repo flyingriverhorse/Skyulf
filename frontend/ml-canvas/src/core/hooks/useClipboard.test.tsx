@@ -1,9 +1,10 @@
-import { describe, it, expect, beforeAll, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from 'vitest';
 import React from 'react';
 import { render, fireEvent } from '@testing-library/react';
 import { useClipboard } from './useClipboard';
 import { useGraphStore } from '../store/useGraphStore';
 import { initializeRegistry } from '../registry/init';
+import { useViewStore } from '../store/useViewStore';
 
 // Mock React Flow's `useReactFlow` so its `getNodes()` / `getEdges()`
 // read from our zustand store. The hook is decoupled from any actually
@@ -31,6 +32,45 @@ describe('useClipboard', () => {
   beforeAll(() => initializeRegistry());
   beforeEach(() => {
     useGraphStore.setState({ nodes: [], edges: [], executionResult: null });
+    useViewStore.setState({ readOnlyOverride: 'off' });
+  });
+  afterEach(() => {
+    useViewStore.setState({ readOnlyOverride: 'auto' });
+    vi.unstubAllGlobals();
+  });
+
+  it.each([
+    { override: 'on', width: 1440, modifier: 'ctrlKey' },
+    { override: 'on', width: 1440, modifier: 'metaKey' },
+    { override: 'auto', width: 900, modifier: 'ctrlKey' },
+  ] as const)('copies but blocks paste in $override mode at $width using $modifier', ({ override, width, modifier }) => {
+    // Read-only copy must remain usable after editing resumes without advancing the paste offset.
+    const id = useGraphStore.getState().addNode('imputation_node', { x: 100, y: 100 });
+    useGraphStore.temporal.getState().clear();
+    renderHost();
+    vi.stubGlobal('innerWidth', width);
+    useViewStore.setState({ readOnlyOverride: override });
+    fireEvent.keyDown(document, { key: 'c', [modifier]: true });
+    fireEvent.keyDown(document, { key: 'v', [modifier]: true });
+    expect(useGraphStore.getState().nodes).toHaveLength(1);
+    expect(useGraphStore.temporal.getState().pastStates).toHaveLength(0);
+    useViewStore.setState({ readOnlyOverride: 'off' });
+    fireEvent.keyDown(document, { key: 'v', [modifier]: true });
+    expect(useGraphStore.getState().nodes).toHaveLength(2);
+    expect(useGraphStore.getState().nodes.find(node => node.id !== id)?.position).toEqual({ x: 150, y: 150 });
+    expect(useGraphStore.temporal.getState().pastStates).toHaveLength(1);
+  });
+
+  it('rechecks automatic read-only mode when the viewport shrinks after copy', () => {
+    // Clipboard mutations must honor the latest viewport even without a hook rerender.
+    useGraphStore.getState().addNode('imputation_node', { x: 0, y: 0 });
+    renderHost();
+    vi.stubGlobal('innerWidth', 1440);
+    useViewStore.setState({ readOnlyOverride: 'auto' });
+    fireEvent.keyDown(document, { key: 'c', ctrlKey: true });
+    vi.stubGlobal('innerWidth', 900);
+    fireEvent.keyDown(document, { key: 'v', ctrlKey: true });
+    expect(useGraphStore.getState().nodes).toHaveLength(1);
   });
 
   it('Ctrl+C with no selection is a no-op (paste also does nothing)', () => {

@@ -154,7 +154,8 @@ def calculate_correlations(df: pl.LazyFrame, numeric_cols: list[str]) -> Correla
         # One collect for the whole matrix: N is capped at 20 columns, and the
         # pairwise pass below needs the values materialized anyway.
 
-        numeric_cols = _cap_numeric_columns(numeric_cols)
+        requested_cols = numeric_cols
+        numeric_cols = _cap_numeric_columns(requested_cols)
 
         subset = _nan_to_null(_collect(df.select(numeric_cols)))
 
@@ -171,7 +172,12 @@ def calculate_correlations(df: pl.LazyFrame, numeric_cols: list[str]) -> Correla
 
         matrix = _pairwise_correlation_matrix(subset, valid_cols)
 
-        return CorrelationMatrix(columns=valid_cols, values=matrix)
+        return CorrelationMatrix(
+            columns=valid_cols,
+            values=matrix,
+            total_columns=len(requested_cols),
+            omitted_columns=requested_cols[len(numeric_cols) :],
+        )
 
     except Exception:
         logger.exception("Error calculating correlations")

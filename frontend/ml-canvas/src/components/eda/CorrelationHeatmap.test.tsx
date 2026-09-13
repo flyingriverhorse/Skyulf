@@ -49,6 +49,21 @@ describe('CorrelationHeatmap', () => {
     expect(within(region).getAllByText('feature_24').length).toBeGreaterThan(0);
   });
 
+  it('explains omissions already applied by the backend without promising missing table data', () => {
+    render(<CorrelationHeatmap data={{
+      columns: manyColumns.slice(0, 20),
+      values: manyValues.slice(0, 20).map(row => row.slice(0, 20)),
+      total_columns: 25,
+      omitted_columns: manyColumns.slice(20),
+    }} />);
+    expect(screen.getByText(/first 20 of 25 numeric columns by column order/i)).toBeInTheDocument();
+    expect(screen.getByText(/5 omitted: feature_20/i)).toBeInTheDocument();
+    expect(screen.getByText(/not included in the data table/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /view data table/i }));
+    const region = screen.getByRole('region', { name: /correlation matrix/i });
+    expect(within(region).queryByText('feature_24')).not.toBeInTheDocument();
+  });
+
   it('keeps correlation values legible as text regardless of theme', () => {
     document.documentElement.classList.add('dark');
     render(<CorrelationHeatmap data={smallData} />);
