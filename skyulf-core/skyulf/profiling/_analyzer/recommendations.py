@@ -63,7 +63,10 @@ class RecommendationsMixin(_AnalyzerState):
         target = self.df[target_col]
         if target.dtype in _INT_DTYPES and target.drop_nulls().n_unique() == 2:
             return "Classification"
-        semantic_type = self._get_semantic_type(target)
+        # EDAAnalyzer resolves this Protocol declaration to ColumnMixin's
+        # concrete string-returning implementation; Pylint cannot follow that
+        # multiple-inheritance path (see the matching RulesMixin exemption).
+        semantic_type = self._get_semantic_type(target)  # pylint: disable=assignment-from-no-return
         if semantic_type in ("Categorical", "Boolean"):
             return "Classification"
         return "Regression" if semantic_type == "Numeric" else None
