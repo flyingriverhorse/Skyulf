@@ -402,15 +402,16 @@ def test_predict_and_decode_failure_wraps_value_error():
         DeploymentService._predict_and_decode(_Failing(), pd.DataFrame({"a": [1]}), None, None)
 
 
-def test_predict_and_decode_plain_list_without_tolist():
+@pytest.mark.parametrize("as_iterator", [False, True])
+def test_predict_and_decode_plain_list_without_tolist(as_iterator):
     """Predictions without a .tolist() attribute go through the `list(predictions)` branch."""
 
     class _PlainListPredictor:
         def predict(self, X):
-            return (1, 2, 3)  # tuple has no .tolist()
+            return iter([1, 2, 3]) if as_iterator else (1, 2, 3)
 
     result, thresholds_applied = DeploymentService._predict_and_decode(
-        _PlainListPredictor(), pd.DataFrame({"a": [1]}), _NoEncoderEngineer(), None
+        _PlainListPredictor(), pd.DataFrame({"a": [1, 2, 3]}), _NoEncoderEngineer(), None
     )
     assert result == [1, 2, 3]
     assert thresholds_applied is None

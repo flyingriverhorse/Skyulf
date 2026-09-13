@@ -16,8 +16,8 @@ and is not counted.
 
 **Qwen follow-up (2026-09-12):** the verified findings
 filed 48 additional records, OC-271–318, after deduplication and scope
-correction. Forty-four have since closed. The live queue now has
-**13 open / 4 parked**; the subsequent OC-320 pipeline finding is now fixed. Details
+correction. Forty-seven have since closed. The live queue now has
+**6 open / 4 parked**; the subsequent OC-320 pipeline finding is now fixed. Details
 and exclusions are in the latest Log entry. Historical baseline counts
 below are unchanged.
 
@@ -112,6 +112,7 @@ uses, so a fixed finding stays where it was filed.
 | OC-290 | 🟠 | **Tokenizer and vectorizer outputs collide with existing columns** (`skyulf-core/skyulf/preprocessing/vectorization/tokenizer.py:63,98`) — Qwen #23. Apply collision-safe output handling to Tokenizer and the shared Count/TF-IDF/Hashing append path. | medium | ✅ fixed — 2026-09-12: Tokenizer and all four vectorizer consumers validate retained-column collisions at fit/apply; Tokenizer computes from original sources before dropping them, preserving safe name reuse and engine/wrapper/index behavior. |
 | OC-293 | 🟠 | **Inference CSV pairs saved predictions with subsequently edited input** (`frontend/ml-canvas/src/components/pages/inference/useInferenceController.tsx:429-447`) — Qwen #26. Export the input snapshot belonging to the completed inference result and handle edits or reruns without mixing generations. | small | ✅ fixed — 2026-09-12: The results table and CSV use the displayed completed run's saved input through edits, reruns and history restoration; clearing or retiring a request blocks late success/error/finally writes. |
 | OC-317 | 🟠 | **Drift summary cards ignore available categorical PSI metrics** (`frontend/ml-canvas/src/pages/drift/SummaryCards.tsx:16-27`) — Qwen #54. Include the appropriate categorical metric when calculating overall drift and selecting the most-drifted feature. | small | ✅ fixed — 2026-09-12: Summary cards include finite numeric and categorical PSI once per column; the 0.01/5 example shows average 2.5050 and category as most drifted, while unavailable PSI remains distinct from measured zero. |
+| OC-281 | 🟠 | **Prediction-time row filtering loses the input-to-prediction contract** (`skyulf-core/skyulf/preprocessing/pipeline.py:44,327`) — Qwen #12. Define and enforce inference row retention or explicit row provenance through Core and deployment serialization; keep fold-scoring OC-251 separate. | medium | ✅ fixed 2026-09-13 — Reject prediction-time row-count changes and built-in temporal reordering before returning unaligned results; preserve ordinary transforms/CV and valid clipped, dense and sparse predictions. |
 
 
 ### Next — wrong results in realistic configs
@@ -153,6 +154,7 @@ uses, so a fixed finding stays where it was filed.
 | OC-318 | 🟡 | **Empty scaling range fields pass validation and become null bounds** (`frontend/ml-canvas/src/modules/nodes/processing/scaling/ScalingControls.tsx:64,91`) — Qwen #55. Validate finite MinMax/Robust range inputs in the UI and reject invalid serialized bounds at the Core boundary. | small | ✅ fixed 2026-09-13 — Keep blank scaling drafts invalid through editing and JSON reload, navigate Issues to the range, and reject malformed/nonfinite Core bounds with named errors; valid numeric iterables, Decimal bounds and fitted-artifact types remain compatible. |
 | OC-286 | 🟠 | **Non-finite profile and preview metrics cross JSON persistence boundaries** (`skyulf-core/skyulf/profiling/schemas.py:259-273`; `backend/ml_pipeline/_execution/strategies.py:130-163`) — Qwen #18 / #41. Enforce a consistent finite-or-null JSON contract for both EDA profile persistence and background preview/job metrics; closure requires coverage of both write paths. | medium | ✅ fixed 2026-09-13 — Normalize nonfinite profile and job-result JSON at actual persistence boundaries; durable EDA/preview/training/tuning writes and report reads retain finite-or-null values. |
 | OC-289 | 🟡 | **User-controlled identifiers can inject new lines into logs** (`backend/ml_pipeline/model_registry/api.py:43-51`) — Qwen #22. Sanitize identifiers and exception text at the affected logging boundaries while retaining prior credential redaction. | small | ✅ fixed 2026-09-13 — Escape user-controlled identifiers and fully rendered exception text without raw exc_info; real HTTP/database regressions preserve credential redaction and status behavior. |
+| OC-277 | 🟠 | **Concurrent submissions bypass duplicate-job protection** (`backend/ml_pipeline/_execution/jobs.py:104-119`) — Qwen #8. Make job reservation atomic across API processes and preserve one lock for an in-process key while waiters exist; coordinate lock cleanup with OC-310. | medium | ✅ fixed 2026-09-13 — Reserve absent-row lookup, version allocation and job insertion across API processes with database transactions; deterministic SQLite processes create one job and dispatch once. |
 
 ### Ongoing — remove the hiding conditions
 
@@ -213,6 +215,7 @@ uses, so a fixed finding stays where it was filed.
 | OC-311 | 🟡 | **Legacy deployment artifact resolution disagrees with the default permitted root** (`backend/ml_pipeline/deployment/service.py:101-104,142-144,224-239`) — Qwen #47. Resolve supported legacy artifact references consistently with configured storage while preserving path containment checks. | small | ✅ fixed 2026-09-13 — Prediction and schema inspection resolve legacy artifacts through the configured permitted root and shared containment checks. |
 | OC-306 | 🟡 | **Monitoring upload parsing masks size-limit errors and allows a very large eager read** (`backend/monitoring/router.py:262-282`) — Qwen #42. Preserve HTTP 413 and enforce an appropriate bounded upload/read policy before parsing. | small | ✅ fixed 2026-09-13 — Check upload sizes with reads at most 1 MiB and parse the existing spool after rewind; seventeen bytes against a sixteen-byte limit now retains HTTP 413, without a second whole-upload byte buffer. |
 | OC-309 | 🟡 | **Sampling and job-list endpoints accept invalid or excessive pagination bounds** (`backend/data_ingestion/connectors/file.py:192-215`) — Qwen #45. Validate non-negative offsets and bounded positive limits before eager reads or large metric serialization. | medium | ✅ fixed 2026-09-13 — Validate positive bounded row counts and nonnegative offsets at HTTP/service/connector boundaries; explicit samples cap at 50000, pages follow MAX_PAGE_SIZE, and full ingestion with limit=None remains supported. |
+| OC-310 | 🟡 | **Failed job submission leaks entries in the per-key lock registry** (`backend/ml_pipeline/_internal/_routers/run_pipeline.py:190-212`) — Qwen #46. Validate job types and clean up reservation failures without evicting locks still owned or awaited; coordinate with OC-277. | small | ✅ fixed 2026-09-13 — Validate unknown job types as HTTP 400 and release failed/cancelled reservations without evicting locks still owned or awaited; version allocation rolls back on failure. |
 
 ### Remaining — direct-audit modules
 
@@ -354,6 +357,8 @@ uses, so a fixed finding stays where it was filed.
 | OC-160 | 🟡 | DropMissingRows and Deduplicate collide with valid `__idx__` feature or target columns (`preprocessing/drop_and_missing/`) | small | ✅ fixed 2026-09-09 — collision-free X row-position names and direct target gathering preserve user columns and positional alignment. |
 | OC-162 | 🟡 | Polars time-series CV overwrites feature columns with temporary or real target names (`modeling/cross_validation.py`) | small | ✅ fixed 2026-09-09 — a shared positional permutation sorts X/y separately without materializing target columns. |
 | OC-312 | 🟡 | **The sklearn bridge returns zero-dimensional object arrays for unsupported containers** (`skyulf-core/skyulf/engines/sklearn_bridge.py:28,44`) — Qwen #48. Reject unsupported input containers clearly at the public adapter boundary while preserving valid mixed-engine X/y conversion. | small | ✅ fixed 2026-09-13 — Reject unsupported X/y containers at the sklearn adapter while retaining mixed-engine frames, wrappers, NumPy arrays and Python sequences. |
+| OC-64 | 🟠 | **F-14 only partially fixed** — engine registry global still an unlocked race (`engines/registry.py:60,86-91`) | small | ✅ fixed 2026-09-13 — Make fallback selection local to each thread/async context with ContextVar; preserve public signatures, engine registration and input-based detection. |
+| OC-65 | 🟡 | polars `to_numpy()` zero-width "parity fix" does not achieve parity (`engines/polars_engine.py`) | small | ✅ fixed 2026-09-13 — Retain native height at wrapper select/drop/indexing before zero-width information loss, preserving subsequent conversions and serialization; raw prior native loss remains unrecoverable. |
 
 ### Remaining — outliers / casting / binning / timeseries / geo
 
@@ -428,6 +433,8 @@ uses, so a fixed finding stays where it was filed.
 | OC-223 | 🟡 | Completing a pending drift disposition clears the newly typed note after switching to another alert | small | ✅ fixed 2026-09-13 — Guard modal drafts and parent GET/disposition lifetimes; late responses cannot clear newer notes or overwrite current detail, loading, error or pending state, including same-alert read/action races. |
 | OC-225 | 🟡 | Selecting a job removes the Jobs drawer's accessible name; the detail Back button is also unnamed | small | ✅ fixed 2026-09-13 — Retain valid history/detail dialog names, label Back and Close, and keep focus within the drawer during real job-card keyboard navigation. |
 | OC-226 | 🟡 | Late Segmentation hyperparameter definitions can restore an old model/reference column and call its old update callback after unmount | small | ✅ fixed 2026-09-13 — Cancel stale model/node definition requests and merge defaults into current config through the current callback; reference edits, user parameters, reversed responses and unmount remain safe. |
+| OC-54 | 🟡 | `DebugNode` is dead code that would silently no-op if wired up (`nodes/DebugNode.tsx`) | small | ✅ fixed 2026-09-13 — Remove the unreferenced DebugNode placeholder after verifying registry and imports; retain real Data Preview behavior and coverage. |
+| OC-57 | ⚪ | `any`-typed chart props bypass type safety in EDA components (`modules/eda/`) | small | ✅ fixed 2026-09-13 — Replace the remaining eleven explicit any sites with real chart/profile contracts and fix exposed null rendering/export defects; type checks, full frontend suite, browser checks and rebuilt assets pass. |
 
 ---
 
@@ -513,6 +520,116 @@ respective fix logs; OC-167 closed with canonical artifact framing on 2026-09-09
 
 
 ## Log
+
+### 2026-09-13 — archive completed review notes from the live queue
+
+At the user's request, removed the Qwen review summary, old claim-number
+cross-references and non-defect dispositions from the live queue. The ten
+finding rows retain their repair scope, evidence and status: **6 open / 4 parked**.
+OC-280 is still open; its source claim was Qwen #11. The unresolved PCA input
+policy remains as a short, separately named decision outside the defect count.
+R1 and DRIFT-01 are unchanged. No application code or finding status changed.
+
+Archived review disposition:
+
+- **#36, PCA infinity policy:** the explicit/tested conversion maps infinities
+  to zero and NaN to the column mean. PCA on that prepared matrix is consistent;
+  documenting or changing this policy remains a decision, not a confirmed
+  calculation defect.
+- **#20/#35/#56:** no standalone runtime defect was established. Histogram
+  counts match the right-closed convention; the inline-dispatch regex gap is an
+  optional code-standard/test improvement; scalar dtype hashing needs a concrete
+  supported-model counterexample or an explicit contract before filing a bug.
+- **#13:** already closed as OC-268. The four user-parked authentication/config
+  findings OC-71/72/73/185 retain their previous status.
+- All **57 claims** were accounted for: 48 new records (including merged
+  #18/#41), three existing open matches (#1/#50/#57 mapped to OC-253/65/64),
+  one already fixed claim, one policy decision and three claims not established
+  as runtime defects. The original filing and subsequent fixes remain in this
+  archive; the standalone source/review files were removed by the user.
+
+### 2026-09-13 — 0.8.23: seven queue findings on submissions, prediction and EDA
+
+Committed the preceding six-finding batch as DCO-signed `d17eb9d2` after
+fresh Core/backend checks and passing pre-commit hooks, then repaired seven
+more findings with separate engine, submission and frontend agents.
+
+- **OC-277/310:** two controlled OS processes previously created two jobs after
+  the same absent-row check. Reserve lookup, version allocation and insertion
+  in one database transaction, retaining manager commits/retries as savepoints.
+  SQLite uses `BEGIN IMMEDIATE`; PostgreSQL uses a stable transaction advisory
+  lock under default READ COMMITTED. File SQLite uses separate pooled connections;
+  in-memory StaticPool reservations are serialized locally. Keep a per-key lock
+  until all owners and waiters leave, including failure/cancellation paths.
+  Unknown job types now return HTTP 400 before lock allocation. Remove the
+  twenty-candidate lookup cap so a twenty-second branch still finds its active
+  job. **45 focused/adjacent tests pass**, including three real two-process SQLite
+  scenarios, failed insert/version rollback, allocator collision retry, pool size
+  one, durable commit before dispatch and one dispatch for duplicate requests.
+  PostgreSQL adapter/key tests pass, but no live PostgreSQL server was available.
+  No schema migration is needed; post-commit broker dispatch failure retains its
+  existing behavior and is outside this reservation fix.
+- **OC-281:** real Core pipelines and artifact-backed HTTP requests reproduced
+  two predictions for three inputs `[2,1000,4]` after outlier filtering. Check
+  each applied prediction step immediately, rejecting row loss/expansion before
+  a later step could conceal it. Built-in Lag/Rolling steps additionally use
+  local positional IDs to detect sorting, without adding feature columns or
+  executing the applier twice. These IDs never reach later target-aware encoders.
+  Prediction returns a stage-specific ValueError/HTTP 400 instead of an ambiguous
+  list; already sorted or explicitly filtered inputs remain usable. Ordinary
+  transform, CV and threshold fitting preserve their existing semantics.
+  Model/probability output counts are checked too. Review exposed and fixed
+  ndarray and sparse compatibility errors in the first guard; external generator
+  predictions also remain supported. **78 scoped Core tests** and **14 actual
+  deployment/artifact tests** pass, with pandas/Polars, pickle reload, outlier
+  families, Winsorize, threshold output, duplicate indices and temporal chaining.
+  Updated older fake predictors to supply one input per expected output.
+  Custom appliers receive count checks; preserving their arbitrary row order
+  remains the plugin author's responsibility and is documented.
+- **OC-64/65:** ContextVar isolates fallback engine selection across threads and
+  async tasks while preserving input-based engine detection. Per user correction,
+  the fallback now defaults to Polars, matching the existing backend default;
+  explicit Pandas selection remains supported. Six default/thread/dispatcher
+  regressions failed before this correction; the related suite then passed 63
+  tests. Full Core verification exposed five generic-input compatibility failures:
+  X/y extraction, numeric detection and target reattachment treated an engine
+  fallback as proof of a Polars frame. Select their Polars branch from actual
+  native/wrapped Polars inputs so generic Pandas adapters and invalid-input
+  diagnostics retain their contracts. All **205 focused tests pass** after this
+  repair; no existing compatibility assertion was weakened. Ordered-thread
+  reproduction showed the old race; no production setter caller was found, so
+  current live-request impact is not claimed. Polars wrapper selection, drop and
+  indexing retain native height before a zero-column projection discards it.
+  A `(3,0)` result stays `(3,0)` through wrapper operations, conversions and
+  pickle reload. Native row-selection validation is preserved, including bounds
+  errors. **530 related Core tests pass**. Operations performed on a raw native
+  frame before wrapping may already lose height; that loss is unrecoverable.
+- **OC-54/57:** remove the unreferenced DebugNode placeholder, keeping registered
+  Data Preview intact. The historical typing finding was partly stale; replace
+  the remaining **eleven explicit any sites** using actual Core payloads and
+  installed chart types. Nullable target/clustering data no longer crashes
+  numeric formatting, missing box statistics display N/A, and both ANOVA exports
+  omit unavailable p-values instead of fabricating zero. Real zero is preserved.
+  Full Vitest passes **2,626 tests across 202 files**; **20 distinct desktop/mobile
+  browser tests** exercise exports/tooltips, temporal profiles and actual
+  scatter/map rendering. TypeScript, ESLint, frontend complexity, production build
+  and size checks pass. Rebuilt shipped assets; main gzip is **326.7/327 KiB**.
+  Independent read-only review found no remaining frontend blocker.
+
+Final combined verification after the temporal guard and Polars-default correction:
+full Core on sklearn 1.9.1 **9,570 passed / 82 skipped**, three snapshots;
+separate full backend suite
+**3,882 passed**, seven snapshots. The first backend run found one S3 test fixture
+whose fake predictor returned two outputs for one input; corrected its input
+cardinality, checked the S3 tests, then reran the complete backend suite. Repository
+Ruff, backend/Core ty, changed-Python formatting, production CCN <=10 and scoped
+whitespace checks pass. Existing dependency and frontend chunk warnings remain.
+User investigation files and temporary user directories are outside this batch.
+
+Queue rows now count **6 open / 4 parked**; Qwen is **47/48 closed**. Remaining
+open findings are OC-280, OC-91, OC-06, OC-07, OC-08 and OC-10. R1 and DRIFT-01
+remain separately planned enhancements; OC-71/72/73/185 retain their user-parked
+status. Changelog entries are under v0.8.23; package versions remain 0.8.22.
 
 ### 2026-09-13 — 0.8.23: six queue findings on drift, dates, persistence and coverage
 

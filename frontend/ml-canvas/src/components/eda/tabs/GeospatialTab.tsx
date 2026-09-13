@@ -27,7 +27,7 @@ interface GeospatialBlock {
 }
 
 interface GeospatialTabProps {
-    profile: { geospatial?: GeospatialBlock; target_col?: string } & Record<string, unknown>;
+    profile: { geospatial?: GeospatialBlock; target_col?: string | null } & Record<string, unknown>;
 }
 
 export const GeospatialTab: React.FC<GeospatialTabProps> = ({ profile }) => {

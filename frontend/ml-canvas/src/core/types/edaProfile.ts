@@ -134,11 +134,53 @@ export type CausalTargetExclusionReason = 'categorical' | 'excluded' | 'unsuppor
 
 export interface CorrelationMatrix {
   columns: string[];
-  values: number[][];
+  values: Array<Array<number | null>>;
   /** Numeric columns considered before the backend's correlation cap. */
   total_columns?: number | null;
   /** Columns omitted by the backend cap, absent in older saved profiles. */
   omitted_columns?: string[];
+}
+
+export interface CategoryBoxPlot {
+  name: string;
+  /** Nonfinite statistics become null in the profile's JSON projection. */
+  stats: { min: number | null; q1: number | null; median: number | null; q3: number | null; max: number | null };
+}
+
+export interface TargetInteraction {
+  feature: string;
+  plot_type: string;
+  data: CategoryBoxPlot[];
+  p_value?: number | null;
+}
+
+export interface TimeSeriesAnalysis {
+  date_col: string;
+  trend: Array<{ date: string; values: Record<string, number | null> }>;
+  seasonality: {
+    day_of_week: Array<{ day: string; count: number | null }>;
+    month_of_year: Array<{ month: string; count: number | null }>;
+  };
+  autocorrelation?: Array<{ lag: number; corr: number }> | null;
+  stationarity_test?: {
+    test_statistic: number;
+    p_value: number;
+    is_stationary: boolean;
+    metric: string;
+  } | null;
+}
+
+export interface ClusteringAnalysis {
+  method: string;
+  n_clusters: number;
+  inertia: number | null;
+  clusters: Array<{
+    cluster_id: number;
+    size: number;
+    percentage: number;
+    center: Record<string, number | null>;
+  }>;
+  points: Array<{ x: number | null; y: number | null; cluster: number; label?: string | null }>;
 }
 
 export interface EDAProfile {
@@ -160,6 +202,11 @@ export interface EDAProfile {
   causal_graph?: CausalGraphData | null;
   /** The same numeric eligibility rule applies to causal discovery and target Pearson values. */
   causal_target_exclusion_reason?: CausalTargetExclusionReason | null;
-  /** Catch-all for future fields not yet typed (PCA, clustering, geo, causal, target, timeseries, etc.). */
+  target_col?: string | null;
+  target_correlations?: Record<string, number | null> | null;
+  target_interactions?: TargetInteraction[] | null;
+  timeseries?: TimeSeriesAnalysis | null;
+  clustering?: ClusteringAnalysis | null;
+  /** Catch-all for future fields not yet typed (PCA, geo, rules, etc.). */
   [extra: string]: unknown;
 }

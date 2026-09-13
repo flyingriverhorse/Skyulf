@@ -5,6 +5,7 @@ This module handles the auto-detection of the appropriate compute engine
 """
 
 import logging
+from contextvars import ContextVar
 from enum import StrEnum
 from typing import Any, ClassVar
 
@@ -57,10 +58,9 @@ class EngineRegistry:
     """Registry mapping engine names to ``BaseEngine`` classes and resolving the active one."""
 
     _engines: ClassVar[dict[str, type[BaseEngine]]] = {}
-    # Deliberate default: pandas is the safer, better-covered path. Polars is
-    # opt-in — either call EngineRegistry.set_active_engine("polars"), or
-    # simply pass Polars data in (resolve() auto-detects from the input).
-    _active_engine: str = "pandas"
+    # Polars is the default fallback; recognized frames select their own engine.
+    # Explicit overrides stay local to the caller's thread or async context.
+    _active_engine: ClassVar[ContextVar[str]] = ContextVar("skyulf_active_engine", default="polars")
 
     # Maps a data object's detected top-level module package to the engine
     # name registered for it. "spark"/"dask" are future-proofing: only used
@@ -87,10 +87,15 @@ class EngineRegistry:
 
     @classmethod
     def set_active_engine(cls, name: str) -> None:
-        """Set the default/fallback engine used when no data is given to resolve()."""
+        """Set the fallback engine for the current thread or async context.
+
+        New async tasks inherit their creator's selection; independent threads
+        start with Polars unless a context is explicitly copied into them.
+        Recognized input types still determine their own engine in ``resolve``.
+        """
         if name not in cls._engines:
             raise ValueError(f"Engine '{name}' not found. Available: {list(cls._engines.keys())}")
-        cls._active_engine = name
+        cls._active_engine.set(name)
         logger.debug(f"Active engine set to: {name}")
 
     @classmethod
@@ -104,7 +109,7 @@ class EngineRegistry:
             The compatible Engine class.
         """
         if data is None:
-            return cls.get(cls._active_engine)
+            return cls.get(cls._active_engine.get())
 
         top_level = cls._detect_top_level_package(data)
         engine_name = cls._TOP_LEVEL_TO_ENGINE.get(top_level)
@@ -113,7 +118,7 @@ class EngineRegistry:
 
         # Fallback to default if unknown (or let it fail later)
         cls._warn_unknown_data_type(data)
-        return cls.get(cls._active_engine)
+        return cls.get(cls._active_engine.get())
 
     @staticmethod
     def _detect_top_level_package(data: Any) -> str:
@@ -148,7 +153,8 @@ class EngineRegistry:
         """
         if not isinstance(data, list | tuple):
             logger.warning(
-                f"Unknown data type {type(data)}, falling back to default engine: {cls._active_engine}"
+                f"Unknown data type {type(data)}, falling back to default engine: "
+                f"{cls._active_engine.get()}"
             )
 
     @classmethod

@@ -76,7 +76,7 @@ async def test_full_inference_pipeline(tmp_path, monkeypatch, frame_engine):
     )
 
     # Node 3: Manual Bounds (Outliers)
-    # Drop training and inference rows outside the configured age bounds.
+    # Filter training/raw transforms; prediction must reject a shortened batch.
     nodes.append(
         NodeConfig(
             node_id="clip_age",
@@ -217,8 +217,12 @@ async def test_full_inference_pipeline(tmp_path, monkeypatch, frame_engine):
             )
             await session.commit()
             await DeploymentService.deploy_model(session, "full-inference")
+            with pytest.raises(ValueError, match="row count from 3 to 2"):
+                await DeploymentService.predict(session, new_data.to_dict("records"))
+            # Explicit filtering lets the caller retain the input-row mapping.
+            valid_input = new_data.iloc[[0, 2]]
             predictions, thresholds = await DeploymentService.predict(
-                session, new_data.to_dict("records")
+                session, valid_input.to_dict("records")
             )
     finally:
         await database.dispose()

@@ -20,11 +20,10 @@ import {
 import { InfoTooltip } from '../../ui/InfoTooltip';
 import { COLORS } from '../constants';
 import { useChartTheme } from '../../../core/hooks/useChartTheme';
+import type { EDAProfile } from '../../../core/types/edaProfile';
 
 interface TimeSeriesTabProps {
-    // Profile shape varies across EDA payloads; consumers read many
-    // dynamic keys, so we keep this loose intentionally.
-    profile: any;
+    profile: Pick<EDAProfile, 'timeseries'>;
     downloadChart: (id: string, filename: string, title: string, subtitle?: string, extraInfo?: string) => void;
 }
 
@@ -33,6 +32,8 @@ export const TimeSeriesTab: React.FC<TimeSeriesTabProps> = ({
     downloadChart
 }) => {
     const chartTheme = useChartTheme();
+    const { timeseries } = profile;
+    if (!timeseries) return null;
     return (
         <div className="mt-4 space-y-6">
             {/* Trend Chart */}
@@ -40,19 +41,19 @@ export const TimeSeriesTab: React.FC<TimeSeriesTabProps> = ({
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center justify-between">
                     <div className="flex items-center">
                         <Calendar className="w-5 h-5 mr-2 text-blue-500" />
-                        Trend Analysis ({profile.timeseries.date_col})
+                        Trend Analysis ({timeseries.date_col})
                         <InfoTooltip text="Shows how values change over time. Look for long-term trends (up/down) or sudden shifts." />
                     </div>
                     <div className="flex items-center gap-2">
-                        {profile.timeseries.stationarity_test && (
+                        {timeseries.stationarity_test && (
                             <div className={`text-xs px-3 py-1 rounded-full border flex items-center gap-1 ${
-                                profile.timeseries.stationarity_test.is_stationary
+                                timeseries.stationarity_test.is_stationary
                                     ? 'bg-green-50 border-green-200 text-green-700 dark:bg-green-900/20 dark:border-green-800 dark:text-green-300'
                                     : 'bg-yellow-50 border-yellow-200 text-yellow-700 dark:bg-yellow-900/20 dark:border-yellow-800 dark:text-yellow-300'
                             }`}>
                                 <InfoTooltip text="Augmented Dickey-Fuller Test. Stationary (p<0.05) means the data has constant mean/variance over time. Non-Stationary (p>=0.05) means it has a trend or seasonality." />
-                                <span className="font-semibold">ADF Test:</span> {profile.timeseries.stationarity_test.is_stationary ? 'Stationary' : 'Non-Stationary'}
-                                <span className="opacity-75 ml-1">(p={profile.timeseries.stationarity_test.p_value.toFixed(3)})</span>
+                                <span className="font-semibold">ADF Test:</span> {timeseries.stationarity_test.is_stationary ? 'Stationary' : 'Non-Stationary'}
+                                <span className="opacity-75 ml-1">(p={timeseries.stationarity_test.p_value.toFixed(3)})</span>
                             </div>
                         )}
                         <button
@@ -60,9 +61,9 @@ export const TimeSeriesTab: React.FC<TimeSeriesTabProps> = ({
                                 'trend-chart',
                                 'trend-analysis',
                                 'Trend Analysis',
-                                `Date Column: ${profile.timeseries.date_col}`,
-                                profile.timeseries.stationarity_test ?
-                                    `ADF Test: ${profile.timeseries.stationarity_test.is_stationary ? 'Stationary' : 'Non-Stationary'} (p=${profile.timeseries.stationarity_test.p_value.toFixed(3)})` : undefined
+                                `Date Column: ${timeseries.date_col}`,
+                                timeseries.stationarity_test ?
+                                    `ADF Test: ${timeseries.stationarity_test.is_stationary ? 'Stationary' : 'Non-Stationary'} (p=${timeseries.stationarity_test.p_value.toFixed(3)})` : undefined
                             )}
                             className="p-1.5 rounded-md bg-white border border-gray-200 text-gray-500 hover:text-gray-700 hover:bg-gray-50 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700 shadow-sm"
                             title="Download Chart"
@@ -74,7 +75,7 @@ export const TimeSeriesTab: React.FC<TimeSeriesTabProps> = ({
                 </h3>
                 <div className="h-80 w-full" id="trend-chart">
                     <ResponsiveContainer width="100%" height="100%">
-                        <LineChart data={profile.timeseries.trend}>
+                        <LineChart data={timeseries.trend}>
                             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={chartTheme.gridColor} />
                             <XAxis
                                 dataKey="date"
@@ -88,7 +89,7 @@ export const TimeSeriesTab: React.FC<TimeSeriesTabProps> = ({
                                 labelStyle={chartTheme.tooltipLabelStyle}
                             />
                             <Legend />
-                            {Object.keys(profile.timeseries.trend[0]?.values || {}).map((key, idx) => (
+                            {Object.keys(timeseries.trend[0]?.values || {}).map((key, idx) => (
                                 <Line
                                     key={key}
                                     type="monotone"
@@ -100,7 +101,7 @@ export const TimeSeriesTab: React.FC<TimeSeriesTabProps> = ({
                                 />
                             ))}
                             {/* Fallback if no values (just count) */}
-                            {(!profile.timeseries.trend[0]?.values || Object.keys(profile.timeseries.trend[0].values).length === 0) && (
+                            {(!timeseries.trend[0]?.values || Object.keys(timeseries.trend[0].values).length === 0) && (
                                     <Line type="monotone" dataKey="count" stroke="#3b82f6" dot={false} />
                             )}
                         </LineChart>
@@ -127,7 +128,7 @@ export const TimeSeriesTab: React.FC<TimeSeriesTabProps> = ({
                     </div>
                     <div className="h-64 w-full" id="day-seasonality-chart">
                         <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={profile.timeseries.seasonality.day_of_week}>
+                            <BarChart data={timeseries.seasonality.day_of_week}>
                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={chartTheme.gridColor} />
                                 <XAxis dataKey="day" tick={{ fontSize: 12, fill: chartTheme.axisColor }} />
                                 <YAxis tick={{ fill: chartTheme.axisColor }} />
@@ -162,7 +163,7 @@ export const TimeSeriesTab: React.FC<TimeSeriesTabProps> = ({
                 </div>
                 <div className="h-64 w-full" id="month-seasonality-chart">
                     <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={profile.timeseries.seasonality.month_of_year}>
+                        <BarChart data={timeseries.seasonality.month_of_year}>
                             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={chartTheme.gridColor} />
                             <XAxis dataKey="month" tick={{ fontSize: 12, fill: chartTheme.axisColor }} />
                             <YAxis tick={{ fill: chartTheme.axisColor }} />
@@ -179,7 +180,7 @@ export const TimeSeriesTab: React.FC<TimeSeriesTabProps> = ({
             </div>
 
             {/* Autocorrelation (ACF) */}
-            {profile.timeseries.autocorrelation && profile.timeseries.autocorrelation.length > 0 && (
+            {timeseries.autocorrelation && timeseries.autocorrelation.length > 0 && (
                 <div className="bg-white dark:bg-gray-800 p-6 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm relative group">
                     <div className="flex items-center justify-between mb-4">
                         <div className="flex items-center">
@@ -204,7 +205,7 @@ export const TimeSeriesTab: React.FC<TimeSeriesTabProps> = ({
                     </div>
                     <div className="h-80 w-full pb-6" id="autocorrelation-chart">
                         <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={profile.timeseries.autocorrelation} margin={{ bottom: 20 }}>
+                            <BarChart data={timeseries.autocorrelation} margin={{ bottom: 20 }}>
                                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={chartTheme.gridColor} />
                                     <XAxis
                                         dataKey="lag"

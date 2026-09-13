@@ -19,7 +19,7 @@ import polars as pl
 # Use relative imports assuming the structure is preserved
 from .._validation import raise_invalid_choice
 from ..data.dataset import SplitDataset
-from ..engines import EngineName, SkyulfDataFrame, get_engine
+from ..engines import SkyulfDataFrame, SkyulfPolarsWrapper, get_engine
 from ._evaluation.classification import evaluate_classification_model
 from ._evaluation.clustering import evaluate_clustering_model
 from ._evaluation.regression import evaluate_regression_model
@@ -47,9 +47,8 @@ def extract_xy(data: Any, target_column: str) -> tuple[Any, Any]:
     if isinstance(data, tuple) and len(data) == 2:
         return _extract_xy_from_tuple(data, target_column)
 
-    engine = get_engine(data)
-
-    if engine.name == EngineName.POLARS:
+    # A fallback engine selection does not establish the input's frame type.
+    if isinstance(data, pl.DataFrame | SkyulfPolarsWrapper):
         return _extract_xy_polars(data, target_column)
 
     return _extract_xy_pandas_like(data, target_column)

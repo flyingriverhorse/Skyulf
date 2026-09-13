@@ -35,6 +35,34 @@ POLARS_NUMERIC_BOOL_DTYPES: frozenset = frozenset(
 POLARS_NUMERIC_DTYPES: frozenset = POLARS_NUMERIC_BOOL_DTYPES - frozenset((pl.Boolean,))
 
 
+def _retain_projection_height(df: pl.DataFrame, height: int) -> pl.DataFrame:
+    """Restore source rows when Polars drops height during an empty projection."""
+    if df.width == 0:
+        # The NumPy constructor retains height without adding sentinel columns.
+        # Unlike select([])/drop(all), it supports native zero-column frames.
+        return pl.DataFrame(np.empty((height, 0)))
+    return df
+
+
+def _indexed_projection_height(height: int, key: Any) -> int:
+    """Count rows for an indexing key already accepted by the native dataframe."""
+    # A byte per row validates bounds without exposing a synthetic column.
+    # Null Series are unsuitable: Polars skips their gather bounds checks.
+    rows = pl.repeat(0, height, dtype=pl.UInt8, eager=True)
+    if isinstance(key, tuple) and len(key) == 2:
+        if isinstance(key[0], bool | str):
+            return height  # Native Polars treats these tuples as column selectors.
+        selected = rows[key[0]]
+    else:
+        try:
+            selected = rows[key]
+        except TypeError:
+            # A key accepted by the frame but not Series indexing selects columns
+            # (e.g. a boolean column mask or an empty Series of column names).
+            return height
+    return len(selected) if isinstance(selected, pl.Series) else 1
+
+
 class SkyulfPolarsWrapper:
     """Wrapper for Polars DataFrame to implement SkyulfDataFrame protocol."""
 
@@ -54,12 +82,14 @@ class SkyulfPolarsWrapper:
         return self._df.shape
 
     def select(self, columns: list[str] | str) -> "SkyulfDataFrame":
-        """Return a new wrapper with only the selected column(s)."""
-        return SkyulfPolarsWrapper(self._df.select(columns))
+        """Return selected columns, preserving rows even when no columns remain."""
+        selected = _retain_projection_height(self._df.select(columns), self._df.height)
+        return SkyulfPolarsWrapper(selected)
 
     def drop(self, columns: list[str]) -> "SkyulfDataFrame":
-        """Return a new wrapper without the given columns."""
-        return SkyulfPolarsWrapper(self._df.drop(columns))
+        """Drop columns, preserving rows even when no columns remain."""
+        dropped = _retain_projection_height(self._df.drop(columns), self._df.height)
+        return SkyulfPolarsWrapper(dropped)
 
     def with_column(self, name: str, values: Any) -> "SkyulfDataFrame":
         """Return a new wrapper with ``name`` set to ``values``; scalars broadcast to all rows."""
@@ -92,8 +122,13 @@ class SkyulfPolarsWrapper:
         return SkyulfPolarsWrapper(self._df.clone())
 
     def __getitem__(self, key):
-        """Delegate column/row selection to the underlying ``polars.DataFrame``."""
-        return self._df[key]
+        """Select native columns/rows without losing zero-column sample counts."""
+        selected = self._df[key]
+        if isinstance(selected, pl.DataFrame) and selected.width == 0:
+            # Native indexing may discard height before applying row selection.
+            height = _indexed_projection_height(self._df.height, key)
+            return _retain_projection_height(selected, height)
+        return selected
 
     def __setitem__(self, key, value):
         """Assign a scalar cell by ``(row, col)`` key; other keys raise ``NotImplementedError``."""
@@ -142,14 +177,16 @@ class PolarsEngine(BaseEngine):
 
     @classmethod
     def to_numpy(cls, df: Any) -> Any:
-        """Convert ``df`` to a NumPy array, mirroring pandas' ``(n, 0)`` shape for empty frames."""
+        """Convert ``df`` to NumPy using its known row count for empty frames.
+
+        Wrapper projections preserve the original height. Native operations run
+        before wrapping can discard it; conversion cannot recover those rows.
+        """
         # `SkyulfPolarsWrapper.__getattr__` delegates to the wrapped
         # `pl.DataFrame`, so `df.to_numpy()` and `df._df.to_numpy()` are
         # identical -- no need for a separate `isinstance` branch.
         if hasattr(df, "to_numpy"):
-            # polars' to_numpy() raises "need at least one array to
-            # concatenate" on a 0-column frame; pandas yields (n, 0) float64,
-            # so mirror that to keep engine parity for empty selections.
+            # Preserve pandas' float64 dtype for zero-column feature matrices.
             if getattr(df, "width", None) == 0:
                 return np.empty((df.height, 0), dtype=np.float64)
             return df.to_numpy()

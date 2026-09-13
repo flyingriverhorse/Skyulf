@@ -136,6 +136,7 @@ async def test_deployment_flow(async_session, tmp_path):
 
 @pytest.mark.asyncio
 async def test_deployment_predict_decodes_label_encoded_target(async_session, tmp_path):
+    """Target decoding must retain one prediction for each submitted input row."""
     pipeline_id = "test_pipeline_deploy_decode"
     job_id = "test_job_decode_123"
 
@@ -182,7 +183,9 @@ async def test_deployment_predict_decodes_label_encoded_target(async_session, tm
 
     with patch("os.getcwd", return_value=str(tmp_path)):
         await DeploymentService.deploy_model(async_session, job_id)
-        preds, thresholds_applied = await DeploymentService.predict(async_session, [{"a": 1}])
+        preds, thresholds_applied = await DeploymentService.predict(
+            async_session, [{"a": 1}, {"a": 2}]
+        )
         assert preds == ["cat", "dog"]
         assert thresholds_applied is None
 

@@ -7,6 +7,7 @@ import { ChartLegend } from '../ChartLegend';
 import { ChartDataTable } from '../ChartDataTable';
 import { buildScatterLegendEntries, groupScatterPoints } from '../scatterGrouping';
 import { ClusteringTab } from './ClusteringTab';
+import type { EDAProfile } from '../../../core/types/edaProfile';
 
 interface PCAComponent {
     component: string;
@@ -15,7 +16,7 @@ interface PCAComponent {
 }
 
 interface PCATabProps {
-    profile: { pca_data?: ScatterPoint[]; pca_components?: PCAComponent[] } & Record<string, unknown>;
+    profile: { pca_data?: ScatterPoint[]; pca_components?: PCAComponent[] } & Pick<EDAProfile, 'clustering'> & Record<string, unknown>;
     isPCA3D: boolean;
     setIsPCA3D: (value: boolean) => void;
     downloadChart: (elementId: string, filename: string, title?: string, subtitle?: string) => void;

@@ -19,6 +19,8 @@ from backend.ml_pipeline._services.prediction_utils import extract_target_label_
 from backend.ml_pipeline.artifacts.factory import ArtifactFactory
 from backend.ml_pipeline.artifacts.s3 import S3ArtifactStore
 from backend.utils import sanitize_for_log
+from skyulf.core.validation import prediction_row_count, validate_prediction_rows
+from skyulf.preprocessing.pipeline import FeatureEngineer
 
 logger = logging.getLogger(__name__)
 
@@ -335,7 +337,14 @@ class DeploymentService:
         try:
             # Use config_context so sklearn returns DataFrames with feature names during inference only
             with sklearn.config_context(transform_output="pandas"):
-                return feature_engineer.transform(df)
+                if isinstance(feature_engineer, FeatureEngineer):
+                    transformed = feature_engineer.transform(df, preserve_rows=True)
+                else:
+                    transformed = feature_engineer.transform(df)
+                validate_prediction_rows(
+                    len(df), prediction_row_count(transformed), stage="Feature engineering"
+                )
+                return transformed
         except Exception as e:
             logger.error(f"Feature engineering failed: {e}")
             raise ValueError(f"Feature engineering failed: {str(e)}") from e
@@ -411,8 +420,13 @@ class DeploymentService:
                 predictions, feature_engineer, target_column=target_col
             )
             if hasattr(predictions, "tolist"):
-                return cast(list[Any], predictions.tolist()), thresholds
-            return list(predictions), thresholds
+                predictions = predictions.tolist()
+            else:
+                predictions = list(predictions)
+            validate_prediction_rows(
+                prediction_row_count(X_transformed), len(predictions), stage="Model prediction"
+            )
+            return cast(list[Any], predictions), thresholds
         except OverrideThresholdMismatch:
             raise
         except Exception as e:
@@ -532,9 +546,9 @@ class DeploymentService:
                 df = df[model_cols]
 
         predictions = artifact.predict(df)
-        if hasattr(predictions, "tolist"):
-            return cast(list[Any], predictions.tolist())
-        return list(predictions)
+        predictions = predictions.tolist() if hasattr(predictions, "tolist") else list(predictions)
+        validate_prediction_rows(len(df), len(predictions), stage="Model prediction")
+        return cast(list[Any], predictions)
 
     @staticmethod
     async def predict(

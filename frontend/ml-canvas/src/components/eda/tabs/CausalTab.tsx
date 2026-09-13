@@ -4,7 +4,7 @@ import { InfoTooltip } from '../../ui/InfoTooltip';
 import { Network, Download, Loader2, Check } from 'lucide-react';
 import { toPng } from 'html-to-image';
 import { toast } from '../../../core/toast';
-import type { CausalGraphData } from '../../../core/types/edaProfile';
+import type { CausalGraphData, EDAProfile } from '../../../core/types/edaProfile';
 import { NumericTargetNotice } from '../NumericTargetNotice';
 
 /** Describe only the selection strategy recorded by the report that is being shown. */
@@ -18,7 +18,7 @@ function selectionDescription(method: CausalGraphData['selection_method']) {
 }
 
 interface CausalTabProps {
-    profile: any;
+    profile: Pick<EDAProfile, 'causal_graph' | 'target_col' | 'causal_target_exclusion_reason'>;
 }
 
 export const CausalTab: React.FC<CausalTabProps> = ({ profile }) => {
@@ -58,7 +58,7 @@ export const CausalTab: React.FC<CausalTabProps> = ({ profile }) => {
             });
     }, []);
 
-    const targetNotice = <NumericTargetNotice target={profile.target_col} reason={profile.causal_target_exclusion_reason} />;
+    const targetNotice = <NumericTargetNotice target={profile.target_col ?? null} reason={profile.causal_target_exclusion_reason ?? null} />;
 
     if (!graph?.nodes?.length) {
         return (

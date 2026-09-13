@@ -36,6 +36,26 @@ validation or test population.
 reserve any rows for evaluation. `TrainTestSplitter` and its legacy `Split` alias
 create the row boundary checked by the leakage gate.
 
+## Prediction row alignment
+
+`SkyulfPipeline.predict()` and deployment prediction require one result per
+submitted row. If an applied step filters or adds rows, prediction stops with
+the step name and before/after counts. For example, an IQR step that reduces
+`[2, 1000, 4]` to two rows cannot return an ambiguous two-element prediction list.
+Use row-preserving handling such as Winsorize, or filter the raw input yourself
+and retain its row mapping before submitting it.
+
+LagFeatures and RollingAggregate can reorder rows through `sort_by`. Prediction
+also rejects a batch whose order changes in either built-in step; sort the input
+as required before submitting it. Temporary position checks stay outside feature
+columns and are removed before the next step. Custom transformers remain
+responsible for preserving order; the generic guard checks their row counts.
+
+Ordinary `FeatureEngineer.transform()` and CV/threshold scoring retain configured
+filtering and sorting. The prediction guard uses `preserve_rows=True` and does
+not change training, fitted artifacts or validation-label alignment. Existing
+splitter, resampling, Deduplicate and DropMissingRows inference skips remain.
+
 ## Read the placement labels
 
 | Label | Meaning | What to do |

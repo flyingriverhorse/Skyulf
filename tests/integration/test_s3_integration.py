@@ -8,6 +8,7 @@ from backend.ml_pipeline.deployment.service import DeploymentService
 
 @pytest.mark.asyncio
 async def test_deployment_predict_s3_creds():
+    """S3 credentials must reach the store while prediction preserves request cardinality."""
     session = AsyncMock()
 
     # Mock active deployment
@@ -36,7 +37,9 @@ async def test_deployment_predict_s3_creds():
                 mock_store.load.return_value = mock_model
 
                 # Call predict
-                preds, thresholds_applied = await DeploymentService.predict(session, [{"f1": 1}])
+                preds, thresholds_applied = await DeploymentService.predict(
+                    session, [{"f1": 1}, {"f1": 2}]
+                )
 
                 assert preds == [1, 0]
                 assert thresholds_applied is None

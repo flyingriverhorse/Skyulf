@@ -43,11 +43,11 @@ class SkyulfDataFrame(Protocol):
 
     # Engine-agnostic column ops (implemented by every engine adapter).
     def select(self, columns: list[str]) -> "SkyulfDataFrame":
-        """Return a new frame with only the given columns."""
+        """Return the given columns, retaining rows when the selection is empty."""
         ...
 
     def drop(self, columns: list[str]) -> "SkyulfDataFrame":
-        """Return a new frame without the given columns."""
+        """Remove the given columns, retaining rows when no columns remain."""
         ...
 
     def with_column(self, name: str, values: Any) -> "SkyulfDataFrame":

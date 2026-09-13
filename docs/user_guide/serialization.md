@@ -22,6 +22,18 @@ missing values and pandas index, along with normal wrapper method delegation.
 Previously saved wrappers that failed to load with `RecursionError` can be
 loaded with the corrected code; no artifact rewrite is required.
 
+Polars wrapper projections preserve row count even after selecting or dropping
+all columns: a three-row input remains shape `(3, 0)` through wrapper chaining,
+NumPy/pandas/Arrow conversion and pickle reload. A native Polars operation run
+before wrapping can already discard that height; wrapping cannot reconstruct it.
+
+`EngineRegistry.set_active_engine(name)` sets the fallback in the current thread
+or async context. The default is Polars. New async tasks inherit their parent's
+selection; independent threads start with Polars unless a context is explicitly
+copied. This selection does not override
+the engine detected from a loaded dataframe or wrapper, and concurrent callers
+cannot change one another's fallback selection.
+
 ## Load and use
 
 ```python

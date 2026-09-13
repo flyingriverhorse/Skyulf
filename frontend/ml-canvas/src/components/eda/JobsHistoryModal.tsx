@@ -19,7 +19,7 @@ interface EdaHistoryJob {
   error?: string | null;
   error_message?: string | null;
   dataset_name?: string;
-  target_col?: string;
+  target_col?: string | null;
   description?: string;
   task_type?: string;
   profile_data?: EDAProfile;

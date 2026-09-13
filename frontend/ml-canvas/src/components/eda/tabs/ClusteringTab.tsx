@@ -2,29 +2,15 @@ import React from 'react';
 import { Network, Download, Info } from 'lucide-react';
 import { InfoTooltip } from '../../ui/InfoTooltip';
 import { COLORS } from '../constants';
-
-interface ClusterStats {
-    cluster_id: number;
-    size: number;
-    percentage: number;
-    center: Record<string, number>;
-}
-
-interface ClusteringAnalysis {
-    method: string;
-    n_clusters: number;
-    inertia: number;
-    clusters: ClusterStats[];
-    points: Array<{ x: number, y: number, cluster: number, label?: string }>;
-}
+import type { EDAProfile } from '../../../core/types/edaProfile';
 
 interface ClusteringTabProps {
-    profile: any;
+    profile: Pick<EDAProfile, 'clustering'>;
     downloadChart: (elementId: string, filename: string, title?: string, subtitle?: string) => void;
 }
 
 export const ClusteringTab: React.FC<ClusteringTabProps> = ({ profile, downloadChart }) => {
-    const analysis = profile.clustering as ClusteringAnalysis | undefined;
+    const analysis = profile.clustering;
 
     if (!analysis) {
         return (
@@ -68,7 +54,7 @@ export const ClusteringTab: React.FC<ClusteringTabProps> = ({ profile, downloadC
                                     </div>
                                     <div className="flex justify-between">
                                         <span>Metric (Inertia):</span>
-                                        <span className="font-medium">{analysis.inertia.toFixed(1)}</span>
+                                        <span className="font-medium">{analysis.inertia?.toFixed(1) ?? 'N/A'}</span>
                                     </div>
                                     <div className="flex justify-between">
                                         <span>Clusters:</span>
@@ -95,12 +81,12 @@ export const ClusteringTab: React.FC<ClusteringTabProps> = ({ profile, downloadC
 
                                     <div className="space-y-1">
                                         {Object.entries(cluster.center)
-                                            .sort(([, a], [, b]) => Math.abs(b) - Math.abs(a))
+                                            .sort(([, a], [, b]) => Math.abs(b ?? 0) - Math.abs(a ?? 0))
                                             .slice(0, 5)
                                             .map(([col, val]) => (
                                             <div key={col} className="flex justify-between text-xs">
                                                 <span className="text-gray-500 dark:text-gray-400 truncate w-24" title={col}>{col}</span>
-                                                <span className="font-mono text-gray-700 dark:text-gray-200">{val.toFixed(2)}</span>
+                                                <span className="font-mono text-gray-700 dark:text-gray-200">{val?.toFixed(2) ?? 'N/A'}</span>
                                             </div>
                                         ))}
                                         {Object.keys(cluster.center).length > 5 && (

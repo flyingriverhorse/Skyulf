@@ -8,6 +8,7 @@ import logging
 from collections.abc import AsyncGenerator
 
 from sqlalchemy import create_engine
+from sqlalchemy.engine import make_url
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
@@ -58,7 +59,13 @@ async def init_db() -> None:
             echo=settings.DB_ECHO,
             future=True,
             # SQLite specific settings for async
-            poolclass=StaticPool,
+            # File databases need distinct connections for concurrent
+            # transactions. Only memory databases must share one connection.
+            **(
+                {"poolclass": StaticPool}
+                if make_url(settings.DATABASE_URL).database in (None, "", ":memory:")
+                else {}
+            ),
             connect_args={
                 "check_same_thread": False,
                 # Enable WAL mode for better concurrency

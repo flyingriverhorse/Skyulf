@@ -8,6 +8,7 @@ import polars as pl
 import pytest
 from sklearn.metrics import accuracy_score
 
+from skyulf.modeling import apply_thresholds
 from skyulf.pipeline import SkyulfPipeline
 
 
@@ -71,9 +72,16 @@ def test_threshold_tuning_aligns_labels_after_sorting(engine, target_shape):
     thresholds = pipeline.optimize_thresholds(X_val, y_val, metric=accuracy_score)
 
     assert thresholds == {0: 0.5, 1: 0.5}
+    transformed = pipeline.feature_engineer.transform(X_val)
+    estimator = pipeline.model_estimator
+    assert estimator is not None and estimator.model is not None
+    probabilities = estimator.applier.predict_proba(transformed, estimator.model)
     np.testing.assert_array_equal(
-        pipeline.predict(X_val, use_tuned_thresholds=True), [0] * 4 + [1] * 4
+        apply_thresholds(np.asarray(probabilities), thresholds, classes=estimator.model.classes_),
+        [0] * 4 + [1] * 4,
     )
+    with pytest.raises(ValueError, match="row order"):
+        pipeline.predict(X_val, use_tuned_thresholds=True)
 
 
 @pytest.mark.parametrize("filter_kind", ["lag", "bounds"])
@@ -107,10 +115,20 @@ def test_threshold_tuning_filters_labels_with_validation_rows(engine, filter_kin
         seen_labels.append(np.asarray(y_true).tolist())
         return accuracy_score(y_true, y_pred)
 
-    pipeline.optimize_thresholds(X_val, [1] * 4 + [0] * 4, metric=metric)
+    thresholds = pipeline.optimize_thresholds(X_val, [1] * 4 + [0] * 4, metric=metric)
 
     assert seen_labels and all(labels == expected for labels in seen_labels)
-    np.testing.assert_array_equal(pipeline.predict(X_val, use_tuned_thresholds=True), expected)
+    transformed = pipeline.feature_engineer.transform(X_val)
+    estimator = pipeline.model_estimator
+    assert estimator is not None and estimator.model is not None
+    probabilities = estimator.applier.predict_proba(transformed, estimator.model)
+    np.testing.assert_array_equal(
+        apply_thresholds(np.asarray(probabilities), thresholds, classes=estimator.model.classes_),
+        expected,
+    )
+    # Threshold fitting can align filtered labels; raw prediction has no row IDs.
+    with pytest.raises(ValueError, match="row count" if filter_kind == "lag" else "row order"):
+        pipeline.predict(X_val, use_tuned_thresholds=True)
 
 
 def test_threshold_tuning_without_preprocessing_preserves_input_order(engine):

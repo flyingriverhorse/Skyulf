@@ -5,9 +5,10 @@ import { CorrelationHeatmap } from '../CorrelationHeatmap';
 import { EmptyState } from '../../shared/EmptyState';
 import { getChartTheme } from '../constants';
 import { NumericTargetNotice } from '../NumericTargetNotice';
+import type { CorrelationMatrix, EDAProfile } from '../../../core/types/edaProfile';
 
 interface CorrelationsTabProps {
-    profile: any;
+    profile: Pick<EDAProfile, 'correlations' | 'correlations_with_target' | 'target_col' | 'causal_target_exclusion_reason'>;
 }
 
 export const CorrelationsTab: React.FC<CorrelationsTabProps> = ({
@@ -15,14 +16,15 @@ export const CorrelationsTab: React.FC<CorrelationsTabProps> = ({
 }) => {
     const [activeBtn, setActiveBtn] = useState<string | null>(null);
     const [doneBtn, setDoneBtn] = useState<string | null>(null);
+    const targetNotice = <NumericTargetNotice target={profile.target_col ?? null} reason={profile.causal_target_exclusion_reason ?? null} />;
 
-    if (!profile?.correlations) {
+    if (!profile.correlations) {
         return <>
-            <NumericTargetNotice target={profile?.target_col} reason={profile?.causal_target_exclusion_reason} />
+            {targetNotice}
             <EmptyState icon={<BarChart2 className="w-12 h-12 text-slate-300 dark:text-slate-600" />} title="No Correlation Data" description="Not enough numeric columns to compute correlations." />
         </>;
     }
-    const downloadMatrix = async (data: any, titleText: string, filename: string) => {
+    const downloadMatrix = async (data: CorrelationMatrix | null | undefined, titleText: string, filename: string) => {
         if (!data) return;
         setActiveBtn(filename);
 
@@ -30,7 +32,7 @@ export const CorrelationsTab: React.FC<CorrelationsTabProps> = ({
             const theme = getChartTheme();
             const MAX_COLS = 20;
             const columns = data.columns.slice(0, MAX_COLS);
-            const values = data.values.slice(0, MAX_COLS).map((row: number[]) => row.slice(0, MAX_COLS));
+            const values = data.values.slice(0, MAX_COLS).map(row => row.slice(0, MAX_COLS));
 
             const cellSize = 60;
 
@@ -63,7 +65,7 @@ export const CorrelationsTab: React.FC<CorrelationsTabProps> = ({
             ctx.textAlign = 'center';
             ctx.fillText(titleText, width / 2, 40);
 
-            const getColor = (val: number) => {
+            const getColor = (val: number | null) => {
                 if (val === null) return theme.bgColor === '#ffffff' ? '#f3f4f6' : '#374151';
                 const opacity = Math.max(0.2, Math.abs(val));
                 if (val > 0) {
@@ -76,12 +78,12 @@ export const CorrelationsTab: React.FC<CorrelationsTabProps> = ({
             ctx.font = '12px sans-serif';
             ctx.textBaseline = 'middle';
 
-            values.forEach((row: number[], i: number) => {
+            values.forEach((row, i) => {
                 ctx.fillStyle = theme.textColor;
                 ctx.textAlign = 'right';
-                ctx.fillText(columns[i], labelWidth - 10, headerHeight + titleHeight + (i * cellSize) + (cellSize/2));
+                ctx.fillText(columns[i] ?? '', labelWidth - 10, headerHeight + titleHeight + (i * cellSize) + (cellSize/2));
 
-                row.forEach((val: number, j: number) => {
+                row.forEach((val, j) => {
                     const x = labelWidth + (j * cellSize);
                     const y = headerHeight + titleHeight + (i * cellSize);
 
@@ -124,7 +126,7 @@ export const CorrelationsTab: React.FC<CorrelationsTabProps> = ({
 
     return (
         <div className="space-y-8">
-            <NumericTargetNotice target={profile.target_col} reason={profile.causal_target_exclusion_reason} />
+            {targetNotice}
             {/* 1. Feature Correlations (Multicollinearity) */}
             <div className="bg-white dark:bg-gray-800 p-6 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm">
                 <div className="flex justify-between items-center mb-4">

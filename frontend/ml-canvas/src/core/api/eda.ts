@@ -18,7 +18,6 @@ export interface EDAReport {
     id?: number;
     status?: 'PENDING' | 'COMPLETED' | 'FAILED' | string;
     profile_data?: EDAProfile & {
-        target_col?: string;
         excluded_columns?: string[];
         task_type?: string;
     };
@@ -32,7 +31,7 @@ export interface EDAHistoryEntry {
     id: number;
     status: string;
     created_at: string;
-    target_col?: string;
+    target_col?: string | null;
     description?: string;
     [extra: string]: unknown;
 }

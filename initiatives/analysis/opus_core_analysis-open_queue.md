@@ -20,7 +20,7 @@ positive and is not counted; the corrections pass stays in the archive.
 
 **Status key:** ⬜ open · 🟨 in progress · ✅ done · ⏭️ parked
 
-Original severity and effort are the audit's own; Qwen follow-up ratings
+Original severity and effort are the audit's own; follow-up ratings
 reflect the verified scope, not the original scanner severity. A status cell
 retains measured evidence and limitations; repair verification lives in the
 archive Log.
@@ -29,40 +29,28 @@ archive Log.
 
 ## Live — fix queue
 
-**Current status (2026-09-13): 13 open / 4 parked.**
-The latest fixes close OC-11/47/80/255/286/289. Verification and
+**Current status (2026-09-13): 6 open / 4 parked.**
+The latest fixes close OC-54/57/64/65/277/281/310. Verification and
 limitations are recorded in the [archive Log](opus_core_analysis-tracker.md#log).
-The earlier batch reports were removed by the user; their closure summaries
-remain in that Log.
-The verified Qwen follow-up added **48 findings, OC-271–318**,
-grouped below by priority and domain. Qwen #1/#50/#57 reuse OC-253/65/64;
-#13 is already fixed as OC-268. #18/#41 share OC-286, now closed with both
-profile and job-result persistence covered. Policy-only #36 is recorded separately
-below, outside the defect count. Reproduction and filing history are in
-the [archive Log](opus_core_analysis-tracker.md#log).
 
 Ordered by the master report's suggested fix order: **Now** (silent wrongness
 reaching users), **Next** (wrong results in realistic configs), **Then** (decide
 deployment model), **Ongoing** (remove the hiding conditions). Remaining findings
 follow, grouped by domain.
 
-The original Now/Next/Ongoing rows and their completed verification history
-remain in the archive. The Qwen follow-up adds new Now and Next work below;
-remaining findings are grouped by domain.
+Completed findings and their verification history remain in the archive.
 
 ### Now — silent wrongness reaching users
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
-| OC-281 | 🟠 | **Prediction-time row filtering loses the input-to-prediction contract** (`skyulf-core/skyulf/preprocessing/pipeline.py:44,327`) — Qwen #12. Define and enforce inference row retention or explicit row provenance through Core and deployment serialization; keep fold-scoring OC-251 separate. | medium | ⬜ open — An IQR pipeline returns two predictions for [2,1000,4]; pandas retains indices [0,2], Polars returns [0,1], and serving serializes values without indices; Winsorize preserves all three rows. |
 
 
 ### Next — wrong results in realistic configs
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
-| OC-277 | 🟠 | **Concurrent submissions bypass duplicate-job protection** (`backend/ml_pipeline/_execution/jobs.py:104-119`) — Qwen #8. Make job reservation atomic across API processes and preserve one lock for an in-process key while waiters exist; coordinate lock cleanup with OC-310. | medium | ⬜ open — Two controlled OS processes create two queued jobs with versions 1/2 after the same absent-row check, and waiting coroutines reach two simultaneous entries for one key; one request alone does not duplicate a job and PostgreSQL was not exercised. |
-| OC-280 | 🟡 | **Configured default rate limits are not applied to undecorated routes** (`backend/middleware/rate_limiter.py:10-19`) — Qwen #11. Wire default limiting into the actual app and retain explicit per-route limits; authentication decisions remain separately parked. | medium | ⬜ open — An undecorated mutation route accepts 230/230 requests while an explicit-limit control returns 429 after 60; the current inventory has 34 mutation routes, eight decorated and 26 without default enforcement. |
+| OC-280 | 🟡 | **Configured default rate limits are not applied to undecorated routes** (`backend/middleware/rate_limiter.py:10-19`). Wire default limiting into the actual app and retain explicit per-route limits; authentication decisions remain separately parked. | medium | ⬜ open — An undecorated mutation route accepts 230/230 requests while an explicit-limit control returns 429 after 60; the current inventory has 34 mutation routes, eight decorated and 26 without default enforcement. |
 
 
 ### Then — decide deployment model first
@@ -83,7 +71,6 @@ remaining findings are grouped by domain.
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
 | OC-185 | 🟡 | Authorization is stubbed in three mutually inconsistent pieces. `database/models.py:157 has_permission` is `return True  # Placeholder` with **zero callers**; `data_ingestion/dependencies.py:26,31 require_data_access`/`require_data_admin` are async no-ops wired to no route; and `data_ingestion/router.py:148,169` hardcode `user_id = 1` under an explicit `# KNOWN-GAP: Auth not implemented yet`, so every source belongs to one user and is visible to everyone. Nothing is exploitable *through* `has_permission` today precisely because nothing calls it — the risk is that the first caller gets an always-yes check shaped like a real API. Needs an authz decision before code | decision + ~1 week | ⏭️ parked — user requested pause |
-| OC-310 | 🟡 | **Failed job submission leaks entries in the per-key lock registry** (`backend/ml_pipeline/_internal/_routers/run_pipeline.py:190-212`) — Qwen #46. Validate job types and clean up reservation failures without evicting locks still owned or awaited; coordinate with OC-277. | small | ⬜ open — Four actual run requests with schema-accepted unknown job types return 500 and leave four unlocked registry entries; the UI does not submit those values and the route has an explicit 20/min rate limit. |
 
 
 ### Remaining — direct-audit modules
@@ -128,8 +115,6 @@ remaining findings are grouped by domain.
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
-| OC-64 | 🟠 | **F-14 only partially fixed** — engine registry global still an unlocked race (`engines/registry.py:60,86-91`) | small | ⬜ open Qwen recheck: ordered threads reproduce the shared-default race, but no production set_active_engine call was found; current live-request impact is unproven. Qwen #57. |
-| OC-65 | 🟡 | polars `to_numpy()` zero-width "parity fix" does not achieve parity (`engines/polars_engine.py`) | small | ⬜ open Qwen recheck: a three-row, zero-column selection reaches conversion as pandas (3,0) versus Polars (0,0), so Polars has already lost its height. Qwen #50. |
 
 
 ### Remaining — outliers / casting / binning / timeseries / geo
@@ -158,8 +143,6 @@ The separately reported lockfile issue still needs its exact advisory details.
 
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
-| OC-54 | 🟡 | `DebugNode` is dead code that would silently no-op if wired up (`nodes/DebugNode.tsx`) | small | ⬜ open |
-| OC-57 | ⚪ | `any`-typed chart props bypass type safety in EDA components (`modules/eda/`) | small | ⬜ open |
 
 
 ### Remaining — tests / packaging / CI (outside the Ongoing tier)
@@ -167,26 +150,13 @@ The separately reported lockfile issue still needs its exact advisory details.
 | ID | Sev | Item | Effort | Status |
 |---|---|---|---|---|
 
-### Qwen review — decisions outside the defect count
+### Pending policy decision — PCA non-finite inputs
 
-- **#36, PCA infinity policy:** the current explicit/tested conversion maps
-  infinities to zero and NaN to the column mean. The prepared-matrix PCA is
-  mathematically consistent, but the choice is not explained to users. Decide
-  whether to retain and document it or change it with compatibility coverage;
-  this is not a confirmed PCA calculation defect or a parked OC record.
-- **#20/#35/#56:** no standalone runtime defect was established. Histogram
-  counts match the right-closed convention; the inline-dispatch regex gap is an
-  optional code-standard/test improvement; scalar dtype hashing needs a concrete
-  supported-model counterexample or an explicit contract before filing a bug.
-- **#13:** remains closed as OC-268. The four user-parked authentication/config
-  findings OC-71/72/73/185 retain their previous status.
-
-The standalone Qwen files were removed by the user after their actionable
-content was transferred here. Claim numbers remain beside the evidence in
-each OC row; fixed rows and their verification move to the archive. The
-original disposition covers all 57 claims: 48 new records (including merged
-#18/#41), three existing open matches, one already fixed claim, one policy
-decision and three claims not established as runtime defects.
+The current explicit/tested conversion maps infinities to zero and NaN to the
+column mean. The prepared-matrix PCA is mathematically consistent, but the choice
+is not explained to users. Decide whether to retain and document it or change it
+with compatibility coverage. This is outside the OC defect count and is not a
+confirmed PCA calculation defect or a parked OC record.
 
 ---
 
