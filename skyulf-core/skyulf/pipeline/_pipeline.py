@@ -13,6 +13,7 @@ import pandas as pd
 import polars as pl
 
 from ..config_validation import validate_pipeline_config
+from ..core.validation import prediction_row_count, validate_prediction_rows
 from ..data.dataset import SplitDataset
 from ..engines import SkyulfDataFrame, get_engine
 from ..leakage import OnLeakage, validate_leakage_safety
@@ -597,13 +598,15 @@ class SkyulfPipeline:
 
         Returns:
             Series (or array, when ``use_tuned_thresholds=True``) of
-            predictions.
+            predictions, with one result per input row.
 
         Raises:
             ValueError: If the input still contains the target column used
                 during fit(); if the pipeline isn't fitted; or if
                 ``use_tuned_thresholds=True`` but ``optimize_thresholds()``
-                has not been called since the most recent fit.
+                has not been called since the most recent fit; or if a fitted
+                preprocessing step or model changes the number of input rows;
+                or if a built-in temporal step reorders them.
         """
         if not (self.model_estimator and self.model_estimator.model is not None):
             raise ValueError("Pipeline not fitted or no model configured.")
@@ -615,13 +618,17 @@ class SkyulfPipeline:
             )
 
         # 1. Feature Engineering (Transform only)
-        transformed_data = self.feature_engineer.transform(data)
+        transformed_data = self.feature_engineer.transform(data, preserve_rows=True)
 
         # 2. Modeling
         if not use_tuned_thresholds:
-            return self.model_estimator.applier.predict(
+            predictions = self.model_estimator.applier.predict(
                 transformed_data, self.model_estimator.model
             )
+            validate_prediction_rows(
+                len(data), prediction_row_count(predictions), stage="Model prediction"
+            )
+            return predictions
 
         if self._tuned_thresholds is None:
             raise ValueError(
@@ -630,6 +637,9 @@ class SkyulfPipeline:
             )
 
         proba_df = self._predict_proba_transformed(transformed_data)
+        validate_prediction_rows(
+            len(data), prediction_row_count(proba_df), stage="Model probabilities"
+        )
         model = self.model_estimator._unwrap_tuned_model()
         classes = np.asarray(model.classes_)
         y_proba = np.asarray(proba_df)[:, : len(classes)]

@@ -1,12 +1,35 @@
 import React, { useMemo } from 'react';
+import type { CorrelationMatrix } from '../../core/types/edaProfile';
 import { ChartDataTable } from './ChartDataTable';
 
 interface CorrelationHeatmapProps {
-  data: {
-    columns: string[];
-    values: number[][];
-  };
+  data: CorrelationMatrix;
 }
+
+/** Distinguish omitted analysis columns from columns merely hidden by the chart cap. */
+const CorrelationOmissions: React.FC<{ data: CorrelationMatrix; maxColumns: number }> = ({ data, maxColumns }) => {
+  const backendOmissions = data.omitted_columns ?? [];
+  if (backendOmissions.length > 0) {
+    const totalColumns = data.total_columns ?? data.columns.length + backendOmissions.length;
+    const consideredColumns = totalColumns - backendOmissions.length;
+    return (
+      <div className="mb-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-200 text-sm rounded-md">
+        Correlation analysis used the first {consideredColumns} of {totalColumns} numeric columns by column order
+        ({backendOmissions.length} omitted: {backendOmissions.slice(0, 5).join(', ')}
+        {backendOmissions.length > 5 ? ', …' : ''}). These omitted columns are not included in the data table.
+      </div>
+    );
+  }
+  const omittedColumns = data.columns.slice(maxColumns);
+  if (omittedColumns.length === 0) return null;
+  return (
+    <div className="mb-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-200 text-sm rounded-md">
+      Showing the first {maxColumns} of {data.columns.length} columns
+      ({omittedColumns.length} omitted: {omittedColumns.slice(0, 5).join(', ')}
+      {omittedColumns.length > 5 ? ', …' : ''}). Use the data table below for the full matrix.
+    </div>
+  );
+};
 
 /** -1 (blue) -> 0 (white) -> 1 (red) cell fill, shared by the grid and the legend swatches. */
 const getColor = (value: number | null): string => {
@@ -42,8 +65,6 @@ export const CorrelationHeatmap: React.FC<CorrelationHeatmapProps> = ({ data }) 
     () => (data?.values ?? []).slice(0, MAX_COLS).map((row) => row.slice(0, MAX_COLS)),
     [data]
   );
-  const omittedColumns = useMemo(() => (data?.columns ?? []).slice(MAX_COLS), [data]);
-
   const tableRows = useMemo(() => {
     if (!data?.columns) return [];
     return data.columns.map((rowCol, i) => {
@@ -57,18 +78,10 @@ export const CorrelationHeatmap: React.FC<CorrelationHeatmapProps> = ({ data }) 
 
   if (!data || !data.columns) return <div>No correlation data available</div>;
 
-  const isTruncated = data.columns.length > MAX_COLS;
-
   return (
     <div className="overflow-x-auto p-4 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
       <CorrelationScaleLegend />
-      {isTruncated && (
-        <div className="mb-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-200 text-sm rounded-md">
-          Showing the first {MAX_COLS} of {data.columns.length} columns
-          ({omittedColumns.length} omitted: {omittedColumns.slice(0, 5).join(', ')}
-          {omittedColumns.length > 5 ? ', …' : ''}). Use the data table below for the full matrix.
-        </div>
-      )}
+      <CorrelationOmissions data={data} maxColumns={MAX_COLS} />
       <div className="inline-block min-w-full">
         <div
             className="grid gap-1"

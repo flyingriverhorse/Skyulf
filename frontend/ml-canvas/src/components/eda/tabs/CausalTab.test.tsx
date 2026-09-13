@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { CausalTab } from './CausalTab';
 import { CorrelationsTab } from './CorrelationsTab';
 import { AnalysisNavigation } from '../edaSidebar/AnalysisNavigation';
+import type { EDAProfile } from '../../../core/types/edaProfile';
 
 const graph = {
   nodes: [{ id: 'measurement', label: 'measurement' }, { id: 'outcome', label: 'outcome' }],
@@ -15,9 +16,9 @@ describe('causal report explanations', () => {
     ['target_correlation', /selected numeric target.*14.*correlat/i],
     ['variance', /15.*highest.variance numeric variables/i],
     [undefined, /up to 15 numeric variables/i],
-  ])('describes selection %s without promising an absent target', (selection_method, message) => {
+  ] as const)('describes selection %s without promising an absent target', (selection_method, message) => {
     /** Selection metadata determines the explanation, including a cautious fallback for cached reports. */
-    render(<CausalTab profile={{ causal_graph: { ...graph, selection_method }, target_col: 'outcome' }} />);
+    render(<CausalTab profile={{ causal_graph: { ...graph, ...(selection_method ? { selection_method } : {}) }, target_col: 'outcome' }} />);
     expect(screen.getByText(message)).toBeInTheDocument();
   });
 
@@ -25,7 +26,7 @@ describe('causal report explanations', () => {
     ['categorical', /species.*categorical.*omitted/i],
     ['excluded', /species.*excluded/i],
     ['unsupported', /species.*not supported/i],
-  ])('explains the %s target even when discovery returns no graph', (reason, message) => {
+  ] as const)('explains the %s target even when discovery returns no graph', (reason, message) => {
     /** Omitted-target metadata remains useful when there are insufficient numeric variables for a graph. */
     render(<CausalTab profile={{ causal_graph: null, target_col: 'species', causal_target_exclusion_reason: reason }} />);
     expect(screen.getByText(/no causal graph available/i)).toBeInTheDocument();
@@ -34,10 +35,12 @@ describe('causal report explanations', () => {
 
   it('uses categorical metadata for a numeric classification target without guessing from dtype', () => {
     /** Numeric class identifiers are categories too and must not be advertised as numeric causal inputs. */
-    render(<CausalTab profile={{
+    const profile: EDAProfile = {
+      row_count: 3, column_count: 1,
       causal_graph: graph, target_col: 'class_id', causal_target_exclusion_reason: 'categorical',
-      columns: { class_id: { dtype: 'Numeric' } },
-    }} />);
+      columns: { class_id: { name: 'class_id', dtype: 'Numeric', missing_count: 0, missing_percentage: 0 } },
+    };
+    render(<CausalTab profile={profile} />);
     expect(screen.getByText(/class_id.*categorical.*omitted/i)).toBeInTheDocument();
     expect(screen.getByText(/Target Analysis.*associations/i)).toBeInTheDocument();
   });

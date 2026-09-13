@@ -179,11 +179,12 @@ class TokenizerCalculator(BaseCalculator):
 
     ``learns_from_data=False``: the artifact is pure configuration, so it is
     reproducible across runs and safe to reuse on data the calculator never saw.
-    """
 
-    def infer_output_schema(self, input_schema: Any, config: dict[str, Any]) -> None:
-        """Return ``None``: which configured columns survive resolution depends on the data."""
-        return None
+    Schema inference conservatively inherits the base ``None`` result. Fitting
+    resolves source columns and excludes the target, including a separately
+    supplied ``y``; runtime introspection determines which source and token
+    columns remain after applying ``drop_original``.
+    """
 
     @fit_method
     def fit(self, X: Any, _y: Any, config: dict[str, Any]) -> TokenizerArtifact:  # pylint: disable=arguments-differ

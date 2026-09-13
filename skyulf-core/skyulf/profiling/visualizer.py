@@ -216,6 +216,7 @@ class EDAVisualizer:
             console.print("[italic]No text columns found.[/italic]")
 
     def _render_outliers(self, console, Table):
+        """Print outlier results with their measured population rather than implying full coverage."""
         if not self.profile.outliers:
             return
         console.print("\n[bold]5. Outlier Detection[/bold]")
@@ -223,6 +224,16 @@ class EDAVisualizer:
             f"Detected [red]{self.profile.outliers.total_outliers}[/red] outliers "
             f"({self.profile.outliers.outlier_percentage:.2f}%)"
         )
+        analyzed_rows = self.profile.outliers.analyzed_rows
+        total_rows = self.profile.outliers.total_rows
+        if analyzed_rows is None or total_rows is None:
+            console.print("Analyzed row count is unavailable for this saved report.")
+        elif analyzed_rows < total_rows:
+            console.print(
+                f"Results describe {analyzed_rows:,} sampled rows out of {total_rows:,} rows."
+            )
+        else:
+            console.print(f"Results describe all {analyzed_rows:,} rows.")
 
         outlier_table = Table(title="Top Anomalies")
         outlier_table.add_column("Index", justify="right")
@@ -815,26 +826,20 @@ class EDAVisualizer:
 
     @staticmethod
     def _timeseries_series(trend):
-        """Parse timeseries trend points into (dates, values_map) for plotting, skipping bad dates."""
+        """Align every metric to parsed timestamps, retaining missing observations as gaps."""
         dates = []
-        values_map = {}  # col -> list of values
-
-        # Initialize lists for each column found in the first point
-        first_point = trend[0]
-        for col in first_point.values:  # noqa: PD011 - pydantic trend-point field, not pandas
-            values_map[col] = []
+        values_map = dict.fromkeys(col for point in trend for col in point.values)
+        values_map = {col: [] for col in values_map}
 
         for point in trend:
             try:
                 # Parse date string back to datetime for plotting
                 dt = datetime.fromisoformat(point.date)
-                dates.append(dt)
-
-                for col, val in point.values.items():  # noqa: PD011 - pydantic trend-point field, not pandas
-                    if col in values_map:
-                        values_map[col].append(val)
             except ValueError:
                 continue
+            dates.append(dt)
+            for col, values in values_map.items():
+                values.append(point.values.get(col, float("nan")))
 
         return dates, values_map
 

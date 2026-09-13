@@ -59,7 +59,8 @@ class ManualBoundsApplier(BaseApplier):
         if not bounds:
             return X, y
 
-        mask = pl.lit(True)
+        # A scalar mask broadcasts for X but yields only index zero when filtering y.
+        mask = pl.repeat(True, pl.len())
         for col, bound in bounds.items():
             if col not in X.columns:
                 continue

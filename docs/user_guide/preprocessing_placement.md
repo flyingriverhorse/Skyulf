@@ -36,6 +36,26 @@ validation or test population.
 reserve any rows for evaluation. `TrainTestSplitter` and its legacy `Split` alias
 create the row boundary checked by the leakage gate.
 
+## Prediction row alignment
+
+`SkyulfPipeline.predict()` and deployment prediction require one result per
+submitted row. If an applied step filters or adds rows, prediction stops with
+the step name and before/after counts. For example, an IQR step that reduces
+`[2, 1000, 4]` to two rows cannot return an ambiguous two-element prediction list.
+Use row-preserving handling such as Winsorize, or filter the raw input yourself
+and retain its row mapping before submitting it.
+
+LagFeatures and RollingAggregate can reorder rows through `sort_by`. Prediction
+also rejects a batch whose order changes in either built-in step; sort the input
+as required before submitting it. Temporary position checks stay outside feature
+columns and are removed before the next step. Custom transformers remain
+responsible for preserving order; the generic guard checks their row counts.
+
+Ordinary `FeatureEngineer.transform()` and CV/threshold scoring retain configured
+filtering and sorting. The prediction guard uses `preserve_rows=True` and does
+not change training, fitted artifacts or validation-label alignment. Existing
+splitter, resampling, Deduplicate and DropMissingRows inference skips remain.
+
 ## Read the placement labels
 
 | Label | Meaning | What to do |
@@ -151,6 +171,14 @@ history protocol. A rolling aggregate includes the current row: a current-target
 input can expose the answer directly. A lagged target is useful only when that
 target observation is actually available at the intended prediction time. Merely
 moving a temporal node after a random split does not establish a valid protocol.
+
+Newly fitted `DateFeatures` steps extract calendar parts in UTC. For example,
+`2024-01-01 00:30+02:00` produces year 2023, day 31 and hour 22. Naive dates
+are interpreted as UTC without moving their clock time; mixed offsets and DST
+transitions follow the same rule on both engines. The original column remains
+unchanged unless `drop_original` is enabled. Saved older artifacts retain their
+original engine-specific behavior so an existing model's features do not change
+on reload. Refit the complete pipeline to adopt UTC for those models.
 
 ## Complete registered-node catalog
 

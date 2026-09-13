@@ -2,16 +2,42 @@ import React from 'react';
 import { AlertTriangle } from 'lucide-react';
 import { InfoTooltip } from '../../ui/InfoTooltip';
 import { EmptyState } from '../../shared/EmptyState';
-import type { EDAProfile } from '../../../core/types/edaProfile';
+import type { EDAProfile, OutlierAnalysis } from '../../../core/types/edaProfile';
 
 interface OutliersTabProps {
     profile: EDAProfile;
 }
 
+/** Describe only the analyzed population recorded with these outlier results. */
+function outlierPopulation(data: OutlierAnalysis) {
+    const { analyzed_rows: analyzedRows, total_rows: totalRows } = data;
+    if (analyzedRows == null || totalRows == null) {
+        return {
+            description: 'Analyzed row count is unavailable for this saved report.',
+            countLabel: 'Reported outliers',
+            percentageLabel: 'Reported percentage',
+        };
+    }
+    if (analyzedRows < totalRows) {
+        return {
+            description: `Analyzed ${analyzedRows.toLocaleString('en-US')} sampled rows out of ${totalRows.toLocaleString('en-US')} rows. Counts and percentages describe this sample.`,
+            countLabel: 'Outliers in sample',
+            percentageLabel: 'Percentage of sampled rows',
+        };
+    }
+    return {
+        description: `Analyzed all ${analyzedRows.toLocaleString('en-US')} rows.`,
+        countLabel: 'Outliers detected',
+        percentageLabel: 'Percentage of analyzed rows',
+    };
+}
+
+/** Display outlier results with the measured row population and row-level explanations. */
 export const OutliersTab: React.FC<OutliersTabProps> = ({ profile }) => {
     if (!profile?.outliers?.top_outliers?.length) {
         return <EmptyState icon={<AlertTriangle className="w-12 h-12 text-slate-300 dark:text-slate-600" />} title="No Outlier Data" description="Outlier analysis did not return any results." />;
     }
+    const population = outlierPopulation(profile.outliers);
 
     return (
         <div className="mt-4 bg-white dark:bg-gray-800 p-6 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm">
@@ -20,14 +46,15 @@ export const OutliersTab: React.FC<OutliersTabProps> = ({ profile }) => {
                 Outlier Analysis ({profile.outliers.method})
                 <InfoTooltip text="Detects anomalous rows using Isolation Forest. Lower scores indicate higher anomaly." />
             </h3>
+            <p className="mb-4 text-sm text-gray-600 dark:text-gray-300">{population.description}</p>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
                 <div className="bg-red-50 dark:bg-red-900/20 p-4 rounded-lg border border-red-100 dark:border-red-800">
-                    <span className="text-sm text-red-600 dark:text-red-400 block mb-1">Total Outliers</span>
+                    <span className="text-sm text-red-600 dark:text-red-400 block mb-1">{population.countLabel}</span>
                     <span className="text-2xl font-bold text-red-700 dark:text-red-300">{profile.outliers.total_outliers}</span>
                 </div>
                 <div className="bg-red-50 dark:bg-red-900/20 p-4 rounded-lg border border-red-100 dark:border-red-800">
-                    <span className="text-sm text-red-600 dark:text-red-400 block mb-1">Percentage</span>
+                    <span className="text-sm text-red-600 dark:text-red-400 block mb-1">{population.percentageLabel}</span>
                     <span className="text-2xl font-bold text-red-700 dark:text-red-300">{profile.outliers.outlier_percentage.toFixed(2)}%</span>
                 </div>
             </div>

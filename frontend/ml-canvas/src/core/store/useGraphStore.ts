@@ -18,7 +18,8 @@ import {
 import { collectGraphValidationIssues } from './graphStore/validation';
 export { collectGraphValidationIssues } from './graphStore/validation';
 import { confirmConnection } from './graphStore/connectionPolicy';
-import { equalGraphHistory } from './graphStore/historyEquality';
+import { createGraphHistoryPartializer, equalGraphHistory } from './graphStore/historyEquality';
+import { equalConfigValue } from './graphStore/nodeData';
 import { registry } from '../registry/NodeRegistry';
 import { PreviewResponse } from '../api/client';
 import type { NodeSummaryEntry } from '../api/jobs';
@@ -262,13 +263,12 @@ export const useGraphStore = create<GraphState>()(
   },
 
   updateNodeData: (id: string, data: unknown) => {
+    const node = get().nodes.find(node => node.id === id);
+    if (!node) return;
+    const merged = { ...node.data, ...(data as object) };
+    if (equalConfigValue(node.data, merged)) return;
     set({
-      nodes: get().nodes.map((node) => {
-        if (node.id === id) {
-          return { ...node, data: { ...node.data, ...(data as object) } };
-        }
-        return node;
-      }),
+      nodes: get().nodes.map(current => current.id === id ? { ...current, data: merged } : current),
     });
   },
 
@@ -372,12 +372,10 @@ export const useGraphStore = create<GraphState>()(
       // `executionResult` keeps preview data out of history (it's
       // populated by the backend, not user actions, and snapshots
       // of it can be tens of MB).
-      partialize: (state) => ({ nodes: state.nodes, edges: state.edges }),
-      // Skip history entries that only differ by an in-progress drag.
-      // React Flow emits a stream of `dragging:true` position changes
-      // per pointer move; we only care about the committed final
-      // position (when `dragging` flips to false). Same for plain
-      // selection changes — toggling `selected` shouldn't be undoable.
+      // Retain the pre-drag positions in snapshots until every dragged
+      // node stops, so one gesture creates exactly one reversible move.
+      partialize: createGraphHistoryPartializer<GraphState>(),
+      // Plain selection changes should not create undo entries.
       equality: equalGraphHistory,
       limit: 100,
     },

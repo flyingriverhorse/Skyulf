@@ -124,6 +124,13 @@ Submit a pipeline for asynchronous execution. Accepts a `PipelineConfigModel` JS
 ```
 
 Multiple `job_ids` are returned when the pipeline is split into parallel branches.
+Concurrent submissions for the same dataset, terminal node and branch reuse a
+recent queued/running job within `JOB_IDEMPOTENCY_WINDOW_SECONDS`; the duplicate
+does not dispatch another task. Reservation covers the duplicate lookup, version
+allocation and committed insertion across API processes. SQLite serializes writers
+during this short transaction; PostgreSQL uses transaction advisory locks with
+the configured default READ COMMITTED isolation. Unsupported job types return
+HTTP 400. Completed jobs and requests outside the window can create new versions.
 
 ### `POST /api/pipeline/preview`
 Run the pipeline in preview mode (synchronous, limited to 1000 rows). Returns per-node output samples.
@@ -258,6 +265,11 @@ Run inference using the active model.
 ```
 
 Returns `404` if no deployment is active.
+Returns `400` if preprocessing changes the number of input rows, or a built-in
+LagFeatures/RollingAggregate step changes their order. The error names the stage;
+no partial prediction list is returned. Filter or sort inputs explicitly while
+retaining their mapping, or use row-preserving preprocessing such as Winsorize.
+External transformers and predictors are also checked for matching row counts.
 
 ---
 
@@ -445,7 +457,12 @@ ws.onmessage = (msg) => {
 
 ## Rate Limiting
 
-The following endpoints are rate-limited by client IP address:
+Undecorated application routes use `RATE_LIMIT_DEFAULT` (**200/minute** by
+default), counted by client IP and URL path. Requests beyond the budget return
+HTTP 429 before the endpoint runs. The current in-memory counters are local to
+each API process; this is not a shared quota across workers.
+
+Routes with explicit limits use their own budget instead of the default:
 
 | Endpoint | Limit |
 |---|---|
@@ -457,6 +474,9 @@ The following endpoints are rate-limited by client IP address:
 | `POST /api/deployment/predict` | 60/minute |
 
 Requests over the limit receive **HTTP 429 Too Many Requests**.
+Explicit exemptions remain exempt. CORS preflight, mounted static files and
+WebSocket connections do not consume an application route's default budget.
+Streaming response bodies and the existing security/CORS headers are preserved.
 
 ---
 

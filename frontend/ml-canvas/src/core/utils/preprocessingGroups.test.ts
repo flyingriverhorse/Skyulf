@@ -6,6 +6,15 @@ import { groupPreprocessingNodes } from './preprocessingGroups';
 beforeAll(() => { initializeRegistry(); });
 
 describe('preprocessing library groups', () => {
+  it('exposes Geo Distance in feature engineering without adding an H3 component', () => {
+    // The new calculator must be reachable in Canvas while the deferred H3 scope stays absent.
+    const geo = registry.get('GeoDistance');
+    expect(geo?.label).toBe('Geo Distance');
+    const features = groupPreprocessingNodes(registry.getAll()).find(group => group.id === 'features');
+    expect(features?.nodes).toContain(geo);
+    expect(registry.get('H3Index')).toBeUndefined();
+  });
+
   it('assigns every visible preprocessing node exactly once to a named task group', () => {
     // A catalog addition or duplicate mapping must not silently hide or repeat a component.
     const nodes = registry.getAll().filter(node => node.category === 'Preprocessing' && !node.hidden);

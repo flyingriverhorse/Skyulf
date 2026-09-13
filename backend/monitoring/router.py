@@ -7,7 +7,6 @@ load a model artifact to answer an operator's question. The one live computation
 stored reference data and records the outcome as a durable alert.
 """
 
-import io
 import logging
 import re
 from datetime import UTC, datetime, timedelta
@@ -259,24 +258,37 @@ def _load_reference_dataframe(artifact_store, reference_key: str, job_id: str) -
         raise SkyulfException(message="Failed to load reference data") from None
 
 
-async def _load_current_dataframe(file: UploadFile) -> pl.DataFrame:
-    """Read the uploaded file (bounded by MAX_UPLOAD_SIZE) and parse it as CSV/Parquet into Polars."""
-    try:
-        from backend.config import get_settings as _get_settings
+async def _validate_current_upload_size(file: UploadFile) -> None:
+    """Check the total policy in 1 MiB reads without copying the spooled upload."""
+    from backend.config import get_settings
 
-        _settings = _get_settings()
-        _max_size = _settings.MAX_UPLOAD_SIZE
-        content = await file.read(_max_size + 1)
-        if len(content) > _max_size:
+    max_size = get_settings().MAX_UPLOAD_SIZE
+    total = 0
+    while chunk := await file.read(min(1024 * 1024, max_size - total + 1)):
+        total += len(chunk)
+        if total > max_size:
             raise HTTPException(
                 status_code=413,
-                detail=f"File too large. Maximum allowed size is {_max_size // (1024 * 1024)} MB.",
+                detail=f"File too large. Maximum allowed size is {max_size // (1024 * 1024)} MB.",
             )
+    await file.seek(0)
+
+
+async def _load_current_dataframe(file: UploadFile) -> pl.DataFrame:
+    """Validate MAX_UPLOAD_SIZE, then parse the existing spooled upload into Polars.
+
+    Validation reads at most 1 MiB at a time and retains no whole-upload copy.
+    CSV/Parquet parsing still materializes the accepted DataFrame in memory.
+    """
+    try:
+        await _validate_current_upload_size(file)
         filename = (file.filename or "").lower()
         if filename.endswith(".parquet"):
-            return pl.read_parquet(io.BytesIO(content))
+            return pl.read_parquet(file.file)
         # Default to CSV (also used for .csv and any other extension)
-        return pl.read_csv(io.BytesIO(content))
+        return pl.read_csv(file.file)
+    except HTTPException:
+        raise
     except Exception as e:
         logger.warning("Failed to parse uploaded file: %s", e)
         raise HTTPException(status_code=400, detail="Failed to parse uploaded file") from e

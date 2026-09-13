@@ -35,7 +35,7 @@ config = {
         "metric": "accuracy",
         "strategy_params": {
             "sampler": "tpe",
-            "pruning": True,
+            "pruner": "none",  # Random Forest does not support incremental fitting.
         },
     },
 }
@@ -48,6 +48,21 @@ omitted or null L1 ratio uses `0.5` in every candidate and the final model.
 Explicit numeric ratios are retained, and the resolved value appears in the
 best parameters. Search Elastic Net separately when combining it with other
 penalties would leave this conditional ratio unspecified.
+
+Named binary `f1`, `precision`, `recall`, and `pr_auc` metrics score the
+sorted-last training class, matching evaluation and decision-threshold tuning's
+`classes_[1]` probability column. For example, labels `{1, 2}` use class `2`,
+`{0, 1}` use class `1`, and `{"no", "yes"}` use `"yes"`. Explicit scorer
+callables and explicit positive-label choices in threshold metrics retain the
+caller's choice. Multiclass metrics keep their existing weighted behavior.
+
+When fold preprocessing filters validation rows, every tuning strategy scores
+the retained features and their matching targets. For example, if an IQR filter
+keeps 110 of 120 validation rows, the scorer compares 110 predictions with those
+110 target values. This score describes the retained population. Preprocessing
+is learned only from the training fold and is applied once per score, including
+when a custom scorer requests several prediction methods. Target encoding keeps
+classification labels and probability columns in the scorer's original space.
 
 ## Configuration reference
 
@@ -87,7 +102,61 @@ Pass these inside `"strategy_params"`:
 | Key | Default | Description |
 |---|---|---|
 | `sampler` | `"tpe"` | Optuna sampler: `tpe`, `random`, or `cmaes` |
-| `pruning` | `false` | Enable Optuna pruning (early stopping of bad trials) |
+| `pruner` | `"median"` | `median` or `hyperband` enables available iteration or CV-fold pruning; `none` disables it |
+| `pruning` | `true` | Optional compatibility switch: explicitly setting `false` disables pruning regardless of `pruner` |
+
+Skyulf selects a pruning loop from the actual estimator and validation setup:
+
+| Models and configuration | When a trial can stop |
+|---|---|
+| XGBoost / LightGBM, including Skyulf fold preprocessing | After a boosting round |
+| Direct incremental estimators, such as SGD, with compatible settings and a fixed positive `max_iter` | After an incremental epoch |
+| Random Forest, Logistic Regression, SVC, Gaussian Naive Bayes, ensembles and ordinary pipelines | After a complete CV fold, if another fold remains |
+
+For example, with three CV folds, an unpromising Random Forest trial can stop
+after its first fold and skip training the other two. Its first forest is fully
+trained. Native boosting can stop within that first fold instead. The chosen
+pruner decides whether to stop; selecting one does not guarantee a trial will
+be pruned, and its startup requirements still apply.
+
+Native callbacks report the selected sklearn scoring metric, including its
+sign for loss metrics. Each fold learns preprocessing only from its training
+rows; held-out features and targets are transformed together. Native trials use
+a common upper `n_estimators` budget to keep reported steps distinct across
+folds even when candidates have different tree counts. Alternate LightGBM round
+aliases conservatively use fold pruning. Evaluating validation predictions
+after each boosting round adds work, so pruning is not always faster.
+
+SGD configurations that search `max_iter`, use `early_stopping=True` or
+`class_weight="balanced"`, and MLP searches containing `solver="lbfgs"`, use
+ordinary fitting between folds. Gaussian Naive Bayes also fits each fold once;
+it never repeats observations through an artificial epoch loop.
+
+A single validation holdout has no remaining fold to skip. Such searches need
+an eligible iteration hook; otherwise pruning is disabled with a reason.
+An explicitly supplied validation split takes precedence over tuning CV,
+including when a later evaluation is configured to use cross-validation.
+`none` or `pruning=false` retains ordinary fitting. Only fully evaluated,
+finite-scoring trials are eligible for best parameters and final refit. Pruned
+trial scores are not shown as completed CV means; if none completes, tuning
+reports that there is no complete trial to refit.
+
+In Canvas, **Optuna Settings → Pruner** checks the selected model, candidate
+values and connected pipeline. Unsupported configurations show **None** in a
+disabled dropdown with the reason. Applying settings saves None while retaining
+the sampler and timeout. Opening or closing the dialog does not alter saved
+settings or undo history. If the check is loading or fails, the saved choice is
+preserved; reopen the dialog to retry. Model, search-space, CV and connection
+changes trigger a fresh check, and late replies cannot replace the current result.
+The separate information icon beside **Pruner** explains the model families;
+the status below it identifies iteration or fold pruning for the current graph.
+
+For example, Random Forest with scaling and three tuning folds supports fold
+pruning; switching to a single holdout disables it. XGBoost and LightGBM with
+scaling support iteration pruning even with that holdout. The default SGD search
+includes `max_iter` candidates and therefore uses fold pruning when possible.
+Canvas offers SGD Classifier under **Text Classification**. Merged inputs remain
+unconfirmed because support cannot be established without executing that graph.
 
 ### Halving (grid / random)
 

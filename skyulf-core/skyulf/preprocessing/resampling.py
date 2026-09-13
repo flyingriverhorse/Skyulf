@@ -208,6 +208,7 @@ def _build_oversampler(method: str, params: dict[str, Any]) -> Any:
             random_state=random_state,
             k_neighbors=k_neighbors,
             m_neighbors=params.get("m_neighbors", 10),
+            svm_estimator=params.get("svm_estimator"),
             out_step=params.get("out_step", 0.5),
         )
     if method == "kmeans_smote":
@@ -215,6 +216,8 @@ def _build_oversampler(method: str, params: dict[str, Any]) -> Any:
             sampling_strategy=strategy,
             random_state=random_state,
             k_neighbors=k_neighbors,
+            kmeans_estimator=params.get("kmeans_estimator"),
+            n_jobs=params.get("n_jobs", -1),
             cluster_balance_threshold=params.get("cluster_balance_threshold", 0.1),
             density_exponent=params.get("density_exponent", "auto"),
         )
@@ -222,7 +225,12 @@ def _build_oversampler(method: str, params: dict[str, Any]) -> Any:
     smote = classes["smote"](
         sampling_strategy=strategy, random_state=random_state, k_neighbors=k_neighbors
     )
-    return cls(sampling_strategy=strategy, random_state=random_state, smote=smote)
+    return cls(
+        sampling_strategy=strategy,
+        random_state=random_state,
+        smote=smote,
+        n_jobs=params.get("n_jobs", -1),
+    )
 
 
 class OversamplingApplier(BaseApplier):
@@ -350,14 +358,20 @@ def _build_undersampler(method: str, params: dict[str, Any]) -> Any:
             replacement=params.get("replacement", False),
         )
     if method == "nearmiss":
-        return cls(sampling_strategy=strategy, version=params.get("version", 1))
+        return cls(
+            sampling_strategy=strategy,
+            version=params.get("version", 1),
+            n_neighbors=params.get("n_neighbors", 3),
+            n_jobs=params.get("n_jobs", -1),
+        )
     if method == "tomek_links":
-        return cls(sampling_strategy=strategy)
+        return cls(sampling_strategy=strategy, n_jobs=params.get("n_jobs", -1))
     # edited_nearest_neighbours
     return cls(
         sampling_strategy=strategy,
         n_neighbors=params.get("n_neighbors", 3),
         kind_sel=params.get("kind_sel", "all"),
+        n_jobs=params.get("n_jobs", -1),
     )
 
 

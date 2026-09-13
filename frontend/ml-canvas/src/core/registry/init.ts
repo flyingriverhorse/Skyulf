@@ -19,6 +19,7 @@ import { MissingIndicatorNode } from '../../modules/nodes/processing/MissingIndi
 import { EncodingNode } from '../../modules/nodes/processing/EncodingNode';
 import { TimeSeriesNode } from '../../modules/nodes/processing/TimeSeriesNode';
 import { OutlierNode } from '../../modules/nodes/processing/OutlierNode';
+import { GeoDistanceNode } from '../../modules/nodes/processing/GeoDistanceNode';
 import { TransformationNode } from '../../modules/nodes/processing/TransformationNode';
 import { BinningNode } from '../../modules/nodes/processing/BinningNode';
 import { ResamplingNode } from '../../modules/nodes/processing/ResamplingNode';
@@ -43,6 +44,7 @@ export const initializeRegistry = () => {
   registry.register(ImputationNode);
   registry.register(ScalingNode);
   registry.register(OutlierNode);
+  registry.register(GeoDistanceNode);
   registry.register(TransformationNode);
   registry.register(BinningNode);
   registry.register(ResamplingNode);

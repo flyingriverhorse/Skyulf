@@ -1,37 +1,31 @@
-import logging
-import shutil
+"""Verify full preprocessing and prediction using isolated, persisted job artifacts."""
+
+from dataclasses import asdict
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 import pytest
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 
+from backend.config import get_settings
 from backend.data.catalog import FileSystemCatalog
+from backend.database.models import Base, TrainingJob
 from backend.ml_pipeline._execution.engine import PipelineEngine
 from backend.ml_pipeline._execution.schemas import NodeConfig, PipelineConfig
 from backend.ml_pipeline.artifacts.local import LocalArtifactStore
-from skyulf.preprocessing.pipeline import FeatureEngineer
-
-# Setup logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
-_LOCAL_WORKSPACE = r"c:\Users\Murat\Desktop\skyulf-mlflow"
+from backend.ml_pipeline.deployment.service import DeploymentService
+from skyulf.modeling.base import extract_xy
 
 
-@pytest.mark.skipif(
-    not Path(_LOCAL_WORKSPACE).exists(),
-    reason="Requires local skyulf-mlflow workspace; skipped on CI",
-)
-def test_full_inference_pipeline():
-    # 1. Setup
-    base_path = r"c:\Users\Murat\Desktop\skyulf-mlflow\temp_test_artifacts_full"
-    if Path(base_path).exists():
-        shutil.rmtree(base_path)
-    Path(base_path).mkdir()
-
+@pytest.mark.parametrize("frame_engine", ["pandas", "polars"])
+async def test_full_inference_pipeline(tmp_path, monkeypatch, frame_engine):
+    """Training, row filtering, encoding and scaling must survive artifact reload and deployment."""
+    monkeypatch.setenv("SKYULF_ENGINE", frame_engine)
+    monkeypatch.setattr(get_settings(), "SKYULF_ENGINE", frame_engine)
+    base_path = str(tmp_path / "artifacts")
     store = LocalArtifactStore(base_path)
-    catalog = FileSystemCatalog()
+    catalog = FileSystemCatalog(str(tmp_path))
     engine = PipelineEngine(store, catalog=catalog)
 
     # 2. Create Complex Dummy Data
@@ -82,7 +76,7 @@ def test_full_inference_pipeline():
     )
 
     # Node 3: Manual Bounds (Outliers)
-    # Clip age to 0-100
+    # Filter training/raw transforms; prediction must reject a shortened batch.
     nodes.append(
         NodeConfig(
             node_id="clip_age",
@@ -101,7 +95,7 @@ def test_full_inference_pipeline():
         NodeConfig(
             node_id="splitter",
             step_type="TrainTestSplitter",
-            params={"test_size": 0.2, "random_state": 42},
+            params={"test_size": 0.2, "random_state": 42, "target_column": "target"},
             inputs=["clip_age"],
         )
     )
@@ -162,171 +156,76 @@ def test_full_inference_pipeline():
 
     config = PipelineConfig(pipeline_id="full_test_pipeline", nodes=nodes)
 
-    # 4. Run Engine (Training)
-    print("Running Training Pipeline...")
-    try:
-        result = engine.run(config)
-    except Exception as e:  # noqa: BLE001 - log engine failure and return
-        print(f"Engine run failed with exception: {e}")
-        import traceback
-
-        traceback.print_exc()
-        return
-
-    if result.status == "failed":
-        print("Pipeline Failed!")
-        for nid, res in result.node_results.items():
-            if res.status == "failed":
-                print(f"Node {nid} failed: {res.error}")
-        # Continue to check artifact anyway if possible
-    else:
-        print("Pipeline Succeeded.")
-
-    # 5. Load Artifact
-    try:
-        model_artifact = store.load("model")
-    except Exception as e:  # noqa: BLE001 - skip artifact load on any failure
-        print(f"Could not load model artifact: {e}")
-        return
-
-    # 6. Verify Artifact Structure
-    print("Verifying Artifact Structure...")
-    if not isinstance(model_artifact, dict):
-        print(f"Model artifact is not a dict: {type(model_artifact)}")
-        return
-
-    plan = model_artifact.get("transformer_plan", [])
-    print(f"Plan Length: {len(plan)}")
-
-    # 7. Simulate Inference
-    print("Simulating Inference...")
-
-    # New data
-    # - Row 1: Valid
-    #   - 'age': 50
-    #   - 'income': 50000
-    #   - 'city': 'SF'
-    #   - 'gender': 'M'
-    # - Row 2: Invalid (Outlier)
-    #   - 'age': 120 (should be dropped by ManualBounds)
-    #   - 'income': 50000
-    #   - 'city': 'NY'
-    #   - 'gender': 'F'
+    result = engine.run(config, job_id="full-inference")
+    assert result.status == "success", {
+        node_id: node.error for node_id, node in result.node_results.items() if node.error
+    }
+    assert all(node.status == "success" for node in result.node_results.values())
+    # The node artifact is a (model, tuning metadata) tuple; the job artifact
+    # carries the fitted preprocessing needed to serve raw records.
+    assert isinstance(store.load("model"), tuple)
+    reopened = LocalArtifactStore(base_path)
+    bundle = reopened.load("full-inference")
+    assert isinstance(bundle, dict)
+    engineer = bundle["feature_engineer"]
 
     new_data = pd.DataFrame(
         {
-            "age": [50, 120],
-            "income": [50000, 50000],
-            "city": ["SF", "NY"],
-            "gender": ["M", "F"],
+            "age": [50.0, 120.0, np.nan],
+            "income": [50000.0, 50000.0, 75000.0],
+            "city": ["SF", "NY", "LA"],
+            "gender": ["M", "F", "F"],
         }
     )
+    transformed = engineer.transform(new_data)
+    if hasattr(transformed, "to_pandas"):
+        transformed = transformed.to_pandas()
+    assert len(transformed) == 2
+    assert "city" not in transformed and "gender" not in transformed
+    np.testing.assert_array_equal(transformed["city_San Francisco"], [1.0, 0.0])
+    np.testing.assert_array_equal(transformed["city_LA"], [0.0, 1.0])
+    np.testing.assert_array_equal(transformed["gender_M"], [1.0, 0.0])
+    split_features, _ = extract_xy(reopened.load("splitter").train, "target")
+    if hasattr(split_features, "to_native"):
+        split_features = split_features.to_native()
+    if hasattr(split_features, "to_pandas"):
+        split_features = split_features.to_pandas()
+    np.testing.assert_allclose(transformed["age"], [50.0, split_features["age"].median()])
+    expected_income = (
+        np.array([50000.0, 75000.0]) - split_features["income"].mean()
+    ) / split_features["income"].std(ddof=0)
+    np.testing.assert_allclose(transformed["income"], expected_income)
+    assert list(transformed.columns) == bundle["feature_columns"]
 
-    transformers = model_artifact.get("transformers", [])
-
-    t_objs = {}
-    for t in transformers:
-        t_node = t.get("node_id")
-        t_name = t.get("transformer_name")
-        t_col = t.get("column_name")
-        t_objs[(t_node, t_name, t_col)] = t.get("transformer")
-
-    current_df = new_data.copy()
-
-    for step in plan:
-        node_id = step.get("node_id")
-        t_name = step.get("transformer_name")
-        t_col = step.get("column_name")
-        t_type = step.get("transformer_type")
-
-        # Skip Splitter in inference usually, but let's see if it runs (it should just pass through or warn)
-        if t_type == "TrainTestSplitter":
-            continue
-
-        print(f"Applying {t_name} ({t_type}) on {t_col}...")
-
-        obj = t_objs.get((node_id, t_name, t_col))
-
-        ApplierCls = None
-        try:
-            # Use FeatureEngineer factory to get the correct applier class
-            temp_engineer = FeatureEngineer([])
-            _, applier_instance = temp_engineer._get_transformer_components(t_type)
-            ApplierCls = type(applier_instance)
-        except ValueError:
-            print(f"Unknown transformer type: {t_type}")
-
-        if ApplierCls:
-            applier = ApplierCls()
-            params = {}
-            if isinstance(obj, dict):
-                params = obj.copy()
-
-            # Inject object into common keys for Appliers that need the raw object (like OneHotEncoder)
-            # Only inject if not already present (to avoid overwriting the real object with the wrapper dict)
-            if obj is not None:
-                if "encoder_object" not in params:
-                    params["encoder_object"] = obj
-                if "scaler_object" not in params:
-                    params["scaler_object"] = obj
-                if "imputer_object" not in params:
-                    params["imputer_object"] = obj
-                if "transformer_object" not in params:
-                    params["transformer_object"] = obj
-
-            try:
-                res = applier.apply(current_df, params)
-                current_df = res[0] if isinstance(res, tuple) else res
-            except Exception as e:  # noqa: BLE001 - log transform failure and continue
-                print(f"Error applying {t_type}: {e}")
-                import traceback
-
-                traceback.print_exc()
-        else:
-            print(f"Warning: No Applier for {t_type}")
-
-    print("Transformed Data:")
-    print(current_df)
-
-    # Verifications
-    # 1. Row count?
-    if len(current_df) == 1:
-        print("SUCCESS: Outlier row dropped (1 row remaining)")
-    else:
-        print(f"FAILURE: Expected 1 row, got {len(current_df)}")
-
-    # 2. Age check
-    if "age" in current_df.columns:
-        val = current_df["age"].iloc[0]
-        if val == 50:
-            print("SUCCESS: Valid age preserved")
-        else:
-            print(f"FAILURE: Unexpected age value: {val}")
-
-    # 3. City encoded?
-    # 'SF' -> 'San Francisco' -> OneHotEncoded
-    # We expect columns like 'city_San Francisco' or similar depending on OHE implementation
-    cols = current_df.columns.tolist()
-    print(f"Columns: {cols}")
-
-    # Check for OHE columns
-    ohe_cols = [c for c in cols if "city" in c or "gender" in c]
-    if len(ohe_cols) > 0:
-        print(f"SUCCESS: Categorical columns encoded: {ohe_cols}")
-    else:
-        print("FAILURE: No encoded columns found")
-
-    # 4. Income scaled?
-    if "income" in current_df.columns:
-        val = current_df["income"].iloc[0]
-        # 50000 was the min in training data (approx), so scaled value should be around -1.5 or so (StandardScaler)
-        # Mean of income ~ 68000, Std ~ 15000. (50000 - 68000)/15000 ~ -1.2
-        print(f"Scaled Income: {val}")
-        if -2.0 < val < 2.0:
-            print("SUCCESS: Income scaled reasonably")
-        else:
-            print("WARNING: Income scaling seems off (or maybe not scaled?)")
-
-
-if __name__ == "__main__":
-    test_full_inference_pipeline()
+    database = create_async_engine(f"sqlite+aiosqlite:///{tmp_path / 'inference.db'}")
+    try:
+        async with database.begin() as connection:
+            await connection.run_sync(Base.metadata.create_all)
+        async with AsyncSession(database, expire_on_commit=False) as session:
+            session.add(
+                TrainingJob(
+                    id="full-inference",
+                    pipeline_id=config.pipeline_id,
+                    node_id="model",
+                    dataset_source_id="source",
+                    status="completed",
+                    run_mode="fixed",
+                    model_type="logistic_regression",
+                    graph=asdict(config),
+                    artifact_uri=reopened.get_artifact_uri("full-inference"),
+                )
+            )
+            await session.commit()
+            await DeploymentService.deploy_model(session, "full-inference")
+            with pytest.raises(ValueError, match="row count from 3 to 2"):
+                await DeploymentService.predict(session, new_data.to_dict("records"))
+            # Explicit filtering lets the caller retain the input-row mapping.
+            valid_input = new_data.iloc[[0, 2]]
+            predictions, thresholds = await DeploymentService.predict(
+                session, valid_input.to_dict("records")
+            )
+    finally:
+        await database.dispose()
+    expected = bundle["model"].predict(transformed[bundle["feature_columns"]])
+    np.testing.assert_array_equal(predictions, expected)
+    assert len(predictions) == 2 and thresholds is None

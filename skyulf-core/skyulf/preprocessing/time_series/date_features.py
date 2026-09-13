@@ -61,7 +61,10 @@ def _apply_pandas(X: Any, _y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
     for col in columns:
         if col not in df.columns:
             continue
-        parsed = pd.to_datetime(df[col], errors="coerce", format="mixed")
+        # Older fitted artifacts keep their original local-calendar semantics.
+        parsed = pd.to_datetime(
+            df[col], errors="coerce", format="mixed", utc=params.get("timezone") == "UTC"
+        )
         is_null = parsed.isna()
         dt = parsed.dt
         for feature in features:
@@ -154,7 +157,15 @@ class DateFeaturesApplier(BaseApplier):
     learns_from_data=False,
 )
 class DateFeaturesCalculator(BaseCalculator):
-    """Normalize the requested calendar features into the artifact."""
+    """Record calendar features using UTC for every newly fitted artifact.
+
+    Offset-aware timestamps are converted to UTC before extracting their
+    calendar parts; naive values are treated as UTC without shifting their
+    clock time. Unparseable values produce null features. Artifacts fitted
+    before this contract retain their original engine-specific interpretation
+    so an existing model's input features do not silently change on reload.
+    Refit the complete pipeline to adopt UTC for such models.
+    """
 
     def fit(
         self,
@@ -167,6 +178,7 @@ class DateFeaturesCalculator(BaseCalculator):
             "columns": config.get("columns", []),
             "features": _resolve_features(config),
             "drop_original": bool(config.get("drop_original", False)),
+            "timezone": "UTC",
         }
 
     def infer_output_schema(

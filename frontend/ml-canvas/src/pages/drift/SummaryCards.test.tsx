@@ -1,6 +1,7 @@
-import { render, screen, within } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { fireEvent, render, screen, within } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
 import type { ColumnDrift, DriftReport } from '../../core/api/monitoring';
+import { DriftTable } from './DriftTable';
 import { SummaryCards } from './SummaryCards';
 
 /** A saved report may count schema changes alongside the four measured features. */
@@ -68,6 +69,26 @@ function summaryCard(label: string) {
 }
 
 describe('SummaryCards PSI evidence', () => {
+    it('displays type drift without inventing stable distribution scores', () => {
+        /** A type-only report must show a drifted row, its explanation and an honest percentage. */
+        const report = psiReport([{
+            column: 'changed', drift_detected: true,
+            metrics: [{ metric: 'type_drift', value: 1, threshold: 0, has_drift: true }],
+            suggestions: ['Column type changed from Int64 to String; check the source schema.'],
+        }]);
+        render(<>
+            <SummaryCards report={report} />
+            <DriftTable report={report} showOnlyDrifted sortConfig={null} onSort={vi.fn()} columnSparklines={{}} />
+        </>);
+
+        expect(screen.getByText('100% of features')).toBeInTheDocument();
+        expect(summaryCard('Avg PSI').getByText('No PSI available')).toBeInTheDocument();
+        expect(screen.queryByText('0.0000')).not.toBeInTheDocument();
+        expect(within(screen.getByRole('table')).getByText('Drifted')).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: 'Details' }));
+        expect(screen.getByText(/Column type changed from Int64 to String/)).toBeVisible();
+    });
+
     it('includes a dominant categorical shift in the average and most drifted column', () => {
         /** A stable numeric feature must not hide the categorical evidence returned by the API. */
         render(<SummaryCards report={psiReport([

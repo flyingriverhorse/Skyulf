@@ -15,6 +15,7 @@ import polars as pl
 from ..._validation import raise_invalid_choice
 from ...core.artifacts import GeoDistanceArtifact
 from ...core.meta.decorators import node_meta
+from ...core.schema import SkyulfSchema
 from ...registry import NodeRegistry
 from .._helpers import select_then_to_pandas
 from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
@@ -174,6 +175,19 @@ class GeoDistanceApplier(BaseApplier):
 )
 class GeoDistanceCalculator(BaseCalculator):
     """Validate the coordinate columns, method, and unit for the distance computation."""
+
+    def infer_output_schema(
+        self, input_schema: SkyulfSchema, config: dict[str, Any]
+    ) -> SkyulfSchema | None:
+        """Expose the distance feature before execution when all coordinate inputs are known."""
+        coordinates = (config.get(key) for key in ("lat1_col", "lon1_col", "lat2_col", "lon2_col"))
+        if not all(column in input_schema for column in coordinates):
+            return None
+        _validate_geo_distance_method_unit(
+            config.get("method", "haversine"), config.get("unit", "km")
+        )
+        output = _distance_output_column(config)
+        return input_schema.add(output, "float64").with_dtype(output, "float64")
 
     @fit_method
     def fit(self, X: Any, _y: Any, config: dict[str, Any]) -> GeoDistanceArtifact:  # pylint: disable=arguments-differ

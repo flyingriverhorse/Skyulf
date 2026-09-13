@@ -97,15 +97,37 @@ describe('ScalingNode public settings', () => {
     ['minmax', 'Feature Range Minimum', 'feature_range_min', 0], ['minmax', 'Feature Range Maximum', 'feature_range_max', 1],
     ['robust', 'Quantile Range Minimum', 'quantile_range_min', 25], ['robust', 'Quantile Range Maximum', 'quantile_range_max', 75],
   ] as const)('preserves numeric parsing for %s %s', (method, label, key, value) => {
-    // Empty input currently serializes NaN; extraction must not change that behavior.
-    const { onChange } = setup({ method, with_mean: false });
+    // Empty drafts must stay invalid through JSON persistence until corrected.
+    const { onChange } = setup({ method, columns: ['age'], with_mean: false });
     const input = screen.getByRole('spinbutton', { name: label });
     expect(input).toHaveValue(value);
     fireEvent.change(input, { target: { value: '0' } });
     fireEvent.change(input, { target: { value: '2.5' } });
-    expect(onChange).toHaveBeenLastCalledWith({ columns: [], method, with_mean: false, [key]: 2.5 });
+    expect(onChange).toHaveBeenLastCalledWith({ columns: ['age'], method, with_mean: false, [key]: 2.5 });
     fireEvent.change(input, { target: { value: '' } });
-    expect(onChange).toHaveBeenLastCalledWith({ columns: [], method, with_mean: false, [key]: NaN });
+    const draft = onChange.mock.lastCall![0] as Config;
+    expect(input).toHaveValue(null);
+    expect(ScalingNode.validate(draft).isValid).toBe(false);
+    expect(ScalingNode.validate(JSON.parse(JSON.stringify(draft)) as Config).isValid).toBe(false);
+    fireEvent.change(input, { target: { value: String(value) } });
+    expect(ScalingNode.validate(onChange.mock.lastCall![0] as Config).isValid).toBe(true);
+  });
+  it.each([
+    { method: 'minmax', feature_range_min: Infinity },
+    { method: 'minmax', feature_range_max: NaN },
+    { method: 'minmax', feature_range_min: 1, feature_range_max: 1 },
+    { method: 'minmax', feature_range_min: 2, feature_range_max: 1 },
+    { method: 'robust', quantile_range_min: -1 },
+    { method: 'robust', quantile_range_max: 101 },
+    { method: 'robust', quantile_range_min: 80, quantile_range_max: 20 },
+    { method: 'robust', quantile_range_max: -Infinity },
+  ] satisfies Partial<Config>[])('rejects invalid active range %j', (config) => {
+    // A selected column cannot make malformed scaling parameters runnable.
+    expect(ScalingNode.validate({ ...ScalingNode.getDefaultConfig(), columns: ['age'], ...config }).isValid).toBe(false);
+  });
+  it.each(['minmax', 'robust', 'standard', 'maxabs'] as const)('accepts omitted defaults for %s', (method) => {
+    // Defaults remain valid without forcing configuration writes when opening settings.
+    expect(ScalingNode.validate({ columns: ['age'], method }).isValid).toBe(true);
   });
   it('retains hidden options through every method', () => {
     // Method switches must only change method and keep saved method-specific fields.

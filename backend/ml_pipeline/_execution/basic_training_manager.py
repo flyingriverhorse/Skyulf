@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session
 
 from backend.config import get_settings
+from backend.data_ingestion.serialization import JSONSafeSerializer
 from backend.database.models import TrainingJob
 from backend.ml_pipeline._execution.graph_utils import (
     extract_job_details,
@@ -165,6 +166,8 @@ class BasicTrainingManager(TrainingJobManagerBase):
 
     @staticmethod
     def _update_training_result(job: TrainingJob, result: dict[str, Any]):
+        """Persist a JSON-safe result copy without changing the worker's payload."""
+        result = JSONSafeSerializer.clean_for_json(result)
         if "metrics" in result:
             job.metrics = result["metrics"]
         if "artifact_uri" in result:

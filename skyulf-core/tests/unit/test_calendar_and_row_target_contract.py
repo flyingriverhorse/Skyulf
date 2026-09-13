@@ -97,14 +97,13 @@ def test_calendar_parsing_keeps_native_null_and_empty_input_contracts(engine, no
 @pytest.mark.parametrize(
     "node_type", ["DateFeatures", "FeatureGeneration", "FeatureGenerationNode", "FeatureMath"]
 )
-def test_calendar_timezone_strings_preserve_existing_timezone_interpretation(engine, node_type):
-    """Row-local parsing must retain each path's existing timezone treatment for valid strings."""
+def test_calendar_timezone_strings_use_utc_for_new_fitted_steps(engine, node_type):
+    """Fresh calendar steps must agree on UTC without interpreting invalid or missing strings."""
     values = ["2024-01-02T23:00:00-05:00", None, "bad"]
     frame = pd.DataFrame({"date": values}) if engine == "pandas" else pl.DataFrame({"date": values})
     config = _calendar_config(node_type, ["day", "hour"])
     artifact = NodeRegistry.get_calculator(node_type)().fit(frame, config)
     result = NodeRegistry.get_applier(node_type)().apply(frame, artifact)
-    day, hour = (2, 23) if node_type == "DateFeatures" and engine == "pandas" else (3, 4)
-    assert result["date_day"][0] == day
-    assert result["date_hour"][0] == hour
+    assert result["date_day"][0] == 3
+    assert result["date_hour"][0] == 4
     assert pd.isna(result["date_day"][1]) and pd.isna(result["date_day"][2])

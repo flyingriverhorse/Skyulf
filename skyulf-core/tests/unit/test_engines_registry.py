@@ -75,18 +75,17 @@ def test_registry_register_and_get_round_trip():
 def test_resolve_with_none_returns_active_default_engine():
     """resolve(None) should return the currently configured default engine."""
     resolved = EngineRegistry.resolve(None)
-    assert resolved is EngineRegistry.get(EngineRegistry._active_engine)
+    assert resolved is PolarsEngine
 
 
 def test_set_active_engine_changes_default(monkeypatch):
     """set_active_engine() should change which engine resolve(None) returns
     (regression guard for r5 EngineRegistry missing setter finding).
     """
-    original = EngineRegistry._active_engine
+    original = EngineRegistry.resolve().name
     try:
-        EngineRegistry.set_active_engine("polars")
-        assert EngineRegistry._active_engine == "polars"
-        assert EngineRegistry.resolve(None) is PolarsEngine
+        EngineRegistry.set_active_engine("pandas")
+        assert EngineRegistry.resolve(None) is PandasEngine
     finally:
         EngineRegistry.set_active_engine(original)
 
@@ -117,7 +116,7 @@ def test_resolve_unknown_type_falls_back_to_default_and_warns(caplog):
 
     with caplog.at_level(logging.WARNING, logger="skyulf.engines.registry"):
         resolved = EngineRegistry.resolve(_Unknown())
-    assert resolved is EngineRegistry.get(EngineRegistry._active_engine)
+    assert resolved is EngineRegistry.resolve()
     assert any("Unknown data type" in record.message for record in caplog.records)
 
 
@@ -129,7 +128,7 @@ def test_resolve_plain_list_falls_back_without_warning(caplog):
     """
     with caplog.at_level(logging.WARNING, logger="skyulf.engines.registry"):
         resolved = EngineRegistry.resolve([1, 2, 3])
-    assert resolved is EngineRegistry.get(EngineRegistry._active_engine)
+    assert resolved is EngineRegistry.resolve()
     assert not any("Unknown data type" in record.message for record in caplog.records)
 
 
@@ -137,7 +136,7 @@ def test_resolve_plain_tuple_falls_back_without_warning(caplog):
     """Same as above but for a plain tuple."""
     with caplog.at_level(logging.WARNING, logger="skyulf.engines.registry"):
         resolved = EngineRegistry.resolve((1, 2, 3))
-    assert resolved is EngineRegistry.get(EngineRegistry._active_engine)
+    assert resolved is EngineRegistry.resolve()
     assert not any("Unknown data type" in record.message for record in caplog.records)
 
 
@@ -153,14 +152,14 @@ def test_resolve_uses_top_level_package_not_substring_match():
 
     _FakePolarsLookalike.__module__ = "fake_polars_stub.frame"
     resolved = EngineRegistry.resolve(_FakePolarsLookalike())
-    assert resolved is EngineRegistry.get(EngineRegistry._active_engine)
+    assert resolved is EngineRegistry.resolve()
 
     class _FakePandasLookalike:
         pass
 
     _FakePandasLookalike.__module__ = "my_pandas_wrapper.core"
     resolved = EngineRegistry.resolve(_FakePandasLookalike())
-    assert resolved is EngineRegistry.get(EngineRegistry._active_engine)
+    assert resolved is EngineRegistry.resolve()
 
 
 def test_resolve_matches_submodules_of_real_pandas_polars():
@@ -209,7 +208,7 @@ def test_resolve_pyspark_like_module_falls_back_without_spark_engine():
 
     _FakePysparkFrame.__module__ = "pyspark.sql.dataframe"
     resolved = EngineRegistry.resolve(_FakePysparkFrame())
-    assert resolved is EngineRegistry.get(EngineRegistry._active_engine)
+    assert resolved is EngineRegistry.resolve()
 
 
 def test_resolve_dask_like_module_falls_back_without_dask_engine():
@@ -220,7 +219,7 @@ def test_resolve_dask_like_module_falls_back_without_dask_engine():
 
     _FakeDaskFrame.__module__ = "dask.dataframe.core"
     resolved = EngineRegistry.resolve(_FakeDaskFrame())
-    assert resolved is EngineRegistry.get(EngineRegistry._active_engine)
+    assert resolved is EngineRegistry.resolve()
 
 
 def test_resolve_pyspark_like_module_uses_registered_spark_engine():

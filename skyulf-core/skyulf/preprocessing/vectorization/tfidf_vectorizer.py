@@ -146,11 +146,10 @@ class TfidfVectorizerCalculator(BaseCalculator):
     training corpus and carried in the artifact, so the weights stay inspectable
     and serialisable. A very wide output is warned about rather than raising,
     since it is a memory problem, not an error.
-    """
 
-    def infer_output_schema(self, input_schema: Any, config: dict[str, Any]) -> None:
-        """Return ``None``: how many columns appear depends on the learned vocabulary."""
-        return None
+    Schema inference inherits the base ``None`` result: the learned vocabulary
+    determines the output columns, so their schema is only known at runtime.
+    """
 
     @fit_method
     def fit(self, X: Any, _y: Any, config: dict[str, Any]) -> TfidfVectorizerArtifact:  # pylint: disable=arguments-differ

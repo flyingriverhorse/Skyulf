@@ -16,6 +16,7 @@ from sklearn.model_selection import (
     HalvingRandomSearchCV,
 )
 
+from ..fold_scoring import wrap_fold_scorer
 from ..params import clean_search_space
 from ..schemas import TuningConfig
 
@@ -32,6 +33,7 @@ def build_halving_searcher(
     factor = strategy_params.get("factor", 3)
     resource = strategy_params.get("resource", "n_samples")
     min_resources = strategy_params.get("min_resources", "exhaust")
+    scoring = wrap_fold_scorer(base_estimator, scoring)
 
     # Halving search uses sklearn's internal scheduler and does NOT
     # expose per-trial callbacks (no equivalent of Optuna's callbacks=).

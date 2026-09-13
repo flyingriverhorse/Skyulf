@@ -20,7 +20,7 @@ from .._helpers import (
 from .._schema import SkyulfSchema
 from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
 from ..dispatcher import apply_dual_engine, fit_dual_engine
-from ._common import _select_subset_pandas, _select_subset_polars
+from ._common import _select_subset_pandas, _select_subset_polars, validate_scaling_range
 
 
 class RobustScalerApplier(BaseApplier):
@@ -135,7 +135,9 @@ class RobustScalerCalculator(BaseCalculator):
 
 def _fit_robust(X_subset: Any, cols: list[str], config: dict[str, Any]) -> dict[str, Any]:
     # Same JSON list -> tuple coercion as MinMaxScaler.
-    quantile_range = tuple(config.get("quantile_range", (25.0, 75.0)))
+    quantile_range = validate_scaling_range(
+        config.get("quantile_range", (25.0, 75.0)), "quantile_range"
+    )
     with_centering = config.get("with_centering", True)
     with_scaling = config.get("with_scaling", True)
     scaler = RobustScaler(

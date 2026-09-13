@@ -134,6 +134,7 @@ export function SearchSpaceSection({
   searchSpaceDefs,
   isLoadingSearchSpaceDefs,
 }: SearchSpaceSectionProps) {
+  const visibleDefs = searchSpaceDefs.filter(def => def.tunable !== false && isSearchSpaceParamVisible(def, config.search_space));
   return (
     <div className="space-y-4 animate-in fade-in duration-300">
         <div className="flex items-center justify-between">
@@ -149,7 +150,7 @@ export function SearchSpaceSection({
             </div>
         ) : (
             <div className="space-y-3">
-                {searchSpaceDefs.filter(def => def.tunable !== false && isSearchSpaceParamVisible(def, config.search_space)).map(def => (
+                {visibleDefs.map(def => (
                     <div key={`${config.model_type}-${def.name}`} className="bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-lg p-3">
                         <SearchSpaceInput
                             def={def}
@@ -171,9 +172,11 @@ export function SearchSpaceSection({
                         )}
                     </div>
                 ))}
-                {searchSpaceDefs.length === 0 && (
+                {visibleDefs.length === 0 && (
                     <div className="text-center py-8 text-gray-500 text-sm">
-                        No hyperparameters available for this model.
+                        {config.model_type === 'voting_regressor'
+                          ? 'Use an Ensemble node to tune the base models of a voting regressor.'
+                          : 'No tunable hyperparameters available for this model.'}
                     </div>
                 )}
             </div>

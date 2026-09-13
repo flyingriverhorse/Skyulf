@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Edge, Node } from '@xyflow/react';
-import { predictMergeConflict } from './predictMergeConflict';
+import { columnsWrittenBy, predictMergeConflict } from './predictMergeConflict';
 
 const node = (id: string, definitionType: string, data: Record<string, unknown> = {}): Node => ({
   id,
@@ -15,6 +15,22 @@ const transform = (id: string, columns: string[], method: string) =>
   node(id, 'TransformationNode', { transformations: [{ columns, method, params: {} }] });
 
 describe('predictMergeConflict', () => {
+  it.each([
+    [{ unit: 'km', output_column: '' }, 'geo_distance_km'],
+    [{ unit: 'mi', output_column: '' }, 'geo_distance_mi'],
+    [{ unit: 'mi', output_column: 'distance' }, 'distance'],
+  ])('tracks generated distance output %s as a branch writer', (config, expected) => {
+    // Parallel distance calculations can overwrite the same generated feature at a merge.
+    const nodes = [node('ds', 'dataset_node'), node('a', 'GeoDistance', config), node('b', 'GeoDistance', config), node('merge', 'MissingIndicator')];
+    const edges = [edge('ds', 'a'), edge('ds', 'b'), edge('a', 'merge'), edge('b', 'merge')];
+    expect(predictMergeConflict('merge', nodes, edges)?.columns).toEqual([expected]);
+  });
+
+  it('does not mistake manual row filtering for rewriting bounded column values', () => {
+    // Manual bounds change the retained population, so they must not claim a value overwrite.
+    expect(columnsWrittenBy(node('bounds', 'outlier', { method: 'manual_bounds', columns: ['age'] }))).toEqual([]);
+  });
+
   it('returns null for a node with a single input', () => {
     const nodes = [node('ds', 'dataset_node'), transform('t1', ['a'], 'log'), node('mi', 'MissingIndicator')];
     const edges = [edge('ds', 't1'), edge('t1', 'mi')];

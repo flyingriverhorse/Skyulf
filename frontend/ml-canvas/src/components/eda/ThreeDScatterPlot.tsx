@@ -3,6 +3,7 @@ import { Plot } from '../../core/plotly';
 import { useChartTheme } from '../../core/hooks/useChartTheme';
 import { groupScatterPoints } from './scatterGrouping';
 import { toPlotlyMarkerSymbol } from './chartMarkerShapes';
+import type { Data } from 'plotly.js';
 
 /** A single point for the 3-D scatter; values are looked up by `xKey/yKey/zKey/labelKey`. */
 export type ScatterPoint = Record<string, string | number | null | undefined>;
@@ -31,18 +32,17 @@ export const ThreeDScatterPlot: React.FC<ThreeDScatterPlotProps> = ({
   height = 600
 }) => {
 
-  // Plotly trace shapes are wide unions; we keep them loose intentionally.
   // Groups get a color AND a marker symbol (see `chartMarkerShapes`) so
   // identity survives grayscale/color-vision-deficiency contexts.
-  const traces: any[] = useMemo(() => {
+  const traces = useMemo<Data[]>(() => {
     const groups = groupScatterPoints(data, labelKey);
 
-    return groups.map(({ label, points: groupData, color, shape }) => {
+    return groups.map(({ label, points: groupData, color, shape }): Data => {
       const symbol = toPlotlyMarkerSymbol(shape);
       return {
-        x: groupData.map((d) => d[xKey]),
-        y: groupData.map((d) => d[yKey]),
-        z: groupData.map((d) => d[zKey]),
+        x: groupData.map((d) => d[xKey] ?? null),
+        y: groupData.map((d) => d[yKey] ?? null),
+        z: groupData.map((d) => d[zKey] ?? null),
         mode: 'markers',
         type: 'scatter3d',
         name: label,
@@ -92,7 +92,7 @@ export const ThreeDScatterPlot: React.FC<ThreeDScatterPlotProps> = ({
           // `ChartLegend` alongside this chart (see `scatterGrouping.ts`),
           // so 2D and 3D scatter plots present a consistent legend UX.
           showlegend: false
-        } as any}
+        }}
         useResizeHandler={true}
         style={{ width: '100%', height: '100%' }}
         config={{ displayModeBar: true }}

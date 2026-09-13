@@ -20,10 +20,20 @@ from typing import Any
 
 from skyulf.preprocessing import SkyulfSchema
 
+from .graph_utils import _discover_ancestors_bfs
 from .schemas import NodeConfig, PipelineConfig
 
 # Param keys whose values are column names (str or list of str).
-_STRING_REF_KEYS = ("target", "target_column", "column", "label_column")
+_STRING_REF_KEYS = (
+    "target",
+    "target_column",
+    "column",
+    "label_column",
+    "lat1_col",
+    "lon1_col",
+    "lat2_col",
+    "lon2_col",
+)
 _LIST_REF_KEYS = (
     "columns",
     "feature_columns",
@@ -31,7 +41,7 @@ _LIST_REF_KEYS = (
     "categorical_columns",
 )
 # Param keys whose values are dicts keyed by column name.
-_DICT_KEY_REF_KEYS = ("column_types", "column_mapping", "rename_map")
+_DICT_KEY_REF_KEYS = ("column_types", "column_mapping", "rename_map", "bounds")
 
 # Some step types have column-ref params that are genuinely optional:
 # the pipeline runs fine even when the column is absent upstream.
@@ -120,6 +130,22 @@ def _upstream_schema(
     return predicted.get(upstream_id)
 
 
+def _feature_input_schema(
+    node: NodeConfig, schema: SkyulfSchema, node_map: dict[str, NodeConfig]
+) -> SkyulfSchema:
+    """Exclude separated labels for controls whose Core appliers operate only on X."""
+    if node.step_type not in {"ManualBounds", "GeoDistance"}:
+        return schema
+    ancestors = _discover_ancestors_bfs(node.node_id, node_map)
+    targets = (
+        node_map[node_id].params.get("target_column")
+        for node_id in ancestors
+        if node_id in node_map
+        and node_map[node_id].step_type in {"feature_target_split", "TrainTestSplitter", "Split"}
+    )
+    return schema.drop(target for target in targets if isinstance(target, str))
+
+
 def find_broken_references(
     config: PipelineConfig,
     predicted_schemas: dict[str, SkyulfSchema | None],
@@ -137,11 +163,13 @@ def find_broken_references(
         Nodes whose upstream schema is unknown (``None``) are skipped.
     """
     broken: list[dict[str, Any]] = []
+    node_map = {node.node_id: node for node in config.nodes}
 
     for node in config.nodes:
         upstream = _upstream_schema(node, predicted_schemas)
         if upstream is None:
             continue
+        upstream = _feature_input_schema(node, upstream, node_map)
         upstream_id = node.inputs[0] if node.inputs else None
         step = node.step_type.value if hasattr(node.step_type, "value") else str(node.step_type)
         optional_keys: set[str] = _OPTIONAL_PARAM_KEYS.get(step, set())

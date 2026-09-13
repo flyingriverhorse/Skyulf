@@ -15,6 +15,7 @@ from backend.database.models import (
     TrainingJob,
 )
 from backend.ml_pipeline._services.job_service import JobService
+from backend.utils.logging_utils import redact_credentials, sanitize_for_log
 
 from .schemas import ArtifactListResponse, ModelRegistryEntry, ModelVersion, RegistryStats
 
@@ -445,5 +446,5 @@ class ModelRegistryService:
             import logging
 
             logger = logging.getLogger(__name__)
-            logger.error(f"Failed to list artifacts: {e}")
+            logger.error("Failed to list artifacts: %s", sanitize_for_log(redact_credentials(e)))
             raise

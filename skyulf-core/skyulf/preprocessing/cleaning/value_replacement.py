@@ -22,7 +22,7 @@ def _is_mapping_like(obj: Any) -> bool:
 
 
 def _coerce_key(key: Any, dtype_kind: str) -> Any:
-    """Coerce a single (possibly JSON-string) mapping key to match ``dtype_kind``."""
+    """Coerce a mapping key to its column dtype, skipping strings that cannot match."""
     if not isinstance(key, str):
         return key
     try:
@@ -36,7 +36,7 @@ def _coerce_key(key: Any, dtype_kind: str) -> Any:
                 return key_lower in {"true", "1"}
             return _SKIP_MAPPING_KEY
     except (ValueError, TypeError):
-        return key
+        return _SKIP_MAPPING_KEY
     return key
 
 

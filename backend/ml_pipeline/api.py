@@ -46,6 +46,7 @@ from ._internal._routers.meta import router as _meta_router
 from ._internal._routers.notebook_export import router as _notebook_export_router
 from ._internal._routers.pipelines_io import router as _pipelines_io_router
 from ._internal._routers.preview import router as _preview_router
+from ._internal._routers.pruning import router as _pruning_router
 from ._internal._routers.run_pipeline import _get_submit_lock  # noqa: F401  (re-exported)
 from ._internal._routers.run_pipeline import router as _run_router
 from ._internal._routers.schema_preview import router as _schema_preview_router
@@ -62,6 +63,7 @@ router.include_router(_jobs_router)
 router.include_router(_meta_router)
 router.include_router(_schema_preview_router)
 router.include_router(_notebook_export_router)
+router.include_router(_pruning_router)
 
 __all__ = [
     "router",

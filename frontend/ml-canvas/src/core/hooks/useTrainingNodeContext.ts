@@ -12,7 +12,8 @@ import { jobsApi } from '../api/jobs';
 import { toast } from '../toast';
 import type { TaskType } from '../types/taskType';
 import type { NodeSubmission } from '../types/runFeedback';
-import type { PipelineConfigModel } from '../api/client';
+import type { NodeConfigModel, PipelineConfigModel } from '../api/client';
+import { findEnsembleConnectionIssues } from '../utils/ensembleConnections';
 
 type JobType = 'training' | 'tuning';
 
@@ -40,6 +41,15 @@ function selectTargetNodes(cfg: PipelineConfigModel, nodeId: string) {
     pendingNodeIds.push(...(nodesById.get(currentId)?.inputs ?? []));
   }
   return cfg.nodes.filter(configNode => selectedNodeIds.has(configNode.node_id));
+}
+
+/** Block invalid selected branches while allowing unrelated terminal models to run. */
+function trainingBlockReason(nodes: Node[], edges: Edge[], selectedNodes: NodeConfigModel[]): string | null {
+  const connectionIssue = findEnsembleConnectionIssues(nodes, edges)
+    .find(issue => selectedNodes.some(selected => selected.node_id === issue.targetId));
+  if (connectionIssue) return connectionIssue.message;
+  return warnAndBlockOnLeakage({ nodes: selectedNodes })
+    ? 'Move data-learning preprocessing after the train/test split.' : null;
 }
 
 /** Share the action label between persistent feedback and submission notifications. */
@@ -133,8 +143,9 @@ export function useTrainingNodeContext(nodeId: string | undefined) {
         const cfg = convertGraphToPipelineConfig(nodes, edges);
         // Match backend target scoping while retaining the full graph for submission.
         const selectedNodes = selectTargetNodes(cfg, nodeId);
-        if (warnAndBlockOnLeakage({ nodes: selectedNodes })) {
-          update({ pending: false, run: null, message: `${label} blocked. Move data-learning preprocessing after the train/test split.` });
+        const blockReason = trainingBlockReason(nodes, edges, selectedNodes);
+        if (blockReason) {
+          update({ pending: false, run: null, message: `${label} blocked. ${blockReason}` });
           return;
         }
         const res = await jobsApi.runPipeline({

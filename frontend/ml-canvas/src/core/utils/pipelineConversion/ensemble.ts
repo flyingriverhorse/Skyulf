@@ -2,6 +2,7 @@ import type { Node, Edge } from '@xyflow/react';
 import { StepType as BackendStepType } from '../../constants/stepTypes';
 import { buildBaseTuningConfig, buildFixedTrainingParams } from './training';
 import type { ConvertedNode } from './types';
+import { findEnsembleConnectionIssues } from '../ensembleConnections';
 
 // Canvas node `definitionType`s that represent a trained-model spec. When one of
 // these feeds an Ensemble node it acts as a *base-learner spec provider* (Phase 2):
@@ -186,9 +187,11 @@ function ensembleTrainingParams(data: Record<string, unknown>, structure: Record
 export function convertEnsembleNode(node: Node, nodes: Node[], edges: Edge[], incomingEdges: Edge[], inputs: string[]): ConvertedNode {
   const wired = collectWiredBaseSpecs(nodes, incomingEdges, node.data.task);
   const structure = buildEnsembleStructure(node.data, wired);
+  // Saved unsupported wires are surfaced by graph/submission validation, never as Dataset inputs.
+  const unsupportedIds = new Set(findEnsembleConnectionIssues(nodes, incomingEdges).map(issue => issue.sourceId));
   return {
     stepType: BackendStepType.TRAINING,
     params: ensembleTrainingParams(node.data, structure),
-    inputs: ensembleDataInputs(inputs, wired.modelSourceIds, edges),
+    inputs: ensembleDataInputs(inputs.filter(id => !unsupportedIds.has(id)), wired.modelSourceIds, edges),
   };
 }

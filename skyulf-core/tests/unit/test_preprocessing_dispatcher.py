@@ -277,10 +277,10 @@ def test_apply_dual_engine_raises_before_any_pandas_conversion():
             return pd.DataFrame({"a": [1, 2, 3]})
 
     spy = _SpyFrame()
-    # Unknown type resolves to the default (pandas) engine; a mapping without
-    # a "pandas" key must raise instead of silently converting.
-    with pytest.raises(NotImplementedError, match="No 'pandas' implementation registered"):
-        apply_dual_engine(spy, {}, {"polars": _polars_apply})
+    # Unknown type resolves to the default (polars) engine; a mapping without
+    # a "polars" key must raise instead of silently converting.
+    with pytest.raises(NotImplementedError, match="No 'polars' implementation registered"):
+        apply_dual_engine(spy, {}, {"pandas": _pandas_apply})
     assert spy.to_pandas_calls == 0
 
 

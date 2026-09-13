@@ -1,7 +1,7 @@
 """Tests for skyulf.profiling._analyzer.numeric.NumericMixin._calculate_vif.
 
 Covers the branches not exercised by test_profiling_analyzer.py's happy-path
-VIF tests: a constant column producing a NaN correlation, a perfectly
+VIF tests: a constant leaving too few variable features, a perfectly
 collinear (singular) correlation matrix, and the generic exception fallback.
 """
 
@@ -16,7 +16,7 @@ from skyulf.profiling.analyzer import EDAAnalyzer
 
 
 def test_calculate_vif_returns_none_for_constant_column() -> None:
-    """A constant numeric column yields NaN in the correlation matrix -> None (line 51)."""
+    """Removing a constant leaves one feature, which has no VIF against other variables."""
     rng = np.random.default_rng(0)
     a = rng.normal(0, 1, 50)
     constant = np.full(50, 5.0)

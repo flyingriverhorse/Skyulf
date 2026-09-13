@@ -15,6 +15,25 @@ from types import ModuleType
 from typing import Any
 
 import numpy as np
+from sklearn._loss import _loss  # ty: ignore[unresolved-import] - compiled sklearn module
+from sklearn.linear_model import (
+    _sgd_fast,  # ty: ignore[unresolved-import] - compiled sklearn module
+)
+
+# Exact library types only: this is not a general pickle-reduction fallback.
+_COMPILED_LOSS_IDENTITIES = {
+    cls: (module_name, cls.__qualname__)
+    for module_name, module in (
+        ("sklearn._loss._loss", _loss),
+        ("sklearn.linear_model._sgd_fast", _sgd_fast),
+    )
+    for cls in vars(module).values()
+    if isinstance(cls, type)
+    and (issubclass(cls, _loss.CyLossFunction) or cls is _loss.CyHalfMultinomialLoss)
+}
+_BIT_GENERATOR_TYPES = frozenset(
+    (np.random.PCG64, np.random.PCG64DXSM, np.random.MT19937, np.random.Philox, np.random.SFC64)
+)
 
 
 def artifact_digest(obj: Any) -> bytes:
@@ -140,12 +159,23 @@ def _canonical_children(h: Any, obj: Any) -> Iterator[Any]:
     elif isinstance(obj, np.random.RandomState):
         h.update(b"randomstate:")
         yield obj.get_state()
+    elif isinstance(obj, np.random.Generator):
+        yield from _generator_children(h, obj)
     elif isinstance(obj, (tuple, list)):
         tag = "tuple" if isinstance(obj, tuple) else "list"
         h.update(f"{tag}:{len(obj)}:".encode())
         yield from obj
     else:
         yield from _object_children(h, obj)
+
+
+def _generator_children(h: Any, obj: np.random.Generator) -> Iterator[Any]:
+    """Describe supported NumPy RNGs without silently dropping custom subclass state."""
+    if type(obj) is not np.random.Generator or type(obj.bit_generator) not in _BIT_GENERATOR_TYPES:
+        raise TypeError(f"Unsupported generator or bit generator type: {type(obj)!r}")
+    h.update(b"generator:")
+    yield type(obj.bit_generator)
+    yield obj.bit_generator.state
 
 
 def _tree_children(h: Any, obj: Any) -> Iterator[Any]:
@@ -177,6 +207,12 @@ def _object_children(h: Any, obj: Any) -> Iterator[Any]:
         yield type(obj)
         yield {field.name: getattr(obj, field.name) for field in dataclasses.fields(obj)}
         return
+    if type(obj) in _COMPILED_LOSS_IDENTITIES:
+        h.update(b"sklearn-loss:")
+        # Cython wheels may expose _loss or sklearn._loss._loss as __module__.
+        yield _COMPILED_LOSS_IDENTITIES[type(obj)]
+        yield _compiled_loss_state(obj)
+        return
     # sklearn trees are C-extension objects without a __dict__.
     if (
         type(obj).__name__ == "Tree"
@@ -191,6 +227,18 @@ def _object_children(h: Any, obj: Any) -> Iterator[Any]:
         yield _object_state(obj)
         return
     raise TypeError(f"Cannot digest object of type {type(obj)!r}: no canonical representation")
+
+
+def _compiled_loss_state(obj: Any) -> Any:
+    """Read known loss parameters without hashing pickle bytes or Cython build checksums."""
+    reduction = obj.__reduce__()
+    if type(obj) is _loss.CyHalfMultinomialLoss:
+        if len(reduction) in (2, 3) and reduction[1][0] is type(obj):
+            # Cython may embed state in reconstruction args instead of __setstate__.
+            return reduction[2] if len(reduction) == 3 else reduction[1][2]
+    elif len(reduction) == 2 and reduction[0] is type(obj):
+        return reduction[1]
+    raise TypeError(f"Cannot digest compiled loss state of type {type(obj)!r}")
 
 
 def _object_state(obj: Any) -> dict[str, Any]:

@@ -2,16 +2,22 @@
 
 These models are what the EDA route serves to the frontend and what the backend
 persists into the report's JSON column, so every field name is public API:
-renaming one is a breaking change, not a refactor. Numeric statistics are typed
-:data:`FiniteFloat`, which rewrites NaN/inf to ``None`` before validation so no
-downstream JSON consumer ever has to parse a bare ``NaN`` token.
+renaming one is a breaking change, not a refactor. JSON projections rewrite all
+non-finite floats to ``None``, including nested typed statistics and free-form
+samples. In-memory statistics retain their mathematical values.
 """
 
 import math
 from datetime import datetime
 from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, BeforeValidator, Field
+from pydantic import (
+    BaseModel,
+    BeforeValidator,
+    Field,
+    SerializerFunctionWrapHandler,
+    model_serializer,
+)
 
 
 def _non_finite_to_none(value: Any) -> Any:
@@ -33,7 +39,26 @@ FiniteFloat = Annotated[float | None, BeforeValidator(_non_finite_to_none)]
 """A ``float | None`` that rejects NaN/inf by rewriting it to ``None``."""
 
 
-class NumericStats(BaseModel):
+def _finite_json_values(value: Any) -> Any:
+    """Copy a JSON projection, preserving keys and replacing non-finite numeric leaves."""
+    if isinstance(value, dict):
+        return {key: _finite_json_values(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_finite_json_values(item) for item in value]
+    return _non_finite_to_none(value)
+
+
+class _ProfileModel(BaseModel):
+    """Keep dict-based JSON projections consistent with Pydantic's JSON encoder."""
+
+    @model_serializer(mode="wrap", when_used="json")
+    def _serialize_finite_json(self, handler: SerializerFunctionWrapHandler):
+        """Normalize JSON output after Pydantic applies field serializers and exclusions."""
+        # A return annotation would replace the model's serialization schema.
+        return _finite_json_values(handler(self))
+
+
+class NumericStats(_ProfileModel):
     """Central-tendency, spread and shape statistics for a numeric column."""
 
     mean: FiniteFloat = None
@@ -51,7 +76,7 @@ class NumericStats(BaseModel):
     normality_test: dict[str, Any] | None = None
 
 
-class CategoricalStats(BaseModel):
+class CategoricalStats(_ProfileModel):
     """Cardinality summary for a categorical column, plus its most frequent labels."""
 
     unique_count: int
@@ -59,7 +84,7 @@ class CategoricalStats(BaseModel):
     rare_labels_count: int = 0
 
 
-class DateStats(BaseModel):
+class DateStats(_ProfileModel):
     """Coverage window of a datetime column: earliest, latest and the span in days."""
 
     min_date: str | None = None
@@ -67,7 +92,7 @@ class DateStats(BaseModel):
     duration_days: float | None = None
 
 
-class TextStats(BaseModel):
+class TextStats(_ProfileModel):
     """Length, vocabulary and sentiment summary for a free-text column."""
 
     avg_length: float | None = None
@@ -79,7 +104,7 @@ class TextStats(BaseModel):
     )
 
 
-class HistogramBin(BaseModel):
+class HistogramBin(_ProfileModel):
     """One equal-width histogram bucket and the number of values falling inside it."""
 
     start: float
@@ -87,7 +112,7 @@ class HistogramBin(BaseModel):
     count: int
 
 
-class NormalityTestResult(BaseModel):
+class NormalityTestResult(_ProfileModel):
     """Outcome of a distribution-normality test and the verdict drawn from it."""
 
     test_name: str
@@ -96,14 +121,14 @@ class NormalityTestResult(BaseModel):
     is_normal: bool
 
 
-class CausalNode(BaseModel):
+class CausalNode(_ProfileModel):
     """One variable in a discovered causal graph."""
 
     id: str
     label: str
 
 
-class CausalEdge(BaseModel):
+class CausalEdge(_ProfileModel):
     """One relationship between two causal nodes; ``type`` records its orientation."""
 
     source: str
@@ -111,7 +136,7 @@ class CausalEdge(BaseModel):
     type: str  # "directed", "undirected", "bidirected"
 
 
-class CausalGraph(BaseModel):
+class CausalGraph(_ProfileModel):
     """Causal structure discovered between the profiled columns."""
 
     nodes: list[CausalNode]
@@ -119,7 +144,7 @@ class CausalGraph(BaseModel):
     selection_method: Literal["all", "target_correlation", "variance"] | None = None
 
 
-class RuleNode(BaseModel):
+class RuleNode(_ProfileModel):
     """One node of the surrogate decision tree fitted to explain the data."""
 
     id: int
@@ -133,7 +158,7 @@ class RuleNode(BaseModel):
     children: list[int] = Field(default_factory=list)  # IDs of children
 
 
-class RuleTree(BaseModel):
+class RuleTree(_ProfileModel):
     """Human-readable decision rules extracted from a surrogate tree.
 
     A categorical feature's node ``threshold`` is an ordinal split point over
@@ -156,7 +181,7 @@ class RuleTree(BaseModel):
     categories: dict[str, list[str]] | None = None
 
 
-class ColumnProfile(BaseModel):
+class ColumnProfile(_ProfileModel):
     """Everything the profiler determined about one column, grouped by its detected type."""
 
     name: str
@@ -179,7 +204,7 @@ class ColumnProfile(BaseModel):
     is_unique: bool = False  # Possible ID
 
 
-class CorrelationMatrix(BaseModel):
+class CorrelationMatrix(_ProfileModel):
     """Symmetric Pearson matrix over the numeric columns, indexed by ``columns``.
 
     ``0.0`` doubles for "not computable": the producer emits it both for NaN
@@ -189,9 +214,13 @@ class CorrelationMatrix(BaseModel):
 
     columns: list[str]
     values: list[list[float]]  # 2D array
+    # Requested numeric columns before the cap and constant-column exclusion.
+    total_columns: int | None = None
+    # Only cap omissions; constant columns are excluded independently.
+    omitted_columns: list[str] = Field(default_factory=list)
 
 
-class ScatterSample(BaseModel):
+class ScatterSample(_ProfileModel):
     """Point pairs for the two named columns, ready to render as a scatter plot."""
 
     x: str
@@ -199,7 +228,7 @@ class ScatterSample(BaseModel):
     data: list[dict[str, Any]]  # [{"x": 1, "y": 2}, ...]
 
 
-class Alert(BaseModel):
+class Alert(_ProfileModel):
     """A data-quality problem the profiler flagged, with its severity."""
 
     column: str | None = None
@@ -208,7 +237,7 @@ class Alert(BaseModel):
     severity: str = "warning"  # "info", "warning", "error"
 
 
-class Recommendation(BaseModel):
+class Recommendation(_ProfileModel):
     """A suggested remediation for one column, with the reasoning behind it."""
 
     column: str | None = None
@@ -217,7 +246,7 @@ class Recommendation(BaseModel):
     suggestion: str
 
 
-class PCAComponent(BaseModel):
+class PCAComponent(_ProfileModel):
     """One principal component: its explained variance and heaviest feature loadings."""
 
     component: str  # "PC1", "PC2", "PC3"
@@ -225,7 +254,7 @@ class PCAComponent(BaseModel):
     top_features: dict[str, float]  # feature_name -> weight/loading
 
 
-class PCAPoint(BaseModel):
+class PCAPoint(_ProfileModel):
     """A row projected into principal-component space for the scatter view."""
 
     x: float
@@ -234,7 +263,7 @@ class PCAPoint(BaseModel):
     label: str | None = None  # For target coloring
 
 
-class GeoPoint(BaseModel):
+class GeoPoint(_ProfileModel):
     """A latitude/longitude pair, optionally labelled with its target value."""
 
     lat: float
@@ -242,7 +271,7 @@ class GeoPoint(BaseModel):
     label: str | None = None
 
 
-class GeospatialStats(BaseModel):
+class GeospatialStats(_ProfileModel):
     """Bounding box and centroid of a detected latitude/longitude column pair."""
 
     lat_col: str
@@ -256,14 +285,14 @@ class GeospatialStats(BaseModel):
     sample_points: list[GeoPoint]
 
 
-class TimeSeriesPoint(BaseModel):
+class TimeSeriesPoint(_ProfileModel):
     """One timestamp and the metric values observed at it."""
 
     date: str
     values: dict[str, float]
 
 
-class BoxPlotStats(BaseModel):
+class BoxPlotStats(_ProfileModel):
     """Five-number summary used to draw one box plot."""
 
     min: float
@@ -273,14 +302,14 @@ class BoxPlotStats(BaseModel):
     max: float
 
 
-class CategoryBoxPlot(BaseModel):
+class CategoryBoxPlot(_ProfileModel):
     """Box plot for a single category level of a feature."""
 
     name: str
     stats: BoxPlotStats
 
 
-class TargetInteraction(BaseModel):
+class TargetInteraction(_ProfileModel):
     """How a feature's distribution varies across the target, with its ANOVA p-value."""
 
     feature: str
@@ -289,14 +318,14 @@ class TargetInteraction(BaseModel):
     p_value: float | None = None  # ANOVA p-value
 
 
-class SeasonalityStats(BaseModel):
+class SeasonalityStats(_ProfileModel):
     """Time-series aggregates by weekday and by month, to expose seasonal shape."""
 
     day_of_week: list[dict[str, Any]]
     month_of_year: list[dict[str, Any]]
 
 
-class TimeSeriesAnalysis(BaseModel):
+class TimeSeriesAnalysis(_ProfileModel):
     """Trend, seasonality and stationarity summary for a detected date column."""
 
     date_col: str
@@ -306,7 +335,7 @@ class TimeSeriesAnalysis(BaseModel):
     stationarity_test: dict[str, Any] | None = None
 
 
-class OutlierPoint(BaseModel):
+class OutlierPoint(_ProfileModel):
     """One anomalous row: its index, key values, anomaly score and per-feature reasons."""
 
     index: int
@@ -317,19 +346,28 @@ class OutlierPoint(BaseModel):
     )
 
 
-class OutlierAnalysis(BaseModel):
-    """Result of an outlier sweep: which method ran, and what it flagged."""
+class OutlierAnalysis(_ProfileModel):
+    """Result of an outlier sweep over the analyzed rows.
+
+    Counts and percentages describe ``analyzed_rows``, which may be a sample
+    of ``total_rows`` after active filters. Older reports omit both counts;
+    their analyzed population is unknown.
+    """
 
     method: str  # "IsolationForest" or "IQR"
     total_outliers: int
     outlier_percentage: float
     top_outliers: list[OutlierPoint]
+    # Counts and percentages describe analyzed rows, not unsampled input rows.
+    analyzed_rows: int | None = None
+    # Population after active filters; absent in older saved reports.
+    total_rows: int | None = None
     plot_data: list[dict[str, Any]] | None = (
         None  # For visualization (e.g. PCA projection of outliers)
     )
 
 
-class ClusteringPoint(BaseModel):
+class ClusteringPoint(_ProfileModel):
     """A row projected to 2D and tagged with its assigned cluster."""
 
     x: float
@@ -338,7 +376,7 @@ class ClusteringPoint(BaseModel):
     label: str | None = None
 
 
-class ClusterStats(BaseModel):
+class ClusterStats(_ProfileModel):
     """Size and centroid of one discovered cluster."""
 
     cluster_id: int
@@ -347,7 +385,7 @@ class ClusterStats(BaseModel):
     center: dict[str, float]
 
 
-class ClusteringAnalysis(BaseModel):
+class ClusteringAnalysis(_ProfileModel):
     """Unsupervised segment structure found across the profiled rows."""
 
     method: str = "KMeans"
@@ -357,7 +395,7 @@ class ClusteringAnalysis(BaseModel):
     points: list[ClusteringPoint]
 
 
-class Filter(BaseModel):
+class Filter(_ProfileModel):
     """One row-level filter applied to the dataset before profiling."""
 
     column: str
@@ -365,7 +403,7 @@ class Filter(BaseModel):
     value: Any
 
 
-class DatasetProfile(BaseModel):
+class DatasetProfile(_ProfileModel):
     """Root EDA payload: dataset-level facts, per-column profiles and optional analyses."""
 
     row_count: int

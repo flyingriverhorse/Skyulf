@@ -4,20 +4,55 @@ import logging
 from collections.abc import Callable, Sequence
 from typing import Any, ClassVar
 
+import numpy as np
 import pandas as pd
 import polars as pl
 
 from ..config_validation import validate_preprocessing_steps
+from ..core.validation import prediction_row_count, validate_prediction_rows
 from ..data.dataset import SplitDataset
 from ..engines import SkyulfDataFrame
 from ..registry import NodeRegistry
 from ..types import PreprocessingStepConfig
-from ..utils import get_data_stats
+from ..utils import get_data_stats, pack_pipeline_output, unpack_pipeline_input
 from .base import StatefulTransformer
+from .dispatcher import _check_xy_engine_parity
+from .time_series.lag import LagFeaturesApplier
+from .time_series.rolling import RollingAggregateApplier
 
 # Import modules to ensure nodes are registered
 
 logger = logging.getLogger(__name__)
+
+
+def _apply_prediction_step(data: Any, step: dict[str, Any]) -> Any:
+    """Apply once, rejecting row-count changes and built-in temporal permutations."""
+    features, target, was_tuple = unpack_pipeline_input(data)
+    expected = prediction_row_count(features)
+    applier = step["applier"]
+    artifact = step["artifact"]
+    stage = f"Step '{step['name']}' ({step['type']})"
+    if type(applier) not in (LagFeaturesApplier, RollingAggregateApplier):
+        result = applier.apply(data, artifact)
+        validate_prediction_rows(
+            expected, prediction_row_count(unpack_pipeline_input(result)[0]), stage=stage
+        )
+        return result
+
+    # Only these built-ins use y exclusively to follow sorting/filtering.
+    # Keep positional IDs local so later target-aware encoders never see them.
+    _check_xy_engine_parity(features, target)
+    if target is not None:
+        validate_prediction_rows(expected, prediction_row_count(target), stage=f"{stage} target")
+    positions = np.arange(expected)
+    transformed, transformed_positions = applier.apply((features, positions), artifact)
+    validate_prediction_rows(expected, prediction_row_count(transformed), stage=stage)
+    if not np.array_equal(transformed_positions, positions):
+        raise ValueError(
+            f"{stage} changed row order. Prediction requires results in input-row order. "
+            f"Sort input by {artifact.get('sort_by')!r} before requesting predictions."
+        )
+    return pack_pipeline_output(transformed, target, was_tuple)
 
 
 class FeatureEngineer:
@@ -64,8 +99,17 @@ class FeatureEngineer:
         self.steps_config = steps_config
         self.fitted_steps: list[dict[str, Any]] = []
 
-    def transform(self, data: pd.DataFrame | SkyulfDataFrame | Any) -> Any:
-        """Apply fitted transformations to new data."""
+    def transform(
+        self, data: pd.DataFrame | SkyulfDataFrame | Any, *, preserve_rows: bool = False
+    ) -> Any:
+        """Apply transformations, optionally rejecting row-count changes and temporal sorting.
+
+        Prediction callers set ``preserve_rows=True`` because their responses
+        have no input-row provenance. Each applied step is checked immediately;
+        a later step cannot conceal filtering, expansion, or a built-in temporal
+        permutation. Ordinary transform and fold scoring retain their configured
+        filtering and sorting behavior. Custom appliers receive count checks only.
+        """
         current_data = data
 
         for step in self.fitted_steps:
@@ -85,7 +129,11 @@ class FeatureEngineer:
                 continue
 
             logger.debug(f"Applying step: {name} ({transformer_type})")
-            current_data = applier.apply(current_data, artifact)
+            current_data = (
+                _apply_prediction_step(current_data, step)
+                if preserve_rows
+                else applier.apply(current_data, artifact)
+            )
 
         return current_data
 

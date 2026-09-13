@@ -10,7 +10,7 @@ const groups = [
     'casting', 'scale_numeric_features', 'encoding', 'TransformationNode', 'BinningNode',
   ] },
   { id: 'features', label: 'Feature engineering', types: [
-    'FeatureGenerationNode', 'PolynomialFeaturesNode', 'FeatureInteractionNode', 'feature_selection', 'TimeSeriesNode',
+    'FeatureGenerationNode', 'PolynomialFeaturesNode', 'FeatureInteractionNode', 'feature_selection', 'TimeSeriesNode', 'GeoDistance',
   ] },
   { id: 'text', label: 'Text processing', types: [
     'TextCleaning', 'count_vectorizer', 'tfidf_vectorizer', 'hashing_vectorizer', 'tokenizer', 'sentence_embedder',

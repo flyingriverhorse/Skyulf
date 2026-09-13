@@ -10,6 +10,8 @@ create with a hardcoded ``user_id=1``, so every source is visible to every
 caller. Each site carries a ``KNOWN-GAP`` comment to that effect.
 """
 
+from typing import Annotated
+
 from fastapi import (
     APIRouter,
     BackgroundTasks,
@@ -24,6 +26,7 @@ from fastapi.responses import Response
 
 from backend.config import get_settings
 from backend.middleware.rate_limiter import limiter
+from backend.pagination import MAX_SAMPLE_ROWS, validate_query_limit
 
 from .dependencies import get_data_service
 from .schemas.ingestion import (
@@ -43,14 +46,15 @@ sources_router = APIRouter(prefix="/data/api", tags=["Data Sources"])
 
 @sources_router.get("/sources", response_model=DataSourceListResponse)
 async def list_sources(
-    limit: int | None = None,
-    skip: int = 0,
+    limit: Annotated[int | None, Query(ge=1)] = None,
+    skip: Annotated[int, Query(ge=0)] = 0,
     service: DataIngestionService = Depends(get_data_service),
 ):
-    """List all available data sources."""
+    """List sources with a positive limit up to MAX_PAGE_SIZE and a non-negative skip."""
     # KNOWN-GAP: Auth not implemented yet — all sources are visible.
     # TODO(auth): Replace None with real user ID from auth dependency.
     effective_limit = limit if limit is not None else get_settings().DEFAULT_PAGE_SIZE
+    validate_query_limit(effective_limit, get_settings().MAX_PAGE_SIZE)
     sources = await service.list_sources(user_id=None, limit=effective_limit, skip=skip)
     return DataSourceListResponse(sources=[DataSourceRead.model_validate(s) for s in sources])
 
@@ -76,11 +80,12 @@ async def get_source(source_id: str, service: DataIngestionService = Depends(get
 @sources_router.get("/sources/{source_id}/sample", response_model=DataSourceSampleResponse)
 async def get_source_sample(
     source_id: str,
-    limit: int | None = None,
+    limit: Annotated[int | None, Query(ge=1, le=MAX_SAMPLE_ROWS)] = None,
     service: DataIngestionService = Depends(get_data_service),
 ):
-    """Get a sample of data from the source."""
+    """Get up to 50,000 source rows; omitted limits use DEFAULT_SAMPLE_ROWS."""
     effective_limit = limit if limit is not None else get_settings().DEFAULT_SAMPLE_ROWS
+    validate_query_limit(effective_limit, MAX_SAMPLE_ROWS)
     data = await service.get_sample(source_id, effective_limit)
     return DataSourceSampleResponse(data=data)
 
@@ -98,7 +103,7 @@ async def delete_source(source_id: str, service: DataIngestionService = Depends(
 async def export_source_data(
     source_id: str,
     format: str = Query("csv", pattern="^(csv|parquet)$"),  # noqa: A002  # pylint: disable=redefined-builtin
-    limit: int = Query(1000, ge=1, le=50_000),
+    limit: int = Query(1000, ge=1, le=MAX_SAMPLE_ROWS),
     service: DataIngestionService = Depends(get_data_service),
 ) -> Response:
     """Export data from a source as CSV or Parquet."""

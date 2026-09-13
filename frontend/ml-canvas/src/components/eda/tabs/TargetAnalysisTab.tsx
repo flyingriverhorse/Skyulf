@@ -23,14 +23,21 @@ import { InfoTooltip } from '../../ui/InfoTooltip';
 import { StatusBadge } from '../../shared/StatusBadge';
 import { getChartTheme } from '../constants';
 import { useChartTheme } from '../../../core/hooks/useChartTheme';
+import type { EDAProfile } from '../../../core/types/edaProfile';
+import type { EDAHistoryEntry, EDAReport } from '../../../core/api/eda';
 
 interface TargetAnalysisTabProps {
-    profile: any;
+    profile: Pick<EDAProfile, 'target_col' | 'target_correlations' | 'target_interactions' | 'columns'>;
     downloadChart: (id: string, filename: string, title: string, subtitle?: string) => void;
-    history: any[];
+    history: EDAHistoryEntry[];
     loading: boolean;
     loadSpecificReport: (id: number) => void;
-    report: any;
+    report: EDAReport | null;
+}
+
+/** The JSON serializer uses null when a box plot statistic cannot be represented. */
+function formatBoxStatistic(value: number | null): string {
+    return value?.toFixed(2) ?? 'N/A';
 }
 
 export const TargetAnalysisTab: React.FC<TargetAnalysisTabProps> = ({
@@ -48,6 +55,10 @@ export const TargetAnalysisTab: React.FC<TargetAnalysisTabProps> = ({
         setDlAllState('done');
         setTimeout(() => setDlAllState('idle'), 1200);
     }, []);
+
+    const { target_col, target_correlations } = profile;
+    if (!target_correlations) return null;
+    const strongestAssociation = Object.values(target_correlations)[0];
 
     const downloadAllInteractions = async () => {
         if (!profile?.target_interactions) return;
@@ -84,6 +95,7 @@ export const TargetAnalysisTab: React.FC<TargetAnalysisTabProps> = ({
         // Draw each chart
         for (let i = 0; i < interactions.length; i++) {
             const interaction = interactions[i];
+            if (!interaction) continue;
             const elementId = `interaction-chart-${i}`;
             const element = document.getElementById(elementId);
             if (!element) continue;
@@ -103,7 +115,7 @@ export const TargetAnalysisTab: React.FC<TargetAnalysisTabProps> = ({
             ctx.textAlign = 'left';
             ctx.fillText(`${interaction.feature} vs ${profile.target_col}`, x + 40, y);
 
-            if (interaction.p_value !== undefined) {
+            if (interaction.p_value != null) {
                 ctx.font = '14px sans-serif';
                 ctx.fillStyle = interaction.p_value < 0.05 ? '#059669' : theme.subTextColor;
                 ctx.fillText(`ANOVA p: ${Number(interaction.p_value).toExponential(2)}`, x + 40, y + 20);
@@ -168,9 +180,9 @@ export const TargetAnalysisTab: React.FC<TargetAnalysisTabProps> = ({
                             <div className="h-64 w-full" id="target-analysis-chart">
                                 <ResponsiveContainer width="100%" height="100%">
                                     <BarChart
-                                        data={Object.entries(profile.target_correlations)
+                                        data={Object.entries(target_correlations)
                                             .slice(0, 10)
-                                            .map(([k, v]) => ({ name: k, value: v as number }))
+                                            .map(([k, v]) => ({ name: k, value: v }))
                                         }
                                         layout="vertical"
                                         margin={{ top: 5, right: 30, left: 40, bottom: 5 }}
@@ -195,14 +207,14 @@ export const TargetAnalysisTab: React.FC<TargetAnalysisTabProps> = ({
                             <ul className="space-y-2 text-sm">
                                 <li className="flex items-start">
                                     <span className="mr-2 text-blue-500">•</span>
-                                    <span>Target is <strong>{profile.columns[profile.target_col]?.dtype}</strong></span>
+                                    <span>Target is <strong>{profile.columns[String(target_col)]?.dtype}</strong></span>
                                 </li>
                                 <li className="flex items-start">
                                     <span className="mr-2 text-blue-500">•</span>
                                     <span>
-                                        Strongest predictor: <strong>{Object.keys(profile.target_correlations)[0] || 'None'}</strong>
-                                        {Object.values(profile.target_correlations)[0] !== undefined && (
-                                            <> ({(Object.values(profile.target_correlations)[0] as number).toFixed(2)})</>
+                                        Strongest predictor: <strong>{Object.keys(target_correlations)[0] || 'None'}</strong>
+                                        {strongestAssociation != null && (
+                                            <> ({strongestAssociation.toFixed(2)})</>
                                         )}
                                     </span>
                                 </li>
@@ -234,7 +246,7 @@ export const TargetAnalysisTab: React.FC<TargetAnalysisTabProps> = ({
                             <span className="font-semibold">ANOVA Analysis:</span> A p-value &lt; 0.05 (highlighted in green) indicates that the feature varies significantly across the target categories, making it a strong predictor.
                         </p>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            {profile.target_interactions.map((interaction: { feature: string; p_value?: number | null; data: Array<{ name: string; stats: { q1: number; q3: number } } & Record<string, unknown>> }, idx: number) => (
+                            {profile.target_interactions.map((interaction, idx) => (
                                 <div key={idx} className="bg-gray-50 dark:bg-gray-900 p-4 rounded-lg border border-gray-100 dark:border-gray-800 relative group">
                                     <div className="absolute top-2 right-2 opacity-100">
                                         <button
@@ -242,7 +254,7 @@ export const TargetAnalysisTab: React.FC<TargetAnalysisTabProps> = ({
                                                 `interaction-chart-${idx}`,
                                                 `interaction-${interaction.feature}`,
                                                 `${interaction.feature} vs ${profile.target_col}`,
-                                                interaction.p_value !== undefined ? `ANOVA p: ${Number(interaction.p_value).toExponential(2)}` : undefined
+                                                interaction.p_value != null ? `ANOVA p: ${Number(interaction.p_value).toExponential(2)}` : undefined
                                             )}
                                             className="p-1.5 rounded-md bg-white border border-gray-200 text-gray-500 hover:text-gray-700 hover:bg-gray-50 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700 shadow-sm"
                                             title="Download Chart"
@@ -271,7 +283,7 @@ export const TargetAnalysisTab: React.FC<TargetAnalysisTabProps> = ({
                                                 data={interaction.data.map((d) => ({
                                                     ...d,
                                                     boxBottom: d.stats.q1,
-                                                    boxHeight: d.stats.q3 - d.stats.q1
+                                                    boxHeight: d.stats.q3 != null && d.stats.q1 != null ? d.stats.q3 - d.stats.q1 : null
                                                 }))}
                                                 margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
                                             >
@@ -280,17 +292,17 @@ export const TargetAnalysisTab: React.FC<TargetAnalysisTabProps> = ({
                                                 <YAxis domain={['auto', 'auto']} tick={{ fontSize: 11, fill: chartTheme.axisColor }} />
                                                 <Tooltip
                                                     cursor={{ fill: 'transparent' }}
-                                                    content={({ active, payload }) => {
-                                                        if (active && payload && payload.length) {
-                                                            const data = payload[0].payload;
+                                                    content={({ active, activeIndex }) => {
+                                                        const data = activeIndex === undefined ? undefined : interaction.data[Number(activeIndex)];
+                                                        if (active && data) {
                                                             return (
                                                                 <div style={chartTheme.tooltipContentStyle} className="text-xs p-2 rounded shadow-lg z-50">
                                                                     <p className="font-semibold mb-1">{data.name}</p>
-                                                                    <p>Max: {data.stats.max.toFixed(2)}</p>
-                                                                    <p>Q3: {data.stats.q3.toFixed(2)}</p>
-                                                                    <p>Median: {data.stats.median.toFixed(2)}</p>
-                                                                    <p>Q1: {data.stats.q1.toFixed(2)}</p>
-                                                                    <p>Min: {data.stats.min.toFixed(2)}</p>
+                                                                    <p>Max: {formatBoxStatistic(data.stats.max)}</p>
+                                                                    <p>Q3: {formatBoxStatistic(data.stats.q3)}</p>
+                                                                    <p>Median: {formatBoxStatistic(data.stats.median)}</p>
+                                                                    <p>Q1: {formatBoxStatistic(data.stats.q1)}</p>
+                                                                    <p>Min: {formatBoxStatistic(data.stats.min)}</p>
                                                                 </div>
                                                             );
                                                         }

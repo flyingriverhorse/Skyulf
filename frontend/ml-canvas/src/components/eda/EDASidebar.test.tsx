@@ -97,7 +97,9 @@ describe('EDASidebar filter contracts', () => {
     expect(screen.queryByText('Specialized')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Decomposition' })).toBeInTheDocument();
     rerender(<EDASidebar {...baseProps} setActiveTab={setActiveTab} profile={{ ...baseProps.profile,
-      sample_data: [], target_col: 'age', target_correlations: {}, correlations_with_target: {}, clustering: {}, timeseries: {},
+      sample_data: [], target_col: 'age', target_correlations: {}, correlations_with_target: { columns: [], values: [] },
+      clustering: { method: 'KMeans', n_clusters: 2, inertia: 0, clusters: [], points: [] },
+      timeseries: { date_col: 'date', trend: [], seasonality: { day_of_week: [], month_of_year: [] } },
     }} />);
     expect(screen.getByRole('button', { name: 'Sample Data' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Target Analysis' })).toBeInTheDocument();

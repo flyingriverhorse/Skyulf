@@ -35,6 +35,7 @@ from .._class_weights import constructor_accepts_class_weight, split_class_weigh
 from .._evaluation.thresholds import apply_thresholds
 from ..base import BaseModelApplier, BaseModelCalculator
 from ..cross_validation import _sort_by_time
+from ..pruning import resolve_pruning_plan, unsupported_pruning_reason
 from . import splitters
 from .fold_pipeline import FoldAwareModelStep
 from .grid_random import fit_and_score_candidate_fold, run_grid_or_random_search
@@ -300,6 +301,65 @@ class TuningCalculator(BaseModelCalculator):
 
     def _clean_search_space(self, search_space: dict[str, Any]) -> dict[str, Any]:
         return clean_search_space(search_space)
+
+    def pruning_support_reason(self, config: TuningConfig) -> str | None:
+        """Inspect compatibility with the legacy direct incremental Optuna loop.
+
+        Uses calculator defaults and the same estimator preparation as tuning.
+        Use ``pruning_support`` to include native and CV-fold pruning modes.
+        The current pruner selection does not affect capability; the explicit
+        ``pruning=False`` opt-out does.
+        """
+        if config.strategy_params.get("pruning") is False:
+            return "pruning=False explicitly disables incremental trial pruning"
+        model_class = getattr(self.model_calculator, "model_class", None)
+        if model_class is None:
+            return "The model does not expose a tunable estimator class"
+        optuna_config = replace(config, strategy="optuna")
+        estimator, search_config, _, _ = self._prepare_search_estimator(
+            model_class, optuna_config, None, None, None, None, None
+        )
+        return unsupported_pruning_reason(estimator, clean_search_space(search_config.search_space))
+
+    def pruning_support(
+        self,
+        config: TuningConfig,
+        *,
+        n_splits: int | None = None,
+        preprocessing: bool = False,
+    ) -> dict[str, Any]:
+        """Describe current pruning support without fitting or reading any data.
+
+        Graph callers supply the actual split count when a validation partition
+        overrides CV, and indicate whether fold preprocessing will be attached.
+        The selected pruner does not disable capability; the legacy opt-out does.
+        """
+        if config.strategy_params.get("pruning") is False:
+            return {
+                "supported": False,
+                "mode": "none",
+                "reason": "pruning=False explicitly disables trial pruning",
+            }
+        model_class = getattr(self.model_calculator, "model_class", None)
+        if model_class is None:
+            return {
+                "supported": False,
+                "mode": "none",
+                "reason": "The model does not expose a tunable estimator class",
+            }
+        optuna_config = replace(config, strategy="optuna")
+        estimator, prepared, _, _ = self._prepare_search_estimator(
+            model_class, optuna_config, None, None, None, None, None
+        )
+        if n_splits is None:
+            n_splits = splitters.select_cv_by_type(config, self.problem_type).get_n_splits()
+        plan = resolve_pruning_plan(
+            estimator,
+            clean_search_space(prepared.search_space),
+            n_splits=n_splits,
+            preprocessing=preprocessing,
+        )
+        return {"supported": plan.mode != "none", "mode": plan.mode, "reason": plan.reason}
 
     @staticmethod
     def _instantiate_model(model_class: Any, params: dict[str, Any]) -> Any:

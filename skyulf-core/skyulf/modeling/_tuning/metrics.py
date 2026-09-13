@@ -209,20 +209,21 @@ def resolve_metric(config: TuningConfig, y: Any, problem_type: str) -> str:
     return metric
 
 
-def resolve_scorer(metric: str, y: Any, problem_type: str | None) -> Any:
+def resolve_scorer(metric: str | Callable[..., float], y: Any, problem_type: str | None) -> Any:
     """The scorer for *metric*, with the binary ``pos_label`` default fixed.
 
     Names sklearn has no scorer for (``pr_auc_weighted``, ``g_score``) are built
     locally; everything else goes through ``get_scorer``.
 
-    f1/precision/recall scorers assume ``pos_label=1``; targets whose
-    label space does not contain 1 (e.g. raw string labels the fold-aware
-    wrapper scores against before the chain encodes them) make every fold
-    raise ``pos_label=1 is not a valid label`` and surface as all-NaN trials.
-    Pin ``pos_label`` to the sorted-last class — the same convention
-    ``apply_thresholds`` uses for the positive class — whenever the default
-    cannot match. Numeric targets containing 1 keep the stock scorer.
+    Named binary f1/precision/recall/average-precision scorers use the
+    sorted-last training class, matching evaluation and threshold tuning's
+    ``classes_[1]`` probability column. This includes labels ``{1, 2}``,
+    where sklearn's stock positive label 1 would score the negative class.
+    The stock scorer is retained when its default already identifies the
+    positive class. Explicit scorer callables preserve their own choices.
     """
+    if not isinstance(metric, str):
+        return get_scorer(metric)
     builder = CUSTOM_SCORER_BUILDERS.get(metric)
     if builder is not None:
         return builder()
@@ -232,7 +233,7 @@ def resolve_scorer(metric: str, y: Any, problem_type: str | None) -> Any:
     if metric not in BINARY_POS_LABEL_METRICS:
         return scorer
     classes = np.unique(np.asarray(y))
-    if classes.size != 2 or 1 in classes.tolist():
+    if classes.size != 2 or classes[1] == 1:
         return scorer
     pos_label = classes[1].item() if hasattr(classes[1], "item") else classes[1]
     return make_scorer(

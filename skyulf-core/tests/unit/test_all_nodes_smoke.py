@@ -37,6 +37,7 @@ from skyulf.registry import NodeRegistry
 
 
 def _make_dataset(n: int = 120, seed: int = 0) -> pd.DataFrame:
+    """Give node configurations representative numeric, categorical, and missing values."""
     rng = np.random.default_rng(seed)
     df = pd.DataFrame(
         {
@@ -103,6 +104,16 @@ _COLUMN_OVERRIDES: dict[str, dict[str, Any]] = {
     "LabelEncoder": {"columns": _CATEGORICAL_COLS},
     "HashEncoder": {"columns": ["cat_high"], "n_features": 4},
     "TargetEncoder": {"columns": _CATEGORICAL_COLS, "target_column": "target"},
+    "WOEEncoder": {"columns": _CATEGORICAL_COLS},
+    # Cleaning defaults often select no columns; exercise a real operation.
+    "AliasReplacement": {
+        "columns": ["cat_low"],
+        "alias_type": "custom",
+        "custom_map": {"red": "warm"},
+    },
+    "InvalidValueReplacement": {"columns": ["with_outliers"], "rule": "negative"},
+    "TextCleaning": {"columns": ["cat_low"], "operations": [{"op": "case", "mode": "upper"}]},
+    "ValueReplacement": {"columns": ["cat_low"], "mapping": {"red": "warm"}},
 }
 
 # ---------------------------------------------------------------------------
@@ -110,16 +121,10 @@ _COLUMN_OVERRIDES: dict[str, dict[str, Any]] = {
 # in this smoke test. They have their own dedicated tests.
 # ---------------------------------------------------------------------------
 
-_NEEDS_SPECIAL_INPUT: set[str] = {
-    # Resamplers need imblearn + a binary y as a separate Series.
-    "Oversampling",
-    "Undersampling",
+_NEEDS_SPECIAL_INPUT: dict[str, str] = {
+    "Oversampling": "Requires numeric-only features; exercised by the resampling tests.",
+    "Undersampling": "Requires numeric-only features; exercised by the resampling tests.",
 }
-
-# Optional: nodes where we expect fit to silently no-op (return {} or None);
-# we still call them but skip the apply step.
-_FIT_MAY_BE_EMPTY: set[str] = set()
-
 
 # ---------------------------------------------------------------------------
 # Test
@@ -152,12 +157,13 @@ def _maybe_call_apply(
 
 @pytest.mark.parametrize(
     "node_id",
-    sorted(
-        node_id
-        for node_id, meta in NodeRegistry.get_all_metadata().items()
+    [
+        pytest.param(node_id, marks=pytest.mark.skip(reason=_NEEDS_SPECIAL_INPUT[node_id]))
+        if node_id in _NEEDS_SPECIAL_INPUT
+        else pytest.param(node_id)
+        for node_id, meta in sorted(NodeRegistry.get_all_metadata().items())
         if meta.get("category") in {"Preprocessing", "Cleaning"}
-        and node_id not in _NEEDS_SPECIAL_INPUT
-    ),
+    ],
 )
 def test_node_smoke(node_id: str) -> None:
     """Smoke test: every Preprocessing/Cleaning node fits + applies on a
@@ -172,17 +178,10 @@ def test_node_smoke(node_id: str) -> None:
     y = df["target"]
     X = df.drop(columns=["target"])
 
-    # Some encoders (TargetEncoder, LabelEncoder when target_column is set)
-    # require the (X, y) tuple shape for fit. Try the simple shape first.
-    try:
-        params = calculator.fit(X, config)
-    except TypeError:
-        params = calculator.fit((X, y), config)
-
-    if not params:
-        # Nothing to apply (node opted out at fit time, e.g. user_picked_no_columns
-        # short-circuit). That's a valid path — don't fail the smoke.
-        return
+    # The standard tuple shape supplies y to supervised encoders; a missing
+    # target can return an empty artifact without raising TypeError.
+    params = calculator.fit((X, y), config)
+    assert params, f"{node_id}: fit returned an empty artifact; update the smoke input/config"
 
     ok, reason = _maybe_call_apply(applier, X, y, params)
     assert ok, f"{node_id}: {reason}"
@@ -198,3 +197,26 @@ def test_registry_minimum_population() -> None:
     assert len(preprocessing) >= 25, (
         f"Preprocessing registry shrunk: only {len(preprocessing)} nodes registered"
     )
+
+
+@pytest.mark.parametrize("empty_artifact", [{}, None], ids=["empty-mapping", "none"])
+def test_smoke_rejects_empty_fit_artifacts(monkeypatch, empty_artifact: Any) -> None:
+    """A node that unexpectedly opts out must fail the smoke instead of passing unexercised."""
+    calculator_class = NodeRegistry.get_calculator("StandardScaler")
+
+    def empty_fit(self, data, config):
+        """Simulate a node returning no learned artifact for the smoke input."""
+        return empty_artifact
+
+    monkeypatch.setattr(calculator_class, "fit", empty_fit)
+
+    with pytest.raises(AssertionError, match="StandardScaler.*empty"):
+        test_node_smoke("StandardScaler")
+
+
+def test_smoke_requires_a_config_for_nodes_with_noop_defaults(monkeypatch) -> None:
+    """Removing a real node's required smoke hint must expose its unexercised default path."""
+    monkeypatch.delitem(_COLUMN_OVERRIDES, "TextCleaning")
+
+    with pytest.raises(AssertionError, match="TextCleaning.*empty"):
+        test_node_smoke("TextCleaning")

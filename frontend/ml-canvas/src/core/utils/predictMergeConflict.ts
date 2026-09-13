@@ -26,10 +26,19 @@ const COLUMN_WRITERS: Record<string, string> = {
   TextCleaning: 'columns',
 };
 
+/** Match Core's configured or unit-based distance output name. */
+function geoDistanceOutputColumn(data: Record<string, unknown>): string {
+  return (data.output_column as string) || `geo_distance_${(data.unit as string) || 'km'}`;
+}
+
 /** Column names a single node rewrites, based on its current configuration. */
 export function columnsWrittenBy(node: Node): string[] {
   const definitionType = node.data?.definitionType as string | undefined;
   if (!definitionType) return [];
+  if (definitionType === 'GeoDistance') {
+    return [geoDistanceOutputColumn(node.data)];
+  }
+  if (definitionType === 'outlier' && node.data.method === 'manual_bounds') return [];
 
   // TransformationNode nests its targets one level deeper, as a list of rules.
   if (definitionType === 'TransformationNode') {

@@ -118,7 +118,7 @@ class BaseCalculator(ABC):
         can be derived purely from ``input_schema`` and ``config`` (i.e.
         without seeing data). Examples:
 
-        * Scalers — pass through (output == input).
+        * Scalers — preserve column names and predict output dtype promotion.
         * Drop columns by name — drop the configured names.
         * One-hot — adds K columns per categorical (K is data-dependent →
           return ``None``).

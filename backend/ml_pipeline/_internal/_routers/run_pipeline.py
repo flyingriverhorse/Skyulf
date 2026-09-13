@@ -45,24 +45,28 @@ router = APIRouter(tags=["ML Pipeline"])
 # Per-key asyncio locks prevent two concurrent requests from racing through
 # the find_active_job + create_job check simultaneously (same event loop).
 _submit_locks: dict[str, asyncio.Lock] = {}
+_submit_lock_users: dict[str, int] = {}
 _submit_locks_guard = asyncio.Lock()
 
 
 async def _get_submit_lock(key: str) -> asyncio.Lock:
+    """Retain the key's lock before a caller can start waiting for ownership."""
     async with _submit_locks_guard:
         if key not in _submit_locks:
             _submit_locks[key] = asyncio.Lock()
+        _submit_lock_users[key] = _submit_lock_users.get(key, 0) + 1
         return _submit_locks[key]
 
 
 async def _release_submit_lock(key: str) -> None:
-    """Evict the lock entry once no submission is actively holding it.
-
-    Any waiter that already has a reference to the lock object will acquire
-    it normally; the eviction only prevents the dict from growing unbounded.
-    """
+    """Evict only after the last owner or waiting caller releases its reference."""
     async with _submit_locks_guard:
-        _submit_locks.pop(key, None)
+        remaining = _submit_lock_users.get(key, 1) - 1
+        if remaining:
+            _submit_lock_users[key] = remaining
+        else:
+            _submit_lock_users.pop(key, None)
+            _submit_locks.pop(key, None)
 
 
 def _build_sub_pipelines(
@@ -181,36 +185,40 @@ async def _submit_or_dedupe_branch_job(
 
     Idempotency: if this exact node is already queued/running from a recent
     submission, the existing job id is returned instead of spawning a
-    duplicate Celery task (e.g. accidental double-click). The asyncio lock
-    serialises concurrent requests so the check+create pair is atomic within
-    the event loop — no two coroutines race through it at the same time.
+    duplicate Celery task. The database reservation also serializes callers
+    in independent API processes and stays held across manager commits.
 
     Returns ``(job_id, was_existing)``.
     """
-    submit_key = f"{dataset_id}:{target_node_id}:{branch_index}"
+    if job_type not in ("training", "tuning", "preview"):
+        raise HTTPException(status_code=400, detail="Unsupported job_type")
+    node_id = target_node_id or "unknown"
+    submit_key = repr((dataset_id, node_id, branch_index))
     lock = await _get_submit_lock(submit_key)
-    async with lock:
-        existing_job_id = await JobManager.find_active_job(
-            db, dataset_id, target_node_id or "unknown", branch_index
-        )
-        if existing_job_id:
-            logger.info("Deduplicating submission: returning existing job %s", existing_job_id)
-            await _release_submit_lock(submit_key)
-            return existing_job_id, True
-
-        # Create Job in DB (commits immediately, visible to next waiter)
-        job_id = await JobManager.create_job(
-            session=db,
-            pipeline_id=sub.pipeline_id,
-            node_id=target_node_id or "unknown",
-            job_type=cast(Literal["training", "tuning", "preview"], job_type),
-            dataset_id=dataset_id,
-            model_type=model_type,
-            graph=branch_graph,
-            branch_index=branch_index,
-        )
-    await _release_submit_lock(submit_key)
-    return job_id, False
+    try:
+        async with (
+            lock,
+            JobManager.reserve_submission(db, dataset_id, node_id, branch_index) as reserved,
+        ):
+            existing_job_id = await JobManager.find_active_job(
+                reserved, dataset_id, node_id, branch_index
+            )
+            if existing_job_id:
+                logger.info("Deduplicating submission: returning existing job %s", existing_job_id)
+                return existing_job_id, True
+            job_id = await JobManager.create_job(
+                session=reserved,
+                pipeline_id=sub.pipeline_id,
+                node_id=node_id,
+                job_type=cast(Literal["training", "tuning", "preview"], job_type),
+                dataset_id=dataset_id,
+                model_type=model_type,
+                graph=branch_graph,
+                branch_index=branch_index,
+            )
+            return job_id, False
+    finally:
+        await _release_submit_lock(submit_key)
 
 
 async def _submit_branch_jobs(
@@ -378,6 +386,9 @@ async def run_pipeline(
     runs concurrently. The response includes all ``job_ids``.
     """
     pipeline_id = config.pipeline_id
+
+    if config.job_type not in (None, "training", "tuning", "preview"):
+        raise HTTPException(status_code=400, detail="Unsupported job_type")
 
     if not config.nodes:
         raise HTTPException(status_code=400, detail="Pipeline has no nodes")

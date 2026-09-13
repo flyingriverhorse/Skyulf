@@ -19,7 +19,7 @@ from .._helpers import (
 from .._schema import SkyulfSchema
 from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
 from ..dispatcher import apply_dual_engine, fit_dual_engine
-from ._common import _select_subset_pandas, _select_subset_polars
+from ._common import _select_subset_pandas, _select_subset_polars, validate_scaling_range
 
 
 class MinMaxScalerApplier(BaseApplier):
@@ -110,7 +110,7 @@ class MinMaxScalerCalculator(BaseCalculator):
 def _fit_minmax(X_subset: Any, cols: list[str], config: dict[str, Any]) -> dict[str, Any]:
     # `feature_range` may arrive as a JSON-loaded list (e.g. ``[0, 1]``) from the
     # frontend or pipeline config; sklearn enforces ``tuple`` via param validation.
-    feature_range = tuple(config.get("feature_range", (0, 1)))
+    feature_range = validate_scaling_range(config.get("feature_range", (0, 1)), "feature_range")
     scaler = MinMaxScaler(feature_range=feature_range)
     X_np, _ = SklearnBridge.to_sklearn(X_subset)
     scaler.fit(X_np)

@@ -5,6 +5,8 @@ import type { GraphValidationIssue } from '../useGraphStore';
 import { convertGraphToPipelineConfig } from '../../utils/pipelineConverter';
 import { findCycleIssues } from '../../utils/pipelineCycleValidation';
 import { findPreprocessingBeforeSplitIssues } from '../../utils/pipelineLeakageValidation';
+import { findEnsembleConnectionIssues } from '../../utils/ensembleConnections';
+import { upstreamTargetColumns } from '../../utils/upstreamTargetColumns';
 
 const prettifyDefinitionType = (definitionType: string): string =>
   definitionType.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
@@ -33,10 +35,44 @@ export function collectGraphValidationIssues(nodes: Node[], edges: Edge[]): Grap
   const issues: GraphValidationIssue[] = [];
 
   for (const node of activeNodes) collectNodeIssues(node, activeEdges, issues);
+  collectSeparatedTargetIssues(activeNodes, activeEdges, issues);
+  for (const issue of findEnsembleConnectionIssues(activeNodes, activeEdges)) {
+    const target = activeNodes.find(node => node.id === issue.targetId)!;
+    issues.push({ nodeId: target.id, nodeLabel: getNodeLabel(target), category: 'connection', message: issue.message });
+  }
   const pipelineConfig = convertGraphToPipelineConfig(activeNodes, activeEdges);
   collectLeakageIssues(pipelineConfig.nodes, activeNodes, issues);
   collectCycleIssues(pipelineConfig.nodes, activeNodes, issues);
   return issues;
+}
+
+/** The new feature-only controls cannot operate on labels already separated into y. */
+function featureReferences(node: Node): [string, unknown][] {
+  if (node.data.definitionType === 'GeoDistance') {
+    return ['lat1_col', 'lon1_col', 'lat2_col', 'lon2_col'].map(field => [field, node.data[field]]);
+  }
+  if (node.data.definitionType === 'outlier' && node.data.method === 'manual_bounds') {
+    const columns = Array.isArray(node.data.columns) ? node.data.columns : [];
+    return columns.map(column => ['bounds', column]);
+  }
+  return [];
+}
+
+/** Reject stale saved selections without waiting for the asynchronous schema request. */
+function collectSeparatedTargetIssues(nodes: Node[], edges: Edge[], issues: GraphValidationIssue[]): void {
+  for (const node of nodes) {
+    const references = featureReferences(node);
+    if (references.length === 0) continue;
+    const targets = upstreamTargetColumns(node.id, nodes, edges);
+    for (const [field, column] of references) {
+      if (typeof column !== 'string' || !targets.has(column)) continue;
+      const label = getNodeLabel(node);
+      issues.push({
+        nodeId: node.id, nodeLabel: label, category: 'configuration', field,
+        message: `${column} has been separated as the target and is unavailable to ${label}. Choose a feature column.`,
+      });
+    }
+  }
 }
 
 /** Keep configuration and required-connection issues in node order. */

@@ -208,7 +208,7 @@ export function EnsembleSettings({ config, onChange, nodeId }: {
             <ParallelJobsSection config={config} update={update} />
             <CalibrationSection config={config} update={update} />
 
-            {isAdvanced && <AdvancedTuningOptions config={config} update={update} />}
+            {isAdvanced && <AdvancedTuningOptions config={config} update={update} nodeId={nodeId} />}
 
             <div className="flex items-start gap-1.5 text-[10px] text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded px-2 py-1.5">
               <Info className="w-3 h-3 mt-0.5 shrink-0" />

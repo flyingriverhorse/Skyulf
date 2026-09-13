@@ -13,6 +13,7 @@ from typing import cast
 import polars as pl
 
 from backend.config import get_settings
+from backend.pagination import MAX_SAMPLE_ROWS, validate_limit
 
 from .base import BaseConnector
 
@@ -187,8 +188,11 @@ class LocalFileConnector(BaseConnector):
 
         CSV and Parquet satisfy a bounded request through a lazy ``head`` so a
         preview never materialises the file. Every other case reads the file in
-        full and truncates afterwards.
+        full and truncates afterwards. Explicit limits must be between 1 and
+        50,000; ``None`` keeps the full-file ingestion operation.
         """
+        if limit is not None:
+            validate_limit(limit, MAX_SAMPLE_ROWS)
         lazy_head = self._try_lazy_head(limit=limit)
         if lazy_head is not None:
             return lazy_head

@@ -28,6 +28,7 @@ from backend.data_ingestion.schemas.ingestion import (
 from backend.data_ingestion.tasks import ingest_data_task
 from backend.database.models import DataSource
 from backend.exceptions.core import ForbiddenException, ResourceNotFoundException, SkyulfException
+from backend.pagination import MAX_SAMPLE_ROWS, validate_limit, validate_page_bounds
 from backend.services.data_service import DataService
 from backend.utils import sanitize_for_log
 
@@ -65,6 +66,7 @@ class DataIngestionService:
     ) -> Sequence[DataSource]:
         """List all data sources."""
         effective_limit = limit if limit is not None else get_settings().DEFAULT_PAGE_SIZE
+        validate_page_bounds(effective_limit, skip)
         query = select(DataSource)
         if user_id:
             query = query.where(DataSource.created_by == user_id)
@@ -296,8 +298,9 @@ class DataIngestionService:
         return []
 
     async def get_sample(self, source_id: int | str, limit: int | None = None) -> list[dict]:
-        """Get a sample of data from the source."""
+        """Get 1 to 50,000 source rows, validating the limit before source lookup."""
         effective_limit = limit if limit is not None else get_settings().DEFAULT_SAMPLE_ROWS
+        validate_limit(effective_limit, MAX_SAMPLE_ROWS)
 
         source = await self.get_source(source_id)
         if not source:

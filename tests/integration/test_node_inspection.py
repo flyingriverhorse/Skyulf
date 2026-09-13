@@ -281,8 +281,8 @@ def test_default_preview_preserves_terminal_payload_without_inspection(preview_c
     assert response["run_id"] is None
 
 
-def test_resolution_failure_cleans_up_temporary_store(preview_client, monkeypatch):
-    """Dataset lookup errors must release the temporary directory even before execution."""
+def test_resolution_failure_does_not_allocate_temporary_store(preview_client, monkeypatch):
+    """Dataset lookup errors must leave no worker-owned resources to clean up."""
     monkeypatch.setattr(
         preview_mod,
         "resolve_pipeline_nodes",
@@ -292,8 +292,7 @@ def test_resolution_failure_cleans_up_temporary_store(preview_client, monkeypatc
         "/pipeline/preview", json={"pipeline_id": "missing", "nodes": [_source()]}
     )
     assert response.status_code == 404
-    assert preview_client.directories
-    assert all(not path.exists() for path in preview_client.directories)
+    assert preview_client.directories == []
 
 
 def test_cell_values_are_json_safe_detached_and_bounded():

@@ -50,6 +50,26 @@ def _step_learns_from_data(step: dict[str, Any], target_column: str | None = Non
     )
 
 
+def partition_fold_steps(
+    steps: list[dict[str, Any]], target_column: str | None = None
+) -> tuple[int | None, list[dict[str, Any]], list[dict[str, Any]]]:
+    """Select the runtime fold steps without reading artifacts or fitting data.
+
+    Return the first row-split position, unsafe learners before it, and the
+    remaining non-splitter steps. Stateless steps before the first split are
+    already applied to its snapshot; stateless steps after it still need replay.
+    """
+    first_split = next(
+        (i for i, step in enumerate(steps) if step.get("transformer") in train_test_splitters()),
+        None,
+    )
+    before = steps[:first_split] if first_split is not None else []
+    after = steps[first_split + 1 :] if first_split is not None else steps
+    unsafe = [step for step in before if _step_learns_from_data(step, target_column)]
+    replay = [step for step in after if step.get("transformer") not in SPLITTER_STEP_TYPES]
+    return first_split, unsafe, replay
+
+
 class FeatureEngMixin:
     """Feature-engineer composition + model bundling helpers."""
 
@@ -619,58 +639,33 @@ class FeatureEngMixin:
                 for node_id, steps in chain
                 for idx, step in enumerate(steps)
             ]
-            splitter_positions = [
-                i
-                for i, (step, *_) in enumerate(flat)
-                if step.get("transformer") in train_test_splitters()
-            ]
-            if splitter_positions:
-                first_split = splitter_positions[0]
-                pre_split_learners = [
-                    step
-                    for step, *_ in flat[:first_split]
-                    if _step_learns_from_data(step, target_col)
-                ]
-                if pre_split_learners:
-                    # Reconstructing the pre-transform payload would re-fit these
-                    # steps on the full frame (held-out rows included), and the
-                    # per-fold adapter would then apply them a second time —
-                    # leaky statistics plus double-transformed features.
-                    names = ", ".join(
-                        sorted({str(step.get("transformer")) for step in pre_split_learners})
-                    )
-                    warning = (
-                        f"data-dependent step(s) before the first row splitter ({names}) "
-                        "cannot be re-fit safely per fold"
-                    )
-                    code = "learner_before_split"
-                    return None, code
-                # Stateless pre-split steps were already applied during payload
-                # reconstruction (or by the upstream node whose artifact is
-                # loaded below); keep them out of the per-fold chain so every
-                # step is applied exactly once.
-                learning_steps = [
-                    step
-                    for step, *_ in flat[first_split + 1 :]
-                    if step.get("transformer") not in SPLITTER_STEP_TYPES
-                ]
-            else:
-                # No split at all: every non-splitter step refits per fold.
-                learning_steps = [
-                    step for step, *_ in flat if step.get("transformer") not in SPLITTER_STEP_TYPES
-                ]
+            first_split, pre_split_learners, learning_steps = partition_fold_steps(
+                [step for step, *_ in flat], target_col
+            )
+            if pre_split_learners:
+                # Re-fitting full-frame learners would leak held-out statistics
+                # and apply their transformation to the split a second time.
+                names = ", ".join(
+                    sorted({str(step.get("transformer")) for step in pre_split_learners})
+                )
+                warning = (
+                    f"data-dependent step(s) before the first row splitter ({names}) "
+                    "cannot be re-fit safely per fold"
+                )
+                code = "learner_before_split"
+                return None, code
             if not learning_steps:
                 # Only splitters (and stateless pre-split steps) upstream:
                 # nothing data-dependent to refit per fold.
                 return None, None
 
-            if not splitter_positions:
+            if first_split is None:
                 # No split at all: the raw loader frame IS the train payload.
                 loader_frame = self.artifact_store.load(loader_id)
                 payload = self._split_train_payload(loader_frame, target_col)
                 validation_payload = self._split_validation_payload(loader_frame, target_col)
             else:
-                _step, node_id, idx, total = flat[splitter_positions[0]]
+                _step, node_id, idx, total = flat[first_split]
                 if idx == total - 1:
                     # The first row splitter ends at a node boundary, so its stored
                     # output artifact is the pre-transform SplitDataset itself.

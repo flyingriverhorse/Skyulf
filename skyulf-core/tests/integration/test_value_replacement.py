@@ -6,6 +6,7 @@ NaN replacement, unseen values, edge cases (empty df, no valid columns),
 and fit -> apply round trips.
 """
 
+import json
 from typing import Any
 
 import numpy as np
@@ -148,6 +149,65 @@ def test_apply_unrecognized_mapping_key_does_not_mutate_boolean_column() -> None
         if hasattr(result, "to_pandas"):
             result = result.to_pandas()
         assert result["flag"].tolist() == [True, False]
+
+
+@pytest.mark.parametrize("engine", ["pandas", "polars"])
+@pytest.mark.parametrize(
+    "dtype,values,mapping,expected",
+    [
+        ("Int64", [1, 2, None], {"1": 10}, [10, 2, None]),
+        ("Float64", [1.5, 2.5, None], {"1.5": 10.5}, [10.5, 2.5, None]),
+        ("boolean", [True, False, None], {" TRUE ": False, "0": True}, [False, True, None]),
+        ("string", ["red", "green", None], {"red": "warm"}, ["warm", "green", None]),
+        ("Int64", [1, 2, None], {"banana": 99}, [1, 2, None]),
+        ("Int64", [1, 2, None], {"1": 10, "banana": 99, "1.5": 99}, [10, 2, None]),
+        ("Float64", [1.5, 2.5, None], {"1.5": 10.5, "banana": 99.0}, [10.5, 2.5, None]),
+        ("boolean", [True, False, None], {"true": False, "banana": True}, [False, False, None]),
+    ],
+)
+def test_json_mapping_keys_match_nullable_column_types(
+    engine: str, dtype: str, values: list, mapping: dict, expected: list
+) -> None:
+    """Saved JSON string keys must replace numeric and boolean values without losing nulls."""
+    config = json.loads(json.dumps({"columns": ["value"], "mapping": mapping}))
+    source = pd.DataFrame({"value": pd.Series(values, dtype=dtype)})
+    original = source.copy(deep=True)
+    frame = source if engine == "pandas" else pl.from_pandas(source)
+    artifact = ValueReplacementCalculator().fit(frame, config)
+    result = ValueReplacementApplier().apply(frame, artifact)
+    expected_frame = pd.DataFrame({"value": pd.Series(expected, dtype=dtype)})
+
+    if isinstance(frame, pl.DataFrame):
+        assert result.equals(pl.from_pandas(expected_frame))
+        assert frame.equals(pl.from_pandas(original))
+    else:
+        pd.testing.assert_frame_equal(result, expected_frame)
+        pd.testing.assert_frame_equal(frame, original)
+    assert config["mapping"] == mapping
+
+
+@pytest.mark.parametrize("engine", ["pandas", "polars"])
+def test_nested_mapping_respects_selected_columns_and_preserves_target(engine: str) -> None:
+    """Partial per-column mappings must leave unmapped features, excluded columns, and y intact."""
+    source = pd.DataFrame({"a": [1, 2, 3], "b": [1, 2, 3], "excluded": [1, 2, 3]})
+    target = pd.Series([0, 1, 0], name="target")
+    config = {
+        "columns": ["a", "b"],
+        "mapping": {"a": {"1": 10}, "excluded": {"2": 20}, "missing": {"3": 30}},
+    }
+    frame = source if engine == "pandas" else pl.from_pandas(source)
+    artifact = ValueReplacementCalculator().fit((frame, target), config)
+    result, result_target = ValueReplacementApplier().apply((frame, target), artifact)
+    expected = source.copy()
+    expected["a"] = [10, 2, 3]
+
+    if isinstance(frame, pl.DataFrame):
+        assert result.equals(pl.from_pandas(expected))
+        assert frame.equals(pl.from_pandas(source))
+    else:
+        pd.testing.assert_frame_equal(result, expected)
+        pd.testing.assert_frame_equal(frame, source)
+    pd.testing.assert_series_equal(result_target, target)
 
 
 # ---------------------------------------------------------------------------

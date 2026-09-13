@@ -10,6 +10,8 @@ encodes text into ``{src}__emb__{i}`` float columns.  Models are cached per
 """
 
 import logging
+from concurrent.futures import Future
+from threading import Lock
 from typing import Any
 
 import numpy as np
@@ -33,6 +35,8 @@ from ._common import (
 logger = logging.getLogger(__name__)
 
 _MODEL_CACHE: dict[str, Any] = {}
+_MODEL_LOADS: dict[str, Future[Any]] = {}
+_MODEL_CACHE_LOCK = Lock()
 
 _INSTALL_HINT = (
     "SentenceEmbedder requires the 'sentence-transformers' package. "
@@ -41,9 +45,35 @@ _INSTALL_HINT = (
 
 
 def _load_model(model_name: str) -> Any:
-    """Lazily import sentence-transformers and return a cached model."""
-    if model_name in _MODEL_CACHE:
-        return _MODEL_CACHE[model_name]
+    """Share one in-process construction per key, including failures, without blocking other keys."""
+    with _MODEL_CACHE_LOCK:
+        if model_name in _MODEL_CACHE:
+            return _MODEL_CACHE[model_name]
+        pending = _MODEL_LOADS.get(model_name)
+        owner = pending is None
+        if owner:
+            pending = Future()
+            _MODEL_LOADS[model_name] = pending
+    if not owner:
+        return pending.result()
+    try:
+        model = _construct_model(model_name)
+    except BaseException as exc:
+        # A notified waiter may retry immediately while this owner is still unwinding.
+        with _MODEL_CACHE_LOCK:
+            _MODEL_LOADS.pop(model_name, None)
+        # Wake every waiter even when loading is interrupted rather than raising Exception.
+        pending.set_exception(exc)
+        raise
+    with _MODEL_CACHE_LOCK:
+        _MODEL_CACHE[model_name] = model
+        _MODEL_LOADS.pop(model_name, None)
+    pending.set_result(model)
+    return model
+
+
+def _construct_model(model_name: str) -> Any:
+    """Import the optional dependency and load model weights outside the cache lock."""
     try:
         # ty: ignore[unresolved-import]
         from sentence_transformers import (  # noqa: PLC0415 - optional nlp extra
@@ -52,9 +82,7 @@ def _load_model(model_name: str) -> Any:
     except ImportError as exc:  # pragma: no cover - depends on optional extra
         raise ImportError(_INSTALL_HINT) from exc
 
-    model = SentenceTransformer(model_name)
-    _MODEL_CACHE[model_name] = model
-    return model
+    return SentenceTransformer(model_name)
 
 
 def _embedding_dimension(model: Any) -> int:
@@ -200,11 +228,11 @@ class SentenceEmbedderCalculator(BaseCalculator):
     ``learns_from_data=False`` — the weights come pretrained and are never
     adjusted here — but fitting is not free: it performs the lazy
     ``sentence-transformers`` import and, on a cold cache, downloads the model.
-    """
 
-    def infer_output_schema(self, input_schema: Any, config: dict[str, Any]) -> None:
-        """Return ``None``: the embedding width is only known once the model is loaded."""
-        return None
+    Schema inference inherits the base ``None`` result because the embedding
+    width is only known after loading the model. Previewing the schema therefore
+    does not load model weights and leaves the output unknown until runtime.
+    """
 
     @fit_method
     def fit(self, X: Any, _y: Any, config: dict[str, Any]) -> SentenceEmbedderArtifact:  # pylint: disable=arguments-differ

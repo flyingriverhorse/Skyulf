@@ -40,6 +40,7 @@ from backend.exceptions.handlers import (
     validation_exception_handler,
 )
 from backend.health.routes import router as health_router
+from backend.middleware.default_rate_limit import DefaultRateLimitMiddleware
 from backend.middleware.error_handler import ErrorHandlerMiddleware
 from backend.middleware.logging import LoggingMiddleware
 from backend.middleware.rate_limiter import limiter
@@ -303,6 +304,7 @@ def create_app() -> FastAPI:
         RateLimitExceeded,
         _rate_limit_exceeded_handler,  # ty: ignore[invalid-argument-type]
     )
+    app.add_middleware(DefaultRateLimitMiddleware)
 
     # Add middleware (order matters!)
     _add_middleware(app, settings)

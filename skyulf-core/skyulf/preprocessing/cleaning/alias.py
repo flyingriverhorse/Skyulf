@@ -4,6 +4,7 @@ import re
 import string
 from typing import Any
 
+import pandas as pd
 import polars as pl
 
 from ...core.meta.decorators import node_meta
@@ -43,6 +44,7 @@ def _normalize_alias_custom_map(custom_map: dict[Any, Any]) -> dict[Any, Any]:
 
 
 def _resolve_alias_mapping(alias_type: str, custom_map: dict[str, str]) -> dict[str, str]:
+    """Return the configured text alias dictionary."""
     if alias_type == "boolean":
         return COMMON_BOOLEAN_ALIASES
     if alias_type == "country":
@@ -53,18 +55,33 @@ def _resolve_alias_mapping(alias_type: str, custom_map: dict[str, str]) -> dict[
 
 
 def _normalize_alias_pandas(val: Any, mapping: dict[str, str]) -> Any:
+    """Normalize text aliases while preserving non-text values exactly."""
     if not isinstance(val, str):
         return val
     clean = val.lower().translate(ALIAS_PUNCTUATION_TABLE).replace(" ", "")
     return mapping.get(clean, val)
 
 
+def _replace_pandas_aliases(series: pd.Series, mapping: dict[str, str]) -> pd.Series:
+    """Keep object values exact instead of inferring float from integers mixed with nulls."""
+    if series.dtype == object:
+        return pd.Series(
+            [_normalize_alias_pandas(value, mapping) for value in series],
+            index=series.index,
+            name=series.name,
+            dtype=object,
+        )
+    return series.map(lambda value: _normalize_alias_pandas(value, mapping))
+
+
 class AliasReplacementApplier(BaseApplier):
     """Canonicalise near-duplicate text values in the resolved columns.
 
     The pandas and polars paths must agree value-for-value: each cell is
-    normalised (lowercased, punctuation and spaces stripped) and looked up in
+    normalised if it is text (lowercased, punctuation and spaces stripped) and looked up in
     the alias map, and a cell that matches nothing is left exactly as it was.
+    Explicitly selected non-text values are unchanged, including numeric 0/1
+    and booleans. Cast them to strings first to interpret them as text aliases.
     ``punctuation`` mode is the exception — it strips punctuation only,
     preserving case and spaces.
     """
@@ -78,6 +95,7 @@ class AliasReplacementApplier(BaseApplier):
 
     @staticmethod
     def _apply_polars(X: Any, _y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
+        """Map native text columns without coercing selected non-text columns."""
         valid = resolve_valid_columns(X, params.get("columns", []))
         if not valid:
             return X, _y
@@ -97,7 +115,20 @@ class AliasReplacementApplier(BaseApplier):
         mapping = _resolve_alias_mapping(alias_type, params.get("custom_map", {}))
 
         exprs = []
+        text_columns = set(_auto_detect_text_columns(X))
         for col in valid:
+            if col not in text_columns:
+                continue
+            if X.schema[col] == pl.Object:
+                exprs.append(
+                    pl.col(col)
+                    .map_elements(
+                        lambda value: _normalize_alias_pandas(value, mapping),
+                        return_dtype=pl.Object,
+                    )
+                    .alias(col)
+                )
+                continue
             clean_expr = (
                 pl.col(col)
                 .cast(pl.String)
@@ -114,6 +145,7 @@ class AliasReplacementApplier(BaseApplier):
 
     @staticmethod
     def _apply_pandas(X: Any, _y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
+        """Apply text aliases without stringifying numbers in mixed object columns."""
         valid = resolve_valid_columns(X, params.get("columns", []))
         if not valid:
             return X, _y
@@ -132,16 +164,10 @@ class AliasReplacementApplier(BaseApplier):
         mapping = _resolve_alias_mapping(alias_type, params.get("custom_map", {}))
 
         df_out = X.copy()
+        text_columns = set(_auto_detect_text_columns(X))
         for col in valid:
-            clean_series = (
-                df_out[col]
-                .astype(str)
-                .str.lower()
-                .str.translate(ALIAS_PUNCTUATION_TABLE)
-                .str.replace(" ", "")
-            )
-            mapped_series = clean_series.map(mapping)
-            df_out[col] = mapped_series.fillna(df_out[col])
+            if col in text_columns:
+                df_out[col] = _replace_pandas_aliases(df_out[col], mapping)
         return df_out, _y
 
 

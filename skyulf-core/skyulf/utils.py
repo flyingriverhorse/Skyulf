@@ -16,10 +16,8 @@ import numpy as np
 import pandas as pd
 import polars as pl
 
-from skyulf.engines import EngineName
-
 from .data.dataset import SplitDataset
-from .engines import POLARS_NUMERIC_DTYPES, SkyulfDataFrame, get_engine
+from .engines import POLARS_NUMERIC_DTYPES, SkyulfDataFrame, SkyulfPolarsWrapper, get_engine
 
 logger = logging.getLogger(__name__)
 
@@ -197,9 +195,7 @@ def pack_pipeline_output(
 
     if y is not None:
         # Re-attach y to X
-        engine = get_engine(X)
-
-        if getattr(engine, "name", "") == "polars":
+        if isinstance(X, pl.DataFrame | SkyulfPolarsWrapper):
             return _pack_polars_output(X, y)
 
         # Default to Pandas behavior (convert if needed or assume Pandas)
@@ -336,9 +332,8 @@ def detect_numeric_columns(
         exclude_binary: If True, excludes columns with only 0/1 values.
         exclude_constant: If True, excludes columns with 0 or 1 unique value.
     """
-    engine = get_engine(frame)
-
-    if engine.name == EngineName.POLARS:
+    # Keep generic to_pandas adapters independent of the configured fallback.
+    if isinstance(frame, pl.DataFrame | SkyulfPolarsWrapper):
         return _detect_numeric_columns_polars(frame, exclude_binary, exclude_constant)
 
     # Convert to Pandas for analysis if not already

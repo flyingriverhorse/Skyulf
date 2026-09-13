@@ -269,6 +269,34 @@ def test_unimplemented_calculator_returns_none() -> None:
     assert VarianceThresholdCalculator().infer_output_schema(s, {}) is None
 
 
+@pytest.mark.parametrize(
+    "node_id",
+    [
+        "count_vectorizer",
+        "tfidf_vectorizer",
+        "hashing_vectorizer",
+        "tokenizer",
+        "sentence_embedder",
+    ],
+)
+@pytest.mark.parametrize(
+    "config",
+    [
+        {},
+        {"columns": []},
+        {"columns": ["text"], "drop_original": True},
+        {"columns": ["missing"], "n_features": 8},
+    ],
+)
+def test_text_vectorization_schema_stays_unknown_without_fitting(
+    node_id: str, config: dict[str, object]
+) -> None:
+    """Preview must defer to runtime rather than promise unverified text output columns."""
+    schema = SkyulfSchema.from_columns(["text", "other"], {"text": "object", "other": "int64"})
+    calculator = NodeRegistry.get_calculator(node_id)()
+    assert calculator.infer_output_schema(schema, config) is None
+
+
 # ---------- Phase A: passthrough Calculators ----------
 
 

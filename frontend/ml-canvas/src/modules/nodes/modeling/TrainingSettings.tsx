@@ -67,7 +67,7 @@ export const TrainingSettings: React.FC<{
   return (
     <div className="flex flex-col h-full" ref={state.containerRef}>
       <TrainingInformation {...state} />
-      <TrainingDialogs {...state} />
+      <TrainingDialogs {...state} nodeId={nodeId} />
       <TrainingLayout {...state} modelPanel={<ModelConfigSection {...state} />} secondaryPanel={secondaryPanel} />
       <TrainingFooter {...state} />
     </div>

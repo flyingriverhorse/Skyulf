@@ -7,12 +7,12 @@ export interface ScalingConfig {
   with_std?: boolean;
 
   // MinMax Scaler
-  feature_range_min?: number;
-  feature_range_max?: number;
+  feature_range_min?: number | null;
+  feature_range_max?: number | null;
 
   // Robust Scaler
-  quantile_range_min?: number;
-  quantile_range_max?: number;
+  quantile_range_min?: number | null;
+  quantile_range_max?: number | null;
   with_centering?: boolean;
   with_scaling?: boolean;
 }

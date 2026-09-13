@@ -108,6 +108,43 @@ it('exposes a visible actionable reason when leakage blocks submission', async (
   expect(jobsApi.runPipeline).not.toHaveBeenCalled();
 });
 
+it.each(['training', 'tuning'] as const)('blocks %s for an imported segmentation-to-ensemble wire with persistent feedback', async jobType => {
+  // An invalid model family must not silently train the ensemble's unrelated configured bases.
+  const converter = await vi.importActual<typeof import('../utils/pipelineConverter')>('../utils/pipelineConverter');
+  vi.mocked(convertGraphToPipelineConfig).mockImplementation(converter.convertGraphToPipelineConfig);
+  vi.mocked(jobsApi.runPipeline).mockResolvedValue(response);
+  const state = useGraphStore.getState();
+  useGraphStore.setState({
+    nodes: [...state.nodes,
+      { id: 'seg', position: { x: 100, y: 0 }, data: { definitionType: 'SegmentationNode', model_type: 'kmeans' } },
+      { id: 'ensemble', position: { x: 200, y: 0 }, data: { definitionType: 'EnsembleNode', model_type: 'voting_classifier' } }],
+    edges: [...state.edges, { id: 'ds-seg', source: 'dataset', target: 'seg' },
+      { id: 'seg-ens', source: 'seg', target: 'ensemble' }],
+  });
+  const { result } = renderHook(() => useTrainingNodeContext('ensemble'));
+  await act(async () => { await result.current.runJob(jobType, 'classification'); });
+  expect(result.current.submissionMessage).toContain('cannot be used as base models');
+  expect(result.current.isSubmitting).toBe(false);
+  expect(jobsApi.runPipeline).not.toHaveBeenCalled();
+});
+
+it('allows a separate valid model to train beside an invalid ensemble connection', async () => {
+  // A saved wiring issue in another terminal branch must not block a selected valid model.
+  vi.mocked(jobsApi.runPipeline).mockResolvedValue(response);
+  const state = useGraphStore.getState();
+  useGraphStore.setState({
+    nodes: [...state.nodes,
+      { id: 'seg', position: { x: 100, y: 0 }, data: { definitionType: 'SegmentationNode' } },
+      { id: 'ensemble', position: { x: 200, y: 0 }, data: { definitionType: 'EnsembleNode' } }],
+    edges: [...state.edges, { id: 'ds-seg', source: 'dataset', target: 'seg' },
+      { id: 'seg-ens', source: 'seg', target: 'ensemble' }],
+  });
+  const { result } = renderHook(() => useTrainingNodeContext('model-a'));
+  await act(async () => { await result.current.runJob('training', 'classification'); });
+  expect(result.current.runFeedback?.jobIds).toEqual(['job-a']);
+  expect(jobsApi.runPipeline).toHaveBeenCalledOnce();
+});
+
 /** Selecting a safe branch must ignore sibling leakage while unsafe selected ancestors stay blocked. */
 it.each([
   { targetNodeId: 'model-a', shouldSubmit: true },

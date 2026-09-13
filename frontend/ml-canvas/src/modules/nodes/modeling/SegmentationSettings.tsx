@@ -57,7 +57,7 @@ export const SegmentationSettings: React.FC<{
     if (field === 'model_type') setActiveTab('model');
   });
   const [showScalingAlert, setShowScalingAlert] = useState(true);
-  const models = useSegmentationModels(config, onChange);
+  const models = useSegmentationModels(config, onChange, nodeId);
   const submission = useSegmentationSubmission(config, nodeId, datasetId, nodes, edges);
 
   const ModelConfigSection = <SegmentationModelSection

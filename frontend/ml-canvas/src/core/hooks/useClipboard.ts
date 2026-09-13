@@ -2,6 +2,7 @@ import { useCallback, useRef, useEffect } from 'react';
 import { Node, Edge, useReactFlow } from '@xyflow/react';
 import { v4 as uuidv4 } from 'uuid';
 import { useGraphStore } from '../store/useGraphStore';
+import { getReadOnlyMode } from './useReadOnlyMode';
 
 interface ClipboardData {
   nodes: Node[];
@@ -40,6 +41,7 @@ export function useClipboard() {
   }, [getNodes, getEdges]);
 
   const paste = useCallback(() => {
+    if (getReadOnlyMode()) return;
     if (!clipboardRef.current || clipboardRef.current.nodes.length === 0) return;
 
     pasteCountRef.current += 1;

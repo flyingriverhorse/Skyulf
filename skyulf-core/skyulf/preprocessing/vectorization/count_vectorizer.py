@@ -152,12 +152,10 @@ class CountVectorizerCalculator(BaseCalculator):
     training corpus, so the artifact is not derivable from config alone. A
     vocabulary over ``_LARGE_VOCAB_THRESHOLD`` columns is warned about rather
     than raising, since a wide bag-of-words is a memory problem, not an error.
-    """
 
-    def infer_output_schema(self, input_schema: Any, config: dict[str, Any]) -> None:
-        """Return ``None``: how many columns appear depends on the learned vocabulary."""
-        # Vocabulary size is data-dependent — return None to signal unknown.
-        return None
+    Schema inference inherits the base ``None`` result: the learned vocabulary
+    determines the output columns, so their schema is only known at runtime.
+    """
 
     @fit_method
     def fit(self, X: Any, _y: Any, config: dict[str, Any]) -> CountVectorizerArtifact:  # pylint: disable=arguments-differ

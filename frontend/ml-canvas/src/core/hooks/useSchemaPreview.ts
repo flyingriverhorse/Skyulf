@@ -10,7 +10,7 @@
 // Errors are logged and silently dropped — schema prediction is a
 // nice-to-have, never block the canvas.
 
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 import { useGraphStore } from '../store/useGraphStore';
 import { convertGraphToPipelineConfig } from '../utils/pipelineConverter';
 import { previewPipelineSchema } from '../api/schemaPreview';
@@ -23,10 +23,6 @@ export const useSchemaPreview = (): void => {
   const setPredictedSchemas = useGraphStore((s) => s.setPredictedSchemas);
   const setBrokenSchemaRefs = useGraphStore((s) => s.setBrokenSchemaRefs);
 
-  // Track in-flight request id so a slow response doesn't overwrite a
-  // newer one. Plain ref; we never need to re-render on this.
-  const requestIdRef = useRef(0);
-
   useEffect(() => {
     if (nodes.length === 0) {
       setPredictedSchemas({});
@@ -34,16 +30,15 @@ export const useSchemaPreview = (): void => {
       return;
     }
 
+    const controller = new AbortController();
     const handle = window.setTimeout(() => {
-      const myRequestId = ++requestIdRef.current;
-
       void (async () => {
         try {
           const config = convertGraphToPipelineConfig(nodes, edges);
-          const response = await previewPipelineSchema(config);
+          const response = await previewPipelineSchema(config, controller.signal);
 
-          // Drop stale responses (a newer request has since been issued).
-          if (myRequestId !== requestIdRef.current) return;
+          // Cleanup invalidates this graph immediately, even during the next debounce.
+          if (controller.signal.aborted) return;
 
           // A degraded response (missing keys) must never land in the
           // store: CustomNodeWrapper indexes these maps per node id and
@@ -66,13 +61,16 @@ export const useSchemaPreview = (): void => {
           setBrokenSchemaRefs(grouped);
         } catch (err) {
           // Schema preview is best-effort — never noisy in the UI.
-          if (myRequestId === requestIdRef.current) {
+          if (!controller.signal.aborted) {
             console.debug('[schema-preview] API call failed', err);
           }
         }
       })();
     }, DEBOUNCE_MS);
 
-    return () => window.clearTimeout(handle);
+    return () => {
+      window.clearTimeout(handle);
+      controller.abort();
+    };
   }, [nodes, edges, setPredictedSchemas, setBrokenSchemaRefs]);
 };

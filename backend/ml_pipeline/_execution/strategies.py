@@ -13,6 +13,7 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
+from backend.data_ingestion.serialization import JSONSafeSerializer
 from backend.database.models import MLJob, TrainingJob
 from backend.ml_pipeline._execution.schemas import PipelineExecutionResult
 from backend.ml_pipeline._execution.summary import build_summary
@@ -160,6 +161,7 @@ class JobStrategy(ABC):
             if result.pipeline_diagram:
                 final_metrics["pipeline_diagram"] = result.pipeline_diagram
 
+            final_metrics = JSONSafeSerializer.clean_for_json(final_metrics)
             job.metrics = final_metrics
             self._seed_tuned_thresholds(job, final_metrics)
 
