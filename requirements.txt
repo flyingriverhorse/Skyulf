@@ -66,7 +66,7 @@ matplotlib>=3.9.4                    # Required by SHAP for plot generation
 seaborn>=0.13.2                      # Statistical visualizations
 plotly>=6.3.0                        # Interactive charts
 # Dense sentence embeddings (pulls PyTorch) are optional: requirements-nlp.txt
-optuna>=4.0,<5                       # Bayesian/early-stopping hyperparameter search
+optuna>=4.0,<6                       # Bayesian/early-stopping hyperparameter search
 optuna-integration>=4.0,<5           # OptunaSearchCV for sklearn hyperparameter tuning
 cmaes>=0.10                          # Required by optuna's CmaEsSampler (not auto-installed)
 imbalanced-learn>=0.14.1,<1.0.0     # Sampling strategies for imbalanced datasets
