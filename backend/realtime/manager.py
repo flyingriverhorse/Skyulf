@@ -31,6 +31,8 @@ def _wrap_payload(raw: str) -> str:
 class ConnectionManager:
     """Tracks live WebSocket clients and fans out Redis events to them."""
 
+    SEND_TIMEOUT = 1.0
+
     def __init__(self) -> None:
         """Start with no clients and no subscriber task running.
 
@@ -40,6 +42,7 @@ class ConnectionManager:
         """
         self._clients: set[WebSocket] = set()
         self._lock = asyncio.Lock()
+        self._broadcast_lock = asyncio.Lock()
         self._subscriber_task: asyncio.Task[None] | None = None
         self._stop = asyncio.Event()
 
@@ -57,26 +60,41 @@ class ConnectionManager:
     async def disconnect(self, ws: WebSocket) -> None:
         """Drop ``ws`` from the broadcast set without closing it.
 
-        Closing the socket stays the route handler's job; ``broadcast`` likewise
-        only discards a socket whose send failed and leaves the close to whoever
-        owns the connection.
+        Explicit disconnect is called by the route after its receive loop ends.
+        Failed broadcasts also close the socket so the receive loop can exit.
         """
         async with self._lock:
             self._clients.discard(ws)
         logger.debug("WS client disconnected (now %d)", len(self._clients))
 
     async def broadcast(self, message: str) -> None:
-        """Send `message` to every connected client; drop dead sockets."""
-        async with self._lock:
-            clients = list(self._clients)
-        for ws in clients:
-            try:
-                await ws.send_text(message)
-            except Exception:  # noqa: BLE001 - dead socket is discarded
-                # Client gone; harvest on next disconnect call. Don't await
-                # close() here — it can block other broadcasts.
-                async with self._lock:
-                    self._clients.discard(ws)
+        """Fan out concurrently, preserving order with bounded backpressure.
+
+        Only one broadcast runs at a time. Each send has a deadline; a slow
+        peer is disconnected instead of accumulating an unbounded event queue.
+        All send tasks are awaited, including when the subscriber is cancelled.
+        """
+        async with self._broadcast_lock:
+            async with self._lock:
+                clients = list(self._clients)
+            await asyncio.gather(*(self._send(ws, message) for ws in clients))
+
+    async def _close(self, ws: WebSocket) -> None:
+        """Close a failed or shutting-down socket within a bounded deadline."""
+        with contextlib.suppress(Exception):
+            await asyncio.wait_for(ws.close(), timeout=self.SEND_TIMEOUT)
+
+    async def _send(self, ws: WebSocket, message: str) -> None:
+        """Remove failed or cancelled sends and release their receive loops."""
+        try:
+            await asyncio.wait_for(ws.send_text(message), timeout=self.SEND_TIMEOUT)
+        except asyncio.CancelledError:
+            await self.disconnect(ws)
+            await self._close(ws)
+            raise
+        except Exception:  # noqa: BLE001 - failed peers must not stop the subscriber
+            await self.disconnect(ws)
+            await self._close(ws)
 
     async def start(self) -> None:
         """Spawn the event subscriber task (idempotent).
@@ -101,13 +119,11 @@ class ConnectionManager:
             with contextlib.suppress(asyncio.CancelledError, Exception):
                 await self._subscriber_task
             self._subscriber_task = None
-        async with self._lock:
-            clients = list(self._clients)
-            self._clients.clear()
-        for ws in clients:
-            # best-effort socket close during shutdown
-            with contextlib.suppress(Exception):
-                await ws.close()
+        async with self._broadcast_lock:
+            async with self._lock:
+                clients = list(self._clients)
+                self._clients.clear()
+            await asyncio.gather(*(self._close(ws) for ws in clients))
 
     async def _drain_pubsub(self, pubsub: Any) -> None:
         """Forward messages from a Redis pubsub stream until stop is set."""

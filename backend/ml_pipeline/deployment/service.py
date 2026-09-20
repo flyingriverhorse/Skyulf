@@ -11,6 +11,7 @@ from sklearn.base import BaseEstimator
 from sklearn.utils.validation import check_is_fitted
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
+from starlette.concurrency import run_in_threadpool
 
 from backend.config import get_settings
 from backend.database.models import Deployment, TrainingJob
@@ -567,6 +568,9 @@ class DeploymentService:
         itself the predictor is used directly and rejects overrides, because it
         exposes no probabilities to threshold.
 
+        Synchronous artifact loading and model work run in the shared thread pool;
+        database lookups and threshold resolution remain on the event loop.
+
         Args:
             session: Async database session, used to find the deployment and its job.
             data: Rows to score, one dict per record.
@@ -588,10 +592,10 @@ class DeploymentService:
             raise ValueError("No active model deployed")
 
         # 2. Load Artifact
-        artifact = DeploymentService._load_predict_artifact(deployment)
+        artifact = await run_in_threadpool(DeploymentService._load_predict_artifact, deployment)
 
         # 3. Prepare Data
-        df = pd.DataFrame(data)
+        df = await run_in_threadpool(pd.DataFrame, data)
 
         # 4. Predict
         # Check for new SDK format: {"feature_engineer": ..., "model": ...}
@@ -604,8 +608,11 @@ class DeploymentService:
             thresholds = DeploymentService._resolve_thresholds_for_predict(
                 override_thresholds, job, getattr(estimator, "classes_", None)
             )
-            return DeploymentService._predict_with_bundled_artifact(
-                artifact, df, thresholds=thresholds
+            return await run_in_threadpool(
+                DeploymentService._predict_with_bundled_artifact,
+                artifact,
+                df,
+                thresholds=thresholds,
             )
         # Legacy support or direct model loading (if artifact is just the model)
         elif hasattr(artifact, "predict"):
@@ -614,7 +621,9 @@ class DeploymentService:
                     "override_thresholds is not supported for this deployed model "
                     "(legacy artifact without probability outputs)."
                 )
-            predictions = DeploymentService._predict_with_legacy_artifact(artifact, df)
+            predictions = await run_in_threadpool(
+                DeploymentService._predict_with_legacy_artifact, artifact, df
+            )
             return predictions, None
         else:
             raise ValueError(

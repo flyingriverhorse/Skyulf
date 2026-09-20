@@ -95,20 +95,26 @@ class TestArtifactsMixinFailureBranches:
 
 class TestWarningCaptureHandlerDefenses:
     def test_emit_swallows_unformattable_records(self, capsys):
+        """An active capture must tolerate records that cannot be formatted."""
         handler = WarningCaptureHandler()
         record = logging.LogRecord(
             "skyulf.test", logging.WARNING, str(Path(__file__)), 1, _BrokenStr(), None, None
         )
-        handler.emit(record)  # handleError path: logs the error, never raises
+        with handler.attach():
+            handler.emit(record)  # handleError path: logs the error, never raises
         assert handler.drain() == []
         capsys.readouterr()  # discard handleError's stderr traceback
 
-    def test_detach_swallows_remove_handler_failures(self):
+    def test_detach_swallows_remove_handler_failures(self, monkeypatch):
+        """Cleanup failures must not escape or leave patched global loggers behind."""
         handler = WarningCaptureHandler()
         handler.attach()
         assert handler._attached
-        handler._attached[0].removeHandler = _raiser(RuntimeError("remove broken"))
-        handler.detach()  # must not raise
+        captured_logger = handler._attached[0]
+        with monkeypatch.context() as patch:
+            patch.setattr(captured_logger, "removeHandler", _raiser(RuntimeError("remove broken")))
+            handler.detach()  # must not raise
+        captured_logger.removeHandler(handler)
         assert handler._attached == []
 
 
