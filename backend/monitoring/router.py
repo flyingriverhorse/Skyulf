@@ -189,8 +189,8 @@ async def update_job_description(
         meta_raw: dict[str, Any] = cast(dict[str, Any], row.job_metadata or {})
         if not isinstance(meta_raw, dict):
             meta_raw = {}
-        meta_raw["description"] = body.description
-        row.job_metadata = cast(Any, meta_raw)
+        # Replace the JSON value so SQLAlchemy detects the description change.
+        row.job_metadata = {**meta_raw, "description": body.description}
         await db.commit()
         return {"status": "ok"}
 

@@ -39,6 +39,7 @@ export function useTrainingSettings(
   const [activeTab, setActiveTab] = useState<'model' | 'params'>('model');
   useValidationReveal((field) => {
     if (field === 'model_type' || field === 'target_column') setActiveTab('model');
+    if (field === 'search_space') setActiveTab('params');
   });
   const [showCV, setShowCV] = useState(false);
   const [availableModels, setAvailableModels] = useState<RegistryItem[]>([]);

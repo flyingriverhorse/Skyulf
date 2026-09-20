@@ -50,6 +50,15 @@ beforeEach(() => {
 
 afterEach(() => vi.unstubAllGlobals());
 
+/** Empty spaces need visible recovery instructions and an explicit Basic/Advanced contract. */
+it('explains an empty advanced search and Basic parameter precedence', async () => {
+  await renderSettings({ run_mode: 'advanced', hyperparameters: { n_estimators: 400, max_depth: 7 }, n_trials: 50 });
+    expect(screen.getByRole('button', { name: 'Tune model' })).toBeDisabled();
+  fireEvent.click(screen.getByRole('button', { name: 'Search Space' }));
+  expect(screen.getByText(/Configure at least one search parameter/)).toBeVisible();
+  expect(screen.getByText(/Basic-mode values are retained for Basic runs only/)).toBeVisible();
+});
+
 /** Controlled updates exercise the same effect and focus lifetimes as the node inspector. */
 function SettingsHarness({ initial }: { initial: TrainingConfig }) {
   const [value, setValue] = useState(initial);
@@ -186,7 +195,8 @@ it.each([
 ])('submits $run_mode work to $task history', async ({ run_mode, model_type, task, jobType, name }) => {
   const context = trainingContext();
   vi.mocked(useTrainingNodeContext).mockReturnValue(context);
-  await renderSettings({ run_mode, model_type }, task);
+  const search_space = model_type === 'ridge_regression' ? { alpha: [1] } : { n_estimators: [100] };
+  await renderSettings({ run_mode, model_type, search_space }, task);
   const action = screen.getByRole('button', { name });
   expect(action).toBeEnabled();
   expect(action).toHaveAccessibleDescription(/in the background/);

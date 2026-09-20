@@ -4,6 +4,7 @@ import { HyperparameterInput } from '../components/HyperparameterInput';
 import { SearchSpaceInput } from '../components/SearchSpaceInput';
 import { isBasicParamVisible, isSearchSpaceParamVisible } from './modelOptions';
 import type { TrainingSettingsState } from './useTrainingSettings';
+import { ValidationField } from '../../../../components/shared/ValidationField';
 
 type HyperparametersSectionProps = Pick<TrainingSettingsState,
   'config'
@@ -136,7 +137,7 @@ export function SearchSpaceSection({
 }: SearchSpaceSectionProps) {
   const visibleDefs = searchSpaceDefs.filter(def => def.tunable !== false && isSearchSpaceParamVisible(def, config.search_space));
   return (
-    <div className="space-y-4 animate-in fade-in duration-300">
+    <ValidationField field="search_space" className="space-y-4 animate-in fade-in duration-300">
         <div className="flex items-center justify-between">
             <h4 className="text-sm font-medium text-gray-900 dark:text-gray-100 flex items-center gap-2">
                 <Settings2 className="w-4 h-4 text-purple-500" />
@@ -144,6 +145,15 @@ export function SearchSpaceSection({
             </h4>
         </div>
 
+        <p className="text-xs text-gray-500 dark:text-gray-400">
+            Advanced search values override model defaults. Basic-mode values are retained for Basic runs only.
+            To hold a parameter fixed in Advanced mode, give it a single search value.
+        </p>
+        {!isLoadingSearchSpaceDefs && Object.keys(config.search_space ?? {}).length === 0 && (
+            <p role="alert" className="text-sm text-amber-700 dark:text-amber-300">
+                Configure at least one search parameter, or switch to Basic mode to train with fixed hyperparameters.
+            </p>
+        )}
         {isLoadingSearchSpaceDefs ? (
             <div className="flex justify-center py-8">
                 <Loader2 className="w-6 h-6 animate-spin text-purple-500" />
@@ -181,6 +191,6 @@ export function SearchSpaceSection({
                 )}
             </div>
         )}
-    </div>
+    </ValidationField>
   );
 }

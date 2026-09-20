@@ -840,6 +840,12 @@ class NodeRunnersMixin:
             if auto_space:
                 tuning_params["search_space"] = auto_space
 
+        if not tuning_params.get("search_space"):
+            raise ValueError(
+                "Configure at least one search parameter in Advanced mode, "
+                "or switch to Basic mode to train with fixed hyperparameters."
+            )
+
         return tuning_params
 
     def _extract_tuning_metrics(

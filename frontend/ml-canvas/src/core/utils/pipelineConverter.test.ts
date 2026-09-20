@@ -16,6 +16,22 @@ const edge = (source: string, target: string): Edge => ({
 });
 
 describe('pipeline conversion boundaries', () => {
+  /** Basic parameters stay in Basic mode; Advanced uses explicit search values and seed zero. */
+  it('keeps Basic 400/7 separate from Advanced search choices', () => {
+    const basic = node('train', 'classification', {
+      run_mode: 'basic', target_column: 'target', model_type: 'random_forest_classifier',
+      hyperparameters: { n_estimators: 400, max_depth: 7 }, n_trials: 50, random_state: 0,
+    });
+    const convert = (model: Node) => convertGraphToPipelineConfig(
+      [node('ds', 'dataset_node'), model], [edge('ds', 'train')],
+    ).nodes.find(entry => entry.node_id === 'train')?.params;
+    expect(convert(basic)).toMatchObject({ run_mode: 'fixed', hyperparameters: { n_estimators: 400, max_depth: 7 } });
+    const advanced = { ...basic, data: { ...basic.data, run_mode: 'advanced', search_space: {} } };
+    expect(convert(advanced)).toMatchObject({ run_mode: 'tuned', tuning_config: { search_space: {}, n_trials: 50, random_state: 0 } });
+    expect(convert(advanced)).not.toHaveProperty('hyperparameters');
+    expect(convert({ ...advanced, data: { ...advanced.data, search_space: { n_estimators: [100, 200], max_depth: [7] } } }))
+      .toMatchObject({ tuning_config: { search_space: { n_estimators: [100, 200], max_depth: [7] }, random_state: 0 } });
+  });
   it('deduplicates split handles and terminates cycles without mutating the graph', () => {
     // Multiple visual handles represent one backend input, even in a cyclic graph.
     const nodes = [node('ds', 'dataset_node'), node('split', 'TrainTestSplitter'), node('preview', 'data_preview')];

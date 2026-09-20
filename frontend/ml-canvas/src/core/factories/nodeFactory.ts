@@ -29,6 +29,8 @@ interface CreateNodeConfig<TConfig> {
 interface BaseModelingConfig {
   target_column?: string;
   model_type?: string;
+  run_mode?: string;
+  search_space?: Record<string, unknown>;
 }
 
 export const createModelingNode = <TConfig extends BaseModelingConfig>({
@@ -63,6 +65,9 @@ export const createModelingNode = <TConfig extends BaseModelingConfig>({
     }),
     validate: validate || ((config: TConfig) => {
       if (!config.target_column) return { isValid: false, message: 'Target column is required.', field: 'target_column' };
+      if (config.run_mode === 'advanced' && Object.keys(config.search_space ?? {}).length === 0) {
+        return { isValid: false, message: 'Configure at least one search parameter in Advanced mode, or switch to Basic mode to train with fixed hyperparameters.', field: 'search_space' };
+      }
       return { isValid: true };
     }),
     getDefaultConfig: () => ({
