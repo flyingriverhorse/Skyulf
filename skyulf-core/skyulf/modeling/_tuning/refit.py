@@ -198,7 +198,7 @@ def tune_decision_thresholds(
 
     try:
         X_val, y_val = validation_data
-        X_val_np, y_val_np = SklearnBridge.to_sklearn((X_val, y_val))
+        X_val_np, y_val_np = SklearnBridge.to_sklearn((X_val, y_val), validate_features=True)
         if len(np.unique(y_val_np)) < 2:
             _skip("the validation split contains only one class, so no threshold can be scored.")
             return

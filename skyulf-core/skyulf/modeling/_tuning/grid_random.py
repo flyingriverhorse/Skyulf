@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING, Any, cast
 import numpy as np
 from sklearn.model_selection import ParameterGrid, ParameterSampler
 
+from ...engines.sklearn_bridge import SklearnBridge
 from .._class_weights import sample_weight_for_fit, split_class_weight_params
 from ..base import BaseModelCalculator
 from .metrics import resolve_scorer
@@ -149,6 +150,8 @@ def fit_and_score_candidate_fold(
             X_train_fold, y_train_fold = preprocessing.fit_transform(X_train_fold, y_train_fold)
             X_val_fold, y_val_fold = preprocessing.transform(X_val_fold, y_val_fold)
 
+        SklearnBridge.validate_features(X_train_fold)
+        SklearnBridge.validate_features(X_val_fold)
         constructor_params, class_weight = split_class_weight_params(
             model_class,
             {**model_calculator.default_params, **(seed_params_overlay or {}), **params},

@@ -30,7 +30,7 @@ def evaluate_regression_model(
     each time.
     """
     # Convert to Numpy for compatibility
-    X_test_np, y_test_np = SklearnBridge.to_sklearn((X_test, y_test))
+    X_test_np, y_test_np = SklearnBridge.to_sklearn((X_test, y_test), validate_features=True)
 
     # Generate predictions once, then reuse for both metrics and residuals
     # (previously metrics recomputed its own predict() on the same data).

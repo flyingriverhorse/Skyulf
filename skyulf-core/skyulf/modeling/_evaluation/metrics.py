@@ -175,7 +175,7 @@ def calculate_classification_metrics(
     """
     # Convert to Numpy for compatibility (skip if the caller already has it)
     if X_np is None or y_np is None:
-        X_np, y_np = SklearnBridge.to_sklearn((X, y))
+        X_np, y_np = SklearnBridge.to_sklearn((X, y), validate_features=True)
 
     # Use DataFrame directly if possible to preserve feature names
     # Only convert to numpy if model doesn't support pandas or if X is not pandas
@@ -412,7 +412,7 @@ def calculate_regression_metrics(
     """
     # Convert to Numpy for compatibility (skip if the caller already has it)
     if X_np is None or y_np is None:
-        X_np, y_np = SklearnBridge.to_sklearn((X, y))
+        X_np, y_np = SklearnBridge.to_sklearn((X, y), validate_features=True)
 
     # Use DataFrame directly if possible to preserve feature names
     if predictions is None:
@@ -446,7 +446,7 @@ def calculate_clustering_metrics(
     (no ground-truth target), so they can be computed on any split a KMeans
     model has genuinely predicted on (train/test/validation alike).
     """
-    X_np, _ = SklearnBridge.to_sklearn((X, None))
+    X_np, _ = SklearnBridge.to_sklearn((X, None), validate_features=True)
     labels_np = np.asarray(labels).ravel()
     silhouette_sample_size = _validate_silhouette_sample_size(silhouette_sample_size)
     # Guard before the row-count check: polars collapses a 0-column frame to

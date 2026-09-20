@@ -33,7 +33,7 @@ def evaluate_classification_model(
 ) -> ModelEvaluationReport:
     """Evaluate a classification model and return a structured report."""
     # Convert to Numpy for compatibility
-    X_test_np, y_test_np = SklearnBridge.to_sklearn((X_test, y_test))
+    X_test_np, y_test_np = SklearnBridge.to_sklearn((X_test, y_test), validate_features=True)
 
     # Generate predictions and probabilities once, then reuse them below both
     # for the curve data and for metrics (previously each was redundantly

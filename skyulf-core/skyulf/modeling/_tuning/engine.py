@@ -614,7 +614,7 @@ class TuningCalculator(BaseModelCalculator):
         )
 
         # Convert data to Numpy for tuning
-        X_np, y_np = SklearnBridge.to_sklearn((X, y))
+        X_np, y_np = SklearnBridge.to_sklearn((X, y), validate_features=preprocessing is None)
 
         # --- VALIDATION: Check for NaNs/Inf in Data ---
         # Query the installed estimator rather than a model-name allowlist:
@@ -643,7 +643,9 @@ class TuningCalculator(BaseModelCalculator):
         validation_data_np = None
         if validation_data:
             X_val, y_val = validation_data
-            X_val_np, y_val_np = SklearnBridge.to_sklearn((X_val, y_val))
+            X_val_np, y_val_np = SklearnBridge.to_sklearn(
+                (X_val, y_val), validate_features=preprocessing is None
+            )
             validation_data_np = (X_val_np, y_val_np)
 
         # Wrap the whole candidate/fold search: sklearn's ConvergenceWarning
@@ -674,7 +676,9 @@ class TuningCalculator(BaseModelCalculator):
         # and what serving will use for predictions.
         if preprocessing is not None:
             X_refit_frame, y_refit_frame = preprocessing.fit_transform(X, y)
-            X_refit, y_refit = SklearnBridge.to_sklearn((X_refit_frame, y_refit_frame))
+            X_refit, y_refit = SklearnBridge.to_sklearn(
+                (X_refit_frame, y_refit_frame), validate_features=True
+            )
         else:
             X_refit, y_refit = X_np, y_np
         model = refit_best_model(
@@ -1007,7 +1011,7 @@ class TuningApplier(BaseModelApplier):
             ):
                 # F-13: apply the decision thresholds tuned on the validation
                 # split instead of the model's default decision rule.
-                X_np, _ = SklearnBridge.to_sklearn(df)
+                X_np, _ = SklearnBridge.to_sklearn(df, validate_features=True)
                 y_proba = model.predict_proba(X_np)
                 preds = apply_thresholds(y_proba, thresholds, classes=model.classes_)
                 index = cast(pd.DataFrame, df).index if hasattr(df, "index") else None

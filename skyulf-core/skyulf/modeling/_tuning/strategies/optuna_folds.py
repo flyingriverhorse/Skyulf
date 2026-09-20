@@ -10,6 +10,7 @@ import pandas as pd
 from sklearn.base import clone
 from sklearn.pipeline import Pipeline
 
+from ....engines.sklearn_bridge import SklearnBridge
 from ..._class_weights import sample_weight_for_fit
 from ..fold_pipeline import FoldAwareModelStep
 
@@ -68,6 +69,8 @@ def _prepare_fold(
     if worker is not None:
         X_train, y_train = worker.fit_transform(X_train, y_train)
         X_valid, y_valid = worker.transform(X_valid, y_valid)
+    SklearnBridge.validate_features(X_train)
+    SklearnBridge.validate_features(X_valid)
     step.label_map_ = step._build_label_map(original_y, y_train, model)
     step.preprocessor_ = None  # Scorers receive data already transformed as a pair.
     if step.label_map_ is not None:

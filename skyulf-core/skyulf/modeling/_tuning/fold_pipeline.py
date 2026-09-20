@@ -25,6 +25,7 @@ import pandas as pd
 from sklearn.base import BaseEstimator, is_classifier
 from sklearn.utils.metaestimators import available_if
 
+from ...engines.sklearn_bridge import SklearnBridge
 from .._class_weights import sample_weight_for_fit
 
 
@@ -170,6 +171,7 @@ class FoldAwareModelStep(BaseEstimator):
         worker = copy.deepcopy(self.preprocessor)
         model = copy.deepcopy(self.estimator)
         X_t, y_t = worker.fit_transform(X, y) if worker is not None else (X, y)
+        SklearnBridge.validate_features(X_t)
         sample_weight = sample_weight_for_fit(model, self.class_weight, y_t)
         fit_kwargs = {"sample_weight": sample_weight} if sample_weight is not None else {}
         model.fit(X_t, y_t, **fit_kwargs)
@@ -180,9 +182,11 @@ class FoldAwareModelStep(BaseEstimator):
 
     def _transform_x(self, X: Any) -> Any:
         if self.preprocessor_ is None:
+            SklearnBridge.validate_features(X)
             return X
         X, _y = self._ensure_frames(X, None)
         X_t, _y_t = self.preprocessor_.transform(X, None)
+        SklearnBridge.validate_features(X_t)
         return X_t
 
     def predict(self, X: Any) -> Any:

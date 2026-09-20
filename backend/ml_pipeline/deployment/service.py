@@ -20,6 +20,7 @@ from backend.ml_pipeline.artifacts.factory import ArtifactFactory
 from backend.ml_pipeline.artifacts.s3 import S3ArtifactStore
 from backend.utils import sanitize_for_log
 from skyulf.core.validation import prediction_row_count, validate_prediction_rows
+from skyulf.engines.sklearn_bridge import SklearnBridge
 from skyulf.preprocessing.pipeline import FeatureEngineer
 
 logger = logging.getLogger(__name__)
@@ -403,6 +404,7 @@ class DeploymentService:
         ``apply_thresholds`` instead of the estimator's default decision rule.
         Returns ``(predictions, thresholds_applied)``.
         """
+        SklearnBridge.validate_features(X_transformed)
         try:
             if thresholds is not None:
                 from skyulf.modeling import apply_thresholds
@@ -545,6 +547,7 @@ class DeploymentService:
                 # Reorder columns to match model
                 df = df[model_cols]
 
+        SklearnBridge.validate_features(df)
         predictions = artifact.predict(df)
         predictions = predictions.tolist() if hasattr(predictions, "tolist") else list(predictions)
         validate_prediction_rows(len(df), len(predictions), stage="Model prediction")

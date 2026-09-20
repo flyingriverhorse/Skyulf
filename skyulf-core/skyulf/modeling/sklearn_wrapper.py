@@ -79,7 +79,7 @@ class SklearnCalculator(BaseModelCalculator):
 
         # 3. Fit
         # Convert to Numpy using Bridge (handles Polars/Pandas/Wrappers)
-        X_np, y_np = SklearnBridge.to_sklearn((X, y))
+        X_np, y_np = SklearnBridge.to_sklearn((X, y), validate_features=True)
 
         sample_weight = None
         if class_weight_to_apply is not None:
@@ -223,7 +223,7 @@ class SklearnApplier(BaseModelApplier):
         inputs fall back to a default index.
         """
         # Convert to Numpy
-        X_np, _ = SklearnBridge.to_sklearn(df)
+        X_np, _ = SklearnBridge.to_sklearn(df, validate_features=True)
 
         preds = model_artifact.predict(X_np)
 
@@ -248,7 +248,7 @@ class SklearnApplier(BaseModelApplier):
         if not hasattr(model_artifact, "predict_proba"):
             return None
 
-        X_np, _ = SklearnBridge.to_sklearn(df)
+        X_np, _ = SklearnBridge.to_sklearn(df, validate_features=True)
         probs = model_artifact.predict_proba(X_np)
 
         # Return as DataFrame
