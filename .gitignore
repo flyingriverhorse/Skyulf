@@ -120,7 +120,7 @@ app_data/
 backups/
 
 # === Documentation (build artifacts) ===
-
+*initiatives
 
 # === Local library bundle ===
 skyulf-mlflow/
