@@ -13,6 +13,23 @@ beforeAll(() => {
 });
 
 describe('pipeline templates', () => {
+  it('binds dataset and target without changing the reusable template', () => {
+    // Each new canvas must receive the chosen data without leaking it into later loads.
+    const template = PIPELINE_TEMPLATES[0]!;
+    const graph = buildGraphFromTemplate(template, { datasetId: '42', datasetName: 'Customers', targetColumn: 'churn' });
+    expect(graph.nodes.find(n => n.data.definitionType === 'dataset_node')?.data).toMatchObject({ datasetId: '42', datasetName: 'Customers' });
+    expect(graph.nodes.find(n => n.data.definitionType === 'TrainTestSplitter')?.data.target_column).toBe('churn');
+    expect(buildGraphFromTemplate(template).nodes[0]?.data.datasetId).toBe('');
+  });
+
+  it('binds the text feature to cleaning and vectorization without using the label', () => {
+    // Text templates require the same explicit feature column at both preprocessing steps.
+    const template = PIPELINE_TEMPLATES.find(t => t.category === 'text')!;
+    const graph = buildGraphFromTemplate(template, { datasetId: '42', datasetName: 'Messages', targetColumn: 'label', textColumn: 'message' });
+    expect(graph.nodes.find(n => n.data.definitionType === 'TextCleaning')?.data.columns).toEqual(['message']);
+    expect(graph.nodes.find(n => n.data.definitionType === 'tfidf_vectorizer')?.data.columns).toEqual(['message']);
+    expect(graph.nodes.find(n => n.data.definitionType === 'tfidf_vectorizer')?.data.drop_original).toBe(true);
+  });
   it('exposes at least one template', () => {
     expect(PIPELINE_TEMPLATES.length).toBeGreaterThan(0);
   });

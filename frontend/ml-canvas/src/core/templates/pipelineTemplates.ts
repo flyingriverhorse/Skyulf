@@ -3,8 +3,8 @@
  *
  * Each template is a curated graph users can drop onto the canvas
  * with one click instead of wiring 8+ nodes by hand. We deliberately
- * do not bind a dataset — every template includes a `dataset_node`
- * placeholder the user must point at their own data before running.
+ * keep stored templates dataset-independent; the gallery can supply a
+ * dataset and column binding when materialising a graph.
  *
  * Templates are pure data + a tiny `buildGraph` factory so loading
  * always produces fresh ids (avoids React Flow id collisions when
@@ -45,13 +45,31 @@ export interface PipelineTemplate {
   edges: TemplateEdge[];
 }
 
+export interface TemplateBinding {
+  datasetId: string;
+  datasetName: string;
+  targetColumn?: string;
+  textColumn?: string;
+}
+
+/** Apply setup choices only to the nodes that own those settings. */
+function bindingForNode(type: string, binding?: TemplateBinding): Record<string, unknown> {
+  if (!binding) return {};
+  if (type === 'dataset_node') return { datasetId: binding.datasetId, datasetName: binding.datasetName };
+  if (type === 'TrainTestSplitter') return { datasetId: binding.datasetId, target_column: binding.targetColumn };
+  if ((type === 'TextCleaning' || type === 'tfidf_vectorizer') && binding.textColumn) {
+    return { columns: [binding.textColumn] };
+  }
+  return {};
+}
+
 /**
  * Materialise a template into React Flow `nodes` / `edges` with fresh
  * UUIDs. Falls back to an empty payload if any node type is missing
  * from the registry (defensive — keeps loading from throwing if a
  * template references a node that has been renamed).
  */
-export function buildGraphFromTemplate(template: PipelineTemplate): {
+export function buildGraphFromTemplate(template: PipelineTemplate, binding?: TemplateBinding): {
   nodes: Node[];
   edges: Edge[];
 } {
@@ -71,6 +89,7 @@ export function buildGraphFromTemplate(template: PipelineTemplate): {
         catalogType: t.type,
         ...(definition.getDefaultConfig() as object),
         ...(t.data ?? {}),
+        ...bindingForNode(t.type, binding),
       },
     });
   }
@@ -167,7 +186,7 @@ const TEXT_CLASSIFICATION: PipelineTemplate = {
     { localId: 'ds', type: 'dataset_node', position: { x: col(0), y: row(0) } },
     { localId: 'split', type: 'TrainTestSplitter', position: { x: col(1), y: row(0) } },
     { localId: 'clean', type: 'TextCleaning', position: { x: col(2), y: row(0) } },
-    { localId: 'vec', type: 'tfidf_vectorizer', position: { x: col(3), y: row(0) } },
+    { localId: 'vec', type: 'tfidf_vectorizer', position: { x: col(3), y: row(0) }, data: { drop_original: true } },
     {
       localId: 'train',
       type: 'text_classification',
