@@ -416,13 +416,19 @@ def _build_drift_column_summary(report) -> dict[str, Any]:
 
 
 async def _find_deployment_context(db: AsyncSession, job_id: str) -> tuple[int | None, str | None]:
-    """Resolve the active deployment id and model-version label for a job, if any.
+    """Resolve the newest active deployment and independent job-version label.
 
-    Returns `(None, None)` when the job has never been deployed — the drift
-    alert still records its evidence, just without a deployment link.
+    Concurrent promotions can leave multiple active rows. Prefer the newest
+    creation time, then highest id to break ties. Undeployed jobs still retain
+    their model-version label; a missing job returns `(None, None)`.
     """
     try:
-        stmt = select(Deployment).where(Deployment.job_id == job_id, Deployment.is_active)
+        stmt = (
+            select(Deployment)
+            .where(Deployment.job_id == job_id, Deployment.is_active)
+            .order_by(Deployment.created_at.desc(), Deployment.id.desc())
+            .limit(1)
+        )
         result = await db.execute(stmt)
         deployment = result.scalar_one_or_none()
 
@@ -1202,7 +1208,9 @@ async def get_error_timeline(
     now = datetime.now(UTC)
     cutoff = now - timedelta(hours=hours)
 
-    stmt = select(ErrorEvent.created_at).where(ErrorEvent.created_at >= cutoff)
+    stmt = select(ErrorEvent.created_at).where(
+        ErrorEvent.created_at >= _normalize_since_for_naive_column(cutoff)
+    )
     result = await db.execute(stmt)
     timestamps = [row[0] for row in result.all()]
 
