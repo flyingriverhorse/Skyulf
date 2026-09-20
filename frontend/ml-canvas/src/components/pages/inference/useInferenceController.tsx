@@ -148,17 +148,13 @@ export function useInferenceController() {
                 }
                 const rows = parsed.map(r => {
                     if (excludedColumns.size === 0) return r;
-                    const cleaned: Record<string, unknown> = {};
-                    Object.entries(r).forEach(([k, v]) => {
-                        if (!excludedColumns.has(k)) cleaned[k] = v;
-                    });
-                    return cleaned;
+                    return Object.fromEntries(Object.entries(r).filter(([k]) => !excludedColumns.has(k)));
                 });
                 setInputData(JSON.stringify(rows, null, 2));
                 toast.success(`Loaded ${rows.length} row${rows.length === 1 ? '' : 's'} from CSV`);
             } catch (e) {
                 console.error('CSV parse failed', e);
-                toast.error('Could not parse CSV');
+                toast.error(e instanceof Error ? e.message : 'Could not parse CSV');
             }
         },
         [excludedColumns],

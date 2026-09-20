@@ -225,31 +225,80 @@ export const checkSchema = (raw: string, schema: { name: string; type: string }[
  */
 export const NUMERIC_RE = /^-?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$/;
 
-/**
- * Tiny CSV-to-objects parser: comma-separated, first row is headers, no
- * quoted-field handling. Numeric-looking cells are coerced to numbers.
- */
-export const parseCsv = (text: string): Record<string, unknown>[] => {
-    const lines = text.split(/\r?\n/).filter(l => l.trim() !== '');
-    if (lines.length < 2) return [];
-    const headers = (lines[0] ?? '').split(',').map(h => h.trim());
-    return lines.slice(1).map(line => {
-        const cells = line.split(',');
-        const row: Record<string, unknown> = {};
-        headers.forEach((h, i) => {
-            const raw = (cells[i] ?? '').trim();
-            if (raw === '') {
-                row[h] = '';
-                return;
-            }
-            if (NUMERIC_RE.test(raw)) {
-                const num = Number(raw);
-                row[h] = Number.isFinite(num) ? num : raw;
+/** Read CSV records without splitting delimiters or line breaks inside quotes. */
+const readCsvRecords = (text: string): string[][] => {
+    const records: string[][] = [];
+    let cells: string[] = [];
+    let cell = '';
+    let quoted = false;
+    let inQuotes = false;
+    let hasContent = false;
+
+    const finishCell = () => {
+        cells.push(quoted ? cell : cell.trim());
+        cell = '';
+        quoted = false;
+    };
+    const finishRecord = () => {
+        finishCell();
+        if (hasContent) records.push(cells);
+        cells = [];
+        hasContent = false;
+    };
+
+    // Spreadsheet UTF-8 exports may prefix the file with a byte-order mark.
+    for (let i = text.startsWith('\uFEFF') ? 1 : 0; i < text.length; i++) {
+        const char = text[i]!;
+        if (inQuotes) {
+            if (char !== '"') {
+                cell += char;
+            } else if (text[i + 1] === '"') {
+                cell += '"';
+                i++;
             } else {
-                row[h] = raw;
+                inQuotes = false;
             }
-        });
-        return row;
+        } else if (char === ',') {
+            hasContent = true;
+            finishCell();
+        } else if (char === '\r' || char === '\n') {
+            finishRecord();
+            if (char === '\r' && text[i + 1] === '\n') i++;
+        } else if (char === '"' && cell === '' && !quoted) {
+            quoted = true;
+            inQuotes = true;
+            hasContent = true;
+        } else {
+            if (quoted || char === '"') {
+                throw new Error(`CSV row ${records.length + 1}: invalid quote placement.`);
+            }
+            cell += char;
+            if (char.trim() !== '') hasContent = true;
+        }
+    }
+    if (inQuotes) throw new Error(`CSV row ${records.length + 1}: unclosed quoted field.`);
+    finishRecord();
+    return records;
+};
+
+/** Parse comma-separated header/records, coercing numeric-looking cells as before. */
+export const parseCsv = (text: string): Record<string, unknown>[] => {
+    const [headers, ...records] = readCsvRecords(text);
+    if (!headers) return [];
+    if (new Set(headers).size !== headers.length) {
+        throw new Error('CSV contains duplicate column headers.');
+    }
+    return records.map((cells, index) => {
+        if (cells.length !== headers.length) {
+            throw new Error(
+                `CSV row ${index + 2}: expected ${headers.length} cells, received ${cells.length}.`,
+            );
+        }
+        return Object.fromEntries(headers.map((header, i) => {
+            const raw = cells[i]!;
+            const num = NUMERIC_RE.test(raw) ? Number(raw) : Number.NaN;
+            return [header, Number.isFinite(num) ? num : raw];
+        }));
     });
 };
 
@@ -332,9 +381,9 @@ export const rowsToCsv = (rows: Record<string, unknown>[]): string => {
     );
     const escape = (v: unknown): string => {
         const s = v == null ? '' : String(v);
-        return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+        return s === '' || s.trim() !== s || /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
     };
-    const header = keys.join(',');
+    const header = keys.map(escape).join(',');
     const body = rows.map(r => keys.map(k => escape(r[k])).join(',')).join('\n');
     return `${header}\n${body}`;
 };
