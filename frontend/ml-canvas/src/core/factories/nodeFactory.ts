@@ -1,5 +1,6 @@
 import { LucideIcon } from 'lucide-react';
 import { NodeDefinition, ValidationResult } from '../types/nodes';
+import { modelNumericIssue } from '../utils/numericValidation';
 
 // Heterogeneous factory for modeling nodes. `NodeDefinition<TConfig>` is
 // already generic; this factory used to erase to `any` internally even
@@ -63,13 +64,16 @@ export const createModelingNode = <TConfig extends BaseModelingConfig>({
       if (target) return `target: ${target}`;
       return null;
     }),
-    validate: validate || ((config: TConfig) => {
+    validate: (config: TConfig) => {
+      const numeric = modelNumericIssue(config);
+      if (numeric) return numeric;
+      if (validate) return validate(config);
       if (!config.target_column) return { isValid: false, message: 'Target column is required.', field: 'target_column' };
       if (config.run_mode === 'advanced' && Object.keys(config.search_space ?? {}).length === 0) {
         return { isValid: false, message: 'Configure at least one search parameter in Advanced mode, or switch to Basic mode to train with fixed hyperparameters.', field: 'search_space' };
       }
       return { isValid: true };
-    }),
+    },
     getDefaultConfig: () => ({
       target_column: '',
       model_type: 'random_forest_classifier',

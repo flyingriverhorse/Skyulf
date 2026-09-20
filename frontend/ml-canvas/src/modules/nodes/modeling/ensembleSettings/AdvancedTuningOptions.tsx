@@ -1,3 +1,5 @@
+import { ValidationField } from '../../../../components/shared/ValidationField';
+import { numericDraft, numericInputValue } from '../../../../core/utils/numericValidation';
 import { useId, useState } from 'react';
 import { ChevronRight, Settings2, Sparkles } from 'lucide-react';
 import type { EnsembleConfig } from '../EnsembleSettings';
@@ -58,28 +60,28 @@ export function AdvancedTuningOptions({ config, update, nodeId }: { config: Ense
         </div>
         <div>
           <label htmlFor={`${fieldId}-n_trials`} className="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Trials</label>
-          <input
+          <ValidationField field="n_trials"><input
             id={`${fieldId}-n_trials`}
             type="number"
             min={1}
-            value={config.n_trials}
-            onChange={(e) => { update({ n_trials: Number(e.target.value) }); }}
+            value={numericInputValue(config.n_trials, 20)}
+            onChange={(e) => { update({ n_trials: numericDraft(e.target.value) }); }}
             className="w-full border border-gray-300 dark:border-gray-600 rounded-lg p-2 text-sm bg-white dark:bg-gray-800 dark:text-gray-100"
-          />
+          /></ValidationField>
         </div>
         <div>
           <span className="flex items-center gap-1 text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
             <label htmlFor={`${fieldId}-random_state`}>Random State</label>
             <HelpTooltip text="Seed for the search and the final refit — same seed + same data = identical tuning outcome." />
           </span>
-          <input
+          <ValidationField field="random_state"><input
             id={`${fieldId}-random_state`}
             type="number"
             min={0}
-            value={config.random_state ?? 42}
-            onChange={(e) => { update({ random_state: Number(e.target.value) }); }}
+            value={numericInputValue(config.random_state, 42)}
+            onChange={(e) => { update({ random_state: numericDraft(e.target.value) }); }}
             className="w-full border border-gray-300 dark:border-gray-600 rounded-lg p-2 text-sm bg-white dark:bg-gray-800 dark:text-gray-100"
-          />
+          /></ValidationField>
         </div>
       </div>
       <div>

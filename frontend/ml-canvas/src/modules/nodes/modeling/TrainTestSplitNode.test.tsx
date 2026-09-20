@@ -19,7 +19,7 @@ it('preserves ratio/seed parsing, toggles and split warning text', () => {
   fireEvent.change(screen.getByLabelText('Test Size (0.0 - 1.0)'), { target: { value: '' } });
   expect(onChange).toHaveBeenLastCalledWith({ ...config, test_size: NaN });
   fireEvent.change(screen.getByLabelText('Random State'), { target: { value: '' } });
-  expect(onChange).toHaveBeenLastCalledWith({ ...config, random_state: 42 });
+  expect(onChange).toHaveBeenLastCalledWith({ ...config, random_state: Number.NaN });
   fireEvent.change(screen.getByLabelText('Random State'), { target: { value: '0' } });
   expect(onChange).toHaveBeenLastCalledWith({ ...config, random_state: 0 });
   fireEvent.click(screen.getByLabelText('Stratify by Target'));

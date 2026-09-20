@@ -18,6 +18,8 @@ export interface TrainingConfig {
   hyperparameters: Record<string, unknown>;
   // Advanced-mode tuning fields.
   search_space: Record<string, unknown>;
+  /** Invalid drafts survive graph saves without turning overflow into a None candidate. */
+  invalid_search_space?: Record<string, string>;
   n_trials: number;
   metric: string;
   search_strategy: string;

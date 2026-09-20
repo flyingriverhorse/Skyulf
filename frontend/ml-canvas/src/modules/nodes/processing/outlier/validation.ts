@@ -1,4 +1,5 @@
 import type { ManualColumnBounds, OutlierConfig } from './types';
+import { numericIssue } from '../../../../core/utils/numericValidation';
 
 /** Validate one selected interval without treating zero as an omitted endpoint. */
 function validateManualBound(column: string, bound: ManualColumnBounds = {}) {
@@ -19,6 +20,10 @@ function validateManualBound(column: string, bound: ManualColumnBounds = {}) {
 }
 
 export const validateOutlier = (config: OutlierConfig) => {
+  const numeric = config.method === 'iqr'
+    ? numericIssue('multiplier', config.multiplier, Number.MIN_VALUE)
+    : config.method === 'zscore' ? numericIssue('threshold', config.threshold, Number.MIN_VALUE) : undefined;
+  if (numeric) return numeric;
   if (config.columns.length === 0) {
     return { isValid: false, field: 'columns', message: 'Select at least one column.' };
   }

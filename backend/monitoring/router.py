@@ -1197,8 +1197,8 @@ async def get_error_timeline(
     """Return error count bucketed by hour for the last N hours.
 
     Returns a list of ``{ hour: <ISO string>, count: N }`` entries,
-    one per hour slot, oldest first. Slots with zero events are included
-    so the chart always has a complete x-axis.
+    one per hour slot, oldest first. The inclusive rolling window spans N+1
+    slots: its first and current hours can be partial. Zero slots are included.
     """
     from backend.config import get_settings as _get_settings
 
@@ -1209,13 +1209,14 @@ async def get_error_timeline(
     cutoff = now - timedelta(hours=hours)
 
     stmt = select(ErrorEvent.created_at).where(
-        ErrorEvent.created_at >= _normalize_since_for_naive_column(cutoff)
+        ErrorEvent.created_at >= _normalize_since_for_naive_column(cutoff),
+        ErrorEvent.created_at <= _normalize_since_for_naive_column(now),
     )
     result = await db.execute(stmt)
     timestamps = [row[0] for row in result.all()]
 
     # Build a zero-filled bucket dict: { slot_iso: count }
-    buckets = _build_zero_filled_hour_buckets(cutoff, hours)
+    buckets = _build_zero_filled_hour_buckets(cutoff, hours + 1)
     _fill_error_buckets(buckets, timestamps)
 
     return [ErrorTimelineEntry(hour=h, count=c) for h, c in sorted(buckets.items())]

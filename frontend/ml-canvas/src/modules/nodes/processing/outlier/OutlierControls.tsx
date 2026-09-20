@@ -1,3 +1,5 @@
+import { ValidationField } from '../../../../components/shared/ValidationField';
+import { numericDraft, numericInputValue } from '../../../../core/utils/numericValidation';
 import type { OutlierConfig, OutlierSettingsProps } from './types';
 import { ManualBoundsOptions } from './ManualBoundsOptions';
 
@@ -32,14 +34,14 @@ function IqrOptions({ config, onChange }: OutlierSettingsProps) {
   return (
     <div className="space-y-2">
       <span className="block text-sm font-medium">Multiplier</span>
-      <input
+      <ValidationField field="multiplier"><input
         aria-label="Multiplier"
         type="number"
         step="0.1"
         className="w-full p-2 border rounded bg-background text-sm"
-        value={config.multiplier ?? 1.5}
-        onChange={(e) => onChange({ ...config, multiplier: Number.parseFloat(e.target.value) })}
-      />
+        value={numericInputValue(config.multiplier, 1.5)}
+        onChange={(e) => onChange({ ...config, multiplier: numericDraft(e.target.value) })}
+      /></ValidationField>
       <p className="text-xs text-muted-foreground">Usually 1.5 for outliers, 3.0 for extreme outliers.</p>
     </div>
   );
@@ -49,14 +51,14 @@ function ZscoreOptions({ config, onChange }: OutlierSettingsProps) {
   return (
     <div className="space-y-2">
       <span className="block text-sm font-medium">Threshold (Sigma)</span>
-      <input
+      <ValidationField field="threshold"><input
         aria-label="Threshold (Sigma)"
         type="number"
         step="0.1"
         className="w-full p-2 border rounded bg-background text-sm"
-        value={config.threshold ?? 3.0}
-        onChange={(e) => onChange({ ...config, threshold: Number.parseFloat(e.target.value) })}
-      />
+        value={numericInputValue(config.threshold, 3.0)}
+        onChange={(e) => onChange({ ...config, threshold: numericDraft(e.target.value) })}
+      /></ValidationField>
       <p className="text-xs text-muted-foreground">Number of standard deviations to tolerate.</p>
     </div>
   );

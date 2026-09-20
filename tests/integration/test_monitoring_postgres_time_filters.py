@@ -97,6 +97,7 @@ def test_timeline_filters_naive_utc_across_midnight(postgres_sessions, monkeypat
         ("2026-09-19T23:00", 1),
         ("2026-09-20T00:00", 1),
         ("2026-09-20T01:00", 0),
+        ("2026-09-20T02:00", 0),
     ]
 
 

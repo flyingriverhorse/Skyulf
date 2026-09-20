@@ -49,6 +49,23 @@ beforeEach(() => {
 
 afterEach(() => vi.unstubAllGlobals());
 
+/** A blank fold control must remain an invalid draft and disable direct training. */
+it('preserves blank stacking folds and blocks an invalid numeric config', async () => {
+  const onChange = await renderSettings({ strategy: 'stacking', cv: Number.NaN });
+  const action = screen.getByRole('button', { name: /Train ensemble/i });
+  expect(action).toBeDisabled();
+  expect(action).toHaveAccessibleDescription(/cv/);
+  fireEvent.change(screen.getByRole('spinbutton', { name: 'Stacking CV Folds' }), { target: { value: '4' } });
+  expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ cv: 4 }));
+});
+
+/** Clearing a numeric field must not silently turn it into a valid zero. */
+it('retains a blank stacking fold draft as NaN', async () => {
+  const onChange = await renderSettings({ strategy: 'stacking', cv: 3 });
+  fireEvent.change(screen.getByRole('spinbutton', { name: 'Stacking CV Folds' }), { target: { value: '' } });
+  expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ cv: Number.NaN }));
+});
+
 /** Ensemble controls need names and selection state across basic and advanced modes. */
 it('labels voting weights, target and conditional tuning fields', async () => {
   await renderSettings({ run_mode: 'advanced', calibrate_base_models: true, cv_enabled: true });

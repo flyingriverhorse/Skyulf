@@ -38,8 +38,9 @@ export function useTrainingSettings(
   const [containerRef, isWide] = useIsWideContainer();
   const [activeTab, setActiveTab] = useState<'model' | 'params'>('model');
   useValidationReveal((field) => {
-    if (field === 'model_type' || field === 'target_column') setActiveTab('model');
+    if (field !== 'search_space') setActiveTab('model');
     if (field === 'search_space') setActiveTab('params');
+    if (field.startsWith('cv_')) setShowCV(true);
   });
   const [showCV, setShowCV] = useState(false);
   const [availableModels, setAvailableModels] = useState<RegistryItem[]>([]);
@@ -123,6 +124,7 @@ export function useTrainingSettings(
       const applySearchDefaults = (defaults: Record<string, unknown>, modelType: string, strategy: string) => {
           onChange({
               ...config,
+              invalid_search_space: {},
               search_space: defaults || {}
           });
           loadedModelTypeRef.current = modelType;
@@ -134,6 +136,8 @@ export function useTrainingSettings(
           if (!modelType) return;
 
           const isNewModel = modelType !== loadedModelTypeRef.current;
+          const preserveSavedSearch = loadedModelTypeRef.current === null &&
+              (Object.keys(config.search_space ?? {}).length > 0 || Object.keys(config.invalid_search_space ?? {}).length > 0);
           // Also reload when switching between grid and non-grid strategies
           // so the search space is appropriate for the selected method.
           const wasGrid = isGridStrategy(loadedStrategyRef.current);
@@ -148,6 +152,14 @@ export function useTrainingSettings(
               if (isNewModel) {
                   const defs = await jobsApi.getHyperparameters(modelType);
                   setSearchSpaceDefs(defs as HyperparameterDef[]);
+              }
+
+              // Opening a saved node must retain both its candidates and failed drafts.
+              // Defaults belong to a new search or an explicit model/strategy change.
+              if (preserveSavedSearch) {
+                  loadedModelTypeRef.current = modelType;
+                  loadedStrategyRef.current = strategy;
+                  return;
               }
 
               // 2. Fetch Defaults when model or strategy class changes

@@ -1,3 +1,5 @@
+import { ValidationField } from '../../../../components/shared/ValidationField';
+import { numericDraft, numericInputValue } from '../../../../core/utils/numericValidation';
 import { Settings2 } from 'lucide-react';
 import { HelpTooltip } from '../components/HelpTooltip';
 import { StrategyParamsHint } from './StrategyParamsHint';
@@ -96,15 +98,15 @@ export function TuningStrategySection({
 
                 <div>
                     <label htmlFor={`${fieldId}-trials`} className="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Trials</label>
-                    <input
+                    <ValidationField field="n_trials"><input
                         id={`${fieldId}-trials`}
                         type="number"
-                        value={config.n_trials}
-                        onChange={(e) => onChange({ ...config, n_trials: Number(e.target.value) })}
+                        value={numericInputValue(config.n_trials, 20)}
+                        onChange={(e) => onChange({ ...config, n_trials: numericDraft(e.target.value) })}
                         disabled={['grid', 'halving_grid'].includes(config.search_strategy)}
                         className="w-full border border-gray-300 dark:border-gray-600 rounded-lg p-2 text-sm bg-white dark:bg-gray-800 dark:text-gray-100 disabled:opacity-50"
                         min={1}
-                    />
+                    /></ValidationField>
                 </div>
 
                 <div>
@@ -112,14 +114,14 @@ export function TuningStrategySection({
                         <label htmlFor={`${fieldId}-random-state`} className="block text-xs font-medium text-gray-700 dark:text-gray-300">Random State</label>
                         <HelpTooltip text="Seed for the search and the final refit — same seed + same data = identical tuning outcome. Applies to every candidate, not just the winner." />
                     </div>
-                    <input
+                    <ValidationField field="random_state"><input
                         id={`${fieldId}-random-state`}
                         type="number"
-                        value={config.random_state ?? 42}
-                        onChange={(e) => onChange({ ...config, random_state: Number(e.target.value) })}
+                        value={numericInputValue(config.random_state, 42)}
+                        onChange={(e) => onChange({ ...config, random_state: numericDraft(e.target.value) })}
                         className="w-full border border-gray-300 dark:border-gray-600 rounded-lg p-2 text-sm bg-white dark:bg-gray-800 dark:text-gray-100"
                         min={0}
-                    />
+                    /></ValidationField>
                 </div>
 
                 {isClassification && (

@@ -165,9 +165,14 @@ export function SearchSpaceSection({
                         <SearchSpaceInput
                             def={def}
                             value={(config.search_space?.[def.name] || []) as unknown[]}
-                            onChange={(newValues) => {
+                            invalidDraft={config.invalid_search_space?.[def.name]}
+                            onChange={(newValues, invalidDraft) => {
+                                const invalidSearchSpace = { ...config.invalid_search_space };
+                                if (invalidDraft === undefined) delete invalidSearchSpace[def.name];
+                                else invalidSearchSpace[def.name] = invalidDraft;
                                 onChange({
                                     ...config,
+                                    invalid_search_space: invalidSearchSpace,
                                     search_space: {
                                         ...config.search_space,
                                         [def.name]: newValues

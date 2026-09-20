@@ -9,9 +9,10 @@ imports continue to work via `api.py`'s re-export shim.
 
 from typing import Any, Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError, model_validator
 
 from backend.ml_pipeline._internal._advisor import Recommendation
+from backend.ml_pipeline._internal._numeric_validation import validate_node_numbers
 
 
 class RegistryItem(BaseModel):
@@ -41,6 +42,27 @@ class NodeConfigModel(BaseModel):
     step_type: str
     params: dict[str, Any] = {}
     inputs: list[str] = []
+
+    @model_validator(mode="after")
+    def validate_numeric_controls(self) -> "NodeConfigModel":
+        """Reject invalid explicit numeric controls before a job can be queued."""
+        try:
+            validate_node_numbers(self.step_type, self.params)
+        except ValueError as exc:
+            # Echoing NaN/Infinity in a validation error breaks JSON responses.
+            # Report the field diagnostic without copying the node's payload.
+            raise ValidationError.from_exception_data(
+                type(self).__name__,
+                [
+                    {
+                        "type": "value_error",
+                        "loc": ("params",),
+                        "input": None,
+                        "ctx": {"error": str(exc)},
+                    }
+                ],
+            ) from exc
+        return self
 
 
 class PipelineConfigModel(BaseModel):

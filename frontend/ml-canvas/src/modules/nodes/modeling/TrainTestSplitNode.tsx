@@ -1,10 +1,10 @@
+import { numericDraft, numericInputValue, numericIssue } from '../../../core/utils/numericValidation';
 import React, { useId } from 'react';
 import { ValidationField } from '../../../components/shared/ValidationField';
 import { NodeDefinition } from '../../../core/types/nodes';
 import { Split } from 'lucide-react';
 import { useUpstreamData } from '../../../core/hooks/useUpstreamData';
 import { useDatasetSchema } from '../../../core/hooks/useDatasetSchema';
-import { parseIntSafe } from '../../../core/utils/numberInput';
 import { useIsWideContainer } from '../../../core/hooks/useIsWideContainer';
 
 interface TrainTestSplitConfig {
@@ -22,7 +22,7 @@ function SplitRatioControls({ config, onChange, fieldId }: {
   onChange: (config: TrainTestSplitConfig) => void;
   fieldId: string;
 }) {
-  const valSize = config.validation_size || 0;
+  const valSize = config.validation_size ?? 0;
   const trainSize = 1 - config.test_size - valSize;
 
   return (
@@ -37,8 +37,8 @@ function SplitRatioControls({ config, onChange, fieldId }: {
             max="0.95"
             className="w-full p-2 border rounded bg-background text-sm"
             id={`${fieldId}-test_size`}
-            value={config.test_size}
-            onChange={(e) => onChange({ ...config, test_size: Number.parseFloat(e.target.value) })}
+            value={numericInputValue(config.test_size, 0.2)}
+            onChange={(e) => onChange({ ...config, test_size: numericDraft(e.target.value) })}
           />
         </div>
       </ValidationField>
@@ -53,8 +53,8 @@ function SplitRatioControls({ config, onChange, fieldId }: {
             max="0.95"
             className="w-full p-2 border rounded bg-background text-sm"
             id={`${fieldId}-validation_size`}
-            value={valSize}
-            onChange={(e) => onChange({ ...config, validation_size: Number.parseFloat(e.target.value) })}
+            value={numericInputValue(valSize, 0)}
+            onChange={(e) => onChange({ ...config, validation_size: numericDraft(e.target.value) })}
           />
           <p className="text-xs text-muted-foreground">
             {Math.round(trainSize * 100)}% Training, {Math.round(valSize * 100)}% Validation, {Math.round(config.test_size * 100)}% Testing
@@ -159,8 +159,8 @@ const TrainTestSplitSettings: React.FC<{ config: TrainTestSplitConfig; onChange:
               type="number"
               className="w-full p-2 border rounded bg-background text-sm"
               id={`${fieldId}-random_state`}
-              value={config.random_state}
-              onChange={(e) => onChange({ ...config, random_state: parseIntSafe(e.target.value, config.random_state) })}
+              value={numericInputValue(config.random_state, 42)}
+              onChange={(e) => onChange({ ...config, random_state: numericDraft(e.target.value) })}
             />
           </div>
         </div>
@@ -237,16 +237,18 @@ export const TrainTestSplitNode: NodeDefinition<TrainTestSplitConfig> = {
     return `${fmt(train)} / ${fmt(test)}`;
   },
   validate: (config) => {
-    if (config.test_size <= 0 || config.test_size >= 1) {
+    if (!Number.isFinite(config.test_size) || config.test_size <= 0 || config.test_size >= 1) {
       return { isValid: false, message: 'Test size must be between 0 and 1.', field: 'test_size' };
     }
-    const valSize = config.validation_size || 0;
-    if (valSize < 0 || valSize >= 1) {
+    const valSize = config.validation_size === undefined ? 0 : config.validation_size;
+    if (typeof valSize !== 'number' || !Number.isFinite(valSize) || valSize < 0 || valSize >= 1) {
       return { isValid: false, message: 'Validation size must be between 0 and 1.', field: 'validation_size' };
     }
     if (config.test_size + valSize >= 1) {
       return { isValid: false, message: 'Sum of Test and Validation sizes must be less than 1.', field: 'validation_size' };
     }
+    const seedIssue = numericIssue('random_state', config.random_state, 0, true, 4294967295);
+    if (seedIssue) return seedIssue;
     return { isValid: true };
   },
   getDefaultConfig: () => ({
