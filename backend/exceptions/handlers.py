@@ -9,6 +9,12 @@ import traceback as tb_module
 from fastapi import Request
 from fastapi.responses import JSONResponse
 
+from backend.utils.logging_utils import (
+    redact_credentials,
+    redact_error_details,
+    sanitize_for_log,
+)
+
 logger = logging.getLogger(__name__)
 
 
@@ -31,15 +37,17 @@ async def _record_error(
             event = ErrorEvent(
                 route=route,
                 error_type=error_type,
-                message=message[:2000],
-                traceback=traceback[:8000],
+                message=redact_credentials(message)[:2000],
+                traceback=redact_credentials(traceback)[:8000],
                 job_id=job_id or None,
                 status_code=status_code,
             )
             session.add(event)
             await session.commit()
     except Exception as persist_err:  # noqa: BLE001 - error logging is best-effort
-        logger.debug("ErrorEvent persist failed: %s", persist_err)
+        logger.debug(
+            "ErrorEvent persist failed: %s", sanitize_for_log(redact_credentials(persist_err))
+        )
 
 
 def record_pipeline_error(job_id: str, message: str, traceback: str) -> None:
@@ -65,8 +73,8 @@ def record_pipeline_error(job_id: str, message: str, traceback: str) -> None:
                 event = ErrorEvent(
                     route="celery/pipeline",
                     error_type="PipelineExecutionException",
-                    message=message[:2000],
-                    traceback=traceback[:8000],
+                    message=redact_credentials(message)[:2000],
+                    traceback=redact_credentials(traceback)[:8000],
                     job_id=job_id or None,
                     status_code=500,
                 )
@@ -77,7 +85,10 @@ def record_pipeline_error(job_id: str, message: str, traceback: str) -> None:
         finally:
             engine.dispose()
     except Exception as persist_err:  # noqa: BLE001 - error logging is best-effort
-        logger.debug("ErrorEvent (sync) persist failed: %s", persist_err)
+        logger.debug(
+            "ErrorEvent (sync) persist failed: %s",
+            sanitize_for_log(redact_credentials(persist_err)),
+        )
 
 
 async def skyulf_exception_handler(request: Request, exc: Exception) -> JSONResponse:
@@ -101,8 +112,8 @@ async def skyulf_exception_handler(request: Request, exc: Exception) -> JSONResp
         content={
             "success": False,
             "error": exc.error_code,
-            "message": exc.message,
-            "details": exc.details,
+            "message": redact_credentials(exc.message),
+            "details": redact_error_details(exc.details),
             "request_id": getattr(request.state, "request_id", None),
         },
     )
@@ -115,7 +126,9 @@ async def not_found_exception_handler(request: Request, exc: Exception) -> JSONR
         content={
             "success": False,
             "error": "Not Found",
-            "message": getattr(exc, "detail", "The requested resource was not found"),
+            "message": redact_error_details(
+                getattr(exc, "detail", "The requested resource was not found")
+            ),
             "request_id": getattr(request.state, "request_id", None),
         },
     )
@@ -131,7 +144,7 @@ async def unauthorized_exception_handler(request: Request, exc: Exception) -> JS
         content={
             "success": False,
             "error": "Unauthorized" if status_code == 401 else "Forbidden",
-            "message": getattr(exc, "detail", error_msg),
+            "message": redact_error_details(getattr(exc, "detail", error_msg)),
             "request_id": getattr(request.state, "request_id", None),
         },
     )
@@ -144,7 +157,7 @@ async def validation_exception_handler(request: Request, exc: Exception) -> JSON
         content={
             "success": False,
             "error": "Unprocessable Entity",
-            "message": getattr(exc, "detail", "Validation error"),
+            "message": redact_error_details(getattr(exc, "detail", "Validation error")),
             "request_id": getattr(request.state, "request_id", None),
         },
     )
@@ -184,7 +197,7 @@ async def generic_http_exception_handler(
         content={
             "success": False,
             "error": f"HTTP {status_code}",
-            "message": getattr(exc, "detail", f"HTTP {status_code} error"),
+            "message": redact_error_details(getattr(exc, "detail", f"HTTP {status_code} error")),
             "status_code": status_code,
         },
     )

@@ -21,6 +21,7 @@ from backend.data_ingestion.connectors.file import LocalFileConnector
 from backend.data_ingestion.connectors.s3 import S3Connector
 from backend.data_ingestion.engine.profiler import DataProfiler
 from backend.database.models import DataSource
+from backend.utils.logging_utils import redact_credentials, sanitize_for_log
 
 logger = logging.getLogger(__name__)
 
@@ -139,7 +140,8 @@ def _mark_ingestion_completed(session, data_source, metadata: dict, profile: dic
 
 def _handle_ingestion_failure(session, source_id: int, error: Exception) -> None:
     """Log the ingestion failure and, if possible, persist a 'failed' ingestion status."""
-    logger.error(f"Ingestion failed for source {source_id}: {str(error)}")
+    safe_error = redact_credentials(error)
+    logger.error("Ingestion failed for source %s: %s", source_id, sanitize_for_log(safe_error))
     if session:
         # Roll back first: if the exception came from a DB error (e.g. a
         # failed commit above), the session is left in a rolled-back/
@@ -150,7 +152,7 @@ def _handle_ingestion_failure(session, source_id: int, error: Exception) -> None
             metadata = dict(data_source.source_metadata or {})
             metadata["ingestion_status"] = {
                 "status": "failed",
-                "error": str(error),
+                "error": safe_error,
                 "updated_at": datetime.now(UTC).isoformat(),
             }
             data_source.source_metadata = metadata
@@ -185,6 +187,13 @@ def ingest_data_task(source_id: int):
         logger.info(f"Ingestion completed for source {source_id}")
 
     except Exception as e:  # noqa: BLE001 - task boundary, failure recorded by handler
-        _handle_ingestion_failure(session, source_id, e)
+        try:
+            _handle_ingestion_failure(session, source_id, e)
+        except Exception as recovery_error:  # noqa: BLE001 - sanitize Celery failure boundary
+            # Keep the task failed, but prevent Celery from serializing SQL parameters
+            # or logging the original exception chain containing source credentials.
+            raise RuntimeError(
+                f"Unable to persist ingestion failure: {redact_credentials(recovery_error)}"
+            ) from None
     finally:
         session.close()

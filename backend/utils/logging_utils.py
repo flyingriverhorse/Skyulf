@@ -6,6 +6,7 @@ import re
 from logging import Handler
 from logging.handlers import RotatingFileHandler, TimedRotatingFileHandler
 from pathlib import Path
+from typing import Any
 
 # Get logger for data actions
 data_logger = logging.getLogger("data_actions")
@@ -68,6 +69,7 @@ _SECRET_NAMES = (
     "x-amz-signature",
     "aws_secret_access_key",
     "aws_access_key_id",
+    "aws_session_token",
     "awsaccesskeyid",
     "secret_access_key",
     "session_token",
@@ -75,6 +77,10 @@ _SECRET_NAMES = (
     "signature",
     "secret",
     "password",
+    "api_key",
+    "access_token",
+    "private_key",
+    "token",
     "key",
 )
 
@@ -132,6 +138,24 @@ def redact_credentials(value: object) -> str:
         lambda m: f"<{m.group('tag')}>[REDACTED]</{m.group('tag')}>",
         text,
     )
+
+
+def redact_error_details(value: Any) -> Any:
+    """Copy diagnostic JSON, scrubbing secret fields and embedded credential text.
+
+    Preserve containers and non-string values so error response schemas remain
+    intact. Apply only to diagnostics, not arbitrary dataset/profile contents.
+    """
+    if isinstance(value, dict):
+        return {
+            key: "[REDACTED]" if str(key).lower() in _SECRET_NAMES else redact_error_details(item)
+            for key, item in value.items()
+        }
+    if isinstance(value, list):
+        return [redact_error_details(item) for item in value]
+    if isinstance(value, tuple):
+        return tuple(redact_error_details(item) for item in value)
+    return redact_credentials(value) if isinstance(value, str) else value
 
 
 def _build_file_handler(

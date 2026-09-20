@@ -16,13 +16,14 @@ from typing import Any, Literal, cast
 import pandas as pd
 import polars as pl
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.exceptions.core import SkyulfException
 from backend.middleware.rate_limiter import limiter
 from backend.ml_pipeline.artifacts.factory import ArtifactFactory
+from backend.utils.logging_utils import redact_credentials
 
 logger = logging.getLogger(__name__)
 from backend.database.models import (
@@ -887,6 +888,12 @@ class ErrorEventResponse(BaseModel):
     resolved_at: str | None = None
     # Derived, not stored — see `_classify_error_severity`.
     severity: str
+
+    @field_validator("message", "traceback", mode="before")
+    @classmethod
+    def redact_diagnostics(cls, value: str | None) -> str | None:
+        """Hide credentials in legacy error rows without mutating stored history."""
+        return redact_credentials(value) if value is not None else None
 
 
 class ErrorCountResponse(BaseModel):
