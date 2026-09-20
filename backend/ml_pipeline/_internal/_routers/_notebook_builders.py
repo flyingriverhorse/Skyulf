@@ -7,7 +7,7 @@ classified `_NodeIn` lists and emit raw nbformat 4.5 cell dicts.
 
 import hashlib
 import json
-import re
+from pprint import pformat
 from typing import Any
 
 from pydantic import BaseModel, Field
@@ -56,7 +56,7 @@ def wrap_notebook(cells: list[dict[str, Any]]) -> dict[str, Any]:
             "kernelspec": {"name": "python3", "display_name": "Python 3", "language": "python"},
             "language_info": {"name": "python", "pygments_lexer": "ipython3"},
         },
-        "cells": cells,
+        "cells": [{**cell, "id": f"cell-{index:04d}"} for index, cell in enumerate(cells)],
     }
 
 
@@ -126,15 +126,10 @@ def metrics_helper_cell() -> dict[str, Any]:
 def _to_py_literal(d: Any) -> str:
     """Serialize *d* as a Python literal string.
 
-    ``json.dumps`` produces JSON-syntax booleans/null (``true``, ``false``,
-    ``null``) which are not valid Python identifiers.  This helper replaces
-    them with their Python equivalents so the cell can be executed as-is.
+    Normalize through JSON to retain the existing ``default=str`` fallback,
+    then format Python values without rewriting words inside string data.
     """
-    j = json.dumps(d, indent=2, default=str)
-    j = re.sub(r"\btrue\b", "True", j)
-    j = re.sub(r"\bfalse\b", "False", j)
-    j = re.sub(r"\bnull\b", "None", j)
-    return j
+    return pformat(json.loads(json.dumps(d, default=str)), indent=2, sort_dicts=False)
 
 
 def config_fingerprint(cfg: _PipelineIn) -> str:
@@ -154,7 +149,12 @@ def _model_algorithm(model: _NodeIn) -> str:
     in `params.algorithm` (e.g. `xgboost_classifier`). Falls back to
     `step_type` for nodes that ARE direct registry entries.
     """
-    return str(model.params.get("algorithm") or model.params.get("type") or model.step_type)
+    return str(
+        model.params.get("algorithm")
+        or model.params.get("model_type")
+        or model.params.get("type")
+        or model.step_type
+    )
 
 
 def _model_label(model: _NodeIn | None) -> str:
@@ -177,6 +177,8 @@ def _build_modeling_block(model: _NodeIn) -> dict[str, Any]:
     ``hyperparameter_tuner`` and flatten the nested ``tuning_config`` fields
     so ``TuningCalculator.fit`` picks them up via its keyword filter.
     """
+    if "model_type" in model.params or "hyperparameters" in model.params:
+        return _canvas_modeling_block(model)
     algorithm = str(model.params.get("algorithm") or model.params.get("type") or "")
     clean_params = strip_internal_params(model.params)
     if _is_tuning_model(model) and algorithm:
@@ -191,14 +193,130 @@ def _build_modeling_block(model: _NodeIn) -> dict[str, Any]:
     return {"type": algorithm or model.step_type, "node_id": model.node_id, **clean_params}
 
 
+def _canvas_modeling_block(model: _NodeIn) -> dict[str, Any]:
+    """Use the Canvas runner's fixed/CV and tuning contracts for its actual wire payload."""
+    from backend.ml_pipeline._execution.engine._node_runners import NodeRunnersMixin
+    from backend.ml_pipeline._execution.model_components import get_model_components
+    from backend.ml_pipeline._execution.schemas import NodeConfig
+
+    algorithm = _model_algorithm(model)
+    task_type = (
+        model.params.get("task_type")
+        or model.params.get("problem_type")
+        or model.params.get("task")
+    )
+    calculator, _ = get_model_components(
+        algorithm, task_type=task_type if isinstance(task_type, str) else None
+    )
+    if calculator.problem_type == "clustering":
+        raise ValueError(
+            "Notebook export does not yet support clustering models; "
+            "their reference-column and inference contracts require a dedicated export"
+        )
+    if calculator.STRUCTURAL_TUNING_KEYS:
+        raise ValueError(
+            "Notebook export does not yet support structural models; "
+            "their configured base estimators cannot be reconstructed by this notebook"
+        )
+    # The runtime resolves aliases; Core needs the canonical registered model ID.
+    algorithm = calculator.__node_meta__.id
+    node = NodeConfig(node_id=model.node_id, step_type=model.step_type, params=model.params)
+    runner = NodeRunnersMixin()
+    params = (
+        runner._prepare_tuning_config(node, calculator)
+        if _is_tuning_model(model)
+        else runner._build_fixed_run_params(node, calculator)
+    )
+    return {"type": "hyperparameter_tuner", "base_model": {"type": algorithm}, **params}
+
+
 def build_skyulf_config(preprocess: list[_NodeIn], model: _NodeIn | None) -> dict[str, Any]:
     """Convert engine `NodeConfig` shape -> SkyulfPipeline shape."""
     steps = [
-        {"name": n.node_id, "transformer": n.step_type, "params": strip_internal_params(n.params)}
-        for n in preprocess
+        {
+            "name": f"{n.step_type}_{index}",
+            "transformer": n.step_type,
+            "params": strip_internal_params(n.params),
+        }
+        for index, n in enumerate(preprocess, start=1)
     ]
     modeling = _build_modeling_block(model) if model is not None else {}
+    modeling.pop("node_id", None)
     return {"preprocessing": steps, "modeling": modeling}
+
+
+def training_chain(
+    preprocess: list[_NodeIn], feat_target: _NodeIn | None, train_test: _NodeIn | None
+) -> list[_NodeIn]:
+    """Place partitioning before learned transforms, supplying the notebook's default split."""
+    split = train_test or _NodeIn(
+        node_id="notebook_train_test_split",
+        step_type="TrainTestSplitter",
+        params={"test_size": 0.2, "random_state": 42},
+    )
+    return ([feat_target] if feat_target is not None else []) + [split] + preprocess
+
+
+def full_training_cells(
+    preprocess: list[_NodeIn],
+    feat_target: _NodeIn | None,
+    train_test: _NodeIn | None,
+    model: _NodeIn,
+    branch_letter: str | None = None,
+) -> list[dict[str, Any]]:
+    """Explain each step while executing, persisting, and predicting through Core's pipeline."""
+    suffix = f"_{branch_letter}" if branch_letter else ""
+    var = f"pipeline{suffix}"
+    target = (
+        model.params.get("target_column")
+        or (feat_target.params.get("target_column") if feat_target else None)
+        or (train_test.params.get("target_column") if train_test else None)
+        or "<target_column>"
+    )
+    chain = training_chain(preprocess, feat_target, train_test)
+    config = build_skyulf_config(chain, model)
+    cells = [
+        md_cell(
+            "### Configure preprocessing and partitions\n\n"
+            "Edit each step below before fitting. Partitioning runs first; learned "
+            "transformations fit on training rows only. Tuning refits preprocessing "
+            "inside each training fold. Shared canvas nodes are fitted independently "
+            "for each model branch. If no split is configured, an 80/20 split is used.\n"
+        ),
+        code_cell("from skyulf.pipeline import SkyulfPipeline\n"),
+        code_cell(f"{var}_config = {_to_py_literal(config)}\n"),
+    ]
+    cells.extend(
+        [
+            md_cell(f"### Train & evaluate — `{_model_algorithm(model)}`\n"),
+            code_cell(
+                f"{var} = SkyulfPipeline({var}_config)\n"
+                f"{var}_metrics = {var}.fit(df.copy(), target_column={target!r})\n"
+                f"_summarize_metrics({var}_metrics)\n"
+            ),
+            md_cell(
+                "### Inspect fitted preprocessing\n\n"
+                "These artifacts were learned from training rows, after partitioning.\n"
+            ),
+            code_cell(
+                f"{var}_artifacts = {var}.feature_engineer.fitted_steps\n"
+                f"[(step['name'], step['artifact']) for step in {var}_artifacts]\n"
+            ),
+            md_cell(
+                "### Save and predict on new rows\n\n"
+                "The artifact contains both preprocessing and the fitted model. "
+                "Pass raw feature rows to the prediction function.\n"
+            ),
+            code_cell(
+                f"{var}.save('skyulf_{var}.pkl')\n"
+                f"loaded{suffix} = SkyulfPipeline.load('skyulf_{var}.pkl')\n"
+                f"def predict_new{suffix}(new_df):\n"
+                f"    return loaded{suffix}.predict(new_df)\n"
+                f"# predictions{suffix} = predict_new{suffix}(new_df)\n"
+            ),
+        ]
+    )
+    return cells
 
 
 def pipeline_diagram_md(preprocess: list[_NodeIn], model: _NodeIn | None) -> str:
@@ -286,8 +404,8 @@ def compact_load_cells(
         code_cell(
             "# EDIT THIS to the absolute or relative path of your training CSV.\n"
             '# Use a raw string (r"...") on Windows to avoid escaping backslashes.\n'
-            f'TRAIN_PATH = r"{data_path}"\n'
-            f'TARGET_COLUMN = "{target_col}"\n'
+            f"TRAIN_PATH = {data_path!r}\n"
+            f"TARGET_COLUMN = {target_col!r}\n"
             "\n"
             "df = pd.read_csv(TRAIN_PATH)\n"
             "df.head()\n"
@@ -387,7 +505,7 @@ def node_to_cell(n: _NodeIn, idx: int) -> dict[str, Any]:
     config_json = _to_py_literal(strip_internal_params(n.params))
     var = f"step{idx:02d}"
     return code_cell(
-        f"# Step {idx}: {n.step_type}  ·  node_id = {n.node_id}\n"
+        f"# Step {idx}: {n.step_type!r}\n"
         f"{var}_calc = NodeRegistry.get_calculator({n.step_type!r})()\n"
         f"{var}_apply = NodeRegistry.get_applier({n.step_type!r})()\n"
         f"{var}_config = {config_json}\n"
@@ -401,9 +519,8 @@ def topology_summary(nodes: list[_NodeIn]) -> str:
     """Format a fenced ASCII listing of *nodes* in topological order for the header markdown."""
     lines = ["```", "Topology (topological order):"]
     for i, n in enumerate(nodes, start=1):
-        inputs = ", ".join(n.inputs) if n.inputs else "—"
         label = n.params.get("_display_name") or n.step_type
-        lines.append(f"  {i:>2}. {label:<28}  step_type={n.step_type:<28}  inputs=[{inputs}]")
+        lines.append(f"  {i:>2}. {label}")
     lines.append("```\n")
     return "\n".join(lines)
 
@@ -576,7 +693,7 @@ def _feat_target_cells(
         return [
             md_cell(f"{h} Feature / target split — `{target_col}`\n"),
             code_cell(
-                f'TARGET_COLUMN = "{target_col}"\n'
+                f"TARGET_COLUMN = {target_col!r}\n"
                 "X = df.drop(columns=[TARGET_COLUMN])\n"
                 "y = df[TARGET_COLUMN]\n"
                 "X.shape, y.shape\n"
@@ -601,8 +718,8 @@ def _train_test_cells(train_test: _NodeIn | None, in_branch: bool = False) -> li
             code_cell(
                 "from sklearn.model_selection import train_test_split\n\n"
                 "X_train, X_test, y_train, y_test = train_test_split(\n"
-                f"    X, y, test_size={p.get('test_size', 0.2)}, "
-                f"random_state={p.get('random_state', 42)},\n"
+                f"    X, y, test_size={_to_py_literal(p.get('test_size', 0.2))}, "
+                f"random_state={_to_py_literal(p.get('random_state', 42))},\n"
                 f"    stratify=y if {bool(p.get('stratify', False))} else None,\n"
                 ")\n"
                 "X_train.shape, X_test.shape\n"
@@ -628,16 +745,16 @@ def split_cells(
 
 
 def persist_cells(preprocess: list[_NodeIn]) -> list[dict[str, Any]]:
-    """Build full-mode sections 7-8: pickle per-step artifacts, then a replay predict loop."""
+    """Persist a preprocessing-only graph and expose transformation without model predictions."""
     artifact_dict = "".join(
         f"    {i:>2}: ({n.step_type!r}, step{i:02d}_artifact),\n"
         for i, n in enumerate(preprocess, start=1)
     )
     return [
         md_cell(
-            "## 7. Persist artifacts for inference\n\n"
-            "Pickle the per-step artifacts together with the model so a "
-            "downstream service can re-apply the exact same transformations.\n"
+            "## Save preprocessing artifacts\n\n"
+            "This graph has no model. Save the learned transformations to apply "
+            "them to new rows; no supervised evaluation or predictions are produced.\n"
         ),
         code_cell(
             "import pickle\n\n"
@@ -646,12 +763,12 @@ def persist_cells(preprocess: list[_NodeIn]) -> list[dict[str, Any]]:
             '    pickle.dump({"artifacts": artifacts}, fh)\n'
         ),
         md_cell(
-            "## 8. Predict on new data (replay loop)\n\n"
+            "## Transform new data (replay loop)\n\n"
             "Re-applies each saved artifact in order. Use this as the template "
-            "for a production scoring service.\n"
+            "for applying the same preprocessing to new rows.\n"
         ),
         code_cell(
-            "def predict_new(new_df: pd.DataFrame) -> pd.DataFrame:\n"
+            "def transform_new(new_df: pd.DataFrame) -> pd.DataFrame:\n"
             "    out = new_df.copy()\n"
             "    for _idx, (step_type, artifact) in artifacts.items():\n"
             "        applier = NodeRegistry.get_applier(step_type)()\n"
@@ -659,7 +776,7 @@ def persist_cells(preprocess: list[_NodeIn]) -> list[dict[str, Any]]:
             "    return out\n"
             "\n"
             "# new_df = pd.read_csv('new_data.csv')\n"
-            "# predict_new(new_df).head()\n"
+            "# transform_new(new_df).head()\n"
         ),
     ]
 
@@ -678,7 +795,7 @@ def full_intro_cells(data_path: str, resolved_from_db: bool = False) -> list[dic
         code_cell(
             "# EDIT THIS to the absolute or relative path of your CSV.\n"
             '# Use a raw string (r"...") on Windows to avoid escaping backslashes.\n'
-            f'DATA_PATH = r"{data_path}"\n'
+            f"DATA_PATH = {data_path!r}\n"
             "\n"
             "df = pd.read_csv(DATA_PATH)\n"
             "print(f'Loaded shape: {df.shape}')\n"
@@ -687,8 +804,8 @@ def full_intro_cells(data_path: str, resolved_from_db: bool = False) -> list[dic
         metrics_helper_cell(),
         md_cell(
             "## 3. Apply preprocessing steps\n\n"
-            "Each cell below mirrors a single canvas node. The `df` variable is "
-            "threaded through; every step writes its fitted artifact to a "
-            "`stepNN_artifact` variable so you can inspect what was learned.\n"
+            "Inspect the node configurations below. Training exports partition "
+            "the data before fitting learned transformations and expose the fitted "
+            "artifacts after training.\n"
         ),
     ]

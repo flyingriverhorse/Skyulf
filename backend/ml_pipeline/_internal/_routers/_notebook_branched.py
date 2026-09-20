@@ -21,9 +21,6 @@ from ._notebook_builders import (
     config_fingerprint,
     full_intro_cells,
     md_cell,
-    modeling_cells,
-    node_to_cell,
-    split_cells,
     wrap_notebook,
 )
 
@@ -48,14 +45,6 @@ def _branch_letter(idx: int) -> str:
     return _branch_letter(idx // 26 - 1) + _branch_letter(idx % 26)
 
 
-def _shared_preprocess_ids(branches: list[list[_NodeIn]]) -> set:
-    """Node IDs that appear in every branch — fitted once before per-branch sections."""
-    if not branches:
-        return set()
-    sets = [{n.node_id for n in b} for b in branches]
-    return set.intersection(*sets)
-
-
 # ---------------------------------------------------------------------------
 # Full-mode branched builders
 # ---------------------------------------------------------------------------
@@ -75,8 +64,7 @@ def _branch_sections_md(
     terminals: list[_NodeIn],
 ) -> str:
     items = "\n".join(
-        f"- **Branch {_branch_letter(i)}** — `{t.step_type}` "
-        f"(`{nb._model_algorithm(t)}`, node `{t.node_id}`)"
+        f"- **Branch {_branch_letter(i)}** — `{t.step_type}` (`{nb._model_algorithm(t)}`)"
         for i, t in enumerate(terminals)
     )
     return (
@@ -85,100 +73,17 @@ def _branch_sections_md(
         f"This pipeline has **{len(terminals)} training branches**. "
         f"Each branch is trained, evaluated, and persisted independently.\n\n"
         f"**Branches:**\n{items}\n\n"
-        f"Shared preprocessing steps (common to every branch) are fitted once at the top; "
-        f"branch-specific steps live inside each branch's section.\n"
-    )
-
-
-def _shared_preprocess_cells(shared: list[_NodeIn]) -> list[dict[str, Any]]:
-    if not shared:
-        return [
-            md_cell(
-                "## 4. Shared preprocessing\n\n"
-                "_None._ Each branch has its own preprocessing chain.\n"
-            ),
-            code_cell(
-                "# No shared nodes — snapshot the raw loaded frame so each branch\n"
-                "# can reset to the same starting point.\n"
-                "df_shared = df.copy()\n"
-            ),
-        ]
-    cells: list[dict[str, Any]] = [
-        md_cell(
-            "## 4. Shared preprocessing\n\n"
-            "These steps are common to every branch. They are fitted once on the "
-            "full training frame before branching.\n"
-        )
-    ]
-    for i, n in enumerate(shared, start=1):
-        cells.append(node_to_cell(n, i))
-    cells.append(
-        code_cell(
-            "# Snapshot the post-shared frame so each branch starts from the same point.\n"
-            "df_shared = df.copy()\n"
-        )
-    )
-    return cells
-
-
-def _branch_persist_cell(letter: str, branch_only: list[_NodeIn]) -> dict[str, Any]:
-    artifact_dict = "".join(
-        f"    {i:>2}: ({n.step_type!r}, step{i:02d}_artifact),\n"
-        for i, n in enumerate(branch_only, start=1)
-    )
-    return code_cell(
-        f"# Persist branch {letter}'s artifacts + fitted estimator.\n"
-        "import pickle\n\n"
-        "branch_artifacts = {\n" + artifact_dict + "}\n"
-        f'with open(f"skyulf_branch_{letter}.pkl", "wb") as fh:\n'
-        '    pickle.dump({"artifacts": branch_artifacts, "estimator": estimator}, fh)\n'
-        f'print("Saved branch {letter} → skyulf_branch_{letter}.pkl")\n'
+        f"Each branch fits its complete preprocessing chain on its own training "
+        f"partition, including nodes shared on the canvas.\n"
     )
 
 
 def _branch_topology_md(letter: str, branch_nodes: list[_NodeIn]) -> dict[str, Any]:
     lines = [f"<details><summary>Branch {letter} nodes (topological order)</summary>\n", "```"]
     for i, n in enumerate(branch_nodes, start=1):
-        inputs = ", ".join(n.inputs) if n.inputs else "—"
-        lines.append(f"  {i:>2}. {n.step_type:<28}  node_id={n.node_id}  inputs=[{inputs}]")
+        lines.append(f"  {i:>2}. {n.step_type}")
     lines.extend(["```", "</details>\n"])
     return md_cell("\n".join(lines))
-
-
-def _full_branch_section(
-    letter: str,
-    section_no: int,
-    branch_nodes: list[_NodeIn],
-    classified: _Classified,
-    shared_ids: set,
-) -> list[dict[str, Any]]:
-    """Cells for one training branch in the full notebook."""
-    _loader, preprocess, feat_target, train_test, model = classified
-    branch_only = [n for n in preprocess if n.node_id not in shared_ids]
-    algo = nb._model_algorithm(model) if model is not None else "none"
-    title = (
-        f"## {section_no}. Branch {letter} — {model.step_type if model else 'no model'} (`{algo}`)"
-    )
-    cells: list[dict[str, Any]] = [
-        md_cell(
-            f"{title}\n\n"
-            f"Replays branch **{letter}** from the shared snapshot. "
-            f"Branch-specific preprocessing: {len(branch_only)} step(s); "
-            f"feat/target split: {'yes' if feat_target else 'no'}; "
-            f"train/test split: {'yes' if train_test else 'no'}.\n"
-        ),
-        code_cell(
-            f"# Reset to shared snapshot before running branch {letter}.\ndf = df_shared.copy()\n"
-        ),
-    ]
-    for i, n in enumerate(branch_only, start=1):
-        cells.append(node_to_cell(n, i))
-    cells.extend(split_cells(feat_target, train_test, in_branch=True))
-    cells.extend(modeling_cells(model, in_branch=True, branch_letter=letter))
-    if model is not None:
-        cells.append(_branch_persist_cell(letter, branch_only))
-    cells.append(_branch_topology_md(letter, branch_nodes))
-    return cells
 
 
 @dataclass
@@ -196,38 +101,8 @@ class _FullBranchCtx:
     resolved_from_db: bool
 
 
-def _assemble_full_branch_cells(
-    terminals: list[_NodeIn],
-    branches: list[list[_NodeIn]],
-    classifications: list[_Classified],
-    shared_ids: set,
-) -> list[dict[str, Any]]:
-    """Build per-branch section cells (extracted to reduce CCN of caller)."""
-    cells: list[dict[str, Any]] = []
-    for i, (_t, branch_nodes, classified) in enumerate(
-        zip(terminals, branches, classifications, strict=True)
-    ):
-        cells.extend(
-            _full_branch_section(_branch_letter(i), 5 + i, branch_nodes, classified, shared_ids)
-        )
-    return cells
-
-
-def _compute_shared_nodes(
-    all_nodes: list[_NodeIn], branches: list[list[_NodeIn]]
-) -> tuple[set, list[_NodeIn]]:
-    """Return (shared_ids, shared_node_list) for the given branches."""
-    shared_ids = _shared_preprocess_ids(
-        [[n for n in b if n.step_type not in _SPLIT_OR_MODEL] for b in branches]
-    )
-    shared_nodes = [
-        n for n in all_nodes if n.node_id in shared_ids and n.step_type not in _SPLIT_OR_MODEL
-    ]
-    return shared_ids, shared_nodes
-
-
 def build_full_branched(ctx: _FullBranchCtx) -> dict[str, Any]:
-    """Full notebook: shared preprocess section + one training section per branch.
+    """Full notebook: an independent preprocessing and training pipeline per branch.
 
     Accepts a :class:`_FullBranchCtx` dataclass instead of many positional
     arguments to stay under the Codacy parameter-count limit.
@@ -235,43 +110,25 @@ def build_full_branched(ctx: _FullBranchCtx) -> dict[str, Any]:
     branches, classifications = _collect_branches(
         ctx.all_nodes, ctx.terminals, ctx.ancestors_in_topo, ctx.classify
     )
-    shared_ids, shared_nodes = _compute_shared_nodes(ctx.all_nodes, branches)
     loader = next((n for n in ctx.all_nodes if n.step_type == "data_loader"), None)
     data_path = ctx.data_path_resolver(loader)
     cells: list[dict[str, Any]] = [
         md_cell(_branch_sections_md(ctx.cfg, ctx.dataset_id, ctx.dataset_name, ctx.terminals)),
     ]
     cells.extend(full_intro_cells(data_path, resolved_from_db=ctx.resolved_from_db))
-    cells.extend(_shared_preprocess_cells(shared_nodes))
-    cells.extend(_assemble_full_branch_cells(ctx.terminals, branches, classifications, shared_ids))
+    for index, (branch_nodes, classified) in enumerate(zip(branches, classifications, strict=True)):
+        letter = _branch_letter(index)
+        _loader, preprocess, feat_target, train_test, model = classified
+        if model is None:
+            continue
+        cells.append(md_cell(f"## Branch {letter}\n"))
+        cells.extend(nb.full_training_cells(preprocess, feat_target, train_test, model, letter))
+        cells.append(code_cell(f"metrics_{letter} = pipeline_{letter}_metrics\n"))
+        cells.append(_branch_topology_md(letter, branch_nodes))
     letters = [_branch_letter(i) for i in range(len(ctx.terminals))]
     n_branches = len(ctx.terminals)
     cells.extend(_metrics_comparison_cell(letters, 5 + n_branches))
-    cells.extend(_full_inference_cells(letters, 6 + n_branches))
     return wrap_notebook(cells)
-
-
-def _full_inference_cells(letters: list[str], section_no: int) -> list[dict[str, Any]]:
-    """Predict-on-new-data section appended after all branch sections in full mode."""
-    load_lines = "".join(
-        f'# branch_{l} = pickle.load(open("skyulf_branch_{l}.pkl", "rb"))\n'
-        f'# estimator_{l} = branch_{l}["estimator"]\n'
-        f"# pred_{l} = estimator_{l}.predict(new_df)\n\n"
-        for l in letters  # noqa: E741
-    )
-    return [
-        md_cell(
-            f"## {section_no}. Predict on new data (per branch)\n\n"
-            "Each branch's estimator was pickled at the end of its section.\n"
-            "Load any artifact below and call `predict` on new rows.\n"
-        ),
-        code_cell(
-            "import pickle\n\n"
-            "# new_df = pd.read_csv('new_data.csv')\n"
-            "# (edit the path and uncomment one block per branch you want to score)\n\n"
-            + load_lines
-        ),
-    ]
 
 
 def _metrics_helper_cell() -> dict[str, Any]:
@@ -358,8 +215,13 @@ def _compact_branch_cells(
 ) -> list[dict[str, Any]]:
     """Fit + persist cells for one compact-mode branch."""
     _loader, preprocess, feat_target, train_test, model = classified
-    target_col = feat_target.params.get("target_column", "") if feat_target else ""
-    full_chain = [n for n in (feat_target, train_test) if n is not None] + preprocess
+    target_col = (
+        (model.params.get("target_column") if model else None)
+        or (feat_target.params.get("target_column") if feat_target else None)
+        or (train_test.params.get("target_column") if train_test else None)
+        or "<target_column>"
+    )
+    full_chain = nb.training_chain(preprocess, feat_target, train_test)
     cfg_dict = build_skyulf_config(full_chain, model)
     config_json = _to_py_literal(cfg_dict)
     var = f"pipeline_{letter}"
@@ -375,7 +237,7 @@ def _compact_branch_cells(
         ),
         code_cell(f"{var}_config = {config_json}\n"),
         code_cell(
-            f'BRANCH_{letter}_TARGET = "{target_col}"  # target column for this branch\n'
+            f"BRANCH_{letter}_TARGET = {target_col!r}  # target column for this branch\n"
             f"{var} = SkyulfPipeline({var}_config)\n"
             f"{var}_metrics = {var}.fit(df, target_column=BRANCH_{letter}_TARGET)\n"
             f"_summarize_metrics({var}_metrics).style.format('{{:.4f}}', na_rep='-')"
@@ -467,7 +329,9 @@ def build_compact_branched(ctx: _CompactBranchCtx) -> dict[str, Any]:
     data_path = ctx.data_path_resolver(loader)
     target_col: str | None = None
     for c in classifications:
-        target_col = ctx.target_resolver(c[2], c[3])
+        target_col = (c[4].params.get("target_column") if c[4] else None) or ctx.target_resolver(
+            c[2], c[3]
+        )
         if target_col:
             break
     target_col = target_col or "<target_column>"

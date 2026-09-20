@@ -123,6 +123,7 @@ class TestModelingCellsForTrainingStepType:
         assert "optuna" in src
 
     def test_full_notebook_includes_modeling_section_for_training_node(self):
+        """The full export must train through Core while retaining the chosen model."""
         train_node = _NodeIn(
             node_id="train1",
             step_type="training",
@@ -137,4 +138,5 @@ class TestModelingCellsForTrainingStepType:
         all_src = "".join(
             "".join(c.get("source", [])) for c in nb["cells"] if c["cell_type"] == "code"
         )
-        assert "estimator.fit_predict" in all_src
+        assert "pipeline.fit(" in all_src
+        assert "xgboost_classifier" in all_src

@@ -16,10 +16,9 @@ Two modes are supported:
 * ``compact`` — minimal notebook that wires up `SkyulfPipeline(config)`
   with a properly split `{preprocessing, modeling}` block, fits, evaluates,
   predicts on new data, and shows a save/load + FastAPI handoff snippet.
-* ``full`` — walks the saved graph in topological order and renders one
-  cell per preprocessing step using `NodeRegistry.get_calculator/get_applier`,
-  followed by feature/target split, train/test split, model fit + evaluation,
-  and inference. Best for teaching, debugging, or hand-tweaking a single step.
+* ``full`` — explains each preprocessing configuration, then trains through
+  `SkyulfPipeline` with partitioning before learned transforms. Fitted artifacts
+  remain inspectable; save/load includes the model and raw-row inference.
 
 Cell builders live in `_notebook_builders` to keep this module focused on
 graph classification and the HTTP endpoint.
@@ -259,11 +258,72 @@ def _resolve_dataset_path(
     )
 
 
-def _resolve_target_column(feat_target: _NodeIn | None, train_test: _NodeIn | None) -> str | None:
-    for src in (feat_target, train_test):
+def _resolve_target_column(
+    feat_target: _NodeIn | None, train_test: _NodeIn | None, model: _NodeIn | None = None
+) -> str | None:
+    for src in (model, feat_target, train_test):
         if src and isinstance(src.params.get("target_column"), str):
             return src.params["target_column"]
     return None
+
+
+def _export_nodes(cfg: _PipelineIn) -> list[_NodeIn]:
+    """Select model ancestry and reject graphs the sequential notebook cannot represent."""
+    ids = {node.node_id for node in cfg.nodes}
+    if len(ids) != len(cfg.nodes):
+        raise HTTPException(400, "Notebook export requires unique node IDs")
+    if any(source not in ids for node in cfg.nodes for source in node.inputs):
+        raise HTTPException(400, "Notebook export has a missing input node")
+    ordered = _topo_sort(cfg.nodes)
+    positions = {node.node_id: index for index, node in enumerate(ordered)}
+    if any(
+        positions[source] >= positions[node.node_id] for node in ordered for source in node.inputs
+    ):
+        raise HTTPException(400, "Notebook export does not support cycles")
+    nodes = _expand_parallel_terminals(ordered)
+    terminals = _terminal_models(nodes)
+    if terminals:
+        selected = {
+            node.node_id
+            for terminal in terminals
+            for node in _ancestors_in_topo(terminal.node_id, nodes)
+        }
+        selected.update(terminal.node_id for terminal in terminals)
+        if any(
+            node.step_type in _MODELING_STEPS and node.node_id not in selected for node in nodes
+        ):
+            raise HTTPException(
+                400, "Notebook export cannot omit a training branch with post-model nodes"
+            )
+        nodes = [node for node in nodes if node.node_id in selected]
+    elif any(node.step_type in _MODELING_STEPS for node in nodes):
+        raise HTTPException(400, "Notebook export requires training nodes to end their branches")
+    runtime = [node for node in nodes if node.step_type not in _PREVIEW_STEPS]
+    if sum(node.step_type in _DATA_LOADER_STEPS for node in runtime) > 1:
+        raise HTTPException(
+            400, "Notebook export supports one data loader; export each dataset separately"
+        )
+    if any(len(set(node.inputs)) > 1 for node in runtime):
+        raise HTTPException(
+            400,
+            "Notebook export does not support merged inputs; use independent parallel training branches",
+        )
+    branches = [
+        _ancestors_in_topo(terminal.node_id, nodes) + [terminal] for terminal in terminals
+    ] or [runtime]
+    for branch in branches:
+        for step_type in ("training", "feature_target_split", "TrainTestSplitter"):
+            if sum(node.step_type == step_type for node in branch) > 1:
+                raise HTTPException(
+                    400, f"Notebook export supports one {step_type} per model branch"
+                )
+    if not terminals and sum(not node.inputs for node in runtime) > 1:
+        raise HTTPException(400, "Notebook export requires a connected preprocessing chain")
+    if not terminals:
+        for node in runtime:
+            if sum(node.node_id in child.inputs for child in runtime) > 1:
+                raise HTTPException(400, "Notebook export requires one preprocessing output chain")
+    return nodes
 
 
 # ---------------------------------------------------------------------------
@@ -277,7 +337,7 @@ def _build_compact_notebook(
     dataset_name: str | None,
     db_file_path: str | None = None,
 ) -> dict[str, Any]:
-    nodes = _expand_parallel_terminals(_topo_sort(cfg.nodes))
+    nodes = _export_nodes(cfg)
     terminals = _terminal_models(nodes)
     if len(terminals) > 1:
         return build_compact_branched(
@@ -297,13 +357,19 @@ def _build_compact_notebook(
             )
         )
     loader, preprocess, feat_target, train_test, model = _classify(nodes)
+    if model is None:
+        return _build_full_notebook(cfg, dataset_id, dataset_name, db_file_path)
     # Compact mode hands the whole feature-engineering chain (including
     # splitters) to SkyulfPipeline; FeatureEngineer skips splitters during
     # transform, so this is safe.
-    full_chain = [n for n in (feat_target, train_test) if n is not None] + preprocess
+    full_chain = (
+        nb.training_chain(preprocess, feat_target, train_test)
+        if model
+        else [n for n in (feat_target, train_test) if n is not None] + preprocess
+    )
     skyulf_cfg = nb.build_skyulf_config(full_chain, model)
     data_path = _resolve_dataset_path(loader, dataset_name, db_file_path)
-    target_col = _resolve_target_column(feat_target, train_test) or "<target_column>"
+    target_col = _resolve_target_column(feat_target, train_test, model) or "<target_column>"
     config_json = nb._to_py_literal(skyulf_cfg)
     cells: list[dict[str, Any]] = [
         nb.md_cell(
@@ -327,7 +393,7 @@ def _build_full_notebook(
     dataset_name: str | None,
     db_file_path: str | None = None,
 ) -> dict[str, Any]:
-    nodes = _expand_parallel_terminals(_topo_sort(cfg.nodes))
+    nodes = _export_nodes(cfg)
     terminals = _terminal_models(nodes)
     if len(terminals) > 1:
         return build_full_branched(
@@ -357,12 +423,21 @@ def _build_full_notebook(
         nb.md_cell(nb.pipeline_diagram_md(diagram_chain, model)),
     ]
     cells.extend(nb.full_intro_cells(data_path, resolved_from_db=db_file_path is not None))
+    if model is not None:
+        cells.extend(nb.full_training_cells(preprocess, feat_target, train_test, model))
+        return nb.wrap_notebook(cells)
     if not preprocess:
         cells.append(nb.md_cell("_No preprocessing transformations in this pipeline._\n"))
+    cells.append(
+        nb.md_cell(
+            "### Preprocessing-only export\n\n"
+            "There is no model in this graph. Feature/target and train/test split nodes "
+            "are omitted; transformations fit all supplied rows. Use a training node "
+            "for held-out evaluation and model predictions.\n"
+        )
+    )
     for i, n in enumerate(preprocess, start=1):
         cells.append(nb.node_to_cell(n, i))
-    cells.extend(nb.split_cells(feat_target, train_test))
-    cells.extend(nb.modeling_cells(model))
     cells.extend(nb.persist_cells(preprocess))
     return nb.wrap_notebook(cells)
 
@@ -387,13 +462,19 @@ async def _lookup_dataset_name(dataset_id: str, session: AsyncSession) -> str | 
 
 
 async def _lookup_dataset_file_path(dataset_id: str, session: AsyncSession) -> str | None:
-    """Resolve a `DataSource.source_id` to its on-disk file path.
+    """Resolve a Canvas numeric ID or source UUID to its on-disk file path.
 
     Returned as a forward-slash POSIX path so notebooks open cleanly on any OS.
     Failure is non-fatal — the caller falls back to the loader node's params.
     """
-    stmt = select(DataSource).where(DataSource.source_id == dataset_id)
     try:
+        # Match DataIngestionService.get_source: numeric strings identify the PK.
+        source_filter = (
+            DataSource.id == int(dataset_id)
+            if dataset_id.isdigit()
+            else DataSource.source_id == dataset_id
+        )
+        stmt = select(DataSource).where(source_filter)
         result = await session.execute(stmt)
         ds = result.scalar_one_or_none()
         if ds is None:
@@ -444,6 +525,8 @@ async def export_pipeline_notebook(
         )
     except HTTPException:
         raise
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from None
     except Exception:
         logger.exception("Failed to export notebook for dataset %s", dataset_id)
         raise HTTPException(status_code=500, detail="Failed to generate notebook") from None
