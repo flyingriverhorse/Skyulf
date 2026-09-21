@@ -58,7 +58,7 @@ describe('VariableRow contracts', () => {
     render(<VariableRow {...baseProps} profile={{ ...profile, numeric_stats: { mean: 0, std: 2, q25: null, skewness: 0.5, kurtosis: -0.5, zeros_count: 0, negatives_count: 0 }, vif: 5 }} />);
     expect(screen.getByText('Mean').nextSibling).toHaveTextContent('0.0000');
     expect(screen.getByText('Variance').nextSibling).toHaveTextContent('4.0000');
-    expect(screen.getByText('25% (Q1)').nextSibling).toHaveTextContent('');
+    expect(screen.getByText('25% (Q1)').nextSibling).toHaveTextContent('—');
     expect(screen.getByText(/Moderately Skewed/)).toBeInTheDocument();
     expect(screen.getByText(/Platykurtic/)).toBeInTheDocument();
     expect(screen.getByText('Zeros').nextSibling).toHaveTextContent('0');

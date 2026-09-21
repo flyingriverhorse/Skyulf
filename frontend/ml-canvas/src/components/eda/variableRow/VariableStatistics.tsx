@@ -1,6 +1,7 @@
 import type { ColumnProfile, NumericStats, TextStats, CategoricalStats } from '../../../core/types/edaProfile';
 import { InfoTooltip } from '../../ui/InfoTooltip';
 import { Badge } from '../../ui/badge';
+import { formatStatistic } from '../formatStatistic';
 
 export function VariableStatistics({ profile }: { profile: ColumnProfile; }) {
     return (
@@ -22,36 +23,36 @@ function NumericStatistics({ stats, vif }: { stats: NumericStats; vif: ColumnPro
     return <>
         <div className="flex justify-between">
             <span className="text-muted-foreground">Mean</span>
-            <span>{stats.mean?.toFixed(4)}</span>
+            <span>{formatStatistic(stats.mean, 4)}</span>
         </div>
         <div className="flex justify-between">
             <span className="text-muted-foreground">Std Dev</span>
-            <span>{stats.std?.toFixed(4)}</span>
+            <span>{formatStatistic(stats.std, 4)}</span>
         </div>
         <div className="flex justify-between">
             <span className="text-muted-foreground">Variance</span>
-            <span>{stats.variance?.toFixed(4) || (Math.pow(stats.std || 0, 2)).toFixed(4)}</span>
+            <span>{formatStatistic(stats.variance === undefined && stats.std != null ? stats.std ** 2 : stats.variance, 4)}</span>
         </div>
         <div className="my-2 border-t border-dashed" />
         <div className="flex justify-between">
             <span className="text-muted-foreground">Min</span>
-            <span>{stats.min?.toFixed(4)}</span>
+            <span>{formatStatistic(stats.min, 4)}</span>
         </div>
         <div className="flex justify-between">
             <span className="text-muted-foreground">25% (Q1)</span>
-            <span>{stats.q25?.toFixed(4)}</span>
+            <span>{formatStatistic(stats.q25, 4)}</span>
         </div>
         <div className="flex justify-between">
             <span className="text-muted-foreground">Median</span>
-            <span>{stats.median?.toFixed(4)}</span>
+            <span>{formatStatistic(stats.median, 4)}</span>
         </div>
         <div className="flex justify-between">
             <span className="text-muted-foreground">75% (Q3)</span>
-            <span>{stats.q75?.toFixed(4)}</span>
+            <span>{formatStatistic(stats.q75, 4)}</span>
         </div>
         <div className="flex justify-between">
             <span className="text-muted-foreground">Max</span>
-            <span>{stats.max?.toFixed(4)}</span>
+            <span>{formatStatistic(stats.max, 4)}</span>
         </div>
         <div className="my-2 border-t border-dashed" />
         <NumericShape stats={stats} />
@@ -65,7 +66,7 @@ function NumericShape({ stats }: { stats: NumericStats; }) {
 
         <div className="flex justify-between">
             <span className="text-muted-foreground">Skewness</span>
-            <span>{stats.skewness?.toFixed(4)}</span>
+            <span>{formatStatistic(stats.skewness, 4)}</span>
         </div>
         {stats.skewness != null && (
             <div className="text-[10px] text-muted-foreground pl-2">
@@ -75,7 +76,7 @@ function NumericShape({ stats }: { stats: NumericStats; }) {
         )}
         <div className="flex justify-between">
             <span className="text-muted-foreground">Kurtosis</span>
-            <span>{stats.kurtosis?.toFixed(4)}</span>
+            <span>{formatStatistic(stats.kurtosis, 4)}</span>
         </div>
         {stats.kurtosis != null && (
             <div className="text-[10px] text-muted-foreground pl-2">

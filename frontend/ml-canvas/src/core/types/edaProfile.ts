@@ -71,9 +71,9 @@ export interface NormalityTestResult {
 
 export interface OutlierExplanation {
   feature: string;
-  value: number;
-  median: number;
-  diff_pct: number;
+  value: number | null;
+  median: number | null;
+  diff_pct: number | null;
 }
 
 export interface OutlierPoint {

@@ -1,0 +1,55 @@
+{
+  "singleton_column": {
+    "name": "value",
+    "dtype": "Numeric",
+    "missing_count": 0,
+    "missing_percentage": 0.0,
+    "numeric_stats": {
+      "mean": 4.2,
+      "median": 4.2,
+      "std": null,
+      "variance": null,
+      "min": 4.2,
+      "max": 4.2,
+      "q25": 4.2,
+      "q75": 4.2,
+      "skewness": null,
+      "kurtosis": null,
+      "zeros_count": 0,
+      "negatives_count": 0,
+      "normality_test": null
+    },
+    "categorical_stats": null,
+    "date_stats": null,
+    "text_stats": null,
+    "histogram": null,
+    "normality_test": null,
+    "is_constant": false,
+    "is_unique": false
+  },
+  "outliers": {
+    "method": "IsolationForest",
+    "total_outliers": 1,
+    "outlier_percentage": 1.0,
+    "top_outliers": [
+      {
+        "index": 99,
+        "values": {
+          "tiny": 10.0
+        },
+        "score": -0.4594699046411099,
+        "explanation": [
+          {
+            "feature": "tiny",
+            "value": 10.0,
+            "median": 1e-308,
+            "diff_pct": null
+          }
+        ]
+      }
+    ],
+    "analyzed_rows": 100,
+    "total_rows": 100,
+    "plot_data": null
+  }
+}

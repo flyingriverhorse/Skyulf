@@ -3,6 +3,7 @@ import { AlertTriangle } from 'lucide-react';
 import { InfoTooltip } from '../../ui/InfoTooltip';
 import { EmptyState } from '../../shared/EmptyState';
 import type { EDAProfile, OutlierAnalysis } from '../../../core/types/edaProfile';
+import { formatStatistic } from '../formatStatistic';
 
 interface OutliersTabProps {
     profile: EDAProfile;
@@ -83,9 +84,9 @@ export const OutliersTab: React.FC<OutliersTabProps> = ({ profile }) => {
                                             {outlier.explanation.map((exp, i) => (
                                                 <div key={i} className="text-xs">
                                                     <span className="font-semibold text-gray-700 dark:text-gray-300">{exp.feature}:</span>{' '}
-                                                    <span className="text-red-600 dark:text-red-400">{exp.value.toFixed(2)}</span>{' '}
+                                                    <span className="text-red-600 dark:text-red-400">{formatStatistic(exp.value, 2)}</span>{' '}
                                                     <span className="text-gray-400">
-                                                        (Median: {exp.median.toFixed(2)}, Diff: {exp.diff_pct.toFixed(0)}%)
+                                                        (Median: {formatStatistic(exp.median, 2)}, Diff: {formatStatistic(exp.diff_pct, 0, '%')})
                                                     </span>
                                                 </div>
                                             ))}
