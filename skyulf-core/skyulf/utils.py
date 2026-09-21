@@ -18,8 +18,20 @@ import polars as pl
 
 from .data.dataset import SplitDataset
 from .engines import POLARS_NUMERIC_DTYPES, SkyulfDataFrame, SkyulfPolarsWrapper, get_engine
+from .engines.spark_engine import is_spark_input
 
 logger = logging.getLogger(__name__)
+
+
+def contains_spark_input(data: Any) -> bool:
+    """Find distributed inputs even inside unsupported tuples or split containers."""
+    if isinstance(data, tuple):
+        return any(contains_spark_input(value) for value in data)
+    if isinstance(data, SplitDataset):
+        return any(
+            contains_spark_input(value) for value in (data.train, data.test, data.validation)
+        )
+    return is_spark_input(data)
 
 
 def _data_stats_from_tuple(data: tuple[Any, Any]) -> tuple[int, set[str]]:
@@ -77,6 +89,8 @@ def get_data_stats(
 
     Supports DataFrame, (X, y) tuple, and SplitDataset.
     """
+    if contains_spark_input(data):
+        raise TypeError("Local data statistics do not support Spark; use distributed FE metrics.")
     # Check for DataFrame-like object (Pandas, Polars, Wrapper)
     if hasattr(data, "shape") and hasattr(data, "columns") and not isinstance(data, tuple):
         payload = cast(Any, data)
@@ -102,6 +116,10 @@ def unpack_pipeline_input(
     `Series[Any] | ...`, poisoning every downstream `with_columns` /
     `to_pandas` call. The runtime contract is unchanged.
     """
+    if contains_spark_input(data):
+        if not is_spark_input(data):
+            raise TypeError("Use a single Spark dataframe containing row keys and target.")
+        return data, None, False
     if isinstance(data, (pd.DataFrame, SkyulfDataFrame)):
         return data, None, False
     if isinstance(data, tuple):
@@ -181,6 +199,10 @@ def pack_pipeline_output(
     numpy-backed frames interchangeably, and ty can't narrow the exact type
     through the engine dispatch below.
     """
+    if contains_spark_input(X) or contains_spark_input(y):
+        if was_tuple or y is not None:
+            raise TypeError("Use a single Spark dataframe containing row keys and target.")
+        return X
     if was_tuple and y is None:
         # Caller said the input was a tuple but lost y along the way.
         # Surface this so wiring/upstream bugs don't silently degrade the

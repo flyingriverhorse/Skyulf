@@ -286,8 +286,14 @@ def test_apply_dual_engine_raises_before_any_pandas_conversion():
 
 def test_apply_dual_engine_raises_for_engine_without_prep_path(monkeypatch):
     """A mapped engine with no input-preparation branch must fail loudly too."""
+
+    class UnsupportedEngine:
+        """Represent a future engine that has no dataframe preparation contract."""
+
+        name = "dask"
+
     monkeypatch.setattr(
-        "skyulf.preprocessing.dispatcher.get_engine", lambda data=None: _StubSparkEngine
+        "skyulf.preprocessing.dispatcher.get_engine", lambda data=None: UnsupportedEngine
     )
 
     called = []
@@ -298,7 +304,7 @@ def test_apply_dual_engine_raises_for_engine_without_prep_path(monkeypatch):
 
     df = pd.DataFrame({"a": [1, 2, 3]})
     with pytest.raises(NotImplementedError, match="input-preparation path"):
-        apply_dual_engine(df, {}, {"spark": _spark_apply})
+        apply_dual_engine(df, {}, {"dask": _spark_apply})
     assert called == []
 
 

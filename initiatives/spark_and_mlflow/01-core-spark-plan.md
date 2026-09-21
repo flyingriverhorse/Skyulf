@@ -130,15 +130,15 @@ local engine regression testleri geçer.
 **Üretir:** FeatureEngineer'ın opt-in `frame_spec`/`execution_options` desteği;
 ayrı X/y Spark frame'i almayan, tek frame'de target/key koruyan fit/transform yolu.
 
-- [ ] Repartition edilmiş frame'de key/target'ın aynı satırda kaldığı testi yaz.
+- [x] Repartition edilmiş frame'de key/target'ın aynı satırda kaldığı testi yaz.
   Duplicate/null key, eksik kolon ve nested/Decimal unsupported hata testleri ekle.
-- [ ] Spark input hazırlığını engine-keyed dispatcher mapping'e ekle; local
+- [x] Spark input hazırlığını engine-keyed dispatcher mapping'e ekle; local
   tuple ve wrapper dönüşlerini değiştirme. Spark destek preflight bütün adımları
   kontrol etsin; ilk node çalışıp sonraki unsupported node'da geç kalınmasın.
-- [ ] Default istatistik toplama Spark'ta count/NumPy conversion başlatmasın.
+- [x] Default istatistik toplama Spark'ta count/NumPy conversion başlatmasın.
   İstenen distributed aggregate metrics ayrı seçilir; local RSS cluster belleği
   gibi raporlanmaz. Satır sayısı bilinmiyorsa unknown kalır.
-- [ ] Feature listesi key/target'ı dışlasın. Kolon adlarında nokta/backtick için
+- [x] Feature listesi key/target'ı dışlasın. Kolon adlarında nokta/backtick için
   doğru quoting ve collision testleri yaz; uydurma internal key ekleme.
 
 ```python

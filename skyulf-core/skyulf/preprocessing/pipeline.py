@@ -9,12 +9,14 @@ import pandas as pd
 import polars as pl
 
 from ..config_validation import validate_preprocessing_steps
+from ..core.execution import ExecutionOptions, FrameSpec
 from ..core.validation import prediction_row_count, validate_prediction_rows
 from ..data.dataset import SplitDataset
 from ..engines import SkyulfDataFrame
 from ..registry import NodeRegistry
 from ..types import PreprocessingStepConfig
 from ..utils import get_data_stats, pack_pipeline_output, unpack_pipeline_input
+from ._spark import fit_spark, transform_spark, use_spark
 from .base import StatefulTransformer
 from .dispatcher import _check_xy_engine_parity
 from .time_series.lag import LagFeaturesApplier
@@ -83,6 +85,8 @@ class FeatureEngineer:
         steps_config: Sequence[PreprocessingStepConfig | dict[str, Any]],
         *,
         _validated: bool = False,
+        frame_spec: FrameSpec | None = None,
+        execution_options: ExecutionOptions | None = None,
     ):
         """Store the ordered step configuration, validating it unless the caller already did.
 
@@ -92,24 +96,41 @@ class FeatureEngineer:
             _validated: Skip ``validate_preprocessing_steps`` when ``True``; set by
                 callers such as ``SkyulfPipeline`` that already validated the same
                 structural rules via ``validate_pipeline_config``.
+            frame_spec: Explicit keys and optional target for a single Spark frame.
+            execution_options: Opt-in engine selection; must match the input engine.
         """
         # `Sequence` (covariant) accepts list[dict] or list[PreprocessingStepConfig].
         if not _validated:
             validate_preprocessing_steps(steps_config)
         self.steps_config = steps_config
         self.fitted_steps: list[dict[str, Any]] = []
+        if frame_spec is not None and not isinstance(frame_spec, FrameSpec):
+            raise TypeError("frame_spec must be FrameSpec.")
+        if execution_options is not None and not isinstance(execution_options, ExecutionOptions):
+            raise TypeError("execution_options must be ExecutionOptions.")
+        self.frame_spec = frame_spec
+        self.execution_options = execution_options
+        self._spark_fitted = False
 
     def transform(
         self, data: pd.DataFrame | SkyulfDataFrame | Any, *, preserve_rows: bool = False
     ) -> Any:
         """Apply transformations, optionally rejecting row-count changes and temporal sorting.
 
-        Prediction callers set ``preserve_rows=True`` because their responses
+        Local prediction callers set ``preserve_rows=True`` because their responses
         have no input-row provenance. Each applied step is checked immediately;
         a later step cannot conceal filtering, expansion, or a built-in temporal
         permutation. Ordinary transform and fold scoring retain their configured
         filtering and sorting behavior. Custom appliers receive count checks only.
+        Spark execution always preserves key identity and optional target values;
+        physical row order is not guaranteed. Consumers must align by row keys.
         """
+        spec = getattr(self, "frame_spec", None)
+        if use_spark(data, getattr(self, "execution_options", None), spec):
+            if not getattr(self, "_spark_fitted", False):
+                raise ValueError("Spark FeatureEngineer must be fitted before transform.")
+            assert spec is not None
+            return transform_spark(data, self.fitted_steps, spec)
         current_data = data
 
         for step in self.fitted_steps:
@@ -159,7 +180,22 @@ class FeatureEngineer:
 
         Returns:
             A pair containing the transformed data and per-step metrics.
+
+        Spark execution validates all capabilities before any data action. Key
+        uniqueness and per-step identity checks run distributed queries with
+        bounded results; local row counts and memory metrics remain unknown.
         """
+        spec = getattr(self, "frame_spec", None)
+        if use_spark(data, getattr(self, "execution_options", None), spec):
+            assert spec is not None
+            if target_column is not None and target_column != spec.target:
+                raise ValueError("target_column conflicts with frame_spec.target.")
+            if on_split is not None:
+                raise ValueError("Spark FE uses one frame; on_split is unsupported.")
+            result, metrics, records = fit_spark(data, self.steps_config, spec)
+            self.fitted_steps = records
+            self._spark_fitted = True
+            return result, metrics
         self.fitted_steps = []  # Reset fitted steps
         current_data = data
         split_captured = False

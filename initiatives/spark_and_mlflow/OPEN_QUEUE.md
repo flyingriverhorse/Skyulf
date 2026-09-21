@@ -1,6 +1,6 @@
 # Spark ve MLflow — Open Queue
 
-Güncelleme: 2026-09-21. **SM-02 tamamlandı. Sonraki görev: SM-03. Hedef: 0.9.0.**
+Güncelleme: 2026-09-21. **SM-03 tamamlandı. Sonraki görev: SM-04. Hedef: 0.9.0.**
 Bu dosya kısa çalışma sırasıdır; detaylar bağlantılı planlarda.
 
 Durumlar: READY = başlanabilir; WAIT = önceki görev bekleniyor;
@@ -12,8 +12,8 @@ DONE = kanıtla tamamlandı. SM-00 commit: `105a6fe4`.
 | SM-00 | Baseline ve Spark test ortamı | — | DONE | Güncel master: 231 baseline; 2 Spark smoke; [kanıt](BASELINE.md) |
 | SM-01 | Execution/capability kuralları | SM-00 | DONE | Immutable config; registry operation desteği; aşağıda kanıt |
 | SM-02 | Spark engine ve conversion sınırı | SM-01 | DONE | Gerçek Spark adapter; conversion korumaları; aşağıda kanıt |
-| SM-03 | Dispatcher, schema, row keys | SM-02 | READY | Key/target korunur; local API çalışır |
-| SM-04 | Versioned portable state | SM-03 | WAIT | Limit/version kontrolü; state round-trip |
+| SM-03 | Dispatcher, schema, row keys | SM-02 | DONE | Keyed Spark FE giriş/preflight; aşağıda kanıt |
+| SM-04 | Versioned portable state | SM-03 | READY | Limit/version kontrolü; state round-trip |
 | SM-05 | Native SimpleImputer | SM-04 | WAIT | Mean/constant train-only fit, Spark apply |
 | SM-06 | Native StandardScaler | SM-05 | WAIT | Population variance ve flag parity |
 | SM-07 | Uçtan uca FE kapısı | SM-06 | WAIT | Üç engine çapraz fit/apply; kayıt/yükleme |
@@ -139,3 +139,45 @@ ve MLflow entegrasyonu henüz yok.
   gerçek oturumda çalıştırıldı. Rehber ve 0.9.0 Unreleased changelog güncel.
 - Sınır: native FE node, Spark dispatcher veya model inference etkin değil.
   Databricks/Connect/uzak CI çalıştırılmadı. Sonraki görev SM-03.
+
+## SM-03 — 2026-09-21 tamamlanma kaydı
+
+- Başlangıç commit'i `2d8cd8e5`; bu kayıt SM-03 çalışma ağacına aittir.
+- FeatureEngineer `frame_spec` / `execution_options` ile Spark'a opt-in olur.
+  Yeni `_spark.py` native yürütmeyi local profiler'dan ayırır. Dispatcher input
+  hazırlığı engine-keyed mapping kullanır. `SkyulfSchema` Spark tiplerini okur.
+- Key/target tek frame'de kalır; key null/duplicate ve desteklenmeyen dtype/schema
+  kontrolleri var. Bütün node fit/apply capability'leri action öncesi kontrol
+  edilir. Her node sonrası protected projection `exceptAll` karşılaştırması
+  key/label değişimini, row drop/expand'i reddeder. Validation sonucu limit(1)'dir;
+  full scan/shuffle maliyeti rehberde yazılıdır. Native node desteği ilan edilmez.
+- Otomatik feature listesi key/target dışındadır. Literal dot/backtick kolonlar,
+  case-insensitive ambiguity ve internal aggregate alias collision testlidir.
+  Local get_data_stats Spark'ı açıkça reddeder; Spark FE metriklerinde row count,
+  fit_time ve peak_memory unknown (`None`). Driver süre ölçümü ayrı isimlidir.
+- Planlanan base.py/data/dataset.py değişikliği gerekmedi: mevcut local profiler'a
+  girilmeden routing yapılır; tuple/SplitDataset Spark input sınırda reddedilir.
+  Local frame/tuple/split API'leri korunur; explicit engine seçimi her split'i denetler.
+- TDD: ilk Spark contract koşusu **10 failed**; uygulama sonrası **10 passed**.
+  Ek güvence testlerinde case-insensitive isim hataları yeniden üretildi ve
+  düzeltildi. Bağımsız review internal alias bulgusunu verdi; son recheck temiz.
+- Son Spark + dispatcher/optional import komutu:
+  `JAVA_HOME=.cache/spark-jdk/jdk-17.0.20.1+1`, `SKYULF_REQUIRE_SPARK=1`;
+  `.venv-spark/Scripts/python.exe -m pytest skyulf-core/tests/spark
+  skyulf-core/tests/unit/test_spark_optional_import.py
+  skyulf-core/tests/unit/test_preprocessing_dispatcher.py -q --tb=short -o addopts=
+  -p no:cacheprovider --basetemp .cache/sm03-spark-reviewed`
+  → **69 passed**, 61.59 saniye; PySpark 4.0.3/Python 3.12.10/Java 17, temiz kapanış.
+- İlk full core **9875 passed, 107 skipped, 1077 warnings**, 170.97 saniye.
+  Ardından explicit local engine/split seçimindeki iki hata testle üretildi;
+  fix sonrası yeni 9 test + dispatcher/pipeline/base/optional import **124 passed**.
+  Son full core komutu:
+  `HF_HUB_OFFLINE=1 .venv/Scripts/python.exe -m pytest skyulf-core/tests -q
+  --tb=short --disable-warnings -o addopts= -p no:cacheprovider
+  --basetemp .cache/sm03-core-final`
+  → **9884 passed, 107 skipped, 1077 warnings**, 170.30 saniye.
+- Ruff/format, tam repo ty ve `mkdocs build --strict` geçti. Spark rehberindeki
+  beş Python örneği aynı gerçek session'da çalıştırıldı; beklenen unsupported
+  capability örneği de doğrulandı. Changelog/rehber birlikte güncellendi.
+- Sınır: built-in native node, portable state codec, distributed model inference,
+  explicit aggregate metrics ve Databricks/Connect testi henüz yok. SM-04 sırada.

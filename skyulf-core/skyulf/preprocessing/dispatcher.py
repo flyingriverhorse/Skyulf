@@ -1,7 +1,7 @@
 """Dual-engine dispatch for preprocessing nodes.
 
 This module owns the *control flow* that lets a single node run on either the
-Polars or the Pandas engine: ``apply_dual_engine`` (and its fit counterparts)
+Polars, pandas or Spark engine: ``apply_dual_engine`` (and its fit counterparts)
 unpacks the pipeline input, selects the engine-specific implementation from a
 mapping keyed by engine name, and repacks the output. It is the single place
 that branches on the engine.
@@ -23,7 +23,13 @@ from typing import Any, TypeVar
 
 import pandas as pd
 
-from ..engines import EngineName, SkyulfDataFrame, SkyulfPolarsWrapper, get_engine
+from ..engines import (
+    EngineName,
+    SkyulfDataFrame,
+    SkyulfPolarsWrapper,
+    SkyulfSparkWrapper,
+    get_engine,
+)
 from ..utils import pack_pipeline_output, unpack_pipeline_input
 
 logger = logging.getLogger(__name__)
@@ -152,31 +158,13 @@ def apply_dual_engine(
     engine = get_engine(X)
     func = _resolve_impl(implementations, engine.name, "apply")
 
-    if engine.name == EngineName.POLARS:
-        # Unwrap SkyulfPolarsWrapper so the implementation sees a raw
-        # pl.DataFrame (native pl APIs crash on the wrapper, F-09); re-wrap
-        # afterwards so the output keeps the caller's engine.
-        X_prep, was_wrapped = _unwrap_polars_wrapper(X)
-        try:
-            X_out, y_out = func(X_prep, y, params)
-        except Exception as exc:
-            _log_dispatch_failure(exc, "Polars", "apply", func)
-            raise
-        X_out = _rewrap_polars_output(X_out, was_wrapped)
-    elif engine.name == EngineName.PANDAS:
-        # Ensure X is pandas
-        X_prep = X.to_pandas() if hasattr(X, "to_pandas") else X
-        try:
-            X_out, y_out = func(X_prep, y, params)
-        except Exception as exc:
-            _log_dispatch_failure(exc, "Pandas", "apply", func)
-            raise
-    else:
-        # Registered engine with an implementation but no input-preparation
-        # path: fail loudly rather than silently collecting to pandas (F-09).
-        raise NotImplementedError(
-            f"No '{engine.name}' input-preparation path in apply_dual_engine yet"
-        )
+    X_prep, was_wrapped = _prepare_input(X, engine.name, "apply_dual_engine")
+    try:
+        X_out, y_out = func(X_prep, y, params)
+    except Exception as exc:
+        _log_dispatch_failure(exc, engine.name.capitalize(), "apply", func)
+        raise
+    X_out = _restore_output(X_out, was_wrapped, engine.name)
 
     return pack_pipeline_output(X_out, y_out, is_tuple)
 
@@ -207,24 +195,12 @@ def fit_dual_engine(
     engine = get_engine(X)
     func = _resolve_impl(implementations, engine.name, "fit")
 
-    if engine.name == EngineName.POLARS:
-        X_prep, _ = _unwrap_polars_wrapper(X)
-        try:
-            return dict(func(X_prep, y, params))
-        except Exception as exc:
-            _log_dispatch_failure(exc, "Polars", "fit", func)
-            raise
-    elif engine.name == EngineName.PANDAS:
-        X_prep = X.to_pandas() if hasattr(X, "to_pandas") else X
-        try:
-            return dict(func(X_prep, y, params))
-        except Exception as exc:
-            _log_dispatch_failure(exc, "Pandas", "fit", func)
-            raise
-    else:
-        raise NotImplementedError(
-            f"No '{engine.name}' input-preparation path in fit_dual_engine yet"
-        )
+    X_prep, _ = _prepare_input(X, engine.name, "fit_dual_engine")
+    try:
+        return dict(func(X_prep, y, params))
+    except Exception as exc:
+        _log_dispatch_failure(exc, engine.name.capitalize(), "fit", func)
+        raise
 
 
 def fit_transform_train_dual_engine(
@@ -250,24 +226,43 @@ def fit_transform_train_dual_engine(
     engine = get_engine(X)
     func = _resolve_impl(implementations, engine.name, "fit_transform_train")
 
-    if engine.name == EngineName.POLARS:
-        X_prep, was_wrapped = _unwrap_polars_wrapper(X)
-        try:
-            artifact, X_out, y_out = func(X_prep, y, params)
-        except Exception as exc:
-            _log_dispatch_failure(exc, "Polars", "fit_transform_train", func)
-            raise
-        X_out = _rewrap_polars_output(X_out, was_wrapped)
-    elif engine.name == EngineName.PANDAS:
-        X_prep = X.to_pandas() if hasattr(X, "to_pandas") else X
-        try:
-            artifact, X_out, y_out = func(X_prep, y, params)
-        except Exception as exc:
-            _log_dispatch_failure(exc, "Pandas", "fit_transform_train", func)
-            raise
-    else:
-        raise NotImplementedError(
-            f"No '{engine.name}' input-preparation path in fit_transform_train_dual_engine yet"
-        )
+    X_prep, was_wrapped = _prepare_input(X, engine.name, "fit_transform_train_dual_engine")
+    try:
+        artifact, X_out, y_out = func(X_prep, y, params)
+    except Exception as exc:
+        _log_dispatch_failure(exc, engine.name.capitalize(), "fit_transform_train", func)
+        raise
+    X_out = _restore_output(X_out, was_wrapped, engine.name)
 
     return dict(artifact), pack_pipeline_output(X_out, y_out, is_tuple)
+
+
+def _prepare_pandas(X: Any) -> tuple[Any, bool]:
+    """Preserve the local pandas conversion contract."""
+    return (X.to_pandas() if hasattr(X, "to_pandas") else X), False
+
+
+def _prepare_spark(X: Any) -> tuple[Any, bool]:
+    """Keep Spark input distributed and remember wrapper shape."""
+    wrapped = isinstance(X, SkyulfSparkWrapper)
+    return (X.to_native() if wrapped else X), wrapped
+
+
+def _prepare_input(X: Any, engine: str, caller: str) -> tuple[Any, bool]:
+    """Resolve input preparation by engine without a conversion fallback."""
+    preparations = {
+        "pandas": _prepare_pandas,
+        "polars": _unwrap_polars_wrapper,
+        "spark": _prepare_spark,
+    }
+    prepare = preparations.get(engine)
+    if prepare is None:
+        raise NotImplementedError(f"No '{engine}' input-preparation path in {caller} yet")
+    return prepare(X)
+
+
+def _restore_output(X: Any, was_wrapped: bool, engine: str) -> Any:
+    """Restore only the input wrapper convention, never collecting distributed output."""
+    if engine == "spark" and was_wrapped:
+        return SkyulfSparkWrapper(X)
+    return _rewrap_polars_output(X, was_wrapped)

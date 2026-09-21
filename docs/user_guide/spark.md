@@ -1,7 +1,8 @@
 # Spark: development setup and current support
 
 Spark support is under development for 0.9.0. The optional dependency and
-runtime tests and Spark engine adapter are available in the development checkout.
+runtime tests, Spark engine adapter and keyed FeatureEngineer entry point are
+available in the development checkout.
 **Native nodes and distributed model inference are not available yet.**
 Installing the extra does not convert a pandas/Polars pipeline to Spark.
 
@@ -136,8 +137,82 @@ identity = FrameSpec(row_keys=("customer_id", "event_id"), target="label")
 Engine values are `pandas`, `polars` and `spark`; `databricks` names a platform,
 not an engine. Unknown configuration fields and nonpositive/noninteger limits
 are rejected. These immutable objects declare requirements; they do not apply
-memory limits or validate the actual values in a dataframe. Runtime key-value
-validation will arrive with the Spark FE dispatcher (SM-03).
+memory limits themselves. The Spark FeatureEngineer entry point validates actual
+key values as described below; state/model budgets belong to later execution stages.
+
+## Keyed Spark FeatureEngineer entry point
+
+Use a single Spark dataframe with explicit identity columns. The initial path
+supports flat scalar schemas and native operations that preserve rows. Nested
+array/map/struct, Decimal and other unsupported types are rejected. Column names
+must be unambiguous under the session's case-sensitivity setting.
+
+This working example exercises the input boundary with an empty pipeline;
+it does not perform feature transformations:
+
+```python
+from skyulf.core.execution import ExecutionOptions, FrameSpec
+from skyulf.preprocessing.pipeline import FeatureEngineer
+
+data = spark.createDataFrame(
+    [(1, 10.0, 0), (2, 20.0, 1)],
+    ["customer_id", "amount", "label"],
+).repartition(2)
+engineer = FeatureEngineer(
+    [],
+    frame_spec=FrameSpec(row_keys=("customer_id",), target="label"),
+    execution_options=ExecutionOptions(engine="spark"),
+)
+training, metrics = engineer.fit_transform(data)
+inference = engineer.transform(data.drop("label"))
+assert inference.columns == ["customer_id", "amount"]
+assert metrics["summary"]["rows_in"] is None
+```
+
+Both options are required for Spark. The target must exist during fit when
+declared; it can be absent during transform. Composite keys must be unique and
+non-null on each input. Separate Spark `(X, y)` pairs and `SplitDataset` inputs
+are rejected; label alignment never depends on partition or row position.
+`target_column`, if passed to fit, must agree with `FrameSpec.target`.
+The `on_split` callback is unavailable on this single-frame entry point.
+
+Automatic feature selection excludes keys and target. Explicit `columns` cannot
+select either. Names are exact and literal, including dots/backticks. Raw inputs
+produce raw Spark outputs; wrapped inputs retain their wrapper convention.
+
+Every step must declare both fit and apply support before fitting starts. Apply
+also checks all fitted steps before execution. This path accepts native,
+row-preserving operations with row-local apply behavior. Worker Python, window,
+filtering and expansion paths require later implementations. No built-in Spark
+FE node is enabled yet; unsupported nodes fail before any validation action or fit.
+Custom native nodes use the existing engine-keyed dispatcher mapping with a
+`"spark"` implementation. It receives the full native frame, `y=None` and the
+resolved feature names in `config["columns"]`; the returned frame retains keys
+and any target. Fitted parameters must contain what its applier needs.
+
+### Validation actions and metrics
+
+Key validation performs a distributed group/count and returns at most one
+invalid group to the driver. After each step, distributed multiset comparisons
+check that the protected key/target projection is unchanged. These checks detect
+changed labels, keys, dropped rows and duplicates even when a custom node claims
+to preserve rows. They can scan/shuffle the data and execute the lazy plan again;
+this initial correctness path is not a claim of optimized cluster performance.
+Only a bounded validation result is collected, never the whole dataset.
+
+The default metrics do not run a separate dataframe `count()` or local memory
+profiler. `rows_in`, `rows_out`, `fit_time` and `peak_memory_bytes` are `None`,
+meaning unknown. Per-step `driver_elapsed_seconds` measures caller-observed time
+including validation; it is not distributed CPU time or cluster peak memory.
+Explicit distributed aggregate metrics are not implemented yet.
+The local `get_data_stats` helper rejects Spark input; use the Spark FE metrics.
+
+Transform preserves key identity, not physical row order, including when
+`preserve_rows=True`. Consumers must match outputs by keys. A successful refit
+replaces fitted steps; a failed refit leaves the last successful fitted steps
+available. Saving portable learned state follows in SM-04.
+
+### Inspecting declared support
 
 A capability check distinguishes fit and apply and never falls back to pandas:
 
@@ -184,8 +259,10 @@ Spark code, certify compatibility or make a window transform batch-independent.
 - **Windows access denied at shutdown:** a process sandbox can prevent Spark's
   child-process cleanup. A passing calculation does not prove clean shutdown;
   use an environment that permits the owned JVM processes to terminate.
-- **Engine not found:** this is expected before the Spark engine implementation
-  is delivered. Do not collect an entire distributed frame into pandas as a workaround.
+- **Spark dependency unavailable:** install the optional `skyulf-core[spark]`
+  dependency in a suitable environment, or use the repository requirements above.
+- **Unsupported node:** the keyed entry point is available, but built-in native
+  FE nodes are still being implemented. Installing Spark does not enable them.
 
 MLflow tracking, Unity Catalog registration, Databricks jobs, serving endpoints
 and Bundle templates are separate integration stages. This page will gain

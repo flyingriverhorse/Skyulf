@@ -18,6 +18,8 @@ from collections.abc import Iterable
 from dataclasses import dataclass, field, replace
 from typing import Any
 
+from ..engines.spark_engine import SkyulfSparkWrapper, is_spark_input
+
 logger = logging.getLogger(__name__)
 
 
@@ -82,7 +84,27 @@ class SkyulfSchema:
 
     @classmethod
     def from_dataframe(cls, df: Any) -> "SkyulfSchema":
-        """Best-effort schema extraction from a Pandas/Polars/Wrapper frame."""
+        """Extract schema metadata from local or Spark frames without collecting rows."""
+        if is_spark_input(df):
+            native = df.to_native() if isinstance(df, SkyulfSparkWrapper) else df
+            labels = {
+                "byte": "int8",
+                "short": "int16",
+                "integer": "int32",
+                "long": "int64",
+                "float": "float32",
+                "double": "float64",
+                "boolean": "bool",
+                "timestamp": "datetime",
+                "timestamp_ntz": "datetime",
+            }
+            return cls(
+                tuple(native.columns),
+                {
+                    field.name: labels.get(field.dataType.typeName(), field.dataType.simpleString())
+                    for field in native.schema.fields
+                },
+            )
         raw_cols = getattr(df, "columns", None)
         cols = list(raw_cols) if raw_cols is not None else []
         dtypes = _extract_pandas_dtypes(df)
