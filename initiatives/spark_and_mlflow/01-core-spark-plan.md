@@ -162,13 +162,13 @@ local FeatureEngineer regression testleri geçer.
 **Üretir:** `encode_state(node_type, params, *, max_bytes) -> bytes` ve
 `decode_state(payload: bytes) -> tuple[str, dict]`; envelope v1.
 
-- [ ] StandardScaler ve SimpleImputer mevcut artifact dict fixture'larını
+- [x] StandardScaler ve SimpleImputer mevcut artifact dict fixture'larını
   lossless round-trip test et; boş state/no-op davranışını ayrı kapsa.
-- [ ] NaN/Infinity, integer/string kategori değerleri ve ordered_columns için
+- [x] NaN/Infinity, integer/string kategori değerleri ve ordered_columns için
   tagged representation; semantic hash'te repr/pickle fallback olmaması testi yaz.
-- [ ] Bozuk payload, bilinmeyen version/node, duplicate columns ve aşırı büyük
+- [x] Bozuk payload, bilinmeyen version/node, duplicate columns ve aşırı büyük
   payload'ı decode/worker yüklemesinden önce reddet.
-- [ ] Eski pipeline pickle save/load testlerini değiştirmeden geçir. Bu codec
+- [x] Eski pipeline pickle save/load testlerini değiştirmeden geçir. Bu codec
   generic Python object serializer değildir; estimator nesnesi kabul etmez.
 
 ```python

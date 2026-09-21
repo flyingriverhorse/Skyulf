@@ -104,12 +104,11 @@ Yeni `NodeRegistry` kopyası oluşturulmaz; mevcut kayıt anahtarlarıyla ilişk
 Spark desteği ilan edilmemiş bütün kayıtlar açıkça unsupported sayılır.
 Operation-level öğrenme ve leakage metadata'sı mevcut mekanizma ile uyumlu kalır.
 
-`skyulf/core/portable_state.py` planlanan envelope alanları:
+`skyulf/core/portable_state.py` SM-04 v1 envelope alanları:
 
 ```text
-format_version=1, node_type, codec_version, ordered_columns,
-input_schema, output_schema, learned_parameters, semantic_options,
-producer_engine, producer_version, compatibility, semantic_digest
+format_version=1, node_type, codec_version=1, ordered_columns,
+learned_parameters, semantic_digest
 ```
 
 Envelope mevcut artifact dict'lerini codec üzerinden taşır; Calculator'ın tüm
@@ -117,6 +116,15 @@ return tipleri bir seferde değiştirilmez. İlk codec'ler SimpleImputer(mean/co
 ve StandardScaler. JSON NaN/Infinity ve dtype değerleri için açık tagged encoding
 kullanılır; `repr` veya pickle bytes üzerinden semantic digest üretilmez.
 Enum/version bilinmiyorsa deserialize etmeden hata verilir.
+
+V1 API yalnız node_type ve mevcut params alır; gerçek input/output schema veya
+producer bilgisi bu girdiden çıkarılamaz. Bu alanlar uydurulmaz. Semantic options
+mevcut artifact içindeki with_mean/with_std/strategy gibi alanlarda korunur.
+Schema, producer ve compatibility metadata daha sonraki bundle aşamasına aittir.
+Mevcut pipeline seal formatı değiştirilmez; portable checksum ayrı versioned
+tagged JSON üzerinden hesaplanır. Checksum imza/authenticity garantisi değildir.
+Decode byte limiti parse öncesi gelen payload'a uygulanır; wire byte bütçesi
+process memory bütçesi değildir. Codec herhangi bir Spark action veya I/O yapmaz.
 
 Küçük state inline taşınabilir. Büyük kategori/group state için immutable tablo
 referansı, schema ve içerik kimliği gerekir; bu SM-17 kapsamıdır. Küçük state

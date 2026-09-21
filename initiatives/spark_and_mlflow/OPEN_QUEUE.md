@@ -1,6 +1,6 @@
 # Spark ve MLflow — Open Queue
 
-Güncelleme: 2026-09-21. **SM-03 tamamlandı. Sonraki görev: SM-04. Hedef: 0.9.0.**
+Güncelleme: 2026-09-21. **SM-04 tamamlandı. Sonraki görev: SM-05. Hedef: 0.9.0.**
 Bu dosya kısa çalışma sırasıdır; detaylar bağlantılı planlarda.
 
 Durumlar: READY = başlanabilir; WAIT = önceki görev bekleniyor;
@@ -13,8 +13,8 @@ DONE = kanıtla tamamlandı. SM-00 commit: `105a6fe4`.
 | SM-01 | Execution/capability kuralları | SM-00 | DONE | Immutable config; registry operation desteği; aşağıda kanıt |
 | SM-02 | Spark engine ve conversion sınırı | SM-01 | DONE | Gerçek Spark adapter; conversion korumaları; aşağıda kanıt |
 | SM-03 | Dispatcher, schema, row keys | SM-02 | DONE | Keyed Spark FE giriş/preflight; aşağıda kanıt |
-| SM-04 | Versioned portable state | SM-03 | READY | Limit/version kontrolü; state round-trip |
-| SM-05 | Native SimpleImputer | SM-04 | WAIT | Mean/constant train-only fit, Spark apply |
+| SM-04 | Versioned portable state | SM-03 | DONE | Tagged state, limit/version/schema kontrolü; aşağıda kanıt |
+| SM-05 | Native SimpleImputer | SM-04 | READY | Mean/constant train-only fit, Spark apply |
 | SM-06 | Native StandardScaler | SM-05 | WAIT | Population variance ve flag parity |
 | SM-07 | Uçtan uca FE kapısı | SM-06 | WAIT | Üç engine çapraz fit/apply; kayıt/yükleme |
 | SM-08 | Ortak inference bundle | SM-07 | WAIT | Raw/features ayrımı; model metadata round-trip |
@@ -181,3 +181,46 @@ ve MLflow entegrasyonu henüz yok.
   capability örneği de doğrulandı. Changelog/rehber birlikte güncellendi.
 - Sınır: built-in native node, portable state codec, distributed model inference,
   explicit aggregate metrics ve Databricks/Connect testi henüz yok. SM-04 sırada.
+
+## SM-04 — 2026-09-21 tamamlanma kaydı
+
+- Başlangıç commit'i `44b5241e`; bu kayıt SM-04 çalışma ağacına aittir.
+- `core/portable_state.py`: UTF-8 tagged JSON v1 encode/decode; explicit encode
+  byte bütçesi ve parse öncesi decode limiti (varsayılan 8 MiB). StandardScaler ve
+  mean/constant SimpleImputer gerçek artifact sözlükleri, boş no-op state dahil.
+- Integer/string/bool/null ayrımı, non-finite float ve signed zero, kolon sırası
+  korunur. Unknown version/node/fields/tags, duplicate JSON/map keys/columns,
+  inconsistent state, unsupported Python objects ve aşırı nesting reddedilir.
+  Checksum canonical semantic content üzerinden SHA-256; imza değildir.
+- `core/artifacts.py` StandardScaler mean/var alanları mevcut disabled-flag
+  davranışına uygun `None` kabul edecek şekilde düzeltildi. İlgili scaling testi
+  mean-enabled koşulda non-null assertion ile gerçek beklentiyi açıkça doğrular.
+- `pipeline/seal.py` değişmedi: eski fingerprint ve pickle formatını değiştirmek
+  gerekmedi. Portable checksum kendi versioned vocabulary'sine sahiptir.
+  API'de bulunmayan producer/schema bilgisi uydurulmadı; mimari metadata sınırı
+  güncellendi. Future bundle bu bilgiyi gerçek input/execution bağlamından alacak.
+- TDD ilk koşu eksik modül nedeniyle fail; ilk uygulama **44 passed**. UTF-16
+  kabulü ve review'un compact Unicode byte-limit bulgusu ayrı red/green testlerle
+  düzeltildi. Review son recheck'te limit sınırlarını bağımsız doğruladı.
+- Odaklı komut: `.venv/Scripts/python.exe -m pytest
+  skyulf-core/tests/spark/test_portable_state.py
+  skyulf-core/tests/unit/test_pipeline_seal.py skyulf-core/tests/unit/test_pipeline.py
+  skyulf-core/tests/unit/test_pipeline_threshold_fingerprint.py
+  skyulf-core/tests/integration/test_scaling.py -q --tb=short -o addopts=
+  -p no:cacheprovider --basetemp .cache/sm04-reviewed`
+  → **188 passed**, 5 mevcut numeric warning, 4.69 saniye. Eski save/load testleri
+  ve fingerprint golden testleri değişmeden geçti. İlk odaklı koşunun Windows
+  default temp erişim hatası workspace içindeki basetemp ile giderildi.
+- Spark profile: `.venv-spark/Scripts/python.exe -m pytest
+  skyulf-core/tests/spark/test_portable_state.py -q --tb=short -o addopts=
+  -p no:cacheprovider --basetemp .cache/sm04-spark-codec`
+  → **61 passed**, 1.22 saniye. Codec JVM kullanmaz; bu sonuç Spark FE kanıtı değildir.
+- Tam core: `HF_HUB_OFFLINE=1 .venv/Scripts/python.exe -m pytest skyulf-core/tests
+  -q --tb=short --disable-warnings -o addopts= -p no:cacheprovider
+  --basetemp .cache/sm04-core`
+  → **9945 passed, 107 skipped, 1077 warnings**, 168.18 saniye.
+  Ruff/format, tam repo ty ve
+  `mkdocs build --strict` geçti. Rehberdeki yeni codec örneği base ortamda çalıştı.
+- Sınır: ayrı codec API'sidir; FeatureEngineer/model worker için otomatik paketleme
+  yok. Byte limiti toplam process memory limiti değildir. Native SimpleImputer
+  SM-05, StandardScaler SM-06; Spark runtime/Databricks bu görevde çalıştırılmadı.

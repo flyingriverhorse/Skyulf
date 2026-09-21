@@ -212,6 +212,7 @@ def test_standard_scaler_nullable_numeric_round_trip(
         out = out.to_pandas()
 
     assert params["columns"] == columns
+    assert params["mean"] is not None
     np.testing.assert_allclose(params["mean"], reference.mean_)
     np.testing.assert_allclose(out[columns].to_numpy(), reference.transform(frame[columns]))
     assert all(pd.api.types.is_float_dtype(out[col]) for col in columns)

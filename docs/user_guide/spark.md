@@ -210,7 +210,68 @@ The local `get_data_stats` helper rejects Spark input; use the Spark FE metrics.
 Transform preserves key identity, not physical row order, including when
 `preserve_rows=True`. Consumers must match outputs by keys. A successful refit
 replaces fitted steps; a failed refit leaves the last successful fitted steps
-available. Saving portable learned state follows in SM-04.
+available. The portable learned-state codec is described below.
+
+## Portable learned state
+
+The development codec transports a small learned-parameter dictionary as
+versioned UTF-8 JSON bytes. It currently supports `StandardScaler` and
+`SimpleImputer` with `mean` or `constant` strategies, including empty no-op
+artifacts. This example works in the base environment without Spark:
+
+```python
+import pandas as pd
+
+from skyulf.core.execution import ExecutionOptions
+from skyulf.core.portable_state import decode_state, encode_state
+from skyulf.preprocessing.imputation.simple import (
+    SimpleImputerApplier,
+    SimpleImputerCalculator,
+)
+
+training = pd.DataFrame({"amount": [1.0, None, 5.0]})
+params = SimpleImputerCalculator().fit(
+    training, {"columns": ["amount"], "strategy": "mean"},
+)
+budget = ExecutionOptions(engine="spark").state_max_bytes
+payload = encode_state("SimpleImputer", params, max_bytes=budget)
+node_type, restored = decode_state(payload, max_bytes=budget)
+assert node_type == "SimpleImputer"
+result = SimpleImputerApplier().apply(pd.DataFrame({"amount": [None]}), restored)
+assert result["amount"].tolist() == [3.0]
+```
+
+The v1 envelope contains `format_version`, `codec_version`, `node_type`,
+`ordered_columns`, `learned_parameters` and `semantic_digest`. The original
+artifact retains its options, such as scaler centering/scaling flags. Unknown
+versions, nodes, fields, malformed tags, duplicate columns and inconsistent
+array lengths/counts are rejected. Actual input/output schemas and producer
+metadata are not inferred from statistics; they belong to later bundle metadata.
+
+Scalar tags distinguish integers, floats, strings, booleans and nulls. Integer
+tags use decimal strings to preserve large category values. Float tags preserve
+finite values and negative zero with hexadecimal notation, and represent NaN
+and positive/negative infinity explicitly. NumPy scalar equivalents normalize
+to Python scalars; arrays, estimators, sessions and arbitrary objects are rejected.
+NaN bit patterns are not separate learned semantics. Column/list order is
+preserved; dictionary insertion order and JSON whitespace are not significant.
+
+The semantic SHA-256 checksum detects changed content; it is not a signature
+or proof of a trusted producer. It uses canonical tagged values, with no
+arbitrary-object `repr` or pickle fallback. Existing pipeline pickle save/load
+and fingerprint algorithms remain unchanged.
+
+`encode_state` requires an explicit positive `max_bytes` budget.
+`decode_state` defaults to 8 MiB and checks received byte length before parsing.
+Pass the same custom budget at both ends when changing it. The limit applies to
+wire bytes; it is not a bound on total Python process memory. The codec performs
+no filesystem or network I/O. Callers own storage and transport of these bytes.
+
+This API does not enable Spark node execution or automatically package a
+FeatureEngineer pipeline. Connecting these artifacts to native Spark imputer
+and scaler implementations follows in SM-05/SM-06; worker model loading comes
+later. Codec tests run in both base and Spark development environments without
+starting a JVM.
 
 ### Inspecting declared support
 

@@ -19,9 +19,9 @@ class StandardScalerArtifact(TypedDict, total=False):
     """Standard-scaling parameters (per-column mean, scale and variance)."""
 
     type: str
-    mean: list[float]
+    mean: list[float] | None
     scale: list[float] | None
-    var: list[float]
+    var: list[float] | None
     with_mean: bool
     with_std: bool
     columns: list[str]
