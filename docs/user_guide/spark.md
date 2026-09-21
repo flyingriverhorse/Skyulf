@@ -3,8 +3,8 @@
 Spark support is under development for 0.9.0. The optional dependency and
 runtime tests, Spark engine adapter and keyed FeatureEngineer entry point are
 available in the development checkout.
-**Native SimpleImputer supports mean/constant fit and apply.** Other built-in
-native nodes and distributed model inference remain under development.
+**Native SimpleImputer (mean/constant) and StandardScaler support fit and apply.**
+Other built-in native nodes and distributed model inference remain under development.
 Installing the extra does not convert a pandas/Polars pipeline to Spark.
 
 ## Why a separate environment?
@@ -186,9 +186,10 @@ Every step must declare both fit and apply support before fitting starts. Apply
 also checks all fitted steps before execution. This path accepts native,
 row-preserving operations with row-local apply behavior. Worker Python, window,
 filtering and expansion paths require later implementations. SimpleImputer
-mean/constant is available; unsupported nodes or strategies fail before any
+mean/constant and StandardScaler are available; unsupported nodes or strategies fail before any
 validation action or fit. The runner normalizes registered node defaults before
-checking capabilities, so an omitted SimpleImputer strategy means `mean`.
+checking capabilities, so an omitted SimpleImputer strategy means `mean`, and
+StandardScaler defaults to `with_mean=True, with_std=True`.
 Custom native nodes use the existing engine-keyed dispatcher mapping with a
 `"spark"` implementation. It receives the full native frame, `y=None` and the
 resolved feature names in `config["columns"]`; the returned frame retains keys
@@ -298,6 +299,81 @@ Existing input column order is retained; direct apply appends missing learned
 columns when a usable fill value exists. The keyed pipeline requires configured
 input feature columns to be present. Output rows must still be matched by keys.
 
+## Native StandardScaler: center and scale
+
+StandardScaler learns per-column statistics on Spark and applies them with native
+expressions. Its population variance matches the local node's `ddof=0` convention,
+as documented by [scikit-learn](https://scikit-learn.org/stable/modules/generated/sklearn.preprocessing.StandardScaler.html).
+It uses Spark's native
+[`var_pop`](https://spark.apache.org/docs/latest/api/python/reference/pyspark.sql/api/pyspark.sql.functions.var_pop.html)
+on shifted values to reduce numerical error.
+
+```python
+from skyulf.core.execution import ExecutionOptions, FrameSpec
+from skyulf.preprocessing.pipeline import FeatureEngineer
+
+train = spark.createDataFrame(
+    [(1, 1.0, 0), (2, 3.0, 1)], "id long, amount double, label long",
+).repartition(2)
+scaler = FeatureEngineer(
+    [{"name": "scale", "transformer": "StandardScaler",
+      "params": {"columns": ["amount"], "with_mean": True, "with_std": True}}],
+    frame_spec=FrameSpec(row_keys=("id",), target="label"),
+    execution_options=ExecutionOptions(engine="spark", state_max_bytes=8192),
+)
+scaled_train, _ = scaler.fit_transform(train)
+assert [r.amount for r in scaled_train.orderBy("id").collect()] == [-1.0, 1.0]
+batch = spark.createDataFrame([(10, 5.0)], "id long, amount double")
+assert scaler.transform(batch).first().amount == 3.0
+```
+
+The same mean/variance/scale artifact can be encoded with
+`encode_state("StandardScaler", state, max_bytes=...)` and applied using
+`StandardScalerApplier` on pandas, Polars or Spark. State list positions follow
+`columns`; apply matches names and retains input column order. Row order is not
+an identity guarantee.
+
+| `with_mean` | `with_std` | Apply formula | Learned statistics |
+| --- | --- | --- | --- |
+| True | True | `(x - mean) / scale` | mean, population variance, scale |
+| True | False | `x - mean` | mean; variance/scale are None |
+| False | True | `x / scale` | mean, population variance, scale |
+| False | False | unchanged | mean/variance/scale are None |
+
+Fit performs at most two distributed aggregate queries. The first finds numeric
+reference values and validates selected input; the second calculates means and
+population variances of deviations from those references. This avoids accumulating
+the same large offset in every addition. A range spanning zero keeps a zero
+reference; a same-sign range uses its endpoint nearest zero. Each query returns one O(columns) row,
+never training samples. With both flags disabled, only the first query is needed.
+Automatic selection adds the same binary/constant checks as the imputer. These
+queries and the pipeline's identity checks can scan or shuffle data; this is not
+a single-pass training algorithm.
+
+- Null/NaN observations are excluded from fitting. Apply preserves missing
+  values. Explicit all-missing columns learn NaN statistics; later observed
+  values become NaN when an enabled operation uses those statistics.
+- Constant and numerically near-constant features receive unit scale using the
+  local sklearn error-bound rule. A single observation has zero variance and
+  unit scale. Imported zero scales are also treated as one during apply.
+- `columns=[]` is a no-op. Explicit feature selection on zero training rows
+  raises an error; automatic selection on empty data has no eligible features.
+  Direct apply skips absent learned columns, matching the local scaler; the
+  keyed pipeline requires its configured feature columns to exist.
+- Primitive numeric Spark types and explicitly selected booleans are supported.
+  Enabled operations produce double columns; disabling both retains original
+  types. Automatic selection skips booleans. Strings, Decimal and nested feature
+  types are rejected, without casting text or falling back to pandas.
+- Selected training infinities and overflowing aggregates are rejected. Double
+  conversion can lose precision for very large integers. Distributed reduction
+  order can still cause floating-point differences: ordinary parity fixtures use
+  `rtol=1e-10, atol=1e-12`; the large-offset/small-spread fixture allows `rtol=0.002`
+  because representable spacing near `1e12` is significant relative to its spread.
+
+Direct apply is lazy, with no Python UDF or data action. FeatureEngineer still
+executes the identity checks described above. This implementation has been tested
+on the local PySpark runtime; Databricks/Connect validation remains a later gate.
+
 ## Portable learned state
 
 The development codec transports a small learned-parameter dictionary as
@@ -357,8 +433,8 @@ The Spark runner validates each declared v1 artifact through the codec and
 enforces `ExecutionOptions.state_max_bytes` after fit and before transform
 validation actions. Direct node calls validate state structure but leave wire
 byte limits to explicit encode/decode callers. The codec does not automatically
-package a FeatureEngineer pipeline. Native StandardScaler and worker model
-loading come later. Codec tests also run without starting a JVM.
+package a FeatureEngineer pipeline. Full pipeline state export/import and worker
+model loading come later. Codec tests also run without starting a JVM.
 
 ### Inspecting declared support
 
@@ -368,13 +444,16 @@ A capability check distinguishes fit and apply and never falls back to pandas:
 from skyulf.core.capabilities import UnsupportedExecutionError, require_capability
 
 require_capability("SimpleImputer", "fit", "spark", config={"strategy": "mean"})
+require_capability("StandardScaler", "apply", "spark", config={
+    "with_mean": True, "with_std": True,
+})
 try:
     require_capability("SimpleImputer", "fit", "spark", config={"strategy": "median"})
 except UnsupportedExecutionError as error:
     print(error.node_type, error.operation, error.engine, error.reason)
 ```
 
-Mean succeeds; median reports unsupported. The query requires explicit defaults.
+Mean and StandardScaler succeed; median reports unsupported. The query requires explicit defaults.
 Existing local pipelines continue to work; this new preflight is not yet wired
 into their execution. A local node without an explicit declaration also fails
 this new query, even though its existing local pipeline path remains available.
@@ -410,7 +489,7 @@ Spark code, certify compatibility or make a window transform batch-independent.
   use an environment that permits the owned JVM processes to terminate.
 - **Spark dependency unavailable:** install the optional `skyulf-core[spark]`
   dependency in a suitable environment, or use the repository requirements above.
-- **Unsupported node:** SimpleImputer mean/constant is available. Other built-in
+- **Unsupported node:** SimpleImputer mean/constant and StandardScaler are available. Other built-in
   native FE nodes are still being implemented; installing Spark does not enable them.
 
 MLflow tracking, Unity Catalog registration, Databricks jobs, serving endpoints

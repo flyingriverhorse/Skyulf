@@ -7,6 +7,7 @@ import numpy as np
 import polars as pl
 from sklearn.preprocessing import StandardScaler
 
+from ...core.capabilities import ExecutionCapability
 from ...core.meta.decorators import node_meta
 from ...engines.sklearn_bridge import SklearnBridge
 from ...registry import NodeRegistry
@@ -22,6 +23,7 @@ from .._schema import SkyulfSchema
 from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
 from ..dispatcher import apply_dual_engine, fit_dual_engine
 from ._common import _select_subset_pandas, _select_subset_polars
+from ._spark_standard import apply_spark_standard, fit_spark_standard
 
 logger = logging.getLogger(__name__)
 
@@ -49,13 +51,21 @@ class StandardScalerApplier(BaseApplier):
 
     Honors ``with_mean``/``with_std``; ``X`` passes through unchanged when the
     enabled flags have no fitted statistics, and ``y`` is never modified.
+    Spark validates portable state and applies native expressions without a
+    data action. Its selected numeric columns become double when scaling is enabled.
     """
 
     @apply_method
     def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
         """Center and scale ``X`` with the fitted statistics on the active engine."""
         return apply_dual_engine(
-            X, params, {"polars": self._apply_polars, "pandas": self._apply_pandas}
+            X,
+            params,
+            {
+                "polars": self._apply_polars,
+                "pandas": self._apply_pandas,
+                "spark": apply_spark_standard,
+            },
         )
 
     @staticmethod
@@ -111,7 +121,24 @@ class StandardScalerApplier(BaseApplier):
         return X_out, _y
 
 
-@NodeRegistry.register("StandardScaler", StandardScalerApplier)
+@NodeRegistry.register(
+    "StandardScaler",
+    StandardScalerApplier,
+    execution_capabilities=tuple(
+        ExecutionCapability(
+            "spark",
+            operation,
+            "native",
+            "preserve",
+            "global" if operation == "fit" else "row",
+            codec_version=1,
+            config_match=(("with_mean", with_mean), ("with_std", with_std)),
+        )
+        for operation in ("fit", "apply")
+        for with_mean in (True, False)
+        for with_std in (True, False)
+    ),
+)
 @node_meta(
     id="StandardScaler",
     name="Standard Scaler",
@@ -121,7 +148,13 @@ class StandardScalerApplier(BaseApplier):
     learns_from_data=True,
 )
 class StandardScalerCalculator(BaseCalculator):
-    """Fit per-column mean/scale statistics with sklearn's ``StandardScaler``."""
+    """Fit per-column statistics using sklearn locally or native Spark aggregates.
+
+    Spark uses population variance (``ddof=0``), ignores null/NaN observations,
+    and returns at most two statistics rows to the driver. Both options default
+    to True. Empty explicit training selections produce a no-op artifact;
+    selected features with zero training rows cannot be fitted.
+    """
 
     def infer_output_schema(
         self, input_schema: SkyulfSchema, config: dict[str, Any]
@@ -138,7 +171,15 @@ class StandardScalerCalculator(BaseCalculator):
             return cast(StandardScalerArtifact, {})
         return cast(
             StandardScalerArtifact,
-            fit_dual_engine(X, config, {"polars": self._fit_polars, "pandas": self._fit_pandas}),
+            fit_dual_engine(
+                X,
+                config,
+                {
+                    "polars": self._fit_polars,
+                    "pandas": self._fit_pandas,
+                    "spark": fit_spark_standard,
+                },
+            ),
         )
 
     @staticmethod

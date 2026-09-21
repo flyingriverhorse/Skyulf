@@ -223,14 +223,14 @@ FeatureEngineer girişinden de test edilir.
 **Oluştur:** `tests/spark/test_standard_scaler.py`.
 **Tüketir/üretir:** Mevcut mean/var/scale/columns/with_mean/with_std artifact'i.
 
-- [ ] Dört with_mean/with_std kombinasyonu, sabit kolon, null/NaN, boş veri,
+- [x] Dört with_mean/with_std kombinasyonu, sabit kolon, null/NaN, boş veri,
   tek satır, büyük offset/küçük varyans ve kolon sırası için parity testleri yaz.
-- [ ] Dağıtık population variance ile ddof=0 semantiğini koru. NaN'ın aggregate
+- [x] Dağıtık population variance ile ddof=0 semantiğini koru. NaN'ın aggregate
   davranışını local node'la eşleştir. Spark ML StandardScaler'ı aynı isim diye
   doğrudan kullanma. O(kolon) sonuç topla; stabil varyans kullan.
-- [ ] Apply `(x - mean) / scale` ifadelerini flag'lere göre kur; sıfır scale
+- [x] Apply `(x - mean) / scale` ifadelerini flag'lere göre kur; sıfır scale
   ve gerekli olmayan None state'i mevcut node davranışına göre ele al.
-- [ ] Floating tolerance küçük normal fixture'da rtol=1e-10/atol=1e-12;
+- [x] Floating tolerance küçük normal fixture'da rtol=1e-10/atol=1e-12;
   adversarial sayısal fixture'da gerekçeli ayrı tolerance, sonuç farkını gizleme.
 
 ```python
