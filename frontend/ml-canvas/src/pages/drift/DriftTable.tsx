@@ -34,7 +34,7 @@ interface DriftTableProps {
     showOnlyDrifted: boolean;
     sortConfig: SortConfig | null;
     onSort: (key: string) => void;
-    columnSparklines: Record<string, number[]>;
+    columnSparklines: Record<string, (number | null)[]>;
 }
 
 const METRIC_KEY_MAP: Record<string, string> = {
@@ -184,7 +184,7 @@ interface DriftRowProps {
     maxImportance: number;
     toggleRow: (column: string) => void;
     hasSparklines: boolean;
-    columnSparklines: Record<string, number[]>;
+    columnSparklines: Record<string, (number | null)[]>;
     colSpan: number;
 }
 
@@ -300,7 +300,7 @@ function DriftRow({ col, fi, isExpanded, maxImportance, toggleRow, hasSparklines
                 </td>
                 {hasSparklines && (
                     <td className="px-6 py-4 whitespace-nowrap">
-                        <Sparkline values={columnSparklines[col.column] ?? []} />
+                        <Sparkline values={columnSparklines[col.column] ?? []} threshold={psi?.threshold} />
                     </td>
                 )}
             </tr>

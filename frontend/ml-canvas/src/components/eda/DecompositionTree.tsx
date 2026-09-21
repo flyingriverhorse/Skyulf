@@ -24,6 +24,7 @@ interface DecompositionTreeProps {
     measureAgg: string;
     columns: string[];
     initialFilters: Filter[];
+    resetVersion?: number;
 }
 
 // Module-level cache to persist state across tab switches. Capped at a
@@ -52,12 +53,31 @@ function setTreeCache(key: string, value: { levels: TreeLevel[], splitPath: (str
     }
 }
 
-export const DecompositionTree: React.FC<DecompositionTreeProps> = ({
+/** Cache conjunctions independently of filter order, preserving value types. */
+function getCacheKey({ datasetId, measureCol, measureAgg, initialFilters }: DecompositionTreeProps): string {
+    const filters = initialFilters.map(({ column, operator, value }) => {
+        const canonicalValue = operator === 'in' && Array.isArray(value)
+            ? [...new Set(value.map(item => JSON.stringify(item)))].sort()
+            : value;
+        return JSON.stringify([column, operator, canonicalValue]);
+    });
+    return JSON.stringify([datasetId, measureCol, measureAgg, [...new Set(filters)].sort()]);
+}
+
+/** A population change owns a new state instance and cannot cache the previous levels. */
+export const DecompositionTree: React.FC<DecompositionTreeProps> = (props) => {
+    const cacheKey = getCacheKey(props);
+    return <DecompositionTreeContent key={cacheKey} {...props} cacheKey={cacheKey} />;
+};
+
+const DecompositionTreeContent: React.FC<DecompositionTreeProps & { cacheKey: string }> = ({
     datasetId,
     measureCol,
     measureAgg,
     columns,
-    initialFilters
+    initialFilters,
+    cacheKey,
+    resetVersion = 0,
 }) => {
     const [levels, setLevels] = useState<TreeLevel[]>([]);
     const [loading, setLoading] = useState(false);
@@ -74,6 +94,7 @@ export const DecompositionTree: React.FC<DecompositionTreeProps> = ({
     // resolved — e.g. rapidly clicking through tree items or switching
     // datasets before the previous request finishes.
     const requestIdRef = useRef(0);
+    const lastResetRef = useRef(resetVersion);
     const [paths, setPaths] = useState<{ d: string }[]>([]);
 
     // Auto-scroll to right when levels change
@@ -163,23 +184,33 @@ export const DecompositionTree: React.FC<DecompositionTreeProps> = ({
     // Update cache when state changes
     useEffect(() => {
         if (levels.length > 0) {
-            const cacheKey = `${datasetId}-${measureCol}-${measureAgg}`;
             setTreeCache(cacheKey, { levels, splitPath });
         }
-    }, [levels, splitPath, datasetId, measureCol, measureAgg]);
+    }, [levels, splitPath, cacheKey]);
 
     // Initialize Root or Load from Cache
     useEffect(() => {
-        const cacheKey = `${datasetId}-${measureCol}-${measureAgg}`;
+        if (lastResetRef.current !== resetVersion) {
+            treeCache.delete(cacheKey);
+            lastResetRef.current = resetVersion;
+        }
+        setSplitMenuOpen(null);
         const cached = treeCache.get(cacheKey);
         if (cached) {
             setLevels(cached.levels);
             setSplitPath(cached.splitPath);
+            setTreeCache(cacheKey, cached);
+            setLoading(false);
         } else {
+            setLevels([]);
+            setSplitPath([null]);
             loadRoot();
         }
+        // Invalidates root and drill-down work on reset, population change, and unmount.
+        return () => { requestIdRef.current += 1; };
+    // The keyed instance fixes request inputs; equivalent filter arrays need no reload.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [datasetId, measureCol, measureAgg]);
+    }, [cacheKey, resetVersion]);
 
     const loadRoot = async () => {
         const myRequestId = ++requestIdRef.current;

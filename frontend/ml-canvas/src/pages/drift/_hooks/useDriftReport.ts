@@ -36,7 +36,7 @@ function evaluateMetric(metric: DriftMetric, column: ColumnDrift, thresholds: Dr
         const statistic = column.metrics.find(item => item.metric === 'ks_statistic');
         if (statistic != null) hasDrift = statistic.value > (thresholds.ks ?? statistic.threshold);
     }
-    return { ...metric, has_drift: hasDrift };
+    return { ...metric, threshold: threshold ?? metric.threshold, has_drift: hasDrift };
 }
 
 /**

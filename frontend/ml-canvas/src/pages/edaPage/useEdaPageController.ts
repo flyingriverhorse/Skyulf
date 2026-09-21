@@ -21,6 +21,7 @@ export function useEdaPageController() {
   const [isLoadingReport, setIsLoadingReport] = useState(false);
   const [isApplyingFilters, setIsApplyingFilters] = useState(false);
   const applyingFiltersRef = useRef(false);
+  const hydratedReportRef = useRef<string | null>(null);
 
   // ── View + analysis-input state lives in the EDA zustand slice ──
   const activeTab = useEDAStore((s) => s.activeTab);
@@ -94,6 +95,7 @@ export function useEdaPageController() {
   // Wipe per-dataset slice fields whenever the user switches datasets.
   useEffect(() => {
     useEDAStore.getState().resetForDataset();
+    hydratedReportRef.current = null;
   }, [selectedDataset]);
 
   // Strip excluded columns from the profile for the UI without mutating the cached payload.
@@ -182,20 +184,24 @@ export function useEdaPageController() {
     runAnalysis(draft);
   };
 
-  // Sync target col and excluded cols from report if available
+  // Restore report provenance once its profile arrives, including pending job completion.
+  // Background refetches of the same report must preserve unsaved draft edits.
   useEffect(() => {
     if (report && report.profile_data) {
-      if (report.profile_data.target_col) {
-        setTargetCol(report.profile_data.target_col);
-      }
+      const reportKey = `${selectedDataset}:${report.id}:${report.status}`;
+      if (hydratedReportRef.current === reportKey) return;
+      hydratedReportRef.current = reportKey;
+      setTargetCol(report.profile_data.target_col ?? '');
       const serverExcluded = Array.isArray(report.profile_data.excluded_columns)
         ? report.profile_data.excluded_columns
         : [];
       useEDAStore.getState().setExcludedApplied(serverExcluded);
       useEDAStore.getState().setExcludedDraft(serverExcluded);
+      const serverFilters = report.config?.filters ?? [];
+      useEDAStore.getState().setFiltersApplied(serverFilters);
+      useEDAStore.getState().setFiltersDraft(serverFilters);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [report?.id]);
+  }, [report, selectedDataset, setTargetCol]);
 
   // Helper to find existing report for current target
   const existingReport = targetCol ? history.find(h => h.target_col === targetCol && h.status === 'COMPLETED') : null;

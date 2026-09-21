@@ -13,10 +13,10 @@ export const DecompositionTab: React.FC<DecompositionTabProps> = ({ datasetId, c
     const [measureCol, setMeasureCol] = useState<string>('count');
     const [measureAgg, setMeasureAgg] = useState<string>('sum');
     const effectiveAgg = measureCol === 'count' ? 'count' : measureAgg;
-    const [key, setKey] = useState(0); // Force re-render to reset tree
+    const [resetVersion, setResetVersion] = useState(0);
 
     const handleReset = () => {
-        setKey(prev => prev + 1);
+        setResetVersion(prev => prev + 1);
     };
 
     return (
@@ -65,9 +65,8 @@ export const DecompositionTab: React.FC<DecompositionTabProps> = ({ datasetId, c
 
             {/* Tree Visualization */}
             <div className="bg-slate-50 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 overflow-hidden">
-                {/* A new measure must not save the previous tree's levels into its cache entry. */}
                 <DecompositionTree
-                    key={JSON.stringify([key, datasetId, measureCol, effectiveAgg])}
+                    resetVersion={resetVersion}
                     datasetId={datasetId}
                     measureCol={measureCol}
                     measureAgg={effectiveAgg}

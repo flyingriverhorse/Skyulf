@@ -407,7 +407,7 @@ def _build_drift_column_summary(report) -> dict[str, Any]:
             metrics_map[m.metric] = m.value
         col_summary[col_name] = {
             "drifted": col_drift.drift_detected,
-            "psi": metrics_map.get("psi"),
+            "psi": metrics_map.get("psi", metrics_map.get("psi_categorical")),
             "wasserstein": metrics_map.get("wasserstein_distance"),
             "ks_statistic": metrics_map.get("ks_statistic"),
             "ks_p_value": metrics_map.get("ks_test_p_value"),
