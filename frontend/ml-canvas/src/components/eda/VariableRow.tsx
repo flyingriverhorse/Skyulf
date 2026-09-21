@@ -12,6 +12,7 @@ import { DistributionChart, type DistributionDatum } from './DistributionChart';
 import { Button } from '../ui/button';
 import { toast } from '../../core/toast';
 import type { ColumnProfile } from '../../core/types/edaProfile';
+import type { Filter } from '../../core/api/eda';
 import { VariableSummary, VariableIdentity, VariableControls } from './variableRow/VariablePresentation';
 import { VariableStatistics } from './variableRow/VariableStatistics';
 
@@ -22,6 +23,7 @@ export interface VariableRowProps {
     onToggleExclude: (colName: string, exclude: boolean) => void;
     isExcluded: boolean;
     handleAddFilter: (column: string, value: string | number, operator: string) => void;
+    handleAddFilters: (filters: Filter[]) => void;
 }
 
 export const VariableRow: React.FC<VariableRowProps> = ({
@@ -30,7 +32,8 @@ export const VariableRow: React.FC<VariableRowProps> = ({
     onToggleExpand,
     onToggleExclude,
     isExcluded,
-    handleAddFilter
+    handleAddFilter,
+    handleAddFilters,
 }) => {
     const chartRef = useRef<HTMLDivElement>(null);
     const [dlState, setDlState] = useState<'idle' | 'downloading' | 'done'>('idle');
@@ -64,8 +67,12 @@ export const VariableRow: React.FC<VariableRowProps> = ({
              handleAddFilter(profile.name, val, '==');
         } else if (profile.dtype === 'Numeric') {
              if (data.rawBin) {
-                 // Try to add >= start
-                 handleAddFilter(profile.name, data.rawBin.start, '>=');
+                 // Numeric profiler bins are right-closed; only the first includes its lower edge.
+                 const firstBin = profile.histogram?.[0];
+                 handleAddFilters([
+                     { column: profile.name, value: data.rawBin.start, operator: data.rawBin.start === firstBin?.start ? '>=' : '>' },
+                     { column: profile.name, value: data.rawBin.end, operator: '<=' },
+                 ]);
              }
         }
     };

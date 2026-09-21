@@ -161,6 +161,12 @@ export function useEdaPageController() {
     useEDAStore.getState().removeFilterDraft(index);
   };
 
+  /** A clicked histogram range must enter the draft as one complete operation. */
+  const handleAddFilters = (filters: EDAFilter[]) => {
+    const state = useEDAStore.getState();
+    state.setFiltersDraft([...state.filtersDraft, ...filters]);
+  };
+
   const handleResetFilters = () => {
     useEDAStore.getState().setFiltersDraft(filtersApplied);
   };
@@ -240,6 +246,7 @@ export function useEdaPageController() {
     runAnalysis,
     loadSpecificReport,
     handleAddFilter,
+    handleAddFilters,
     handleRemoveFilter,
     handleResetFilters,
     handleApplyFilters,

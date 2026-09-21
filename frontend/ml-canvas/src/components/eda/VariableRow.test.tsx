@@ -21,10 +21,27 @@ vi.mock('recharts', () => ({
 }));
 
 const profile: ColumnProfile = { name: 'age', dtype: 'Numeric', missing_count: 0, missing_percentage: 0 };
-const baseProps = { profile, isExpanded: true, onToggleExpand: vi.fn(), onToggleExclude: vi.fn(), isExcluded: false, handleAddFilter: vi.fn() };
+const baseProps = { profile, isExpanded: true, onToggleExpand: vi.fn(), onToggleExclude: vi.fn(), isExcluded: false, handleAddFilter: vi.fn(), handleAddFilters: vi.fn() };
 afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); document.documentElement.classList.remove('dark'); });
 
 describe('VariableRow contracts', () => {
+  it.each([0, 1, 2])('adds both exact numeric bin boundaries in one callback for bin %s', (index) => {
+    // The first bin includes the minimum; subsequent bins exclude their shared lower edge.
+    const histogram = [
+      { start: 0, end: 1, count: 3 }, { start: 1, end: 2, count: 2 }, { start: 2, end: 3, count: 2 },
+    ];
+    const handleAddFilters = vi.fn();
+    const handleAddFilter = vi.fn();
+    render(<VariableRow {...baseProps} profile={{ ...profile, histogram }} handleAddFilters={handleAddFilters} handleAddFilter={handleAddFilter} />);
+    const rawBin = histogram[index]!;
+    act(() => chart.click?.({ name: 'bin', fullName: 'bin', count: rawBin.count, rawBin }));
+    expect(handleAddFilters).toHaveBeenCalledExactlyOnceWith([
+      { column: 'age', operator: index === 0 ? '>=' : '>', value: rawBin.start },
+      { column: 'age', operator: '<=', value: rawBin.end },
+    ]);
+    expect(handleAddFilter).not.toHaveBeenCalled();
+  });
+
   it('keeps unknown native columns visible with missing counts and an unavailable-statistics warning', () => {
     const message = "Statistics for column 'amount' with dtype 'Decimal(precision=38, scale=2)' are unavailable. Missing counts and sample values are retained.";
     render(<>
@@ -57,13 +74,12 @@ describe('VariableRow contracts', () => {
     expect(screen.getByTestId('mini')).toHaveAttribute('data-values', '[{"name":"0","count":2}]');
   });
 
-  it.each(['Categorical', 'Boolean', 'Numeric', 'Text', 'constructor'])('keeps %s bar filter payloads', (dtype) => {
+  it.each(['Categorical', 'Boolean', 'Text', 'constructor'])('keeps %s bar filter payloads', (dtype) => {
     const handleAddFilter = vi.fn();
     render(<VariableRow {...baseProps} profile={{ ...profile, dtype }} handleAddFilter={handleAddFilter} />);
     const datum = { name: 'fallback', fullName: 'full', count: 1, value: 0, rawBin: { start: 0, end: 1, count: 1 } };
     act(() => chart.click?.(datum));
     if (dtype === 'Categorical' || dtype === 'Boolean') expect(handleAddFilter).toHaveBeenCalledWith('age', 0, '==');
-    else if (dtype === 'Numeric') expect(handleAddFilter).toHaveBeenCalledWith('age', 0, '>=');
     else expect(handleAddFilter).not.toHaveBeenCalled();
   });
 

@@ -135,12 +135,13 @@ const PROFILE_TABS = {
     );
   },
   variables: (props: ProfileTabProps) => {
-    const { profile, handleToggleExclude, handleAddFilter } = props;
+    const { profile, handleToggleExclude, handleAddFilter, handleAddFilters } = props;
     return (
       <VariablesTab
         profile={profile}
         handleToggleExclude={handleToggleExclude}
         handleAddFilter={handleAddFilter}
+        handleAddFilters={handleAddFilters}
       />
     );
   },

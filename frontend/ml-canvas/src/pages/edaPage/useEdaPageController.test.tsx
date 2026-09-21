@@ -27,6 +27,25 @@ function mountController(report: EDAReport) {
 }
 
 describe('saved EDA report filters', () => {
+  it('adds a histogram range atomically while preserving existing and applied filters', async () => {
+    // Store subscribers must never observe only one half of the selected range.
+    const { result } = mountController({ id: 11, status: 'COMPLETED', profile_data: profile, config: { filters: savedFilters } });
+    await waitFor(() => expect(result.current.filtersApplied).toEqual(savedFilters));
+    const range: Filter[] = [
+      { column: 'price', operator: '>', value: 1 }, { column: 'price', operator: '<=', value: 2 },
+    ];
+    const observed: Filter[][] = [];
+    const unsubscribe = useEDAStore.subscribe(state => observed.push(state.filtersDraft));
+    try {
+      act(() => result.current.handleAddFilters(range));
+    } finally {
+      unsubscribe();
+    }
+    expect(observed).toEqual([[...savedFilters, ...range]]);
+    expect(result.current.filtersApplied).toEqual(savedFilters);
+    expect(result.current.filtersDirty).toBe(true);
+  });
+
   beforeEach(() => useEDAStore.setState(useEDAStore.getInitialState()));
   afterEach(cleanup);
 
