@@ -325,6 +325,8 @@ export const monitoringApi = {
     },
 
     calculateDrift: async (jobId: string, file: File, datasetName?: string, thresholds?: DriftThresholds): Promise<DriftReport> => {
+        const { validateDriftThresholds } = await import('../utils/driftThresholds');
+        validateDriftThresholds(thresholds ?? {});
         const formData = new FormData();
         formData.append('job_id', jobId);
         formData.append('file', file);

@@ -530,10 +530,10 @@ async def calculate_drift(
     job_id: str = Form(...),
     file: UploadFile = File(...),
     dataset_name: str | None = Form(None),
-    threshold_psi: float | None = Form(None),
-    threshold_ks: float | None = Form(None),
-    threshold_wasserstein: float | None = Form(None),
-    threshold_kl: float | None = Form(None),
+    threshold_psi: float | None = Form(None, ge=0, allow_inf_nan=False),
+    threshold_ks: float | None = Form(None, ge=0, le=1, allow_inf_nan=False),
+    threshold_wasserstein: float | None = Form(None, ge=0, allow_inf_nan=False),
+    threshold_kl: float | None = Form(None, ge=0, allow_inf_nan=False),
     db: AsyncSession = Depends(get_db),
 ) -> EnrichedDriftReport:
     """Compare an uploaded dataset against the reference data stored for a job.
