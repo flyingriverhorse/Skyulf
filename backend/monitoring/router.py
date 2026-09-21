@@ -16,13 +16,15 @@ from typing import Any, Literal, cast
 import pandas as pd
 import polars as pl
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.exceptions.core import SkyulfException
 from backend.middleware.rate_limiter import limiter
+from backend.ml_pipeline.artifacts.discovery import ReferenceArtifact
 from backend.ml_pipeline.artifacts.factory import ArtifactFactory
+from backend.utils.logging_utils import redact_credentials
 
 logger = logging.getLogger(__name__)
 from backend.database.models import (
@@ -132,6 +134,17 @@ def _enrich_drift_job(job: DriftJobOption, db_row: TrainingJob) -> None:
         job.best_metric = _build_drift_metric_summary(metrics)
 
 
+def _drift_reference_sort_key(ref: ReferenceArtifact) -> tuple[bool, datetime, str, str]:
+    """Sort raw artifact timestamps newest first, with deterministic unknown-date ties."""
+    try:
+        created_at = datetime.fromisoformat(ref.created_at or "")
+    except ValueError:
+        return False, datetime.min.replace(tzinfo=UTC), ref.job_id, ref.filename
+    if created_at.tzinfo is None:
+        created_at = created_at.replace(tzinfo=UTC)
+    return True, created_at, ref.job_id, ref.filename
+
+
 @router.get("/jobs", response_model=list[DriftJobOption])
 async def list_drift_jobs(db: AsyncSession = Depends(get_db)):
     """List all jobs that have reference data available for drift calculation.
@@ -148,7 +161,11 @@ async def list_drift_jobs(db: AsyncSession = Depends(get_db)):
             filename=ref.filename,
             created_at=ref.created_at or "Unknown",
         )
-        for ref in ArtifactFactory.get_discovery().list_reference_artifacts()
+        for ref in sorted(
+            ArtifactFactory.get_discovery().list_reference_artifacts(),
+            key=_drift_reference_sort_key,
+            reverse=True,
+        )
     ]
 
     if not found_jobs:
@@ -164,7 +181,6 @@ async def list_drift_jobs(db: AsyncSession = Depends(get_db)):
             _enrich_drift_job(job, db_row)
         jobs.append(job)
 
-    jobs.sort(key=lambda x: x.created_at or "", reverse=True)
     return jobs
 
 
@@ -188,8 +204,8 @@ async def update_job_description(
         meta_raw: dict[str, Any] = cast(dict[str, Any], row.job_metadata or {})
         if not isinstance(meta_raw, dict):
             meta_raw = {}
-        meta_raw["description"] = body.description
-        row.job_metadata = cast(Any, meta_raw)
+        # Replace the JSON value so SQLAlchemy detects the description change.
+        row.job_metadata = {**meta_raw, "description": body.description}
         await db.commit()
         return {"status": "ok"}
 
@@ -406,7 +422,7 @@ def _build_drift_column_summary(report) -> dict[str, Any]:
             metrics_map[m.metric] = m.value
         col_summary[col_name] = {
             "drifted": col_drift.drift_detected,
-            "psi": metrics_map.get("psi"),
+            "psi": metrics_map.get("psi", metrics_map.get("psi_categorical")),
             "wasserstein": metrics_map.get("wasserstein_distance"),
             "ks_statistic": metrics_map.get("ks_statistic"),
             "ks_p_value": metrics_map.get("ks_test_p_value"),
@@ -415,13 +431,19 @@ def _build_drift_column_summary(report) -> dict[str, Any]:
 
 
 async def _find_deployment_context(db: AsyncSession, job_id: str) -> tuple[int | None, str | None]:
-    """Resolve the active deployment id and model-version label for a job, if any.
+    """Resolve the newest active deployment and independent job-version label.
 
-    Returns `(None, None)` when the job has never been deployed — the drift
-    alert still records its evidence, just without a deployment link.
+    Concurrent promotions can leave multiple active rows. Prefer the newest
+    creation time, then highest id to break ties. Undeployed jobs still retain
+    their model-version label; a missing job returns `(None, None)`.
     """
     try:
-        stmt = select(Deployment).where(Deployment.job_id == job_id, Deployment.is_active)
+        stmt = (
+            select(Deployment)
+            .where(Deployment.job_id == job_id, Deployment.is_active)
+            .order_by(Deployment.created_at.desc(), Deployment.id.desc())
+            .limit(1)
+        )
         result = await db.execute(stmt)
         deployment = result.scalar_one_or_none()
 
@@ -523,10 +545,10 @@ async def calculate_drift(
     job_id: str = Form(...),
     file: UploadFile = File(...),
     dataset_name: str | None = Form(None),
-    threshold_psi: float | None = Form(None),
-    threshold_ks: float | None = Form(None),
-    threshold_wasserstein: float | None = Form(None),
-    threshold_kl: float | None = Form(None),
+    threshold_psi: float | None = Form(None, ge=0, allow_inf_nan=False),
+    threshold_ks: float | None = Form(None, ge=0, le=1, allow_inf_nan=False),
+    threshold_wasserstein: float | None = Form(None, ge=0, allow_inf_nan=False),
+    threshold_kl: float | None = Form(None, ge=0, allow_inf_nan=False),
     db: AsyncSession = Depends(get_db),
 ) -> EnrichedDriftReport:
     """Compare an uploaded dataset against the reference data stored for a job.
@@ -888,6 +910,12 @@ class ErrorEventResponse(BaseModel):
     # Derived, not stored — see `_classify_error_severity`.
     severity: str
 
+    @field_validator("message", "traceback", mode="before")
+    @classmethod
+    def redact_diagnostics(cls, value: str | None) -> str | None:
+        """Hide credentials in legacy error rows without mutating stored history."""
+        return redact_credentials(value) if value is not None else None
+
 
 class ErrorCountResponse(BaseModel):
     """Result of `GET /errors/count`: how many events are still unresolved."""
@@ -1184,8 +1212,8 @@ async def get_error_timeline(
     """Return error count bucketed by hour for the last N hours.
 
     Returns a list of ``{ hour: <ISO string>, count: N }`` entries,
-    one per hour slot, oldest first. Slots with zero events are included
-    so the chart always has a complete x-axis.
+    one per hour slot, oldest first. The inclusive rolling window spans N+1
+    slots: its first and current hours can be partial. Zero slots are included.
     """
     from backend.config import get_settings as _get_settings
 
@@ -1195,12 +1223,15 @@ async def get_error_timeline(
     now = datetime.now(UTC)
     cutoff = now - timedelta(hours=hours)
 
-    stmt = select(ErrorEvent.created_at).where(ErrorEvent.created_at >= cutoff)
+    stmt = select(ErrorEvent.created_at).where(
+        ErrorEvent.created_at >= _normalize_since_for_naive_column(cutoff),
+        ErrorEvent.created_at <= _normalize_since_for_naive_column(now),
+    )
     result = await db.execute(stmt)
     timestamps = [row[0] for row in result.all()]
 
     # Build a zero-filled bucket dict: { slot_iso: count }
-    buckets = _build_zero_filled_hour_buckets(cutoff, hours)
+    buckets = _build_zero_filled_hour_buckets(cutoff, hours + 1)
     _fill_error_buckets(buckets, timestamps)
 
     return [ErrorTimelineEntry(hour=h, count=c) for h, c in sorted(buckets.items())]

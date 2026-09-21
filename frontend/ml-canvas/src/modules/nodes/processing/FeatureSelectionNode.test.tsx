@@ -129,14 +129,15 @@ describe('Feature Selection settings', () => {
     ['select_percentile', 'Percentile', 'percentile'],
     ['select_from_model', 'Max Features', 'max_features'],
     ['rfe', 'Step', 'step'],
-  ] as const)('preserves zero and the last valid integer for %s', (method, label, field) => {
-    // Clearing a numeric field during editing retains the existing safe-parser fallback.
+  ] as const)('preserves numeric drafts without silent truncation for %s', (method, label, field) => {
+    /** Invalid required drafts block Run; optional caps can be explicitly cleared. */
     const { onChange } = renderSettings({ method, [field]: 0 });
     const input = screen.getByRole('spinbutton', { name: label });
     expect(input).toHaveValue(0);
     fireEvent.change(input, { target: { value: '12.9' } });
+    expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ [field]: 12.9 }));
     fireEvent.change(input, { target: { value: '' } });
-    expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ [field]: 12 }));
+    expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ [field]: field === 'max_features' ? undefined : Number.NaN }));
   });
 
   it.each([

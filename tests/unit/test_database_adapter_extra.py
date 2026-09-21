@@ -46,6 +46,7 @@ class TestGetDbTypeFromUrl:
         [
             ("postgresql://u:p@host/db", adapter.DatabaseType.POSTGRES),
             ("postgresql+asyncpg://u:p@host/db", adapter.DatabaseType.POSTGRES),
+            ("postgresql+psycopg2://u:p@host/db", adapter.DatabaseType.POSTGRES),
             ("sqlite:///file.db", adapter.DatabaseType.SQLITE),
             ("sqlite+aiosqlite:///file.db", adapter.DatabaseType.SQLITE),
             ("mysql://u:p@host/db", adapter.DatabaseType.MYSQL),
@@ -62,8 +63,14 @@ class TestGetDbTypeFromUrl:
             adapter.get_db_type_from_url("snowflake://account/db") == adapter.DatabaseType.SNOWFLAKE
         )
 
-    def test_unrecognized_url_defaults_to_sqlite(self):
-        assert adapter.get_db_type_from_url("some-random-string") == adapter.DatabaseType.SQLITE
+    @pytest.mark.parametrize(
+        "url", ["some-random-string", "unknown://user:secret@host/db", "unknown://snowflake/db"]
+    )
+    def test_unrecognized_url_raises_without_echoing_credentials(self, url):
+        """An unsupported connection must not silently select SQLite or leak its URL."""
+        with pytest.raises(ValueError, match="Unsupported database URL scheme") as error:
+            adapter.get_db_type_from_url(url)
+        assert "secret" not in str(error.value)
 
     def test_get_db_type_uses_settings_database_url(self):
         settings = _fake_settings(DATABASE_URL="mysql://u:p@host/db")
@@ -208,6 +215,33 @@ class TestSnowflakeConnection:
 
 
 class TestAsyncSessionOrConnection:
+    @pytest.mark.parametrize(
+        "url,db_type",
+        [
+            ("postgresql://u:p@host/db", adapter.DatabaseType.POSTGRES),
+            ("postgresql+asyncpg://u:p@host/db", adapter.DatabaseType.POSTGRES),
+            ("postgresql+psycopg2://u:p@host/db", adapter.DatabaseType.POSTGRES),
+            ("sqlite:///x.db", adapter.DatabaseType.SQLITE),
+            ("sqlite+aiosqlite:///x.db", adapter.DatabaseType.SQLITE),
+        ],
+    )
+    async def test_driver_url_selects_its_backend_factory(self, monkeypatch, url, db_type):
+        """Data-source consumers use this dispatcher, so test selection beyond the helper."""
+        from contextlib import asynccontextmanager
+
+        sentinel = object()
+
+        @asynccontextmanager
+        async def factory(settings, cfg):
+            """Stand in for the selected driver without requiring a remote database."""
+            yield sentinel
+
+        monkeypatch.setitem(adapter._CONNECTION_FACTORIES, db_type, factory)
+        async with adapter.async_session_or_connection(
+            _fake_settings(DATABASE_URL=url)
+        ) as resource:
+            assert resource is sentinel
+
     async def test_unsupported_db_type_raises(self, monkeypatch):
         monkeypatch.setattr(adapter, "get_db_type", lambda settings: "not-a-real-db-type")
         settings = _fake_settings()

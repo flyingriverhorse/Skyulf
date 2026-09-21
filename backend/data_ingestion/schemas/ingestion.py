@@ -11,6 +11,8 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from backend.utils.logging_utils import redact_error_details
+
 # Keys inside `config` that should never be sent to clients.
 _SENSITIVE_CONFIG_KEYS = frozenset(
     {
@@ -65,6 +67,12 @@ class IngestionStatus(BaseModel):
     details: dict[str, Any] | None = None
     updated_at: datetime
 
+    @field_validator("error", "details", mode="before")
+    @classmethod
+    def redact_diagnostics(cls, value: Any) -> Any:
+        """Protect stored status diagnostics, including records written before redaction."""
+        return redact_error_details(value)
+
 
 class DataSourceRead(BaseModel):
     """Client-safe view of a ``DataSource`` row.
@@ -88,6 +96,14 @@ class DataSourceRead(BaseModel):
     rows: int | None = None
     columns: int | None = None
     size_bytes: int | None = None
+
+    @field_validator("source_metadata", mode="before")
+    @classmethod
+    def redact_ingestion_diagnostics(cls, value: Any) -> Any:
+        """Copy and scrub ingestion status without changing user data in the profile."""
+        if isinstance(value, dict) and "ingestion_status" in value:
+            return {**value, "ingestion_status": redact_error_details(value["ingestion_status"])}
+        return value
 
     @field_validator("config", mode="before")
     @classmethod

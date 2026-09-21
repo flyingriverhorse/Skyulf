@@ -1,5 +1,19 @@
 import type { DriftReport } from '../../../core/api/monitoring';
 
+function getRisk(
+    featureImportances: DriftReport['feature_importances'],
+    importance: number | undefined,
+    driftDetected: boolean,
+    rank: number | null,
+): string {
+    if (featureImportances && importance == null) return 'Unknown';
+    if (driftDetected && rank != null) {
+        if (rank <= 5) return 'High';
+        return rank <= 15 ? 'Medium' : 'Low';
+    }
+    return featureImportances ? 'Low' : '';
+}
+
 /**
  * Serialise the (threshold-evaluated) drift report to CSV and trigger a
  * browser download. Includes per-feature importance and risk class when the
@@ -18,19 +32,12 @@ export function exportDriftReportCSV(report: DriftReport, datasetName: string | 
         ...(fi ? ['Importance', 'Risk'] : []),
     ];
     const rows = Object.values(report.column_drifts).map(col => {
-        const get = (m: string) => col.metrics.find(x => x.metric === m)?.value?.toFixed(6) ?? '';
+        const get = (m: string) => col.metrics.find(
+            x => x.metric === m || (m === 'psi' && x.metric === 'psi_categorical'),
+        )?.value?.toFixed(6) ?? '';
         const importance = fi?.[col.column];
-        const rank = fi ? Object.values(fi).filter(v => v > (importance ?? 0)).length + 1 : null;
-        const risk =
-            col.drift_detected && rank != null
-                ? rank <= 5
-                    ? 'High'
-                    : rank <= 15
-                    ? 'Medium'
-                    : 'Low'
-                : fi
-                ? 'Low'
-                : '';
+        const rank = fi && importance != null ? Object.values(fi).filter(v => v > importance).length + 1 : null;
+        const risk = getRisk(fi, importance, col.drift_detected, rank);
         return [
             col.column,
             col.drift_detected ? 'Drifted' : 'Stable',
@@ -42,7 +49,7 @@ export function exportDriftReportCSV(report: DriftReport, datasetName: string | 
             ...(fi ? [importance?.toFixed(6) ?? '', risk] : []),
         ];
     });
-    const csv = [headers, ...rows].map(r => r.map(c => `"${c}"`).join(',')).join('\n');
+    const csv = [headers, ...rows].map(r => r.map(c => `"${c.replace(/"/g, '""')}"`).join(',')).join('\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');

@@ -8,9 +8,14 @@ under the ``skyulf.*`` logger tree while a pipeline is running, tagged
 with the currently-executing node id, so the engine can return them on
 ``PipelineExecutionResult.node_warnings`` and the UI can surface them as
 toasts / a notification panel.
+
+Only the active execution context receives a record. Unrelated threads,
+including workers that do not propagate context variables, retain normal
+server logging but are not attributed to an arbitrary pipeline run.
 """
 
 import logging
+from contextvars import ContextVar, Token
 from typing import Any
 
 # Logger trees we want to mirror to the user. ``skyulf`` covers all
@@ -18,6 +23,7 @@ from typing import Any
 # engine-level advisories that aren't already routed via merge_warnings.
 _CAPTURED_LOGGERS = ("skyulf", "backend.ml_pipeline")
 logger = logging.getLogger(__name__)
+_active_capture: ContextVar[object | None] = ContextVar("pipeline_warning_capture", default=None)
 
 
 class WarningCaptureHandler(logging.Handler):
@@ -39,6 +45,7 @@ class WarningCaptureHandler(logging.Handler):
         self._current_node_type: str | None = None
         # Track which loggers we attached to so we can detach cleanly.
         self._attached: list[logging.Logger] = []
+        self._context_token: Token[object | None] | None = None
 
     # ------------------------------------------------------------------
     # Engine integration
@@ -70,6 +77,8 @@ class WarningCaptureHandler(logging.Handler):
         ``handleError`` and is dropped, because a logging handler that threw
         would take the pipeline run down with it.
         """
+        if _active_capture.get() is not self or not self._attached:
+            return
         try:
             msg = record.getMessage()
         except Exception:  # noqa: BLE001 - logging handler emit must never raise
@@ -94,6 +103,9 @@ class WarningCaptureHandler(logging.Handler):
 
         Returns self so callers can use it as a context manager.
         """
+        if self._attached:
+            return self
+        self._context_token = _active_capture.set(self)
         for name in _CAPTURED_LOGGERS:
             lg = logging.getLogger(name)
             lg.addHandler(self)
@@ -117,6 +129,9 @@ class WarningCaptureHandler(logging.Handler):
                     exc_info=True,
                 )
         self._attached.clear()
+        if self._context_token is not None:
+            _active_capture.reset(self._context_token)
+            self._context_token = None
 
     # Context-manager sugar so engine code can do ``with handler.attach():``.
     def __enter__(self) -> "WarningCaptureHandler":

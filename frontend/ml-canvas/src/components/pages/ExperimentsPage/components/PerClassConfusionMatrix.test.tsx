@@ -37,6 +37,17 @@ const evaluationData: Extract<EvaluationData, { problem_type: 'classification' |
 const noop = async () => {};
 
 describe('PerClassConfusionMatrix — tuned threshold redraw', () => {
+  it('shows an actionable error instead of rendering invalid multiclass scores', () => {
+    /** Invalid saved thresholds must not crash the page or display misleading matrices. */
+    render(<PerClassConfusionMatrix
+      evaluationData={evaluationData} selectedRocClass={null} threshold={0.5}
+      showTrainMetrics showTestMetrics={false} showValMetrics={false}
+      handleDownload={noop} downloadingChart={null} doneChart={null}
+      tunedThresholds={{ a: 0, b: 0.5, c: 0.5 }} useTunedThresholds
+    />);
+    expect(screen.getByRole('alert')).toHaveTextContent(/finite.*greater than 0/i);
+    expect(screen.queryByTitle('a vs Rest')).not.toBeInTheDocument();
+  });
   it('uses the existing applyThreshold path when the new props are omitted', () => {
     render(
       <PerClassConfusionMatrix

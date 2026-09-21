@@ -7,6 +7,7 @@ import { thresholdTuningApi } from '../../core/api/thresholdTuning';
 import { deploymentApi } from '../../core/api/deployment';
 import { jobsApi } from '../../core/api/jobs';
 import { DatasetService } from '../../core/api/datasets';
+import { toast } from '../../core/toast';
 
 vi.mock('../../core/api/thresholdTuning', async () => {
   const actual = await vi.importActual<typeof import('../../core/api/thresholdTuning')>(
@@ -254,6 +255,45 @@ const renderInferencePage = () =>
   );
 
 describe('InferencePage input and result contracts', () => {
+  it('uploads quoted CSV and submits intact rows without the target column', async () => {
+    // FileReader, exclusion and prediction submission must agree on actual imported cells.
+    mockedDeploymentApi.getActive.mockResolvedValue({
+      ...activeDeployment,
+      input_schema: [{ name: 'amount', type: 'float64' }, { name: 'note,detail', type: 'string' }],
+    });
+    mockedDeploymentApi.predict.mockResolvedValue({ predictions: [10, 20], model_version: 'v1' });
+    const { container } = renderInferencePage();
+    await waitFor(() => expect(mockedJobsApi.getJob).toHaveBeenCalledWith('job-2'));
+    const csv = 'amount,"note,detail",target\r\n1.5,"first,line\r\nsaid ""hi""",yes\r\n2,"",no';
+    fireEvent.change(container.querySelector('input[type="file"]')!, {
+      target: { files: [new File([csv], 'quoted.csv', { type: 'text/csv' })] },
+    });
+    const expected = [{ amount: 1.5, 'note,detail': 'first,line\r\nsaid "hi"' }, { amount: 2, 'note,detail': '' }];
+    await waitFor(() => expect(JSON.parse((screen.getByLabelText(/Input Data/) as HTMLTextAreaElement).value)).toEqual(expected));
+    fireEvent.click(screen.getByRole('button', { name: 'Run Prediction' }));
+    await waitFor(() => expect(mockedDeploymentApi.predict).toHaveBeenCalled());
+    expect(mockedDeploymentApi.predict.mock.calls[0]?.[0]).toEqual(expected);
+  });
+
+  it('rejects malformed CSV with a row diagnostic and preserves existing input', async () => {
+    // Invalid files must not replace editable data with shifted or truncated columns.
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      const { container } = renderInferencePage();
+      await waitFor(() => expect(mockedJobsApi.getJob).toHaveBeenCalledWith('job-2'));
+      const editor = screen.getByLabelText(/Input Data/) as HTMLTextAreaElement;
+      fireEvent.change(editor, { target: { value: '[{"feature1":9}]' } });
+      fireEvent.change(container.querySelector('input[type="file"]')!, {
+        target: { files: [new File(['feature1,target\n1,2,3'], 'bad.csv', { type: 'text/csv' })] },
+      });
+      await waitFor(() => expect(toast.error).toHaveBeenCalledWith(expect.stringMatching(/(?:row|record)\s*2/i)));
+      expect(editor.value).toBe('[{"feature1":9}]');
+      expect(mockedDeploymentApi.predict).not.toHaveBeenCalled();
+    } finally {
+      log.mockRestore();
+    }
+  });
+
   /** Samples must retain only deployed features and zero-fill missing schema keys. */
   it('projects dataset samples onto the deployment schema at the selected sample size', async () => {
     mockedDeploymentApi.getActive.mockResolvedValue({

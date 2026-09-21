@@ -42,13 +42,14 @@ class DatabaseType:
     SNOWFLAKE = "snowflake"
 
 
-# Maps DB type -> tuple of recognized URL prefixes, checked in order.
-_URL_PREFIX_TYPES: tuple[tuple[str, tuple[str, ...]], ...] = (
-    (DatabaseType.POSTGRES, ("postgresql://", "postgresql+asyncpg://")),
-    (DatabaseType.SQLITE, ("sqlite://", "sqlite+aiosqlite://")),
-    (DatabaseType.MYSQL, ("mysql://", "mysql+aiomysql://")),
-    (DatabaseType.MONGODB, ("mongodb://", "mongodb+srv://")),
-)
+# Backend family does not depend on the optional driver suffix.
+_URL_SCHEME_TYPES = {
+    "postgresql": DatabaseType.POSTGRES,
+    "sqlite": DatabaseType.SQLITE,
+    "mysql": DatabaseType.MYSQL,
+    "mongodb": DatabaseType.MONGODB,
+    "snowflake": DatabaseType.SNOWFLAKE,
+}
 
 
 def get_db_type_from_url(database_url: str) -> str:
@@ -59,16 +60,16 @@ def get_db_type_from_url(database_url: str) -> str:
 
     Returns:
         str: Database type identifier
+
+    Raises:
+        ValueError: The URL scheme is absent or unsupported. Driver availability
+            and async compatibility are validated when the connection is opened.
     """
-    for db_type, prefixes in _URL_PREFIX_TYPES:
-        if database_url.startswith(prefixes):
-            return db_type
-
-    if "snowflake" in database_url.lower():
-        return DatabaseType.SNOWFLAKE
-
-    # Default fallback
-    return DatabaseType.SQLITE
+    scheme, separator, _ = database_url.partition("://")
+    backend = scheme.lower().split("+", 1)[0]
+    if separator and backend in _URL_SCHEME_TYPES:
+        return _URL_SCHEME_TYPES[backend]
+    raise ValueError("Unsupported database URL scheme")
 
 
 def get_db_type(settings: Settings) -> str:

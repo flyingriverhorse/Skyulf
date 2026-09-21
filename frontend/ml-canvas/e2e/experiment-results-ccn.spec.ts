@@ -80,6 +80,26 @@ test.beforeEach(async ({ page }) => {
   await page.getByRole('tab', { name: 'Experiments', exact: true }).click();
 });
 
+test('relative-error tails remain visible and excluded rows are explained', async ({ page }) => {
+  // Extreme errors and undefined ratios must remain accounted for in the real chart.
+  await page.route('**/api/pipeline/jobs/ccn-regressor/evaluation', route => route.fulfill({ json: {
+    problem_type: 'regression', splits: {
+      test: { y_true: [1, 1, 0, 1e-12], y_pred: [-3, 5, 1, 1] },
+    },
+  } }));
+  await page.getByText('CCN regression dataset', { exact: false }).click();
+  await page.getByRole('button', { name: 'Model Evaluation', exact: true }).click();
+  const chart = page.locator('#test-rel-err');
+  await expect(chart).toContainText('2 included; 2 excluded');
+  await expect(chart).toContainText('Tail bins retain errors outside ±200%.');
+  await chart.scrollIntoViewIfNeeded();
+  const positiveBars = chart.locator('.recharts-bar-rectangle path');
+  await expectRenderedShapes(chart, '.recharts-bar-rectangle path', 2);
+  await positiveBars.last().hover();
+  await expect(chart.locator('.recharts-tooltip-wrapper')).toContainText('Range: > 200%');
+  await expect(chart.locator('.recharts-tooltip-wrapper')).toContainText('Count: 1');
+});
+
 /** Wait for drawn SVG shapes to have stable, visible geometry after Recharts animation. */
 async function expectRenderedShapes(chart: Locator, selector: string, count: number) {
   await chart.scrollIntoViewIfNeeded();

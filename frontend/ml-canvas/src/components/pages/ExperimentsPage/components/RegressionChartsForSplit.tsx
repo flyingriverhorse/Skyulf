@@ -222,25 +222,26 @@ export const RegressionChartsForSplit: React.FC<Props> = ({
 
       {/* 5. Relative Error Histogram */}
       {relHist && (
-        <div className="h-[260px] relative group" id={`${splitName}-rel-err`}>
+        <div className="h-[300px] relative group" id={`${splitName}-rel-err`}>
           {downloadBtn(`${splitName}-rel-err`, `${splitName}_relative_error`)}
           <h5 className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 text-center flex items-center justify-center gap-1">
             Relative Error Distribution
-            <InfoTooltip text="Histogram of (Predicted − Actual) / |Actual|. Shows proportional error, useful when targets span orders of magnitude. Capped at ±200% for readability. A spike at 0 = accurate; wide spread = inconsistent predictions." align="center" size="sm" />
+            <InfoTooltip text="Histogram of (Predicted − Actual) / |Actual|, shown as percentages. Errors below -200% and above 200% are counted in separate tail bins. Actual values with magnitude ≤ 1e-9 and non-finite or missing pairs/ratios are excluded. A spike at 0 = accurate; wide spread = inconsistent predictions." align="center" size="sm" />
           </h5>
-          <ResponsiveContainer width="100%" height="88%">
-            <BarChart data={relHist} margin={{ top: 5, right: 20, bottom: 28, left: 30 }}>
+          <p className="text-xs text-center text-gray-500 mb-2">{relHist.included} included; {relHist.excluded} excluded (near-zero actual or invalid pair/ratio). Tail bins retain errors outside ±200%.</p>
+          <ResponsiveContainer width="100%" height="75%">
+            <BarChart data={relHist.bins} margin={{ top: 5, right: 20, bottom: 28, left: 30 }}>
               <CartesianGrid strokeDasharray="3 3" opacity={0.15} />
               <XAxis dataKey="label" tick={{ fontSize: 10 }} label={{ value: 'Relative Error (Predicted − Actual) / |Actual|', position: 'insideBottom', offset: -8, fontSize: 11, fill: '#9ca3af' }} />
               <YAxis tick={{ fontSize: 10 }} label={{ value: 'Count', angle: -90, position: 'insideLeft', style: { textAnchor: 'middle' }, fontSize: 11, fill: '#9ca3af' }} />
               <Tooltip content={({ active, payload }) => {
                 if (active && payload?.length) {
                   const p = payload[0]!;
-                  return <div className="bg-white dark:bg-gray-800 p-2 border border-gray-200 dark:border-gray-700 shadow-sm rounded text-xs"><p>Bin ≥ <span className="font-mono">{String(p.payload.label)}</span></p><p>Count: <span className="font-mono font-semibold">{String(p.value)}</span></p></div>;
+                  return <div className="bg-white dark:bg-gray-800 p-2 border border-gray-200 dark:border-gray-700 shadow-sm rounded text-xs"><p>Range: <span className="font-mono">{String(p.payload.range)}</span></p><p>Count: <span className="font-mono font-semibold">{String(p.value)}</span></p></div>;
                 }
                 return null;
               }} />
-              <ReferenceLine x={relHist.find(b => Number.parseFloat(b.label) >= 0)?.label ?? ''} stroke="#ef4444" strokeDasharray="3 3" strokeWidth={1.5} label={{ value: '0', position: 'top', fontSize: 10, fill: '#ef4444' }} />
+              <ReferenceLine x={relHist.bins.find(b => Number.parseFloat(b.label) >= 0)?.label ?? ''} stroke="#ef4444" strokeDasharray="3 3" strokeWidth={1.5} label={{ value: '0', position: 'top', fontSize: 10, fill: '#ef4444' }} />
               <Bar dataKey="count" fill="#fbbf24" fillOpacity={0.8} isAnimationActive={false} />
             </BarChart>
           </ResponsiveContainer>

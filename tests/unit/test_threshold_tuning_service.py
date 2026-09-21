@@ -2,17 +2,21 @@
 
 from unittest.mock import AsyncMock, patch
 
+import pandas as pd
 import pytest
 import pytest_asyncio
+from sklearn.dummy import DummyClassifier
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 
 from backend.database.models import Base, TrainingJob
+from backend.ml_pipeline._execution.strategies import JobStrategy
 from backend.ml_pipeline._services.threshold_tuning_service import (
     ThresholdTuningError,
     ThresholdTuningService,
 )
+from backend.ml_pipeline.deployment.service import DeploymentService
 
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
 
@@ -384,6 +388,62 @@ async def test_save_toggle_clear_round_trip(async_session):
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("invalid", [0.0, -0.1, float("nan"), float("inf"), -float("inf")])
+async def test_save_rejects_invalid_multiclass_denominators(async_session, invalid):
+    """An invalid multiclass set must not replace an existing valid saved threshold configuration."""
+    await _insert_job(async_session, "threshold-contract")
+    valid = {"2": 4.0, "0": 2.0, "1": 3.0}
+    await ThresholdTuningService.save(
+        async_session, "threshold-contract", valid, [0, 1, 2], "f1", "validation"
+    )
+    with pytest.raises(ThresholdTuningError, match="threshold"):
+        await ThresholdTuningService.save(
+            async_session,
+            "threshold-contract",
+            {"0": 1.0, "1": invalid, "2": 1.0},
+            [0, 1, 2],
+            "f1",
+            "validation",
+        )
+    async_session.expire_all()
+    saved = await ThresholdTuningService.get_saved(async_session, "threshold-contract")
+    assert saved["thresholds"] == valid
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "labels, thresholds, expected",
+    [
+        (["no", "yes"], {"yes": 0.0, "no": 1.0}, ["yes", "yes"]),
+        (["no", "yes"], {"yes": 1.0, "no": 0.0}, ["no", "no"]),
+        (["z", "a", "m"], {"z": 4.0, "m": 2.0, "a": 3.0}, ["m", "m", "m"]),
+    ],
+)
+async def test_saved_thresholds_round_trip_into_real_estimator_predictions(
+    async_session, labels, thresholds, expected
+):
+    """Persisted binary endpoints and positive multiclass weights must reach serving unchanged."""
+    await _insert_job(async_session, "threshold-serving")
+    features = pd.DataFrame({"x": range(len(labels))})
+    estimator = DummyClassifier(strategy="prior").fit(features, labels)
+    await ThresholdTuningService.save(
+        async_session, "threshold-serving", thresholds, labels, "f1", "validation"
+    )
+    async_session.expire_all()
+    job = (
+        await async_session.execute(
+            select(TrainingJob).where(TrainingJob.id == "threshold-serving")
+        )
+    ).scalar_one()
+    resolved = DeploymentService._resolve_thresholds_for_predict(None, job, estimator.classes_)
+    predictions, applied = DeploymentService._predict_and_decode(
+        estimator, features, None, None, thresholds=resolved
+    )
+    assert predictions == expected
+    assert applied == thresholds
+
+
+@pytest.mark.asyncio
 async def test_toggle_raises_when_no_saved_thresholds(async_session):
     """toggle() raises ThresholdTuningError when the job has no saved tuned thresholds yet."""
     await _insert_job(async_session, "job-3")
@@ -559,3 +619,81 @@ async def test_legacy_roc_auc_thresholds_remain_readable_and_toggleable(async_se
     cleared = await ThresholdTuningService.get_saved(async_session, "legacy-job")
     assert cleared["thresholds"] is None
     assert cleared["enabled"] is False
+
+
+@pytest.mark.asyncio
+async def test_training_provenance_survives_preview_but_not_manual_save(async_session):
+    """A newly saved preview must never inherit the replaced training set's provenance."""
+    await _insert_job(async_session, "provenance-job")
+    job = await async_session.get(TrainingJob, "provenance-job")
+    assert job is not None
+    JobStrategy._seed_tuned_thresholds(
+        job,
+        {
+            "decision_thresholds": {"0": 0.6, "1": 0.4},
+            "decision_threshold_metric": "f1",
+        },
+    )
+    await async_session.commit()
+    async_session.expire_all()
+    seeded = await ThresholdTuningService.get_saved(async_session, "provenance-job")
+    assert seeded["source"] == "training"
+
+    with patch(
+        "backend.ml_pipeline._services.threshold_tuning_service.EvaluationService"
+        "._load_raw_evaluation_data",
+        new=AsyncMock(return_value=(_fake_binary_evaluation_data(), None)),
+    ):
+        preview = await ThresholdTuningService.preview(
+            async_session, "provenance-job", "balanced_accuracy"
+        )
+
+    assert "source" not in preview
+    async_session.expire_all()
+    assert await ThresholdTuningService.get_saved(async_session, "provenance-job") == seeded
+
+    await ThresholdTuningService.save(async_session, "provenance-job", **preview)
+    async_session.expire_all()
+    saved = await ThresholdTuningService.get_saved(async_session, "provenance-job")
+    assert saved["source"] is None
+    assert saved["thresholds"] == preview["thresholds"]
+    assert saved["metric"] == "balanced_accuracy"
+    assert saved["enabled"] is True
+
+    for enabled in (False, True):
+        await ThresholdTuningService.toggle(async_session, "provenance-job", enabled)
+        async_session.expire_all()
+        toggled = await ThresholdTuningService.get_saved(async_session, "provenance-job")
+        assert toggled == {**saved, "enabled": enabled}
+
+    await ThresholdTuningService.clear(async_session, "provenance-job")
+    async_session.expire_all()
+    cleared = await ThresholdTuningService.get_saved(async_session, "provenance-job")
+    assert cleared["source"] is None
+    assert cleared["thresholds"] is None
+    assert cleared["enabled"] is False
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("source_fields", [{}, {"source": None}])
+async def test_legacy_threshold_provenance_stays_unknown(async_session, source_fields):
+    """Missing and explicit null provenance remain readable without inventing an origin."""
+    await _insert_job(async_session, "legacy-provenance-job")
+    job = await async_session.get(TrainingJob, "legacy-provenance-job")
+    assert job is not None
+    job.tuned_thresholds = {
+        "thresholds": {"0": 0.6, "1": 0.4},
+        "classes": [0, 1],
+        "metric": "f1",
+        "split_used": "validation",
+        **source_fields,
+    }
+    await async_session.commit()
+
+    for enabled in (True, False):
+        await ThresholdTuningService.toggle(async_session, "legacy-provenance-job", enabled)
+        async_session.expire_all()
+        saved = await ThresholdTuningService.get_saved(async_session, "legacy-provenance-job")
+        assert saved["source"] is None
+        assert saved["thresholds"] == {"0": 0.6, "1": 0.4}
+        assert saved["enabled"] is enabled

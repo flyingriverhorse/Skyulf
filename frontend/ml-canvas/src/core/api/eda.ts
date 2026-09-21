@@ -17,6 +17,8 @@ export interface DecompositionFilter extends Omit<Filter, 'value'> {
 export interface EDAReport {
     id?: number;
     status?: 'PENDING' | 'COMPLETED' | 'FAILED' | string;
+    /** Persisted analysis inputs; omitted filters mean an unfiltered report. */
+    config?: { filters?: Filter[] | null; [extra: string]: unknown } | null;
     profile_data?: EDAProfile & {
         excluded_columns?: string[];
         task_type?: string;

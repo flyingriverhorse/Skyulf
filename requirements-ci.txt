@@ -5,6 +5,7 @@
 -e ./skyulf-core
 
 fastapi>=0.104.0,<1.0.0
+anyio>=4.14.2,<5.0.0                 # Security floor for TLS and process-pool fixes
 uvicorn>=0.24.0,<1.0.0
 pydantic>=2.4.0,<3.0.0
 pydantic-settings>=2.0.0,<3.0.0
@@ -45,6 +46,8 @@ pytest-cov>=4.1.0,<8.0.0
 hypothesis>=6.100,<7.0.0
 syrupy>=4.0.0
 pytest-benchmark>=5.0.0,<6.0.0
+ipython>=8.18.1                       # Imported by full executable notebook exports
+jinja2>=3.1.6                         # Required by pandas Styler in compact notebook exports
 ruff>=0.15,<1.0                     # >=0.15 for PLC0415 (F-11 deferred-import enforcement)
 lizard>=1.23.0
 ty>=0.0.55,<0.0.76

@@ -162,7 +162,12 @@ class TemporalMixin(_AnalyzerState):
             for row in moy_df.iter_rows(named=True)
         ]
 
-        return SeasonalityStats(day_of_week=dow_stats, month_of_year=moy_stats)
+        return SeasonalityStats(
+            day_of_week=dow_stats,
+            month_of_year=moy_stats,
+            aggregation="mean" if cols_to_track else "count",
+            metric=cols_to_track[0] if cols_to_track else None,
+        )
 
     @staticmethod
     def _prepare_temporal_series(

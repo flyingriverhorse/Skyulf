@@ -3,6 +3,7 @@ import { AlertTriangle } from 'lucide-react';
 import { InfoTooltip } from '../../ui/InfoTooltip';
 import { EmptyState } from '../../shared/EmptyState';
 import type { EDAProfile, OutlierAnalysis } from '../../../core/types/edaProfile';
+import { formatStatistic } from '../formatStatistic';
 
 interface OutliersTabProps {
     profile: EDAProfile;
@@ -34,10 +35,13 @@ function outlierPopulation(data: OutlierAnalysis) {
 
 /** Display outlier results with the measured row population and row-level explanations. */
 export const OutliersTab: React.FC<OutliersTabProps> = ({ profile }) => {
-    if (!profile?.outliers?.top_outliers?.length) {
-        return <EmptyState icon={<AlertTriangle className="w-12 h-12 text-slate-300 dark:text-slate-600" />} title="No Outlier Data" description="Outlier analysis did not return any results." />;
+    if (!profile?.outliers) {
+        return <EmptyState icon={<AlertTriangle className="w-12 h-12 text-slate-300 dark:text-slate-600" />} title="Outlier analysis unavailable" description="This report contains no outlier analysis. No reason was recorded." />;
     }
     const population = outlierPopulation(profile.outliers);
+    if (profile.outliers.total_outliers === 0 && profile.outliers.top_outliers.length === 0) {
+        return <EmptyState title="No outliers detected" description={population.description} />;
+    }
 
     return (
         <div className="mt-4 bg-white dark:bg-gray-800 p-6 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm">
@@ -73,6 +77,7 @@ export const OutliersTab: React.FC<OutliersTabProps> = ({ profile }) => {
                         </tr>
                     </thead>
                     <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                        {profile.outliers.top_outliers.length === 0 && <tr><td colSpan={3} className="px-4 py-3 text-sm text-gray-500">Row-level details are unavailable for this saved report.</td></tr>}
                         {profile.outliers.top_outliers.map((outlier) => (
                             <tr key={outlier.index} className="hover:bg-gray-50 dark:hover:bg-gray-700">
                                 <td className="px-4 py-3 text-sm font-mono text-gray-500">{outlier.index}</td>
@@ -83,9 +88,9 @@ export const OutliersTab: React.FC<OutliersTabProps> = ({ profile }) => {
                                             {outlier.explanation.map((exp, i) => (
                                                 <div key={i} className="text-xs">
                                                     <span className="font-semibold text-gray-700 dark:text-gray-300">{exp.feature}:</span>{' '}
-                                                    <span className="text-red-600 dark:text-red-400">{exp.value.toFixed(2)}</span>{' '}
+                                                    <span className="text-red-600 dark:text-red-400">{formatStatistic(exp.value, 2)}</span>{' '}
                                                     <span className="text-gray-400">
-                                                        (Median: {exp.median.toFixed(2)}, Diff: {exp.diff_pct.toFixed(0)}%)
+                                                        (Median: {formatStatistic(exp.median, 2)}, Diff: {formatStatistic(exp.diff_pct, 0, '%')})
                                                     </span>
                                                 </div>
                                             ))}

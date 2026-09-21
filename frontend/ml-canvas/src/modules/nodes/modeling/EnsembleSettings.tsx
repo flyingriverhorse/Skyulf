@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo, useId } from 'react';
+import { useValidationReveal } from '../../../components/shared/ValidationField';
 import { Boxes, Info, X } from 'lucide-react';
 import { useIsWideContainer } from '../../../core/hooks/useIsWideContainer';
 import { useTrainingNodeContext } from '../../../core/hooks/useTrainingNodeContext';
@@ -72,6 +73,7 @@ export function EnsembleSettings({ config, onChange, nodeId }: {
   // columns instead of one long scroll; the sidebar stays single-column.
   const [containerRef, isWide] = useIsWideContainer(560);
   const [showCV, setShowCV] = useState(false);
+  useValidationReveal((field) => { if (field.startsWith('cv_')) setShowCV(true); });
   const [showBaseParams, setShowBaseParams] = useState(false);
   const [showInfo, setShowInfo] = useState(() => !sessionStorage.getItem('hide_info_ensemble'));
   const { availableColumns, upstreamTarget, datasetId, runJob, isSubmitting, submissionMessage, runFeedback } = useTrainingNodeContext(nodeId);

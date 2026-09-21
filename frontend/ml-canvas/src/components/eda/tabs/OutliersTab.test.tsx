@@ -16,6 +16,26 @@ function profile(population: Record<string, number | null> = {}): EDAProfile {
 }
 
 describe('outlier analysis population', () => {
+  it('preserves positive counts when row-level details are unavailable', () => {
+    /** Missing saved row details must not erase a recorded anomaly count. */
+    const saved = profile();
+    saved.outliers!.top_outliers = [];
+    render(<OutliersTab profile={saved} />);
+    expect(screen.getByText('2500')).toBeVisible();
+    expect(screen.getByText('Row-level details are unavailable for this saved report.')).toBeVisible();
+    expect(screen.queryByText('No outliers detected')).not.toBeInTheDocument();
+  });
+  it('distinguishes a successful zero result from unavailable analysis', () => {
+    // A completed analysis finding no anomalies is a meaningful result.
+    const zero = profile({ analyzed_rows: 100, total_rows: 100 });
+    zero.outliers = { ...zero.outliers!, total_outliers: 0, outlier_percentage: 0, top_outliers: [] };
+    const { rerender } = render(<OutliersTab profile={zero} />);
+    expect(screen.getByText('No outliers detected')).toBeVisible();
+    expect(screen.getByText(/Analyzed all 100 rows/)).toBeVisible();
+    rerender(<OutliersTab profile={{ ...zero, outliers: null }} />);
+    expect(screen.getByText('Outlier analysis unavailable')).toBeVisible();
+    expect(screen.queryByText('No outliers detected')).not.toBeInTheDocument();
+  });
   it('labels counts and percentages as sample results with both row counts', () => {
     /** Sample results must not imply that every dataset row was scored. */
     render(<OutliersTab profile={profile({ analyzed_rows: 50000, total_rows: 200000 })} />);

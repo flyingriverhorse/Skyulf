@@ -14,6 +14,7 @@ import type { TaskType } from '../types/taskType';
 import type { NodeSubmission } from '../types/runFeedback';
 import type { NodeConfigModel, PipelineConfigModel } from '../api/client';
 import { findEnsembleConnectionIssues } from '../utils/ensembleConnections';
+import { registry } from '../registry/NodeRegistry';
 
 type JobType = 'training' | 'tuning';
 
@@ -45,6 +46,12 @@ function selectTargetNodes(cfg: PipelineConfigModel, nodeId: string) {
 
 /** Block invalid selected branches while allowing unrelated terminal models to run. */
 function trainingBlockReason(nodes: Node[], edges: Edge[], selectedNodes: NodeConfigModel[]): string | null {
+  const selectedIds = new Set(selectedNodes.map(node => node.node_id));
+  for (const node of nodes) {
+    if (!selectedIds.has(node.id)) continue;
+    const validation = registry.get(String(node.data.definitionType))?.validate(node.data);
+    if (validation && !validation.isValid) return validation.message ?? 'Correct the selected branch configuration.';
+  }
   const connectionIssue = findEnsembleConnectionIssues(nodes, edges)
     .find(issue => selectedNodes.some(selected => selected.node_id === issue.targetId));
   if (connectionIssue) return connectionIssue.message;

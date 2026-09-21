@@ -1,18 +1,21 @@
 import { RunFeedback } from '../../../../components/shared/RunFeedback';
 import { TrainingActionFooter } from '../../../../components/shared/TrainingActionFooter';
 import type { useTrainingNodeContext } from '../../../../core/hooks/useTrainingNodeContext';
-import { useId } from 'react';
+import { lazy, Suspense, useId } from 'react';
 import { AlertTriangle, ChevronRight, Sparkles, Loader2, Play } from 'lucide-react';
 import type { ColumnProfile } from '../../../../core/api/client';
 import { ValidationField } from '../../../../components/shared/ValidationField';
+import { modelNumericIssue, numericDraft, numericInputValue } from '../../../../core/utils/numericValidation';
 import type { EnsembleConfig } from '../EnsembleSettings';
-import { BaseModelParamsEditor } from '../components/BaseModelParamsEditor';
 import { MultiSelectChips } from '../components/MultiSelectChips';
 import { HelpTooltip } from '../components/HelpTooltip';
 import {
   defaultBaseEstimators, defaultFinalEstimator, defaultMetric, resolveModelId, optionLabelMap,
   type Option, type Task, type Strategy, type RunMode, type UpdateFn,
 } from './modelOptions';
+
+const BaseModelParamsEditor = lazy(() => import('../components/BaseModelParamsEditor')
+  .then(module => ({ default: module.BaseModelParamsEditor })));
 
 /** Two-option segmented control (Classification/Regression, Voting/Stacking). */
 function SegmentedToggle({ label, options, value, onSelect }: {
@@ -74,7 +77,7 @@ export function StrategyOptions({ config, update, options }: { config: EnsembleC
           ))}
         </select>
       </div>
-      <div>
+      <ValidationField field="cv">
         <div className="flex items-center gap-1 mb-1">
           <label htmlFor={`${fieldId}-cv`} className="block text-xs font-medium text-gray-700 dark:text-gray-300">Stacking CV Folds</label>
           <HelpTooltip text="Out-of-fold folds used to train the final estimator without leakage. Keep small (e.g. 3) when also running an outer hyperparameter search." />
@@ -84,11 +87,11 @@ export function StrategyOptions({ config, update, options }: { config: EnsembleC
           type="number"
           min={2}
           max={10}
-          value={config.cv}
-          onChange={(e) => { update({ cv: Number(e.target.value) }); }}
+          value={numericInputValue(config.cv, 3)}
+          onChange={(e) => { update({ cv: numericDraft(e.target.value) }); }}
           className="w-full border border-gray-300 dark:border-gray-600 rounded-lg p-2 text-sm bg-white dark:bg-gray-800 dark:text-gray-100"
         />
-      </div>
+      </ValidationField>
       <div>
         <label className="flex items-center gap-2 text-xs font-medium text-gray-700 dark:text-gray-300">
           <input
@@ -158,7 +161,7 @@ export function ParallelJobsSection({ config, update }: { config: EnsembleConfig
     { label: 'All cores (-1)', value: '-1' },
   ];
   return (
-    <div className="space-y-1.5">
+    <ValidationField field="n_jobs" className="space-y-1.5">
       <div className="flex items-center gap-1">
         <label htmlFor={`${fieldId}-n_jobs`} className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Parallel Jobs</label>
         <HelpTooltip text="How many base models to fit in parallel. -1 uses all CPU cores; 1 trains sequentially." />
@@ -173,7 +176,7 @@ export function ParallelJobsSection({ config, update }: { config: EnsembleConfig
           <option key={opt.value} value={opt.value}>{opt.label}</option>
         ))}
       </select>
-    </div>
+    </ValidationField>
   );
 }
 
@@ -214,7 +217,7 @@ export function CalibrationSection({ config, update }: { config: EnsembleConfig;
               <option value="isotonic">Isotonic</option>
             </select>
           </div>
-          <div>
+          <ValidationField field="calibration_cv">
             <label htmlFor={`${fieldId}-calibration_cv`} className="block text-xs text-gray-500 mb-1">CV Folds</label>
             <input
               id={`${fieldId}-calibration_cv`}
@@ -222,11 +225,11 @@ export function CalibrationSection({ config, update }: { config: EnsembleConfig;
               type="number"
               min={2}
               max={10}
-              value={config.calibration_cv ?? 3}
-              onChange={(e) => { update({ calibration_cv: Number(e.target.value) }); }}
+              value={numericInputValue(config.calibration_cv, 3)}
+              onChange={(e) => { update({ calibration_cv: numericDraft(e.target.value) }); }}
               className="w-full border border-gray-300 dark:border-gray-600 rounded-lg p-2 text-sm bg-white dark:bg-gray-800 dark:text-gray-100"
             />
-          </div>
+          </ValidationField>
         </div>
       )}
     </div>
@@ -292,6 +295,7 @@ export function BaseParamsSection({ config, update, open, setOpen, options }: {
       </button>
       {open && (
         <div className="p-3 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700">
+          <Suspense fallback={<p role="status">Loading model parameters...</p>}>
           <BaseModelParamsEditor
             task={config.task}
             baseEstimators={config.base_estimators ?? []}
@@ -303,6 +307,7 @@ export function BaseParamsSection({ config, update, open, setOpen, options }: {
               update({ base_estimator_params: baseParams, final_estimator_params: finalParams });
             }}
           />
+          </Suspense>
         </div>
       )}
     </div>
@@ -413,6 +418,8 @@ function runAvailability(config: EnsembleConfig, datasetId: string | undefined, 
   if (!datasetId) return { canRun: false, description: 'Connect a dataset node upstream and select a dataset to enable this action.' };
   if (!config.target_column?.trim()) return { canRun: false, description: 'Choose a target column to enable this action.' };
   if (tooFewModels) return { canRun: false, description: 'Choose at least two base models to enable this action.' };
+  const numeric = modelNumericIssue(config);
+  if (numeric) return { canRun: false, description: numeric.message };
   return { canRun: true, description: `${config.run_mode === 'advanced' ? 'Tunes' : 'Trains'} the ${config.strategy} ensemble with ${config.base_estimators.length} base models in the background.` };
 }
 

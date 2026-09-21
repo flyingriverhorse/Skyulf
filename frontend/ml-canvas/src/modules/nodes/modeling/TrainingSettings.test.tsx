@@ -50,11 +50,43 @@ beforeEach(() => {
 
 afterEach(() => vi.unstubAllGlobals());
 
+/** Invalid numeric drafts must disable the direct Tune button as well as global Run. */
+it('blocks tuning with an invalid trial budget and explains how to recover', async () => {
+  await renderSettings({ run_mode: 'advanced', n_trials: Number.NaN, search_space: { max_depth: [2] } });
+  const action = screen.getByRole('button', { name: 'Tune model' });
+  expect(action).toBeDisabled();
+  expect(action).toHaveAccessibleDescription(/n_trials/);
+  fireEvent.click(action);
+  expect(vi.mocked(useTrainingNodeContext).mock.results[0]!.value.runJob).not.toHaveBeenCalled();
+});
+
+/** Empty spaces need visible recovery instructions and an explicit Basic/Advanced contract. */
+it('explains an empty advanced search and Basic parameter precedence', async () => {
+  await renderSettings({ run_mode: 'advanced', hyperparameters: { n_estimators: 400, max_depth: 7 }, n_trials: 50 });
+    expect(screen.getByRole('button', { name: 'Tune model' })).toBeDisabled();
+  fireEvent.click(screen.getByRole('button', { name: 'Search Space' }));
+  expect(screen.getByText(/Configure at least one search parameter/)).toBeVisible();
+  expect(screen.getByText(/Basic-mode values are retained for Basic runs only/)).toBeVisible();
+});
+
 /** Controlled updates exercise the same effect and focus lifetimes as the node inspector. */
 function SettingsHarness({ initial }: { initial: TrainingConfig }) {
   const [value, setValue] = useState(initial);
   return <TrainingSettings config={value} onChange={setValue} nodeId="model" />;
 }
+
+/** Changing a Basic model must discard the old model's saved search before entering Advanced. */
+it('loads the new model search after a Basic model change instead of retaining old drafts', async () => {
+  vi.mocked(jobsApi.getHyperparameters).mockResolvedValue([{ name: 'alpha', label: 'Alpha', type: 'number', default: 1 }]);
+  vi.mocked(jobsApi.getDefaultSearchSpace).mockResolvedValue({ alpha: [1, 2] });
+  await act(async () => render(<SettingsHarness initial={{ ...config, search_space: { max_depth: [3] }, invalid_search_space: { max_depth: '1e400' } }} />));
+  await act(async () => fireEvent.change(screen.getByRole('combobox', { name: 'Model Type' }), { target: { value: 'ridge_regression' } }));
+  await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Advanced (Tuning)' })));
+  expect(jobsApi.getDefaultSearchSpace).toHaveBeenCalledWith('ridge_regression', 'random');
+  fireEvent.click(screen.getByRole('button', { name: 'Search Space' }));
+  expect(screen.getByRole('textbox', { name: 'Alpha' })).toHaveValue('1, 2');
+  expect(screen.getByRole('button', { name: 'Tune model' })).toBeEnabled();
+});
 
 /** Basic training keeps a manual target while advanced tuning follows its upstream target. */
 it('preserves a manual basic target and synchronizes it on switching to tuning', async () => {
@@ -186,7 +218,8 @@ it.each([
 ])('submits $run_mode work to $task history', async ({ run_mode, model_type, task, jobType, name }) => {
   const context = trainingContext();
   vi.mocked(useTrainingNodeContext).mockReturnValue(context);
-  await renderSettings({ run_mode, model_type }, task);
+  const search_space = model_type === 'ridge_regression' ? { alpha: [1] } : { n_estimators: [100] };
+  await renderSettings({ run_mode, model_type, search_space }, task);
   const action = screen.getByRole('button', { name });
   expect(action).toBeEnabled();
   expect(action).toHaveAccessibleDescription(/in the background/);

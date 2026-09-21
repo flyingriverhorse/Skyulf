@@ -14,6 +14,8 @@ from types import SimpleNamespace
 from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock
 
+import pytest
+
 from backend.data_ingestion import tasks as tasks_mod
 from backend.data_ingestion.engine.profiler import DataProfiler
 from backend.database import async_registry
@@ -115,6 +117,10 @@ class TestRegistryDirectoryBestEffort:
 
 class TestDatabaseEngineDefenses:
     class _ExplodingConn:
+        async def run_sync(self, *args, **kwargs):
+            """Represent an inaccessible schema during migration inspection."""
+            raise RuntimeError("schema inspection failed")
+
         async def execute(self, *args, **kwargs):
             raise RuntimeError("duplicate column")
 
@@ -125,11 +131,13 @@ class TestDatabaseEngineDefenses:
         async def __aexit__(self, *exc):
             return False
 
-    async def test_migrations_skip_failing_statements(self, monkeypatch):
+    async def test_migrations_propagate_inspection_failure(self, monkeypatch):
+        """Migration inspection failure must not appear as a successful startup."""
         fake_engine = MagicMock()
         fake_engine.begin.return_value = self._FakeBeginCM()
         monkeypatch.setattr(db_engine_mod, "async_engine", fake_engine)
-        await db_engine_mod._run_migrations()  # must not raise
+        with pytest.raises(RuntimeError, match="schema inspection failed"):
+            await db_engine_mod._run_migrations()
 
     async def test_health_check_returns_false_on_probe_failure(self, monkeypatch):
         fake_engine = MagicMock()

@@ -9,6 +9,7 @@ pipeline run.
 """
 
 import contextlib
+import hashlib
 import logging
 import os
 import tempfile
@@ -344,8 +345,8 @@ class S3Catalog(DataCatalog):
         return f"s3://{self.bucket_name}/{dataset_id}"
 
     def _get_cache_path(self, s3_path: str) -> str:
-        # Create a safe filename from the S3 path
-        safe_name = s3_path.replace("s3://", "").replace("/", "_").replace("\\", "_")
+        """Hash the full bucket/key identity without reusing ambiguous legacy caches."""
+        safe_name = "s3-v2-" + hashlib.sha256(s3_path.encode("utf-8")).hexdigest()
         resolved = os.path.realpath(os.path.join(self.cache_dir, safe_name))
         base = os.path.realpath(self.cache_dir)
         if not resolved.startswith(base + os.sep) and resolved != base:

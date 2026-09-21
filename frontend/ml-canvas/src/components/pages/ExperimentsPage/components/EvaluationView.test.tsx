@@ -285,6 +285,7 @@ describe('EvaluationView — Threshold Slider / Threshold Tuning tabs', () => {
   });
 
   it('surfaces clear failures inline with a scoped retry', async () => {
+    /** A valid preview keeps clear-operation feedback independent of threshold validation. */
     const onClearThresholds = vi
       .fn()
       .mockRejectedValueOnce(new Error('clear failed'))
@@ -295,8 +296,8 @@ describe('EvaluationView — Threshold Slider / Threshold Tuning tabs', () => {
         {...baseProps({
           activeTab: 'tuning',
           tuningPreview: {
-            thresholds: { a: 1 },
-            classes: [0],
+            thresholds: { a: 1, b: 1, c: 1 },
+            classes: [0, 1, 2],
             metric: 'f1',
             split_used: 'validation',
           },

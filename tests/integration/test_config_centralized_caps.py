@@ -84,10 +84,10 @@ def test_redis_healthcheck_uses_settings_timeout(monkeypatch):
 
 
 def test_error_timeline_hours_clamped_to_default_setting(client):
-    """Default settings should still cap at 168 hours (unchanged behavior)."""
+    """The 168-hour cap includes both boundary hour slots of the rolling window."""
     response = client.get("/api/monitoring/errors/timeline", params={"hours": 9999})
     assert response.status_code == 200
-    assert len(response.json()) == 168
+    assert len(response.json()) == 169
 
 
 def test_detailed_health_check_returns_only_aggregate_status(client):
@@ -110,7 +110,7 @@ def test_error_timeline_hours_clamped_to_configured_setting(client, monkeypatch)
     _patched_settings(monkeypatch, MONITORING_MAX_TIMELINE_HOURS=5)
     response = client.get("/api/monitoring/errors/timeline", params={"hours": 9999})
     assert response.status_code == 200
-    assert len(response.json()) == 5
+    assert len(response.json()) == 6
 
 
 # ── Monitoring: slow-nodes days/limit caps ───────────────────────────────

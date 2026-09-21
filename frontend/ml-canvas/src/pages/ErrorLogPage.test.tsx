@@ -764,24 +764,26 @@ describe('ErrorLogPage — server-side search, facets, links, and export', () =>
     await waitFor(() => expect(notify).toHaveBeenCalledWith('Failed to load error sample', 'Please try again.'));
   });
 
-  it('merges UTC HTTP counts and local pipeline timestamps into 24 hourly chart buckets', async () => {
+  it('merges UTC HTTP counts and local pipeline timestamps including both partial edge hours', async () => {
     // Chart bucketing retains its timezone boundary and includes every pipeline level.
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date('2026-09-09T12:30:00Z'));
     const local = new Date();
     const pad = (value: number) => String(value).padStart(2, '0');
     const prefix = `${local.getFullYear()}-${pad(local.getMonth() + 1)}-${pad(local.getDate())}T${pad(local.getHours())}`;
+    const bucketStart = new Date(Math.floor(local.getTime() / 3_600_000) * 3_600_000);
+    const bucketLabel = `${bucketStart.getFullYear()}-${pad(bucketStart.getMonth() + 1)}-${pad(bucketStart.getDate())}T${pad(bucketStart.getHours())}:${pad(bucketStart.getMinutes())}:00`;
     vi.mocked(monitoringApi.getTimeline).mockResolvedValue([{ hour: '2026-09-09T12:00', count: 3 }, { hour: 'invalid', count: 99 }]);
     vi.mocked(monitoringApi.getPipelineLogs).mockResolvedValue(pipelineResponse([
-      pipelineLog({ run_at: `${prefix}:05:00`, level: 'warning' }),
+      pipelineLog({ run_at: `${prefix}:${pad(local.getMinutes())}:00`, level: 'warning' }),
       pipelineLog({ id: 10, run_at: null }),
       pipelineLog({ id: 11, run_at: '2000-01-01T12:00:00' }),
     ]));
     renderPage();
     await screen.findByText('Events (4)');
     const buckets = JSON.parse(screen.getByLabelText('Timeline buckets').textContent!) as { hour: string; count: number }[];
-    expect(buckets).toHaveLength(24);
-    expect(buckets.at(-1)).toMatchObject({ hour: `${prefix}:00:00`, count: 4 });
+    expect(buckets).toHaveLength(25);
+    expect(buckets.at(-1)).toMatchObject({ hour: bucketLabel, count: 4 });
     expect(buckets.reduce((sum, bucket) => sum + bucket.count, 0)).toBe(4);
   });
 });

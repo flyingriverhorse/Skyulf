@@ -1,6 +1,6 @@
 import React from 'react';
 import { RuleTreeGraph } from '../RuleTreeGraph';
-import { AlertCircle, GitBranch, BarChart3 } from 'lucide-react';
+import { GitBranch, BarChart3 } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../../ui/tooltip';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Cell } from 'recharts';
 import { useChartTheme } from '../../../core/hooks/useChartTheme';
@@ -37,13 +37,8 @@ export const RuleDiscoveryTab: React.FC<RuleDiscoveryTabProps> = ({ profile }) =
                 <GitBranch className="w-12 h-12 mb-4 text-gray-300 dark:text-gray-600" />
                 <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">Decision Tree Not Available</h3>
                 <p className="text-center max-w-md mb-4">
-                    No tree was generated. This usually happens if the dataset is too small,
-                    or if a target column was not selected for analysis.
+                    No decision tree was recorded for this report. No reason was recorded.
                 </p>
-                <div className="flex items-center gap-2 text-sm text-amber-600 bg-amber-50 dark:bg-amber-900/20 dark:text-amber-400 px-4 py-2 rounded-md">
-                    <AlertCircle className="w-4 h-4" />
-                    <span>Ensure you have selected a <strong>Target Column</strong> and re-run the analysis.</span>
-                </div>
             </div>
         );
     }

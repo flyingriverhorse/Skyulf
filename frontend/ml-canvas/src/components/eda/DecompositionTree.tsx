@@ -24,6 +24,7 @@ interface DecompositionTreeProps {
     measureAgg: string;
     columns: string[];
     initialFilters: Filter[];
+    resetVersion?: number;
 }
 
 // Module-level cache to persist state across tab switches. Capped at a
@@ -52,15 +53,35 @@ function setTreeCache(key: string, value: { levels: TreeLevel[], splitPath: (str
     }
 }
 
-export const DecompositionTree: React.FC<DecompositionTreeProps> = ({
+/** Cache conjunctions independently of filter order, preserving value types. */
+function getCacheKey({ datasetId, measureCol, measureAgg, initialFilters }: DecompositionTreeProps): string {
+    const filters = initialFilters.map(({ column, operator, value }) => {
+        const canonicalValue = operator === 'in' && Array.isArray(value)
+            ? [...new Set(value.map(item => JSON.stringify(item)))].sort()
+            : value;
+        return JSON.stringify([column, operator, canonicalValue]);
+    });
+    return JSON.stringify([datasetId, measureCol, measureAgg, [...new Set(filters)].sort()]);
+}
+
+/** A population change owns a new state instance and cannot cache the previous levels. */
+export const DecompositionTree: React.FC<DecompositionTreeProps> = (props) => {
+    const cacheKey = getCacheKey(props);
+    return <DecompositionTreeContent key={cacheKey} {...props} cacheKey={cacheKey} />;
+};
+
+const DecompositionTreeContent: React.FC<DecompositionTreeProps & { cacheKey: string }> = ({
     datasetId,
     measureCol,
     measureAgg,
     columns,
-    initialFilters
+    initialFilters,
+    cacheKey,
+    resetVersion = 0,
 }) => {
     const [levels, setLevels] = useState<TreeLevel[]>([]);
     const [loading, setLoading] = useState(false);
+    const [requestError, setRequestError] = useState<{ message: string; retry: () => void } | null>(null);
     const [splitMenuOpen, setSplitMenuOpen] = useState<{ levelIndex: number, item: TreeItem, x: number, y: number } | null>(null);
 
     // We need to store the "structure" of the tree (the sequence of split columns)
@@ -74,6 +95,7 @@ export const DecompositionTree: React.FC<DecompositionTreeProps> = ({
     // resolved — e.g. rapidly clicking through tree items or switching
     // datasets before the previous request finishes.
     const requestIdRef = useRef(0);
+    const lastResetRef = useRef(resetVersion);
     const [paths, setPaths] = useState<{ d: string }[]>([]);
 
     // Auto-scroll to right when levels change
@@ -163,26 +185,38 @@ export const DecompositionTree: React.FC<DecompositionTreeProps> = ({
     // Update cache when state changes
     useEffect(() => {
         if (levels.length > 0) {
-            const cacheKey = `${datasetId}-${measureCol}-${measureAgg}`;
             setTreeCache(cacheKey, { levels, splitPath });
         }
-    }, [levels, splitPath, datasetId, measureCol, measureAgg]);
+    }, [levels, splitPath, cacheKey]);
 
     // Initialize Root or Load from Cache
     useEffect(() => {
-        const cacheKey = `${datasetId}-${measureCol}-${measureAgg}`;
+        if (lastResetRef.current !== resetVersion) {
+            treeCache.delete(cacheKey);
+            lastResetRef.current = resetVersion;
+        }
+        setSplitMenuOpen(null);
+        setRequestError(null);
         const cached = treeCache.get(cacheKey);
         if (cached) {
             setLevels(cached.levels);
             setSplitPath(cached.splitPath);
+            setTreeCache(cacheKey, cached);
+            setLoading(false);
         } else {
+            setLevels([]);
+            setSplitPath([null]);
             loadRoot();
         }
+        // Invalidates root and drill-down work on reset, population change, and unmount.
+        return () => { requestIdRef.current += 1; };
+    // The keyed instance fixes request inputs; equivalent filter arrays need no reload.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [datasetId, measureCol, measureAgg]);
+    }, [cacheKey, resetVersion]);
 
     const loadRoot = async () => {
         const myRequestId = ++requestIdRef.current;
+        setRequestError(null);
         setLoading(true);
         try {
             const res = await EDAService.getDecomposition(
@@ -210,6 +244,7 @@ export const DecompositionTree: React.FC<DecompositionTreeProps> = ({
         } catch (err) {
             if (myRequestId === requestIdRef.current) {
                 console.error(err);
+                setRequestError({ message: 'Could not load decomposition.', retry: () => { void loadRoot(); } });
             }
         } finally {
             if (myRequestId === requestIdRef.current) {
@@ -257,6 +292,9 @@ export const DecompositionTree: React.FC<DecompositionTreeProps> = ({
     };
 
     const handleItemClick = async (levelIndex: number, item: TreeItem) => {
+        const myRequestId = ++requestIdRef.current;
+        setRequestError(null);
+        setSplitMenuOpen(null);
         // 1. Compute the updated current level immutably — mutating the level
         // object in place would poison both React state (before any setLevels
         // call) and the module-level treeCache, which stores these objects by
@@ -272,7 +310,6 @@ export const DecompositionTree: React.FC<DecompositionTreeProps> = ({
 
         if (nextSplitCol) {
             // AUTOMATIC UPDATE: If next level exists, refresh it instead of opening menu
-            const myRequestId = ++requestIdRef.current;
             setLoading(true);
             try {
                 // Construct filters for the next level
@@ -322,6 +359,8 @@ export const DecompositionTree: React.FC<DecompositionTreeProps> = ({
             } catch (err) {
                 if (myRequestId === requestIdRef.current) {
                     console.error(err);
+                    setRequestError({ message: `Could not refresh ${nextSplitCol}. Previous results are still shown.`,
+                        retry: () => { void handleItemClick(levelIndex, item); } });
                     // Fetch failed — do not apply the optimistic selection change,
                     // since no next-level data actually loaded for it.
                 }
@@ -331,17 +370,19 @@ export const DecompositionTree: React.FC<DecompositionTreeProps> = ({
                 }
             }
         } else {
+            setLoading(false);
             // No next level defined, just update selection
             setLevels(newLevels);
             // Do NOT open menu automatically anymore. User must click header + button.
         }
     };
 
-    const handleSplit = async (column: string) => {
-        if (!splitMenuOpen) return;
+    const handleSplit = async (column: string, target = splitMenuOpen) => {
+        if (!target) return;
 
-        const { levelIndex, item } = splitMenuOpen;
+        const { levelIndex, item } = target;
         setSplitMenuOpen(null);
+        setRequestError(null);
         const myRequestId = ++requestIdRef.current;
         setLoading(true);
 
@@ -386,6 +427,8 @@ export const DecompositionTree: React.FC<DecompositionTreeProps> = ({
         } catch (err) {
             if (myRequestId === requestIdRef.current) {
                 console.error(err);
+                setRequestError({ message: `Could not split by ${column}. Previous results are still shown.`,
+                    retry: () => { void handleSplit(column, target); } });
             }
         } finally {
             if (myRequestId === requestIdRef.current) {
@@ -395,12 +438,20 @@ export const DecompositionTree: React.FC<DecompositionTreeProps> = ({
     };
 
     const closeSplit = (levelIndex: number) => {
+        requestIdRef.current += 1;
+        setRequestError(null);
+        setLoading(false);
+        setSplitMenuOpen(null);
         setLevels(levels.slice(0, levelIndex));
         setSplitPath(splitPath.slice(0, levelIndex));
     };
 
     return (
         <div className="relative w-full h-[600px] bg-slate-50 dark:bg-slate-900 overflow-hidden flex flex-col">
+            {requestError && <div role="alert" className="m-3 p-3 rounded border border-red-200 bg-red-50 text-red-700 text-sm">
+                <p>{requestError.message}</p>
+                <button onClick={requestError.retry} disabled={loading} className="mt-2 underline font-medium">Retry</button>
+            </div>}
             {loading && (
                 <div className="absolute top-2 right-2 z-50">
                     <Loader2 className="w-5 h-5 animate-spin text-blue-500" />

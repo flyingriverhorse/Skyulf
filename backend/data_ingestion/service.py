@@ -9,6 +9,7 @@ and from whether the request supplied a background-task queue.
 """
 
 import logging
+import traceback
 import uuid
 from collections.abc import Sequence
 from datetime import UTC, datetime
@@ -31,6 +32,7 @@ from backend.exceptions.core import ForbiddenException, ResourceNotFoundExceptio
 from backend.pagination import MAX_SAMPLE_ROWS, validate_limit, validate_page_bounds
 from backend.services.data_service import DataService
 from backend.utils import sanitize_for_log
+from backend.utils.logging_utils import redact_credentials
 
 logger = logging.getLogger(__name__)
 
@@ -198,12 +200,18 @@ class DataIngestionService:
         except (ForbiddenException, ResourceNotFoundException) as e:
             # Typed exceptions raised by S3Connector for 403/404 provider
             # responses — classified there rather than string-matched here.
-            logger.error(f"Failed to get S3 sample: {e}", exc_info=log_exc_info)
+            diagnostic = "".join(traceback.format_exception(e)) if log_exc_info else str(e)
+            logger.error(
+                "Failed to get S3 sample: %s", sanitize_for_log(redact_credentials(diagnostic))
+            )
             raise HTTPException(
                 status_code=400, detail="S3 access denied or resource not found"
             ) from e
         except Exception as e:
-            logger.error(f"Failed to get S3 sample: {e}", exc_info=log_exc_info)
+            diagnostic = "".join(traceback.format_exception(e)) if log_exc_info else str(e)
+            logger.error(
+                "Failed to get S3 sample: %s", sanitize_for_log(redact_credentials(diagnostic))
+            )
             raise SkyulfException(message="Failed to read S3 data sample") from e
 
     async def _sample_local_file(self, file_path: Any, limit: int) -> list[dict]:
@@ -334,7 +342,11 @@ class DataIngestionService:
             def _on_done(t: asyncio.Task) -> None:
                 exc = t.exception() if not t.cancelled() else None
                 if exc:
-                    logger.error("Ingestion task failed for source %s: %s", source_id, exc)
+                    logger.error(
+                        "Ingestion task failed for source %s: %s",
+                        source_id,
+                        sanitize_for_log(redact_credentials(exc)),
+                    )
 
             _task.add_done_callback(_on_done)
 
@@ -405,8 +417,9 @@ class DataIngestionService:
         except HTTPException:
             raise
         except Exception as e:
-            logger.error(f"Database error: {e}")
-            raise SkyulfException(message=f"Database error: {str(e)}") from e
+            safe_error = redact_credentials(e)
+            logger.error("Database error: %s", sanitize_for_log(safe_error))
+            raise SkyulfException(message=f"Database error: {safe_error}") from e
 
     @staticmethod
     def _check_declared_upload_size(file: UploadFile, settings: Any) -> None:
@@ -525,11 +538,12 @@ class DataIngestionService:
             )
 
         except Exception as e:
-            logger.error(f"Database error: {e}")
+            safe_error = redact_credentials(e)
+            logger.error("Database error: %s", sanitize_for_log(safe_error))
             # Cleanup file if DB fails
             if file_path.exists():
                 file_path.unlink()
-            raise SkyulfException(message=f"Database error: {str(e)}") from e
+            raise SkyulfException(message=f"Database error: {safe_error}") from e
 
     async def handle_file_upload(
         self,

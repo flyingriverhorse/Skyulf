@@ -2,6 +2,7 @@
 
 import logging
 import os
+import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -37,14 +38,26 @@ class LocalArtifactStore(ArtifactStore):
         return resolved
 
     def save(self, key: str, data: Any) -> None:
-        """Write ``data`` to the store as a joblib file named after ``key``.
+        """Atomically publish ``data`` as a joblib file named after ``key``.
 
         Separators inside ``key`` are flattened and ``.joblib`` is appended, so
         the file always lands directly in ``base_path``; a key that would
         resolve outside it raises ``PermissionError``.
+        A failed write leaves any previous artifact intact.
         """
         path = self._get_path(key)
-        joblib.dump(data, path)
+        staging = None
+        try:
+            with tempfile.NamedTemporaryFile(
+                dir=Path(path).parent, prefix=".skyulf-artifact-", suffix=".tmp", delete=False
+            ) as stream:
+                staging = Path(stream.name)
+                joblib.dump(data, stream)
+            # Close the staging handle before replacing, including on Windows.
+            os.replace(staging, path)
+        finally:
+            if staging is not None:
+                staging.unlink(missing_ok=True)
 
     def load(self, key: str) -> Any:
         """Load a joblib artifact.
@@ -73,6 +86,8 @@ class LocalArtifactStore(ArtifactStore):
         files = [f.name for f in Path(self.base_path).iterdir()]
         keys = []
         for f in files:
+            if f.startswith(".skyulf-artifact-") and f.endswith(".tmp"):
+                continue
             if f.endswith(".joblib"):
                 keys.append(f[:-7])  # Remove .joblib
             else:

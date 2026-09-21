@@ -1,8 +1,11 @@
 import type { ToolbarState } from './_hooks/useToolbarState';
 import { useGraphStore } from '../../../core/store/useGraphStore';
-import { TemplatesGalleryModal } from '../../canvas/TemplatesGalleryModal';
+import { lazy, Suspense } from 'react';
 import { CanvasLegend } from './CanvasLegend';
 import { ExperimentRunDialog } from './ExperimentRunDialog';
+
+const TemplatesGalleryModal = lazy(() => import('../../canvas/TemplatesGalleryModal')
+  .then(module => ({ default: module.TemplatesGalleryModal })));
 
 export function ToolbarOverlays(
   { layout, run, menus, readOnly }: Pick<ToolbarState, 'layout' | 'run' | 'menus' | 'readOnly'>,
@@ -37,9 +40,8 @@ export function ToolbarOverlays(
         <CanvasLegend onClose={() => setShowLegend(false)} />
       </div>
     )}
-    <TemplatesGalleryModal
-      isOpen={showTemplates}
-      onClose={() => setShowTemplates(false)}
-    />
+    {showTemplates && <Suspense fallback={<p role="status" className="fixed bottom-4 right-4 z-50 rounded-md border bg-background p-3 text-sm">Loading templates…</p>}>
+      <TemplatesGalleryModal isOpen onClose={() => setShowTemplates(false)} />
+    </Suspense>}
   </>);
 }

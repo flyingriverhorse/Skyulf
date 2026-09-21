@@ -2,6 +2,7 @@ import { Play, Loader2, Activity } from 'lucide-react';
 import { TrainingActionFooter } from '../../../../components/shared/TrainingActionFooter';
 import { RunFeedback } from '../../../../components/shared/RunFeedback';
 import type { TrainingSettingsState } from './useTrainingSettings';
+import { modelNumericIssue } from '../../../../core/utils/numericValidation';
 
 type TrainingFooterProps = Pick<TrainingSettingsState,
   'config'
@@ -69,11 +70,17 @@ function trainingRunHelp(config: TrainingSettingsState['config'], datasetId: str
     if (!datasetId) return 'Connect a dataset node upstream and select a dataset to enable this action.';
     if (!config.target_column?.trim()) return 'Choose a target column to enable this action.';
     if (!config.model_type) return 'Choose a model to enable this action.';
+    const numeric = modelNumericIssue(config);
+    if (numeric) return numeric.message!;
+    if (isAdvanced && Object.keys(config.search_space ?? {}).length === 0) {
+        return 'Open Search Space and configure at least one parameter to enable tuning.';
+    }
     return isAdvanced
         ? 'Searches hyperparameters and trains the selected model in the background.'
         : 'Trains the selected model with fixed parameters in the background.';
 }
 
 function isRunDisabled(config: TrainingSettingsState['config'], datasetId: string | undefined, isSubmitting: boolean): boolean {
-    return !datasetId || isSubmitting || !config.target_column?.trim() || !config.model_type;
+    return !datasetId || isSubmitting || !config.target_column?.trim() || !config.model_type || Boolean(modelNumericIssue(config))
+        || (config.run_mode === 'advanced' && Object.keys(config.search_space ?? {}).length === 0);
 }

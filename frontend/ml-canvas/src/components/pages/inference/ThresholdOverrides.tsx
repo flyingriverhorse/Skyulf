@@ -22,6 +22,11 @@ export function ThresholdOverrides({ controller }: {
         setNewOverrideClass, newOverrideThreshold, setNewOverrideThreshold,
         handleAddOverrideEntry, singleProbMap, handlePrefillFromLastPrediction,
     } = controller;
+    const isMulticlass = Math.max(
+        Object.keys(overrideThresholdsValue).length,
+        controller.savedThresholds?.classes?.length ?? 0,
+        Object.keys(singleProbMap ?? {}).length,
+    ) > 2;
     return (<details className="mt-3 shrink-0 rounded-lg border border-gray-200 dark:border-gray-700 group overflow-hidden">
         <summary className="cursor-pointer select-none px-3 py-2 text-xs font-medium text-gray-600 dark:text-gray-300 flex items-center gap-2">
             <Sparkles className="w-3.5 h-3.5" /> Advanced: override thresholds
@@ -51,7 +56,7 @@ export function ThresholdOverrides({ controller }: {
                             <input
                                 type="number"
                                 min={0}
-                                max={1}
+                                max={isMulticlass ? undefined : 1}
                                 step={0.01}
                                 value={thr}
                                 onChange={e =>
@@ -82,7 +87,7 @@ export function ThresholdOverrides({ controller }: {
                 <input
                     type="number"
                     min={0}
-                    max={1}
+                    max={isMulticlass ? undefined : 1}
                     step={0.01}
                     value={newOverrideThreshold}
                     onChange={e => setNewOverrideThreshold(e.target.value)}
@@ -109,6 +114,7 @@ export function ThresholdOverrides({ controller }: {
             <p className="text-[10px] text-gray-400 italic">
                 Class labels must exactly match the deployed model&apos;s classes
                 (e.g. 0, 1, 2), or the prediction will be rejected.
+                {' '}Multiclass thresholds must be finite and greater than 0; values above 1 are allowed.
             </p>
         </div>
     </details>);

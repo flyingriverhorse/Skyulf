@@ -38,16 +38,36 @@ export function getErrorPercentiles(y_true: number[], y_pred: number[]): { p50: 
   return { p50: pct(0.5), p90: pct(0.9), p95: pct(0.95) };
 }
 
-/** Relative error histogram: (pred − actual) / |actual|, binned. Skips near-zero actuals. */
-export function getRelativeErrorHist(y_true: number[], y_pred: number[], nBins = 20): { label: string; count: number }[] | null {
-  const relErrs = y_true.map((y, i) => Math.abs(y) > 1e-9 ? (y_pred[i]! - y) / Math.abs(y) : null).filter((v): v is number => v !== null);
-  if (relErrs.length < 2) return null;
-  const min = Math.max(Math.min(...relErrs), -2), max = Math.min(Math.max(...relErrs), 2);
-  if (min === max) return null;
-  const w = (max - min) / nBins;
-  const bins = Array.from({ length: nBins }, (_, i) => ({ label: (min + i * w).toFixed(2), count: 0 }));
-  for (const r of relErrs) { if (r >= min && r <= max) bins[Math.min(Math.floor((r - min) / w), nBins - 1)]!.count++; }
-  return bins;
+/** Relative errors with explicit tail bins and accounting for undefined ratios. */
+export function getRelativeErrorHist(y_true: number[], y_pred: number[], nBins = 20): {
+  bins: { label: string; range: string; count: number }[];
+  included: number;
+  excluded: number;
+} | null {
+  if (!y_true.length) return null;
+  if (!Number.isInteger(nBins) || nBins < 1) throw new Error('nBins must be a positive integer');
+  const width = 4 / nBins;
+  const percent = (value: number) => `${Number((value * 100).toFixed(2))}%`;
+  const bins = [
+    { label: '< -200%', range: '< -200%', count: 0 },
+    ...Array.from({ length: nBins }, (_, i) => ({
+      label: percent(-2 + i * width),
+      range: `[${percent(-2 + i * width)}, ${percent(-2 + (i + 1) * width)}${i === nBins - 1 ? ']' : ')'}`,
+      count: 0,
+    })),
+    { label: '> 200%', range: '> 200%', count: 0 },
+  ];
+  let included = 0;
+  y_true.forEach((actual, index) => {
+    const predicted = y_pred[index];
+    if (!Number.isFinite(actual) || !Number.isFinite(predicted) || Math.abs(actual) <= 1e-9) return;
+    const error = (predicted! - actual) / Math.abs(actual);
+    if (!Number.isFinite(error)) return;
+    const binIndex = error < -2 ? 0 : error > 2 ? nBins + 1 : 1 + Math.min(Math.floor((error + 2) / width), nBins - 1);
+    bins[binIndex]!.count++;
+    included++;
+  });
+  return { bins, included, excluded: y_true.length - included };
 }
 
 /** Scale-Location: sqrt(|residual|) vs predicted — surfaces heteroscedasticity. */

@@ -16,7 +16,8 @@ def cleanup_error_events(self) -> dict:  # type: ignore[override]
     """Delete error_events older than ERROR_LOG_RETENTION_DAYS. Runs daily."""
     settings = get_settings()
     retention_days: int = getattr(settings, "ERROR_LOG_RETENTION_DAYS", 30)
-    cutoff = datetime.now(UTC) - timedelta(days=retention_days)
+    # ErrorEvent.created_at stores naive UTC (TIMESTAMP WITHOUT TIME ZONE).
+    cutoff = datetime.now(UTC).replace(tzinfo=None) - timedelta(days=retention_days)
 
     async def _run() -> int:
         from sqlalchemy import delete

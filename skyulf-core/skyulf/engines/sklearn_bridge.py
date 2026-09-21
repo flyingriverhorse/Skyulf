@@ -1,5 +1,6 @@
 """Convert Skyulf engine-agnostic frames into NumPy arrays for scikit-learn."""
 
+from datetime import date, time, timedelta
 from typing import Any
 
 import numpy as np
@@ -15,18 +16,20 @@ class SklearnBridge:
     """Bridge between Skyulf DataFrames (Pandas/Polars) and Scikit-Learn (Numpy)."""
 
     @staticmethod
-    def to_sklearn(X: Any) -> tuple[np.ndarray, Any]:
+    def to_sklearn(X: Any, *, validate_features: bool = False) -> tuple[np.ndarray, Any]:
         """Convert input to Numpy array for Scikit-Learn.
 
         Args:
             X: Input data (Pandas, Polars, Wrapper, or (X, y) tuple).
+            validate_features: Reject raw temporal model features. Leave disabled
+                for preprocessing or fold partitioning before feature extraction.
 
         Returns:
             Tuple (X_numpy, y_numpy_or_None)
 
         Raises:
             TypeError: If either input is not a supported frame, array or sequence.
-            ValueError: If the feature input is None.
+            ValueError: If features are None or contain unconverted temporal values.
         """
         y = None
 
@@ -41,10 +44,74 @@ class SklearnBridge:
 
             X = X_data
 
+        if validate_features:
+            SklearnBridge.validate_features(X)
         X_numpy = SklearnBridge._convert_single(X)
         if X_numpy is None:
             raise ValueError("Input X could not be converted to a numpy array (got None).")
         return X_numpy, y
+
+    @staticmethod
+    def validate_features(data: Any) -> None:
+        """Reject raw temporal features before engine conversion can erase their units."""
+        native = (
+            data.to_native()
+            if isinstance(data, SkyulfPandasWrapper | SkyulfPolarsWrapper)
+            else data
+        )
+        columns = []
+        if isinstance(native, pl.DataFrame | pl.Series):
+            columns = SklearnBridge._polars_temporal_columns(native)
+        elif isinstance(native, pd.DataFrame | pd.Series):
+            columns = SklearnBridge._pandas_temporal_columns(native)
+        elif isinstance(native, np.ndarray | list | tuple) and SklearnBridge._contains_temporal(
+            np.asarray(native)
+        ):
+            columns = ["array input"]
+        if columns:
+            raise ValueError(
+                f"Raw temporal features are not supported: {', '.join(columns)}. "
+                "Use DateFeatures with drop_original=True, remove these columns, or "
+                "explicitly convert them to numeric features before model fitting or prediction."
+            )
+
+    @staticmethod
+    def _polars_temporal_columns(native: pl.DataFrame | pl.Series) -> list[str]:
+        """Find temporal Polars columns before conversion erases their units."""
+        schema = native.schema if isinstance(native, pl.DataFrame) else {native.name: native.dtype}
+        columns = []
+        for name, dtype in schema.items():
+            series = native[name] if isinstance(native, pl.DataFrame) else native
+            if dtype.is_temporal() or (
+                dtype == pl.Object and SklearnBridge._contains_temporal(series.to_numpy())
+            ):
+                columns.append(str(name))
+        return columns
+
+    @staticmethod
+    def _pandas_temporal_columns(native: pd.DataFrame | pd.Series) -> list[str]:
+        """Find typed and object-backed temporal pandas columns."""
+        items = native.items() if isinstance(native, pd.DataFrame) else [(native.name, native)]
+        columns = []
+        for name, series in items:
+            if (
+                series.dtype.kind in "Mm"
+                or isinstance(series.dtype, pd.PeriodDtype)
+                or series.dtype.kind == "O"
+                and SklearnBridge._contains_temporal(series.to_numpy())
+            ):
+                columns.append(str(name))
+        return columns
+
+    @staticmethod
+    def _contains_temporal(values: np.ndarray) -> bool:
+        """Recognize typed arrays and object-backed dates without parsing strings."""
+        if values.dtype.kind in "Mm":
+            return True
+        temporal_types = (date, time, timedelta, np.datetime64, np.timedelta64, pd.Period)
+        return values.dtype.kind == "O" and any(
+            isinstance(value, temporal_types) for value in values.flat
+        )
 
     @staticmethod
     def _convert_single(data: Any) -> np.ndarray | None:

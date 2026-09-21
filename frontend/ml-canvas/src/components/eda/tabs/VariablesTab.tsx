@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { VariableRow } from '../VariableRow';
+import { VariableRow, type VariableRowProps } from '../VariableRow';
 import { useEscapeKey } from '../../../core/hooks/useEscapeKey';
 import { Input } from '../../ui/input';
 import { Search } from 'lucide-react';
@@ -11,12 +11,14 @@ interface VariablesTabProps {
     profile: EDAProfile;
     handleToggleExclude: (colName: string, exclude: boolean) => void;
     handleAddFilter: (column: string, value: string | number, operator: string) => void;
+    handleAddFilters: VariableRowProps['handleAddFilters'];
 }
 
 export const VariablesTab: React.FC<VariablesTabProps> = ({
     profile,
     handleToggleExclude,
-    handleAddFilter
+    handleAddFilter,
+    handleAddFilters,
 }) => {
     const [searchTerm, setSearchTerm] = useState('');
     const [expandedVars, setExpandedVars] = useState<Set<string>>(new Set());
@@ -87,6 +89,7 @@ export const VariablesTab: React.FC<VariablesTabProps> = ({
                         onToggleExclude={handleToggleExclude}
                         isExcluded={false}
                         handleAddFilter={handleAddFilter}
+                        handleAddFilters={handleAddFilters}
                     />
                 ))}
 
@@ -105,6 +108,7 @@ export const VariablesTab: React.FC<VariablesTabProps> = ({
                                 onToggleExclude={handleToggleExclude}
                                 isExcluded={true}
                                 handleAddFilter={handleAddFilter}
+                                handleAddFilters={handleAddFilters}
                             />
                         ))}
                     </div>

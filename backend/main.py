@@ -51,6 +51,7 @@ from backend.ml_pipeline.model_registry.api import router as model_registry_rout
 from backend.monitoring.router import router as monitoring_router
 from backend.realtime import connection_manager
 from backend.realtime import router as realtime_router
+from backend.realtime.events import close_job_event_publisher
 from backend.utils.logging_utils import (
     redact_credentials,
     sanitize_for_log,
@@ -270,6 +271,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         await connection_manager.stop()
     except Exception as exc:  # noqa: BLE001 - shutdown teardown is best-effort
         logger.warning("Realtime subscriber shutdown error: %s", exc)
+    close_job_event_publisher()
     await close_db()
     logger.info("✅ Application shutdown complete")
 

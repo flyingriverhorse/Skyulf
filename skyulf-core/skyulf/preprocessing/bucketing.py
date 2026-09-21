@@ -249,7 +249,7 @@ def _format_intervals_to_strings(
     binned_series = binned_series.astype(str)
     if missing_strategy == "keep":
         # ``astype(str)`` turns NaN into the literal "nan"; restore.
-        binned_series = binned_series.replace("nan", np.nan)
+        binned_series = binned_series.mask(binned_series == "nan")
     return binned_series
 
 

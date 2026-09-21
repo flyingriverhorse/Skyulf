@@ -9,6 +9,7 @@ from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
+from starlette.concurrency import run_in_threadpool
 
 from backend.config import Settings
 from backend.dependencies import get_config
@@ -17,6 +18,18 @@ router = APIRouter()
 
 # Initialize start time for uptime calculation
 START_TIME = time.time()
+
+
+def _check_cache_health(settings: Settings) -> None:
+    """Probe Redis with bounded socket waits and release its connection pool."""
+    import redis  # ty: ignore[unresolved-import]
+
+    with redis.from_url(
+        settings.CELERY_BROKER_URL,
+        socket_connect_timeout=settings.REDIS_HEALTHCHECK_TIMEOUT_SECONDS,
+        socket_timeout=settings.REDIS_HEALTHCHECK_TIMEOUT_SECONDS,
+    ) as client:
+        client.ping()
 
 
 class HealthResponse(BaseModel):
@@ -79,13 +92,7 @@ async def detailed_health_check(settings: Settings = Depends(get_config)):
     # Check cache connectivity
     if settings.USE_CELERY:
         try:
-            import redis  # ty: ignore[unresolved-import]
-
-            r = redis.from_url(
-                settings.CELERY_BROKER_URL,
-                socket_connect_timeout=settings.REDIS_HEALTHCHECK_TIMEOUT_SECONDS,
-            )
-            r.ping()
+            await run_in_threadpool(_check_cache_health, settings)
         except Exception:  # noqa: BLE001 - health check falls back to unhealthy
             logging.getLogger(__name__).debug("Cache health check failed", exc_info=True)
             dependencies_healthy = False

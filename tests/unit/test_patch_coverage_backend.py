@@ -418,17 +418,22 @@ class TestFeatureEngMixinFailureBranches:
         def load(self, key):
             raise RuntimeError("artifact unreadable")
 
-    def test_merge_fitted_steps_skips_unloadable_artifacts(self):
+    def test_merge_fitted_steps_rejects_unloadable_artifacts(self):
+        """An unreadable upstream step must not create an incomplete deployment pipeline."""
         mixin = self._mixin(self._ExplodingStore())
-        assert mixin._merge_fitted_steps(["k1", "k2"]) == []
+        with pytest.raises(ValueError, match="k1"):
+            mixin._merge_fitted_steps(["k1", "k2"])
 
     def test_resolve_bundle_feature_engineer_load_failure_keeps_override(self):
+        """An explicit engineer wins; an unreadable required artifact without one must fail."""
         mixin = self._mixin(self._ExplodingStore())
         override = SimpleNamespace(transform=lambda df: df)
         assert mixin._resolve_bundle_feature_engineer(override, "artifact_key") is override
-        assert mixin._resolve_bundle_feature_engineer(None, "artifact_key") is None
+        with pytest.raises(ValueError, match="artifact_key"):
+            mixin._resolve_bundle_feature_engineer(None, "artifact_key")
 
     def test_build_legacy_transformer_bundle_load_failure(self):
+        """Legacy reconstruction cannot silently omit an executed transformer."""
         mixin = self._mixin(self._ExplodingStore())
         mixin.executed_transformers = [
             {
@@ -439,11 +444,10 @@ class TestFeatureEngMixinFailureBranches:
                 "transformer_type": "StandardScaler",
             }
         ]
-        bundle = mixin._build_legacy_transformer_bundle(
-            model_artifact="model", job_id="job", target_column="y", dropped_columns=None
-        )
-        assert bundle["transformers"] == []
-        assert bundle["transformer_plan"] == []
+        with pytest.raises(ValueError, match="t1"):
+            mixin._build_legacy_transformer_bundle(
+                model_artifact="model", job_id="job", target_column="y", dropped_columns=None
+            )
 
 
 class TestDataServiceFallbackBranches:

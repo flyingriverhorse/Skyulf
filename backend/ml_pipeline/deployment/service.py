@@ -1,6 +1,7 @@
 """Serving side of a deployment: promote a job, resolve its artifact, score rows."""
 
 import logging
+import math
 from collections.abc import Sequence
 from pathlib import Path
 from typing import Any, cast
@@ -11,6 +12,7 @@ from sklearn.base import BaseEstimator
 from sklearn.utils.validation import check_is_fitted
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
+from starlette.concurrency import run_in_threadpool
 
 from backend.config import get_settings
 from backend.database.models import Deployment, TrainingJob
@@ -20,13 +22,14 @@ from backend.ml_pipeline.artifacts.factory import ArtifactFactory
 from backend.ml_pipeline.artifacts.s3 import S3ArtifactStore
 from backend.utils import sanitize_for_log
 from skyulf.core.validation import prediction_row_count, validate_prediction_rows
+from skyulf.engines.sklearn_bridge import SklearnBridge
 from skyulf.preprocessing.pipeline import FeatureEngineer
 
 logger = logging.getLogger(__name__)
 
 
 class OverrideThresholdMismatch(ValueError):
-    """Raised when override_thresholds keys don't match the model's classes."""
+    """Raised when active threshold keys or weights cannot be applied to the model."""
 
 
 def _maybe_decode_predictions(
@@ -353,7 +356,7 @@ class DeploymentService:
     def _validate_override_thresholds(
         override_thresholds: dict[str, float], estimator_classes: Any
     ) -> None:
-        """Raise OverrideThresholdMismatch unless the override keys match the model's classes exactly."""
+        """Reject mismatched class keys and weights that Core cannot apply safely."""
         expected = {str(c) for c in (estimator_classes if estimator_classes is not None else [])}
         provided = set(override_thresholds.keys())
         if provided != expected:
@@ -361,6 +364,24 @@ class DeploymentService:
                 f"override_thresholds keys {sorted(provided)} do not match "
                 f"model classes {sorted(expected)}"
             )
+        DeploymentService._validate_threshold_weights(override_thresholds, len(expected))
+
+    @staticmethod
+    def _validate_threshold_weights(thresholds: dict[str, float], class_count: int) -> None:
+        """Validate finite weights and binary or multiclass positivity rules."""
+        for value in thresholds.values():
+            if (
+                not isinstance(value, (int, float))
+                or not math.isfinite(value)
+                or value < 0
+                or (class_count > 2 and value == 0)
+            ):
+                raise OverrideThresholdMismatch(
+                    "threshold weights must be finite and "
+                    + ("positive for multiclass" if class_count > 2 else "nonnegative for binary")
+                )
+        if not any(value > 0 for value in thresholds.values()):
+            raise OverrideThresholdMismatch("threshold weights must not all be zero")
 
     @staticmethod
     def _resolve_thresholds_for_predict(
@@ -371,6 +392,7 @@ class DeploymentService:
         """Resolve which per-class thresholds to apply: override > saved+enabled > None.
 
         Returns a str-keyed dict (matching the JSON/response shape) or None.
+        Invalid active saved sets raise instead of silently using default predictions.
         """
         if override_thresholds is not None:
             DeploymentService._validate_override_thresholds(override_thresholds, estimator_classes)
@@ -383,10 +405,8 @@ class DeploymentService:
             and estimator_classes is not None
         ):
             saved = job.tuned_thresholds.get("thresholds", {})
-            resolved = {str(c): saved[str(c)] for c in estimator_classes if str(c) in saved}
-            if len(resolved) == len(list(estimator_classes)):
-                return resolved
-            logger.warning("Saved tuned thresholds do not cover every model class; skipping them.")
+            DeploymentService._validate_override_thresholds(saved, estimator_classes)
+            return {str(c): saved[str(c)] for c in estimator_classes}
         return None
 
     @staticmethod
@@ -403,6 +423,7 @@ class DeploymentService:
         ``apply_thresholds`` instead of the estimator's default decision rule.
         Returns ``(predictions, thresholds_applied)``.
         """
+        SklearnBridge.validate_features(X_transformed)
         try:
             if thresholds is not None:
                 from skyulf.modeling import apply_thresholds
@@ -545,6 +566,7 @@ class DeploymentService:
                 # Reorder columns to match model
                 df = df[model_cols]
 
+        SklearnBridge.validate_features(df)
         predictions = artifact.predict(df)
         predictions = predictions.tolist() if hasattr(predictions, "tolist") else list(predictions)
         validate_prediction_rows(len(df), len(predictions), stage="Model prediction")
@@ -563,6 +585,9 @@ class DeploymentService:
         job's saved-and-enabled tuned thresholds second. A legacy artifact that is
         itself the predictor is used directly and rejects overrides, because it
         exposes no probabilities to threshold.
+
+        Synchronous artifact loading and model work run in the shared thread pool;
+        database lookups and threshold resolution remain on the event loop.
 
         Args:
             session: Async database session, used to find the deployment and its job.
@@ -585,10 +610,10 @@ class DeploymentService:
             raise ValueError("No active model deployed")
 
         # 2. Load Artifact
-        artifact = DeploymentService._load_predict_artifact(deployment)
+        artifact = await run_in_threadpool(DeploymentService._load_predict_artifact, deployment)
 
         # 3. Prepare Data
-        df = pd.DataFrame(data)
+        df = await run_in_threadpool(pd.DataFrame, data)
 
         # 4. Predict
         # Check for new SDK format: {"feature_engineer": ..., "model": ...}
@@ -601,8 +626,11 @@ class DeploymentService:
             thresholds = DeploymentService._resolve_thresholds_for_predict(
                 override_thresholds, job, getattr(estimator, "classes_", None)
             )
-            return DeploymentService._predict_with_bundled_artifact(
-                artifact, df, thresholds=thresholds
+            return await run_in_threadpool(
+                DeploymentService._predict_with_bundled_artifact,
+                artifact,
+                df,
+                thresholds=thresholds,
             )
         # Legacy support or direct model loading (if artifact is just the model)
         elif hasattr(artifact, "predict"):
@@ -611,7 +639,9 @@ class DeploymentService:
                     "override_thresholds is not supported for this deployed model "
                     "(legacy artifact without probability outputs)."
                 )
-            predictions = DeploymentService._predict_with_legacy_artifact(artifact, df)
+            predictions = await run_in_threadpool(
+                DeploymentService._predict_with_legacy_artifact, artifact, df
+            )
             return predictions, None
         else:
             raise ValueError(

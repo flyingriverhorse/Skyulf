@@ -270,7 +270,13 @@ const convertFeatureGenerationNode: NodeConverter = (node) => {
   return {
     stepType: 'FeatureMath',
     params: {
-      operations: node.data.operations
+      operations: Array.isArray(node.data.operations)
+        ? node.data.operations.map((operation: Record<string, unknown>) => {
+          const params = { ...operation };
+          delete params.isExpanded;
+          return params;
+        })
+        : node.data.operations
     }
   };
 };
@@ -404,3 +410,14 @@ export const preprocessingConverters = new Map<string, NodeConverter>([
   ['InvalidValueReplacement', convertInvalidValueReplacement],
   ['data_preview', convertDataPreview],
 ]);
+
+// Every registered preprocessing step excludes node dispatch metadata. Unknown
+// saved node types keep their separate compatibility path above.
+preprocessingConverters.forEach((convert, key) => {
+  preprocessingConverters.set(key, node => {
+    const result = convert(node);
+    const params = { ...result.params };
+    delete params.definitionType;
+    return { ...result, params };
+  });
+});

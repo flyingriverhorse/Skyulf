@@ -35,6 +35,7 @@ class TestBasicTrainingStrategy(unittest.TestCase):
         # Mock a Job object
         self.job = MagicMock(spec=TrainingJob)
         self.job.run_mode = "fixed"
+        self.job.node_id = "node_1"
         self.job.metrics = {}  # Start with empty metrics
         self.job.tuned_thresholds = None
         self.job.tuned_thresholds_enabled = False
@@ -218,6 +219,7 @@ class TestAdvancedTuningStrategy(unittest.TestCase):
         self.strategy = AdvancedTuningStrategy()
         self.job = MagicMock(spec=TrainingJob)
         self.job.run_mode = "tuned"
+        self.job.node_id = "tuner_node"
         self.job.metrics = {}
         # Mock specific tuning fields
         self.job.best_params = {}

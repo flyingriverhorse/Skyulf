@@ -84,14 +84,14 @@ export function ModelConfigSection({
                                 value={config.model_type}
                                 onChange={(e) => {
                                     if (isAdvanced) {
-                                        onChange({ ...config, model_type: e.target.value, search_space: {} });
+                                        onChange({ ...config, model_type: e.target.value, search_space: {}, invalid_search_space: {} });
                                         return;
                                     }
                                     // Check if customization is active before switching
                                     if (Object.keys(config.hyperparameters).length > 0) {
                                         keepCustomizationOpen.current = true;
                                     }
-                                    onChange({ ...config, model_type: e.target.value, hyperparameters: {} });
+                                    onChange({ ...config, model_type: e.target.value, hyperparameters: {}, search_space: {}, invalid_search_space: {} });
                                 }}
                                 className="w-full appearance-none border border-gray-300 dark:border-gray-600 rounded-lg p-2.5 text-sm bg-white dark:bg-gray-800 dark:text-gray-100 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none transition-all"
                                 disabled={isLoadingModels}

@@ -83,7 +83,7 @@ function baseSelectionChanged(estimators: string[], config: EnsembleConfig): boo
       !estimators.every((value) => config.base_estimators?.includes(value)));
 }
 
-/** Compare only derived fields; parameter-only differences historically do not trigger sync. */
+/** Compare derived scalar fields without emitting redundant updates. */
 function changedFields(config: EnsembleConfig, candidate: Partial<EnsembleConfig>): Partial<EnsembleConfig> {
   return Object.fromEntries(Object.entries(candidate).filter(([key, value]) => config[key as keyof EnsembleConfig] !== value));
 }
@@ -103,6 +103,12 @@ export function connectedModelPatch(models: Node<ModelData>[], config: EnsembleC
   const target = firstModel.data.target_column || config.target_column;
   if (target) candidate.target_column = target;
   const patch = changedFields(config, candidate);
+  // Merging preserves existing parameters and reuses upstream values, including
+  // array/object references. Compare values instead of the newly allocated maps.
+  const paramsChanged = Object.entries(params).some(([base, values]) =>
+    Object.entries(values).some(([key, value]) =>
+      !Object.is(config.base_estimator_params?.[base]?.[key], value)));
+  if (paramsChanged) patch.base_estimator_params = params;
   if (Object.keys(patch).length === 0) return null;
   return { ...patch, base_estimator_params: params };
 }

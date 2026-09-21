@@ -1,5 +1,5 @@
 import { act, renderHook } from '@testing-library/react';
-import { beforeEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { jobsApi, type RunPipelineResponse } from '../api/jobs';
 import { useGraphStore } from '../store/useGraphStore';
 import { useJobStore } from '../store/useJobStore';
@@ -9,6 +9,8 @@ import { useTrainingNodeContext } from './useTrainingNodeContext';
 import { toast } from '../toast';
 import { convertGraphToPipelineConfig } from '../utils/pipelineConverter';
 import type { PipelineConfigModel } from '../api/client';
+import { registry } from '../registry/NodeRegistry';
+import { ClassificationNode } from '../../modules/nodes/modeling/ClassificationNode';
 
 vi.mock('./useUpstreamData', () => ({ useUpstreamData: () => [] }));
 vi.mock('./useDatasetSchema', () => ({ useDatasetSchema: () => ({ data: undefined }) }));
@@ -18,6 +20,24 @@ vi.mock('../api/jobs', () => ({ jobsApi: { runPipeline: vi.fn() } }));
 vi.mock('../toast', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
 const response = { job_id: 'job-a', job_ids: ['job-a'], pipeline_id: 'run', message: 'Submitted' };
+afterEach(() => vi.restoreAllMocks());
+
+it('blocks invalid selected model drafts before a direct submission', async () => {
+  // Per-node Train/Tune must enforce the same numeric rules as Run all.
+  vi.spyOn(registry, 'get').mockReturnValue({ ...ClassificationNode,
+    validate: config => ClassificationNode.validate(config as Parameters<typeof ClassificationNode.validate>[0]),
+  } as ReturnType<typeof registry.get>);
+  useGraphStore.setState({ nodes: useGraphStore.getState().nodes.map(node => node.id === 'model-a'
+    ? { ...node, data: { ...node.data, target_column: 'y', run_mode: 'advanced', n_trials: Number.NaN, search_space: { max_depth: [2] } } }
+    : node) });
+  vi.mocked(convertGraphToPipelineConfig).mockReturnValue({ pipeline_id: 'pipeline', nodes: [
+    { node_id: 'model-a', step_type: 'training', params: {}, inputs: [] },
+  ] });
+  const { result } = renderHook(() => useTrainingNodeContext('model-a'));
+  await act(async () => { await result.current.runJob('tuning', 'classification'); });
+  expect(jobsApi.runPipeline).not.toHaveBeenCalled();
+  expect(result.current.submissionMessage).toContain('n_trials');
+});
 
 beforeEach(() => {
   vi.clearAllMocks();

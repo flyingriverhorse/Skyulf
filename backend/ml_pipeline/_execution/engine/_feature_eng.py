@@ -179,6 +179,9 @@ class FeatureEngMixin:
             if self.artifact_store.exists(candidate):
                 keys.append(candidate)
                 break
+        else:
+            if any(step["node_id"] == node_id for step in self.executed_transformers):
+                raise ValueError(f"Missing fitted preprocessing artifact for node {node_id!r}")
 
         return keys
 
@@ -188,13 +191,13 @@ class FeatureEngMixin:
         for key in artifact_keys:
             try:
                 fe = self.artifact_store.load(key)
-            except Exception as e:  # noqa: BLE001 - unreadable artifact skipped; merge continues
-                logger.debug(f"Failed to load pipeline artifact {key}: {e}")
-                continue
+            except Exception as e:
+                raise ValueError(f"Cannot load fitted preprocessing artifact {key!r}") from e
 
             fitted_steps = getattr(fe, "fitted_steps", None)
-            if isinstance(fitted_steps, list) and fitted_steps:
-                merged_steps.extend(fitted_steps)
+            if not isinstance(fitted_steps, list):
+                raise ValueError(f"Invalid fitted preprocessing artifact {key!r}")
+            merged_steps.extend(fitted_steps)
         return merged_steps
 
     def _build_composite_feature_engineer(self, node: NodeConfig) -> FeatureEngineer | None:
@@ -245,17 +248,19 @@ class FeatureEngMixin:
         if feature_engineer_override is not None and hasattr(
             feature_engineer_override, "transform"
         ):
-            feature_engineer = feature_engineer_override
+            return feature_engineer_override
 
         if feature_engineer_artifact_key:
             try:
                 obj = self.artifact_store.load(feature_engineer_artifact_key)
                 if hasattr(obj, "transform"):
                     feature_engineer = obj
-            except Exception as e:  # noqa: BLE001 - load failure keeps existing fallback
-                logger.warning(
-                    f"Failed to load feature engineer artifact {feature_engineer_artifact_key}: {e}"
-                )
+                else:
+                    raise ValueError("Artifact has no transform method")
+            except Exception as e:
+                raise ValueError(
+                    f"Cannot load fitted preprocessing artifact {feature_engineer_artifact_key!r}"
+                ) from e
 
         return feature_engineer
 
@@ -296,8 +301,10 @@ class FeatureEngMixin:
                             "transformer_type": t_info["transformer_type"],
                         }
                     )
-            except Exception as e:  # noqa: BLE001 - one bad artifact must not break bundle
-                logger.warning(f"Failed to load transformer artifact {t_info['artifact_key']}: {e}")
+            except Exception as e:
+                raise ValueError(
+                    f"Cannot load required transformer artifact {t_info['artifact_key']!r}"
+                ) from e
 
         return {
             "model": model_artifact,

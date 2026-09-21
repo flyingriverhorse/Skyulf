@@ -66,6 +66,23 @@ async function loadReport(loaded: DriftReport) {
 }
 
 describe('useDriftReport threshold re-evaluation', () => {
+    it('exposes the effective PSI threshold alongside the recalculated verdict', async () => {
+        /** Table sparklines must use the same override or saved fallback as metric cells. */
+        const loaded = report({ category: column('category', [
+            { metric: 'psi_categorical', value: 0.48, threshold: 0.3, has_drift: true },
+        ]) });
+        const { result, rerender } = await loadReport(loaded);
+        rerender({ thresholds: { psi: 0.5 } });
+        expect(result.current.evaluatedReport!.column_drifts.category!.metrics[0]).toMatchObject({
+            threshold: 0.5, has_drift: false,
+        });
+        rerender({ thresholds: {} });
+        expect(result.current.evaluatedReport!.column_drifts.category!.metrics[0]).toMatchObject({
+            threshold: 0.3, has_drift: true,
+        });
+        expect(loaded.column_drifts.category!.metrics[0]!.threshold).toBe(0.3);
+    });
+
     beforeEach(() => {
         vi.clearAllMocks();
     });

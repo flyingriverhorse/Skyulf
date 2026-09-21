@@ -123,47 +123,50 @@ class JobStrategy(ABC):
 
         Base implementation handles common metrics.
         """
-        # Extract metrics from the last node if available
-        if result.node_results:
-            last_node_id = list(result.node_results.keys())[-1]
-            last_result = result.node_results[last_node_id]
+        target_result = result.node_results.get(job.node_id)
+        if target_result is None:
+            raise ValueError(f"No execution result for job target node {job.node_id!r}")
+        if target_result.status != "success":
+            raise ValueError(
+                f"Job target node {job.node_id!r} did not succeed: {target_result.status}"
+            )
 
-            final_metrics = last_result.metrics.copy() if last_result.metrics else {}
+        final_metrics = target_result.metrics.copy() if target_result.metrics else {}
 
-            # Per-node execution-time roll-up — surfaces the same slow-step
-            # info the engine already collected, without re-instrumenting.
-            # (Top-N slowest nodes admin view) reads this off completed
-            # jobs to aggregate workspace-wide; if missing the page just
-            # shows an empty state for legacy jobs.
-            node_timings = self._collect_node_timings(result)
-            if node_timings:
-                final_metrics["node_timings"] = node_timings
+        # Per-node execution-time roll-up — surfaces the same slow-step
+        # info the engine already collected, without re-instrumenting.
+        # (Top-N slowest nodes admin view) reads this off completed
+        # jobs to aggregate workspace-wide; if missing the page just
+        # shows an empty state for legacy jobs.
+        node_timings = self._collect_node_timings(result)
+        if node_timings:
+            final_metrics["node_timings"] = node_timings
 
-            # Collect dropped columns from all nodes
-            all_dropped_columns = self._collect_dropped_columns(result)
-            if all_dropped_columns:
-                final_metrics["dropped_columns"] = all_dropped_columns
+        # Collect dropped columns from all nodes
+        all_dropped_columns = self._collect_dropped_columns(result)
+        if all_dropped_columns:
+            final_metrics["dropped_columns"] = all_dropped_columns
 
-            # Stamp a one-line summary the canvas can render on the
-            # trainer node card.
-            summary = self._resolve_job_summary(job, last_result, final_metrics)
-            if summary:
-                final_metrics["summary"] = summary
+        # Stamp a one-line summary the canvas can render on the
+        # trainer node card.
+        summary = self._resolve_job_summary(job, target_result, final_metrics)
+        if summary:
+            final_metrics["summary"] = summary
 
-            # Persist the pre-execution leakage-gate verdict so Job Details
-            # can show it as factual per-job information (legacy/preview
-            # runs carry none and simply omit the tile).
-            if result.leakage_verdict is not None:
-                final_metrics["leakage_gate"] = result.leakage_verdict
+        # Persist the pre-execution leakage-gate verdict so Job Details
+        # can show it as factual per-job information (legacy/preview
+        # runs carry none and simply omit the tile).
+        if result.leakage_verdict is not None:
+            final_metrics["leakage_gate"] = result.leakage_verdict
 
-            # Mermaid topology diagram for the Experiments "Pipeline Diagram"
-            # tab; legacy/preview runs carry none and the tab stays hidden.
-            if result.pipeline_diagram:
-                final_metrics["pipeline_diagram"] = result.pipeline_diagram
+        # Mermaid topology diagram for the Experiments "Pipeline Diagram"
+        # tab; legacy/preview runs carry none and the tab stays hidden.
+        if result.pipeline_diagram:
+            final_metrics["pipeline_diagram"] = result.pipeline_diagram
 
-            final_metrics = JSONSafeSerializer.clean_for_json(final_metrics)
-            job.metrics = final_metrics
-            self._seed_tuned_thresholds(job, final_metrics)
+        final_metrics = JSONSafeSerializer.clean_for_json(final_metrics)
+        job.metrics = final_metrics
+        self._seed_tuned_thresholds(job, final_metrics)
 
     @staticmethod
     def _seed_tuned_thresholds(job: MLJob, final_metrics: dict) -> None:

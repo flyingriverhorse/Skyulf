@@ -185,6 +185,15 @@ async def create_tables() -> None:
     logger.info("✅ Database tables created/updated")
 
 
+def _is_duplicate_column(original, dialect: str, column: str) -> bool:
+    """Recognize only driver-confirmed duplicate-column migration failures."""
+    return (dialect == "postgresql" and getattr(original, "sqlstate", None) == "42701") or (
+        dialect == "sqlite"
+        and getattr(original, "sqlite_errorcode", None) == 1
+        and str(original) == f"duplicate column name: {column}"
+    )
+
+
 async def _run_migrations() -> None:
     """Apply incremental schema migrations for columns added after initial table creation.
 
@@ -193,9 +202,9 @@ async def _run_migrations() -> None:
     ``_MIGRATIONS`` list below so that existing databases are patched on the
     next startup.
 
-    Each statement is executed inside its own try/except so that:
-    * Fresh databases (column already exists via create_all) skip silently.
-    * Repeated startups are idempotent.
+    Inspect columns before executing each ALTER so repeated startups are
+    idempotent. Missing legacy tables are optional; inspection and DDL failures
+    for the current schema propagate to prevent a falsely successful startup.
 
     HOW TO ADD A FUTURE MIGRATION:
         1. Add the column to the SQLAlchemy model as usual.
@@ -206,17 +215,18 @@ async def _run_migrations() -> None:
     if not async_engine:
         return
 
-    from sqlalchemy import text
+    from sqlalchemy import inspect, text
+    from sqlalchemy.exc import DBAPIError
 
     _MIGRATIONS: list[tuple[str, str]] = [
         # v0.5.0 — Promote Winner
-        ("0.5.0", "ALTER TABLE basic_training_jobs ADD COLUMN promoted_at DATETIME"),
-        ("0.5.0", "ALTER TABLE advanced_tuning_jobs ADD COLUMN promoted_at DATETIME"),
+        ("0.5.0", "ALTER TABLE basic_training_jobs ADD COLUMN promoted_at TIMESTAMP"),
+        ("0.5.0", "ALTER TABLE advanced_tuning_jobs ADD COLUMN promoted_at TIMESTAMP"),
         # v0.6.0 — Threshold Tuning Phase 2
         ("0.6.0", "ALTER TABLE training_jobs ADD COLUMN tuned_thresholds JSON"),
         (
             "0.6.0",
-            "ALTER TABLE training_jobs ADD COLUMN tuned_thresholds_enabled BOOLEAN NOT NULL DEFAULT 0",
+            "ALTER TABLE training_jobs ADD COLUMN tuned_thresholds_enabled BOOLEAN NOT NULL DEFAULT FALSE",
         ),
         # v0.7.6 — OPS-002 model-to-deployment lineage
         ("0.7.6", "ALTER TABLE deployments ADD COLUMN previous_deployment_id INTEGER"),
@@ -230,8 +240,8 @@ async def _run_migrations() -> None:
             "ALTER TABLE drift_check_results ADD COLUMN status VARCHAR(20) NOT NULL DEFAULT 'new'",
         ),
         ("0.7.6", "ALTER TABLE drift_check_results ADD COLUMN owner VARCHAR(255)"),
-        ("0.7.6", "ALTER TABLE drift_check_results ADD COLUMN acknowledged_at DATETIME"),
-        ("0.7.6", "ALTER TABLE drift_check_results ADD COLUMN resolved_at DATETIME"),
+        ("0.7.6", "ALTER TABLE drift_check_results ADD COLUMN acknowledged_at TIMESTAMP"),
+        ("0.7.6", "ALTER TABLE drift_check_results ADD COLUMN resolved_at TIMESTAMP"),
         ("0.7.6", "ALTER TABLE drift_check_results ADD COLUMN disposition_history JSON"),
         ("0.7.6", "ALTER TABLE drift_check_results ADD COLUMN threshold_version INTEGER"),
         ("0.7.6", "ALTER TABLE drift_check_results ADD COLUMN threshold_psi FLOAT"),
@@ -248,18 +258,43 @@ async def _run_migrations() -> None:
         ("0.7.6", "ALTER TABLE drift_check_results ADD COLUMN error_message TEXT"),
     ]
 
+    def needs_column(sync_conn, table, column):
+        """Skip existing columns and absent, retired job tables only."""
+        inspector = inspect(sync_conn)
+        if table in {"basic_training_jobs", "advanced_tuning_jobs"} and not inspector.has_table(
+            table
+        ):
+            return False
+        return column not in {item["name"] for item in inspector.get_columns(table)}
+
     applied = 0
     for version, ddl in _MIGRATIONS:
+        # Entries use the documented ALTER TABLE <table> ADD COLUMN <column>
+        # format; identifiers come exclusively from the static list above.
+        tokens = ddl.split()
+        table, column = tokens[2], tokens[5]
+
         try:
-            # Each migration runs in its own transaction so that a "column
-            # already exists" error on PostgreSQL does not abort the whole
-            # batch and crash startup.
             async with async_engine.begin() as conn:
+                if not await conn.run_sync(needs_column, table, column):
+                    continue
                 await conn.execute(text(ddl))
-            applied += 1
-            logger.info("Migration [%s] applied: %s", version, ddl)
-        except Exception:  # noqa: BLE001 - idempotent migration skips existing column
-            pass  # nosec B110 - Column already exists — idempotent migration, safe to skip
+        except DBAPIError as exc:
+            # A second startup worker may add the column after inspection.
+            # Accept only a driver-confirmed duplicate, then verify the schema
+            # in a new transaction after the failed ALTER has rolled back.
+            duplicate = _is_duplicate_column(exc.orig, async_engine.dialect.name, column)
+            if not duplicate:
+                raise
+            async with async_engine.begin() as conn:
+                columns = await conn.run_sync(
+                    lambda sync_conn, table_name: inspect(sync_conn).get_columns(table_name), table
+                )
+            if column not in {item["name"] for item in columns}:
+                raise
+            continue
+        applied += 1
+        logger.info("Migration [%s] applied: %s", version, ddl)
 
     if applied:
         logger.info("✅ %d migration(s) applied", applied)

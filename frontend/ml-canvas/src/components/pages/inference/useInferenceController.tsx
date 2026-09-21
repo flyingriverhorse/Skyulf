@@ -148,17 +148,13 @@ export function useInferenceController() {
                 }
                 const rows = parsed.map(r => {
                     if (excludedColumns.size === 0) return r;
-                    const cleaned: Record<string, unknown> = {};
-                    Object.entries(r).forEach(([k, v]) => {
-                        if (!excludedColumns.has(k)) cleaned[k] = v;
-                    });
-                    return cleaned;
+                    return Object.fromEntries(Object.entries(r).filter(([k]) => !excludedColumns.has(k)));
                 });
                 setInputData(JSON.stringify(rows, null, 2));
                 toast.success(`Loaded ${rows.length} row${rows.length === 1 ? '' : 's'} from CSV`);
             } catch (e) {
                 console.error('CSV parse failed', e);
-                toast.error('Could not parse CSV');
+                toast.error(e instanceof Error ? e.message : 'Could not parse CSV');
             }
         },
         [excludedColumns],
@@ -334,7 +330,11 @@ export function useInferenceController() {
     const handleAddOverrideEntry = () => {
         const cls = newOverrideClass.trim();
         const threshold = Number(newOverrideThreshold);
-        if (!cls || !Number.isFinite(threshold)) return;
+        if (!cls) return;
+        if (!newOverrideThreshold.trim() || !Number.isFinite(threshold)) {
+            setError('Enter a finite number for the threshold.');
+            return;
+        }
         setOverrideThresholdsValue(prev => ({ ...prev, [cls]: threshold }));
         setNewOverrideClass('');
         setNewOverrideThreshold('0.5');
@@ -352,7 +352,10 @@ export function useInferenceController() {
     /** Update the threshold value for an existing override entry. */
     const handleOverrideThresholdChange = (cls: string, value: string) => {
         const num = Number(value);
-        if (!Number.isFinite(num)) return;
+        if (!value.trim() || !Number.isFinite(num)) {
+            setError('Enter a finite number for the threshold.');
+            return;
+        }
         setOverrideThresholdsValue(prev => ({ ...prev, [cls]: num }));
     };
 

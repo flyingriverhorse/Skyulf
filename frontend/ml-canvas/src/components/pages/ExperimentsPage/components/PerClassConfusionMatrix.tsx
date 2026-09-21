@@ -47,20 +47,27 @@ export const PerClassConfusionMatrix: React.FC<Props> = ({
   // for every split, so it's memoised on the split data + selected class +
   // threshold to avoid recomputing on every unrelated re-render (e.g. every
   // pixel of drag on the threshold slider would otherwise recompute this).
-  const matrixBySplit = useMemo(() => {
+  const { matrixBySplit, thresholdError } = useMemo(() => {
     const result: Record<string, { classes: (string | number)[]; matrix: number[][] }> = {};
-    for (const [name, splitData] of Object.entries(evaluationData.splits)) {
-      result[name] = useTunedThresholds && tunedThresholds
-        ? applyMulticlassThresholds(splitData, tunedThresholds)
-        : applyThreshold(splitData, selectedRocClass, threshold);
+    try {
+      for (const [name, splitData] of Object.entries(evaluationData.splits)) {
+        result[name] = useTunedThresholds && tunedThresholds
+          ? applyMulticlassThresholds(splitData, tunedThresholds)
+          : applyThreshold(splitData, selectedRocClass, threshold);
+      }
+      return { matrixBySplit: result, thresholdError: null };
+    } catch (error) {
+      return { matrixBySplit: result, thresholdError: error instanceof Error ? error.message : 'Invalid tuned thresholds.' };
     }
-    return result;
   }, [evaluationData.splits, selectedRocClass, threshold, tunedThresholds, useTunedThresholds]);
+
+  if (thresholdError) return <p role="alert" className="text-sm text-red-600">{thresholdError} Preview new thresholds before saving or enabling them.</p>;
 
   // Only bail out for genuinely invalid data (0 or 1 classes) — 2-class
   // (binary) jobs now render via `renderSplitBinary` below instead of the
   // "N vs Rest" multiclass grid.
-  if ((evaluationData.splits.train?.y_proba?.classes.length ?? 0) < 2) return null;
+  const classCount = evaluationData.splits.train?.y_proba?.classes.length ?? 0;
+  if (classCount < 2) return null;
 
                             // Binary jobs: one plain N×N (2×2) matrix with real class
                             // names on both axes, instead of two redundant "vs Rest"
@@ -230,7 +237,7 @@ export const PerClassConfusionMatrix: React.FC<Props> = ({
                             };
 
                             const { trainEntry, testEntry, valEntry } = getVisibleSplits(evaluationData.splits, showTrainMetrics, showTestMetrics, showValMetrics);
-                            const isBinary = (evaluationData.splits.train?.y_proba?.classes.length ?? 0) === 2;
+                            const isBinary = classCount === 2;
                             const renderSplit = isBinary ? renderSplitBinary : renderSplitPerClass;
 
                             return (

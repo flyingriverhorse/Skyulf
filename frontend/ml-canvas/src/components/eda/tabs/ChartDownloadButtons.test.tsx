@@ -106,7 +106,7 @@ describe('EDA chart download buttons', () => {
   it('keeps the PCA download button disabled until PCA data is available', () => {
     renderWithClient(<PCAHarness profile={baseProfile} />);
 
-    const button = screen.getByRole('button', { name: /not enough numeric data for pca/i });
+    const button = screen.getByRole('button', { name: /pca results unavailable/i });
     expect(button).toBeDisabled();
   });
 

@@ -31,6 +31,7 @@ from backend.realtime.trial_buffer import record_iteration, record_trial
 from skyulf.data.catalog import DataCatalog
 from skyulf.data.dataset import SplitDataset
 from skyulf.engines.registry import EngineName, EngineRegistry
+from skyulf.engines.sklearn_bridge import SklearnBridge
 from skyulf.modeling._tuning.engine import TuningApplier, TuningCalculator
 from skyulf.modeling.base import StatefulEstimator
 from skyulf.modeling.clustering import _select_numeric_features
@@ -359,6 +360,7 @@ class NodeRunnersMixin:
         if not hasattr(frame, "columns") or len(frame.columns) == 0:
             return
         excluded = self._non_feature_training_columns(frame, target_col, tuning_params)
+        SklearnBridge.validate_features(frame[[c for c in frame.columns if c not in excluded]])
         _, dropped = _select_numeric_features(frame)
         offending = [c for c in dropped if c not in excluded]
         if not offending:
@@ -837,6 +839,12 @@ class NodeRunnersMixin:
             )
             if auto_space:
                 tuning_params["search_space"] = auto_space
+
+        if not tuning_params.get("search_space"):
+            raise ValueError(
+                "Configure at least one search parameter in Advanced mode, "
+                "or switch to Basic mode to train with fixed hyperparameters."
+            )
 
         return tuning_params
 

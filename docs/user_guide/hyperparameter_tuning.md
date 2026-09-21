@@ -292,7 +292,12 @@ metrics = estimator.evaluate(dataset=dataset, target_column="target")
 > **Seeds:** `random_state` pins the whole tuning run — candidate sampling,
 > per-candidate CV folds, and the final refit of the winner — while
 > `cv_random_state` pins only the post-tuning evaluation folds. Both default
-> to `DEFAULT_RANDOM_STATE` (`42`), so tuning is reproducible out of the box.
+> to `DEFAULT_RANDOM_STATE` (`42`). Reproducibility assumes the same engine,
+> ordered input values and dtypes, configuration, library versions, and execution
+> settings. A fixed seed does not guarantee bitwise-identical preprocessing or
+> fitted models across pandas and Polars. Floating-point differences can affect
+> iterative stopping and predictions, and consequently tuning scores or model
+> selection. Assess numerical tolerance for your dataset and estimator.
 > The seed itself is never a search-space candidate. In the canvas these are
 > the **Random State** field (Tuning Strategy section) and **Fold Split Seed**
 > (Cross Validation section).

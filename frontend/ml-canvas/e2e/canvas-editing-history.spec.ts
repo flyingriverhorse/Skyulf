@@ -49,9 +49,11 @@ test('hover, zoom, pan and repeated node selection leave history unchanged', asy
 test('reopening tuned model settings does not record identical loaded defaults', async ({ page }) => {
   // Clicking a configured trainer repeatedly must not fill history with invisible copies.
   await prepareCanvas(page);
-  await page.route('**/api/pipeline/hyperparameters/*/defaults?*', route => route.fulfill({
-    json: { n_estimators: [10, 20] },
-  }));
+  let defaultRequests = 0;
+  await page.route('**/api/pipeline/hyperparameters/*/defaults?*', route => {
+    defaultRequests++;
+    return route.fulfill({ json: { n_estimators: [10, 20] } });
+  });
   const id = await page.evaluate(() => {
     const store = window.__skyulfTest!.graphStore;
     const id = store.getState().addNode('classification', { x: 100, y: 350 }, {
@@ -64,11 +66,10 @@ test('reopening tuned model settings does not record identical loaded defaults',
   await page.locator('.react-flow__controls-fitview').click();
   const node = page.locator(`.react-flow__node[data-id="${id}"] [title="Classification"]`);
   for (let i = 0; i < 5; i++) {
-    const defaults = page.waitForResponse(response => response.url().includes('/defaults?'));
     await node.click();
-    await defaults;
     await page.getByRole('button', { name: 'Close settings panel', exact: true }).click();
   }
+  expect(defaultRequests).toBe(0);
   expect(await page.evaluate(() => window.__skyulfTest!.graphStore.temporal.getState().pastStates.length)).toBe(0);
 });
 

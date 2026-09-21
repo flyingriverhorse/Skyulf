@@ -34,7 +34,27 @@ def _class_threshold_array(thresholds: dict[Any, float], classes: np.ndarray) ->
             f"thresholds is missing entries for classes: {missing}. "
             "apply_thresholds() requires a threshold for every class."
         )
-    return np.array([float(thresholds[c]) for c in classes])
+    if len(thresholds) != len(classes):
+        raise ValueError("thresholds keys must match classes exactly")
+    values = np.array([float(thresholds[c]) for c in classes])
+    if len(classes) > 2:
+        if not np.all(np.isfinite(values) & (values > 0)):
+            raise ValueError("Multiclass thresholds must be positive finite numbers")
+    elif not np.all(np.isfinite(values) & (values >= 0)) or not np.any(values > 0):
+        raise ValueError("Binary thresholds must be finite nonnegative weights, not all zero")
+    return values
+
+
+def _apply_binary_weights(
+    y_proba: np.ndarray, weights: np.ndarray, classes: np.ndarray
+) -> np.ndarray:
+    """Apply binary weights with positive-class ties and inclusive cutoff one."""
+    # Cross multiplication avoids division by zero at complementary endpoints.
+    if weights[0] == 0:
+        return np.where(y_proba[:, 1] >= 1, classes[1], classes[0])
+    positive = y_proba[:, 1] * weights[0]
+    negative = y_proba[:, 0] * weights[1]
+    return np.where(positive >= negative, classes[1], classes[0])
 
 
 def apply_thresholds(
@@ -54,7 +74,8 @@ def apply_thresholds(
 
     Multiclass (3+ classes, ``thresholds`` covering every class): scaled
     argmax — ``classes[argmax(y_proba / thresholds, axis=1)]``. Equal
-    thresholds across all classes reduce to plain argmax.
+    thresholds across all classes reduce to plain argmax. Each threshold must
+    be finite and strictly positive; values above one are valid weights.
 
     Args:
         y_proba: Array-like of shape (n_samples, n_classes), predicted
@@ -99,16 +120,9 @@ def apply_thresholds(
         return np.where(y_proba[:, 1] >= threshold, classes[1], classes[0])
 
     thresholds_array = _class_threshold_array(thresholds, classes)
-    scaled = y_proba / thresholds_array
     if n_classes == 2:
-        # `np.argmax` breaks exact ties toward the first column, which would
-        # turn the documented binary rule (`>=` predicts the positive class)
-        # into a strict `>` for the full-coverage dict `_grid_search_binary`
-        # returns — so the search would score ties as positive while
-        # apply-time scoring counts them negative. Comparing the scaled scores
-        # directly keeps `>=` authoritative and is identical on every non-tied
-        # row.
-        return np.where(scaled[:, 1] >= scaled[:, 0], classes[1], classes[0])
+        return _apply_binary_weights(y_proba, thresholds_array, classes)
+    scaled = y_proba / thresholds_array
     return classes[np.argmax(scaled, axis=1)]
 
 

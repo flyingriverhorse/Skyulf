@@ -3,6 +3,40 @@ import { expect, it, vi } from 'vitest';
 import { SearchSpaceInput } from './SearchSpaceInput';
 import type { HyperparameterDef } from './types';
 
+/** Overflow candidates must invalidate the stored search, not leave a stale runnable value. */
+it.each(['Infinity', '1e400', 'NaN'])('blocks a nonfinite numeric draft %s', draft => {
+  const onChange = vi.fn();
+  render(<SearchSpaceInput def={{ name: 'p', label: 'Parameter', type: 'number', default: 1 }} value={[1]} onChange={onChange} />);
+  fireEvent.change(screen.getByRole('textbox'), { target: { value: draft } });
+  fireEvent.blur(screen.getByRole('textbox'));
+  expect(screen.getByRole('alert')).toHaveTextContent('not a valid number');
+  expect(onChange).toHaveBeenLastCalledWith([1], draft);
+});
+
+/** Reloaded draft errors remain visible, and an intentional None edit clears the persisted error. */
+it('restores an invalid draft and allows repair to an unchanged None candidate', () => {
+  const onChange = vi.fn();
+  render(<SearchSpaceInput def={{ name: 'p', label: 'Parameter', type: 'number', default: null }} value={[null]} invalidDraft="1e400" onChange={onChange} />);
+  const input = screen.getByRole('textbox');
+  expect(input).toHaveValue('1e400');
+  expect(input).toHaveAttribute('aria-invalid', 'true');
+  fireEvent.change(input, { target: { value: 'None' } });
+  fireEvent.blur(input);
+  expect(onChange).toHaveBeenLastCalledWith([null]);
+});
+
+/** A defaults reload must clear the old draft's visible error along with persisted state. */
+it('clears stale error styling when valid external defaults replace the draft', () => {
+  const def: HyperparameterDef = { name: 'p', label: 'Parameter', type: 'number', default: 1 };
+  const onChange = vi.fn();
+  const { rerender } = render(<SearchSpaceInput def={def} value={[1]} invalidDraft="1e400" onChange={onChange} />);
+  expect(screen.getByRole('textbox')).toHaveAttribute('aria-invalid', 'true');
+  rerender(<SearchSpaceInput def={def} value={[2]} onChange={onChange} />);
+  expect(screen.getByRole('textbox')).toHaveValue('2');
+  expect(screen.getByRole('textbox')).not.toHaveAttribute('aria-invalid');
+  expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+});
+
 /** Comma parsing keeps order, duplicates, nulls and the existing Number coercion. */
 it.each<{ type: HyperparameterDef['type']; draft: string; expected: unknown[] }>([
   { type: 'number', draft: '0, None, 0x10, , 0', expected: [0, null, 16, 0] },
@@ -19,7 +53,7 @@ it.each<{ type: HyperparameterDef['type']; draft: string; expected: unknown[] }>
   expect(onChange).toHaveBeenCalledExactlyOnceWith(expected);
 });
 
-/** Invalid candidates must retain the draft and report the first bad entry without emitting data. */
+/** Invalid candidates retain the draft; numeric errors also block the stored search. */
 it.each([
   { type: 'number' as const, draft: '1, bad, worse', message: '"bad" is not a valid number' },
   { type: 'boolean' as const, draft: 'true, bad', message: '"bad" must be true or false' },
@@ -31,7 +65,7 @@ it.each([
   fireEvent.blur(input);
   expect(screen.getByRole('alert')).toHaveTextContent(message);
   expect(input).toHaveValue(draft);
-  expect(onChange).not.toHaveBeenCalled();
+  expect(onChange).toHaveBeenCalledExactlyOnceWith([1], draft);
   fireEvent.change(input, { target: { value: '' } });
   expect(screen.queryByRole('alert')).not.toBeInTheDocument();
 });

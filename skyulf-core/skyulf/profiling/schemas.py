@@ -323,6 +323,8 @@ class SeasonalityStats(_ProfileModel):
 
     day_of_week: list[dict[str, Any]]
     month_of_year: list[dict[str, Any]]
+    aggregation: Literal["mean", "count"] | None = None
+    metric: str | None = None
 
 
 class TimeSeriesAnalysis(_ProfileModel):

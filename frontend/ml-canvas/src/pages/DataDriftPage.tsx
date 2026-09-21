@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, BarChart2, Loader2, RefreshCw, Settings } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
 import type { DriftThresholds } from '../core/api/monitoring';
+import { DEFAULT_DRIFT_THRESHOLDS as DEFAULT_THRESHOLDS } from '../core/utils/driftThresholds';
 import { ErrorState } from '../components/shared';
 import { DriftAlertModal } from './drift/DriftAlertModal';
 import { DriftAlertsHistoryTable } from './drift/DriftAlertsHistoryTable';
@@ -21,8 +22,6 @@ import { useDriftJobs } from './drift/_hooks/useDriftJobs';
 import { useDriftReport } from './drift/_hooks/useDriftReport';
 import { useSortConfig } from './drift/_hooks/useSortConfig';
 import { exportDriftReportCSV } from './drift/_utils/csvExport';
-
-const DEFAULT_THRESHOLDS: DriftThresholds = { psi: 0.2, ks: 0.1, wasserstein: 0.1, kl: 0.1 };
 
 interface DriftToolbarProps {
     jobs: React.ComponentProps<typeof JobSelector>['jobs'];
@@ -131,7 +130,7 @@ export const DataDriftPage: React.FC = () => {
 
     // Data sources
     const { jobs, refreshing, refresh, updateJobDescription } = useDriftJobs();
-    const { evaluatedReport, loading, error, errorKind, setError, calculate } =
+    const { report, evaluatedReport, loading, error, errorKind, setError, calculate } =
         useDriftReport(thresholds);
     const { driftHistory, columnSparklines, refreshHistory } = useDriftHistory(selectedJob);
     const { sortConfig, handleSort, clearSort } = useSortConfig();
@@ -186,7 +185,7 @@ export const DataDriftPage: React.FC = () => {
                     onToggleThresholds={() => setShowThresholds(p => !p)}
                 />
 
-                {showThresholds && <ThresholdsPanel thresholds={thresholds} onChange={setThresholds} />}
+                {showThresholds && <ThresholdsPanel thresholds={thresholds} onChange={setThresholds} report={report} />}
 
                 {selectedJobData && (
                     <SelectedJobMeta

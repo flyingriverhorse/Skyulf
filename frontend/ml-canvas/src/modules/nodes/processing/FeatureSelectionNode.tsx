@@ -1,5 +1,6 @@
 import { useValidationReveal } from '../../../components/shared/ValidationField';
 import React, { useState } from 'react';
+import { featureSelectionNumericIssue } from './featureSelection/numericValidation';
 import { NodeDefinition } from '../../../core/types/nodes';
 import { Filter } from 'lucide-react';
 import { useIsWideContainer } from '../../../core/hooks/useIsWideContainer';
@@ -70,6 +71,8 @@ export const FeatureSelectionNode: NodeDefinition<FeatureSelectionConfig> = {
     return method;
   },
   validate: (config) => {
+    const numeric = featureSelectionNumericIssue(config);
+    if (numeric) return numeric;
     if (config.method !== 'variance_threshold' && config.method !== 'correlation_threshold' && !config.target_column) {
       return { isValid: false, field: 'target_column', message: 'Target column is required for this method.' };
     }

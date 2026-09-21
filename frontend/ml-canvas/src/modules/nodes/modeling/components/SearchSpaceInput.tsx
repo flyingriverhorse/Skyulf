@@ -6,7 +6,8 @@ import type { HyperparameterDef } from './types';
 export interface SearchSpaceInputProps {
     def: HyperparameterDef;
     value: unknown[];
-    onChange: (values: unknown[]) => void;
+    onChange: (values: unknown[], invalidDraft?: string) => void;
+    invalidDraft?: string | undefined;
 }
 
 function ExclusiveOptionsHint({ def }: { def: HyperparameterDef }) {
@@ -29,14 +30,21 @@ function ExclusiveOptionsHint({ def }: { def: HyperparameterDef }) {
  * Comma-separated entries get parsed/validated against the param's type.
  * For `select` defs, option chips toggle inclusion in the value list.
  */
-export const SearchSpaceInput: React.FC<SearchSpaceInputProps> = ({ def, value, onChange }) => {
+export const SearchSpaceInput: React.FC<SearchSpaceInputProps> = ({ def, value, onChange, invalidDraft }) => {
     const fieldId = useId();
     const [localValue, setLocalValue] = useState('');
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
+        if (invalidDraft !== undefined) {
+            setLocalValue(invalidDraft);
+            setError('Correct this invalid search candidate before running.');
+            return;
+        }
+        if (value.some(candidate => typeof candidate === 'number' && !Number.isFinite(candidate))) return;
+        setError(null);
         setLocalValue(Array.isArray(value) ? value.map(v => v === null ? 'None' : v).join(', ') : '');
-    }, [value]);
+    }, [value, invalidDraft]);
 
     const validateAndParse = (input: string): unknown[] => {
         if (!input.trim()) return [];
@@ -52,7 +60,7 @@ export const SearchSpaceInput: React.FC<SearchSpaceInputProps> = ({ def, value, 
 
             if (def.type === 'number') {
                 const num = Number(part);
-                if (Number.isNaN(num)) {
+                if (!Number.isFinite(num)) {
                     throw new Error(`"${part}" is not a valid number`);
                 }
                 parsed.push(num);
@@ -78,11 +86,12 @@ export const SearchSpaceInput: React.FC<SearchSpaceInputProps> = ({ def, value, 
             }
             setError(null);
             // Avoid identity-only re-renders that could loop upstream effects
-            if (JSON.stringify(parsed) !== JSON.stringify(value)) {
+            if (invalidDraft !== undefined || parsed.length !== value.length || parsed.some((candidate, index) => !Object.is(candidate, value[index]))) {
                 onChange(parsed);
             }
         } catch (err: unknown) {
             setError((err as Error).message);
+            onChange(value, localValue);
         }
     };
 

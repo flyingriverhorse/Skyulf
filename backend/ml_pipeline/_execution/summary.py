@@ -577,18 +577,21 @@ def _best_score_value_and_label(metrics: Mapping[str, Any], best: float) -> tupl
     # Flip the sign so the card shows the natural magnitude.
     value = float(best)
     if scoring_raw.startswith("neg_") and value <= 0:
-        value = -value
+        value = abs(value)
     label = _SCORING_LABEL.get(scoring_raw) or (scoring_raw.replace("_", " ") or "score")
     return value, label
 
 
 def _best_score_headline(metrics: Mapping[str, Any], n_trials: int | None) -> str | None:
-    """Render the "<label> <value>" headline from ``best_score``, or ``None`` if absent."""
-    best = metrics.get("best_score")
-    if not isinstance(best, int | float) or isinstance(best, bool):
+    """Render a finite objective or mark it unavailable; only absent scores fall back."""
+    if "best_score" not in metrics:
         return None
-    value, label = _best_score_value_and_label(metrics, best)
-    head = f"{label} {value:.3f}"
+    best = metrics.get("best_score")
+    if not isinstance(best, int | float) or isinstance(best, bool) or not math.isfinite(best):
+        head = "Tuning score unavailable"
+    else:
+        value, label = _best_score_value_and_label(metrics, best)
+        head = f"{label} {value:.3f}"
     return f"{head} · {n_trials} trials" if n_trials else head
 
 

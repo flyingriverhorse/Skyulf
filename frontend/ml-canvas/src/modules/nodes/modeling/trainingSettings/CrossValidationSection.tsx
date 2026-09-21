@@ -1,3 +1,5 @@
+import { ValidationField } from '../../../../components/shared/ValidationField';
+import { numericDraft, numericInputValue } from '../../../../core/utils/numericValidation';
 import { BarChart3, ChevronRight, AlertTriangle } from 'lucide-react';
 import { HelpTooltip } from '../components/HelpTooltip';
 import type { TrainingSettingsState } from './useTrainingSettings';
@@ -75,14 +77,14 @@ function CrossValidationOptions({
         <div className="grid grid-cols-2 gap-3">
             <div>
                 <label htmlFor={`${fieldId}-cv-folds`} className="block text-xs text-gray-500 mb-1">Folds</label>
-                <input
+                <ValidationField field="cv_folds"><input
                     id={`${fieldId}-cv-folds`}
                     type="number"
-                    value={config.cv_folds ?? 5}
-                    onChange={(e) => onChange({ ...config, cv_folds: Number(e.target.value) })}
+                    value={numericInputValue(config.cv_folds, 5)}
+                    onChange={(e) => onChange({ ...config, cv_folds: numericDraft(e.target.value) })}
                     className="w-full border border-gray-300 dark:border-gray-600 rounded p-1.5 text-sm bg-white dark:bg-gray-800 dark:text-gray-100"
                     min={2}
-                />
+                /></ValidationField>
             </div>
             <div>
                 <label htmlFor={`${fieldId}-cv-method`} className="block text-xs text-gray-500 mb-1">Method</label>
@@ -153,14 +155,14 @@ function CrossValidationOptions({
                     <label htmlFor={`${fieldId}-cv-seed`} className="block text-xs text-gray-500">Fold Split Seed</label>
                     <HelpTooltip text="Seed controlling how rows are dealt to folds — same seed = identical fold splits, so CV scores stay comparable across runs." />
                 </div>
-                <input
+                <ValidationField field="cv_random_state"><input
                     id={`${fieldId}-cv-seed`}
                     type="number"
-                    value={config.cv_random_state ?? 42}
-                    onChange={(e) => onChange({ ...config, cv_random_state: Number(e.target.value) })}
+                    value={numericInputValue(config.cv_random_state, 42)}
+                    onChange={(e) => onChange({ ...config, cv_random_state: numericDraft(e.target.value) })}
                     className="w-full border border-gray-300 dark:border-gray-600 rounded p-1.5 text-sm bg-white dark:bg-gray-800 dark:text-gray-100"
                     min={0}
-                />
+                /></ValidationField>
             </div>
         )}
     </div>

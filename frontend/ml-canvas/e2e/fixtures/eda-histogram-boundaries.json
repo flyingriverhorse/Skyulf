@@ -1,0 +1,304 @@
+{
+ "values": [
+  0.0,
+  0.001,
+  0.999,
+  1.0,
+  1.001,
+  1.999,
+  2.0,
+  2.001,
+  2.999,
+  3.0,
+  3.001,
+  3.999,
+  4.0,
+  4.001,
+  4.999,
+  5.0,
+  5.001,
+  5.999,
+  6.0,
+  6.001,
+  6.999,
+  7.0,
+  7.001,
+  7.999,
+  8.0,
+  8.001,
+  8.999,
+  9.0,
+  9.001,
+  9.999,
+  10.0,
+  10.001,
+  10.999,
+  11.0,
+  11.001,
+  11.999,
+  12.0,
+  12.001,
+  12.999,
+  13.0,
+  13.001,
+  13.999,
+  14.0,
+  14.001,
+  14.999,
+  15.0,
+  15.001,
+  15.999,
+  16.0,
+  16.001,
+  16.999,
+  17.0,
+  17.001,
+  17.999,
+  18.0,
+  18.001,
+  18.999,
+  19.0,
+  19.001,
+  19.999,
+  20.0,
+  null
+ ],
+ "excluded_values": [
+  0.0,
+  1.0,
+  10.0,
+  20.0,
+  null
+ ],
+ "existing_filters": [
+  {
+   "column": "cohort",
+   "operator": "==",
+   "value": "keep"
+  }
+ ],
+ "profile": {
+  "row_count": 62,
+  "column_count": 2,
+  "columns": {
+   "value": {
+    "name": "value",
+    "dtype": "Numeric",
+    "missing_count": 1,
+    "missing_percentage": 1.6129032258064515,
+    "histogram": [
+     {
+      "start": 0.0,
+      "end": 1.0,
+      "count": 4
+     },
+     {
+      "start": 1.0,
+      "end": 2.0,
+      "count": 3
+     },
+     {
+      "start": 2.0,
+      "end": 3.0,
+      "count": 3
+     },
+     {
+      "start": 3.0,
+      "end": 4.0,
+      "count": 3
+     },
+     {
+      "start": 4.0,
+      "end": 5.0,
+      "count": 3
+     },
+     {
+      "start": 5.0,
+      "end": 6.0,
+      "count": 3
+     },
+     {
+      "start": 6.0,
+      "end": 7.0,
+      "count": 3
+     },
+     {
+      "start": 7.0,
+      "end": 8.0,
+      "count": 3
+     },
+     {
+      "start": 8.0,
+      "end": 9.0,
+      "count": 3
+     },
+     {
+      "start": 9.0,
+      "end": 10.0,
+      "count": 3
+     },
+     {
+      "start": 10.0,
+      "end": 11.0,
+      "count": 3
+     },
+     {
+      "start": 11.0,
+      "end": 12.0,
+      "count": 3
+     },
+     {
+      "start": 12.0,
+      "end": 13.0,
+      "count": 3
+     },
+     {
+      "start": 13.0,
+      "end": 14.0,
+      "count": 3
+     },
+     {
+      "start": 14.0,
+      "end": 15.0,
+      "count": 3
+     },
+     {
+      "start": 15.0,
+      "end": 16.0,
+      "count": 3
+     },
+     {
+      "start": 16.0,
+      "end": 17.0,
+      "count": 3
+     },
+     {
+      "start": 17.0,
+      "end": 18.0,
+      "count": 3
+     },
+     {
+      "start": 18.0,
+      "end": 19.0,
+      "count": 3
+     },
+     {
+      "start": 19.0,
+      "end": 20.0,
+      "count": 3
+     }
+    ]
+   }
+  },
+  "active_filters": [
+   {
+    "column": "cohort",
+    "operator": "==",
+    "value": "keep"
+   }
+  ]
+ },
+ "expected_bin_counts": [
+  4,
+  3,
+  3,
+  3,
+  3,
+  3,
+  3,
+  3,
+  3,
+  3,
+  3,
+  3,
+  3,
+  3,
+  3,
+  3,
+  3,
+  3,
+  3,
+  3
+ ],
+ "cases": [
+  {
+   "name": "first",
+   "bin_index": 0,
+   "filters": [
+    {
+     "column": "cohort",
+     "operator": "==",
+     "value": "keep"
+    },
+    {
+     "column": "value",
+     "operator": ">=",
+     "value": 0
+    },
+    {
+     "column": "value",
+     "operator": "<=",
+     "value": 1
+    }
+   ],
+   "expected_values": [
+    0.0,
+    0.001,
+    0.999,
+    1.0
+   ]
+  },
+  {
+   "name": "middle",
+   "bin_index": 9,
+   "filters": [
+    {
+     "column": "cohort",
+     "operator": "==",
+     "value": "keep"
+    },
+    {
+     "column": "value",
+     "operator": ">",
+     "value": 9
+    },
+    {
+     "column": "value",
+     "operator": "<=",
+     "value": 10
+    }
+   ],
+   "expected_values": [
+    9.001,
+    9.999,
+    10.0
+   ]
+  },
+  {
+   "name": "last",
+   "bin_index": 19,
+   "filters": [
+    {
+     "column": "cohort",
+     "operator": "==",
+     "value": "keep"
+    },
+    {
+     "column": "value",
+     "operator": ">",
+     "value": 19
+    },
+    {
+     "column": "value",
+     "operator": "<=",
+     "value": 20
+    }
+   ],
+   "expected_values": [
+    19.001,
+    19.999,
+    20.0
+   ]
+  }
+ ]
+}

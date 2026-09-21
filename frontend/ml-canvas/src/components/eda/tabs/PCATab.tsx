@@ -66,7 +66,7 @@ export const PCATab: React.FC<PCATabProps> = ({ profile, isPCA3D, setIsPCA3D, do
     const canDownload = Array.isArray(profile.pca_data) && profile.pca_data.length > 0;
     const downloadHint = canDownload
         ? 'Download Chart'
-        : 'Not enough numeric data for PCA';
+        : 'PCA results unavailable';
 
     const pcaData = useMemo(() => profile.pca_data ?? [], [profile.pca_data]);
 
@@ -143,7 +143,7 @@ export const PCATab: React.FC<PCATabProps> = ({ profile, isPCA3D, setIsPCA3D, do
                     )
                 ) : (
                     <div className="h-64 flex items-center justify-center bg-gray-50 dark:bg-gray-900 rounded text-gray-400 text-sm text-center p-4">
-                        Not enough numeric data for PCA.
+                        No PCA projection was recorded for this report.
                     </div>
                 )}
                 </div>

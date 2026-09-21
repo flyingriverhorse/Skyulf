@@ -139,7 +139,7 @@ class ArtifactsMixin:
         """Finalize training by saving standard artifacts.
 
         1. Reference Data for Drift Detection (if not already present).
-        2. Model Artifact (node_id and job_id).
+        2. Model Artifact under node_id; the job key is published after bundling.
         """
         # Save Reference Data for Drift Detection
         # Only overwrite if it doesn't exist (prefer Raw/Splitter data over Scaled/Transformed data)
@@ -154,9 +154,6 @@ class ArtifactsMixin:
 
         # Manually save the model artifact
         self.artifact_store.save(node_id, model_artifact)
-        if job_id and job_id != "unknown":
-            self.log(f"Saving model artifact to job key: {job_id}")
-            self.artifact_store.save(job_id, model_artifact)
 
     @staticmethod
     def _target_name(y: Any) -> str:

@@ -1,4 +1,5 @@
 import { apiClient } from './client';
+import { validateThresholds } from '../utils/thresholdValidation';
 
 /** Class-prediction objectives accepted by the threshold preview/save endpoints. */
 export const THRESHOLD_TUNING_METRICS: readonly string[] = ['accuracy', 'f1', 'precision', 'recall', 'balanced_accuracy'];
@@ -50,11 +51,13 @@ export const thresholdTuningApi = {
       `/pipeline/jobs/${jobId}/thresholds/preview`,
       { metric },
     );
+    validateThresholds(response.data.thresholds, response.data.classes);
     return response.data;
   },
 
   /** Persist tuned thresholds against the job. */
   save: async (jobId: string, payload: ThresholdSavePayload): Promise<void> => {
+    validateThresholds(payload.thresholds, payload.classes);
     await apiClient.post(`/pipeline/jobs/${jobId}/thresholds/save`, payload);
   },
 
