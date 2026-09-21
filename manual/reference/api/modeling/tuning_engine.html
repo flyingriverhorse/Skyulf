@@ -3424,11 +3424,7 @@ existing test surface.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>skyulf-core/skyulf/modeling/_tuning/engine.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 969</span>
-<span class="normal"> 970</span>
-<span class="normal"> 971</span>
-<span class="normal"> 972</span>
-<span class="normal"> 973</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 973</span>
 <span class="normal"> 974</span>
 <span class="normal"> 975</span>
 <span class="normal"> 976</span>
@@ -3495,7 +3491,11 @@ existing test surface.</p>
 <span class="normal">1037</span>
 <span class="normal">1038</span>
 <span class="normal">1039</span>
-<span class="normal">1040</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">TuningApplier</span><span class="p">(</span><span class="n">BaseModelApplier</span><span class="p">):</span>
+<span class="normal">1040</span>
+<span class="normal">1041</span>
+<span class="normal">1042</span>
+<span class="normal">1043</span>
+<span class="normal">1044</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">TuningApplier</span><span class="p">(</span><span class="n">BaseModelApplier</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""Applier for TuningCalculator.</span>
 
 <span class="sd">    Wraps the base model applier to provide predictions using the refitted best model.</span>
@@ -3536,7 +3536,7 @@ existing test surface.</p>
             <span class="p">):</span>
                 <span class="c1"># F-13: apply the decision thresholds tuned on the validation</span>
                 <span class="c1"># split instead of the model's default decision rule.</span>
-                <span class="n">X_np</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">SklearnBridge</span><span class="o">.</span><span class="n">to_sklearn</span><span class="p">(</span><span class="n">df</span><span class="p">)</span>
+                <span class="n">X_np</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">SklearnBridge</span><span class="o">.</span><span class="n">to_sklearn</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">validate_features</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
                 <span class="n">y_proba</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">predict_proba</span><span class="p">(</span><span class="n">X_np</span><span class="p">)</span>
                 <span class="n">preds</span> <span class="o">=</span> <span class="n">apply_thresholds</span><span class="p">(</span><span class="n">y_proba</span><span class="p">,</span> <span class="n">thresholds</span><span class="p">,</span> <span class="n">classes</span><span class="o">=</span><span class="n">model</span><span class="o">.</span><span class="n">classes_</span><span class="p">)</span>
                 <span class="n">index</span> <span class="o">=</span> <span class="n">cast</span><span class="p">(</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">df</span><span class="p">)</span><span class="o">.</span><span class="n">index</span> <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="s2">"index"</span><span class="p">)</span> <span class="k">else</span> <span class="kc">None</span>
@@ -3602,14 +3602,14 @@ delegate, keeping the tuner transparent at serving time.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>skyulf-core/skyulf/modeling/_tuning/engine.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">975</span>
-<span class="normal">976</span>
-<span class="normal">977</span>
-<span class="normal">978</span>
-<span class="normal">979</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">979</span>
 <span class="normal">980</span>
 <span class="normal">981</span>
-<span class="normal">982</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">base_applier</span><span class="p">:</span> <span class="n">BaseModelApplier</span><span class="p">):</span>
+<span class="normal">982</span>
+<span class="normal">983</span>
+<span class="normal">984</span>
+<span class="normal">985</span>
+<span class="normal">986</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">base_applier</span><span class="p">:</span> <span class="n">BaseModelApplier</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""Store the base applier that performs the actual predictions.</span>
 
 <span class="sd">    The tuning artifact is a ``(model, tuning_result)`` tuple; unless</span>
@@ -3646,11 +3646,7 @@ nodes still receive correctly shaped output.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>skyulf-core/skyulf/modeling/_tuning/engine.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 984</span>
-<span class="normal"> 985</span>
-<span class="normal"> 986</span>
-<span class="normal"> 987</span>
-<span class="normal"> 988</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 988</span>
 <span class="normal"> 989</span>
 <span class="normal"> 990</span>
 <span class="normal"> 991</span>
@@ -3685,7 +3681,11 @@ nodes still receive correctly shaped output.</p>
 <span class="normal">1020</span>
 <span class="normal">1021</span>
 <span class="normal">1022</span>
-<span class="normal">1023</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">predict</span><span class="p">(</span>
+<span class="normal">1023</span>
+<span class="normal">1024</span>
+<span class="normal">1025</span>
+<span class="normal">1026</span>
+<span class="normal">1027</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">predict</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">df</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span> <span class="o">|</span> <span class="n">SkyulfDataFrame</span><span class="p">,</span>
     <span class="n">model_artifact</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
@@ -3711,7 +3711,7 @@ nodes still receive correctly shaped output.</p>
         <span class="p">):</span>
             <span class="c1"># F-13: apply the decision thresholds tuned on the validation</span>
             <span class="c1"># split instead of the model's default decision rule.</span>
-            <span class="n">X_np</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">SklearnBridge</span><span class="o">.</span><span class="n">to_sklearn</span><span class="p">(</span><span class="n">df</span><span class="p">)</span>
+            <span class="n">X_np</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">SklearnBridge</span><span class="o">.</span><span class="n">to_sklearn</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">validate_features</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
             <span class="n">y_proba</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">predict_proba</span><span class="p">(</span><span class="n">X_np</span><span class="p">)</span>
             <span class="n">preds</span> <span class="o">=</span> <span class="n">apply_thresholds</span><span class="p">(</span><span class="n">y_proba</span><span class="p">,</span> <span class="n">thresholds</span><span class="p">,</span> <span class="n">classes</span><span class="o">=</span><span class="n">model</span><span class="o">.</span><span class="n">classes_</span><span class="p">)</span>
             <span class="n">index</span> <span class="o">=</span> <span class="n">cast</span><span class="p">(</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">df</span><span class="p">)</span><span class="o">.</span><span class="n">index</span> <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="s2">"index"</span><span class="p">)</span> <span class="k">else</span> <span class="kc">None</span>
@@ -3751,11 +3751,7 @@ the <code>(model, tuning_result)</code> tuple the tuner produces.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>skyulf-core/skyulf/modeling/_tuning/engine.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1025</span>
-<span class="normal">1026</span>
-<span class="normal">1027</span>
-<span class="normal">1028</span>
-<span class="normal">1029</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1029</span>
 <span class="normal">1030</span>
 <span class="normal">1031</span>
 <span class="normal">1032</span>
@@ -3766,7 +3762,11 @@ the <code>(model, tuning_result)</code> tuple the tuner produces.</p>
 <span class="normal">1037</span>
 <span class="normal">1038</span>
 <span class="normal">1039</span>
-<span class="normal">1040</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">predict_proba</span><span class="p">(</span>
+<span class="normal">1040</span>
+<span class="normal">1041</span>
+<span class="normal">1042</span>
+<span class="normal">1043</span>
+<span class="normal">1044</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">predict_proba</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">df</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span> <span class="o">|</span> <span class="n">SkyulfDataFrame</span><span class="p">,</span>
     <span class="n">model_artifact</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
@@ -4539,7 +4539,11 @@ and requires the Optuna integration package.</p>
 <span class="normal">963</span>
 <span class="normal">964</span>
 <span class="normal">965</span>
-<span class="normal">966</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">TuningCalculator</span><span class="p">(</span><span class="n">BaseModelCalculator</span><span class="p">):</span>
+<span class="normal">966</span>
+<span class="normal">967</span>
+<span class="normal">968</span>
+<span class="normal">969</span>
+<span class="normal">970</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">TuningCalculator</span><span class="p">(</span><span class="n">BaseModelCalculator</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""Tune a plain ``BaseModelCalculator`` and refit it with the best parameters.</span>
 
 <span class="sd">    ``fit`` accepts a ``TuningConfig`` or dict with ``strategy``, ``metric``,</span>
@@ -4893,7 +4897,7 @@ and requires the Optuna integration package.</p>
         <span class="p">)</span>
 
         <span class="c1"># Convert data to Numpy for tuning</span>
-        <span class="n">X_np</span><span class="p">,</span> <span class="n">y_np</span> <span class="o">=</span> <span class="n">SklearnBridge</span><span class="o">.</span><span class="n">to_sklearn</span><span class="p">((</span><span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">))</span>
+        <span class="n">X_np</span><span class="p">,</span> <span class="n">y_np</span> <span class="o">=</span> <span class="n">SklearnBridge</span><span class="o">.</span><span class="n">to_sklearn</span><span class="p">((</span><span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">),</span> <span class="n">validate_features</span><span class="o">=</span><span class="n">preprocessing</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">)</span>
 
         <span class="c1"># --- VALIDATION: Check for NaNs/Inf in Data ---</span>
         <span class="c1"># Query the installed estimator rather than a model-name allowlist:</span>
@@ -4922,7 +4926,9 @@ and requires the Optuna integration package.</p>
         <span class="n">validation_data_np</span> <span class="o">=</span> <span class="kc">None</span>
         <span class="k">if</span> <span class="n">validation_data</span><span class="p">:</span>
             <span class="n">X_val</span><span class="p">,</span> <span class="n">y_val</span> <span class="o">=</span> <span class="n">validation_data</span>
-            <span class="n">X_val_np</span><span class="p">,</span> <span class="n">y_val_np</span> <span class="o">=</span> <span class="n">SklearnBridge</span><span class="o">.</span><span class="n">to_sklearn</span><span class="p">((</span><span class="n">X_val</span><span class="p">,</span> <span class="n">y_val</span><span class="p">))</span>
+            <span class="n">X_val_np</span><span class="p">,</span> <span class="n">y_val_np</span> <span class="o">=</span> <span class="n">SklearnBridge</span><span class="o">.</span><span class="n">to_sklearn</span><span class="p">(</span>
+                <span class="p">(</span><span class="n">X_val</span><span class="p">,</span> <span class="n">y_val</span><span class="p">),</span> <span class="n">validate_features</span><span class="o">=</span><span class="n">preprocessing</span> <span class="ow">is</span> <span class="kc">None</span>
+            <span class="p">)</span>
             <span class="n">validation_data_np</span> <span class="o">=</span> <span class="p">(</span><span class="n">X_val_np</span><span class="p">,</span> <span class="n">y_val_np</span><span class="p">)</span>
 
         <span class="c1"># Wrap the whole candidate/fold search: sklearn's ConvergenceWarning</span>
@@ -4953,7 +4959,9 @@ and requires the Optuna integration package.</p>
         <span class="c1"># and what serving will use for predictions.</span>
         <span class="k">if</span> <span class="n">preprocessing</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
             <span class="n">X_refit_frame</span><span class="p">,</span> <span class="n">y_refit_frame</span> <span class="o">=</span> <span class="n">preprocessing</span><span class="o">.</span><span class="n">fit_transform</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">)</span>
-            <span class="n">X_refit</span><span class="p">,</span> <span class="n">y_refit</span> <span class="o">=</span> <span class="n">SklearnBridge</span><span class="o">.</span><span class="n">to_sklearn</span><span class="p">((</span><span class="n">X_refit_frame</span><span class="p">,</span> <span class="n">y_refit_frame</span><span class="p">))</span>
+            <span class="n">X_refit</span><span class="p">,</span> <span class="n">y_refit</span> <span class="o">=</span> <span class="n">SklearnBridge</span><span class="o">.</span><span class="n">to_sklearn</span><span class="p">(</span>
+                <span class="p">(</span><span class="n">X_refit_frame</span><span class="p">,</span> <span class="n">y_refit_frame</span><span class="p">),</span> <span class="n">validate_features</span><span class="o">=</span><span class="kc">True</span>
+            <span class="p">)</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="n">X_refit</span><span class="p">,</span> <span class="n">y_refit</span> <span class="o">=</span> <span class="n">X_np</span><span class="p">,</span> <span class="n">y_np</span>
         <span class="n">model</span> <span class="o">=</span> <span class="n">refit_best_model</span><span class="p">(</span>
@@ -5499,7 +5507,11 @@ intact.</p>
 <span class="normal">703</span>
 <span class="normal">704</span>
 <span class="normal">705</span>
-<span class="normal">706</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">fit</span><span class="p">(</span>
+<span class="normal">706</span>
+<span class="normal">707</span>
+<span class="normal">708</span>
+<span class="normal">709</span>
+<span class="normal">710</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">fit</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">X</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span> <span class="o">|</span> <span class="n">SkyulfDataFrame</span><span class="p">,</span>
     <span class="n">y</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span> <span class="o">|</span> <span class="n">Any</span><span class="p">,</span>
@@ -5553,7 +5565,7 @@ intact.</p>
     <span class="p">)</span>
 
     <span class="c1"># Convert data to Numpy for tuning</span>
-    <span class="n">X_np</span><span class="p">,</span> <span class="n">y_np</span> <span class="o">=</span> <span class="n">SklearnBridge</span><span class="o">.</span><span class="n">to_sklearn</span><span class="p">((</span><span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">))</span>
+    <span class="n">X_np</span><span class="p">,</span> <span class="n">y_np</span> <span class="o">=</span> <span class="n">SklearnBridge</span><span class="o">.</span><span class="n">to_sklearn</span><span class="p">((</span><span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">),</span> <span class="n">validate_features</span><span class="o">=</span><span class="n">preprocessing</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">)</span>
 
     <span class="c1"># --- VALIDATION: Check for NaNs/Inf in Data ---</span>
     <span class="c1"># Query the installed estimator rather than a model-name allowlist:</span>
@@ -5582,7 +5594,9 @@ intact.</p>
     <span class="n">validation_data_np</span> <span class="o">=</span> <span class="kc">None</span>
     <span class="k">if</span> <span class="n">validation_data</span><span class="p">:</span>
         <span class="n">X_val</span><span class="p">,</span> <span class="n">y_val</span> <span class="o">=</span> <span class="n">validation_data</span>
-        <span class="n">X_val_np</span><span class="p">,</span> <span class="n">y_val_np</span> <span class="o">=</span> <span class="n">SklearnBridge</span><span class="o">.</span><span class="n">to_sklearn</span><span class="p">((</span><span class="n">X_val</span><span class="p">,</span> <span class="n">y_val</span><span class="p">))</span>
+        <span class="n">X_val_np</span><span class="p">,</span> <span class="n">y_val_np</span> <span class="o">=</span> <span class="n">SklearnBridge</span><span class="o">.</span><span class="n">to_sklearn</span><span class="p">(</span>
+            <span class="p">(</span><span class="n">X_val</span><span class="p">,</span> <span class="n">y_val</span><span class="p">),</span> <span class="n">validate_features</span><span class="o">=</span><span class="n">preprocessing</span> <span class="ow">is</span> <span class="kc">None</span>
+        <span class="p">)</span>
         <span class="n">validation_data_np</span> <span class="o">=</span> <span class="p">(</span><span class="n">X_val_np</span><span class="p">,</span> <span class="n">y_val_np</span><span class="p">)</span>
 
     <span class="c1"># Wrap the whole candidate/fold search: sklearn's ConvergenceWarning</span>
@@ -5613,7 +5627,9 @@ intact.</p>
     <span class="c1"># and what serving will use for predictions.</span>
     <span class="k">if</span> <span class="n">preprocessing</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
         <span class="n">X_refit_frame</span><span class="p">,</span> <span class="n">y_refit_frame</span> <span class="o">=</span> <span class="n">preprocessing</span><span class="o">.</span><span class="n">fit_transform</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">)</span>
-        <span class="n">X_refit</span><span class="p">,</span> <span class="n">y_refit</span> <span class="o">=</span> <span class="n">SklearnBridge</span><span class="o">.</span><span class="n">to_sklearn</span><span class="p">((</span><span class="n">X_refit_frame</span><span class="p">,</span> <span class="n">y_refit_frame</span><span class="p">))</span>
+        <span class="n">X_refit</span><span class="p">,</span> <span class="n">y_refit</span> <span class="o">=</span> <span class="n">SklearnBridge</span><span class="o">.</span><span class="n">to_sklearn</span><span class="p">(</span>
+            <span class="p">(</span><span class="n">X_refit_frame</span><span class="p">,</span> <span class="n">y_refit_frame</span><span class="p">),</span> <span class="n">validate_features</span><span class="o">=</span><span class="kc">True</span>
+        <span class="p">)</span>
     <span class="k">else</span><span class="p">:</span>
         <span class="n">X_refit</span><span class="p">,</span> <span class="n">y_refit</span> <span class="o">=</span> <span class="n">X_np</span><span class="p">,</span> <span class="n">y_np</span>
     <span class="n">model</span> <span class="o">=</span> <span class="n">refit_best_model</span><span class="p">(</span>
@@ -5828,11 +5844,7 @@ The current pruner selection does not affect capability; the explicit
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>skyulf-core/skyulf/modeling/_tuning/engine.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">855</span>
-<span class="normal">856</span>
-<span class="normal">857</span>
-<span class="normal">858</span>
-<span class="normal">859</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">859</span>
 <span class="normal">860</span>
 <span class="normal">861</span>
 <span class="normal">862</span>
@@ -5939,7 +5951,11 @@ The current pruner selection does not affect capability; the explicit
 <span class="normal">963</span>
 <span class="normal">964</span>
 <span class="normal">965</span>
-<span class="normal">966</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">tune</span><span class="p">(</span>
+<span class="normal">966</span>
+<span class="normal">967</span>
+<span class="normal">968</span>
+<span class="normal">969</span>
+<span class="normal">970</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">tune</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">X</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
     <span class="n">y</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>

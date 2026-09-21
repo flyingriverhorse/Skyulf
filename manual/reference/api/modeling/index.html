@@ -7885,7 +7885,7 @@ inert unless <code>penalty</code> is switched to <code>"elasticnet"</code>.</p>
 <span class="sd">        inputs fall back to a default index.</span>
 <span class="sd">        """</span>
         <span class="c1"># Convert to Numpy</span>
-        <span class="n">X_np</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">SklearnBridge</span><span class="o">.</span><span class="n">to_sklearn</span><span class="p">(</span><span class="n">df</span><span class="p">)</span>
+        <span class="n">X_np</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">SklearnBridge</span><span class="o">.</span><span class="n">to_sklearn</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">validate_features</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 
         <span class="n">preds</span> <span class="o">=</span> <span class="n">model_artifact</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">X_np</span><span class="p">)</span>
 
@@ -7910,7 +7910,7 @@ inert unless <code>penalty</code> is switched to <code>"elasticnet"</code>.</p>
         <span class="k">if</span> <span class="ow">not</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">model_artifact</span><span class="p">,</span> <span class="s2">"predict_proba"</span><span class="p">):</span>
             <span class="k">return</span> <span class="kc">None</span>
 
-        <span class="n">X_np</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">SklearnBridge</span><span class="o">.</span><span class="n">to_sklearn</span><span class="p">(</span><span class="n">df</span><span class="p">)</span>
+        <span class="n">X_np</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">SklearnBridge</span><span class="o">.</span><span class="n">to_sklearn</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">validate_features</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
         <span class="n">probs</span> <span class="o">=</span> <span class="n">model_artifact</span><span class="o">.</span><span class="n">predict_proba</span><span class="p">(</span><span class="n">X_np</span><span class="p">)</span>
 
         <span class="c1"># Return as DataFrame</span>
@@ -7990,7 +7990,7 @@ inputs fall back to a default index.</p>
 <span class="sd">    inputs fall back to a default index.</span>
 <span class="sd">    """</span>
     <span class="c1"># Convert to Numpy</span>
-    <span class="n">X_np</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">SklearnBridge</span><span class="o">.</span><span class="n">to_sklearn</span><span class="p">(</span><span class="n">df</span><span class="p">)</span>
+    <span class="n">X_np</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">SklearnBridge</span><span class="o">.</span><span class="n">to_sklearn</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">validate_features</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 
     <span class="n">preds</span> <span class="o">=</span> <span class="n">model_artifact</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">X_np</span><span class="p">)</span>
 
@@ -8064,7 +8064,7 @@ raising; column labels come from <code>classes_</code> when it is exposed.</p>
     <span class="k">if</span> <span class="ow">not</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">model_artifact</span><span class="p">,</span> <span class="s2">"predict_proba"</span><span class="p">):</span>
         <span class="k">return</span> <span class="kc">None</span>
 
-    <span class="n">X_np</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">SklearnBridge</span><span class="o">.</span><span class="n">to_sklearn</span><span class="p">(</span><span class="n">df</span><span class="p">)</span>
+    <span class="n">X_np</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">SklearnBridge</span><span class="o">.</span><span class="n">to_sklearn</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">validate_features</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
     <span class="n">probs</span> <span class="o">=</span> <span class="n">model_artifact</span><span class="o">.</span><span class="n">predict_proba</span><span class="p">(</span><span class="n">X_np</span><span class="p">)</span>
 
     <span class="c1"># Return as DataFrame</span>
@@ -8371,7 +8371,7 @@ raising; column labels come from <code>classes_</code> when it is exposed.</p>
 
         <span class="c1"># 3. Fit</span>
         <span class="c1"># Convert to Numpy using Bridge (handles Polars/Pandas/Wrappers)</span>
-        <span class="n">X_np</span><span class="p">,</span> <span class="n">y_np</span> <span class="o">=</span> <span class="n">SklearnBridge</span><span class="o">.</span><span class="n">to_sklearn</span><span class="p">((</span><span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">))</span>
+        <span class="n">X_np</span><span class="p">,</span> <span class="n">y_np</span> <span class="o">=</span> <span class="n">SklearnBridge</span><span class="o">.</span><span class="n">to_sklearn</span><span class="p">((</span><span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">),</span> <span class="n">validate_features</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 
         <span class="n">sample_weight</span> <span class="o">=</span> <span class="kc">None</span>
         <span class="k">if</span> <span class="n">class_weight_to_apply</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
@@ -8727,7 +8727,7 @@ stays generic across estimators.</p>
 
     <span class="c1"># 3. Fit</span>
     <span class="c1"># Convert to Numpy using Bridge (handles Polars/Pandas/Wrappers)</span>
-    <span class="n">X_np</span><span class="p">,</span> <span class="n">y_np</span> <span class="o">=</span> <span class="n">SklearnBridge</span><span class="o">.</span><span class="n">to_sklearn</span><span class="p">((</span><span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">))</span>
+    <span class="n">X_np</span><span class="p">,</span> <span class="n">y_np</span> <span class="o">=</span> <span class="n">SklearnBridge</span><span class="o">.</span><span class="n">to_sklearn</span><span class="p">((</span><span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">),</span> <span class="n">validate_features</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 
     <span class="n">sample_weight</span> <span class="o">=</span> <span class="kc">None</span>
     <span class="k">if</span> <span class="n">class_weight_to_apply</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
@@ -11047,7 +11047,8 @@ reduces to the same rule. Either way an exact tie predicts the positive
 class, matching <code>&gt;=</code>.</p>
 <p>Multiclass (3+ classes, <code>thresholds</code> covering every class): scaled
 argmax — <code>classes[argmax(y_proba / thresholds, axis=1)]</code>. Equal
-thresholds across all classes reduce to plain argmax.</p>
+thresholds across all classes reduce to plain argmax. Each threshold must
+be finite and strictly positive; values above one are valid weights.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -11166,27 +11167,7 @@ every class implied by <code>y_proba</code>'s column count.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>skyulf-core/skyulf/modeling/_evaluation/thresholds.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 40</span>
-<span class="normal"> 41</span>
-<span class="normal"> 42</span>
-<span class="normal"> 43</span>
-<span class="normal"> 44</span>
-<span class="normal"> 45</span>
-<span class="normal"> 46</span>
-<span class="normal"> 47</span>
-<span class="normal"> 48</span>
-<span class="normal"> 49</span>
-<span class="normal"> 50</span>
-<span class="normal"> 51</span>
-<span class="normal"> 52</span>
-<span class="normal"> 53</span>
-<span class="normal"> 54</span>
-<span class="normal"> 55</span>
-<span class="normal"> 56</span>
-<span class="normal"> 57</span>
-<span class="normal"> 58</span>
-<span class="normal"> 59</span>
-<span class="normal"> 60</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 60</span>
 <span class="normal"> 61</span>
 <span class="normal"> 62</span>
 <span class="normal"> 63</span>
@@ -11238,7 +11219,21 @@ every class implied by <code>y_proba</code>'s column count.</p>
 <span class="normal">109</span>
 <span class="normal">110</span>
 <span class="normal">111</span>
-<span class="normal">112</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">apply_thresholds</span><span class="p">(</span>
+<span class="normal">112</span>
+<span class="normal">113</span>
+<span class="normal">114</span>
+<span class="normal">115</span>
+<span class="normal">116</span>
+<span class="normal">117</span>
+<span class="normal">118</span>
+<span class="normal">119</span>
+<span class="normal">120</span>
+<span class="normal">121</span>
+<span class="normal">122</span>
+<span class="normal">123</span>
+<span class="normal">124</span>
+<span class="normal">125</span>
+<span class="normal">126</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">apply_thresholds</span><span class="p">(</span>
     <span class="n">y_proba</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
     <span class="n">thresholds</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="nb">float</span><span class="p">]</span> <span class="o">|</span> <span class="nb">float</span><span class="p">,</span>
     <span class="n">classes</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -11255,7 +11250,8 @@ every class implied by <code>y_proba</code>'s column count.</p>
 
 <span class="sd">    Multiclass (3+ classes, ``thresholds`` covering every class): scaled</span>
 <span class="sd">    argmax — ``classes[argmax(y_proba / thresholds, axis=1)]``. Equal</span>
-<span class="sd">    thresholds across all classes reduce to plain argmax.</span>
+<span class="sd">    thresholds across all classes reduce to plain argmax. Each threshold must</span>
+<span class="sd">    be finite and strictly positive; values above one are valid weights.</span>
 
 <span class="sd">    Args:</span>
 <span class="sd">        y_proba: Array-like of shape (n_samples, n_classes), predicted</span>
@@ -11300,16 +11296,9 @@ every class implied by <code>y_proba</code>'s column count.</p>
         <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">y_proba</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">]</span> <span class="o">&gt;=</span> <span class="n">threshold</span><span class="p">,</span> <span class="n">classes</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">classes</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
 
     <span class="n">thresholds_array</span> <span class="o">=</span> <span class="n">_class_threshold_array</span><span class="p">(</span><span class="n">thresholds</span><span class="p">,</span> <span class="n">classes</span><span class="p">)</span>
-    <span class="n">scaled</span> <span class="o">=</span> <span class="n">y_proba</span> <span class="o">/</span> <span class="n">thresholds_array</span>
     <span class="k">if</span> <span class="n">n_classes</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
-        <span class="c1"># `np.argmax` breaks exact ties toward the first column, which would</span>
-        <span class="c1"># turn the documented binary rule (`&gt;=` predicts the positive class)</span>
-        <span class="c1"># into a strict `&gt;` for the full-coverage dict `_grid_search_binary`</span>
-        <span class="c1"># returns — so the search would score ties as positive while</span>
-        <span class="c1"># apply-time scoring counts them negative. Comparing the scaled scores</span>
-        <span class="c1"># directly keeps `&gt;=` authoritative and is identical on every non-tied</span>
-        <span class="c1"># row.</span>
-        <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">scaled</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">]</span> <span class="o">&gt;=</span> <span class="n">scaled</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">],</span> <span class="n">classes</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">classes</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+        <span class="k">return</span> <span class="n">_apply_binary_weights</span><span class="p">(</span><span class="n">y_proba</span><span class="p">,</span> <span class="n">thresholds_array</span><span class="p">,</span> <span class="n">classes</span><span class="p">)</span>
+    <span class="n">scaled</span> <span class="o">=</span> <span class="n">y_proba</span> <span class="o">/</span> <span class="n">thresholds_array</span>
     <span class="k">return</span> <span class="n">classes</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">argmax</span><span class="p">(</span><span class="n">scaled</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)]</span>
 </code></pre></div></td></tr></table></div>
             </details>
@@ -11416,7 +11405,7 @@ omitted, each is (re)computed here exactly as before.</p>
 <span class="sd">    """</span>
     <span class="c1"># Convert to Numpy for compatibility (skip if the caller already has it)</span>
     <span class="k">if</span> <span class="n">X_np</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">y_np</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-        <span class="n">X_np</span><span class="p">,</span> <span class="n">y_np</span> <span class="o">=</span> <span class="n">SklearnBridge</span><span class="o">.</span><span class="n">to_sklearn</span><span class="p">((</span><span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">))</span>
+        <span class="n">X_np</span><span class="p">,</span> <span class="n">y_np</span> <span class="o">=</span> <span class="n">SklearnBridge</span><span class="o">.</span><span class="n">to_sklearn</span><span class="p">((</span><span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">),</span> <span class="n">validate_features</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 
     <span class="c1"># Use DataFrame directly if possible to preserve feature names</span>
     <span class="c1"># Only convert to numpy if model doesn't support pandas or if X is not pandas</span>
@@ -11554,7 +11543,7 @@ model has genuinely predicted on (train/test/validation alike).</p>
 <span class="sd">    (no ground-truth target), so they can be computed on any split a KMeans</span>
 <span class="sd">    model has genuinely predicted on (train/test/validation alike).</span>
 <span class="sd">    """</span>
-    <span class="n">X_np</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">SklearnBridge</span><span class="o">.</span><span class="n">to_sklearn</span><span class="p">((</span><span class="n">X</span><span class="p">,</span> <span class="kc">None</span><span class="p">))</span>
+    <span class="n">X_np</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">SklearnBridge</span><span class="o">.</span><span class="n">to_sklearn</span><span class="p">((</span><span class="n">X</span><span class="p">,</span> <span class="kc">None</span><span class="p">),</span> <span class="n">validate_features</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
     <span class="n">labels_np</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">labels</span><span class="p">)</span><span class="o">.</span><span class="n">ravel</span><span class="p">()</span>
     <span class="n">silhouette_sample_size</span> <span class="o">=</span> <span class="n">_validate_silhouette_sample_size</span><span class="p">(</span><span class="n">silhouette_sample_size</span><span class="p">)</span>
     <span class="c1"># Guard before the row-count check: polars collapses a 0-column frame to</span>
@@ -11686,7 +11675,7 @@ avoiding a redundant conversion/inference pass on the same data.</p>
 <span class="sd">    """</span>
     <span class="c1"># Convert to Numpy for compatibility (skip if the caller already has it)</span>
     <span class="k">if</span> <span class="n">X_np</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">y_np</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-        <span class="n">X_np</span><span class="p">,</span> <span class="n">y_np</span> <span class="o">=</span> <span class="n">SklearnBridge</span><span class="o">.</span><span class="n">to_sklearn</span><span class="p">((</span><span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">))</span>
+        <span class="n">X_np</span><span class="p">,</span> <span class="n">y_np</span> <span class="o">=</span> <span class="n">SklearnBridge</span><span class="o">.</span><span class="n">to_sklearn</span><span class="p">((</span><span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">),</span> <span class="n">validate_features</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 
     <span class="c1"># Use DataFrame directly if possible to preserve feature names</span>
     <span class="k">if</span> <span class="n">predictions</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
@@ -12239,21 +12228,7 @@ strategy, evenly spaced over (0, 1) exclusive.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>skyulf-core/skyulf/modeling/_evaluation/thresholds.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">226</span>
-<span class="normal">227</span>
-<span class="normal">228</span>
-<span class="normal">229</span>
-<span class="normal">230</span>
-<span class="normal">231</span>
-<span class="normal">232</span>
-<span class="normal">233</span>
-<span class="normal">234</span>
-<span class="normal">235</span>
-<span class="normal">236</span>
-<span class="normal">237</span>
-<span class="normal">238</span>
-<span class="normal">239</span>
-<span class="normal">240</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">240</span>
 <span class="normal">241</span>
 <span class="normal">242</span>
 <span class="normal">243</span>
@@ -12280,7 +12255,21 @@ strategy, evenly spaced over (0, 1) exclusive.</p>
 <span class="normal">264</span>
 <span class="normal">265</span>
 <span class="normal">266</span>
-<span class="normal">267</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">optimize_thresholds</span><span class="p">(</span>
+<span class="normal">267</span>
+<span class="normal">268</span>
+<span class="normal">269</span>
+<span class="normal">270</span>
+<span class="normal">271</span>
+<span class="normal">272</span>
+<span class="normal">273</span>
+<span class="normal">274</span>
+<span class="normal">275</span>
+<span class="normal">276</span>
+<span class="normal">277</span>
+<span class="normal">278</span>
+<span class="normal">279</span>
+<span class="normal">280</span>
+<span class="normal">281</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">optimize_thresholds</span><span class="p">(</span>
     <span class="n">y_true</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
     <span class="n">y_proba</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
     <span class="n">metric</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="n">Any</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span> <span class="nb">float</span><span class="p">],</span>

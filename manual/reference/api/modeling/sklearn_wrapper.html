@@ -3434,7 +3434,7 @@
 <span class="sd">        inputs fall back to a default index.</span>
 <span class="sd">        """</span>
         <span class="c1"># Convert to Numpy</span>
-        <span class="n">X_np</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">SklearnBridge</span><span class="o">.</span><span class="n">to_sklearn</span><span class="p">(</span><span class="n">df</span><span class="p">)</span>
+        <span class="n">X_np</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">SklearnBridge</span><span class="o">.</span><span class="n">to_sklearn</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">validate_features</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 
         <span class="n">preds</span> <span class="o">=</span> <span class="n">model_artifact</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">X_np</span><span class="p">)</span>
 
@@ -3459,7 +3459,7 @@
         <span class="k">if</span> <span class="ow">not</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">model_artifact</span><span class="p">,</span> <span class="s2">"predict_proba"</span><span class="p">):</span>
             <span class="k">return</span> <span class="kc">None</span>
 
-        <span class="n">X_np</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">SklearnBridge</span><span class="o">.</span><span class="n">to_sklearn</span><span class="p">(</span><span class="n">df</span><span class="p">)</span>
+        <span class="n">X_np</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">SklearnBridge</span><span class="o">.</span><span class="n">to_sklearn</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">validate_features</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
         <span class="n">probs</span> <span class="o">=</span> <span class="n">model_artifact</span><span class="o">.</span><span class="n">predict_proba</span><span class="p">(</span><span class="n">X_np</span><span class="p">)</span>
 
         <span class="c1"># Return as DataFrame</span>
@@ -3539,7 +3539,7 @@ inputs fall back to a default index.</p>
 <span class="sd">    inputs fall back to a default index.</span>
 <span class="sd">    """</span>
     <span class="c1"># Convert to Numpy</span>
-    <span class="n">X_np</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">SklearnBridge</span><span class="o">.</span><span class="n">to_sklearn</span><span class="p">(</span><span class="n">df</span><span class="p">)</span>
+    <span class="n">X_np</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">SklearnBridge</span><span class="o">.</span><span class="n">to_sklearn</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">validate_features</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 
     <span class="n">preds</span> <span class="o">=</span> <span class="n">model_artifact</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">X_np</span><span class="p">)</span>
 
@@ -3613,7 +3613,7 @@ raising; column labels come from <code>classes_</code> when it is exposed.</p>
     <span class="k">if</span> <span class="ow">not</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">model_artifact</span><span class="p">,</span> <span class="s2">"predict_proba"</span><span class="p">):</span>
         <span class="k">return</span> <span class="kc">None</span>
 
-    <span class="n">X_np</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">SklearnBridge</span><span class="o">.</span><span class="n">to_sklearn</span><span class="p">(</span><span class="n">df</span><span class="p">)</span>
+    <span class="n">X_np</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">SklearnBridge</span><span class="o">.</span><span class="n">to_sklearn</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">validate_features</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
     <span class="n">probs</span> <span class="o">=</span> <span class="n">model_artifact</span><span class="o">.</span><span class="n">predict_proba</span><span class="p">(</span><span class="n">X_np</span><span class="p">)</span>
 
     <span class="c1"># Return as DataFrame</span>
@@ -3920,7 +3920,7 @@ raising; column labels come from <code>classes_</code> when it is exposed.</p>
 
         <span class="c1"># 3. Fit</span>
         <span class="c1"># Convert to Numpy using Bridge (handles Polars/Pandas/Wrappers)</span>
-        <span class="n">X_np</span><span class="p">,</span> <span class="n">y_np</span> <span class="o">=</span> <span class="n">SklearnBridge</span><span class="o">.</span><span class="n">to_sklearn</span><span class="p">((</span><span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">))</span>
+        <span class="n">X_np</span><span class="p">,</span> <span class="n">y_np</span> <span class="o">=</span> <span class="n">SklearnBridge</span><span class="o">.</span><span class="n">to_sklearn</span><span class="p">((</span><span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">),</span> <span class="n">validate_features</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 
         <span class="n">sample_weight</span> <span class="o">=</span> <span class="kc">None</span>
         <span class="k">if</span> <span class="n">class_weight_to_apply</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
@@ -4276,7 +4276,7 @@ stays generic across estimators.</p>
 
     <span class="c1"># 3. Fit</span>
     <span class="c1"># Convert to Numpy using Bridge (handles Polars/Pandas/Wrappers)</span>
-    <span class="n">X_np</span><span class="p">,</span> <span class="n">y_np</span> <span class="o">=</span> <span class="n">SklearnBridge</span><span class="o">.</span><span class="n">to_sklearn</span><span class="p">((</span><span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">))</span>
+    <span class="n">X_np</span><span class="p">,</span> <span class="n">y_np</span> <span class="o">=</span> <span class="n">SklearnBridge</span><span class="o">.</span><span class="n">to_sklearn</span><span class="p">((</span><span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">),</span> <span class="n">validate_features</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 
     <span class="n">sample_weight</span> <span class="o">=</span> <span class="kc">None</span>
     <span class="k">if</span> <span class="n">class_weight_to_apply</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
