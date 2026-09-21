@@ -5,6 +5,9 @@ runtime tests, Spark engine adapter and keyed FeatureEngineer entry point are
 available in the development checkout.
 **Native SimpleImputer (mean/constant) and StandardScaler support fit and apply.**
 Their fitted pipeline can be exported and restored across pandas, Polars and Spark.
+The [standalone inference bundle](inference_bundles.md) packages this state with
+a fitted model and validates local raw/features prediction. The Spark model
+worker runner is the next stage.
 Other built-in native nodes and distributed model inference remain under development.
 Installing the extra does not convert a pandas/Polars pipeline to Spark.
 

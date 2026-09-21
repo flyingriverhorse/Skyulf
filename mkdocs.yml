@@ -74,6 +74,7 @@ nav:
     - Overview: user_guide/overview.md
     - Installation: user_guide/installation.md
     - Spark (Development): user_guide/spark.md
+    - Inference Bundles (Development): user_guide/inference_bundles.md
     - Pipeline Quickstart: user_guide/pipeline_quickstart.md
     - Step-by-Step (No Config): user_guide/step_by_step_no_config.md
     - Automated EDA: user_guide/eda_profiling.md

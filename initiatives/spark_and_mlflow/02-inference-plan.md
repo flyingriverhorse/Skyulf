@@ -40,14 +40,14 @@ regression için boş tuple'dır.
 `predict_local` sonucu regression için `prediction`; classification için
 `prediction` ve sınıf sırası manifestte tanımlı probability kolonlarıdır.
 
-- [ ] Mevcut pipeline'dan bundle oluştur; raw ve features girişlerini ayrı
+- [x] Mevcut pipeline'dan bundle oluştur; raw ve features girişlerini ayrı
   fixtures ile kaydet/yükle. `features` modunda scaler ikinci kez uygulanmamalı.
-- [ ] İsim doğru ama kolon sırası farklı, eksik/ekstra kolon, dtype uyuşmazlığı,
+- [x] İsim doğru ama kolon sırası farklı, eksik/ekstra kolon, dtype uyuşmazlığı,
   bilinmeyen version ve model boyut sınırı için failure testleri yaz.
-- [ ] Model payload ile manifest checksum'ını doğrula; dependency manifesti
+- [x] Model payload ile manifest checksum'ını doğrula; dependency manifesti
   credentials ve session taşımasın. Pickle tabanlı payload yalnız güvenilir
   kaynaklardan yüklenir; manifest checksum'ı güvenilirlik kanıtı değildir.
-- [ ] Eski standalone ve backend artifact formatları için explicit adapter
+- [x] Eski standalone ve backend artifact formatları için explicit adapter
   tasarla; ilk bundle yalnız doğrulanmış standalone girdiyi kabul etsin.
   Legacy backend adapter SM-18'de mevcut threshold/label davranışıyla test edilir.
 
@@ -56,20 +56,29 @@ def test_bundle_round_trip_predictions(fitted_regression_pipeline, tmp_path, raw
     """Packaging must preserve the prediction function, including preprocessing."""
     import numpy as np
     from skyulf.inference.bundle import build_bundle, save_bundle, load_bundle, predict_local
-    bundle = build_bundle(fitted_regression_pipeline, input_stage="raw", feature_order=("x",))
+    bundle = build_bundle(fitted_regression_pipeline, input_stage="raw", feature_order=("x", "z"))
     before = predict_local(raw_frame, bundle)["prediction"]
     save_bundle(bundle, tmp_path / "model")
     after = predict_local(raw_frame, load_bundle(tmp_path / "model"))["prediction"]
     np.testing.assert_allclose(after, before, rtol=1e-10, atol=1e-12)
 ```
 
-Fixture'lar bu görevde `tests/spark/conftest.py` içine eklenir: `raw_frame`
-id/x kolonları ve farklı scale içeren küçük pandas verisi;
+SM-08 fixture'ları `tests/spark/test_inference_bundle.py` içindedir: `raw_frame`
+x/z kolonları ve farklı scale içeren küçük pandas verisi;
 `fitted_regression_pipeline` imputer + scaler + mevcut linear regression ile
 local fit edilmiş gerçek SkyulfPipeline. Veri üretimi seed=17 ve held-out
 satırlarla sabitlenir; mock estimator bu testin yerine geçmez.
+Local giriş yalnız feature kolonlarıdır; ekstra id/target reddedilir. SM-09
+shared fixture'a ihtiyaç duyduğunda conftest'e taşır, Spark verisine ayrı id ekler.
+Kolon adı/sırası modelin NumPy girdisinden tahmin edilmez; başarılı pipeline fit
+metadata-only raw/model schema kaydeder. Eski standalone pickle için adapter
+`SkyulfPipeline.load` → `build_bundle`; schema yoksa refit gerekir. Backend
+dict adapter'ı SM-18'e kadar açıkça reddedilir. Ayrıntılar [bundle rehberinde](../../docs/user_guide/inference_bundles.md).
 **Komut:** `python -m pytest skyulf-core/tests/spark/test_inference_bundle.py -q`
 **Kabul:** Kayıt/yükleme, feature sırası ve raw/features giriş ayrımı doğrulanmış.
+
+2026-09-21: SM-08 tamamlandı. Komutlar, runtime sonuçları ve kapsam sınırları
+[tamamlanma kaydında](OPEN_QUEUE.md). Dağıtık inference kapısı G2 henüz kapanmadı.
 
 ## SM-09 — Native Spark FE ardından Python model
 
@@ -100,7 +109,7 @@ def test_native_path_matches_local(spark, raw_frame, regression_bundle):
         frame_spec=FrameSpec(row_keys=("id",)),
         options=ExecutionOptions(engine="spark", python_batch_rows=2),
         mode="native_features").toPandas().sort_values("id")
-    expected = predict_local(raw_frame.sort_values("id"), regression_bundle)
+    expected = predict_local(raw_frame.sort_values("id").drop(columns="id"), regression_bundle)
     np.testing.assert_allclose(actual["prediction"], expected["prediction"], rtol=1e-10)
 ```
 

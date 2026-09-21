@@ -1,6 +1,6 @@
 # Spark ve MLflow — Open Queue
 
-Güncelleme: 2026-09-21. **SM-00–SM-07 tamamlandı; sıradaki SM-08. Hedef: 0.9.0.**
+Güncelleme: 2026-09-21. **SM-00–SM-08 tamamlandı; sıradaki SM-09. Hedef: 0.9.0.**
 Bu dosya kısa çalışma sırasıdır; detaylar bağlantılı planlarda.
 
 Durumlar: READY = başlanabilir; WAIT = önceki görev bekleniyor;
@@ -17,8 +17,8 @@ DONE = kanıtla tamamlandı. SM-00 commit: `105a6fe4`.
 | SM-05 | Native SimpleImputer | SM-04 | DONE | Mean/constant train-only fit, Spark apply; aşağıda kanıt |
 | SM-06 | Native StandardScaler | SM-05 | DONE | Population variance, dört flag ve numeric parity; aşağıda kanıt |
 | SM-07 | Uçtan uca FE kapısı | SM-06 | DONE | Üç engine çapraz fit/apply; kayıt/yükleme; aşağıda kanıt |
-| SM-08 | Ortak inference bundle | SM-07 | READY | Raw/features ayrımı; model metadata round-trip |
-| SM-09 | Native FE + worker model | SM-08 | WAIT | Spark tahmini local ile key bazında aynı |
+| SM-08 | Ortak inference bundle | SM-07 | DONE | Raw/features ayrımı; model metadata round-trip; aşağıda kanıt |
+| SM-09 | Native FE + worker model | SM-08 | READY | Spark tahmini local ile key bazında aynı |
 | SM-10 | Worker Python FE + model | SM-09 | WAIT | Batch-safe pipeline; window gibi yollar açık ret |
 | SM-11 | Classification ve ölçek kapısı | SM-10 | WAIT | Class/proba/threshold parity; worker kanıtı |
 | SM-12 | Opsiyonel MLflow tracking | SM-11 | WAIT | Off bağımsız; gerçek run lifecycle ve izolasyon |
@@ -374,3 +374,68 @@ ve MLflow entegrasyonu henüz yok.
   → **1 passed, 1 warning**, 38.00 saniye; mevcut pandas fillna FutureWarning.
 - Sınır: G1 feature engineering içindir; model bundle/inference, MLflow,
   Databricks/Connect ve endpoint/template doğrulaması değildir. Sonraki görev SM-08.
+
+## SM-08 — 2026-09-21 tamamlanma kaydı
+
+- Başlangıç commit'i `7099733c`; bu kayıt SM-08 çalışma ağacına aittir.
+- `skyulf/inference/` public API: `build_bundle`, `save_bundle`, `load_bundle`,
+  `predict_local`, immutable `InferenceBundle`. Metadata ve payload bytes ayrı;
+  `raw` input'ta FE bir kez uygulanır, `features` doğrudan model tahminidir.
+  pandas/Polars girdisi; çıktı pandas prediction/probability kolonlarıdır.
+- `SkyulfPipeline.fit` metadata-only `_inference_schemas` kaydeder: target hariç
+  raw input ve gerçek model training feature sırası/dtype'ları. Başarısız refit
+  temizler; raw frame tutulmaz. NumPy bridge'in kaybettiği kolon adları tahminle
+  doldurulmaz. Schema capture 31 gerçek frame/tuple/split/wrapper/tuning testiyle
+  korundu; mevcut pickle ve fingerprint davranışı değişmedi.
+- Katı manifest: stage, input/model/output schema, class/probability sırası,
+  positive label, tuning ve explicit pipeline threshold provenance, sabit
+  dependency listesi ve digest'ler. pandas/Polars Boolean/bool eşleştirmesi açık.
+  Eksik/ekstra/tekrarlı/sırası yanlış veya dtype'ı farklı feature'lar reddedilir.
+- Kayıt üç sabit isimli dosyadır: manifest.json, features.json, model.pkl.
+  Var olan hedefe yazılmaz. FE+manifest state bütçesi ile model wire bütçesi ayrı;
+  protokol-5 PickleBuffer byte sayımı ve explicit FE limitinin tüm çağrılara
+  aktarımı test edildi. Kaynak pipeline'ın sonraki mutasyonu paketi değiştirmez.
+- Semantic digest pickle protokolüne bağlı değildir; ayrıca model/FE wire
+  checksum kontrolü yapılır. Pickle yalnız güvenilir üreticiden yüklenir.
+  Python major/minor ve skyulf-core/sklearn/NumPy/SciPy sürümleri yüklemeden
+  önce doğrulanır. pandas/Polars sürümleri provenance olarak kaydedilir.
+- Ruling: local giriş yalnız feature kolonlarını kabul eder; id gibi ekstra
+  kolonlar otomatik elenmez. SM-09 runner key'leri model girişinden açıkça ayırır.
+  Fixture seed=17, iki farklı ölçekli x/z kolonu ve held-out satırlar içerir;
+  test dosyasında tutulur. Bu, plandaki tek x/id örneğine göre kolon sırası
+  hatasını da yakalar; SM-09 shared fixture'a ihtiyaç duyduğunda taşınabilir.
+- Ruling: mevcut `core/serialization.py` provider'ı ve eski backend okuyucu
+  değiştirilmedi. Standalone adapter `SkyulfPipeline.load` → `build_bundle`;
+  schema bilgisi olmayan eski pickle yeniden fit gerektirir. Backend dict
+  doğrudan reddedilir, adapter SM-18'de. İlk FE desteği SM-07'nin node'ları;
+  split node yerine explicit SplitDataset ile training partitions verilebilir.
+- Bağımsız review Polars Boolean alias'ını, 8 MiB üstü FE için custom budget
+  aktarımını ve büyük estimator protocol-5 PickleBuffer serialization hatasını
+  yeniden üretti. Red regresyonlardan sonra düzeltildi. Re-review: gerçek
+  144 KB KNN bundle ve 8.39 MB FE / 16 MiB bütçe ile pandas+Polars inference geçti;
+  açık önemli bulgu kalmadı. KNN gibi modeller kendi state'lerinde örnek tutabilir;
+  schema capture'ın veri tutmaması estimator'ın bu davranışını değiştirmez.
+- Dar testler: **76 passed, 2 skipped, 21 warnings**, 4.46 saniye. İki skip
+  Spark-local giriş reddi vakasıdır; gerçek Spark lane'inde ayrıca çalışır.
+- `skyulf-core/examples/inference_bundle.py --bundle-dir .cache/sm08-example-model`
+  çalıştı: kayıt/yükleme sonrası **[40.0, 20.0]**, raw/features parity ve aynı
+  semantic digest. Ayrı base-process import kontrolü PySpark/MLflow yüklemedi.
+- Yeni `docs/user_guide/inference_bundles.md`, Spark rehberi linki ve nav kaydı.
+  Rehberin Python örneği gerçek base ortamında **1 passed**, 2.08 saniye;
+  `mkdocs build --strict` başarılı. Ruff/format ve tam repo ty geçti.
+- Tam core: `HF_HUB_OFFLINE=1 .venv/Scripts/python.exe -m pytest skyulf-core/tests
+  -q --tb=short --disable-warnings -o addopts= -p no:cacheprovider
+  --basetemp .cache/sm08-core-full`
+  → **10045 passed, 225 skipped, 1097 warnings**, 193.33 saniye. Base ortamda
+  PySpark yok; yeni gerçek Spark input-ret testleri burada iki skip'tir.
+- Tam Spark: `JAVA_HOME=.cache/spark-jdk/jdk-17.0.20.1+1`,
+  `SKYULF_REQUIRE_SPARK=1`, `.venv-spark/Scripts/python.exe -m pytest
+  skyulf-core/tests/spark skyulf-core/tests/unit/test_execution_capabilities.py
+  skyulf-core/tests/unit/test_feature_state.py
+  skyulf-core/tests/unit/test_pipeline_inference_schema.py -q --tb=short
+  -o addopts= -p no:cacheprovider --basetemp .cache/sm08-spark-full`
+  → **339 passed, 2 warnings**, 340.64 saniye. PySpark 4.0.3 / Java 17;
+  Windows JVM child-process cleanup başarılı. Warning'ler mevcut Split alias'ına ait.
+- Sınır: bu görev local paketleme/inference içindir. Spark worker model runner
+  SM-09, ikinci Python FE yolu SM-10, dağıtık classification kapısı SM-11'dir.
+  MLflow, Databricks/Connect, endpoint ve template doğrulaması henüz yok.

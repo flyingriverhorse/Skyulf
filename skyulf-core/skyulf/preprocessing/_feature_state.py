@@ -12,7 +12,7 @@ from .scaling.standard import StandardScalerApplier
 _APPLIERS = {"SimpleImputer": SimpleImputerApplier, "StandardScaler": StandardScalerApplier}
 
 
-def export_feature_state(engineer: Any) -> bytes:
+def export_feature_state(engineer: Any, *, options: ExecutionOptions | None = None) -> bytes:
     """Reject incomplete or unsupported execution histories before serializing learned state."""
     if not getattr(engineer, "_portable_fitted", bool(engineer.fitted_steps)):
         raise ValueError("FeatureEngineer must be successfully fitted before exporting state.")
@@ -24,7 +24,8 @@ def export_feature_state(engineer: Any) -> bytes:
         if node not in _APPLIERS or type(record["applier"]) is not _APPLIERS[node]:
             raise ValueError("Unsupported portable pipeline node or custom applier.")
         records.append({**record, "params": record.get("params", config.get("params", {}))})
-    return encode_pipeline(records, max_bytes=_budget(getattr(engineer, "execution_options", None)))
+    budget = options if options is not None else getattr(engineer, "execution_options", None)
+    return encode_pipeline(records, max_bytes=_budget(budget))
 
 
 def restore_feature_state(

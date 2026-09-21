@@ -13,6 +13,7 @@ import pandas as pd
 import polars as pl
 
 from ..config_validation import validate_pipeline_config
+from ..core.schema import SkyulfSchema
 from ..core.validation import prediction_row_count, validate_prediction_rows
 from ..data.dataset import SplitDataset
 from ..engines import SkyulfDataFrame, get_engine
@@ -143,6 +144,7 @@ class SkyulfPipeline:
         self._fit_metrics: dict[str, Any] | None = None
         self._target_column: str | None = None
         self._tuned_thresholds: dict[Any, float] | None = None
+        self._inference_schemas: tuple[SkyulfSchema, SkyulfSchema] | None = None
 
         # Initialize model estimator if config is present
         if self.modeling_config:
@@ -339,6 +341,7 @@ class SkyulfPipeline:
         self._fit_metrics = None
         self._target_column = None
         self._tuned_thresholds = None
+        self._inference_schemas = None
         if self.model_estimator is not None:
             self.model_estimator.model = None
         try:
@@ -359,6 +362,11 @@ class SkyulfPipeline:
     ) -> dict[str, Any]:
         """Fit validated data, publishing metadata only after all stages complete."""
         metrics = {}
+        input_schema = None
+        if self.model_estimator is not None:
+            raw_train = data.train if isinstance(data, SplitDataset) else data
+            raw_features = raw_train[0] if isinstance(raw_train, tuple) else raw_train
+            input_schema = SkyulfSchema.from_dataframe(raw_features).drop((target_column,))
 
         # 1. Feature Engineering
         logger.info("Starting Feature Engineering...")
@@ -389,6 +397,10 @@ class SkyulfPipeline:
                 empty_df = engine.create_dataframe({})
                 dataset = SplitDataset(train=transformed_data, test=empty_df, validation=None)
 
+            # Observe the actual training representation before sklearn loses
+            # its column names. Schemas contain metadata only, never samples.
+            model_schema = SkyulfSchema.from_dataframe(extract_xy(dataset.train, target_column)[0])
+
             # Fit the model
             # Note: fit_predict updates self.model_estimator.model in-memory
             if not is_tuning:
@@ -408,6 +420,9 @@ class SkyulfPipeline:
             except Exception as e:  # noqa: BLE001 - evaluation failure is recorded as modeling_error; fit must continue
                 logger.warning(f"Evaluation failed: {e}")
                 metrics["modeling_error"] = str(e)
+
+            if self.model_estimator.model is not None and input_schema is not None:
+                self._inference_schemas = (input_schema, model_schema)
 
         self._fit_metrics = metrics
         self._target_column = target_column
