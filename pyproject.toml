@@ -114,6 +114,7 @@ dev = [
     "pre-commit>=3.4.0",
     "pre-commit-hooks>=4.6.0",  # Hygiene hooks run via python -m (avoids AppLocker-blocked .exe wrappers)
     "ipython>=8.18.1",
+    "jinja2>=3.1.6",  # Required by pandas Styler in executable notebook exports
     "jupyter>=1.1.1",
     "jupyter-server>=2.21.0,<3.0.0",  # Redact token-bearing request headers in logs
 

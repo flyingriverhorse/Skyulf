@@ -49,7 +49,7 @@ def test_run_pipeline_task_training_job(mock_get_db_session, mock_engine_class):
     session = MagicMock()
     mock_get_db_session.return_value = session
 
-    job = TrainingJob(id=MOCK_JOB_ID, status="queued", run_mode="fixed")
+    job = TrainingJob(id=MOCK_JOB_ID, node_id="node_1", status="queued", run_mode="fixed")
 
     # Configure query side effects
     # First query returns the job
@@ -90,7 +90,7 @@ def test_run_pipeline_task_tuning_job(mock_get_db_session, mock_engine_class):
     session = MagicMock()
     mock_get_db_session.return_value = session
 
-    job = TrainingJob(id=MOCK_JOB_ID, status="queued", run_mode="tuned")
+    job = TrainingJob(id=MOCK_JOB_ID, node_id="node_1", status="queued", run_mode="tuned")
 
     # Configure query side effects
     # Single query against the unified TrainingJob table returns job
@@ -104,7 +104,16 @@ def test_run_pipeline_task_tuning_job(mock_get_db_session, mock_engine_class):
     # Setup Mock Engine
     engine_instance = mock_engine_class.return_value
     engine_instance.run.return_value = PipelineExecutionResult(
-        pipeline_id="test_pipeline", status="success", node_results={}
+        pipeline_id="test_pipeline",
+        status="success",
+        node_results={
+            "node_1": NodeExecutionResult(
+                node_id="node_1",
+                status="success",
+                output_artifact_id="art_1",
+                metrics={"best_score": 0.95},
+            )
+        },
     )
 
     # Run Task
