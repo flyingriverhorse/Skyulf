@@ -1,6 +1,6 @@
 # Spark ve MLflow — Open Queue
 
-Güncelleme: 2026-09-21. **SM-00–SM-08 tamamlandı; sıradaki SM-09. Hedef: 0.9.0.**
+Güncelleme: 2026-09-21. **SM-00–SM-09 tamamlandı; sıradaki SM-10. Hedef: 0.9.0.**
 Bu dosya kısa çalışma sırasıdır; detaylar bağlantılı planlarda.
 
 Durumlar: READY = başlanabilir; WAIT = önceki görev bekleniyor;
@@ -18,8 +18,8 @@ DONE = kanıtla tamamlandı. SM-00 commit: `105a6fe4`.
 | SM-06 | Native StandardScaler | SM-05 | DONE | Population variance, dört flag ve numeric parity; aşağıda kanıt |
 | SM-07 | Uçtan uca FE kapısı | SM-06 | DONE | Üç engine çapraz fit/apply; kayıt/yükleme; aşağıda kanıt |
 | SM-08 | Ortak inference bundle | SM-07 | DONE | Raw/features ayrımı; model metadata round-trip; aşağıda kanıt |
-| SM-09 | Native FE + worker model | SM-08 | READY | Spark tahmini local ile key bazında aynı |
-| SM-10 | Worker Python FE + model | SM-09 | WAIT | Batch-safe pipeline; window gibi yollar açık ret |
+| SM-09 | Native FE + worker model | SM-08 | DONE | Spark tahmini local ile key bazında aynı; aşağıda kanıt |
+| SM-10 | Worker Python FE + model | SM-09 | READY | Batch-safe pipeline; window gibi yollar açık ret |
 | SM-11 | Classification ve ölçek kapısı | SM-10 | WAIT | Class/proba/threshold parity; worker kanıtı |
 | SM-12 | Opsiyonel MLflow tracking | SM-11 | WAIT | Off bağımsız; gerçek run lifecycle ve izolasyon |
 | SM-13 | MLflow model packaging | SM-12 | WAIT | Temiz ortamda pyfunc yükleme ve parity |
@@ -66,8 +66,8 @@ olarak yazılır; yerel test sonucu gerçek UC/Databricks sonucu yerine geçmez.
 Önce README, mimari ve bu kuyruğu oku. Güncel git durumunu ve ilgili kaynakları
 doğrula; kullanıcı değişikliklerini koru. İlk READY görevi ACTIVE yap, kendi
 test döngüsüyle tamamla ve kanıtı yaz. Sonraki bağımlılığı aç. Endpoint veya
-template'e önden başlama. SM-00 test/runtime hazırlığıdır; native node uygulaması
-ve MLflow entegrasyonu henüz yok.
+template'e önden başlama. SM-00 yalnız test/runtime hazırlığıydı; güncel
+destek ve sınırlar tamamlanan görevlerin kayıtlarında belirtilir.
 
 ## SM-00 — 2026-09-21 tamamlanma kaydı
 
@@ -439,3 +439,72 @@ ve MLflow entegrasyonu henüz yok.
 - Sınır: bu görev local paketleme/inference içindir. Spark worker model runner
   SM-09, ikinci Python FE yolu SM-10, dağıtık classification kapısı SM-11'dir.
   MLflow, Databricks/Connect, endpoint ve template doğrulaması henüz yok.
+
+## SM-09 — 2026-09-21 tamamlanma kaydı
+
+- Başlangıç commit'i `81745a7b`; bu kayıt SM-09 çalışma ağacına aittir.
+- `inference/spark.py` ve public `predict_spark`: raw girdiye native FE,
+  ardından `mapInPandas` iterator'larında Python regression tahmini. Model
+  iterator başına bir kez yüklenir; yalnız feature'lar ve key'ler worker'a gider.
+  Ortak model tahmin helper'ı local davranışı tekrar kullanır. Session, frame
+  veya bağlantı worker closure'a girmez; pandas dönüşümü worker batch'indedir.
+- `tests/spark/test_native_features_inference.py`; SM-08'in fitted pipeline ve
+  raw-frame fixture'ları ortak conftest'e taşındı. pandas/Polars eğitim, bundle
+  kayıt/yükleme, repartition 1/3, Arrow limit 1/5, eksik değerler, boş veri ve
+  partition'lar, birleşik key'ler, `2**53` üstü identity, worker projection,
+  bounded driver validation, iterator model yükleme ve chunk sınırı doğrulandı.
+- Ruling: native model schema önce yalnız Spark ifadeleri oluşturularak
+  incelenir; sonra mevcut FE key/preservation kontrolleri çalışır. Preview veri
+  action'ı içermez, öğrenilmiş kuralları tekrar fit etmez. Local integer imputer
+  çıktısı ile Spark double promotion uyuşmazlığı artık action'dan önce hata verir.
+- Ruling: nullable integer/boolean model feature schema'ları erken reddedilir;
+  Arrow null batch dönüşümü hassasiyet kaybetmeden çözülene kadar destek ilan
+  edilmez. Non-nullable integer model feature ve büyük integer key gerçek action
+  ile geçti. Key'lerin nullable schema metadata'sı ayrı değer kontrolüyle korunur.
+  Broader nullable transport SM-11'e kayıtlıdır.
+- Ruling: raw model input kolonlarının kendi sırası/dtype'ları korunmalı;
+  extra kolonlar projection ile elenir. Key'ler integer/string/boolean'dır;
+  feature/output isimleriyle çakışamaz. Incoming prediction kolonu da reddedilir.
+  `FrameSpec.target` boş olmalıdır. Raw regression dışındaki stage/task/mode ve
+  streaming açık ret verir. `python_batch_rows` model çağrısını sınırlar;
+  Arrow transport konfigürasyonuna veya kullanıcının Spark session'ına yazılmaz.
+- TDD red: eksik public API; streaming, native dtype ve nullable transport
+  girdilerinin doğrulamadan önce Spark action'a ulaşması ayrı ayrı yeniden
+  üretildi. Dar final test: `JAVA_HOME=.cache/spark-jdk/jdk-17.0.20.1+1`,
+  `SKYULF_REQUIRE_SPARK=1`, `.venv-spark/Scripts/python.exe -m pytest
+  skyulf-core/tests/spark/test_native_features_inference.py
+  skyulf-core/tests/spark/test_inference_bundle.py -q -o addopts=
+  -p no:cacheprovider --basetemp .cache/sm09-runner-final`
+  → **101 passed**, 110.42 saniye; owned JVM temiz kapandı.
+- Bağımsız review iki schema/Arrow bulgusunu doğruladı; düzeltmelerin ve red
+  regresyonların yeniden incelemesinde açık yüksek/orta bulgu kalmadı.
+- Eski backend artifact akışı ayrıca doğrulandı: `.venv/Scripts/python.exe -m
+  pytest tests/integration/test_bundle_preprocessing_integrity.py
+  tests/integration/test_full_inference_pipeline.py -q --tb=short -o addopts=
+  -p no:cacheprovider --basetemp .cache/sm09-legacy`
+  → **22 passed, 30 warnings**, 7.80 saniye. Backend kaynakları değiştirilmedi;
+  full FE/model joblib reader korunuyor, yeni bundle adapter'ı SM-18'de.
+- Tam core: `HF_HUB_OFFLINE=1 .venv/Scripts/python.exe -m pytest skyulf-core/tests
+  -q --tb=short --disable-warnings -o addopts= -p no:cacheprovider
+  --basetemp .cache/sm09-core-full`
+  → **10050 passed, 274 skipped, 1097 warnings**, 194.81 saniye. Base ortamda
+  PySpark yok; gerçek Spark testleri ayrı lane'de doğrulanır.
+- Ruff/format ve tam repo ty başarılı. Bundle/Spark rehberleri mevcut artifact
+  davranışını, yeni runner'ı, dtype ve sürüm sınırlarını açıklıyor.
+  `mkdocs build --strict` başarılı.
+- Tam Spark: `JAVA_HOME=.cache/spark-jdk/jdk-17.0.20.1+1`,
+  `SKYULF_REQUIRE_SPARK=1`, `.venv-spark/Scripts/python.exe -m pytest
+  skyulf-core/tests/spark skyulf-core/tests/unit/test_execution_capabilities.py
+  skyulf-core/tests/unit/test_feature_state.py
+  skyulf-core/tests/unit/test_pipeline_inference_schema.py -q --tb=short
+  -o addopts= -p no:cacheprovider --basetemp .cache/sm09-spark-full`
+  → **393 passed, 2 warnings**, 418.45 saniye. PySpark 4.0.3 / Java 17;
+  JVM temiz kapandı. Warning'ler mevcut Split alias'ına ait.
+- Spark runtime: Python 3.12.10, skyulf-core 0.9.0, pandas 2.3.2,
+  Polars 1.44.2, sklearn 1.9.1, NumPy 1.26.4, SciPy 1.17.1, Arrow 24.0.0.
+- Rehberin iki Python bloğu `.venv-spark/Scripts/python.exe
+  .cache/sm09_docs_example.py` ile aynı ortamda çalıştırıldı: local kayıt/yükleme
+  ve key'li Spark sonucu **[40.0, 20.0]**, başarılı assert'ler ve temiz JVM kapanışı.
+- Sınır: bu G2a / native FE + regression teslimatıdır. SM-10 Python FE worker
+  modu, SM-11 classification/worker wheel/ölçek kapısıdır. Databricks/Connect,
+  MLflow/UC, endpoint ve template doğrulaması yoktur. Sıradaki görev SM-10.

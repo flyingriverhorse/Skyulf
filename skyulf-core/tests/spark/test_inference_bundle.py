@@ -19,36 +19,6 @@ from skyulf.pipeline import SkyulfPipeline
 from skyulf.preprocessing import _feature_state
 
 
-@pytest.fixture(params=["pandas", "polars"])
-def fitted_regression_pipeline(request):
-    """Different feature scales expose swapped columns and accidental double preprocessing."""
-    rng = np.random.default_rng(17)
-    frame = pd.DataFrame({"x": rng.normal(100, 20, 40), "z": rng.normal(5, 2, 40)})
-    frame["target"] = 2 * frame.x - 3 * frame.z + 7
-    pipeline = SkyulfPipeline(
-        {
-            "preprocessing": [
-                {"name": "fill", "transformer": "SimpleImputer", "params": {"columns": ["x", "z"]}},
-                {
-                    "name": "scale",
-                    "transformer": "StandardScaler",
-                    "params": {"columns": ["x", "z"]},
-                },
-            ],
-            "modeling": {"type": "linear_regression"},
-        }
-    )
-    data = pl.from_pandas(frame) if request.param == "polars" else frame
-    pipeline.fit(SplitDataset(train=data, test=data.head(0)), target_column="target")
-    return pipeline
-
-
-@pytest.fixture
-def raw_frame():
-    """Held-out values and a nondefault index expose re-fitting and row misalignment."""
-    return pd.DataFrame({"x": [150.0, 80.0], "z": [9.0, 3.0]}, index=[17, 4])
-
-
 @pytest.mark.parametrize("stage", ["raw", "features"])
 def test_round_trip_preserves_predictions(fitted_regression_pipeline, raw_frame, tmp_path, stage):
     """Loading must preserve the same prediction function without applying FE twice."""

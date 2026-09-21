@@ -63,13 +63,14 @@ def test_bundle_round_trip_predictions(fitted_regression_pipeline, tmp_path, raw
     np.testing.assert_allclose(after, before, rtol=1e-10, atol=1e-12)
 ```
 
-SM-08 fixture'ları `tests/spark/test_inference_bundle.py` içindedir: `raw_frame`
-x/z kolonları ve farklı scale içeren küçük pandas verisi;
-`fitted_regression_pipeline` imputer + scaler + mevcut linear regression ile
+`raw_frame`, x/z kolonları ve farklı scale içeren küçük pandas verisidir.
+SM-09 ile bu fixture ve `fitted_regression_pipeline`, ortak
+`tests/spark/conftest.py` dosyasındadır; pipeline fixture'ı imputer +
+scaler + mevcut linear regression ile
 local fit edilmiş gerçek SkyulfPipeline. Veri üretimi seed=17 ve held-out
 satırlarla sabitlenir; mock estimator bu testin yerine geçmez.
 Local giriş yalnız feature kolonlarıdır; ekstra id/target reddedilir. SM-09
-shared fixture'a ihtiyaç duyduğunda conftest'e taşır, Spark verisine ayrı id ekler.
+Spark verisine ayrı id ekler; training fixture iki engine için ortak kullanılır.
 Kolon adı/sırası modelin NumPy girdisinden tahmin edilmez; başarılı pipeline fit
 metadata-only raw/model schema kaydeder. Eski standalone pickle için adapter
 `SkyulfPipeline.load` → `build_bundle`; schema yoksa refit gerekir. Backend
@@ -88,13 +89,13 @@ dict adapter'ı SM-18'e kadar açıkça reddedilir. Ayrıntılar [bundle rehberi
 `mode="native_features"` ham girdiye önce native FE uygular, worker'a yalnız
 model feature'ları + keys gönderir. Sonuç Spark DataFrame'dir.
 
-- [ ] Gerçek Spark action ve key-based karşılaştırma testi yaz. Model training
+- [x] Gerçek Spark action ve key-based karşılaştırma testi yaz. Model training
   local fixture'da açıkça yapılsın; Spark fit çağrısı veya gizli conversion olmasın.
-- [ ] Native FE'yi G1 yoluyla çalıştır; Python modelini mapInPandas iterator
+- [x] Native FE'yi G1 yoluyla çalıştır; Python modelini mapInPandas iterator
   başına bir kez yükle. Output schema önceden bundle'dan gelsin; key dtype korunsun.
-- [ ] Feature order ve input_stage doğrulamasını driver'da yap. Geniş kolonları
+- [x] Feature order ve input_stage doğrulamasını driver'da yap. Geniş kolonları
   gereksiz yere worker'a gönderme; session/connection closure capture etme.
-- [ ] Repartition ve Arrow batch boyutu değişince aynı key için aynı tahmini,
+- [x] Repartition ve Arrow batch boyutu değişince aynı key için aynı tahmini,
   boş partition ve boş dataframe'de doğru boş schema'yı doğrula.
 
 ```python
@@ -104,12 +105,12 @@ def test_native_path_matches_local(spark, raw_frame, regression_bundle):
     from skyulf.core.execution import FrameSpec, ExecutionOptions
     from skyulf.inference.bundle import predict_local
     from skyulf.inference.spark import predict_spark
-    frame = spark.createDataFrame(raw_frame).repartition(3)
+    frame = spark.createDataFrame(raw_frame.assign(id=range(len(raw_frame)))).repartition(3)
     actual = predict_spark(frame, regression_bundle,
         frame_spec=FrameSpec(row_keys=("id",)),
         options=ExecutionOptions(engine="spark", python_batch_rows=2),
         mode="native_features").toPandas().sort_values("id")
-    expected = predict_local(raw_frame.sort_values("id").drop(columns="id"), regression_bundle)
+    expected = predict_local(raw_frame, regression_bundle)
     np.testing.assert_allclose(actual["prediction"], expected["prediction"], rtol=1e-10)
 ```
 
@@ -118,6 +119,16 @@ Testteki toPandas yalnız küçük test sonucunu karşılaştırmak içindir; ü
 inference yolunda driver collection olmaması ayrıca denetlenir.
 **Komut:** `python -m pytest skyulf-core/tests/spark/test_native_features_inference.py -q`
 **Kabul:** G2a: Spark FE native, model dağıtık Python; FE bir kez uygulanır.
+
+2026-09-21: SM-09 tamamlandı. 393 gerçek Spark lane testi, 10050 base core testi
+ve rehber örneği geçti; komutlar ve sınırlar [tamamlanma kaydındadır](OPEN_QUEUE.md).
+
+SM-09'un ilk runner'ı raw regression bundle kabul eder. Prepared-feature giriş,
+Python FE worker modu, classification ve streaming açık ret verir. Numeric
+model schema değişimleri action öncesinde reddedilir. Integer/boolean model
+feature'ları Arrow hassasiyetini korumak için non-nullable Spark schema ister;
+key'ler ayrı non-null/unique değer kontrolünden geçer. Model chunk satır limiti
+Arrow transport limiti değildir. Detaylar [bundle rehberindedir](../../docs/user_guide/inference_bundles.md).
 
 ## SM-10 — Worker'da Python FE + model
 
@@ -167,6 +178,10 @@ metadata'sı taşıyan geçerli bundle'dır; bozuk manifest ile ret üretme.
 - [ ] Worker'ın wheel'i kullanması ve eksik dependency'nin anlaşılır hatası için
   ayrı-process testi ekle. Model her satır için yüklenmesin; iterator seviyesinde
   yükleme helper'ını ölç. Task sayısına eşit tam bir global yükleme sayısı varsayma.
+- [ ] SM-09'un nullable integer/boolean model-feature schema sınırını yeniden
+  değerlendir. Arrow → pandas null dönüşümünde büyük integer hassasiyeti
+  korunmadan desteği genişletme; float'tan integer'a geri cast çözüm değildir.
+  Destek açılmayacaksa mevcut erken ret ve kullanıcı dokümanını koru.
 - [ ] Büyük sentetik veri üzerinde driver RSS, worker peak ve wall time ölç;
   row count/feature width/partition sayısını kaydet. Driver belleğinin input
   boyutuyla doğrusal büyümemesini araştır; sabit hızlanma oranı vaat etme.

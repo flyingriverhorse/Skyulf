@@ -2,7 +2,7 @@
 
 The 0.9.0 development API packages a fitted feature pipeline and a Python
 estimator with an explicit inference contract. It supports local pandas/Polars
-prediction and provides the package boundary for the later Spark worker runner.
+prediction and native Spark FE followed by Python regression on Spark workers.
 Importing `skyulf.inference` requires neither PySpark nor MLflow.
 
 ## Raw data and prepared features
@@ -78,8 +78,8 @@ when the source schema differs intentionally.
 
 Supply feature columns only. Extra targets or identity columns are rejected.
 The returned pandas DataFrame preserves a pandas input index; Polars input
-receives a RangeIndex. The later Spark runner will carry explicit `FrameSpec`
-keys separately from model features. Calling `predict_local` with a Spark frame
+receives a RangeIndex. The Spark runner carries explicit `FrameSpec` keys
+separately from model features. Calling `predict_local` with a Spark frame
 fails before any collection or local conversion.
 
 Regression returns a float64 `prediction` column. Supported classifiers return
@@ -136,6 +136,89 @@ for estimator bytes. Oversized file reads and pickle serialization are bounded.
 These are wire-size checks, not total process-memory guarantees. A wider input
 batch or a loaded estimator can use more memory than its serialized form.
 
+## Native Spark FE and worker model inference
+
+`predict_spark(..., mode="native_features")` accepts a raw-input regression
+bundle and a Spark DataFrame. The fitted FE runs as native Spark expressions.
+Only the prepared feature columns and row keys reach the Python workers;
+the estimator receives the features in the saved training order. Pandas/NumPy
+batches exist inside those workers, without collecting the dataset to the driver.
+Local training describes where the fit runs; it does not waive the matching
+runtime requirements above. Train/package and consume in compatible environments,
+even when switching from pandas or Polars inputs to Spark inputs.
+
+This example continues the local training example above. `spark` is an existing,
+caller-owned SparkSession; the runner neither creates nor closes it:
+
+```python
+from skyulf.core.execution import ExecutionOptions, FrameSpec
+from skyulf.inference import predict_spark
+
+incoming = spark.createDataFrame(
+    [(101, 4.0, "unused"), (102, None, "unused")],
+    "id long, amount double, extra string",
+).repartition(2)
+
+predictions = predict_spark(
+    incoming,
+    bundle,
+    frame_spec=FrameSpec(row_keys=("id",)),
+    options=ExecutionOptions("spark", python_batch_rows=2),
+    mode="native_features",
+)
+# This small example materializes two output rows; the runner does not collect them.
+rows = predictions.orderBy("id").collect()
+assert [row.id for row in rows] == [101, 102]
+np.testing.assert_allclose([row.prediction for row in rows], [40.0, 20.0], atol=1e-12)
+```
+
+Production consumers receive a Spark DataFrame and can select their own action
+or output sink. Output rows have no guaranteed physical order; match them by
+the declared unique, non-null keys. Composite integer/string/boolean keys are
+supported; floating-point and date/time keys are rejected by this first runner.
+Keys must not also be model features. Incoming column names must not collide
+with prediction output names. Leave `FrameSpec.target` unset. Unused input
+columns are projected away, while the relative order and dtypes of required
+feature columns are validated rather than silently corrected.
+
+Native FE output must also match the recorded model-feature dtypes before any
+validation action runs. Some local/Spark operations promote numeric types
+differently: a local integer column without missing values can remain integer
+after mean imputation, while Spark's replacement expression produces double.
+That bundle is rejected instead of casting silently. Normalize numeric types
+explicitly before training and use the same input types for inference when a
+cross-engine pipeline requires floating-point features.
+
+For this first worker runner, integral/boolean **model features** must have a
+non-nullable Spark schema. Arrow can convert a nullable integer batch to pandas
+float when it contains nulls, losing precision for large integers before the
+model sees it. Nullable integral/boolean feature schemas are rejected eagerly,
+even if their present rows happen to contain no nulls. Floating-point features
+can retain null/NaN behavior. Row keys have a separate distributed non-null
+check and can retain nullable schema metadata. Broader nullable feature transport
+is part of the later worker validation gate.
+
+The model is loaded once per worker iterator invocation and reused over its
+prediction chunks. Task retries or later actions may load it again. The worker
+receives model bytes and inference metadata, without a SparkSession, registry
+client or tracking connection. Prepare matching dependencies on driver and
+workers; the runtime contract is checked in both places.
+
+`python_batch_rows` limits the rows passed to an individual model prediction.
+Spark's `spark.sql.execution.arrow.maxRecordsPerBatch` separately controls Arrow
+transport batches. Set that Spark configuration on your session when needed;
+the runner does not change it. Neither row limit is a byte-memory guarantee.
+Input-key and FE preservation checks can execute bounded validation actions
+before prediction; prediction itself remains a lazy Spark computation.
+Validation does not freeze a changing source. The caller owns any snapshot or
+persist policy needed to keep validation and later actions on the same input.
+
+The first distributed runner accepts `input_stage="raw"` and regression only.
+Prepared-feature bundles, classification, streaming and the Python FE worker
+mode are not enabled by this delivery. Local classification remains available. Databricks,
+Spark Connect and worker-wheel isolation still require their later validation
+gates; local PySpark tests do not establish those deployment guarantees.
+
 ## Current support and legacy adapters
 
 The first version accepts a successfully fitted standalone `SkyulfPipeline`
@@ -147,6 +230,21 @@ FE nodes require a separate adapter; they are not serialized as an opaque
 whole pipeline. Training-only split nodes in the FE chain are therefore not
 portable yet; an explicit `SplitDataset` can supply training/test partitions.
 
+Saving fitted transformations alongside the model already exists in Skyulf.
+The new bundle adds an explicit execution contract for local and distributed
+consumers; it does not relearn or replace those fitted transformations.
+
+| Existing artifact | Saved information and current consumer | New bundle bridge |
+| --- | --- | --- |
+| Standalone `SkyulfPipeline.save()` pickle | The pipeline object, fitted FE and model; `SkyulfPipeline.load(...).predict(...)` | Load with the existing API, then call `build_bundle` if recorded schemas and supported FE are present |
+| Backend job artifact, normally `.joblib` | Model, fitted FeatureEngineer, target/drop metadata, model feature order/dtypes and training engine; `DeploymentService` | Explicit adapter planned for SM-18; do not pass the dictionary to `build_bundle` |
+| Estimator-only pickle | Whatever the producer saved in the estimator | External preprocessing is not recovered automatically; a fitted pipeline and its input contract are needed |
+
+The backend serving path already transforms raw input and aligns the result to
+the saved training feature order. Some serving choices, including enabled tuned
+thresholds and request overrides, are resolved outside that artifact. Its adapter
+must preserve that behavior and target-label decoding as well as the fitted model.
+
 Existing `SkyulfPipeline.save/load` pickle behavior is unchanged. A standalone
 pipeline saved after schema capture can be loaded through that API and passed
 to `build_bundle`. Historical standalone artifacts without captured schemas
@@ -154,6 +252,23 @@ must be fitted successfully again; the bundle does not invent missing column
 names or types. Backend artifact dictionaries are rejected. Their explicit
 adapter and threshold/label compatibility checks belong to SM-18.
 
-This delivery verifies local packaging and inference. Distributed Python model
-execution, MLflow/Unity Catalog, Databricks runtime validation, endpoints and
-template generation remain later stages of the [Spark work](spark.md).
+Changing the inference engine does not make every fitted Python transformer a
+native Spark operation. For example, a future binning adapter must use the saved
+training bin boundaries; it must not discover new boundaries from each inference
+batch. The native path requires an implemented Spark applier and a supported
+state codec. The planned Python-worker path requires explicit support for
+independent batches and row preservation. Rolling/lag and transformations that
+need neighboring rows cannot be made correct merely by putting them inside a
+worker batch. Unsupported combinations fail explicitly; there is no automatic
+conversion of a whole Spark dataset to local pandas or Polars.
+
+MLflow is a separate packaging/integration layer. Logging only an estimator
+does not include external feature engineering; log a fitted pipeline or provide
+a model wrapper that runs it. MLflow's
+[Spark UDF](https://mlflow.org/docs/latest/api_reference/python_api/mlflow.pyfunc.html#mlflow.pyfunc.spark_udf)
+executes Python model inference through pandas batches; it does not compile
+arbitrary Python transformations into native Spark expressions. Skyulf's MLflow
+adapter will expose the selected bundle contract in a later stage.
+
+MLflow/Unity Catalog, Databricks runtime validation, endpoints and template
+generation remain later stages of the [Spark work](spark.md).

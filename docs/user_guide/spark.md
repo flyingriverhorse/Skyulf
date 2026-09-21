@@ -6,9 +6,9 @@ available in the development checkout.
 **Native SimpleImputer (mean/constant) and StandardScaler support fit and apply.**
 Their fitted pipeline can be exported and restored across pandas, Polars and Spark.
 The [standalone inference bundle](inference_bundles.md) packages this state with
-a fitted model and validates local raw/features prediction. The Spark model
-worker runner is the next stage.
-Other built-in native nodes and distributed model inference remain under development.
+a fitted model and validates local raw/features prediction. The Spark runner
+applies native FE and runs a Python regression model in worker batches.
+Other native nodes, worker Python FE and distributed classification remain under development.
 Installing the extra does not convert a pandas/Polars pipeline to Spark.
 
 ## Why a separate environment?
@@ -526,6 +526,27 @@ The automated gate covers all nine fit/apply engine combinations, file round-tri
 repartitioning to 1/2/7 partitions, reversed inputs, repeated apply and a 10,000-row
 fixture that rejects unbounded driver collection. Validation currently uses local
 PySpark; Databricks/Connect validation is still pending.
+
+## Model inference after native FE
+
+Use `predict_spark(..., mode="native_features")` with a raw-input inference
+bundle to apply the supported saved transformations natively and run a Python
+regression model on Spark workers. The result is a Spark DataFrame containing
+row keys and predictions. The full dataset remains distributed; pandas/NumPy
+are used for individual worker model batches.
+
+The [inference bundle guide](inference_bundles.md#native-spark-fe-and-worker-model-inference)
+contains a working example, input/order checks and the distinction between
+model chunk size and Arrow transport batches. Its
+[legacy artifact section](inference_bundles.md#current-support-and-legacy-adapters)
+explains how existing pipeline pickle and backend joblib artifacts relate to
+the new bundle. Saving fitted FE with a model already existed; distributed
+execution requires explicit support for the transformations in that artifact.
+
+Current distributed model support is regression with native mean/constant
+imputation and StandardScaler, including an empty FE chain. Local training can
+use pandas or Polars. Python FE on workers, classification, MLflow packaging and
+Databricks runtime validation have separate later gates.
 
 ## Capability declarations
 

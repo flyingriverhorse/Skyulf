@@ -225,24 +225,31 @@ def predict_local(
             {col.name: pd.Series(index=index, dtype=col.dtype) for col in manifest.output_schema}
         )
     model = load_model(bundle.model_payload, manifest)
+    return _predict_features(features, model, manifest, index)
+
+
+def _predict_features(
+    features: Any, model: Any, manifest: BundleManifest, index: pd.Index
+) -> pd.DataFrame:
+    """Apply an already loaded estimator without preprocessing or retaining batch state."""
     values, _ = SklearnBridge.to_sklearn(features, validate_features=True)
     probabilities = None
     if manifest.task == "classification":
         probabilities = np.asarray(model.predict_proba(values))
-        if probabilities.shape != (len(frame), len(bundle.classes)):
+        if probabilities.shape != (len(features), len(manifest.classes)):
             raise ValueError("Model probability shape violates the bundle contract.")
     if manifest.thresholds.values:
-        thresholds = dict(zip(bundle.classes, manifest.thresholds.values, strict=True))
-        predictions = apply_thresholds(probabilities, thresholds, classes=bundle.classes)
+        thresholds = dict(zip(manifest.classes, manifest.thresholds.values, strict=True))
+        predictions = apply_thresholds(probabilities, thresholds, classes=manifest.classes)
     else:
         predictions = np.asarray(model.predict(values))
-    if predictions.shape != (len(frame),):
+    if predictions.shape != (len(features),):
         raise ValueError("Model prediction shape violates the bundle contract.")
     output = pd.DataFrame(
         {"prediction": pd.Series(predictions, index=index, dtype=manifest.output_schema[0].dtype)}
     )
     if probabilities is not None:
-        for position, name in enumerate(bundle.probability_columns):
+        for position, name in enumerate(manifest.probability_columns):
             output[name] = probabilities[:, position]
     return output
 
