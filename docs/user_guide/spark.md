@@ -71,6 +71,65 @@ keep the dataset in Spark and transfer bounded learned state when supported.
 Python model inference on Spark workers is a separate capability from native
 Spark model training.
 
+## Execution contracts
+
+The development API can validate a future execution request without starting
+Spark or changing the current pandas/Polars engine:
+
+```python
+from skyulf.core.execution import ExecutionOptions, FrameSpec
+
+options = ExecutionOptions.from_config({
+    "engine": "spark",
+    "python_batch_rows": 4096,
+    "state_max_bytes": 8 * 1024 * 1024,
+})
+identity = FrameSpec(row_keys=("customer_id", "event_id"), target="label")
+```
+
+Engine values are `pandas`, `polars` and `spark`; `databricks` names a platform,
+not an engine. Unknown configuration fields and nonpositive/noninteger limits
+are rejected. These immutable objects declare requirements; they do not apply
+memory limits or validate the actual values in a dataframe. Runtime key-value
+validation will arrive with the Spark dataframe adapter.
+
+A capability check distinguishes fit and apply and never falls back to pandas:
+
+```python
+from skyulf.core.capabilities import UnsupportedExecutionError, require_capability
+
+try:
+    require_capability("SimpleImputer", "fit", "spark", config={"strategy": "mean"})
+except UnsupportedExecutionError as error:
+    print(error.node_type, error.operation, error.engine, error.reason)
+```
+
+This currently reports unsupported: no built-in Spark node has been enabled.
+Existing local pipelines continue to work; this new preflight is not yet wired
+into their execution. A local node without an explicit declaration also fails
+this new query, even though its existing local pipeline path remains available.
+
+### Declaring custom operation support
+
+Node authors can pass an immutable `execution_capabilities` tuple to
+`NodeRegistry.register`. Each `ExecutionCapability` records:
+
+| Field | Meaning |
+| --- | --- |
+| `engine`, `operation` | Exact engine and `fit` or `apply` |
+| `execution_kind` | `native`, `python_batch` or `local` |
+| `row_effect` | `preserve`, `filter` or `expand` |
+| `context` | `row`, `group`, `window` or `global` |
+| `codec_version` | Optional positive version of the fitted-state codec |
+| `config_match` | Immutable tuple of required key/scalar-value pairs |
+
+For example, `config_match=(("strategy", "mean"),)` allows only an explicit
+mean strategy; absent keys do not match. Normalize node defaults before querying.
+Selectors compare types as well as values, so `True` is not treated as integer 1.
+Aliases of the same calculator share declarations; subclasses must declare
+their own support. Metadata is an implementation promise: it does not generate
+Spark code, certify compatibility or make a window transform batch-independent.
+
 ## Troubleshooting and support boundaries
 
 - **Java gateway fails:** check Java 17 and the current shell's `JAVA_HOME`.

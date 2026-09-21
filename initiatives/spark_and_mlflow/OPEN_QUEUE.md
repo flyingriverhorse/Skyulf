@@ -1,17 +1,17 @@
 # Spark ve MLflow — Open Queue
 
-Güncelleme: 2026-09-21. **SM-00 tamamlandı. Sonraki görev: SM-01. Hedef: 0.9.0.**
+Güncelleme: 2026-09-21. **SM-01 tamamlandı. Sonraki görev: SM-02. Hedef: 0.9.0.**
 Bu dosya kısa çalışma sırasıdır; detaylar bağlantılı planlarda.
 
 Durumlar: READY = başlanabilir; WAIT = önceki görev bekleniyor;
 LATER = son aşama; ACTIVE = yürütülüyor; BLOCKED = somut dış engel;
-DONE = kanıtla tamamlandı. Şu an ACTIVE görev yok; SM-01 başlanabilir.
+DONE = kanıtla tamamlandı. SM-00 commit: `105a6fe4`.
 
 | Sıra | Görev | Bağımlılık | Durum | Kısa bitiş ölçütü |
 | --- | --- | --- | --- | --- |
 | SM-00 | Baseline ve Spark test ortamı | — | DONE | Güncel master: 231 baseline; 2 Spark smoke; [kanıt](BASELINE.md) |
-| SM-01 | Execution/capability kuralları | SM-00 | READY | Desteklenmeyen engine/operation erken ret |
-| SM-02 | Spark engine ve conversion sınırı | SM-01 | WAIT | Spark tanınır; gizli local conversion yok |
+| SM-01 | Execution/capability kuralları | SM-00 | DONE | Immutable config; registry operation desteği; aşağıda kanıt |
+| SM-02 | Spark engine ve conversion sınırı | SM-01 | READY | Spark tanınır; gizli local conversion yok |
 | SM-03 | Dispatcher, schema, row keys | SM-02 | WAIT | Key/target korunur; local API çalışır |
 | SM-04 | Versioned portable state | SM-03 | WAIT | Limit/version kontrolü; state round-trip |
 | SM-05 | Native SimpleImputer | SM-04 | WAIT | Mean/constant train-only fit, Spark apply |
@@ -80,3 +80,28 @@ ve MLflow entegrasyonu henüz yok.
   exit 1. Eksik dependency başarılı CI gibi raporlanmıyor.
 - Ruff check/format ve scoped ty geçti. GitHub Actions ve Databricks çalıştırılmadı.
 - Sonraki görev SM-01; bu kanıt native Spark node desteği anlamına gelmez.
+
+## SM-01 — 2026-09-21 tamamlanma kaydı
+
+- Başlangıç commit'i `105a6fe4`; bu kayıt doğrulanmış SM-01 çalışma ağacına aittir.
+- Yeni `core/execution.py`: frozen FrameSpec ve ExecutionOptions, strict
+  `from_config`, pozitif integer limitleri; engine default'unu değiştirmez.
+- Yeni `core/capabilities.py`: immutable operation/engine/config desteği ve
+  structured UnsupportedExecutionError. NodeRegistry mevcut Calculator sınıfında
+  declaration tutar; alias aynı sınıfı paylaşır, subclass açıkça yeniden ilan eder.
+- Yeni testler `tests/unit/test_execution_contract.py` ve
+  `tests/unit/test_execution_capabilities.py`; Spark gerektirmeyen kurallar bu
+  yüzden planlanan spark/ dizini yerine unit/ altındadır.
+- İlk 48 test eksik modüllerle fail oldu; uygulama sonrası geçti. Tam core:
+  `HF_HUB_OFFLINE=1 .venv/Scripts/python.exe -m pytest skyulf-core/tests -q
+  --tb=short --disable-warnings -p no:cacheprovider --basetemp .cache/sm01-core`
+  → **9850 passed, 84 skipped, 1077 warnings**, 127.52 saniye; 3 snapshot geçti.
+- Bağımsız inceleme bloklayan sorun bulmadı. Ek alias/subclass, type-exact
+  selector, invalid registration ve optional import regresyonlarından sonra:
+  iki yeni unit dosyası + test_engines_registry.py + test_core_seams.py
+  → **94 passed**. Bu son eklemeler test kapsamıdır; ürün kodu değişmedi.
+- Tam repo ty, scoped Ruff/format ve yeni core modüllerinde CCN<=8 kontrolü geçti.
+  `mkdocs build --strict` başarılı; docs/user_guide/spark.md kontrat örnekleri
+  doğrudan çalıştırıldı. Kullanıcı belgeleri uygulamayla birlikte güncellendi.
+- Spark engine/node desteği henüz etkin değil. Existing local pipeline preflight'ı
+  bu yeni API'ye bağlanmadı; SM-03'te yapılacak. Sıradaki görev SM-02.

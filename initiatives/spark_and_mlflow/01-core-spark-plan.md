@@ -61,20 +61,21 @@ def test_spark_executes_multiple_partitions(spark):
 ## SM-01 — Execution ve capability sözleşmesi
 
 **Bağımlılık:** SM-00. **Oluştur:** `skyulf/core/execution.py`,
-`skyulf/core/capabilities.py`, `tests/spark/test_capabilities.py` (ilk iki yol
+`skyulf/core/capabilities.py`, `tests/unit/test_execution_capabilities.py`,
+`tests/unit/test_execution_contract.py` (ilk iki yol
 `skyulf-core/` altında; bu planda tüm `skyulf/` ve `tests/` yolları aynı köke göre).
 **Değiştir:** `skyulf/registry.py`, `skyulf/config_validation.py`.
 **Tüketir:** Mevcut node registration anahtarları ve operation metadata.
 **Üretir:** ARCHITECTURE'daki FrameSpec, ExecutionOptions,
 `require_capability(...)`; `UnsupportedExecutionError(ValueError)`.
 
-- [ ] Mevcut registry anahtarlarını dolaşan testte Spark desteği ilan edilmemiş
+- [x] Mevcut registry anahtarlarını dolaşan testte Spark desteği ilan edilmemiş
   bütün fit/apply kombinasyonlarının açıklayıcı hatayla reddedildiğini sabitle.
-- [ ] Capability kaydına engine + operation + config strategy + row/context etkisi
+- [x] Capability kaydına engine + operation + config strategy + row/context etkisi
   ekle. Alias'lar canonical node ile aynı kararı vermeli; ikinci node registry yok.
-- [ ] FrameSpec duplicate key isimlerini/target-key çakışmasını; options sıfır/negatif
+- [x] FrameSpec duplicate key isimlerini/target-key çakışmasını; options sıfır/negatif
   limitleri ve bilinmeyen engine'i reddetsin. Frame içeriği kontrolü SM-03'te.
-- [ ] Yeni runtime config'de yazım hatasının sessizce kabul edilmediğini test et.
+- [x] Yeni runtime config'de yazım hatasının sessizce kabul edilmediğini test et.
   Eski config davranışını topluca değiştirme.
 
 ```python
@@ -86,7 +87,7 @@ def test_unimplemented_spark_fit_is_explicit():
         require_capability("KNNImputer", "fit", "spark", config={})
 ```
 
-**Komut:** `python -m pytest skyulf-core/tests/spark/test_capabilities.py -q`
+**Komut:** `python -m pytest skyulf-core/tests/unit/test_execution_contract.py skyulf-core/tests/unit/test_execution_capabilities.py -q`
 **Kabul:** Destek olmayan yol herhangi bir Spark action veya estimator fit çağırmaz.
 
 ## SM-02 — Spark engine ve materialization sınırı

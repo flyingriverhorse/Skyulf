@@ -8,7 +8,10 @@ makes the node resolvable. All state is class-level and process-wide.
 import logging
 import warnings
 from threading import Lock
-from typing import Any, ClassVar
+from typing import TYPE_CHECKING, Any, ClassVar
+
+if TYPE_CHECKING:
+    from .core.capabilities import ExecutionCapability
 
 logger = logging.getLogger(__name__)
 
@@ -31,14 +34,28 @@ class NodeRegistry:
     _lock = Lock()
 
     @classmethod
-    def register(cls, name: str, applier_cls: type, metadata: dict[str, Any] | None = None):
+    def register(
+        cls,
+        name: str,
+        applier_cls: type,
+        metadata: dict[str, Any] | None = None,
+        *,
+        execution_capabilities: tuple["ExecutionCapability", ...] | None = None,
+    ):
         """Decorator to register a Calculator/Applier pair.
 
         Args:
             name: The unique string identifier for the node (e.g. 'random_forest').
             applier_cls: The class of the Applier (must be passed as we decorate the Calculator).
             metadata: Optional dictionary of UI metadata.
+            execution_capabilities: Optional immutable declarations for explicit
+                execution preflight. Omission preserves declarations on aliases.
         """
+        if execution_capabilities is not None:
+            # Avoid loading core and its registry consumers while nodes import.
+            from .core.capabilities import validate_capabilities  # noqa: PLC0415
+
+            validate_capabilities(execution_capabilities)
 
         def wrapper(calculator_cls):
             with cls._lock:
@@ -49,6 +66,8 @@ class NodeRegistry:
 
                 cls._calculators[name] = calculator_cls
                 cls._appliers[name] = applier_cls
+                if execution_capabilities is not None:
+                    calculator_cls.__execution_capabilities__ = execution_capabilities
 
                 # 1. Use passed metadata if available
                 if metadata is not None:
