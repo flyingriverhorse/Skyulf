@@ -364,18 +364,23 @@ class DeploymentService:
                 f"override_thresholds keys {sorted(provided)} do not match "
                 f"model classes {sorted(expected)}"
             )
-        for value in override_thresholds.values():
+        DeploymentService._validate_threshold_weights(override_thresholds, len(expected))
+
+    @staticmethod
+    def _validate_threshold_weights(thresholds: dict[str, float], class_count: int) -> None:
+        """Validate finite weights and binary or multiclass positivity rules."""
+        for value in thresholds.values():
             if (
                 not isinstance(value, (int, float))
                 or not math.isfinite(value)
                 or value < 0
-                or (len(expected) > 2 and value == 0)
+                or (class_count > 2 and value == 0)
             ):
                 raise OverrideThresholdMismatch(
                     "threshold weights must be finite and "
-                    + ("positive for multiclass" if len(expected) > 2 else "nonnegative for binary")
+                    + ("positive for multiclass" if class_count > 2 else "nonnegative for binary")
                 )
-        if not any(value > 0 for value in override_thresholds.values()):
+        if not any(value > 0 for value in thresholds.values()):
             raise OverrideThresholdMismatch("threshold weights must not all be zero")
 
     @staticmethod

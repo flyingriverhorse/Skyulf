@@ -57,6 +57,9 @@ function bindingForNode(type: string, binding?: TemplateBinding): Record<string,
   if (!binding) return {};
   if (type === 'dataset_node') return { datasetId: binding.datasetId, datasetName: binding.datasetName };
   if (type === 'TrainTestSplitter') return { datasetId: binding.datasetId, target_column: binding.targetColumn };
+  if (binding.targetColumn && ['classification', 'regression', 'text_classification', 'EnsembleNode'].includes(type)) {
+    return { target_column: binding.targetColumn };
+  }
   if ((type === 'TextCleaning' || type === 'tfidf_vectorizer') && binding.textColumn) {
     return { columns: [binding.textColumn] };
   }

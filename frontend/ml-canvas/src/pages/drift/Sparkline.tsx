@@ -1,5 +1,9 @@
 import React from 'react';
 
+function isFiniteValue(value: number | null | undefined): value is number {
+    return value != null && Number.isFinite(value);
+}
+
 /**
  * Tiny SVG sparkline used in the per-feature drift table to show the recent
  * PSI trend. Gaps retain missing checks; only the endpoint encodes the PSI verdict.
@@ -11,7 +15,7 @@ export const Sparkline: React.FC<{
     height?: number;
 }> = ({ values, threshold, width = 64, height = 20 }) => {
     if (values.length < 2) return <span className="text-[10px] text-gray-400">—</span>;
-    const valid = values.filter((value): value is number => value != null && Number.isFinite(value));
+    const valid = values.filter(isFiniteValue);
     if (!valid.length) return <span className="text-[10px] text-gray-400" title="PSI unavailable for all checks">—</span>;
     const min = Math.min(...valid);
     const max = Math.max(...valid);
@@ -19,7 +23,7 @@ export const Sparkline: React.FC<{
     const segments: string[][] = [];
     let segment: string[] = [];
     const points = values.map((value, index) => {
-        if (value == null || !Number.isFinite(value)) {
+        if (!isFiniteValue(value)) {
             segment = [];
             return null;
         }
@@ -30,8 +34,8 @@ export const Sparkline: React.FC<{
         return point;
     });
     const last = values[values.length - 1];
-    const hasLast = last != null && Number.isFinite(last);
-    const hasThreshold = threshold != null && Number.isFinite(threshold);
+    const hasLast = isFiniteValue(last);
+    const hasThreshold = isFiniteValue(threshold);
     const color = hasLast && hasThreshold ? (last > threshold ? '#ef4444' : '#22c55e') : '#94a3b8';
     const label = `PSI history: ${values.length - valid.length} missing checks; latest PSI ${hasLast ? last : 'unavailable'}; threshold ${hasThreshold ? threshold : 'unavailable'}`;
     return (

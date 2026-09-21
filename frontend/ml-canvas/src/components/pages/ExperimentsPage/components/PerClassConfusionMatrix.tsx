@@ -66,7 +66,8 @@ export const PerClassConfusionMatrix: React.FC<Props> = ({
   // Only bail out for genuinely invalid data (0 or 1 classes) — 2-class
   // (binary) jobs now render via `renderSplitBinary` below instead of the
   // "N vs Rest" multiclass grid.
-  if ((evaluationData.splits.train?.y_proba?.classes.length ?? 0) < 2) return null;
+  const classCount = evaluationData.splits.train?.y_proba?.classes.length ?? 0;
+  if (classCount < 2) return null;
 
                             // Binary jobs: one plain N×N (2×2) matrix with real class
                             // names on both axes, instead of two redundant "vs Rest"
@@ -236,7 +237,7 @@ export const PerClassConfusionMatrix: React.FC<Props> = ({
                             };
 
                             const { trainEntry, testEntry, valEntry } = getVisibleSplits(evaluationData.splits, showTrainMetrics, showTestMetrics, showValMetrics);
-                            const isBinary = (evaluationData.splits.train?.y_proba?.classes.length ?? 0) === 2;
+                            const isBinary = classCount === 2;
                             const renderSplit = isBinary ? renderSplitBinary : renderSplitPerClass;
 
                             return (

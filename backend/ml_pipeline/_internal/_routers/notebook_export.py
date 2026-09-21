@@ -267,28 +267,39 @@ def _resolve_target_column(
     return None
 
 
-def _export_nodes(cfg: _PipelineIn) -> list[_NodeIn]:
-    """Select model ancestry and reject graphs the sequential notebook cannot represent."""
-    ids = {node.node_id for node in cfg.nodes}
-    if len(ids) != len(cfg.nodes):
+def _validate_export_ids(nodes: list[_NodeIn]) -> None:
+    """Reject duplicate IDs and references to missing input nodes."""
+    ids = {node.node_id for node in nodes}
+    if len(ids) != len(nodes):
         raise HTTPException(400, "Notebook export requires unique node IDs")
-    if any(source not in ids for node in cfg.nodes for source in node.inputs):
+    if any(source not in ids for node in nodes for source in node.inputs):
         raise HTTPException(400, "Notebook export has a missing input node")
-    ordered = _topo_sort(cfg.nodes)
+
+
+def _validate_export_order(ordered: list[_NodeIn]) -> None:
+    """Reject edges that contradict the topological order."""
     positions = {node.node_id: index for index, node in enumerate(ordered)}
     if any(
         positions[source] >= positions[node.node_id] for node in ordered for source in node.inputs
     ):
         raise HTTPException(400, "Notebook export does not support cycles")
-    nodes = _expand_parallel_terminals(ordered)
-    terminals = _terminal_models(nodes)
+
+
+def _export_ancestor_ids(nodes: list[_NodeIn], terminals: list[_NodeIn]) -> set[str]:
+    """Collect terminal models and their ancestors for notebook selection."""
+    selected = {
+        node.node_id
+        for terminal in terminals
+        for node in _ancestors_in_topo(terminal.node_id, nodes)
+    }
+    selected.update(terminal.node_id for terminal in terminals)
+    return selected
+
+
+def _select_export_ancestry(nodes: list[_NodeIn], terminals: list[_NodeIn]) -> list[_NodeIn]:
+    """Keep every terminal model's ancestry without omitting training branches."""
     if terminals:
-        selected = {
-            node.node_id
-            for terminal in terminals
-            for node in _ancestors_in_topo(terminal.node_id, nodes)
-        }
-        selected.update(terminal.node_id for terminal in terminals)
+        selected = _export_ancestor_ids(nodes, terminals)
         if any(
             node.step_type in _MODELING_STEPS and node.node_id not in selected for node in nodes
         ):
@@ -298,7 +309,11 @@ def _export_nodes(cfg: _PipelineIn) -> list[_NodeIn]:
         nodes = [node for node in nodes if node.node_id in selected]
     elif any(node.step_type in _MODELING_STEPS for node in nodes):
         raise HTTPException(400, "Notebook export requires training nodes to end their branches")
-    runtime = [node for node in nodes if node.step_type not in _PREVIEW_STEPS]
+    return nodes
+
+
+def _validate_export_runtime(runtime: list[_NodeIn]) -> None:
+    """Require one dataset and reject merged runtime inputs."""
     if sum(node.step_type in _DATA_LOADER_STEPS for node in runtime) > 1:
         raise HTTPException(
             400, "Notebook export supports one data loader; export each dataset separately"
@@ -308,6 +323,12 @@ def _export_nodes(cfg: _PipelineIn) -> list[_NodeIn]:
             400,
             "Notebook export does not support merged inputs; use independent parallel training branches",
         )
+
+
+def _validate_export_branches(
+    nodes: list[_NodeIn], terminals: list[_NodeIn], runtime: list[_NodeIn]
+) -> None:
+    """Reject repeated structural steps within each exported model branch."""
     branches = [
         _ancestors_in_topo(terminal.node_id, nodes) + [terminal] for terminal in terminals
     ] or [runtime]
@@ -317,12 +338,30 @@ def _export_nodes(cfg: _PipelineIn) -> list[_NodeIn]:
                 raise HTTPException(
                     400, f"Notebook export supports one {step_type} per model branch"
                 )
-    if not terminals and sum(not node.inputs for node in runtime) > 1:
+
+
+def _validate_preprocessing_chain(runtime: list[_NodeIn]) -> None:
+    """Require preprocessing-only exports to form one connected output chain."""
+    if sum(not node.inputs for node in runtime) > 1:
         raise HTTPException(400, "Notebook export requires a connected preprocessing chain")
+    for node in runtime:
+        if sum(node.node_id in child.inputs for child in runtime) > 1:
+            raise HTTPException(400, "Notebook export requires one preprocessing output chain")
+
+
+def _export_nodes(cfg: _PipelineIn) -> list[_NodeIn]:
+    """Select model ancestry and reject graphs the sequential notebook cannot represent."""
+    _validate_export_ids(cfg.nodes)
+    ordered = _topo_sort(cfg.nodes)
+    _validate_export_order(ordered)
+    nodes = _expand_parallel_terminals(ordered)
+    terminals = _terminal_models(nodes)
+    nodes = _select_export_ancestry(nodes, terminals)
+    runtime = [node for node in nodes if node.step_type not in _PREVIEW_STEPS]
+    _validate_export_runtime(runtime)
+    _validate_export_branches(nodes, terminals, runtime)
     if not terminals:
-        for node in runtime:
-            if sum(node.node_id in child.inputs for child in runtime) > 1:
-                raise HTTPException(400, "Notebook export requires one preprocessing output chain")
+        _validate_preprocessing_chain(runtime)
     return nodes
 
 

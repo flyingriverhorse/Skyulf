@@ -210,17 +210,24 @@ def _compact_branch_summary_md(
     )
 
 
-def _compact_branch_cells(
-    letter: str, section_no: int, classified: _Classified
-) -> list[dict[str, Any]]:
-    """Fit + persist cells for one compact-mode branch."""
-    _loader, preprocess, feat_target, train_test, model = classified
-    target_col = (
+def _compact_branch_target(
+    model: _NodeIn | None, feat_target: _NodeIn | None, train_test: _NodeIn | None
+) -> str:
+    """Resolve the branch target in model, feature, then split order."""
+    return (
         (model.params.get("target_column") if model else None)
         or (feat_target.params.get("target_column") if feat_target else None)
         or (train_test.params.get("target_column") if train_test else None)
         or "<target_column>"
     )
+
+
+def _compact_branch_cells(
+    letter: str, section_no: int, classified: _Classified
+) -> list[dict[str, Any]]:
+    """Fit + persist cells for one compact-mode branch."""
+    _loader, preprocess, feat_target, train_test, model = classified
+    target_col = _compact_branch_target(model, feat_target, train_test)
     full_chain = nb.training_chain(preprocess, feat_target, train_test)
     cfg_dict = build_skyulf_config(full_chain, model)
     config_json = _to_py_literal(cfg_dict)

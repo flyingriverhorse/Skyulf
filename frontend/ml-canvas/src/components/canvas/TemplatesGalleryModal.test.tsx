@@ -34,6 +34,7 @@ describe('template setup', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Open in Canvas' }));
     await waitFor(() => expect(close).toHaveBeenCalledOnce());
     expect(useGraphStore.getState().nodes.find(n => n.data.definitionType === 'TrainTestSplitter')?.data.target_column).toBe('label');
+    expect(useGraphStore.getState().nodes.find(n => n.data.definitionType === 'classification')?.data.target_column).toBe('label');
   });
 
   it('clears selected columns when the dataset changes', () => {

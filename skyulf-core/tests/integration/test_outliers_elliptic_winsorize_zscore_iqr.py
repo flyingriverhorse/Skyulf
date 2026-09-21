@@ -121,12 +121,12 @@ _winsorize_polars_passthrough_cases = TestCaseLoader(
 
 class TestIQRCalculator:
     @pytest.mark.parametrize(*_iqr_bounds_formula_cases)
-    def test_bounds_match_q1_q3_formula(self, values: list) -> None:
+    def test_bounds_match_q1_q3_formula(self, values: list[float]) -> None:
         """Bounds must equal Q1 - k*IQR and Q3 + k*IQR for the configured multiplier."""
         df = pd.DataFrame({"val": values})
         params = IQRCalculator().fit(df, {"columns": ["val"], "multiplier": 1.5})
 
-        series = pd.Series(values, dtype=float)
+        series = pd.Series(values, dtype="float64")
         q1, q3 = series.quantile(0.25), series.quantile(0.75)
         iqr = q3 - q1
         expected_lower = q1 - 1.5 * iqr
@@ -293,7 +293,7 @@ class TestWinsorizeCalculator:
         params = WinsorizeCalculator().fit(
             df, {"columns": ["val"], "lower_percentile": 5.0, "upper_percentile": 95.0}
         )
-        series = pd.Series(values, dtype=float)
+        series = pd.Series(values, dtype="float64")
         expected_lower = series.quantile(0.05)
         expected_upper = series.quantile(0.95)
         bounds = params["bounds"]["val"]

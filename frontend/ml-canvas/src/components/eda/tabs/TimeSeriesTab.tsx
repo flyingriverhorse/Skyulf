@@ -20,11 +20,19 @@ import {
 import { InfoTooltip } from '../../ui/InfoTooltip';
 import { COLORS } from '../constants';
 import { useChartTheme } from '../../../core/hooks/useChartTheme';
-import type { EDAProfile } from '../../../core/types/edaProfile';
+import type { EDAProfile, TimeSeriesAnalysis } from '../../../core/types/edaProfile';
 
 interface TimeSeriesTabProps {
     profile: Pick<EDAProfile, 'timeseries'>;
     downloadChart: (id: string, filename: string, title: string, subtitle?: string, extraInfo?: string) => void;
+}
+
+function getMeasureLabel(seasonality: TimeSeriesAnalysis['seasonality']): string {
+    if (seasonality.aggregation === 'count') return 'Row count';
+    if (seasonality.aggregation === 'mean' && seasonality.metric) {
+        return `Mean of ${seasonality.metric}`;
+    }
+    return 'Recorded value (measure unavailable)';
 }
 
 export const TimeSeriesTab: React.FC<TimeSeriesTabProps> = ({
@@ -35,11 +43,7 @@ export const TimeSeriesTab: React.FC<TimeSeriesTabProps> = ({
     const { timeseries } = profile;
     if (!timeseries) return null;
     const seasonality = timeseries.seasonality;
-    const measureLabel = seasonality.aggregation === 'count'
-        ? 'Row count'
-        : seasonality.aggregation === 'mean' && seasonality.metric
-            ? `Mean of ${seasonality.metric}`
-            : 'Recorded value (measure unavailable)';
+    const measureLabel = getMeasureLabel(seasonality);
     return (
         <div className="mt-4 space-y-6">
             {/* Trend Chart */}

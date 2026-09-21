@@ -26,16 +26,33 @@ export function modelNumericIssue(config: object): ValidationResult | undefined 
   if (data.cv_enabled !== false) checks.push(numericIssue('cv_folds', data.cv_folds, 2, true));
   if (data.strategy === 'stacking') checks.push(numericIssue('cv', data.cv, 2, true));
   if (data.task === 'classification' && data.calibrate_base_models === true) checks.push(numericIssue('calibration_cv', data.calibration_cv, 2, true));
+  checks.push(parallelJobsIssue(data));
+  checks.push(...randomStateIssues(data));
+  checks.push(searchSpaceIssue(data));
+  return checks.find(Boolean);
+}
+
+/** Advanced mode does not consume the parallel jobs setting. */
+function parallelJobsIssue(data: Record<string, unknown>): ValidationResult | undefined {
   if (data.run_mode !== 'advanced' && data.n_jobs != null && (typeof data.n_jobs !== 'number' || !Number.isSafeInteger(data.n_jobs) || data.n_jobs === 0)) {
-    checks.push({ isValid: false, field: 'n_jobs', message: 'Parallel jobs must be a nonzero integer (-1 uses all cores).' });
+    return { isValid: false, field: 'n_jobs', message: 'Parallel jobs must be a nonzero integer (-1 uses all cores).' };
   }
+}
+
+/** Null seeds retain their unseeded behavior; supplied seeds must fit uint32. */
+function randomStateIssues(data: Record<string, unknown>): (ValidationResult | undefined)[] {
+  const checks: (ValidationResult | undefined)[] = [];
   for (const field of ['random_state', 'cv_random_state']) {
     if (data[field] !== undefined && data[field] !== null) checks.push(numericIssue(field, data[field], 0, true, 4294967295));
   }
+  return checks;
+}
+
+/** Search candidates matter only when advanced tuning is active. */
+function searchSpaceIssue(data: Record<string, unknown>): ValidationResult | undefined {
   if (data.run_mode === 'advanced' && (containsInvalidCandidates(data.search_space) || Object.keys((data.invalid_search_space ?? {}) as object).length > 0)) {
-    checks.push({ isValid: false, field: 'search_space', message: 'Search parameters need at least one candidate and numeric candidates must be finite.' });
+    return { isValid: false, field: 'search_space', message: 'Search parameters need at least one candidate and numeric candidates must be finite.' };
   }
-  return checks.find(Boolean);
 }
 
 /** Null candidates and categorical strings retain their original search semantics. */

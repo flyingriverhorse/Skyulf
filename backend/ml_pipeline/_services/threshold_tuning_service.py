@@ -212,6 +212,17 @@ class ThresholdTuningService:
                 f"thresholds keys {sorted(thresholds.keys())} do not match "
                 f"classes {sorted(expected_keys)}"
             )
+        ThresholdTuningService._validate_save_weights(thresholds, classes)
+        if not any(value > 0 for value in thresholds.values()):
+            raise ThresholdTuningError("thresholds must not all be zero")
+        if split_used not in ("validation", "test"):
+            raise ThresholdTuningError(
+                f"split_used must be 'validation' or 'test', got {split_used!r}"
+            )
+
+    @staticmethod
+    def _validate_save_weights(thresholds: dict[str, float], classes: list) -> None:
+        """Check each saved weight while preserving per-class error details."""
         for key, value in thresholds.items():
             # Multiclass thresholds are positive division weights, with no
             # upper bound. Binary complementary pairs may contain zero.
@@ -224,12 +235,6 @@ class ThresholdTuningService:
                     f"threshold for class {key!r} must be "
                     + ("positive for multiclass" if len(classes) > 2 else "nonnegative for binary")
                 )
-        if not any(value > 0 for value in thresholds.values()):
-            raise ThresholdTuningError("thresholds must not all be zero")
-        if split_used not in ("validation", "test"):
-            raise ThresholdTuningError(
-                f"split_used must be 'validation' or 'test', got {split_used!r}"
-            )
 
     @staticmethod
     async def save(

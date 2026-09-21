@@ -246,34 +246,48 @@ const readCsvRecords = (text: string): string[][] => {
         hasContent = false;
     };
 
+    /** Consume escaped quotes and preserve delimiters inside a quoted field. */
+    const consumeQuoted = (index: number): number => {
+        const char = text[index]!;
+        if (char !== '"') {
+            cell += char;
+        } else if (text[index + 1] === '"') {
+            cell += '"';
+            return index + 1;
+        } else {
+            inQuotes = false;
+        }
+        return index;
+    };
+
+    /** Open a quoted field or append ordinary text, rejecting misplaced quotes. */
+    const consumeUnquoted = (char: string) => {
+        if (char === '"' && cell === '' && !quoted) {
+            quoted = true;
+            inQuotes = true;
+            hasContent = true;
+            return;
+        }
+        if (quoted || char === '"') {
+            throw new Error(`CSV row ${records.length + 1}: invalid quote placement.`);
+        }
+        cell += char;
+        if (char.trim() !== '') hasContent = true;
+    };
+
     // Spreadsheet UTF-8 exports may prefix the file with a byte-order mark.
     for (let i = text.startsWith('\uFEFF') ? 1 : 0; i < text.length; i++) {
         const char = text[i]!;
         if (inQuotes) {
-            if (char !== '"') {
-                cell += char;
-            } else if (text[i + 1] === '"') {
-                cell += '"';
-                i++;
-            } else {
-                inQuotes = false;
-            }
+            i = consumeQuoted(i);
         } else if (char === ',') {
             hasContent = true;
             finishCell();
         } else if (char === '\r' || char === '\n') {
             finishRecord();
             if (char === '\r' && text[i + 1] === '\n') i++;
-        } else if (char === '"' && cell === '' && !quoted) {
-            quoted = true;
-            inQuotes = true;
-            hasContent = true;
         } else {
-            if (quoted || char === '"') {
-                throw new Error(`CSV row ${records.length + 1}: invalid quote placement.`);
-            }
-            cell += char;
-            if (char.trim() !== '') hasContent = true;
+            consumeUnquoted(char);
         }
     }
     if (inQuotes) throw new Error(`CSV row ${records.length + 1}: unclosed quoted field.`);

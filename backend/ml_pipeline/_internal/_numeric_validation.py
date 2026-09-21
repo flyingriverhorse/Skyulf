@@ -56,54 +56,65 @@ def _model_threshold(value: Any) -> bool:
         return False
 
 
+def _model_selection(params: dict[str, Any]) -> None:
+    """Validate model-based selection thresholds and feature counts."""
+    if "threshold" in params and not _model_threshold(params["threshold"]):
+        raise ValueError(
+            "threshold must be finite, mean, median or a finite multiple of mean/median."
+        )
+    if params.get("max_features") is not None:
+        _number(params, "max_features", 0, integer=True)
+
+
+def _rfe_selection(params: dict[str, Any]) -> None:
+    """Validate recursive selection counts and fractional steps."""
+    count_field = "n_features_to_select" if params.get("n_features_to_select") is not None else "k"
+    for field in (count_field, "step"):
+        if field != "step" and params.get(field) is None:
+            continue
+        _number(params, field, math.ulp(0.0))
+        value = params.get(field, 1)
+        if value >= 1 and value != int(value):
+            raise ValueError(f"{field} must be a positive integer or a fraction below 1.")
+
+
+def _univariate_selection(params: dict[str, Any]) -> None:
+    """Validate the active generic univariate selector mode."""
+    mode = params.get("mode", "k_best")
+    field = (
+        "param"
+        if "param" in params
+        else {"k_best": "k", "percentile": "percentile"}.get(mode, "alpha")
+    )
+    if mode == "k_best" and params.get(field) == "all":
+        return
+    _number(
+        params,
+        field,
+        1 if mode == "k_best" else 0,
+        math.inf if mode == "k_best" else 100 if mode == "percentile" else 1,
+        integer=mode == "k_best",
+    )
+
+
 def _selection(params: dict[str, Any]) -> None:
     """Validate only the active selector's settings."""
     method = params.get("method", "variance")
-    if method == "variance":
-        method = "variance_threshold"
-    if method in {"variance_threshold", "correlation_threshold"}:
+    if method in {"variance", "variance_threshold", "correlation_threshold"}:
         _number(params, "threshold", 0, 1 if method == "correlation_threshold" else math.inf)
     elif method == "select_from_model":
-        if "threshold" in params and not _model_threshold(params["threshold"]):
-            raise ValueError(
-                "threshold must be finite, mean, median or a finite multiple of mean/median."
-            )
-        if params.get("max_features") is not None:
-            _number(params, "max_features", 0, integer=True)
+        _model_selection(params)
     elif method == "select_k_best":
         if params.get("k") != "all":
             _number(params, "k", 1, integer=True)
     elif method == "rfe":
-        count_field = (
-            "n_features_to_select" if params.get("n_features_to_select") is not None else "k"
-        )
-        for field in (count_field, "step"):
-            if field != "step" and params.get(field) is None:
-                continue
-            _number(params, field, math.ulp(0.0))
-            value = params.get(field, 1)
-            if value >= 1 and value != int(value):
-                raise ValueError(f"{field} must be a positive integer or a fraction below 1.")
+        _rfe_selection(params)
     elif method == "select_percentile":
         _number(params, "percentile", 0, 100)
     elif method in {"select_fpr", "select_fdr", "select_fwe"}:
         _number(params, "alpha", 0, 1)
     elif method == "generic_univariate_select":
-        mode = params.get("mode", "k_best")
-        field = (
-            "param"
-            if "param" in params
-            else {"k_best": "k", "percentile": "percentile"}.get(mode, "alpha")
-        )
-        if mode == "k_best" and params.get(field) == "all":
-            return
-        _number(
-            params,
-            field,
-            1 if mode == "k_best" else 0,
-            math.inf if mode == "k_best" else 100 if mode == "percentile" else 1,
-            integer=mode == "k_best",
-        )
+        _univariate_selection(params)
 
 
 def _finite_candidates(value: Any) -> None:
@@ -128,6 +139,11 @@ def _training(params: dict[str, Any], *, tuned: bool = False) -> None:
     for seed in ("random_state", "cv_random_state"):
         if params.get(seed) is not None:
             _number(params, seed, 0, 4294967295, integer=True)
+    _training_structure(params, tuned=tuned)
+
+
+def _training_structure(params: dict[str, Any], *, tuned: bool) -> None:
+    """Validate model CV and explicit basic-training worker counts."""
     model = params.get("model_type", params.get("algorithm", ""))
     structure = params if tuned else params.get("hyperparameters", {})
     if not isinstance(structure, dict):
@@ -158,15 +174,20 @@ def validate_node_numbers(step_type: str, params: dict[str, Any]) -> None:
     elif step_type == "feature_selection":
         _selection(params)
     elif step_type in {"training", "tuning"}:
-        tuned = step_type == "tuning" or params.get("run_mode") in {"tuned", "advanced"}
-        config = params.get("tuning_config", {}) if tuned else params
-        if isinstance(config, dict):
-            _training(
-                {
-                    **config,
-                    "algorithm": params.get("algorithm")
-                    or params.get("model_type")
-                    or config.get("algorithm", ""),
-                },
-                tuned=tuned,
-            )
+        _training_node(step_type, params)
+
+
+def _training_node(step_type: str, params: dict[str, Any]) -> None:
+    """Resolve nested tuning controls before validating consumed values."""
+    tuned = step_type == "tuning" or params.get("run_mode") in {"tuned", "advanced"}
+    config = params.get("tuning_config", {}) if tuned else params
+    if isinstance(config, dict):
+        _training(
+            {
+                **config,
+                "algorithm": params.get("algorithm")
+                or params.get("model_type")
+                or config.get("algorithm", ""),
+            },
+            tuned=tuned,
+        )

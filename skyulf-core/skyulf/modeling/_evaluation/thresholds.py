@@ -45,6 +45,18 @@ def _class_threshold_array(thresholds: dict[Any, float], classes: np.ndarray) ->
     return values
 
 
+def _apply_binary_weights(
+    y_proba: np.ndarray, weights: np.ndarray, classes: np.ndarray
+) -> np.ndarray:
+    """Apply binary weights with positive-class ties and inclusive cutoff one."""
+    # Cross multiplication avoids division by zero at complementary endpoints.
+    if weights[0] == 0:
+        return np.where(y_proba[:, 1] >= 1, classes[1], classes[0])
+    positive = y_proba[:, 1] * weights[0]
+    negative = y_proba[:, 0] * weights[1]
+    return np.where(positive >= negative, classes[1], classes[0])
+
+
 def apply_thresholds(
     y_proba: Any,
     thresholds: dict[Any, float] | float,
@@ -109,14 +121,7 @@ def apply_thresholds(
 
     thresholds_array = _class_threshold_array(thresholds, classes)
     if n_classes == 2:
-        # Cross multiplication preserves the positive-class tie break without
-        # dividing by zero at complementary cutoff endpoints. A zero negative
-        # weight represents cutoff one, which includes probability exactly one.
-        if thresholds_array[0] == 0:
-            return np.where(y_proba[:, 1] >= 1, classes[1], classes[0])
-        positive = y_proba[:, 1] * thresholds_array[0]
-        negative = y_proba[:, 0] * thresholds_array[1]
-        return np.where(positive >= negative, classes[1], classes[0])
+        return _apply_binary_weights(y_proba, thresholds_array, classes)
     scaled = y_proba / thresholds_array
     return classes[np.argmax(scaled, axis=1)]
 

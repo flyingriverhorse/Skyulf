@@ -796,7 +796,7 @@ class TestNumericStatParityWithPandas:
         """
         values = [1.0, 2.0, 3.0, 10.0]
         stats = EDAAnalyzer(pl.DataFrame({"x": values})).analyze().columns["x"].numeric_stats
-        expected = pd.Series(values)
+        expected = pd.Series(values, dtype="float64")
 
         assert stats is not None
         assert stats.q25 == pytest.approx(expected.quantile(0.25))

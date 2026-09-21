@@ -282,8 +282,8 @@ it('refreshes connected depth without changing other settings and allows manual 
   }
   await act(async () => { render(<Harness />); });
   await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Base Model Hyperparameters' })); });
-  fireEvent.click(screen.getByRole('button', { name: 'Random Forest 1 set' }));
-  expect(screen.getByRole('spinbutton', { name: 'Max Depth' })).toHaveValue(3);
+  fireEvent.click(await screen.findByRole('button', { name: 'Random Forest 1 set' }));
+  expect(await screen.findByRole('spinbutton', { name: 'Max Depth' })).toHaveValue(3);
   await act(async () => { connectModels(models(10)); });
   expect(screen.getByRole('spinbutton', { name: 'Max Depth' })).toHaveValue(10);
   expect(changed).toHaveBeenCalledTimes(1);

@@ -61,34 +61,47 @@ class SklearnBridge:
         )
         columns = []
         if isinstance(native, pl.DataFrame | pl.Series):
-            schema = (
-                native.schema if isinstance(native, pl.DataFrame) else {native.name: native.dtype}
-            )
-            for name, dtype in schema.items():
-                series = native[name] if isinstance(native, pl.DataFrame) else native
-                if dtype.is_temporal() or (
-                    dtype == pl.Object and SklearnBridge._contains_temporal(series.to_numpy())
-                ):
-                    columns.append(str(name))
+            columns = SklearnBridge._polars_temporal_columns(native)
         elif isinstance(native, pd.DataFrame | pd.Series):
-            items = native.items() if isinstance(native, pd.DataFrame) else [(native.name, native)]
-            for name, series in items:
-                if (
-                    series.dtype.kind in "Mm"
-                    or isinstance(series.dtype, pd.PeriodDtype)
-                    or series.dtype.kind == "O"
-                    and SklearnBridge._contains_temporal(series.to_numpy())
-                ):
-                    columns.append(str(name))
-        elif isinstance(native, np.ndarray | list | tuple):
-            if SklearnBridge._contains_temporal(np.asarray(native)):
-                columns = ["array input"]
+            columns = SklearnBridge._pandas_temporal_columns(native)
+        elif isinstance(native, np.ndarray | list | tuple) and SklearnBridge._contains_temporal(
+            np.asarray(native)
+        ):
+            columns = ["array input"]
         if columns:
             raise ValueError(
                 f"Raw temporal features are not supported: {', '.join(columns)}. "
                 "Use DateFeatures with drop_original=True, remove these columns, or "
                 "explicitly convert them to numeric features before model fitting or prediction."
             )
+
+    @staticmethod
+    def _polars_temporal_columns(native: pl.DataFrame | pl.Series) -> list[str]:
+        """Find temporal Polars columns before conversion erases their units."""
+        schema = native.schema if isinstance(native, pl.DataFrame) else {native.name: native.dtype}
+        columns = []
+        for name, dtype in schema.items():
+            series = native[name] if isinstance(native, pl.DataFrame) else native
+            if dtype.is_temporal() or (
+                dtype == pl.Object and SklearnBridge._contains_temporal(series.to_numpy())
+            ):
+                columns.append(str(name))
+        return columns
+
+    @staticmethod
+    def _pandas_temporal_columns(native: pd.DataFrame | pd.Series) -> list[str]:
+        """Find typed and object-backed temporal pandas columns."""
+        items = native.items() if isinstance(native, pd.DataFrame) else [(native.name, native)]
+        columns = []
+        for name, series in items:
+            if (
+                series.dtype.kind in "Mm"
+                or isinstance(series.dtype, pd.PeriodDtype)
+                or series.dtype.kind == "O"
+                and SklearnBridge._contains_temporal(series.to_numpy())
+            ):
+                columns.append(str(name))
+        return columns
 
     @staticmethod
     def _contains_temporal(values: np.ndarray) -> bool:

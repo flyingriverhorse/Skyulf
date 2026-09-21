@@ -9,6 +9,12 @@ import type { TrainingConfig, TrainingTask } from '../TrainingSettings';
 import { getTaskForModelType } from '../../../../components/pages/ExperimentsPage/utils/jobMeta';
 import { TASK_TAG, isClassificationModel, isTrainingModel, isGridStrategy, hasLoadedSearchSpace } from './modelOptions';
 
+/** Preserve saved candidates and invalid drafts on the first inspector load. */
+function shouldPreserveSavedSearch(config: TrainingConfig, loadedModel: string | null): boolean {
+  return loadedModel === null &&
+    (Object.keys(config.search_space ?? {}).length > 0 || Object.keys(config.invalid_search_space ?? {}).length > 0);
+}
+
 /** Keep inspector state and asynchronous definitions alive when visible tabs change. */
 export function useTrainingSettings(
   config: TrainingConfig,
@@ -136,8 +142,7 @@ export function useTrainingSettings(
           if (!modelType) return;
 
           const isNewModel = modelType !== loadedModelTypeRef.current;
-          const preserveSavedSearch = loadedModelTypeRef.current === null &&
-              (Object.keys(config.search_space ?? {}).length > 0 || Object.keys(config.invalid_search_space ?? {}).length > 0);
+          const preserveSavedSearch = shouldPreserveSavedSearch(config, loadedModelTypeRef.current);
           // Also reload when switching between grid and non-grid strategies
           // so the search space is appropriate for the selected method.
           const wasGrid = isGridStrategy(loadedStrategyRef.current);

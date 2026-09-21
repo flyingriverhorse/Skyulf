@@ -185,6 +185,15 @@ async def create_tables() -> None:
     logger.info("✅ Database tables created/updated")
 
 
+def _is_duplicate_column(original, dialect: str, column: str) -> bool:
+    """Recognize only driver-confirmed duplicate-column migration failures."""
+    return (dialect == "postgresql" and getattr(original, "sqlstate", None) == "42701") or (
+        dialect == "sqlite"
+        and getattr(original, "sqlite_errorcode", None) == 1
+        and str(original) == f"duplicate column name: {column}"
+    )
+
+
 async def _run_migrations() -> None:
     """Apply incremental schema migrations for columns added after initial table creation.
 
@@ -274,15 +283,7 @@ async def _run_migrations() -> None:
             # A second startup worker may add the column after inspection.
             # Accept only a driver-confirmed duplicate, then verify the schema
             # in a new transaction after the failed ALTER has rolled back.
-            original = exc.orig
-            duplicate = (
-                async_engine.dialect.name == "postgresql"
-                and getattr(original, "sqlstate", None) == "42701"
-            ) or (
-                async_engine.dialect.name == "sqlite"
-                and getattr(original, "sqlite_errorcode", None) == 1
-                and str(original) == f"duplicate column name: {column}"
-            )
+            duplicate = _is_duplicate_column(exc.orig, async_engine.dialect.name, column)
             if not duplicate:
                 raise
             async with async_engine.begin() as conn:

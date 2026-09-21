@@ -1,5 +1,19 @@
 import type { DriftReport } from '../../../core/api/monitoring';
 
+function getRisk(
+    featureImportances: DriftReport['feature_importances'],
+    importance: number | undefined,
+    driftDetected: boolean,
+    rank: number | null,
+): string {
+    if (featureImportances && importance == null) return 'Unknown';
+    if (driftDetected && rank != null) {
+        if (rank <= 5) return 'High';
+        return rank <= 15 ? 'Medium' : 'Low';
+    }
+    return featureImportances ? 'Low' : '';
+}
+
 /**
  * Serialise the (threshold-evaluated) drift report to CSV and trigger a
  * browser download. Includes per-feature importance and risk class when the
@@ -23,18 +37,7 @@ export function exportDriftReportCSV(report: DriftReport, datasetName: string | 
         )?.value?.toFixed(6) ?? '';
         const importance = fi?.[col.column];
         const rank = fi && importance != null ? Object.values(fi).filter(v => v > importance).length + 1 : null;
-        const risk =
-            fi && importance == null
-                ? 'Unknown'
-                : col.drift_detected && rank != null
-                ? rank <= 5
-                    ? 'High'
-                    : rank <= 15
-                    ? 'Medium'
-                    : 'Low'
-                : fi
-                ? 'Low'
-                : '';
+        const risk = getRisk(fi, importance, col.drift_detected, rank);
         return [
             col.column,
             col.drift_detected ? 'Drifted' : 'Stable',

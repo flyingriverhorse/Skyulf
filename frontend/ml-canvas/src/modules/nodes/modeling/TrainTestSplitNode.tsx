@@ -215,6 +215,11 @@ const TrainTestSplitSettings: React.FC<{ config: TrainTestSplitConfig; onChange:
   );
 };
 
+/** The test proportion must be finite and strictly between zero and one. */
+function isInvalidTestSize(testSize: number): boolean {
+  return !Number.isFinite(testSize) || testSize <= 0 || testSize >= 1;
+}
+
 export const TrainTestSplitNode: NodeDefinition<TrainTestSplitConfig> = {
   type: 'TrainTestSplitter', // Matches backend registry ID
   label: 'Train-Test Split',
@@ -237,7 +242,7 @@ export const TrainTestSplitNode: NodeDefinition<TrainTestSplitConfig> = {
     return `${fmt(train)} / ${fmt(test)}`;
   },
   validate: (config) => {
-    if (!Number.isFinite(config.test_size) || config.test_size <= 0 || config.test_size >= 1) {
+    if (isInvalidTestSize(config.test_size)) {
       return { isValid: false, message: 'Test size must be between 0 and 1.', field: 'test_size' };
     }
     const valSize = config.validation_size === undefined ? 0 : config.validation_size;
