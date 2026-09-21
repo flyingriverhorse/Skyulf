@@ -5,6 +5,9 @@ estimator with an explicit inference contract. It supports local pandas/Polars
 prediction and native Spark FE followed by Python regression on Spark workers.
 Importing `skyulf.inference` requires neither PySpark nor MLflow.
 
+Start with [How inference works](inference_flow.md) for training and inference
+diagrams and a worked example of reusing the same fitted FE and model.
+
 ## Raw data and prepared features
 
 Choose the input stage when building a bundle:

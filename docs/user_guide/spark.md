@@ -11,6 +11,9 @@ applies native FE and runs a Python regression model in worker batches.
 Other native nodes, worker Python FE and distributed classification remain under development.
 Installing the extra does not convert a pandas/Polars pipeline to Spark.
 
+[How inference works](inference_flow.md) explains how the saved FE and
+model are reused, with diagrams for local, native Spark and planned worker FE paths.
+
 ## Why a separate environment?
 
 `.venv-spark` isolates PySpark and its dependencies from the web application's

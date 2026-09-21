@@ -1,0 +1,23 @@
+flowchart TD
+    accTitle: Planned Python FE and model inference inside Spark workers
+    accDescr: SM-10 is not implemented. The planned path distributes raw batches and applies fitted Python FE and the model inside each worker.
+    status["SM-10: PLANNED<br/>python_pipeline is not available yet"]:::future
+    raw["Distributed Spark input<br/>Raw features + row_keys"]:::plain
+    subgraph wa["Python worker A — planned"]
+        fea["Batch-independent Python FE<br/>Apply saved transformation rules"]:::future
+        ma["Predict with the same fitted model"]:::future
+        fea --> ma
+    end
+    subgraph wb["Python worker B — planned"]
+        feb["Batch-independent Python FE<br/>Apply saved transformation rules"]:::future
+        mb["Predict with the same fitted model"]:::future
+        feb --> mb
+    end
+    result["Spark DataFrame<br/>row_keys + prediction"]:::plain
+    status -.-> raw
+    raw -->|"Raw batch + keys"| wa
+    raw -->|"Raw batch + keys"| wb
+    ma --> result
+    mb --> result
+    classDef plain fill:#ffffff,stroke:#64748b,color:#172b3a
+    classDef future fill:#fff0e8,stroke:#aa4b23,color:#172b3a
