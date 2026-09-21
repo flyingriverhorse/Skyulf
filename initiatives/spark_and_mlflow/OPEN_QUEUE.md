@@ -3,6 +3,8 @@
 Güncelleme: 2026-09-21. **SM-00–SM-09 tamamlandı; sıradaki SM-10. Hedef: 0.9.0.**
 Bu dosya kısa çalışma sırasıdır; detaylar bağlantılı planlarda.
 
+Session parked on 2026-09-21: read [HANDOFF.md](HANDOFF.md) before resuming SM-10.
+
 Durumlar: READY = başlanabilir; WAIT = önceki görev bekleniyor;
 LATER = son aşama; ACTIVE = yürütülüyor; BLOCKED = somut dış engel;
 DONE = kanıtla tamamlandı. SM-00 commit: `105a6fe4`.
