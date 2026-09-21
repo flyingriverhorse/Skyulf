@@ -3318,6 +3318,15 @@ wheels = [
 ]
 
 [[package]]
+name = "py4j"
+version = "0.10.9.9"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/38/31/0b210511177070c8d5d3059556194352e5753602fa64b85b7ab81ec1a009/py4j-0.10.9.9.tar.gz", hash = "sha256:f694cad19efa5bd1dee4f3e5270eb406613c974394035e5bfc4ec1aba870b879", size = 761089, upload-time = "2025-01-15T03:53:18.624Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/bd/db/ea0203e495be491c85af87b66e37acfd3bf756fd985f87e46fc5e3bf022c/py4j-0.10.9.9-py2.py3-none-any.whl", hash = "sha256:c7c26e4158defb37b0bb124933163641a2ff6e3a3913f7811b0ddbe07ed61533", size = 203008, upload-time = "2025-01-15T03:53:15.648Z" },
+]
+
+[[package]]
 name = "pyarrow"
 version = "24.0.0"
 source = { registry = "https://pypi.org/simple" }
@@ -3568,6 +3577,15 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/05/88/9a253734b44b494cf99370b4f116c0f254a5152fbf650f531458a63289b6/pyscan_rs-2.1.3-py3-none-win_amd64.whl", hash = "sha256:9abadc3e684eda9940d4fb6758d26defe885bffbbd03af25559b296f08fd1d77", size = 2546723, upload-time = "2026-06-03T08:42:28.549Z" },
     { url = "https://files.pythonhosted.org/packages/ce/41/39842a6440834324286de1ac15a0402cb6626ef14be0e742b96fbb5df905/pyscan_rs-2.1.3-py3-none-win_arm64.whl", hash = "sha256:c9dea27f0f912e7e86ff00fb7924d4be3ddc29c795bb93f434fc9424890aaf14", size = 2410874, upload-time = "2026-06-03T08:42:27.121Z" },
 ]
+
+[[package]]
+name = "pyspark"
+version = "4.0.4"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "py4j" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/9a/c8/27b5316543a4d724efef4ecc1cfcb42a9afcb8af33cfdff989164b9a4487/pyspark-4.0.4.tar.gz", hash = "sha256:7e119366364d48e3cda1b1efd1ebc6cd672949500667c9cabbeef858daba700f", size = 434312230, upload-time = "2026-07-15T11:15:10.721Z" }
 
 [[package]]
 name = "pytest"
@@ -4508,7 +4526,7 @@ wheels = [
 
 [[package]]
 name = "skyulf"
-version = "0.8.24"
+version = "0.9.0"
 source = { virtual = "." }
 dependencies = [
     { name = "aiofiles" },
@@ -4780,6 +4798,10 @@ nlp = [
 preprocessing-imbalanced = [
     { name = "imbalanced-learn" },
 ]
+spark = [
+    { name = "pandas" },
+    { name = "pyspark" },
+]
 text = [
     { name = "vadersentiment" },
 ]
@@ -4819,10 +4841,12 @@ requires-dist = [
     { name = "optuna-integration", marker = "extra == 'all'", specifier = ">=3.0.0" },
     { name = "optuna-integration", marker = "extra == 'tuning'", specifier = ">=3.0.0" },
     { name = "pandas", specifier = ">=2.0.0,<3.0.0" },
+    { name = "pandas", marker = "extra == 'spark'", specifier = ">=2.0.0,<3.0.0" },
     { name = "polars", specifier = ">=1.43.2" },
     { name = "pyarrow", specifier = ">=21.0.0" },
     { name = "pydantic", specifier = ">=2.0.0" },
     { name = "pyproj", marker = "extra == 'geo'", specifier = ">=3.6.0,<3.8.0" },
+    { name = "pyspark", marker = "extra == 'spark'", specifier = ">=4.0.3,<4.1.0" },
     { name = "pytest", marker = "extra == 'dev'" },
     { name = "pytest-benchmark", marker = "extra == 'dev'", specifier = ">=5.0.0,<6.0.0" },
     { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=4.1.0,<5.0.0" },
@@ -4845,7 +4869,7 @@ requires-dist = [
     { name = "xgboost", marker = "extra == 'all'", specifier = ">=2.1.4" },
     { name = "xgboost", marker = "extra == 'modeling-xgboost'", specifier = ">=2.1.4" },
 ]
-provides-extras = ["dev", "viz", "eda", "text", "nlp", "geo", "tuning", "preprocessing-imbalanced", "modeling-xgboost", "modeling-lightgbm", "explainability", "all"]
+provides-extras = ["spark", "dev", "viz", "eda", "text", "nlp", "geo", "tuning", "preprocessing-imbalanced", "modeling-xgboost", "modeling-lightgbm", "explainability", "all"]
 
 [[package]]
 name = "slicer"

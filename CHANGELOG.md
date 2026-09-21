@@ -10,6 +10,7 @@ Each major/minor series has its own file in the [`changelog/`](changelog/) folde
 
 | Series | File | Status | Description |
 |--------|------|--------|-------------|
+| **0.9.x** | [changelog/0.9.x.md](changelog/0.9.x.md) | Unreleased | Spark execution and optional MLflow integration — in development |
 | **0.8.x** | [changelog/0.8.x.md](changelog/0.8.x.md) | Active | (v0.8.0+) |
 | **0.7.x** | [changelog/0.7.x.md](changelog/0.7.x.md) | Stable | Model Explainability, Segmentation Models & Unified Training Pipeline (v0.7.0 — v0.7.9) |
 | **0.6.x** | [changelog/0.6.x.md](changelog/0.6.x.md) | Stable | Ensemble Models, Security Hardening & Codebase Audit Sweeps (v0.6.0 — v0.6.10) |

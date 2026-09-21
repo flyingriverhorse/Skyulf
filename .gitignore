@@ -163,6 +163,7 @@ site/
 .github/instructions/codacy.instructions.md
 
 .worktrees/
+.venv-spark/
 sast/architecture.md
 sast/final-report.md
 sast/hardcodedsecrets-results.md
