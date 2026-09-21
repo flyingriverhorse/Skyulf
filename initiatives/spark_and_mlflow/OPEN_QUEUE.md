@@ -1,6 +1,6 @@
 # Spark ve MLflow — Open Queue
 
-Güncelleme: 2026-09-21. **SM-04 tamamlandı. Sonraki görev: SM-05. Hedef: 0.9.0.**
+Güncelleme: 2026-09-21. **SM-05 tamamlandı. Sonraki görev: SM-06. Hedef: 0.9.0.**
 Bu dosya kısa çalışma sırasıdır; detaylar bağlantılı planlarda.
 
 Durumlar: READY = başlanabilir; WAIT = önceki görev bekleniyor;
@@ -14,8 +14,8 @@ DONE = kanıtla tamamlandı. SM-00 commit: `105a6fe4`.
 | SM-02 | Spark engine ve conversion sınırı | SM-01 | DONE | Gerçek Spark adapter; conversion korumaları; aşağıda kanıt |
 | SM-03 | Dispatcher, schema, row keys | SM-02 | DONE | Keyed Spark FE giriş/preflight; aşağıda kanıt |
 | SM-04 | Versioned portable state | SM-03 | DONE | Tagged state, limit/version/schema kontrolü; aşağıda kanıt |
-| SM-05 | Native SimpleImputer | SM-04 | READY | Mean/constant train-only fit, Spark apply |
-| SM-06 | Native StandardScaler | SM-05 | WAIT | Population variance ve flag parity |
+| SM-05 | Native SimpleImputer | SM-04 | DONE | Mean/constant train-only fit, Spark apply; aşağıda kanıt |
+| SM-06 | Native StandardScaler | SM-05 | READY | Population variance ve flag parity |
 | SM-07 | Uçtan uca FE kapısı | SM-06 | WAIT | Üç engine çapraz fit/apply; kayıt/yükleme |
 | SM-08 | Ortak inference bundle | SM-07 | WAIT | Raw/features ayrımı; model metadata round-trip |
 | SM-09 | Native FE + worker model | SM-08 | WAIT | Spark tahmini local ile key bazında aynı |
@@ -224,3 +224,46 @@ ve MLflow entegrasyonu henüz yok.
 - Sınır: ayrı codec API'sidir; FeatureEngineer/model worker için otomatik paketleme
   yok. Byte limiti toplam process memory limiti değildir. Native SimpleImputer
   SM-05, StandardScaler SM-06; Spark runtime/Databricks bu görevde çalıştırılmadı.
+
+## SM-05 — 2026-09-21 tamamlanma kaydı
+
+- Başlangıç commit'i `81216e16`; bu kayıt SM-05 çalışma ağacına aittir.
+- `imputation/_spark_simple.py`: mean/constant için native fit/apply. Mean,
+  missing counts ve otomatik seçim istatistikleri aynı aggregate sorgusunda;
+  driver'a tek istatistik satırı döner. Constant da mevcut artifact missing-count
+  sözleşmesi için aggregate kullanır. Boş kolon seçimi doğrudan no-op.
+- Apply native expressions kullanır; veri action'ı, Python UDF veya pandas
+  fallback yok. FeatureEngineer'ın key/target doğrulama action'ları devam eder.
+  Integer constant hassasiyeti korunur; mean double promotion yapabilir.
+  All-null mean uydurulmaz; numeric/string/bool sabitlerin sınırları rehberde.
+- Registry mean/constant için fit/apply capability ve codec v1 bildirir.
+  Runner node default'larını preflight öncesi normalize eder; açık `columns=[]`
+  korunur. `state_max_bytes` fit artifact'ında ve transform action'larından önce
+  uygulanır. Direct apply codec yapısal doğrulamasını wire limiti dayatmadan kullanır.
+- pandas/Polars/Spark arasında 18 fit/apply kombinasyonu JSON round-trip ile
+  doğrulandı. Yeni test dosyasında 36 vaka: train-only öğrenme, null/NaN,
+  all-null, kolon seçimi, dtype, key/target, lazy plan, state bütçesi ve precision.
+- İlk TDD koşusu **19 failed, 8 passed**; native uygulama sonrası **26 passed**,
+  bir fixture DDL quoting hatası düzeltildi. Bağımsız review üç yakın-binary
+  değerin yanlış elenmesini ve imported state'in `x`/`X` çakışmasını buldu.
+  Gerçek runtime tekrarları ve regresyonlarla düzeltildi; review recheck temiz.
+- Gerçek Spark komutu: `JAVA_HOME=.cache/spark-jdk/jdk-17.0.20.1+1`,
+  `SKYULF_REQUIRE_SPARK=1`, `.venv-spark/Scripts/python.exe -m pytest
+  skyulf-core/tests/spark skyulf-core/tests/unit/test_execution_capabilities.py
+  -q --tb=short -o addopts= -p no:cacheprovider
+  --basetemp .cache/sm05-spark-full`
+  → **157 passed, 2 warnings**, 112.97 saniye. PySpark 4.0.3 / Java 17;
+  Windows JVM child-process cleanup başarılı. Warning'ler mevcut Split alias'ına ait.
+- Tam core: `HF_HUB_OFFLINE=1 .venv/Scripts/python.exe -m pytest skyulf-core/tests
+  -q --tb=short --disable-warnings -o addopts= -p no:cacheprovider
+  --basetemp .cache/sm05-core-full`
+  → **9945 passed, 143 skipped, 1077 warnings**, 185.45 saniye.
+  Base ortamda PySpark yok; 36 yeni runtime testi burada skip, üstte gerçek Spark'ta geçti.
+- Ruff/format, tam repo ty ve `mkdocs build --strict` geçti. Spark rehberindeki
+  session kurulumundan sonraki yedi Python snippet'i aynı gerçek session'da
+  çalıştırıldı: `.venv-spark/Scripts/python.exe -m pytest
+  .cache/sm05_docs/test_spark_examples.py -q --tb=short -o addopts=
+  -p no:cacheprovider --basetemp .cache/sm05-doc-examples`
+  → **1 passed**, 27.12 saniye; mevcut pandas fillna FutureWarning.
+- Sınır: median/mode, StandardScaler native apply, distributed model inference,
+  MLflow ve Databricks/Connect entegrasyon kanıtı henüz yok. Sonraki görev SM-06.

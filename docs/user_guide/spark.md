@@ -3,7 +3,8 @@
 Spark support is under development for 0.9.0. The optional dependency and
 runtime tests, Spark engine adapter and keyed FeatureEngineer entry point are
 available in the development checkout.
-**Native nodes and distributed model inference are not available yet.**
+**Native SimpleImputer supports mean/constant fit and apply.** Other built-in
+native nodes and distributed model inference remain under development.
 Installing the extra does not convert a pandas/Polars pipeline to Spark.
 
 ## Why a separate environment?
@@ -67,7 +68,7 @@ finally:
     spark.stop()
 ```
 
-Only one aggregate row is returned to Python. Future native FE operations will
+Only one aggregate row is returned to Python. Supported native FE operations
 keep the dataset in Spark and transfer bounded learned state when supported.
 Python model inference on Spark workers is a separate capability from native
 Spark model training.
@@ -138,7 +139,8 @@ Engine values are `pandas`, `polars` and `spark`; `databricks` names a platform,
 not an engine. Unknown configuration fields and nonpositive/noninteger limits
 are rejected. These immutable objects declare requirements; they do not apply
 memory limits themselves. The Spark FeatureEngineer entry point validates actual
-key values as described below; state/model budgets belong to later execution stages.
+key values as described below and enforces `state_max_bytes` for nodes declaring
+the portable codec. Model budgets belong to later inference stages.
 
 ## Keyed Spark FeatureEngineer entry point
 
@@ -183,8 +185,10 @@ produce raw Spark outputs; wrapped inputs retain their wrapper convention.
 Every step must declare both fit and apply support before fitting starts. Apply
 also checks all fitted steps before execution. This path accepts native,
 row-preserving operations with row-local apply behavior. Worker Python, window,
-filtering and expansion paths require later implementations. No built-in Spark
-FE node is enabled yet; unsupported nodes fail before any validation action or fit.
+filtering and expansion paths require later implementations. SimpleImputer
+mean/constant is available; unsupported nodes or strategies fail before any
+validation action or fit. The runner normalizes registered node defaults before
+checking capabilities, so an omitted SimpleImputer strategy means `mean`.
 Custom native nodes use the existing engine-keyed dispatcher mapping with a
 `"spark"` implementation. It receives the full native frame, `y=None` and the
 resolved feature names in `config["columns"]`; the returned frame retains keys
@@ -211,6 +215,88 @@ Transform preserves key identity, not physical row order, including when
 `preserve_rows=True`. Consumers must match outputs by keys. A successful refit
 replaces fitted steps; a failed refit leaves the last successful fitted steps
 available. The portable learned-state codec is described below.
+
+## Native SimpleImputer: fit once, apply without relearning
+
+The following pipeline learns the mean on training data and applies that same
+value to an unlabeled batch. Use a caller-owned Spark session as above:
+
+```python
+from skyulf.core.execution import ExecutionOptions, FrameSpec
+from skyulf.preprocessing.pipeline import FeatureEngineer
+
+train = spark.createDataFrame(
+    [(1, 1.0, 0), (2, None, 1), (3, 3.0, 0)],
+    "customer_id long, amount double, label long",
+).repartition(2)
+engineer = FeatureEngineer(
+    [{"name": "fill", "transformer": "SimpleImputer",
+      "params": {"columns": ["amount"], "strategy": "mean"}}],
+    frame_spec=FrameSpec(row_keys=("customer_id",), target="label"),
+    execution_options=ExecutionOptions(engine="spark", state_max_bytes=8192),
+)
+training, metrics = engineer.fit_transform(train)
+batch = spark.createDataFrame(
+    [(10, 100.0), (11, None)], "customer_id long, amount double",
+)
+output = engineer.transform(batch)
+# Collect only this tiny demonstration; production output remains a Spark frame.
+assert [row.amount for row in output.orderBy("customer_id").collect()] == [100.0, 2.0]
+```
+
+`mean` fit aggregates means and missing counts together, returning one statistics
+row to the driver. `constant` fit also aggregates missing counts for the artifact;
+the fill value itself is supplied in `fill_value`. Both null and floating NaN
+count as missing. Direct node apply constructs native Spark expressions without
+a data action, Python UDF or pandas conversion. FeatureEngineer additionally
+performs the key/target validation actions described above.
+
+Selection and dtype rules:
+
+- Explicit `columns=[]` is a no-op. Omitted columns select numeric mean
+  candidates automatically, excluding all-missing, constant and binary columns.
+  Automatic detection adds min/max, distinct-count and binary checks to the same
+  aggregate query; Spark may shuffle data internally. Explicit columns avoid
+  this selection cost and can include binary or constant numeric columns.
+- The pipeline protects keys and target. A direct calculator has no `FrameSpec`;
+  specify its feature columns explicitly to avoid learning from identifiers.
+- Mean supports Spark byte/short/integer/long/float/double columns. Mean filling
+  can promote integers to double; it does not promise exact large-integer output.
+  Explicitly selected all-missing numeric columns retain an undefined mean and
+  remain missing. Spark/Polars use `None` for that mean; pandas can use NaN.
+- Numeric constant defaults to zero. String and boolean columns require an
+  explicit compatible string or boolean value. Integer constants must fit
+  signed 64-bit integers; integer-only filling preserves large integer values.
+  Decimal, date/time and nested imputation are not supported.
+- Non-finite computed means are rejected. Median and most-frequent/mode remain
+  unsupported on Spark; there is no local fallback. Exact feature names and
+  Spark's case-sensitivity setting must not produce ambiguous columns.
+
+Learned state can also cross engines explicitly. This example fits on pandas and
+applies to Spark; swapping the fit/apply engines follows the same codec contract:
+
+```python
+import pandas as pd
+from skyulf.core.portable_state import encode_state, decode_state
+from skyulf.preprocessing.imputation.simple import (
+    SimpleImputerCalculator, SimpleImputerApplier,
+)
+
+state = SimpleImputerCalculator().fit(
+    pd.DataFrame({"amount": [1.0, None, 3.0]}),
+    {"columns": ["amount"], "strategy": "mean"},
+)
+payload = encode_state("SimpleImputer", state, max_bytes=8192)
+_, restored = decode_state(payload, max_bytes=8192)
+batch = spark.createDataFrame([(100.0,), (None,)], "amount double")
+output = SimpleImputerApplier().apply(batch, restored)
+assert [row.amount for row in output.collect()] == [100.0, 2.0]
+```
+
+Only the small artifact crosses engines. The Spark dataset remains distributed.
+Existing input column order is retained; direct apply appends missing learned
+columns when a usable fill value exists. The keyed pipeline requires configured
+input feature columns to be present. Output rows must still be matched by keys.
 
 ## Portable learned state
 
@@ -267,11 +353,12 @@ Pass the same custom budget at both ends when changing it. The limit applies to
 wire bytes; it is not a bound on total Python process memory. The codec performs
 no filesystem or network I/O. Callers own storage and transport of these bytes.
 
-This API does not enable Spark node execution or automatically package a
-FeatureEngineer pipeline. Connecting these artifacts to native Spark imputer
-and scaler implementations follows in SM-05/SM-06; worker model loading comes
-later. Codec tests run in both base and Spark development environments without
-starting a JVM.
+The Spark runner validates each declared v1 artifact through the codec and
+enforces `ExecutionOptions.state_max_bytes` after fit and before transform
+validation actions. Direct node calls validate state structure but leave wire
+byte limits to explicit encode/decode callers. The codec does not automatically
+package a FeatureEngineer pipeline. Native StandardScaler and worker model
+loading come later. Codec tests also run without starting a JVM.
 
 ### Inspecting declared support
 
@@ -280,13 +367,14 @@ A capability check distinguishes fit and apply and never falls back to pandas:
 ```python
 from skyulf.core.capabilities import UnsupportedExecutionError, require_capability
 
+require_capability("SimpleImputer", "fit", "spark", config={"strategy": "mean"})
 try:
-    require_capability("SimpleImputer", "fit", "spark", config={"strategy": "mean"})
+    require_capability("SimpleImputer", "fit", "spark", config={"strategy": "median"})
 except UnsupportedExecutionError as error:
     print(error.node_type, error.operation, error.engine, error.reason)
 ```
 
-This currently reports unsupported: no built-in Spark node has been enabled.
+Mean succeeds; median reports unsupported. The query requires explicit defaults.
 Existing local pipelines continue to work; this new preflight is not yet wired
 into their execution. A local node without an explicit declaration also fails
 this new query, even though its existing local pipeline path remains available.
@@ -322,8 +410,8 @@ Spark code, certify compatibility or make a window transform batch-independent.
   use an environment that permits the owned JVM processes to terminate.
 - **Spark dependency unavailable:** install the optional `skyulf-core[spark]`
   dependency in a suitable environment, or use the repository requirements above.
-- **Unsupported node:** the keyed entry point is available, but built-in native
-  FE nodes are still being implemented. Installing Spark does not enable them.
+- **Unsupported node:** SimpleImputer mean/constant is available. Other built-in
+  native FE nodes are still being implemented; installing Spark does not enable them.
 
 MLflow tracking, Unity Catalog registration, Databricks jobs, serving endpoints
 and Bundle templates are separate integration stages. This page will gain

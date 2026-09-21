@@ -6,6 +6,7 @@ import pandas as pd
 import polars as pl
 from sklearn.impute import SimpleImputer
 
+from ...core.capabilities import ExecutionCapability
 from ...core.meta.decorators import node_meta
 from ...registry import NodeRegistry
 from ...utils import detect_numeric_columns, is_decimal_series, user_picked_no_columns
@@ -23,6 +24,7 @@ from ._common import (
     _polars_missing_counts,
     _resolve_simple_columns,
 )
+from ._spark_simple import apply_spark_imputer, fit_spark_imputer
 
 
 class SimpleImputerApplier(BaseApplier):
@@ -31,13 +33,21 @@ class SimpleImputerApplier(BaseApplier):
     The calculator artifact records per-column values for ``mean``, ``median``,
     ``most_frequent`` (also accepted as ``mode``), or ``constant`` strategies.
     Missing columns seen during fitting are restored with their stored value.
+    Spark supports only ``mean`` and ``constant`` artifacts and applies them
+    with native expressions. All-missing means leave existing columns untouched.
     """
 
     @apply_method
     def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
         """Fill nulls and NaNs with the fitted per-column values; ``y`` passes through."""
         return apply_dual_engine(
-            X, params, {"polars": self._apply_polars, "pandas": self._apply_pandas}
+            X,
+            params,
+            {
+                "polars": self._apply_polars,
+                "pandas": self._apply_pandas,
+                "spark": apply_spark_imputer,
+            },
         )
 
     @staticmethod
@@ -104,7 +114,23 @@ class SimpleImputerApplier(BaseApplier):
         return X_out, _y
 
 
-@NodeRegistry.register("SimpleImputer", SimpleImputerApplier)
+@NodeRegistry.register(
+    "SimpleImputer",
+    SimpleImputerApplier,
+    execution_capabilities=tuple(
+        ExecutionCapability(
+            "spark",
+            operation,
+            "native",
+            "preserve",
+            "global" if operation == "fit" else "row",
+            codec_version=1,
+            config_match=(("strategy", strategy),),
+        )
+        for operation in ("fit", "apply")
+        for strategy in ("mean", "constant")
+    ),
+)
 @node_meta(
     id="SimpleImputer",
     name="Simple Imputer",
@@ -121,6 +147,8 @@ class SimpleImputerCalculator(BaseCalculator):
     ``columns`` to select columns and ``fill_value`` with ``constant``.
     Mean and median auto-select numeric columns and reject explicitly selected
     non-numeric columns. The other strategies can operate on all selected columns.
+    Spark supports only ``mean`` and ``constant`` through a native aggregate;
+    string and boolean constants require explicit compatible fill values.
     """
 
     def infer_output_schema(
@@ -141,8 +169,24 @@ class SimpleImputerCalculator(BaseCalculator):
         ``mode`` is accepted as an alias of ``most_frequent``; mean/median are
         restricted to numeric columns.
         """
+        return cast(
+            SimpleImputerArtifact,
+            fit_dual_engine(
+                X,
+                config,
+                {
+                    "polars": self._fit_polars_input,
+                    "pandas": self._fit_pandas_input,
+                    "spark": fit_spark_imputer,
+                },
+            ),
+        )
+
+    @staticmethod
+    def _prepare_local(X: Any, config: dict[str, Any]) -> dict[str, Any] | None:
+        """Keep existing local column/strategy resolution separate from Spark preparation."""
         if user_picked_no_columns(config):
-            return {}
+            return None
 
         strategy = config.get("strategy", "mean")
         if strategy == "mode":
@@ -151,7 +195,7 @@ class SimpleImputerCalculator(BaseCalculator):
 
         cols = _resolve_simple_columns(X, config, strategy)
         if not cols:
-            return {}
+            return None
 
         if strategy in {"mean", "median"}:
             numeric = set(auto_detect_numeric_columns(X))
@@ -168,10 +212,19 @@ class SimpleImputerCalculator(BaseCalculator):
         merged["_resolved_cols"] = cols
         merged["_resolved_fill_value"] = fill_value
 
-        return cast(
-            SimpleImputerArtifact,
-            fit_dual_engine(X, merged, {"polars": self._fit_polars, "pandas": self._fit_pandas}),
-        )
+        return merged
+
+    @staticmethod
+    def _fit_polars_input(X: Any, y: Any, config: dict[str, Any]) -> dict[str, Any]:
+        """Prepare the existing Polars contract before its fit implementation."""
+        prepared = SimpleImputerCalculator._prepare_local(X, config)
+        return {} if prepared is None else SimpleImputerCalculator._fit_polars(X, y, prepared)
+
+    @staticmethod
+    def _fit_pandas_input(X: Any, y: Any, config: dict[str, Any]) -> dict[str, Any]:
+        """Prepare the existing pandas contract before its fit implementation."""
+        prepared = SimpleImputerCalculator._prepare_local(X, config)
+        return {} if prepared is None else SimpleImputerCalculator._fit_pandas(X, y, prepared)
 
     @staticmethod
     def _fit_polars(X: Any, _y: Any, params: dict[str, Any]) -> dict[str, Any]:

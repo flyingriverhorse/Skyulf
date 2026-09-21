@@ -110,7 +110,7 @@ def test_full_preflight_before_any_action(spark, native_node, monkeypatch):
         monkeypatch.setattr(type(frame), name, forbidden)
     steps = [
         {"name": "first", "transformer": "TestSparkDouble"},
-        {"name": "last", "transformer": "SimpleImputer"},
+        {"name": "last", "transformer": "SimpleImputer", "params": {"strategy": "median"}},
     ]
     with pytest.raises(UnsupportedExecutionError, match="SimpleImputer"):
         engineer(steps, target=None).fit_transform(frame)

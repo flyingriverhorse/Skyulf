@@ -130,7 +130,13 @@ class FeatureEngineer:
             if not getattr(self, "_spark_fitted", False):
                 raise ValueError("Spark FeatureEngineer must be fitted before transform.")
             assert spec is not None
-            return transform_spark(data, self.fitted_steps, spec)
+            assert self.execution_options is not None
+            return transform_spark(
+                data,
+                self.fitted_steps,
+                spec,
+                state_max_bytes=self.execution_options.state_max_bytes,
+            )
         current_data = data
 
         for step in self.fitted_steps:
@@ -192,7 +198,13 @@ class FeatureEngineer:
                 raise ValueError("target_column conflicts with frame_spec.target.")
             if on_split is not None:
                 raise ValueError("Spark FE uses one frame; on_split is unsupported.")
-            result, metrics, records = fit_spark(data, self.steps_config, spec)
+            assert self.execution_options is not None
+            result, metrics, records = fit_spark(
+                data,
+                self.steps_config,
+                spec,
+                state_max_bytes=self.execution_options.state_max_bytes,
+            )
             self.fitted_steps = records
             self._spark_fitted = True
             return result, metrics

@@ -191,14 +191,14 @@ def test_state_rejects_future_version():
 **Tüketir/üretir:** Mevcut SimpleImputer artifact anahtarları; mean/constant
 Spark fit ve apply. Median/most_frequent Spark fit bu görevde unsupported kalır.
 
-- [ ] Local ve Spark mean/constant fixture'ları: train/test dağılımları farklı,
+- [x] Local ve Spark mean/constant fixture'ları: train/test dağılımları farklı,
   null/NaN, tamamen boş kolon, boş seçim ve geçersiz tip; öğrenme yalnız train'den.
-- [ ] Mean fit için seçilen kolonlarda bounded aggregate; constant için veri
+- [x] Mean fit için seçilen kolonlarda bounded aggregate; constant için veri
   istatistiği gerekmiyorsa action yok. Missing counts gerekiyorsa aynı aggregate'e
   birleştir. Mevcut local boş kolon politikasını baseline'dan aynen koru.
-- [ ] Apply yalnız Spark expressions kullansın; keys/target'a dokunmasın.
+- [x] Apply yalnız Spark expressions kullansın; keys/target'a dokunmasın.
   Capability stratejiye göre karar versin; median'ı mean'e dönüştürme.
-- [ ] Apply planında Python UDF olmadığını, row/key setinin korunduğunu doğrula.
+- [x] Apply planında Python UDF olmadığını, row/key setinin korunduğunu doğrula.
 
 ```python
 def test_spark_mean_uses_only_training_data(spark):

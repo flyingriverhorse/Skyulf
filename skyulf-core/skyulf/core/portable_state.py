@@ -34,11 +34,17 @@ def encode_state(node_type: str, params: Any, *, max_bytes: int) -> bytes:
     Empty dictionaries remain no-op artifacts. Other objects are rejected.
     """
     _validate_limit(max_bytes)
+    normalized = validate_state(node_type, params)
+    document = _envelope(node_type, normalized)
+    return _json_bytes(document, max_bytes)
+
+
+def validate_state(node_type: str, params: Any) -> dict[str, Any]:
+    """Validate and copy learned scalars without serializing bytes or imposing a wire limit."""
     _validate_node(node_type)
     normalized = _normalize(params)
     _validate_state(node_type, normalized)
-    document = _envelope(node_type, normalized)
-    return _json_bytes(document, max_bytes)
+    return normalized
 
 
 def decode_state(

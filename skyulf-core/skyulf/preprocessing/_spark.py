@@ -8,6 +8,7 @@ from typing import Any
 
 from ..core.capabilities import UnsupportedExecutionError, require_capability
 from ..core.execution import ExecutionOptions, FrameSpec
+from ..core.portable_state import DEFAULT_MAX_STATE_BYTES, decode_state, encode_state
 from ..data.dataset import SplitDataset
 from ..engines import SkyulfSparkWrapper, SparkEngine, get_engine
 from ..registry import NodeRegistry
@@ -122,7 +123,12 @@ def _params(config: Any, spec: FrameSpec, frame: Any = None) -> dict[str, Any]:
     if columns and any(name in protected for name in columns):
         raise ValueError("Spark feature columns cannot include row_keys or target.")
     if frame is not None:
-        selected = columns or [name for name in frame.columns if name not in protected]
+        params.setdefault("_auto_columns", columns is None)
+        selected = (
+            columns
+            if columns is not None
+            else [name for name in frame.columns if name not in protected]
+        )
         if set(selected).difference(frame.columns):
             raise ValueError("Spark feature columns are missing or duplicated.")
         params["columns"] = selected
@@ -165,7 +171,7 @@ def _preflight(steps: Any, spec: FrameSpec, *, training: bool) -> None:
     operations = ("fit", "apply") if training else ("apply",)
     for step in steps:
         node_type = step["transformer"] if training else step["type"]
-        params = _params(step.get("params", {}), spec)
+        params = _params(_node_config(node_type, step.get("params", {})), spec)
         for operation in operations:
             require_capability(node_type, operation, "spark", config=params)
             declarations = vars(NodeRegistry.get_calculator(node_type))[
@@ -197,7 +203,9 @@ def _check_output(before: Any, output: Any, spec: FrameSpec) -> Any:
     return after
 
 
-def fit_spark(data: Any, steps: Any, spec: FrameSpec) -> tuple[Any, dict, list[dict]]:
+def fit_spark(
+    data: Any, steps: Any, spec: FrameSpec, *, state_max_bytes: int = DEFAULT_MAX_STATE_BYTES
+) -> tuple[Any, dict, list[dict]]:
     """Fit/apply native steps transactionally, reporting unknown distributed metrics."""
     _preflight(steps, spec, training=True)
     current = _native(data)
@@ -206,12 +214,13 @@ def fit_spark(data: Any, steps: Any, spec: FrameSpec) -> tuple[Any, dict, list[d
     records = []
     step_metrics = {}
     for index, step in enumerate(steps):
-        params = _params(step.get("params", {}), spec, current)
         node_type = step["transformer"]
+        params = _params(_node_config(node_type, step.get("params", {})), spec, current)
         calculator = NodeRegistry.get_calculator(node_type)()
         applier = NodeRegistry.get_applier(node_type)()
         start = time.perf_counter()
         artifact = dict(calculator.fit(current, params))
+        artifact = _checked_state(node_type, artifact, params, state_max_bytes)
         current = _check_output(current, applier.apply(current, artifact), spec)
         step_metrics[f"{index}:{step['name']}"] = {
             "driver_elapsed_seconds": time.perf_counter() - start,
@@ -233,18 +242,52 @@ def fit_spark(data: Any, steps: Any, spec: FrameSpec) -> tuple[Any, dict, list[d
     return _restore(current, data), metrics, records
 
 
-def transform_spark(data: Any, steps: Any, spec: FrameSpec) -> Any:
+def transform_spark(
+    data: Any, steps: Any, spec: FrameSpec, *, state_max_bytes: int = DEFAULT_MAX_STATE_BYTES
+) -> Any:
     """Apply fitted native steps to labeled or unlabeled data using key identity."""
     _preflight(steps, spec, training=False)
+    artifacts = [
+        _checked_state(step["type"], step["artifact"], step["params"], state_max_bytes)
+        for step in steps
+    ]
     current = _native(data)
     _validate_schema(current, spec, training=False)
     _validate_keys(current, spec)
-    for step in steps:
+    for step, artifact in zip(steps, artifacts, strict=True):
         _params(step["params"], spec, current)
-        current = _check_output(current, step["applier"].apply(current, step["artifact"]), spec)
+        current = _check_output(current, step["applier"].apply(current, artifact), spec)
     return _restore(current, data)
 
 
 def _restore(frame: Any, original: Any) -> Any:
     """Preserve the caller's raw-versus-wrapper return convention."""
     return SkyulfSparkWrapper(frame) if isinstance(original, SkyulfSparkWrapper) else frame
+
+
+def _node_config(node_type: str, config: Any) -> dict[str, Any]:
+    """Normalize declared scalar defaults while keeping omitted columns distinct from []."""
+    defaults = NodeRegistry.get_all_metadata().get(node_type, {}).get("params", {})
+    return {
+        **{key: deepcopy(value) for key, value in defaults.items() if key != "columns"},
+        **config,
+    }
+
+
+def _checked_state(node_type: str, artifact: dict, config: dict, max_bytes: int) -> dict:
+    """Enforce the declared portable codec before apply or distributed input actions."""
+    declarations = vars(NodeRegistry.get_calculator(node_type)).get(
+        "__execution_capabilities__", ()
+    )
+    versions = {
+        item.codec_version
+        for item in declarations
+        if item.engine == "spark" and item.operation == "apply" and item.matches_config(config)
+    }
+    if versions == {None}:
+        return artifact
+    if versions != {1}:
+        raise ValueError("Unsupported or ambiguous portable codec version.")
+    return decode_state(
+        encode_state(node_type, artifact, max_bytes=max_bytes), max_bytes=max_bytes
+    )[1]
