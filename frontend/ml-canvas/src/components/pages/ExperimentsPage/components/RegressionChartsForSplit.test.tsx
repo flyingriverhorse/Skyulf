@@ -19,6 +19,7 @@ describe('regression chart public series', () => {
     expect(series).toContainEqual([{ x: 3, y: 2, residual: 1 }, { x: 0, y: 0, residual: 0 }, { x: 2, y: 4, residual: -2 }, { x: 1, y: 1, residual: 0 }]);
     expect(series).toContainEqual([{ r0: 1, r1: 0 }, { r0: 0, r1: -2 }, { r0: -2, r1: 0 }]);
     expect(screen.getByText('Absolute error percentiles:')).toBeInTheDocument();
+    expect(screen.getByText(/3 included; 1 excluded/)).toBeVisible();
     fireEvent.click(screen.getAllByTitle('Download Graph')[0]!);
     expect(handleDownload).toHaveBeenCalledWith('validation-actual-pred', 'validation_actual_vs_predicted');
     rerender(<RegressionChartsForSplit splitName="validation" splitData={{ y_true: [], y_pred: [] }} handleDownload={handleDownload} downloadingChart={null} doneChart={null} />);
