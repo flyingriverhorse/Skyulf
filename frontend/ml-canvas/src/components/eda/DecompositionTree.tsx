@@ -81,6 +81,7 @@ const DecompositionTreeContent: React.FC<DecompositionTreeProps & { cacheKey: st
 }) => {
     const [levels, setLevels] = useState<TreeLevel[]>([]);
     const [loading, setLoading] = useState(false);
+    const [requestError, setRequestError] = useState<{ message: string; retry: () => void } | null>(null);
     const [splitMenuOpen, setSplitMenuOpen] = useState<{ levelIndex: number, item: TreeItem, x: number, y: number } | null>(null);
 
     // We need to store the "structure" of the tree (the sequence of split columns)
@@ -195,6 +196,7 @@ const DecompositionTreeContent: React.FC<DecompositionTreeProps & { cacheKey: st
             lastResetRef.current = resetVersion;
         }
         setSplitMenuOpen(null);
+        setRequestError(null);
         const cached = treeCache.get(cacheKey);
         if (cached) {
             setLevels(cached.levels);
@@ -214,6 +216,7 @@ const DecompositionTreeContent: React.FC<DecompositionTreeProps & { cacheKey: st
 
     const loadRoot = async () => {
         const myRequestId = ++requestIdRef.current;
+        setRequestError(null);
         setLoading(true);
         try {
             const res = await EDAService.getDecomposition(
@@ -241,6 +244,7 @@ const DecompositionTreeContent: React.FC<DecompositionTreeProps & { cacheKey: st
         } catch (err) {
             if (myRequestId === requestIdRef.current) {
                 console.error(err);
+                setRequestError({ message: 'Could not load decomposition.', retry: () => { void loadRoot(); } });
             }
         } finally {
             if (myRequestId === requestIdRef.current) {
@@ -288,6 +292,9 @@ const DecompositionTreeContent: React.FC<DecompositionTreeProps & { cacheKey: st
     };
 
     const handleItemClick = async (levelIndex: number, item: TreeItem) => {
+        const myRequestId = ++requestIdRef.current;
+        setRequestError(null);
+        setSplitMenuOpen(null);
         // 1. Compute the updated current level immutably — mutating the level
         // object in place would poison both React state (before any setLevels
         // call) and the module-level treeCache, which stores these objects by
@@ -303,7 +310,6 @@ const DecompositionTreeContent: React.FC<DecompositionTreeProps & { cacheKey: st
 
         if (nextSplitCol) {
             // AUTOMATIC UPDATE: If next level exists, refresh it instead of opening menu
-            const myRequestId = ++requestIdRef.current;
             setLoading(true);
             try {
                 // Construct filters for the next level
@@ -353,6 +359,8 @@ const DecompositionTreeContent: React.FC<DecompositionTreeProps & { cacheKey: st
             } catch (err) {
                 if (myRequestId === requestIdRef.current) {
                     console.error(err);
+                    setRequestError({ message: `Could not refresh ${nextSplitCol}. Previous results are still shown.`,
+                        retry: () => { void handleItemClick(levelIndex, item); } });
                     // Fetch failed — do not apply the optimistic selection change,
                     // since no next-level data actually loaded for it.
                 }
@@ -362,17 +370,19 @@ const DecompositionTreeContent: React.FC<DecompositionTreeProps & { cacheKey: st
                 }
             }
         } else {
+            setLoading(false);
             // No next level defined, just update selection
             setLevels(newLevels);
             // Do NOT open menu automatically anymore. User must click header + button.
         }
     };
 
-    const handleSplit = async (column: string) => {
-        if (!splitMenuOpen) return;
+    const handleSplit = async (column: string, target = splitMenuOpen) => {
+        if (!target) return;
 
-        const { levelIndex, item } = splitMenuOpen;
+        const { levelIndex, item } = target;
         setSplitMenuOpen(null);
+        setRequestError(null);
         const myRequestId = ++requestIdRef.current;
         setLoading(true);
 
@@ -417,6 +427,8 @@ const DecompositionTreeContent: React.FC<DecompositionTreeProps & { cacheKey: st
         } catch (err) {
             if (myRequestId === requestIdRef.current) {
                 console.error(err);
+                setRequestError({ message: `Could not split by ${column}. Previous results are still shown.`,
+                    retry: () => { void handleSplit(column, target); } });
             }
         } finally {
             if (myRequestId === requestIdRef.current) {
@@ -426,12 +438,20 @@ const DecompositionTreeContent: React.FC<DecompositionTreeProps & { cacheKey: st
     };
 
     const closeSplit = (levelIndex: number) => {
+        requestIdRef.current += 1;
+        setRequestError(null);
+        setLoading(false);
+        setSplitMenuOpen(null);
         setLevels(levels.slice(0, levelIndex));
         setSplitPath(splitPath.slice(0, levelIndex));
     };
 
     return (
         <div className="relative w-full h-[600px] bg-slate-50 dark:bg-slate-900 overflow-hidden flex flex-col">
+            {requestError && <div role="alert" className="m-3 p-3 rounded border border-red-200 bg-red-50 text-red-700 text-sm">
+                <p>{requestError.message}</p>
+                <button onClick={requestError.retry} disabled={loading} className="mt-2 underline font-medium">Retry</button>
+            </div>}
             {loading && (
                 <div className="absolute top-2 right-2 z-50">
                     <Loader2 className="w-5 h-5 animate-spin text-blue-500" />

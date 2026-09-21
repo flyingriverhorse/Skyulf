@@ -96,8 +96,16 @@ for (const viewport of [
         },
       });
       const requests: Array<{ column: string; operator: string; value: string }> = [];
+      let failRoot = true;
+      let failSplit = true;
       await page.route('**/api/eda/193/decomposition', route => {
         const body = route.request().postDataJSON();
+        if (!body.split_col && failRoot) {
+          return route.fulfill({ status: 503, json: { detail: 'Root unavailable' } });
+        }
+        if (body.split_col === 'recorded_at' && failSplit) {
+          return route.fulfill({ status: 503, json: { detail: 'Split unavailable' } });
+        }
         if (!body.split_col) return route.fulfill({ json: [{ name: 'Total', value: 4, ratio: 1 }] });
         if (body.split_col === 'recorded_at') return route.fulfill({ json: [
           { name: timestamp, filter_value: timestamp, value: 2, ratio: 0.5 },
@@ -110,9 +118,16 @@ for (const viewport of [
         return route.fulfill({ status: 400, json: { detail: 'Unexpected temporal filter' } });
       });
       await openAnalysis(page, 'Decomposition', viewport.name === 'mobile');
+      await expect(page.getByRole('alert')).toContainText('Could not load decomposition');
+      failRoot = false;
+      await page.getByRole('button', { name: 'Retry', exact: true }).click();
       await page.getByRole('button', { name: 'Total 4 (100%)', exact: true }).click();
       await page.getByTitle('Split further').click();
       await page.getByRole('button', { name: 'recorded_at', exact: true }).click();
+      await expect(page.getByRole('alert')).toContainText('Could not split by recorded_at');
+      failSplit = false;
+      await expect(page.getByRole('button', { name: 'Total 4 (100%)', exact: true })).toBeVisible();
+      await page.getByRole('button', { name: 'Retry', exact: true }).click();
       const bucket = page.getByRole('button', { name: `${timestamp} 2 (50%)`, exact: true });
       await bucket.focus();
       await bucket.press('Enter');
