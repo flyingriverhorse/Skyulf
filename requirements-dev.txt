@@ -22,4 +22,5 @@ pandas-stubs
 # Optional helpful REPL / notebook tools for development
 ipython>=8.18.1
 jupyter>=1.1.1
+jupyter-server>=2.21.0,<3.0.0         # Redact token-bearing request headers in logs
 rich>=13.0.0
