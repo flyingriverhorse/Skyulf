@@ -177,3 +177,5 @@ sast/xss-recon.md
 sast/xss-results.md
 .continue/agents/new-config.yaml
 .qoder/skills/modern-coding-standards/SKILL.md
+docs/reports/2026-09-21-spark-core-inventory.md
+docs/reports/2026-09-21-spark-databricks-readiness.md

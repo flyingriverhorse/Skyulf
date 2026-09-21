@@ -20,7 +20,12 @@ async function seed(page: Page, width = 1440, modelType = 'classification') {
     const update = state.updateNodeData as (id: string, data: unknown) => void;
     update(ids[0]!, { datasetId: 'iris-demo', datasetName: 'Iris' });
     update(ids[2]!, { target_column: 'species', label: 'Forest A' });
-    update(ids[3]!, { target_column: 'species', label: 'Forest B', run_mode: 'advanced' });
+    update(ids[3]!, {
+      target_column: 'species',
+      label: 'Forest B',
+      run_mode: 'advanced',
+      search_space: { n_estimators: [10, 20] },
+    });
     (state.onConnect as (edge: unknown) => void)({ source: ids[0], sourceHandle: 'data', target: ids[1], targetHandle: 'in' });
     for (const target of ids.slice(2)) (state.onConnect as (edge: unknown) => void)({ source: ids[1], sourceHandle: 'train', target, targetHandle: 'in' });
     (state.onNodesChange as (changes: unknown[]) => void)(ids.map(id => ({ id, type: 'select', selected: false })));
