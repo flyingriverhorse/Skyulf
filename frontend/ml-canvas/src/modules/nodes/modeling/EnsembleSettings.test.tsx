@@ -3,6 +3,7 @@ import { useState } from 'react';
 import type { ColumnProfile } from '../../../core/api/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { registryApi } from '../../../core/api/registry';
+import { jobsApi } from '../../../core/api/jobs';
 import { useTrainingNodeContext } from '../../../core/hooks/useTrainingNodeContext';
 import { useGraphStore } from '../../../core/store/useGraphStore';
 import { useJobStore } from '../../../core/store/useJobStore';
@@ -47,7 +48,10 @@ beforeEach(() => {
   useJobStore.setState({ jobs: [], runJobs: {}, inspectedRun: null, toggleDrawer: vi.fn(), setTab: vi.fn() });
 });
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.restoreAllMocks();
+});
 
 /** A blank fold control must remain an invalid draft and disable direct training. */
 it('preserves blank stacking folds and blocks an invalid numeric config', async () => {
@@ -249,11 +253,52 @@ it.each((['basic', 'advanced'] as const).flatMap(run_mode => [
   expect(synchronized.cv_random_state).toBe(expected);
 });
 
-/** Connected selection comparison is order-insensitive and parameter-only edits do not emit a patch. */
-it('keeps the existing no-op behavior for reordered connected models and parameter-only changes', async () => {
+/** Reordering connected models with equal parameters must not create a sync loop. */
+it('keeps reordered connected models with unchanged parameters as a no-op', async () => {
   connectModels([{ model_type: 'logistic_regression', hyperparameters: { C: 2 } }, { model_type: 'random_forest_classifier' }]);
-  const onChange = await renderSettings();
+  const onChange = await renderSettings({ base_estimator_params: { logistic_regression: { C: 2 } } });
   expect(onChange).not.toHaveBeenCalled();
+});
+
+/** A parameter-only upstream edit must update both the real form and submitted recipe. */
+it('refreshes connected depth without changing other settings and allows manual edits after disconnect', async () => {
+  vi.spyOn(jobsApi, 'getHyperparameters').mockResolvedValue([
+    { name: 'max_depth', label: 'Max Depth', type: 'number' },
+  ]);
+  const models = (depth: number) => [
+    { model_type: 'random_forest_classifier', hyperparameters: { max_depth: depth } },
+    { model_type: 'logistic_regression' },
+  ];
+  connectModels(models(3));
+  let current = { ...config, base_estimator_params: { random_forest: { max_depth: 3 } } } as EnsembleConfig;
+  const changed = vi.fn();
+  function Harness() {
+    const [value, setValue] = useState(current);
+    return <EnsembleSettings config={value} nodeId="ensemble" onChange={next => {
+      current = next;
+      changed(next);
+      setValue(next);
+    }} />;
+  }
+  await act(async () => { render(<Harness />); });
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Base Model Hyperparameters' })); });
+  fireEvent.click(screen.getByRole('button', { name: 'Random Forest 1 set' }));
+  expect(screen.getByRole('spinbutton', { name: 'Max Depth' })).toHaveValue(3);
+  await act(async () => { connectModels(models(10)); });
+  expect(screen.getByRole('spinbutton', { name: 'Max Depth' })).toHaveValue(10);
+  expect(changed).toHaveBeenCalledTimes(1);
+  const { nodes, edges } = useGraphStore.getState();
+  const ensemble = { id: 'ensemble', position: { x: 0, y: 0 }, data: { ...current } };
+  expect(convertEnsembleNode(ensemble, nodes, edges, edges, nodes.map(node => node.id)).params)
+    .toEqual(expect.objectContaining({ hyperparameters: expect.objectContaining({
+      base_estimator_params: { random_forest: { max_depth: 10 } },
+    }) }));
+  await act(async () => { connectModels(models(10)); });
+  expect(changed).toHaveBeenCalledTimes(1);
+  await act(async () => { useGraphStore.setState({ edges: [] }); });
+  fireEvent.change(screen.getByRole('spinbutton', { name: 'Max Depth' }), { target: { value: '7' } });
+  expect(screen.getByRole('spinbutton', { name: 'Max Depth' })).toHaveValue(7);
+  expect(current.base_estimator_params).toEqual({ random_forest: { max_depth: 7 } });
 });
 
 /** A manual task locks out both connected-task and target-dtype inference. */
