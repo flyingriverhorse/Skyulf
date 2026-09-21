@@ -200,9 +200,8 @@ class ThresholdTuningService:
     ) -> None:
         """Reject payloads that predict-time cannot honor.
 
-        Without this, garbage persists silently: ``_resolve_thresholds_for_predict``
-        skips any saved set that doesn't cover every model class, so a bad save
-        looks active but is quietly ignored at predict time.
+        Save and deployment both require exact class coverage and valid
+        weights so a configuration cannot appear enabled but fail at predict time.
         """
         _validate_metric(metric)
         if not classes:
@@ -214,14 +213,19 @@ class ThresholdTuningService:
                 f"classes {sorted(expected_keys)}"
             )
         for key, value in thresholds.items():
-            # No [0, 1] bound on purpose: optimize_thresholds' nelder-mead
-            # strategy legitimately returns out-of-range cut-points for
-            # multiclass jobs, and apply_thresholds' scaled argmax handles
-            # them arithmetically. Finite-ness is the real invariant.
+            # Multiclass thresholds are positive division weights, with no
+            # upper bound. Binary complementary pairs may contain zero.
             if not isinstance(value, (int, float)) or not math.isfinite(value):
                 raise ThresholdTuningError(
                     f"threshold for class {key!r} must be a finite number, got {value!r}"
                 )
+            if value < 0 or (len(classes) > 2 and value == 0):
+                raise ThresholdTuningError(
+                    f"threshold for class {key!r} must be "
+                    + ("positive for multiclass" if len(classes) > 2 else "nonnegative for binary")
+                )
+        if not any(value > 0 for value in thresholds.values()):
+            raise ThresholdTuningError("thresholds must not all be zero")
         if split_used not in ("validation", "test"):
             raise ThresholdTuningError(
                 f"split_used must be 'validation' or 'test', got {split_used!r}"

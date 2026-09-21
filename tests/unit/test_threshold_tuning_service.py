@@ -2,8 +2,10 @@
 
 from unittest.mock import AsyncMock, patch
 
+import pandas as pd
 import pytest
 import pytest_asyncio
+from sklearn.dummy import DummyClassifier
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
@@ -13,6 +15,7 @@ from backend.ml_pipeline._services.threshold_tuning_service import (
     ThresholdTuningError,
     ThresholdTuningService,
 )
+from backend.ml_pipeline.deployment.service import DeploymentService
 
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
 
@@ -381,6 +384,62 @@ async def test_save_toggle_clear_round_trip(async_session):
     await async_session.refresh(job)
     assert job.tuned_thresholds is None
     assert job.tuned_thresholds_enabled is False
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("invalid", [0.0, -0.1, float("nan"), float("inf"), -float("inf")])
+async def test_save_rejects_invalid_multiclass_denominators(async_session, invalid):
+    """An invalid multiclass set must not replace an existing valid saved threshold configuration."""
+    await _insert_job(async_session, "threshold-contract")
+    valid = {"2": 4.0, "0": 2.0, "1": 3.0}
+    await ThresholdTuningService.save(
+        async_session, "threshold-contract", valid, [0, 1, 2], "f1", "validation"
+    )
+    with pytest.raises(ThresholdTuningError, match="threshold"):
+        await ThresholdTuningService.save(
+            async_session,
+            "threshold-contract",
+            {"0": 1.0, "1": invalid, "2": 1.0},
+            [0, 1, 2],
+            "f1",
+            "validation",
+        )
+    async_session.expire_all()
+    saved = await ThresholdTuningService.get_saved(async_session, "threshold-contract")
+    assert saved["thresholds"] == valid
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "labels, thresholds, expected",
+    [
+        (["no", "yes"], {"yes": 0.0, "no": 1.0}, ["yes", "yes"]),
+        (["no", "yes"], {"yes": 1.0, "no": 0.0}, ["no", "no"]),
+        (["z", "a", "m"], {"z": 4.0, "m": 2.0, "a": 3.0}, ["m", "m", "m"]),
+    ],
+)
+async def test_saved_thresholds_round_trip_into_real_estimator_predictions(
+    async_session, labels, thresholds, expected
+):
+    """Persisted binary endpoints and positive multiclass weights must reach serving unchanged."""
+    await _insert_job(async_session, "threshold-serving")
+    features = pd.DataFrame({"x": range(len(labels))})
+    estimator = DummyClassifier(strategy="prior").fit(features, labels)
+    await ThresholdTuningService.save(
+        async_session, "threshold-serving", thresholds, labels, "f1", "validation"
+    )
+    async_session.expire_all()
+    job = (
+        await async_session.execute(
+            select(TrainingJob).where(TrainingJob.id == "threshold-serving")
+        )
+    ).scalar_one()
+    resolved = DeploymentService._resolve_thresholds_for_predict(None, job, estimator.classes_)
+    predictions, applied = DeploymentService._predict_and_decode(
+        estimator, features, None, None, thresholds=resolved
+    )
+    assert predictions == expected
+    assert applied == thresholds
 
 
 @pytest.mark.asyncio

@@ -1,4 +1,5 @@
 import { apiClient } from './client';
+import { validateThresholds } from '../utils/thresholdValidation';
 
 export interface DeploymentInfo {
   id: number;
@@ -61,6 +62,8 @@ export const deploymentApi = {
     overrideThresholds?: Record<string, number> | null,
     options?: { signal?: AbortSignal },
   ): Promise<PredictionResponse> => {
+    // Model class coverage is checked by the server; reject invalid supplied values before JSON encoding.
+    if (overrideThresholds) validateThresholds(overrideThresholds);
     const response = await apiClient.post<PredictionResponse>(
       '/deployment/predict',
       {

@@ -8,6 +8,7 @@
 
 import type { EvaluationSplit, YProba } from '../types';
 import { findBinaryThreshold, multiclassMetricValue } from './classificationCharts/thresholdMetrics';
+import { validateThresholds } from '../../../../core/utils/thresholdValidation';
 
 /** Locate the column index of `targetClass` in y_proba, preferring `labels` over `classes`. */
 function findClassIndex(y_proba: YProba, targetClass: string | number): number {
@@ -134,6 +135,7 @@ export function applyMulticlassThresholds(
   const { y_pred, y_proba } = splitData;
   let yTrue: (string | number)[] = splitData.y_true;
   if (!y_proba) return calculateConfusionMatrix(yTrue, y_pred);
+  validateThresholds(thresholds, y_proba.classes);
 
   // Map string labels back to their class values, when the split reports
   // labels separately from classes (e.g. label-encoded targets) — mirrors
@@ -148,11 +150,22 @@ export function applyMulticlassThresholds(
   }
 
   const yPred = y_proba.values.map(row => {
+    if (y_proba.classes.length === 2) {
+      const negative = y_proba.classes[0]!;
+      const positive = y_proba.classes[1]!;
+      const negativeThreshold = thresholds[String(negative)] ?? 1;
+      const positiveThreshold = thresholds[String(positive)] ?? 1;
+      // Cross multiplication avoids 0/0 at valid binary threshold boundaries.
+      const isPositive = negativeThreshold === 0
+        ? (row[1] ?? 0) >= 1
+        : (row[1] ?? 0) * negativeThreshold >= (row[0] ?? 0) * positiveThreshold;
+      return isPositive ? positive : negative;
+    }
     let bestIdx = 0;
     let bestScore = -Infinity;
     row.forEach((value, idx) => {
       const classLabel = y_proba.classes[idx];
-      const threshold = thresholds[String(classLabel)] ?? 1;
+      const threshold = thresholds[String(classLabel)]!;
       const score = value / threshold;
       if (score > bestScore) {
         bestScore = score;

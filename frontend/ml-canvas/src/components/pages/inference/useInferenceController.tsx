@@ -330,7 +330,11 @@ export function useInferenceController() {
     const handleAddOverrideEntry = () => {
         const cls = newOverrideClass.trim();
         const threshold = Number(newOverrideThreshold);
-        if (!cls || !Number.isFinite(threshold)) return;
+        if (!cls) return;
+        if (!newOverrideThreshold.trim() || !Number.isFinite(threshold)) {
+            setError('Enter a finite number for the threshold.');
+            return;
+        }
         setOverrideThresholdsValue(prev => ({ ...prev, [cls]: threshold }));
         setNewOverrideClass('');
         setNewOverrideThreshold('0.5');
@@ -348,7 +352,10 @@ export function useInferenceController() {
     /** Update the threshold value for an existing override entry. */
     const handleOverrideThresholdChange = (cls: string, value: string) => {
         const num = Number(value);
-        if (!Number.isFinite(num)) return;
+        if (!value.trim() || !Number.isFinite(num)) {
+            setError('Enter a finite number for the threshold.');
+            return;
+        }
         setOverrideThresholdsValue(prev => ({ ...prev, [cls]: num }));
     };
 

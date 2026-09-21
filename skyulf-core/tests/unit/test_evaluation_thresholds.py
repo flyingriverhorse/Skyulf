@@ -7,6 +7,46 @@ from sklearn.metrics import f1_score
 from skyulf.modeling._evaluation.thresholds import apply_thresholds, optimize_thresholds
 
 
+@pytest.mark.parametrize("invalid", [0.0, -0.1, float("nan"), float("inf"), -float("inf")])
+def test_multiclass_rejects_invalid_threshold_denominators(invalid):
+    """Invalid denominators must fail explicitly instead of producing an arbitrary winning class."""
+    with pytest.raises(ValueError, match="positive.*finite|finite.*positive"):
+        apply_thresholds([[0.2, 0.5, 0.3]], {"z": 1.0, "a": invalid, "m": 1.0}, ["z", "a", "m"])
+
+
+def test_multiclass_thresholds_preserve_probability_order_and_allow_above_one():
+    """JSON map order and non-alphabetic class labels must not change the scaled winner."""
+    predictions = apply_thresholds(
+        [[0.4, 0.4, 0.2]], {"m": 4.0, "a": 2.0, "z": 3.0}, ["z", "a", "m"]
+    )
+    assert predictions.tolist() == ["a"]
+
+
+@pytest.mark.parametrize("threshold, expected", [(0.0, ["yes"] * 3), (1.0, ["no", "no", "yes"])])
+def test_binary_full_pair_matches_scalar_at_zero_and_one(threshold, expected):
+    """Saved complementary binary pairs must agree with scalar cutoff at exact endpoint probabilities."""
+    probabilities = [[1.0, 0.0], [0.5, 0.5], [0.0, 1.0]]
+    with np.errstate(divide="raise", invalid="raise"):
+        pair = apply_thresholds(
+            probabilities, {"no": 1.0 - threshold, "yes": threshold}, ["no", "yes"]
+        )
+    assert pair.tolist() == expected
+    assert pair.tolist() == apply_thresholds(probabilities, threshold, ["no", "yes"]).tolist()
+
+
+@pytest.mark.parametrize("thresholds", [{"no": 0.0, "yes": 0.0}, {"no": -0.1, "yes": 0.5}])
+def test_binary_full_pair_rejects_invalid_weights(thresholds):
+    """A full pair must define nonnegative weights with at least one positive entry."""
+    with pytest.raises(ValueError, match="threshold"):
+        apply_thresholds([[0.5, 0.5]], thresholds, ["no", "yes"])
+
+
+def test_multiclass_rejects_extra_threshold_keys():
+    """Misspelled or stale class keys must not disappear silently during application."""
+    with pytest.raises(ValueError, match="classes"):
+        apply_thresholds([[0.2, 0.5, 0.3]], {0: 1.0, 1: 1.0, 2: 1.0, 3: 1.0}, [0, 1, 2])
+
+
 def test_apply_thresholds_binary_basic():
     """Binary: predicts positive class when proba[:, 1] >= threshold."""
     y_proba = np.array(

@@ -1,6 +1,7 @@
 """Serving side of a deployment: promote a job, resolve its artifact, score rows."""
 
 import logging
+import math
 from collections.abc import Sequence
 from pathlib import Path
 from typing import Any, cast
@@ -28,7 +29,7 @@ logger = logging.getLogger(__name__)
 
 
 class OverrideThresholdMismatch(ValueError):
-    """Raised when override_thresholds keys don't match the model's classes."""
+    """Raised when active threshold keys or weights cannot be applied to the model."""
 
 
 def _maybe_decode_predictions(
@@ -355,7 +356,7 @@ class DeploymentService:
     def _validate_override_thresholds(
         override_thresholds: dict[str, float], estimator_classes: Any
     ) -> None:
-        """Raise OverrideThresholdMismatch unless the override keys match the model's classes exactly."""
+        """Reject mismatched class keys and weights that Core cannot apply safely."""
         expected = {str(c) for c in (estimator_classes if estimator_classes is not None else [])}
         provided = set(override_thresholds.keys())
         if provided != expected:
@@ -363,6 +364,19 @@ class DeploymentService:
                 f"override_thresholds keys {sorted(provided)} do not match "
                 f"model classes {sorted(expected)}"
             )
+        for value in override_thresholds.values():
+            if (
+                not isinstance(value, (int, float))
+                or not math.isfinite(value)
+                or value < 0
+                or (len(expected) > 2 and value == 0)
+            ):
+                raise OverrideThresholdMismatch(
+                    "threshold weights must be finite and "
+                    + ("positive for multiclass" if len(expected) > 2 else "nonnegative for binary")
+                )
+        if not any(value > 0 for value in override_thresholds.values()):
+            raise OverrideThresholdMismatch("threshold weights must not all be zero")
 
     @staticmethod
     def _resolve_thresholds_for_predict(
@@ -373,6 +387,7 @@ class DeploymentService:
         """Resolve which per-class thresholds to apply: override > saved+enabled > None.
 
         Returns a str-keyed dict (matching the JSON/response shape) or None.
+        Invalid active saved sets raise instead of silently using default predictions.
         """
         if override_thresholds is not None:
             DeploymentService._validate_override_thresholds(override_thresholds, estimator_classes)
@@ -385,10 +400,8 @@ class DeploymentService:
             and estimator_classes is not None
         ):
             saved = job.tuned_thresholds.get("thresholds", {})
-            resolved = {str(c): saved[str(c)] for c in estimator_classes if str(c) in saved}
-            if len(resolved) == len(list(estimator_classes)):
-                return resolved
-            logger.warning("Saved tuned thresholds do not cover every model class; skipping them.")
+            DeploymentService._validate_override_thresholds(saved, estimator_classes)
+            return {str(c): saved[str(c)] for c in estimator_classes}
         return None
 
     @staticmethod

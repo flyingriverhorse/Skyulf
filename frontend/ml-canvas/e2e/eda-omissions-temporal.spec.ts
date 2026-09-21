@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { mockBackend } from './fixtures/mockApi';
+import { readFile } from 'node:fs/promises';
 
 /** Load report metadata through the same endpoints used by a saved EDA report. */
 async function mockProfile(page: Page, columns: Record<string, unknown>, extra: Record<string, unknown> = {}) {
@@ -36,12 +37,13 @@ for (const viewport of [
       /** A capped backend response must expose omissions even when the rendered matrix has only 20 columns. */
       const allColumns = Array.from({ length: 25 }, (_, index) => `feature_${index}`);
       const matrixColumns = allColumns.slice(0, 20);
+      const sample = [-1, -0.4, -0.02, 0, 0.02, 0.4, 1, null];
       await mockProfile(page, Object.fromEntries(allColumns.map(name => [name, {
         name, dtype: 'Numeric', missing_count: 0, missing_percentage: 0,
       }])), {
         correlations: {
           columns: matrixColumns,
-          values: matrixColumns.map((_, row) => matrixColumns.map((__, column) => row === column ? 1 : 0.5)),
+          values: matrixColumns.map(() => matrixColumns.map((_, column) => sample[column % sample.length])),
           total_columns: 25, omitted_columns: allColumns.slice(20),
         },
       });
@@ -51,6 +53,30 @@ for (const viewport of [
       await expect(warning).toContainText('5 omitted: feature_20, feature_21, feature_22, feature_23, feature_24');
       await expect(warning).toContainText('These omitted columns are not included in the data table.');
       await expect(page.getByText(/Use the data table below for the full matrix/)).toHaveCount(0);
+      const screenColors = await Promise.all(sample.map((value, index) =>
+        page.getByTitle(`feature_0 vs feature_${index}: ${value === null ? 'N/A' : value.toFixed(3)}`, { exact: true })
+          .evaluate(element => getComputedStyle(element).backgroundColor)));
+      const downloaded = page.waitForEvent('download');
+      await page.getByRole('button', { name: 'Download Matrix', exact: true }).click();
+      const download = await downloaded;
+      const png = await readFile((await download.path())!);
+      const exportedColors = await page.evaluate(async ({ base64, columns }) => {
+        const image = new Image();
+        image.src = `data:image/png;base64,${base64}`;
+        await image.decode();
+        const canvas = document.createElement('canvas');
+        canvas.width = image.width;
+        canvas.height = image.height;
+        const context = canvas.getContext('2d')!;
+        context.drawImage(image, 0, 0);
+        context.font = '12px sans-serif';
+        const labelWidth = Math.max(...columns.map(name => context.measureText(name).width)) + 40;
+        return Array.from({ length: 8 }, (_, index) => {
+          const pixel = context.getImageData(labelWidth + index * 60 + 4, image.height - 50 - columns.length * 60 + 4, 1, 1).data;
+          return `rgb(${pixel[0]}, ${pixel[1]}, ${pixel[2]})`;
+        });
+      }, { base64: png.toString('base64'), columns: matrixColumns });
+      expect(exportedColors).toEqual(screenColors);
       await page.getByRole('button', { name: 'View data table', exact: true }).click();
       const table = page.getByRole('region', { name: 'Full correlation matrix data table', exact: true });
       await expect(table).toBeVisible();

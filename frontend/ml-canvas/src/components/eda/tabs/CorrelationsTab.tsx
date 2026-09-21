@@ -5,6 +5,7 @@ import { CorrelationHeatmap } from '../CorrelationHeatmap';
 import { EmptyState } from '../../shared/EmptyState';
 import { getChartTheme } from '../constants';
 import { NumericTargetNotice } from '../NumericTargetNotice';
+import { correlationColor, correlationScopeNotes, CORRELATION_MAX_COLUMNS, CORRELATION_SCALE } from '../correlationPresentation';
 import type { CorrelationMatrix, EDAProfile } from '../../../core/types/edaProfile';
 
 interface CorrelationsTabProps {
@@ -30,7 +31,7 @@ export const CorrelationsTab: React.FC<CorrelationsTabProps> = ({
 
         try {
             const theme = getChartTheme();
-            const MAX_COLS = 20;
+            const MAX_COLS = CORRELATION_MAX_COLUMNS;
             const columns = data.columns.slice(0, MAX_COLS);
             const values = data.values.slice(0, MAX_COLS).map(row => row.slice(0, MAX_COLS));
 
@@ -49,9 +50,22 @@ export const CorrelationsTab: React.FC<CorrelationsTabProps> = ({
 
             const labelWidth = maxLabelWidth + 40;
             const headerHeight = (maxLabelWidth * 0.7) + 60;
-            const titleHeight = 60;
-
-            const width = labelWidth + (columns.length * cellSize) + 50;
+            const width = Math.max(520, labelWidth + (columns.length * cellSize) + 50);
+            const scopeLines: string[] = [];
+            for (const note of correlationScopeNotes(data)) {
+                let line = '';
+                for (const word of note.split(' ')) {
+                    const candidate = line ? `${line} ${word}` : word;
+                    if (line && ctx.measureText(candidate).width > width - 40) {
+                        scopeLines.push(line);
+                        line = word;
+                    } else {
+                        line = candidate;
+                    }
+                }
+                if (line) scopeLines.push(line);
+            }
+            const titleHeight = 110 + scopeLines.length * 18;
             const height = headerHeight + (columns.length * cellSize) + titleHeight + 50;
 
             canvas.width = width;
@@ -65,18 +79,17 @@ export const CorrelationsTab: React.FC<CorrelationsTabProps> = ({
             ctx.textAlign = 'center';
             ctx.fillText(titleText, width / 2, 40);
 
-            const getColor = (val: number | null) => {
-                if (val === null) return theme.bgColor === '#ffffff' ? '#f3f4f6' : '#374151';
-                const opacity = Math.max(0.2, Math.abs(val));
-                if (val > 0) {
-                    return `rgba(239, 68, 68, ${opacity})`;
-                } else {
-                    return `rgba(59, 130, 246, ${opacity})`;
-                }
-            };
-
             ctx.font = '12px sans-serif';
             ctx.textBaseline = 'middle';
+            [...CORRELATION_SCALE, null].forEach((value, index) => {
+                const x = 20 + index * 60;
+                ctx.fillStyle = correlationColor(value);
+                ctx.fillRect(x, 60, 28, 16);
+                ctx.fillStyle = theme.textColor;
+                ctx.textAlign = 'left';
+                ctx.fillText(value === null ? 'Missing' : String(value), x, 88);
+            });
+            scopeLines.forEach((line, index) => ctx.fillText(line, 20, 112 + index * 18));
 
             values.forEach((row, i) => {
                 ctx.fillStyle = theme.textColor;
@@ -87,11 +100,11 @@ export const CorrelationsTab: React.FC<CorrelationsTabProps> = ({
                     const x = labelWidth + (j * cellSize);
                     const y = headerHeight + titleHeight + (i * cellSize);
 
-                    ctx.fillStyle = getColor(val);
+                    ctx.fillStyle = correlationColor(val);
                     ctx.fillRect(x, y, cellSize - 2, cellSize - 2);
 
                     if (val !== null) {
-                        ctx.fillStyle = Math.abs(val) > 0.5 ? '#ffffff' : theme.textColor;
+                        ctx.fillStyle = '#111827';
                         ctx.textAlign = 'center';
                         ctx.fillText(val.toFixed(2), x + (cellSize/2), y + (cellSize/2));
                     }
