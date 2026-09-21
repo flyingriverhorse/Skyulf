@@ -53,6 +53,17 @@ describe('inference result input snapshots', () => {
 
   afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
+  it('computes summary and histogram inputs from observed numeric predictions only', async () => {
+    // The controller must give both statistics and histogram the same two observed values.
+    vi.spyOn(deploymentApi, 'predict').mockResolvedValue({ predictions: [1, null, 3], model_version: 'v1' });
+    const { result } = renderHook(useInferenceController, { wrapper: ConfirmProvider });
+    await waitFor(() => expect(result.current.activeDeployment?.job_id).toBe('job-a'));
+    act(() => { result.current.setInputData('[{"a":1},{"a":2},{"a":3}]'); });
+    await act(async () => { await result.current.handlePredict(); });
+    expect(result.current.predictions).toEqual([1, null, 3]);
+    expect(result.current.predictionStats).toEqual({ count: 2, mean: 2, min: 1, max: 3, values: [1, 3] });
+  });
+
   it('exports and displays the submitted rows after the editor is changed', async () => {
     // Editing or invalidating JSON must not relabel an existing result's rows.
     vi.spyOn(deploymentApi, 'predict').mockResolvedValue({ predictions: [10, 20], model_version: 'v1' });

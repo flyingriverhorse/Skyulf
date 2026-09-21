@@ -302,9 +302,10 @@ export const parseCsv = (text: string): Record<string, unknown>[] => {
     });
 };
 
-/** Pull the predictions list down to plain numbers for stats display. */
+/** Accept finite numbers and nonempty numeric strings for stats and histogram inputs. */
 export const toNumericArray = (preds: unknown[]): number[] =>
     preds
+        .filter(p => typeof p === 'number' || (typeof p === 'string' && p.trim() !== ''))
         .map(p => (typeof p === 'number' ? p : Number(p)))
         .filter(n => Number.isFinite(n));
 
