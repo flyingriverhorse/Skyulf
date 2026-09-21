@@ -22,7 +22,7 @@ export const CorrelationsTab: React.FC<CorrelationsTabProps> = ({
     if (!profile.correlations) {
         return <>
             {targetNotice}
-            <EmptyState icon={<BarChart2 className="w-12 h-12 text-slate-300 dark:text-slate-600" />} title="No Correlation Data" description="Not enough numeric columns to compute correlations." />
+            <EmptyState icon={<BarChart2 className="w-12 h-12 text-slate-300 dark:text-slate-600" />} title="No Correlation Data" description="No correlation results were recorded for this report." />
         </>;
     }
     const downloadMatrix = async (data: CorrelationMatrix | null | undefined, titleText: string, filename: string) => {

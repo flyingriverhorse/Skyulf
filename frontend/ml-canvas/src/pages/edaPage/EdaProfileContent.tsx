@@ -18,6 +18,7 @@ import { downloadChart } from '../../core/utils/chartUtils';
 import type { EDAReport } from '../../core/api/eda';
 import type { EDAProfile } from '../../core/types/edaProfile';
 import type { EdaPageModel } from './useEdaPageController';
+import { EmptyState } from '../../components/shared/EmptyState';
 
 type ProfileProps = EdaPageModel & { profile: EDAProfile; report: EDAReport; };
 type ProfileTabProps = ProfileProps & { allColumns: string[]; };
@@ -71,7 +72,7 @@ export function EdaProfileContent(props: ProfileProps) {
   );
 }
 
-/** The selected tab keeps its original data guard and prop contract. */
+/** Pure render functions retain each tab's data guard and prop contract. */
 const PROFILE_TABS = {
   dashboard: (props: ProfileTabProps) => {
     const { profile, handleToggleExclude, excludedColsDraft } = props;
@@ -212,7 +213,8 @@ const PROFILE_TABS = {
 
 function ProfileTab(props: ProfileTabProps) {
   const tab = props.activeTab;
-  if (!Object.prototype.hasOwnProperty.call(PROFILE_TABS, tab)) return null;
-  const Tab = PROFILE_TABS[tab as keyof typeof PROFILE_TABS];
-  return <Tab {...props} />;
+  const renderTab = Object.prototype.hasOwnProperty.call(PROFILE_TABS, tab)
+    ? PROFILE_TABS[tab as keyof typeof PROFILE_TABS] : undefined;
+  return renderTab?.(props) || <EmptyState title="Analysis results unavailable"
+    description="This report does not contain results for this analysis. No reason was recorded." />;
 }

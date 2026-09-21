@@ -64,7 +64,7 @@ export const CausalTab: React.FC<CausalTabProps> = ({ profile }) => {
         return (
             <div className="p-8 text-center text-gray-500">
                 <Network className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                <p>No causal graph available. This might be because there are fewer than 2 numeric columns or the analysis failed.</p>
+                <p>No causal graph available. No reason was recorded for this report.</p>
                 {targetNotice}
             </div>
         );

@@ -17,7 +17,7 @@ export const ClusteringTab: React.FC<ClusteringTabProps> = ({ profile, downloadC
              <div className="mt-4 bg-white dark:bg-gray-800 p-6 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm flex flex-col items-center justify-center text-gray-500 min-h-[300px]">
                 <Network className="w-12 h-12 mb-4 opacity-20" />
                 <p>Clustering analysis not available.</p>
-                <p className="text-sm mt-2">Requires at least 2 numeric columns.</p>
+                <p className="text-sm mt-2">No clustering results were recorded for this report.</p>
             </div>
         );
     }

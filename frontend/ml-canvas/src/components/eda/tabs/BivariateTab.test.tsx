@@ -56,8 +56,8 @@ describe('Statistical chart series and selection', () => {
         expect(screen.getByText('PC3')).toBeInTheDocument();
         rerender(<PCATab {...props} profile={{ pca_data: [] }} />);
         expect(charts.two).toHaveBeenLastCalledWith(expect.objectContaining({ data: [] }));
-        expect(screen.queryByText('Not enough numeric data for PCA.')).not.toBeInTheDocument();
+        expect(screen.queryByText('No PCA projection was recorded for this report.')).not.toBeInTheDocument();
         rerender(<PCATab {...props} profile={{}} />);
-        expect(screen.getByText('Not enough numeric data for PCA.')).toBeInTheDocument();
+        expect(screen.getByText('No PCA projection was recorded for this report.')).toBeInTheDocument();
     });
 });

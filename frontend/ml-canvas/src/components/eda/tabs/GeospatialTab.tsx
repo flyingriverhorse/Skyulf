@@ -32,7 +32,7 @@ interface GeospatialTabProps {
 
 export const GeospatialTab: React.FC<GeospatialTabProps> = ({ profile }) => {
     if (!profile?.geospatial?.sample_points?.length) {
-        return <EmptyState icon={<Map className="w-12 h-12 text-slate-300 dark:text-slate-600" />} title="No Geospatial Data" description="No latitude/longitude columns were detected in the dataset." />;
+        return <EmptyState icon={<Map className="w-12 h-12 text-slate-300 dark:text-slate-600" />} title="No Geospatial Data" description="No geospatial sample points were recorded for this report." />;
     }
 
     const geo = profile.geospatial;
