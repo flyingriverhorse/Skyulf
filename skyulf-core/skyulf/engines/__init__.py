@@ -1,4 +1,4 @@
-"""Engine abstraction: the ``SkyulfDataFrame`` protocol, pandas/polars adapters and registry."""
+"""Local and distributed dataframe protocols, adapters and engine registry."""
 
 from .pandas_engine import PandasEngine
 from .polars_engine import (
@@ -7,13 +7,16 @@ from .polars_engine import (
     PolarsEngine,
     SkyulfPolarsWrapper,
 )
-from .protocol import PandasBackedFrame, PolarsBackedFrame, SkyulfDataFrame
+from .protocol import DistributedDataFrame, PandasBackedFrame, PolarsBackedFrame, SkyulfDataFrame
 from .registry import BaseEngine, EngineName, EngineRegistry, get_engine
+from .spark_engine import DistributedMaterializationError, SkyulfSparkWrapper, SparkEngine
 
 __all__ = [
     "POLARS_NUMERIC_BOOL_DTYPES",
     "POLARS_NUMERIC_DTYPES",
     "BaseEngine",
+    "DistributedDataFrame",
+    "DistributedMaterializationError",
     "EngineName",
     "EngineRegistry",
     "PandasBackedFrame",
@@ -22,5 +25,7 @@ __all__ = [
     "PolarsEngine",
     "SkyulfDataFrame",
     "SkyulfPolarsWrapper",
+    "SkyulfSparkWrapper",
+    "SparkEngine",
     "get_engine",
 ]

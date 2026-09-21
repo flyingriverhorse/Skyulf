@@ -7,6 +7,8 @@ import pandas as pd
 import polars as pl
 import pytest
 
+from skyulf.engines.pandas_engine import SkyulfPandasWrapper
+from skyulf.engines.polars_engine import SkyulfPolarsWrapper
 from skyulf.engines.registry import EngineRegistry
 from skyulf.engines.sklearn_bridge import SklearnBridge
 
@@ -70,6 +72,7 @@ def test_zero_sample_projection_stays_empty(engine_name):
     """Retaining height must not invent samples for genuinely empty input."""
     engine = EngineRegistry.get(engine_name)
     empty = engine.wrap(engine.from_pandas(pd.DataFrame({"a": []}))).select([])
+    assert isinstance(empty, SkyulfPandasWrapper | SkyulfPolarsWrapper)
     X, _ = SklearnBridge.to_sklearn(empty.drop([]).copy())
     assert X.shape == (0, 0)
     assert empty.to_pandas().shape == (0, 0)

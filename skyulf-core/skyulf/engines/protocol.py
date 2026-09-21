@@ -1,4 +1,4 @@
-"""Engine-agnostic DataFrame protocols: ``SkyulfDataFrame`` and its pandas/polars refinements."""
+"""Separate local and distributed dataframe contracts without hidden materialization."""
 
 from typing import Any, Protocol, runtime_checkable
 
@@ -7,10 +7,11 @@ import pandas as pd
 
 @runtime_checkable
 class SkyulfDataFrame(Protocol):
-    """The Universal DataFrame Interface for Skyulf.
+    """The local DataFrame interface for Skyulf.
 
     This protocol defines the minimum set of operations that any compute engine
-    (Pandas, Polars, Spark, Dask) must support to be used within Skyulf nodes.
+    (pandas or Polars) must support to be used within local Skyulf nodes.
+    Distributed engines use a separate, narrower protocol.
     """
 
     @property
@@ -81,6 +82,29 @@ class SkyulfDataFrame(Protocol):
 
     def copy(self) -> "SkyulfDataFrame":
         """Return a copy of the dataframe."""
+        ...
+
+
+@runtime_checkable
+class DistributedDataFrame(Protocol):
+    """Metadata and lazy projection without local indexing or conversion semantics."""
+
+    @property
+    def columns(self) -> list[str]:
+        """Return column names without collecting rows."""
+        ...
+
+    @property
+    def schema(self) -> Any:
+        """Return the native distributed schema."""
+        ...
+
+    def select(self, columns: list[str]) -> "DistributedDataFrame":
+        """Return a lazy projection using literal column names."""
+        ...
+
+    def to_native(self) -> Any:
+        """Return the distributed native dataframe without conversion."""
         ...
 
 

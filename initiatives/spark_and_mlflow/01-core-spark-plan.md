@@ -97,14 +97,14 @@ def test_unimplemented_spark_fit_is_explicit():
 `skyulf/engines/{registry,protocol,__init__}.py`, `skyulf/engines/sklearn_bridge.py`.
 **Üretir:** SparkEngine; `EngineName.SPARK`; açık distributed frame sözleşmesi.
 
-- [ ] Gerçek Spark frame'in `get_engine(frame)` sonucunu ve local default'un
+- [x] Gerçek Spark frame'in `get_engine(frame)` sonucunu ve local default'un
   değişmediğini test et. Paket yokken core importu başarılı kalmalı.
-- [ ] Bilinen pyspark frame için engine kurulu/kayıtlı değilse erken dependency
+- [x] Bilinen pyspark frame için engine kurulu/kayıtlı değilse erken dependency
   hatası ekle; bilinmeyen local objelerin mevcut fallback davranışını ayrı koru.
-- [ ] `len/shape/to_numpy/toPandas` gerektiren local protocol'ü Spark'a sahte
+- [x] `len/shape/to_numpy/toPandas` gerektiren local protocol'ü Spark'a sahte
   implement etme. Local-only materialization metodları açıklayıcı hata versin;
   schema/columns/select gibi yetenekleri ayrı dar protocol üzerinden sağla.
-- [ ] SklearnBridge Spark veriyi reddetsin. Session yaratma, session singleton
+- [x] SklearnBridge Spark veriyi reddetsin. Session yaratma, session singleton
   tutma veya RDD tabanlı wrapper ekleme.
 
 ```python

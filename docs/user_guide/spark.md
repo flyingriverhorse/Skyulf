@@ -1,8 +1,8 @@
 # Spark: development setup and current support
 
 Spark support is under development for 0.9.0. The optional dependency and
-runtime tests are available in the development checkout. **Skyulf's Spark
-engine, native nodes and distributed model inference are not available yet.**
+runtime tests and Spark engine adapter are available in the development checkout.
+**Native nodes and distributed model inference are not available yet.**
 Installing the extra does not convert a pandas/Polars pipeline to Spark.
 
 ## Why a separate environment?
@@ -71,6 +71,52 @@ keep the dataset in Spark and transfer bounded learned state when supported.
 Python model inference on Spark workers is a separate capability from native
 Spark model training.
 
+## Spark engine adapter
+
+The adapter detects real Spark dataframes without changing the default local
+engine. Importing Skyulf does not import PySpark or MLflow. Requesting the Spark
+engine without its optional dependency raises an explicit installation error.
+
+After creating your own `spark` session, you can run:
+
+```python
+from skyulf.engines import EngineRegistry, SparkEngine, get_engine
+
+local_default = get_engine()
+frame = spark.range(10).repartition(2)
+assert get_engine(frame) is SparkEngine
+wrapped = EngineRegistry.wrap(frame)
+selected = wrapped.select(["id"])
+assert selected.columns == ["id"]
+assert selected.schema == frame.schema
+assert selected.to_native().count() == 10  # Explicit native Spark action.
+assert get_engine() is local_default
+```
+
+The separate `DistributedDataFrame` protocol exposes `columns`, `schema`,
+`select` and `to_native`. Projection treats names literally, including dots and
+backticks; an empty projection keeps the rows. Schema access can require query
+analysis, but these adapter operations do not collect rows or count them.
+
+The local `SkyulfDataFrame` protocol remains for pandas/Polars. Spark wrappers
+reject `len`, `shape`, `to_pandas`, `to_numpy` and `to_arrow` with
+`DistributedMaterializationError`. `SparkEngine.to_numpy` and `SklearnBridge`
+also reject distributed features or targets. Worker inference will have its own
+explicit entry point; it is not enabled by this adapter.
+
+Skyulf neither creates nor retains a Spark session. Use your own
+`spark.createDataFrame(...)` to create input; `SparkEngine.from_pandas` and
+`create_dataframe` reject calls with this guidance. `to_native()` returns the
+original distributed frame: native actions you call explicitly remain your
+responsibility. In particular, Spark's
+[`toPandas`](https://spark.apache.org/docs/4.0.3/api/python/reference/pyspark.sql/api/pyspark.sql.DataFrame.toPandas.html)
+collects data into driver memory.
+
+Validation currently covers classic PySpark 4.0.3 on the local test runtime.
+The adapter uses public dataframe APIs, but Databricks and Spark Connect have
+not been integration-tested yet. Engine detection does not authorize a Spark
+frame to run through existing local-only FE nodes.
+
 ## Execution contracts
 
 The development API can validate a future execution request without starting
@@ -91,7 +137,7 @@ Engine values are `pandas`, `polars` and `spark`; `databricks` names a platform,
 not an engine. Unknown configuration fields and nonpositive/noninteger limits
 are rejected. These immutable objects declare requirements; they do not apply
 memory limits or validate the actual values in a dataframe. Runtime key-value
-validation will arrive with the Spark dataframe adapter.
+validation will arrive with the Spark FE dispatcher (SM-03).
 
 A capability check distinguishes fit and apply and never falls back to pandas:
 

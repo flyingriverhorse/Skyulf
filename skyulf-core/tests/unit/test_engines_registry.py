@@ -200,15 +200,16 @@ def test_get_engine_helper_matches_resolve():
     assert get_engine(df) is EngineRegistry.resolve(df)
 
 
-def test_resolve_pyspark_like_module_falls_back_without_spark_engine():
-    """A pyspark-namespaced type with no registered 'spark' engine should fall back to default."""
+def test_resolve_pyspark_like_module_rejects_without_spark_engine(monkeypatch):
+    """Recognized distributed data must never reach the local fallback."""
+    monkeypatch.delitem(EngineRegistry._engines, "spark")
 
     class _FakePysparkFrame:
         pass
 
     _FakePysparkFrame.__module__ = "pyspark.sql.dataframe"
-    resolved = EngineRegistry.resolve(_FakePysparkFrame())
-    assert resolved is EngineRegistry.resolve()
+    with pytest.raises(ImportError, match="Spark engine is not registered"):
+        EngineRegistry.resolve(_FakePysparkFrame())
 
 
 def test_resolve_dask_like_module_falls_back_without_dask_engine():
@@ -222,23 +223,25 @@ def test_resolve_dask_like_module_falls_back_without_dask_engine():
     assert resolved is EngineRegistry.resolve()
 
 
-def test_resolve_pyspark_like_module_uses_registered_spark_engine():
+def test_resolve_pyspark_like_module_uses_registered_spark_engine(monkeypatch):
     """When a 'spark' engine is registered, a pyspark-namespaced type should resolve to it."""
 
     class DummySparkEngine(BaseEngine):
         name = EngineName.BASE
 
-    EngineRegistry.register("spark", DummySparkEngine)
-    try:
+        @classmethod
+        def is_compatible(cls, data):
+            """Let the test adapter explicitly accept the synthetic input."""
+            return True
 
-        class _FakePysparkFrame:
-            pass
+    monkeypatch.setitem(EngineRegistry._engines, "spark", DummySparkEngine)
 
-        _FakePysparkFrame.__module__ = "pyspark.sql.dataframe"
-        resolved = EngineRegistry.resolve(_FakePysparkFrame())
-        assert resolved is DummySparkEngine
-    finally:
-        del EngineRegistry._engines["spark"]
+    class _FakePysparkFrame:
+        pass
+
+    _FakePysparkFrame.__module__ = "pyspark.sql.dataframe"
+    resolved = EngineRegistry.resolve(_FakePysparkFrame())
+    assert resolved is DummySparkEngine
 
 
 def test_resolve_dask_like_module_uses_registered_dask_engine():

@@ -10,6 +10,7 @@ import polars as pl
 from .pandas_engine import SkyulfPandasWrapper
 from .polars_engine import SkyulfPolarsWrapper
 from .registry import get_engine
+from .spark_engine import SparkEngine, is_spark_input
 
 
 class SklearnBridge:
@@ -54,6 +55,8 @@ class SklearnBridge:
     @staticmethod
     def validate_features(data: Any) -> None:
         """Reject raw temporal features before engine conversion can erase their units."""
+        if is_spark_input(data):
+            SparkEngine.to_numpy(data)
         native = (
             data.to_native()
             if isinstance(data, SkyulfPandasWrapper | SkyulfPolarsWrapper)
@@ -116,6 +119,8 @@ class SklearnBridge:
     @staticmethod
     def _convert_single(data: Any) -> np.ndarray | None:
         """Convert supported array-like containers without accepting arbitrary scalars."""
+        if is_spark_input(data):
+            SparkEngine.to_numpy(data)
         if data is None:
             return None
 

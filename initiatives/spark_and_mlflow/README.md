@@ -1,6 +1,6 @@
 # Spark ve MLflow initiative
 
-Tarih: 2026-09-21. Durum: **SM-00 ve SM-01 tamamlandı; sıradaki görev SM-02.**
+Tarih: 2026-09-21. Durum: **SM-00–SM-02 tamamlandı; sıradaki görev SM-03.**
 Hedef sürüm [0.9.0 — Unreleased](../../changelog/0.9.x.md).
 Geliştirme sürümü 0.9.0; yayın yapılmadı. [Güncel baseline](BASELINE.md).
 
@@ -47,7 +47,7 @@ Median/quantile, kategorik state ve zaman pencereleri ilk teslimattan ayrı tutu
 
 ## Çalışma kuralları
 
-- Sonraki görev **SM-02**. Bir sonraki satıra geçmeden önce bağımlılıklarını bitir.
+- Sonraki görev **SM-03**. Bir sonraki satıra geçmeden önce bağımlılıklarını bitir.
 - Her görevde test → beklenen başarısızlık → dar uygulama → test/gate kanıtı.
 - Yeni testler docstring ve gerçek assertion içerir. Uygulama sırasında kaynak
   yollarını yeniden doğrula; planlanan API'ler bugün mevcut API gibi kullanılmaz.

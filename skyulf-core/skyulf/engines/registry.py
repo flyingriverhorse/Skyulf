@@ -7,19 +7,24 @@ This module handles the auto-detection of the appropriate compute engine
 import logging
 from contextvars import ContextVar
 from enum import StrEnum
-from typing import Any, ClassVar
+from typing import TYPE_CHECKING, Any, ClassVar, overload
+
+if TYPE_CHECKING:
+    import pandas as pd
+    import polars as pl
 
 # protocol.py is a leaf module (no engine imports), so this top-level import is safe.
-from .protocol import SkyulfDataFrame
+from .protocol import DistributedDataFrame, SkyulfDataFrame
 
 logger = logging.getLogger(__name__)
 
 
 class EngineName(StrEnum):
-    """Enumeration of the compute-engine identities (``pandas``, ``polars``, ``base``)."""
+    """Enumeration of local and distributed compute-engine identities."""
 
     PANDAS = "pandas"
     POLARS = "polars"
+    SPARK = "spark"
     BASE = "base"
 
 
@@ -27,6 +32,10 @@ class BaseEngine:
     """Abstract base class for all engines."""
 
     name: EngineName = EngineName.BASE
+
+    @classmethod
+    def ensure_available(cls) -> None:
+        """Validate optional runtime dependencies; local engines need no extra check."""
 
     @classmethod
     def is_compatible(cls, data: Any) -> bool:
@@ -44,8 +53,8 @@ class BaseEngine:
         raise NotImplementedError
 
     @classmethod
-    def wrap(cls, data: Any) -> "SkyulfDataFrame":
-        """Wrap the native dataframe in a SkyulfDataFrame compliant wrapper."""
+    def wrap(cls, data: Any) -> SkyulfDataFrame | DistributedDataFrame:
+        """Wrap the native dataframe using its local or distributed contract."""
         raise NotImplementedError
 
     @classmethod
@@ -63,8 +72,7 @@ class EngineRegistry:
     _active_engine: ClassVar[ContextVar[str]] = ContextVar("skyulf_active_engine", default="polars")
 
     # Maps a data object's detected top-level module package to the engine
-    # name registered for it. "spark"/"dask" are future-proofing: only used
-    # if/when those engines are actually registered in `_engines`.
+    # name registered for it. Recognized Spark inputs never fall back locally.
     _TOP_LEVEL_TO_ENGINE: ClassVar[dict[str, str]] = {
         "polars": "polars",
         "pandas": "pandas",
@@ -83,7 +91,9 @@ class EngineRegistry:
         """Get an engine by name."""
         if name not in cls._engines:
             raise ValueError(f"Engine '{name}' not found. Available: {list(cls._engines.keys())}")
-        return cls._engines[name]
+        engine = cls._engines[name]
+        engine.ensure_available()
+        return engine
 
     @classmethod
     def set_active_engine(cls, name: str) -> None:
@@ -93,8 +103,7 @@ class EngineRegistry:
         start with Polars unless a context is explicitly copied into them.
         Recognized input types still determine their own engine in ``resolve``.
         """
-        if name not in cls._engines:
-            raise ValueError(f"Engine '{name}' not found. Available: {list(cls._engines.keys())}")
+        cls.get(name)
         cls._active_engine.set(name)
         logger.debug(f"Active engine set to: {name}")
 
@@ -113,6 +122,13 @@ class EngineRegistry:
 
         top_level = cls._detect_top_level_package(data)
         engine_name = cls._TOP_LEVEL_TO_ENGINE.get(top_level)
+        if engine_name == "spark":
+            if "spark" not in cls._engines:
+                raise ImportError("Spark engine is not registered; cannot use a local fallback.")
+            engine = cls.get("spark")
+            if not engine.is_compatible(data):
+                raise TypeError("Spark engine requires a pyspark.sql.DataFrame.")
+            return engine
         if engine_name is not None and engine_name in cls._engines:
             return cls.get(engine_name)
 
@@ -140,7 +156,10 @@ class EngineRegistry:
         """
         top_level = type(data).__module__.split(".", 1)[0]
         if top_level == "skyulf" and hasattr(data, "to_native"):
-            top_level = type(data.to_native()).__module__.split(".", 1)[0]
+            data = data.to_native()
+            top_level = type(data).__module__.split(".", 1)[0]
+        if any(base.__module__.split(".", 1)[0] == "pyspark" for base in type(data).__mro__):
+            return "pyspark"
         return top_level
 
     @classmethod
@@ -157,8 +176,16 @@ class EngineRegistry:
                 f"{cls._active_engine.get()}"
             )
 
+    @overload
     @classmethod
-    def wrap(cls, data: Any) -> "SkyulfDataFrame":
+    def wrap(cls, data: "pd.DataFrame | pl.DataFrame | SkyulfDataFrame") -> SkyulfDataFrame: ...
+
+    @overload
+    @classmethod
+    def wrap(cls, data: Any) -> SkyulfDataFrame | DistributedDataFrame: ...
+
+    @classmethod
+    def wrap(cls, data: Any) -> SkyulfDataFrame | DistributedDataFrame:
         """Auto-detect engine and wrap the data."""
         engine = cls.resolve(data)
         return engine.wrap(data)

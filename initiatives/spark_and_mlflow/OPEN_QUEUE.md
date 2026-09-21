@@ -1,6 +1,6 @@
 # Spark ve MLflow — Open Queue
 
-Güncelleme: 2026-09-21. **SM-01 tamamlandı. Sonraki görev: SM-02. Hedef: 0.9.0.**
+Güncelleme: 2026-09-21. **SM-02 tamamlandı. Sonraki görev: SM-03. Hedef: 0.9.0.**
 Bu dosya kısa çalışma sırasıdır; detaylar bağlantılı planlarda.
 
 Durumlar: READY = başlanabilir; WAIT = önceki görev bekleniyor;
@@ -11,8 +11,8 @@ DONE = kanıtla tamamlandı. SM-00 commit: `105a6fe4`.
 | --- | --- | --- | --- | --- |
 | SM-00 | Baseline ve Spark test ortamı | — | DONE | Güncel master: 231 baseline; 2 Spark smoke; [kanıt](BASELINE.md) |
 | SM-01 | Execution/capability kuralları | SM-00 | DONE | Immutable config; registry operation desteği; aşağıda kanıt |
-| SM-02 | Spark engine ve conversion sınırı | SM-01 | READY | Spark tanınır; gizli local conversion yok |
-| SM-03 | Dispatcher, schema, row keys | SM-02 | WAIT | Key/target korunur; local API çalışır |
+| SM-02 | Spark engine ve conversion sınırı | SM-01 | DONE | Gerçek Spark adapter; conversion korumaları; aşağıda kanıt |
+| SM-03 | Dispatcher, schema, row keys | SM-02 | READY | Key/target korunur; local API çalışır |
 | SM-04 | Versioned portable state | SM-03 | WAIT | Limit/version kontrolü; state round-trip |
 | SM-05 | Native SimpleImputer | SM-04 | WAIT | Mean/constant train-only fit, Spark apply |
 | SM-06 | Native StandardScaler | SM-05 | WAIT | Population variance ve flag parity |
@@ -105,3 +105,37 @@ ve MLflow entegrasyonu henüz yok.
   doğrudan çalıştırıldı. Kullanıcı belgeleri uygulamayla birlikte güncellendi.
 - Spark engine/node desteği henüz etkin değil. Existing local pipeline preflight'ı
   bu yeni API'ye bağlanmadı; SM-03'te yapılacak. Sıradaki görev SM-02.
+
+## SM-02 — 2026-09-21 tamamlanma kaydı
+
+- Başlangıç commit'i `b9eef16a`; bu kayıt SM-02 çalışma ağacına aittir.
+- SparkEngine ve ayrı DistributedDataFrame sözleşmesi eklendi. Gerçek dataframe
+  tanıma, literal kolon seçimi ve native frame erişimi var; varsayılan local
+  engine korunur. Eksik Spark dependency/registration local fallback'e gitmez.
+- Adapter session oluşturmaz; `len/shape/to_pandas/to_numpy/to_arrow` ve
+  SklearnBridge üzerinden Spark feature/target dönüşümü açık hata verir.
+  `from_pandas/create_dataframe` çağırana kendi SparkSession'ını kullanmasını söyler.
+- TDD: ilk 12 gerçek Spark testi başarısızdı; adapter sonrası runtime dahil
+  14 test geçti. Son iki lazy-operation/namespace testi ve review düzeltmesiyle:
+  `JAVA_HOME=.cache/spark-jdk/jdk-17.0.20.1+1`, `SKYULF_REQUIRE_SPARK=1`;
+  `.venv-spark/Scripts/python.exe -m pytest skyulf-core/tests/spark
+  skyulf-core/tests/unit/test_spark_optional_import.py
+  skyulf-core/tests/unit/test_engines_registry.py -q --tb=short -o addopts=
+  -p no:cacheprovider --basetemp .cache/sm02-spark-reviewed`
+  → **46 passed**, 11.07 saniye; JVM temiz kapandı.
+- PySpark 4.0.3 / Python 3.12.10 / Java 17 profili kullanıldı. Base ortamda
+  subprocess import engeli PySpark/MLflow yokken core importunu ve local seçimi
+  doğrular. Aynı test Spark kurulu ortamda da dependency yokluğunu simüle eder.
+- Bağımsız review yalnız dependency hata mesajındaki dağıtım adını düzeltti:
+  `skyulf-core[spark]`. İlk tam core koşusu bu düzeltme sırasında eski toplanmış
+  test beklentisi/yeni subprocess kaynağı nedeniyle 1 failed verdi; son kaynakla
+  odaklı test **3 passed**. Son kaynakla tam core tekrarı:
+  `HF_HUB_OFFLINE=1 .venv/Scripts/python.exe -m pytest skyulf-core/tests -q
+  --tb=short --disable-warnings -o addopts= -p no:cacheprovider
+  --basetemp .cache/sm02-core-reviewed`
+  → **9875 passed, 84 skipped, 1077 warnings**, 163.31 saniye.
+- Ruff check/format ve tam repo ty geçti. Yeni adapter max CCN=3.
+  `mkdocs build --strict` geçti; Spark rehberindeki runtime/adapter örnekleri
+  gerçek oturumda çalıştırıldı. Rehber ve 0.9.0 Unreleased changelog güncel.
+- Sınır: native FE node, Spark dispatcher veya model inference etkin değil.
+  Databricks/Connect/uzak CI çalıştırılmadı. Sonraki görev SM-03.
