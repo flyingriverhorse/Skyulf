@@ -74,7 +74,9 @@ veya mkdocs build yapmak gerekmez; doküman linkleri doğrulanır.
 
 ## Kapılar
 
-- G1 / SM-07: native FE ve portable state; local API regresyonu yok.
+- G1 / SM-07: native FE ve portable state; local API regresyonu yok. **Tamamlandı
+  (2026-09-21):** 261 Spark lane testi; 9969 local geçti, 223 skip.
+  [Komutlar ve sınırlar](OPEN_QUEUE.md).
 - G2 / SM-11: iki inference yolu + classification + worker/ölçek kanıtı.
 - G3 / SM-14: opsiyonel MLflow model/run/registry; UC gerçek kanıtı G4'te.
 - G4 / SM-16: gerçek Databricks job + UC load + idempotent Delta batch.

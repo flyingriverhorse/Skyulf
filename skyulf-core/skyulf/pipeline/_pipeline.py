@@ -270,6 +270,7 @@ class SkyulfPipeline:
         # new prediction requests or changing their row order.
         _record_tuning_column_drops(adapter._engineer, raw_train[0], adapter.input_columns)
         self.feature_engineer.fitted_steps = prefix.fitted_steps + adapter._engineer.fitted_steps
+        self.feature_engineer._portable_fitted = True
         transformed = SplitDataset(
             train=adapter.training_payload,
             test=self._transform_tuning_split(adapter, raw_dataset.test, target_column),
@@ -346,6 +347,7 @@ class SkyulfPipeline:
             # A failure can occur after model fitting, while transforming or
             # predicting held-out data. Never expose that partial replacement.
             self.feature_engineer.fitted_steps = []
+            self.feature_engineer._portable_fitted = False
             if self.model_estimator is not None:
                 self.model_estimator.model = None
             raise

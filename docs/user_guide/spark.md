@@ -4,6 +4,7 @@ Spark support is under development for 0.9.0. The optional dependency and
 runtime tests, Spark engine adapter and keyed FeatureEngineer entry point are
 available in the development checkout.
 **Native SimpleImputer (mean/constant) and StandardScaler support fit and apply.**
+Their fitted pipeline can be exported and restored across pandas, Polars and Spark.
 Other built-in native nodes and distributed model inference remain under development.
 Installing the extra does not convert a pandas/Polars pipeline to Spark.
 
@@ -432,9 +433,98 @@ no filesystem or network I/O. Callers own storage and transport of these bytes.
 The Spark runner validates each declared v1 artifact through the codec and
 enforces `ExecutionOptions.state_max_bytes` after fit and before transform
 validation actions. Direct node calls validate state structure but leave wire
-byte limits to explicit encode/decode callers. The codec does not automatically
-package a FeatureEngineer pipeline. Full pipeline state export/import and worker
-model loading come later. Codec tests also run without starting a JVM.
+byte limits to explicit encode/decode callers. Use the FeatureEngineer methods
+below to package an ordered pipeline. Worker model loading remains a later stage.
+Codec tests also run without starting a JVM.
+
+## Save and restore a fitted feature pipeline
+
+`FeatureEngineer.export_state()` returns bytes for the complete supported FE
+chain. `FeatureEngineer.from_state(...)` validates those bytes and restores the
+learned transformations without fitting. Both methods work without Spark installed
+when the destination is local. With a caller-owned `spark` session:
+
+```python
+import math
+import pandas as pd
+
+from skyulf.core.execution import ExecutionOptions, FrameSpec
+from skyulf.preprocessing.pipeline import FeatureEngineer
+
+engineer = FeatureEngineer([
+    {"name": "fill", "transformer": "SimpleImputer",
+     "params": {"columns": ["amount"], "strategy": "mean"}},
+    {"name": "scale", "transformer": "StandardScaler",
+     "params": {"columns": ["amount"]}},
+])
+engineer.fit_transform(pd.DataFrame({"amount": [1.0, None, 3.0]}))
+payload = engineer.export_state()
+# Application code may persist these bytes with Path(...).write_bytes(payload).
+restored = FeatureEngineer.from_state(
+    payload,
+    frame_spec=FrameSpec(row_keys=("customer_id",)),
+    execution_options=ExecutionOptions(engine="spark"),
+)
+batch = spark.createDataFrame(
+    [(20, 3.0), (10, 1.0), (30, None)], "customer_id long, amount double",
+)
+output = restored.transform(batch.repartition(7))
+# Collect only this three-row example; a production caller can write output as a table.
+actual = {row.customer_id: row.amount for row in output.collect()}
+expected = {10: -math.sqrt(1.5), 20: math.sqrt(1.5), 30: 0.0}
+assert actual.keys() == expected.keys()
+assert all(math.isclose(actual[key], value, abs_tol=1e-12)
+           for key, value in expected.items())
+assert restored.export_state() == payload
+```
+
+For pandas or Polars apply, omit `frame_spec` and either omit `execution_options`
+or select that local engine explicitly. For Spark fit, pass `FrameSpec` and
+`ExecutionOptions("spark")` to the initial FeatureEngineer as in the native
+examples above. The training engine does not lock the saved rules to that engine.
+Only learned parameters move; Spark apply keeps the batch distributed.
+
+The envelope retains step order, names, resolved configuration and each node's
+validated state. Learned column selection is frozen, including selections originally
+made automatically. Restoring and then refitting uses these explicit columns;
+create a new FeatureEngineer from the original configuration to rediscover features.
+Statistics follow the saved column names/order; transforms retain input column order.
+Match output rows by keys, since Spark does not guarantee physical row order.
+
+Keys, target declarations and runtime objects are not saved. Spark loading requires
+fresh row keys, optionally a target, and explicit execution options. These columns
+cannot overlap learned features. Transform validates actual keys and the required
+input schema before applying the saved rules. Neither loading nor exporting creates
+a session, reads files, contacts a registry or runs a model.
+
+The current supported chain contains only SimpleImputer `mean`/`constant` and
+StandardScaler, including intentionally fitted empty/no-op pipelines. Unsupported
+nodes, custom appliers, partial local fits and arbitrary Python objects fail
+explicitly. This API exports feature transformations only; it is not a model bundle
+or a general replacement for existing pipeline pickle persistence.
+
+`ExecutionOptions.state_max_bytes` limits the entire pipeline envelope, not only
+individual node artifacts. The default is 8 MiB; loading checks received byte length
+before parsing. Compact UTF-8 wire encoding and escaped JSON have the same semantic
+checksum. Unknown versions, malformed fields, configuration/state disagreement and
+checksum mismatches are rejected. The checksum covers step order and configuration;
+it detects corruption but does not authenticate a producer.
+
+The runnable repository example also exercises Spark fit and application-owned
+file persistence. From the repository root, with Java configured as above:
+
+```powershell
+.venv-spark/Scripts/python.exe skyulf-core/examples/spark_feature_engineering.py --state-path features.json
+```
+
+`skyulf-core/examples/spark_feature_engineering.py` owns and closes its local Spark
+session. Its `run_example(spark, state_path)` function accepts an existing session.
+The automated gate covers all nine fit/apply engine combinations, file round-trips,
+repartitioning to 1/2/7 partitions, reversed inputs, repeated apply and a 10,000-row
+fixture that rejects unbounded driver collection. Validation currently uses local
+PySpark; Databricks/Connect validation is still pending.
+
+## Capability declarations
 
 ### Inspecting declared support
 

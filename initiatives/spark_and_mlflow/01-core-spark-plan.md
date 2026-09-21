@@ -263,13 +263,13 @@ Public state API'si `FeatureEngineer.export_state() -> bytes` ve
 olarak eklenir. Ordered step config + codec payload dizisi saklanır; keys ve
 runtime tercihi yeni çağrıdan alınır, SparkSession kaydedilmez.
 
-- [ ] Frame projection ile key/target/feature listesini oluştur; yeni bir node
+- [x] Frame projection ile key/target/feature listesini oluştur; yeni bir node
   tipi gereksizse sırf demo için registry node'u ekleme.
-- [ ] Her destekli node için pandas/Polars/Spark fit × üç apply engine'i test et;
+- [x] Her destekli node için pandas/Polars/Spark fit × üç apply engine'i test et;
   sıralı output yerine key join ile karşılaştır. State kaydet/yüklemeyi araya koy.
-- [ ] Repartition(1/2/7), ters girdi sırası ve ikinci transform çağrısında
+- [x] Repartition(1/2/7), ters girdi sırası ve ikinci transform çağrısında
   öğrenilmiş state'in değişmemesini doğrula.
-- [ ] Baseline local pipeline ve leakage suite'leri + Spark suite çalıştır.
+- [x] Baseline local pipeline ve leakage suite'leri + Spark suite çalıştır.
   Büyük veri testinde input collect yasak, sadece bounded aggregate izinli;
   terminal test collect'i sınırlı fixture için ayrı işaretlenir.
 
@@ -295,3 +295,7 @@ pandas/Polars fit edilmiş state için de uygulanır.
 **Komut:** `python -m pytest skyulf-core/tests/spark -q`
 **Kabul:** G1: çalışan native FE, taşınabilir küçük state, local regresyon yok.
 Sonraki dilim [inference](02-inference-plan.md); henüz endpoint veya template yok.
+
+2026-09-21: G1 tamamlandı. Çalışan public API, örnek, runtime ve local test
+kanıtları [SM-07 tamamlanma kaydında](OPEN_QUEUE.md).
+Gerçek engine-parametrized fixture `tests/spark/test_feature_pipeline.py` içindedir.

@@ -300,5 +300,7 @@ def test_decode_limit_measures_received_unicode_bytes():
     """Canonical checksum escaping must not reject a received envelope within budget."""
     payload = encode_state("SimpleImputer", imputer_state("λ" * 100), max_bytes=8192)
     compact = json.dumps(json.loads(payload), ensure_ascii=False, separators=(",", ":")).encode()
-    assert len(compact) < len(payload)
+    escaped = json.dumps(json.loads(payload), ensure_ascii=True, separators=(",", ":")).encode()
+    assert len(compact) < len(escaped)
     assert decode_state(compact, max_bytes=len(compact)) == decode_state(payload)
+    assert decode_state(escaped) == decode_state(payload)

@@ -1,6 +1,6 @@
 # Spark ve MLflow — Open Queue
 
-Güncelleme: 2026-09-21. **SM-06 tamamlandı. Sonraki görev: SM-07. Hedef: 0.9.0.**
+Güncelleme: 2026-09-21. **SM-00–SM-07 tamamlandı; sıradaki SM-08. Hedef: 0.9.0.**
 Bu dosya kısa çalışma sırasıdır; detaylar bağlantılı planlarda.
 
 Durumlar: READY = başlanabilir; WAIT = önceki görev bekleniyor;
@@ -16,8 +16,8 @@ DONE = kanıtla tamamlandı. SM-00 commit: `105a6fe4`.
 | SM-04 | Versioned portable state | SM-03 | DONE | Tagged state, limit/version/schema kontrolü; aşağıda kanıt |
 | SM-05 | Native SimpleImputer | SM-04 | DONE | Mean/constant train-only fit, Spark apply; aşağıda kanıt |
 | SM-06 | Native StandardScaler | SM-05 | DONE | Population variance, dört flag ve numeric parity; aşağıda kanıt |
-| SM-07 | Uçtan uca FE kapısı | SM-06 | READY | Üç engine çapraz fit/apply; kayıt/yükleme |
-| SM-08 | Ortak inference bundle | SM-07 | WAIT | Raw/features ayrımı; model metadata round-trip |
+| SM-07 | Uçtan uca FE kapısı | SM-06 | DONE | Üç engine çapraz fit/apply; kayıt/yükleme; aşağıda kanıt |
+| SM-08 | Ortak inference bundle | SM-07 | READY | Raw/features ayrımı; model metadata round-trip |
 | SM-09 | Native FE + worker model | SM-08 | WAIT | Spark tahmini local ile key bazında aynı |
 | SM-10 | Worker Python FE + model | SM-09 | WAIT | Batch-safe pipeline; window gibi yollar açık ret |
 | SM-11 | Classification ve ölçek kapısı | SM-10 | WAIT | Class/proba/threshold parity; worker kanıtı |
@@ -320,3 +320,57 @@ ve MLflow entegrasyonu henüz yok.
 - Sınır: FeatureEngineer export_state/from_state, tüm zincirin persistence
   kapısı ve örnek script SM-07'de. Distributed model inference, MLflow ve
   Databricks/Connect entegrasyon doğrulaması henüz yok.
+
+## SM-07 — 2026-09-21 tamamlanma kaydı
+
+- Başlangıç commit'i `802f60d3`; bu kayıt SM-07 çalışma ağacına aittir.
+- Public `FeatureEngineer.export_state() -> bytes` ve `from_state(...)`:
+  sıralı step isimleri/config'leri ve mevcut node codec envelope'ları tek
+  versioned JSON paketinde. İlk destek mean/constant imputer ve StandardScaler.
+  Öğrenilmiş kolon seçimi explicit hale gelir; auto-selection yeniden çalışmaz.
+  Session/keys/target runtime'dan yeniden alınır; core dosya I/O yapmaz.
+- `core/portable_pipeline.py` toplam wire bütçesini parse öncesinde kontrol eder;
+  step sırası, config ve nested state checksum kapsamındadır. Bilinmeyen
+  node/version, custom applier, bozuk veya eksik fit state'i açıkça reddedilir.
+  `_feature_state.py` yalnız bilinen applier'ları kurar; Spark key/target ile
+  öğrenilmiş feature çakışmasını execution başlamadan reddeder.
+- Node ve pipeline wire JSON compact UTF-8; semantic checksum'ın mevcut ASCII
+  canonical biçimi değişmedi. Unicode kolonlarda re-encoding kaynaklı yanlış
+  bütçe aşımı giderildi; escaped surrogate isimler eski codec ile uyumlu.
+- Başarılı tuning'in adopted FE state'i export edilebilir. Başarısız local/model
+  refit export'u kapatır; boş pipeline da buna dahildir. Spark'ın başarısız refit'i
+  önceki başarılı state'i koruma sözleşmesi değişmedi. Legacy pickle ve pipeline
+  fingerprint hesapları mevcut regresyonlarla korundu.
+- `tests/spark/test_feature_pipeline.py`: gerçek üç fit × üç apply engine,
+  dosyada JSON round-trip, repartition 1/2/7, ters girdi ve tekrar transform.
+  Key bazlı sonuçlar aynı; train-only learned state değişmez. 10.000 satırlı
+  imputer→scaler testinde unbounded collect ve local conversion yasak; yalnız
+  bounded aggregate/validation satırları driver'a döner. Fixture dosya içindedir.
+- Bağımsız review Unicode byte limiti ve tuning fitted-state aktarımını buldu.
+  Gerçek Spark Unicode testi düzeltmeden önce failed, sonra passed. Tuning/model
+  × boş/scaler dört regresyonu önce failed, sonra passed; exception sonrası boş
+  pipeline'ın yanlış export edilmesi de düzeltildi. Son review recheck temiz.
+- Dar local state/codec/lifecycle koşusu: **101 passed, 28 warnings**, 1.75 saniye.
+  Tam core: `HF_HUB_OFFLINE=1 .venv/Scripts/python.exe -m pytest skyulf-core/tests
+  -q --tb=short --disable-warnings -o addopts= -p no:cacheprovider
+  --basetemp .cache/sm07-base-full`
+  → **9969 passed, 223 skipped, 1077 warnings**, 192.35 saniye. Base ortamda
+  PySpark yok; runtime skip'leri gerçek Spark lane'inden ayrı değerlendirilir.
+- `skyulf-core/examples/spark_feature_engineering.py --state-path
+  .cache/sm07-example-features.json` gerçek PySpark 4.0.3/Java 17 ile çalıştı:
+  **1949 byte**, üç keyed feature beklenen ±sqrt(1.5)/0; dosya save/load ve
+  JVM kapanışı başarılı. Rehber kullanım, frozen columns ve runtime sınırlarını açıklar.
+- Tam Spark: `JAVA_HOME=.cache/spark-jdk/jdk-17.0.20.1+1`,
+  `SKYULF_REQUIRE_SPARK=1`, `.venv-spark/Scripts/python.exe -m pytest
+  skyulf-core/tests/spark skyulf-core/tests/unit/test_execution_capabilities.py
+  skyulf-core/tests/unit/test_feature_state.py -q --tb=short -o addopts=
+  -p no:cacheprovider --basetemp .cache/sm07-spark-full`
+  → **261 passed, 2 warnings**, 345.28 saniye. PySpark 4.0.3 / Java 17;
+  Windows JVM child-process cleanup başarılı. Warning'ler mevcut Split alias'ına ait.
+- Ruff/format, tam repo ty ve `mkdocs build --strict` geçti. Rehberde session
+  kurulumundan sonraki dokuz Python snippet'i aynı gerçek session'da çalıştı:
+  `.venv-spark/Scripts/python.exe -m pytest .cache/sm07_docs/test_spark_examples.py
+  -q --tb=short -o addopts= -p no:cacheprovider --basetemp .cache/sm07-doc-examples`
+  → **1 passed, 1 warning**, 38.00 saniye; mevcut pandas fillna FutureWarning.
+- Sınır: G1 feature engineering içindir; model bundle/inference, MLflow,
+  Databricks/Connect ve endpoint/template doğrulaması değildir. Sonraki görev SM-08.

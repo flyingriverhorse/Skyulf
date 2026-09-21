@@ -64,18 +64,23 @@ def decode_state(
         document = json.loads(
             payload.decode("utf-8"), object_pairs_hook=_unique_object, parse_constant=_bad_constant
         )
-        _validate_envelope(document)
-        node_type = document["node_type"]
-        params = _unpack(document["learned_parameters"])
-        _validate_state(node_type, params)
-        if document["ordered_columns"] != params.get("columns", []):
-            raise ValueError("ordered_columns must match the learned columns in order.")
-        expected = _envelope(node_type, params)["semantic_digest"]
-        if document["semantic_digest"] != expected:
-            raise ValueError("Portable state semantic_digest mismatch.")
-        return node_type, params
+        return _decode_envelope(document)
     except (RecursionError, UnicodeError, OverflowError) as exc:
         raise ValueError("Invalid portable state encoding or nesting depth.") from exc
+
+
+def _decode_envelope(document: Any) -> tuple[str, dict[str, Any]]:
+    """Validate a parsed node envelope inside an already byte-bounded document."""
+    _validate_envelope(document)
+    node_type = document["node_type"]
+    params = _unpack(document["learned_parameters"])
+    _validate_state(node_type, params)
+    if document["ordered_columns"] != params.get("columns", []):
+        raise ValueError("ordered_columns must match the learned columns in order.")
+    expected = _envelope(node_type, params)["semantic_digest"]
+    if document["semantic_digest"] != expected:
+        raise ValueError("Portable state semantic_digest mismatch.")
+    return node_type, params
 
 
 def _validate_limit(value: int) -> None:
@@ -293,15 +298,18 @@ def _envelope(node_type: str, params: dict[str, Any]) -> dict[str, Any]:
 def _json_bytes(document: dict, max_bytes: int) -> bytes:
     """Stop JSON output as soon as the complete wire representation exceeds its budget."""
     output = bytearray()
-    for encoded in _json_chunks(document):
+    for encoded in _json_chunks(document, ensure_ascii=False):
         if len(output) + len(encoded) > max_bytes:
             raise ValueError("Portable state exceeds max_bytes.")
         output.extend(encoded)
     return bytes(output)
 
 
-def _json_chunks(document: dict) -> Iterator[bytes]:
+def _json_chunks(document: dict, *, ensure_ascii: bool = True) -> Iterator[bytes]:
     """Stream canonical UTF-8 chunks for serialization and semantic hashing."""
-    encoder = json.JSONEncoder(sort_keys=True, separators=(",", ":"), allow_nan=False)
+    encoder = json.JSONEncoder(
+        sort_keys=True, separators=(",", ":"), allow_nan=False, ensure_ascii=ensure_ascii
+    )
     for chunk in encoder.iterencode(document):
-        yield chunk.encode("utf-8")
+        # Lone surrogates retain their JSON escape spelling, as in the original codec.
+        yield chunk.encode("utf-8", errors="backslashreplace")
