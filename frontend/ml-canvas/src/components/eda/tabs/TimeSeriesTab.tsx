@@ -34,6 +34,12 @@ export const TimeSeriesTab: React.FC<TimeSeriesTabProps> = ({
     const chartTheme = useChartTheme();
     const { timeseries } = profile;
     if (!timeseries) return null;
+    const seasonality = timeseries.seasonality;
+    const measureLabel = seasonality.aggregation === 'count'
+        ? 'Row count'
+        : seasonality.aggregation === 'mean' && seasonality.metric
+            ? `Mean of ${seasonality.metric}`
+            : 'Recorded value (measure unavailable)';
     return (
         <div className="mt-4 space-y-6">
             {/* Trend Chart */}
@@ -114,7 +120,7 @@ export const TimeSeriesTab: React.FC<TimeSeriesTabProps> = ({
                 <div className="bg-white dark:bg-gray-800 p-6 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm relative group">
                     <div className="absolute top-4 right-4 opacity-100 z-10">
                         <button
-                            onClick={() => downloadChart('day-seasonality-chart', 'day-seasonality', 'Day of Week Seasonality')}
+                            onClick={() => downloadChart('day-seasonality-chart', 'day-seasonality', 'Day of Week Seasonality', measureLabel)}
                             className="p-1.5 rounded-md bg-white border border-gray-200 text-gray-500 hover:text-gray-700 hover:bg-gray-50 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700 shadow-sm"
                             title="Download Chart"
                             aria-label="Download Chart"
@@ -124,8 +130,9 @@ export const TimeSeriesTab: React.FC<TimeSeriesTabProps> = ({
                     </div>
                     <div className="flex items-center mb-4">
                         <h3 className="text-sm font-medium text-gray-500">Day of Week Seasonality</h3>
-                        <InfoTooltip text="Average values for each day. Helps identify weekly patterns (e.g., lower on weekends)." />
+                        <InfoTooltip text={`${measureLabel} by day of week. Helps identify weekly patterns.`} />
                     </div>
+                    <p className="text-sm text-gray-500 mb-2">{measureLabel}</p>
                     <div className="h-64 w-full" id="day-seasonality-chart">
                         <ResponsiveContainer width="100%" height="100%">
                             <BarChart data={timeseries.seasonality.day_of_week}>
@@ -138,7 +145,7 @@ export const TimeSeriesTab: React.FC<TimeSeriesTabProps> = ({
                                     labelStyle={chartTheme.tooltipLabelStyle}
                                     cursor={{fill: 'transparent'}}
                                 />
-                                <Bar dataKey="count" fill="#8884d8" radius={[4, 4, 0, 0]} />
+                                <Bar dataKey="count" name={measureLabel} fill="#8884d8" radius={[4, 4, 0, 0]} />
                             </BarChart>
                         </ResponsiveContainer>
                     </div>
@@ -149,7 +156,7 @@ export const TimeSeriesTab: React.FC<TimeSeriesTabProps> = ({
             <div className="bg-white dark:bg-gray-800 p-6 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm relative group">
                 <div className="absolute top-4 right-4 opacity-100 z-10">
                     <button
-                        onClick={() => downloadChart('month-seasonality-chart', 'month-seasonality', 'Monthly Seasonality')}
+                        onClick={() => downloadChart('month-seasonality-chart', 'month-seasonality', 'Monthly Seasonality', measureLabel)}
                         className="p-1.5 rounded-md bg-white border border-gray-200 text-gray-500 hover:text-gray-700 hover:bg-gray-50 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700 shadow-sm"
                         title="Download Chart"
                         aria-label="Download Chart"
@@ -159,8 +166,9 @@ export const TimeSeriesTab: React.FC<TimeSeriesTabProps> = ({
                 </div>
                 <div className="flex items-center mb-4">
                     <h3 className="text-sm font-medium text-gray-500">Monthly Seasonality</h3>
-                    <InfoTooltip text="Average values for each month. Helps identify yearly patterns or seasonal effects." />
+                    <InfoTooltip text={`${measureLabel} by month. Helps identify yearly patterns.`} />
                 </div>
+                <p className="text-sm text-gray-500 mb-2">{measureLabel}</p>
                 <div className="h-64 w-full" id="month-seasonality-chart">
                     <ResponsiveContainer width="100%" height="100%">
                         <BarChart data={timeseries.seasonality.month_of_year}>
@@ -173,7 +181,7 @@ export const TimeSeriesTab: React.FC<TimeSeriesTabProps> = ({
                                 labelStyle={chartTheme.tooltipLabelStyle}
                                 cursor={{fill: 'transparent'}}
                             />
-                            <Bar dataKey="count" fill="#82ca9d" radius={[4, 4, 0, 0]} />
+                            <Bar dataKey="count" name={measureLabel} fill="#82ca9d" radius={[4, 4, 0, 0]} />
                         </BarChart>
                     </ResponsiveContainer>
                 </div>

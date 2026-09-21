@@ -158,6 +158,8 @@ export interface TimeSeriesAnalysis {
   date_col: string;
   trend: Array<{ date: string; values: Record<string, number | null> }>;
   seasonality: {
+    aggregation?: 'mean' | 'count' | null;
+    metric?: string | null;
     day_of_week: Array<{ day: string; count: number | null }>;
     month_of_year: Array<{ month: string; count: number | null }>;
   };
