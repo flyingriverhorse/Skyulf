@@ -7,6 +7,8 @@ sidesteps the partial-update problem.
 """
 
 import logging
+import os
+import threading
 from typing import Any, Literal
 
 import orjson
@@ -15,6 +17,19 @@ from pydantic import BaseModel
 from backend.config import get_settings
 
 logger = logging.getLogger(__name__)
+_publisher_client: Any = None
+_publisher_lock = threading.Lock()
+
+
+def _reset_publisher_after_fork() -> None:
+    """Discard inherited client and lock state before a child starts publishing."""
+    global _publisher_client, _publisher_lock
+    _publisher_lock = threading.Lock()
+    _publisher_client = None
+
+
+if hasattr(os, "register_at_fork"):
+    os.register_at_fork(after_in_child=_reset_publisher_after_fork)
 
 # Single broadcast channel. Per-user filtering can be added later when
 # auth is wired up; today every endpoint already returns every job.
@@ -51,15 +66,33 @@ class JobEvent(BaseModel):
 
 
 def _redis_client_sync() -> Any:
-    """Sync Redis client used from Celery workers.
+    """Reuse a process-owned, thread-safe Redis connection pool.
 
     Imported lazily so the module is importable in environments without
     Redis (e.g. unit tests that exercise the engine but not the queue).
     """
-    import redis
+    global _publisher_client
+    with _publisher_lock:
+        if _publisher_client is None:
+            import redis
 
-    settings = get_settings()
-    return redis.Redis.from_url(settings.CELERY_BROKER_URL, decode_responses=True)
+            settings = get_settings()
+            _publisher_client = redis.Redis.from_url(
+                settings.CELERY_BROKER_URL, decode_responses=True
+            )
+        return _publisher_client
+
+
+def close_job_event_publisher() -> None:
+    """Release the owned pool during API or Celery worker shutdown, best-effort."""
+    global _publisher_client
+    with _publisher_lock:
+        client, _publisher_client = _publisher_client, None
+        if client is not None:
+            try:
+                client.close()
+            except Exception as exc:  # noqa: BLE001 - shutdown must remain best-effort
+                logger.warning("Job event publisher shutdown failed: %s", exc)
 
 
 def publish_job_event(event: JobEvent) -> None:
@@ -89,5 +122,5 @@ def publish_job_event(event: JobEvent) -> None:
     try:
         client = _redis_client_sync()
         client.publish(JOB_EVENTS_CHANNEL, payload)
-    except Exception as exc:  # noqa: BLE001 - event publish is best-effort  # pragma: no cover - depends on live Redis
+    except Exception as exc:  # noqa: BLE001 - event publish is best-effort
         logger.warning("publish_job_event failed for %s: %s", event.job_id, exc)

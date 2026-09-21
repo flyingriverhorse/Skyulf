@@ -6,7 +6,12 @@
 import asyncio
 import logging
 
-from celery.signals import setup_logging, worker_process_init
+from celery.signals import (
+    setup_logging,
+    worker_process_init,
+    worker_process_shutdown,
+    worker_shutdown,
+)
 
 from backend.celery_app import celery_app
 from backend.config import get_settings
@@ -17,11 +22,19 @@ from backend.database.engine import init_db
 from backend.eda import tasks as _eda_tasks  # noqa: F401
 from backend.ml_pipeline import tasks as _ml_pipeline_tasks  # noqa: F401
 from backend.monitoring import tasks as _monitoring_tasks  # noqa: F401
+from backend.realtime.events import close_job_event_publisher
 from backend.utils.logging_utils import setup_universal_logging
 
 __all__ = ["celery_app"]
 
 logger = logging.getLogger(__name__)
+
+
+@worker_process_shutdown.connect
+@worker_shutdown.connect
+def close_worker_publisher(**kwargs):
+    """Close the publisher in prefork children and solo/thread worker processes."""
+    close_job_event_publisher()
 
 
 @setup_logging.connect

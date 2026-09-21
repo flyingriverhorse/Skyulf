@@ -1,19 +1,21 @@
 import { RunFeedback } from '../../../../components/shared/RunFeedback';
 import { TrainingActionFooter } from '../../../../components/shared/TrainingActionFooter';
 import type { useTrainingNodeContext } from '../../../../core/hooks/useTrainingNodeContext';
-import { useId } from 'react';
+import { lazy, Suspense, useId } from 'react';
 import { AlertTriangle, ChevronRight, Sparkles, Loader2, Play } from 'lucide-react';
 import type { ColumnProfile } from '../../../../core/api/client';
 import { ValidationField } from '../../../../components/shared/ValidationField';
 import { modelNumericIssue, numericDraft, numericInputValue } from '../../../../core/utils/numericValidation';
 import type { EnsembleConfig } from '../EnsembleSettings';
-import { BaseModelParamsEditor } from '../components/BaseModelParamsEditor';
 import { MultiSelectChips } from '../components/MultiSelectChips';
 import { HelpTooltip } from '../components/HelpTooltip';
 import {
   defaultBaseEstimators, defaultFinalEstimator, defaultMetric, resolveModelId, optionLabelMap,
   type Option, type Task, type Strategy, type RunMode, type UpdateFn,
 } from './modelOptions';
+
+const BaseModelParamsEditor = lazy(() => import('../components/BaseModelParamsEditor')
+  .then(module => ({ default: module.BaseModelParamsEditor })));
 
 /** Two-option segmented control (Classification/Regression, Voting/Stacking). */
 function SegmentedToggle({ label, options, value, onSelect }: {
@@ -293,6 +295,7 @@ export function BaseParamsSection({ config, update, open, setOpen, options }: {
       </button>
       {open && (
         <div className="p-3 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700">
+          <Suspense fallback={<p role="status">Loading model parameters...</p>}>
           <BaseModelParamsEditor
             task={config.task}
             baseEstimators={config.base_estimators ?? []}
@@ -304,6 +307,7 @@ export function BaseParamsSection({ config, update, open, setOpen, options }: {
               update({ base_estimator_params: baseParams, final_estimator_params: finalParams });
             }}
           />
+          </Suspense>
         </div>
       )}
     </div>

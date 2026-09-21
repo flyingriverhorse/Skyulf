@@ -101,6 +101,17 @@ test.describe('Seed controls', () => {
     await expect(page.locator('.react-flow')).toBeVisible({ timeout: 10_000 });
     await addNode(page, 'Ensemble');
 
+    // The parameter editor loads on demand and retains edits when reopened.
+    await page.getByRole('button', { name: 'Base Model Hyperparameters', exact: true }).click();
+    await page.getByRole('button', { name: 'Random Forest', exact: true }).and(page.locator('[aria-expanded]')).click();
+    await page.getByRole('spinbutton', { name: 'Number of Trees', exact: true }).fill('123');
+    await expect(page.getByRole('spinbutton', { name: 'Number of Trees', exact: true })).toHaveValue('123');
+    await page.getByRole('button', { name: 'Base Model Hyperparameters', exact: true }).click();
+    await page.getByRole('button', { name: 'Base Model Hyperparameters', exact: true }).click();
+    await page.getByRole('button', { name: 'Random Forest 1 set', exact: true }).click();
+    await expect(page.getByRole('spinbutton', { name: 'Number of Trees', exact: true })).toHaveValue('123');
+    await page.getByRole('button', { name: 'Base Model Hyperparameters', exact: true }).click();
+
     // Tuning controls only render in advanced run mode (segmented toggle).
     await page.getByRole('button', { name: 'Advanced (Tuning)' }).click();
 

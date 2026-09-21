@@ -198,6 +198,34 @@ async def test_list_drift_jobs_enriches_and_sorts():
     assert [j.job_id for j in result] == ["job-2", "job-1"]
 
 
+@pytest.mark.parametrize("reverse_discovery", [False, True])
+async def test_list_drift_jobs_dates_precede_unknown_with_enrichment(reverse_discovery):
+    """Missing timestamps cannot hide recent jobs or inherit filesystem ordering."""
+    refs = [
+        MagicMock(job_id=job_id, dataset_name="ds", filename=f"{job_id}.csv", created_at=date)
+        for job_id, date in [
+            ("unknown-a", None),
+            ("older", "2024-06-01T12:00:00+03:00"),
+            ("unknown-z", ""),
+            ("newer", "2024-06-01T10:00:00Z"),
+            ("oldest", "2024-01-01 12:00:00"),
+        ]
+    ]
+    db = AsyncMock()
+    row = _make_job_row(id="unknown-a", job_metadata={"description": "Enriched job"})
+    db.execute.return_value = _make_db_execute_result([row])
+    with patch("backend.monitoring.router.ArtifactFactory") as factory:
+        factory.get_discovery.return_value.list_reference_artifacts.return_value = (
+            list(reversed(refs)) if reverse_discovery else refs
+        )
+        result = await list_drift_jobs(db)
+
+    assert [job.job_id for job in result] == ["newer", "older", "oldest", "unknown-z", "unknown-a"]
+    assert result[-1].description == "Enriched job"
+    assert result[-1].model_type == "RandomForest"
+    assert [job.created_at for job in result[-2:]] == ["Unknown", "Unknown"]
+
+
 # ---------------------------------------------------------------------------
 # _find_reference_key
 # ---------------------------------------------------------------------------

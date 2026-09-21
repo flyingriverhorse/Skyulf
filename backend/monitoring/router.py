@@ -22,6 +22,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.exceptions.core import SkyulfException
 from backend.middleware.rate_limiter import limiter
+from backend.ml_pipeline.artifacts.discovery import ReferenceArtifact
 from backend.ml_pipeline.artifacts.factory import ArtifactFactory
 from backend.utils.logging_utils import redact_credentials
 
@@ -133,6 +134,17 @@ def _enrich_drift_job(job: DriftJobOption, db_row: TrainingJob) -> None:
         job.best_metric = _build_drift_metric_summary(metrics)
 
 
+def _drift_reference_sort_key(ref: ReferenceArtifact) -> tuple[bool, datetime, str, str]:
+    """Sort raw artifact timestamps newest first, with deterministic unknown-date ties."""
+    try:
+        created_at = datetime.fromisoformat(ref.created_at or "")
+    except ValueError:
+        return False, datetime.min.replace(tzinfo=UTC), ref.job_id, ref.filename
+    if created_at.tzinfo is None:
+        created_at = created_at.replace(tzinfo=UTC)
+    return True, created_at, ref.job_id, ref.filename
+
+
 @router.get("/jobs", response_model=list[DriftJobOption])
 async def list_drift_jobs(db: AsyncSession = Depends(get_db)):
     """List all jobs that have reference data available for drift calculation.
@@ -149,7 +161,11 @@ async def list_drift_jobs(db: AsyncSession = Depends(get_db)):
             filename=ref.filename,
             created_at=ref.created_at or "Unknown",
         )
-        for ref in ArtifactFactory.get_discovery().list_reference_artifacts()
+        for ref in sorted(
+            ArtifactFactory.get_discovery().list_reference_artifacts(),
+            key=_drift_reference_sort_key,
+            reverse=True,
+        )
     ]
 
     if not found_jobs:
@@ -165,7 +181,6 @@ async def list_drift_jobs(db: AsyncSession = Depends(get_db)):
             _enrich_drift_job(job, db_row)
         jobs.append(job)
 
-    jobs.sort(key=lambda x: x.created_at or "", reverse=True)
     return jobs
 
 
