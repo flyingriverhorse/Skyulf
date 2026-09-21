@@ -32,10 +32,10 @@ export const ClusteringTab: React.FC<ClusteringTabProps> = ({ profile, downloadC
                         <InfoTooltip text="Automatically groups data points into distinct clusters (segments) based on similarity. Useful for finding natural groups like 'High Spenders' or 'At Risk' users." />
                     </h3>
                     <button
-                        onClick={() => downloadChart('clustering-chart', 'clustering-analysis', 'Clustering Segmentation', `${analysis.n_clusters} Clusters Found`)}
+                        onClick={() => downloadChart('clustering-chart', 'clustering-summary', 'Clustering Summary', `${analysis.n_clusters} Clusters Found`)}
                         className="p-2 rounded-md border bg-white border-gray-300 text-gray-700 hover:bg-gray-50 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300"
-                        title="Download Chart"
-                        aria-label="Download Chart"
+                        title="Download Summary"
+                        aria-label="Download Summary"
                     >
                         <Download className="w-4 h-4" />
                     </button>
@@ -105,8 +105,8 @@ export const ClusteringTab: React.FC<ClusteringTabProps> = ({ profile, downloadC
             <div className="flex items-start gap-3 p-4 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 rounded-lg text-sm border border-blue-100 dark:border-blue-800">
                 <Info className="w-5 h-5 flex-shrink-0 mt-0.5" />
                 <div>
-                     These clusters are found using unsupervised learning (K-Means) on numeric features.
-                     The plot shows a 2D projection (PCA) of the clusters. Use this to identify distinct groups of data points that behave similarly.
+                     This summary shows the clustering method, inertia and cluster profiles.
+                     Each profile lists up to five centroid feature values, ordered by absolute magnitude.
                 </div>
             </div>
         </div>
