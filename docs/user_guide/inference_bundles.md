@@ -211,8 +211,11 @@ float when it contains nulls, losing precision for large integers before the
 model sees it. Nullable integral/boolean feature schemas are rejected eagerly,
 even if their present rows happen to contain no nulls. Floating-point features
 can retain null/NaN behavior. Row keys have a separate distributed non-null
-check and can retain nullable schema metadata. Broader nullable feature transport
-is part of the later worker validation gate.
+check and can retain nullable schema metadata. The `python_pipeline` path also
+rejects nullable integral/boolean raw inputs before Arrow, because Python FE
+would otherwise receive a widened batch before its frozen imputer or scaler
+could run. Broader nullable feature transport is part of the later worker
+validation gate.
 
 The model is loaded once per worker iterator invocation and reused over its
 prediction chunks. Task retries or later actions may load it again. The worker

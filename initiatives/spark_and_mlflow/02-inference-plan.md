@@ -182,11 +182,11 @@ boundary remains a separate explicit engine capability.
   her satır için yüklenmesin; iterator seviyesinde yükleme helper'ını ölç. Task
   sayısına eşit tam bir global yükleme sayısı varsayma. Worker wheel packaging
   remains a later platform gate.
-- [ ] SM-09'un nullable integer/boolean model-feature schema sınırını yeniden
+- [x] SM-09'un nullable integer/boolean model-feature schema sınırını yeniden
   değerlendir. Arrow → pandas null dönüşümünde büyük integer hassasiyeti
   korunmadan desteği genişletme; float'tan integer'a geri cast çözüm değildir.
   Destek açılmayacaksa mevcut erken ret ve kullanıcı dokümanını koru.
-- [ ] Büyük sentetik veri üzerinde driver RSS, worker peak ve wall time ölç;
+- [x] Büyük sentetik veri üzerinde driver RSS, worker peak ve wall time ölç;
   row count/feature width/partition sayısını kaydet. Driver belleğinin input
   boyutuyla doğrusal büyümemesini araştır; sabit hızlanma oranı vaat etme.
 - [x] Güncel core suite ve optional-dependency import testini çalıştır;
@@ -208,14 +208,17 @@ estimator.classes_ ile karşılaştırılır. Sum testi tek başına yeterli de�
 Spark probability değerleri local estimator.predict_proba ile sınıf bazında
 karşılaştırılır; threshold label sonucu ayrıca assertion alır.
 **Komut:** `python -m pytest skyulf-core/tests/spark -q`
-**Kabul:** G2: iki yol, regression/classification and worker isolation are
-tested. Worker wheel/Databricks deployment validation remains a later platform
-gate; local Spark proves the iterator contract only.
+**Kabul:** G2: both paths, regression/classification, worker isolation,
+nullable transport rejection, wheel import and local scale evidence are tested.
+Worker wheel deployment on Databricks remains a later platform gate; local
+Spark proves the iterator contract only.
 Endpoint yok; [MLflow/batch](03-mlflow-batch-delivery-plan.md) aşamasına geçilir.
 
 2026-09-22: Classification is available for raw bundles in both Spark modes.
 String binary labels, integer multiclass labels, probability ordering, saved
 threshold precedence, two partition layouts and two Arrow batch limits are
 covered. The worker loads the model once per iterator and calls it on bounded
-chunks. Nullable integral/boolean model features remain rejected before Arrow
-execution; worker wheel and scale measurements are explicit later gates.
+chunks. Nullable integral/boolean raw inputs are rejected before Arrow
+execution. A 0.9.0 wheel subprocess smoke and local synthetic scale/RSS
+measurements are recorded in OPEN_QUEUE.md; Databricks deployment remains a
+later platform gate.

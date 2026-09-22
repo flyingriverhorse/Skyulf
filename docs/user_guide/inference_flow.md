@@ -170,7 +170,7 @@ The limitation concerns arbitrary operations inside arbitrary artifacts:
 | FE without a supported Spark applier or portable-state codec | Unsupported by the new bundle/native path; no silent fallback |
 | Wrong feature order, missing columns or a different native FE output dtype | Error instead of silent correction |
 | Incompatible model/runtime versions | Error; prepare compatible driver and worker environments |
-| Nullable integer/boolean model-feature schema | The initial Spark runner rejects it before actions due to Arrow conversion risks |
+| Nullable integer/boolean model-feature or Python-worker raw schema | The initial Spark runner rejects it before actions due to Arrow conversion risks |
 | An existing backend artifact dictionary supplied as a new bundle | Rejected; the backend adapter is planned for SM-18 |
 
 Current native FE support covers **SimpleImputer mean/constant and StandardScaler**;

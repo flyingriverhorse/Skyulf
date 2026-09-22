@@ -1,15 +1,15 @@
 # Session handoff - 2026-09-22
 
-SM-11 is active again after a validation review found a Python-worker nullable
-transport gap. Resume the corrective SM-11 work before SM-12.
+SM-11 is complete after the corrective validation gate. Resume with SM-12.
 Target release: 0.9.0. Branch: `090`.
 
 ## Starting point
 
-- SM-00 through SM-10 are complete; SM-11 is ACTIVE and SM-12 remains WAIT.
-- Last implementation commit: `04dbe303` (distributed classification inference,
-  output schema and worker isolation tests).
-- Last guide commit: `04dbe303` (SM-11 guide, example, queue and handoff update).
+- SM-00 through SM-11 are complete; SM-12 is READY.
+- Last implementation commits: `04dbe303` (distributed classification
+  inference) and `7cdd622c` (nullable Arrow transport and oracle hardening).
+- Last guide commit: `04dbe303`; queue and handoff closure follows in the current
+  documentation commit.
 - Read [OPEN_QUEUE.md](OPEN_QUEUE.md), [ARCHITECTURE.md](ARCHITECTURE.md) and
   the SM-11 section of [02-inference-plan.md](02-inference-plan.md) before coding.
 - User-facing guide: [How inference works](../../docs/user_guide/inference_flow.md).
@@ -58,17 +58,18 @@ Keep new documentation and diagram labels in English.
 
 ## Verification and workspace
 
-Before this correction, the English guide's example was checked with both pandas and
+Before parking, the English guide's example was checked with both pandas and
 Polars training: local and Spark predictions matched `[400.0, 200.0]`. SM-10
 passed its focused 14-test Spark lane; SM-11 classification and isolation
-regressions passed in the combined 123-test focused lane. The standalone Spark
+regressions passed in the corrective 63-test focused lane and the full Spark
+gate passed 418 tests with 2 warnings. The standalone Spark
 batch example completed in both modes with matching string labels and
 probability columns.
 The strict documentation build, four rendered diagrams and commit hooks passed.
-The review found that Python-worker nullable raw integral/boolean inputs could
-cross Arrow before the native guard when a frozen FE chain changed the model
-dtype. The corrective preflight and independent oracle assertions are now
-unstaged and require a fresh full Spark gate before SM-11 can be marked DONE.
+A built 0.9.0 wheel imported the worker inference module in a separate process.
+Synthetic local measurements recorded 10k/2 partitions at 3.929s and
+50k/8 partitions at 8.089s with driver peak RSS 246.2/246.8 MB. These are local
+evidence only; Databricks worker-wheel deployment and MLflow remain later gates.
 
 Three pre-existing untracked directories remain outside this change:
 `.tmp-review-model/`, `.tmp-spark-review-full/`, `.tmp-spark-review-pytest/`.

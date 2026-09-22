@@ -1,10 +1,9 @@
 # Spark ve MLflow — Open Queue
 
-Güncelleme: 2026-09-22. **SM-00–SM-10 tamamlandı; SM-11 ACTIVE. Hedef: 0.9.0.**
+Güncelleme: 2026-09-22. **SM-00–SM-11 tamamlandı; sıradaki SM-12. Hedef: 0.9.0.**
 Bu dosya kısa çalışma sırasıdır; detaylar bağlantılı planlarda.
 
-Session resumed on 2026-09-22: SM-11 remains active pending its final transport,
-packaging and scale evidence.
+Session resumed on 2026-09-22: read [HANDOFF.md](HANDOFF.md) before starting SM-12.
 
 Durumlar: READY = başlanabilir; WAIT = önceki görev bekleniyor;
 LATER = son aşama; ACTIVE = yürütülüyor; BLOCKED = somut dış engel;
@@ -23,8 +22,8 @@ DONE = kanıtla tamamlandı. SM-00 commit: `105a6fe4`.
 | SM-08 | Ortak inference bundle | SM-07 | DONE | Raw/features ayrımı; model metadata round-trip; aşağıda kanıt |
 | SM-09 | Native FE + worker model | SM-08 | DONE | Spark tahmini local ile key bazında aynı; aşağıda kanıt |
 | SM-10 | Worker Python FE + model | SM-09 | DONE | Batch-safe portable FE; window gibi yollar açık ret |
-| SM-11 | Classification ve ölçek kapısı | SM-10 | ACTIVE | Class/proba/threshold parity; transport, packaging and scale evidence pending |
-| SM-12 | Opsiyonel MLflow tracking | SM-11 | WAIT | Off bağımsız; gerçek run lifecycle ve izolasyon |
+| SM-11 | Classification ve ölçek kapısı | SM-10 | DONE | Class/proba/threshold parity; transport, packaging and scale evidence |
+| SM-12 | Opsiyonel MLflow tracking | SM-11 | READY | Off bağımsız; gerçek run lifecycle ve izolasyon |
 | SM-13 | MLflow model packaging | SM-12 | WAIT | Temiz ortamda pyfunc yükleme ve parity |
 | SM-14 | Registry/Unity Catalog adapter | SM-13 | WAIT | URI/signature; alias → sabit version |
 | SM-15 | Aylık batch + Delta sink | SM-14 | WAIT | Dönem izolasyonu, retry ve conflict kontrolü |
@@ -512,10 +511,11 @@ destek ve sınırlar tamamlanan görevlerin kayıtlarında belirtilir.
   modu, SM-11 classification/worker wheel/ölçek kapısıdır. Databricks/Connect,
   MLflow/UC, endpoint ve template doğrulaması yoktur. Sıradaki görev SM-10.
 
-## SM-11 — 2026-09-22 interim validation record (supersedes premature DONE label)
+## SM-11 — 2026-09-22 final validation record
 
-- Starting point: `a930f8a5`; implementation commit: `04dbe303`.
-  The earlier DONE label was premature and is intentionally reopened here.
+- Starting point: `a930f8a5`; implementation commits: `04dbe303` and
+  corrective `7cdd622c`. The earlier DONE label was reopened during review and
+  is now restored only after the corrective evidence below.
 - `predict_spark` now accepts raw regression and classification bundles in both
   `native_features` and `python_pipeline` modes. The output schema maps
   manifest label dtypes to Spark types and keeps probability columns in the
@@ -530,22 +530,22 @@ destek ve sınırlar tamamlanan görevlerin kayıtlarında belirtilir.
 - Added `skyulf-core/examples/spark_batch_inference.py`, which runs the same
   classification bundle through both Spark modes. The example sets the current
   interpreter as the Python worker on Windows when no worker override exists.
-- Focused verification before the corrective transport guard:
+- Corrective focused verification:
   `.venv-spark/Scripts/python.exe -m pytest -o addopts='' --basetemp
   .tmp-sm11-regression skyulf-core/tests/spark/test_native_features_inference.py
   skyulf-core/tests/spark/test_python_pipeline_inference.py
   skyulf-core/tests/spark/test_prediction_contract.py
   skyulf-core/tests/spark/test_worker_isolation.py
   skyulf-core/tests/spark/test_inference_bundle.py -q --disable-warnings
-  --maxfail=1` → **123 passed**. JVM cleanup prints the
+  --maxfail=1` → **63 passed**. JVM cleanup prints the
   existing Windows `ERROR: Access denied` after a successful exit.
-- Full Spark gate before the corrective transport guard:
+- Full Spark gate after the corrective transport guard:
   `.venv-spark/Scripts/python.exe -m pytest -o addopts='' --basetemp
-  .tmp-sm11-spark-all skyulf-core/tests/spark
+  .tmp-sm11-spark-final skyulf-core/tests/spark
   skyulf-core/tests/unit/test_execution_capabilities.py
   skyulf-core/tests/unit/test_feature_state.py
   skyulf-core/tests/unit/test_pipeline_inference_schema.py -q --disable-warnings
-  --maxfail=1` → **415 passed, 2 warnings**, 516.51 seconds. The warnings are
+  --maxfail=1` → **418 passed, 2 warnings**, 525.50 seconds. The warnings are
   existing; Windows prints the cleanup access-denied line after exit 0.
 - Both example commands completed with exit code 0 and printed matching
   `prediction`, `probability_0` and `probability_1` results. Ruff check and
@@ -553,12 +553,13 @@ destek ve sınırlar tamamlanan görevlerin kayıtlarında belirtilir.
 - Nullable integer/boolean model-feature transport remains rejected because
   Arrow can widen values with nulls. Worker wheel isolation, scale/RSS
   measurements, MLflow, Databricks, endpoints and templates remain later work.
-- Corrective work now active: reject nullable integral/boolean raw inputs in
-  `python_pipeline` before key validation, strengthen independent estimator and
-  non-default threshold assertions, and rerun the full Spark gate. A wheel
-  subprocess smoke imported `skyulf.inference.spark` from the built 0.9.0 wheel;
-  local scale measurements recorded 10k/2 partitions at 3.929s and 50k/8
-  partitions at 8.089s with driver peak RSS 246.2/246.8 MB. These results are
-  evidence, not a production performance guarantee.
-- SM-12 remains blocked until the corrective SM-11 review and full verification
-  are complete.
+- Corrective preflight rejects nullable integral/boolean raw inputs in
+  `python_pipeline` before key validation. Independent estimator class/probability
+  assertions and a non-default threshold decision assertion are covered. A
+  wheel subprocess smoke imported `skyulf.inference.spark` from the built 0.9.0
+  wheel. Local scale measurements recorded 10k/2 partitions at 3.929s and
+  50k/8 partitions at 8.089s with driver peak RSS 246.2/246.8 MB and child
+  process peak RSS 887.2/922.7 MB. These results are evidence, not a production
+  performance guarantee.
+- Next task: SM-12 optional MLflow tracking, with tracking disabled remaining a
+  valid local/Spark workflow.
