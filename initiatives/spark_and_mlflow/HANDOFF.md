@@ -7,9 +7,9 @@ Target release: 0.9.0. Branch: `090`.
 ## Starting point
 
 - SM-00 through SM-12 are complete; SM-13 is READY.
-- Last implementation commits: `04dbe303` (distributed classification
-  inference) and `7cdd622c` (nullable Arrow transport and oracle hardening).
-- Last guide/queue commit: `80dc9ee9` (SM-11 closure and SM-12 handoff).
+- Last implementation commit: `f8f188ca` (optional MLflow tracking,
+  dependency metadata, tests and guide).
+- Previous guide/queue commit: `80dc9ee9` (SM-11 closure and SM-12 handoff).
 - Read [OPEN_QUEUE.md](OPEN_QUEUE.md), [ARCHITECTURE.md](ARCHITECTURE.md) and
   the SM-11 section of [02-inference-plan.md](02-inference-plan.md) before coding.
 - User-facing guide: [How inference works](../../docs/user_guide/inference_flow.md).
