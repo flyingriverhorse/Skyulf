@@ -30,12 +30,13 @@ failure_policy="raise")`; `track_run(config, *, run_name)` context manager.
 Yield edilen run nesnesi `log_metrics`, `log_params`, `set_tags` sunar;
 disabled durumda aynı arayüzle no-op ve network/import yok.
 
-- [ ] MLflow kurulu olmayan base ortamda import ve disabled eğitim testi yaz.
-- [ ] URI/experiment seçimi açık client/run_id kapsamına bağlı olsun; eşzamanlı
+- [x] MLflow kurulu olmayan base ortamda import ve disabled eğitim testi yaz.
+- [x] URI/experiment seçimi açık client/run_id kapsamına bağlı olsun; eşzamanlı
   iki çalışmanın run id'si karışmasın. Kullanıcının aktif run'ını sessizce kapatma.
-- [ ] Exception'da run FAILED; başarıda FINISHED. Varsayılan `raise`; opt-in
-  `warn` durumunda model sonucu korunur ve tracking kaybı sonuç metadata'sında görünür.
-- [ ] Explicit param/metric log; params limitinde tam config artifact + digest;
+- [x] Exception'da run FAILED; başarıda FINISHED. Varsayılan `raise`; opt-in
+  `warn` durumunda model sonucu korunur ve tracking kaybı `run.tracking_error`
+  üzerinde görünür; dış runner bunu kendi sonuç metadata'sına taşır.
+- [x] Explicit param/metric log; params limitinde tam config artifact + digest;
   veri satırları ve secret içerebilen bütün config otomatik loglanmaz.
 
 ```python
@@ -53,6 +54,12 @@ def test_disabled_tracking_never_constructs_client(monkeypatch):
 `_make_client` bu görevde lazy client fabrikası olarak oluşturulur.
 **Komut:** `python -m pytest skyulf-core/tests/integrations/test_mlflow_tracking.py -q`
 **Kabul:** Base dependency isolation; local geçici tracking store'da gerçek run lifecycle.
+
+**Validation record (2026-09-22):** `skyulf.integrations.mlflow.tracking` keeps
+MLflow lazy and client-bound. Base tests passed with MLflow absent; the isolated
+MLflow 3.16.1 environment passed all 8 tracking tests, including SQLite
+FINISHED/FAILED lifecycle, concurrent run-ID isolation, caller active-run
+preservation, explicit config digest/artifact, and warn-mode failure handling.
 
 ## SM-13 — MLflow model flavor ve bağımsız yükleme
 

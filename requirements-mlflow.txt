@@ -1,0 +1,3 @@
+# Optional MLflow tracking/model integration for skyulf-core.
+# This file is separate from the base and Spark environments.
+mlflow>=3.10,<4.0

@@ -1,6 +1,6 @@
 # Spark ve MLflow — Open Queue
 
-Güncelleme: 2026-09-22. **SM-00–SM-11 tamamlandı; sıradaki SM-12. Hedef: 0.9.0.**
+Güncelleme: 2026-09-22. **SM-00–SM-12 tamamlandı; sıradaki SM-13. Hedef: 0.9.0.**
 Bu dosya kısa çalışma sırasıdır; detaylar bağlantılı planlarda.
 
 Session resumed on 2026-09-22: read [HANDOFF.md](HANDOFF.md) before starting SM-12.
@@ -23,8 +23,8 @@ DONE = kanıtla tamamlandı. SM-00 commit: `105a6fe4`.
 | SM-09 | Native FE + worker model | SM-08 | DONE | Spark tahmini local ile key bazında aynı; aşağıda kanıt |
 | SM-10 | Worker Python FE + model | SM-09 | DONE | Batch-safe portable FE; window gibi yollar açık ret |
 | SM-11 | Classification ve ölçek kapısı | SM-10 | DONE | Class/proba/threshold parity; transport, packaging and scale evidence |
-| SM-12 | Opsiyonel MLflow tracking | SM-11 | READY | Off bağımsız; gerçek run lifecycle ve izolasyon |
-| SM-13 | MLflow model packaging | SM-12 | WAIT | Temiz ortamda pyfunc yükleme ve parity |
+| SM-12 | Opsiyonel MLflow tracking | SM-11 | DONE | Off bağımsız; gerçek run lifecycle ve izolasyon |
+| SM-13 | MLflow model packaging | SM-12 | READY | Temiz ortamda pyfunc yükleme ve parity |
 | SM-14 | Registry/Unity Catalog adapter | SM-13 | WAIT | URI/signature; alias → sabit version |
 | SM-15 | Aylık batch + Delta sink | SM-14 | WAIT | Dönem izolasyonu, retry ve conflict kontrolü |
 | SM-16 | Gerçek Databricks kapısı | SM-15 | WAIT | Job/run kanıtı; UC load; iki inference yolu |
@@ -46,6 +46,28 @@ test/review kapısı vardır. Tüm node'ların native olması zorunlu değildir;
 gerçekten desteklenen kapsam ilan edilerek G5 kapatılır.
 SM-19 streaming isteğe bağlıdır; HTTP/SQL bittiğinde streaming unsupported
 olarak açıkça kaydedilebilir, template'i belirsiz süre bloke etmez.
+
+## SM-12 — 2026-09-22 validation record
+
+- Added the optional `skyulf.integrations.mlflow` adapter, the `mlflow` package
+  extra, `requirements-mlflow.txt`, and the English tracking guide. Importing
+  the adapter does not import MLflow; disabled tracking is a no-op with no
+  client construction or network access.
+- `TrackingConfig` and `track_run` use an explicit `MlflowClient` and run ID.
+  They do not mutate MLflow's process-global active run, so concurrent contexts
+  remain isolated and a caller-owned run stays open. Explicit metrics, params,
+  tags, and an opt-in config artifact/digest are supported.
+- Successful contexts terminate `FINISHED`; body exceptions terminate `FAILED`.
+  The default `raise` policy propagates tracking failures. `warn` preserves the
+  body result and exposes `run.tracking_error`; an outer runner may propagate
+  that value into its own result metadata.
+- Base verification (`.venv`): **4 passed, 4 skipped** for the integration
+  tests; MLflow is absent in that environment. Optional verification in an
+  isolated MLflow 3.16.1 environment: **8 passed**. Ruff and ty checks passed
+  for the new Python files.
+- Scope boundary: this task adds run tracking only. MLflow model packaging,
+  registry/Unity Catalog, Databricks batch delivery, endpoints, and templates
+  remain SM-13 onward.
 
 ## Bir görevi kapatma kaydı
 

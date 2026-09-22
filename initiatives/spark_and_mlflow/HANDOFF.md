@@ -1,11 +1,12 @@
 # Session handoff - 2026-09-22
 
-SM-11 is complete after the corrective validation gate. Resume with SM-12.
+SM-11 is complete after the corrective validation gate. SM-12 is now complete;
+resume with SM-13.
 Target release: 0.9.0. Branch: `090`.
 
 ## Starting point
 
-- SM-00 through SM-11 are complete; SM-12 is READY.
+- SM-00 through SM-12 are complete; SM-13 is READY.
 - Last implementation commits: `04dbe303` (distributed classification
   inference) and `7cdd622c` (nullable Arrow transport and oracle hardening).
 - Last guide/queue commit: `80dc9ee9` (SM-11 closure and SM-12 handoff).
@@ -68,7 +69,11 @@ The strict documentation build, four rendered diagrams and commit hooks passed.
 A built 0.9.0 wheel imported the worker inference module in a separate process.
 Synthetic local measurements recorded 10k/2 partitions at 3.929s and
 50k/8 partitions at 8.089s with driver peak RSS 246.2/246.8 MB. These are local
-evidence only; Databricks worker-wheel deployment and MLflow remain later gates.
+evidence only; Databricks worker-wheel deployment remains a later gate. SM-12
+also added optional MLflow tracking: the base environment keeps MLflow absent,
+while an isolated MLflow 3.16.1 environment passed all 8 tracking tests for
+explicit client-bound lifecycle, concurrency, caller-run preservation, config
+digest/artifact logging, and warn-mode degradation.
 
 Three pre-existing untracked directories remain outside this change:
 `.tmp-review-model/`, `.tmp-spark-review-full/`, `.tmp-spark-review-pytest/`.

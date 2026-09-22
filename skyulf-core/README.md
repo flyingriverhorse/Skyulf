@@ -64,6 +64,9 @@ pip install skyulf-core[text]
 
 # All non-geo optional runtime features
 pip install skyulf-core[all]
+
+# Optional experiment tracking
+pip install skyulf-core[mlflow]
 ```
 
 `all` intentionally excludes the native geospatial stack; add `[geo]` only when you need geospatial nodes.

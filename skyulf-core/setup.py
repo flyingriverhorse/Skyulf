@@ -43,6 +43,7 @@ setup(
     extras_require={
         # Experimental test/runtime dependency only; node support is gated separately.
         "spark": ["pyspark>=4.0.3,<4.1.0", "pandas>=2.0.0,<3.0.0"],
+        "mlflow": ["mlflow>=3.10,<4.0"],
         "dev": [
             "pytest",
             "pytest-cov>=4.1.0,<5.0.0",
@@ -94,6 +95,7 @@ setup(
             "lightgbm>=4.0.0",
             "sentence-transformers>=2.2.0",
             "shap>=0.46.0,<1.0.0",
+            "mlflow>=3.10,<4.0",
         ],
     },
     python_requires=">=3.12",
