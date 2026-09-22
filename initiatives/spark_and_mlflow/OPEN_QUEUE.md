@@ -1,6 +1,6 @@
 # Spark ve MLflow — Open Queue
 
-Güncelleme: 2026-09-21. **SM-00–SM-09 tamamlandı; sıradaki SM-10. Hedef: 0.9.0.**
+Güncelleme: 2026-09-22. **SM-00–SM-10 tamamlandı; sıradaki SM-11. Hedef: 0.9.0.**
 Bu dosya kısa çalışma sırasıdır; detaylar bağlantılı planlarda.
 
 Session parked on 2026-09-21: read [HANDOFF.md](HANDOFF.md) before resuming SM-10.
@@ -21,8 +21,8 @@ DONE = kanıtla tamamlandı. SM-00 commit: `105a6fe4`.
 | SM-07 | Uçtan uca FE kapısı | SM-06 | DONE | Üç engine çapraz fit/apply; kayıt/yükleme; aşağıda kanıt |
 | SM-08 | Ortak inference bundle | SM-07 | DONE | Raw/features ayrımı; model metadata round-trip; aşağıda kanıt |
 | SM-09 | Native FE + worker model | SM-08 | DONE | Spark tahmini local ile key bazında aynı; aşağıda kanıt |
-| SM-10 | Worker Python FE + model | SM-09 | READY | Batch-safe pipeline; window gibi yollar açık ret |
-| SM-11 | Classification ve ölçek kapısı | SM-10 | WAIT | Class/proba/threshold parity; worker kanıtı |
+| SM-10 | Worker Python FE + model | SM-09 | DONE | Batch-safe portable FE; window gibi yollar açık ret |
+| SM-11 | Classification ve ölçek kapısı | SM-10 | READY | Class/proba/threshold parity; worker kanıtı |
 | SM-12 | Opsiyonel MLflow tracking | SM-11 | WAIT | Off bağımsız; gerçek run lifecycle ve izolasyon |
 | SM-13 | MLflow model packaging | SM-12 | WAIT | Temiz ortamda pyfunc yükleme ve parity |
 | SM-14 | Registry/Unity Catalog adapter | SM-13 | WAIT | URI/signature; alias → sabit version |

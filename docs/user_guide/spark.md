@@ -8,11 +8,11 @@ Their fitted pipeline can be exported and restored across pandas, Polars and Spa
 The [standalone inference bundle](inference_bundles.md) packages this state with
 a fitted model and validates local raw/features prediction. The Spark runner
 applies native FE and runs a Python regression model in worker batches.
-Other native nodes, worker Python FE and distributed classification remain under development.
+Other native nodes and distributed classification remain under development.
 Installing the extra does not convert a pandas/Polars pipeline to Spark.
 
 [How inference works](inference_flow.md) explains how the saved FE and
-model are reused, with diagrams for local, native Spark and planned worker FE paths.
+model are reused, with diagrams for local, native Spark and worker FE paths.
 
 ## Why a separate environment?
 
@@ -548,8 +548,8 @@ execution requires explicit support for the transformations in that artifact.
 
 Current distributed model support is regression with native mean/constant
 imputation and StandardScaler, including an empty FE chain. Local training can
-use pandas or Polars. Python FE on workers, classification, MLflow packaging and
-Databricks runtime validation have separate later gates.
+use pandas or Polars. Classification, MLflow packaging and Databricks runtime
+validation have separate later gates.
 
 ## Capability declarations
 

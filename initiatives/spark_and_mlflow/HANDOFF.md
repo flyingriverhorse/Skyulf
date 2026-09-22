@@ -1,15 +1,15 @@
 # Session handoff - 2026-09-21
 
-Work is parked at the user's request. Resume with SM-10 when requested.
+Work is parked at the user's request after completing SM-10. Resume with SM-11 when requested.
 Target release: 0.9.0. Branch: `090`.
 
 ## Starting point
 
-- SM-00 through SM-09 are complete; SM-10 remains READY and is not implemented.
+- SM-00 through SM-10 are complete; SM-11 is the next READY task.
 - Last implementation commit: `74ceacb9` (native Spark batch model inference).
 - Last guide commit: `a910e08b` (English inference explanation and four diagrams).
 - Read [OPEN_QUEUE.md](OPEN_QUEUE.md), [ARCHITECTURE.md](ARCHITECTURE.md) and
-  the SM-10 section of [02-inference-plan.md](02-inference-plan.md) before coding.
+  the SM-11 section of [02-inference-plan.md](02-inference-plan.md) before coding.
 - User-facing guide: [How inference works](../../docs/user_guide/inference_flow.md).
 
 ## Confirmed terminology and intended workflow
@@ -46,14 +46,16 @@ Keep new documentation and diagram labels in English.
   and an empty chain. Unsupported steps fail explicitly.
 - Spark FE fit -> export -> restore -> Spark apply is available. This does
   not imply that end-to-end distributed model training is implemented.
-- `mode="python_pipeline"` is still rejected. SM-10 adds compatible fitted
-  Python FE and model execution together inside workers, without refitting,
-  while rejecting unsupported context-dependent or row-changing operations.
+- `mode="python_pipeline"` now runs compatible fitted Python FE and model
+  execution together inside workers, without refitting. It rejects unsupported
+  context-dependent, row-changing and non-portable FE operations.
 
 ## Verification and workspace
 
 Before parking, the English guide's example was checked with both pandas and
-Polars training: local and Spark predictions matched `[400.0, 200.0]`.
+Polars training: local and Spark predictions matched `[400.0, 200.0]`. SM-10
+also passed its focused 14-test Spark lane and the native inference file passed
+52 tests.
 The strict documentation build, four rendered diagrams and commit hooks passed.
 Broader implementation evidence is recorded under SM-09 in OPEN_QUEUE.md;
 those suites were not rerun for this handoff-only update.

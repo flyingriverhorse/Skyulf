@@ -1,6 +1,6 @@
 # How inference works: pandas, Polars and Spark
 
-**Status: 0.9.0 development branch, SM-09 complete.** This guide explains how
+**Status: 0.9.0 development branch, SM-10 complete.** This guide explains how
 fitted feature engineering (FE) and a trained model are reused on new data.
 
 The principle is the same in each path: **learn during training → save an
@@ -123,15 +123,16 @@ results to the driver. Prediction remains a lazy Spark DataFrame: an action such
 as `show`, `collect` or writing to a sink executes model prediction. The runner
 does not itself write a table or schedule a monthly job.
 
-## 5. Python FE + model inside workers — planned SM-10
+## 5. Python FE + model inside workers — available in SM-10
 
-![Planned path: Spark distributes raw batches and workers apply fitted Python FE and the model](../assets/diagrams/inference/spark_python_planned.svg)
+![Spark distributes raw batches and workers apply fitted Python FE and the model](../assets/diagrams/inference/spark_python_planned.svg)
 
 [Editable Mermaid source](../assets/diagrams/inference/spark_python_planned.mmd)
 
-This path is **not implemented yet**. `mode="python_pipeline"` currently raises
-an error. The planned path distributes raw batches and runs compatible fitted
-Python FE together with the model inside each worker.
+`mode="python_pipeline"` distributes raw batches and runs compatible fitted
+Python FE together with the model inside each worker. The worker restores the
+frozen portable state once per iterator, applies it to each pandas batch, and
+then predicts with the same serialized regression model.
 
 This also keeps the dataset distributed. The distinction is where FE executes:
 native Spark expressions or Python code inside worker batches.
@@ -149,6 +150,8 @@ Not every Python transformation is independent of batch boundaries:
 Being batch-independent does not automatically make a node supported today.
 Packaging, execution and compatibility checks must also be implemented. An
 unsupported native FE step will not silently fall back to this worker path.
+The current worker path accepts portable SimpleImputer `mean`/`constant`,
+StandardScaler and an empty FE chain; classification remains a later gate.
 
 ## 6. What compatibility means
 
@@ -193,7 +196,7 @@ backend artifact format is a separate delivery.
 | Local raw | Local pandas/Polars | The same local Python process | Available |
 | Local prepared features | Already prepared; FE is bypassed here | Local Python process | Available |
 | Spark native features | Native Spark operations | Spark Python worker batches | SM-09: raw + regression |
-| Spark Python pipeline | Python FE inside a Spark worker | Python model in the same worker | SM-10: planned |
+| Spark Python pipeline | Python FE inside a Spark worker | Python model in the same worker | SM-10: available for raw regression |
 
 Local/Spark describes where and how computation runs. Monthly batch scheduling,
 HTTP endpoints and SQL access describe how it is invoked; they are separate from

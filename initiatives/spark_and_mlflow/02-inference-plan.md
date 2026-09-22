@@ -162,7 +162,10 @@ def test_python_pipeline_rejects_window_context(spark, rolling_bundle):
 `rolling_bundle` fixture'ı mevcut rolling node ile fit edilmiş, window context
 metadata'sı taşıyan geçerli bundle'dır; bozuk manifest ile ret üretme.
 **Komut:** `python -m pytest skyulf-core/tests/spark/test_python_pipeline_inference.py -q`
-**Kabul:** G2b: iki inference yolunda parity; temporal karşı örnek sessizce çalışmaz.
+**Kabul:** G2b: native ve Python-worker inference parity; temporal karşı örnek
+sessizce çalışmaz. Training input may be pandas or Polars; the current
+`mapInPandas` worker boundary receives pandas batches, while a Polars worker
+boundary remains a separate explicit engine capability.
 
 ## SM-11 — Classification ve dağıtık yürütme kapısı
 

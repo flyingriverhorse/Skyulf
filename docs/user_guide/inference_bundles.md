@@ -216,9 +216,10 @@ before prediction; prediction itself remains a lazy Spark computation.
 Validation does not freeze a changing source. The caller owns any snapshot or
 persist policy needed to keep validation and later actions on the same input.
 
-The first distributed runner accepts `input_stage="raw"` and regression only.
-Prepared-feature bundles, classification, streaming and the Python FE worker
-mode are not enabled by this delivery. Local classification remains available. Databricks,
+The distributed runners accept `input_stage="raw"` and regression only.
+Prepared-feature bundles, classification and streaming remain unsupported.
+The Python FE worker mode is available for the portable row-independent path;
+local classification remains available. Databricks,
 Spark Connect and worker-wheel isolation still require their later validation
 gates; local PySpark tests do not establish those deployment guarantees.
 
@@ -259,8 +260,8 @@ Changing the inference engine does not make every fitted Python transformer a
 native Spark operation. For example, a future binning adapter must use the saved
 training bin boundaries; it must not discover new boundaries from each inference
 batch. The native path requires an implemented Spark applier and a supported
-state codec. The planned Python-worker path requires explicit support for
-independent batches and row preservation. Rolling/lag and transformations that
+state codec. The Python-worker path requires explicit support for independent
+batches and row preservation. Rolling/lag and transformations that
 need neighboring rows cannot be made correct merely by putting them inside a
 worker batch. Unsupported combinations fail explicitly; there is no automatic
 conversion of a whole Spark dataset to local pandas or Polars.
