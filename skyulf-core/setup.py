@@ -43,6 +43,8 @@ setup(
     extras_require={
         # Experimental test/runtime dependency only; node support is gated separately.
         "spark": ["pyspark>=4.0.3,<4.1.0", "pandas>=2.0.0,<3.0.0"],
+        # Local Delta harness only; Databricks Runtime supplies its own Delta engine.
+        "delta": ["delta-spark>=4.0.0,<4.1.0", "pyspark>=4.0.3,<4.1.0"],
         "mlflow": ["mlflow>=3.10,<4.0"],
         "dev": [
             "pytest",

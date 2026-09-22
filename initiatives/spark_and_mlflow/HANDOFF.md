@@ -1,17 +1,19 @@
 # Session handoff - 2026-09-22
 
-SM-11 is complete after the corrective validation gate. SM-12, SM-13 and SM-14
-are now complete; resume with SM-15.
+SM-00 through SM-15 are complete. Resume with SM-16 platform preparation;
+live Databricks execution has not been validated.
 Target release: 0.9.0. Branch: `090`.
 
 ## Starting point
 
-- SM-00 through SM-14 are complete; SM-15 is READY.
+- SM-00 through SM-15 are complete; SM-16 is READY for platform preparation.
+- SM-15 baseline: `4a613cb5`. Its implementation and verification are in the
+  delivery commit containing this handoff. No live Databricks validation yet.
 - SM-13 starts from `67315253`; its implementation, guide and evidence are in
   the delivery commit containing this handoff.
 - Previous guide/queue commit: `80dc9ee9` (SM-11 closure and SM-12 handoff).
 - Read [OPEN_QUEUE.md](OPEN_QUEUE.md), [ARCHITECTURE.md](ARCHITECTURE.md) and
-  the SM-15 section of [03-mlflow-batch-delivery-plan.md](03-mlflow-batch-delivery-plan.md).
+  the SM-16 section of [03-mlflow-batch-delivery-plan.md](03-mlflow-batch-delivery-plan.md).
 - User-facing guide: [How inference works](../../docs/user_guide/inference_flow.md).
 
 ## Confirmed terminology and intended workflow
@@ -97,3 +99,36 @@ that later platform gate.
 
 Pre-existing `.tmp-*` directories remain outside this change. Preserve them;
 do not stage or delete them as part of the next task.
+
+## SM-15 delivery and next platform boundary
+
+The monthly runner now reads a pinned Delta snapshot, checks its availability
+at `as_of`, runs either Spark inference mode and atomically replaces one period
+in a precreated target. Required provenance includes the model digest and
+installed code version. The source producer still owns historical feature joins;
+the cutoff does not establish their point-in-time correctness.
+
+Local Linux validation passed **43 tests** on Spark **4.0.3** / Delta **4.0.0**:
+18 real Delta cases plus 25 contract/admission cases. Base regression passed
+105 with 26 optional skips. See the queue for exact commands and package versions.
+The English [batch guide](../../docs/user_guide/databricks_batch.md) includes the
+schema, code example, diagram, retry policy and limits.
+
+`LocalTableLock` uses cross-process OS locks and requires a common directory
+on one host. Both public entry points reject it on distributed Spark masters.
+SM-16 must implement or validate distributed publish admission; the provider
+protocol is not proof that Databricks has a coordinator. Expiring leases cannot
+protect this sink because it has no fencing-token mechanism. Every publisher
+must use the same authority. Test actual Delta/UC permissions in that lane.
+
+Keep the current source snapshot and original spec available for retries. A
+receipt returns the old committed version even after a newer recomputation,
+without writing again. New computation needs a new run ID and reviewed target
+version. History and transaction retention must cover the allowed retry window.
+
+Next, prepare the SM-16 wheel/job smoke and platform evidence record, including
+the carried registry-to-Spark path, without creating a DAB template or endpoints.
+Actual execution needs an explicitly selected runtime, permitted test namespace,
+and authentication. The user retracted an accidentally pasted login command;
+do not treat its host or editor-created `databricks.yml` as authorization to log
+in, submit jobs or use that workspace. Those editor files remain outside SM-15.

@@ -1,0 +1,4 @@
+# Local Delta Lake harness for the optional Spark batch tests.
+# Databricks Runtime already provides Delta; do not install this into a DBR job.
+-r requirements-spark.txt
+delta-spark==4.0.0

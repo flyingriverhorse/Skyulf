@@ -6,6 +6,7 @@ on:
     paths:
       - "skyulf-core/**"
       - "requirements-spark.txt"
+      - "requirements-delta.txt"
       - ".github/workflows/spark-tests.yml"
   workflow_dispatch:
 
@@ -32,3 +33,27 @@ jobs:
         run: uv pip install --system -r requirements-spark.txt
       - name: Exercise Spark JVM and Python workers
         run: python -m pytest skyulf-core/tests/spark -q -o addopts=
+
+  delta:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      SKYULF_REQUIRE_DELTA: "1"
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
+      - name: Install optional Delta test dependencies
+        run: uv pip install --system -r requirements-delta.txt
+      - name: Exercise real Delta transactions and publish admission
+        run: >-
+          python -m pytest
+          skyulf-core/tests/integrations/test_batch_contract.py
+          skyulf-core/tests/integrations/test_batch_admission.py
+          skyulf-core/tests/integrations/test_delta_publish.py -q -o addopts=

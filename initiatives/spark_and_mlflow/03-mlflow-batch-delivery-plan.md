@@ -147,46 +147,49 @@ validation. MLflow 3.16.1 isolated lane: **10 passed**. Base environment:
 registry module skipped because MLflow is absent. Live Unity Catalog and Spark
 runner validation remain SM-16 carry-forward items.
 
-## SM-15 — Aylık batch ve Delta yayınlama
+## SM-15 — Monthly batch and Delta publication
 
-**Bağımlılık:** SM-14. **Oluştur:**
-`skyulf/integrations/databricks/{__init__,batch,delta}.py`,
-`tests/integrations/test_batch_contract.py`, `tests/integrations/test_delta_publish.py`.
-**Üretir:** `BatchSpec(period_start, period_end, as_of, row_keys, output_table,
-model_name, model_version, publish_mode="replace_period")`;
-`run_batch(spark, spec, *, source, bundle, options) -> BatchResult`.
+**Dependency:** SM-14. **Files:**
+`skyulf/integrations/databricks/{__init__,_contracts,admission,batch,delta}.py`,
+`tests/integrations/{conftest,test_batch_contract,test_batch_admission,test_delta_publish}.py`.
+**API:** `BatchSpec` pins aware period boundaries, `as_of`, keys, source version,
+target name/expected version, model name/concrete version/digest, installed code
+version, run ID and inference mode. `run_batch(spark, spec, *, source, bundle,
+options, admission) -> BatchResult` consumes an existing Delta table by name.
 
-- [ ] UTC yarı açık `[start,end)` dönem, business timezone dönüşümü ve explicit
-  `as_of` doğrulansın. Scheduler saati otomatik data cutoff sayılmasın.
-- [ ] Kaynak tablo sürümü/snapshot, concrete model version, code wheel sürümü,
-  input/output counts ve run_id manifestte kaydedilsin. `as_of` point-in-time
-  veri yoksa tarihsel doğruluk garantisi vermez; job açıklayıcı hata üretir.
-- [ ] İlk sink `replace_period`: yalnız hedef dönem için atomic Delta replace;
-  boş sonuçta dönem silme explicit `allow_empty=True` gerektirir. Nonmatching
-  period satırları yazma öncesi reddedilir. Dönem dışı satır korunur.
-- [ ] Aynı logical run retry mükerrer satır oluşturmasın. Aynı döneme eşzamanlı
-  farklı run için tek-writer admission + Delta conflict handling gerekir;
-  conflict sessiz last-writer-wins olmaz. Sonuç başarılı ancak commit sonrası.
-- [ ] Append ve key MERGE ilk release'te unsupported; sonraki genişletmede
-  merge key `(row_keys, period, model_version)` veya business overwrite politikası
-  explicit seçilir. Backfill geçmiş model/current model seçimini zorunlu alır.
+- [x] Validate UTC half-open periods, explicit calendar timezone and cutoff;
+  reject naive/nonexistent local times. Test a non-UTC Spark session and DST.
+- [x] Read a concrete Delta `versionAsOf` and verify its commit is no later than
+  `as_of`. Retain table ID/version, model digest, runtime version and counts in
+  a committed manifest. Reject incorrect digests/runtime and unavailable history.
+- [x] Use atomic `replaceWhere`, preserving other periods. Reject invalid output
+  timestamps/metadata/counts before writing; empty deletion requires `allow_empty`.
+- [x] Enforce explicit table-wide admission and expected target version. Replays
+  return the original receipt without undoing newer intentional recomputation;
+  changed requests under the same run ID fail. Return success only after receipt
+  verification. Test real Delta transactions and cross-process OS lock contention.
+- [x] Reject append/key MERGE. Require a concrete model version for every run,
+  including backfills. Intentional replacement uses a new run ID and explicitly
+  reviewed target version; no automatic conflict overwrite.
 
-```python
-def test_retry_preserves_other_periods(delta_batch_harness):
-    """Rerunning one month must neither duplicate it nor erase another month."""
-    h = delta_batch_harness
-    h.seed_previous_period()
-    first = h.run_current_period()
-    second = h.run_current_period()
-    assert h.current_keys_are_unique()
-    assert first.output_count == second.output_count
-    assert h.previous_period_matches_seed()
-```
+**Temporal boundary:** `as_of` proves snapshot availability, not correctness of
+upstream historical feature joins. The runner rejects a snapshot committed after
+the cutoff. The source producer remains responsible for point-in-time joins;
+there is no generic timestamp-column filter claiming to reconstruct history.
+Model name/version association is caller-provided; the supplied bundle's digest
+is verified. MLflow/UC downloads remain separate adapter/platform work.
 
-`delta_batch_harness` bu görevde geçici Delta tablolarına gerçek read/write yapan
-fixture'dır; mock sink testin yerine geçmez. Yetkisiz/çakışan publish ayrıca test edilir.
-**Komut:** `python -m pytest skyulf-core/tests/integrations/test_batch_contract.py skyulf-core/tests/integrations/test_delta_publish.py -q`
-**Kabul:** G4 local/uyumlu Delta ortamında dönem izolasyonu, retry ve conflict kanıtı.
+**Admission boundary:** `LocalTableLock` coordinates local Spark drivers on one
+host using a common lock directory keyed by Delta table ID. It is rejected by
+both public entry points on distributed masters. The provider protocol requires
+non-expiring ownership through the commit; it has no sink fencing token support.
+Distributed admission remains SM-16. Writers bypassing the authority are outside
+the single-writer guarantee. Delta-detected concurrency failures still propagate.
+
+**Acceptance:** G4 local Delta period isolation, retry and conflict evidence.
+The fixture performs real Delta I/O; permission denial at the admission boundary
+is a fault-injection test, not evidence of live UC permissions. Exact versions,
+commands and results are recorded in [OPEN_QUEUE.md](OPEN_QUEUE.md).
 
 ## SM-16 — Gerçek Databricks doğrulaması
 
@@ -194,6 +197,11 @@ fixture'dır; mock sink testin yerine geçmez. Yetkisiz/çakışan publish ayrı
 `initiatives/spark_and_mlflow/PLATFORM_VALIDATION.md` (uygulama sırasında).
 **Üretir:** Bir wheel ile gerçek FE → registry load → Spark inference → test Delta table.
 
+- [ ] Implement and verify shared publish admission for the selected runtime.
+  SM-15's local file locks are rejected on distributed masters. The provider
+  must hold exclusive ownership through commit and receipt verification;
+  expiring leases require a new sink fencing design before they can be used.
+  Include actual UC write-permission and concurrent-publisher evidence.
 - [ ] Kullanılan DBR/Python/Spark/MLflow/Arrow, compute türü, izinli catalog/schema
   ve test resource isimlerini kaydet. Workspace bilgisi yoksa yalnız bu görev WAIT
   olur; local testler Databricks geçti sayılmaz.

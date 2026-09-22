@@ -1,0 +1,194 @@
+# Monthly Spark inference and Delta publication
+
+`run_batch` reads a pinned Delta snapshot, applies a fitted inference bundle,
+and atomically replaces the requested period in a precreated Delta table.
+It reuses both [Spark inference modes](inference_flow.md), without refitting
+feature engineering or the model. Scheduling remains the caller's responsibility.
+
+The current validation covers **local Spark 4.0.3 with Delta Lake 4.0.0 on Linux**.
+Live Databricks, Unity Catalog, distributed publish admission and wheel delivery
+remain the SM-16 platform gate. Installing this adapter does not certify those
+platforms. Tracking and registry remain optional and independent of the engine.
+
+```mermaid
+flowchart LR
+    A["Delta source: fixed version"] --> B["Select UTC period [start, end)"]
+    C["Fitted bundle: fixed model digest"] --> D["Spark inference"]
+    B --> D
+    D --> E["Validate predictions and metadata"]
+    E --> F["Acquire exclusive table admission"]
+    F --> G{"Existing run receipt?"}
+    G -->|"Same request"| H["Return original commit"]
+    G -->|"New request"| I["Check expected target version"]
+    I --> J["Atomic Delta replaceWhere"]
+    J --> K["Verify committed receipt"]
+```
+
+## Prepare the inputs
+
+Use an existing raw `InferenceBundle`, produced through
+[local or Spark feature engineering](inference_flow.md). Its supported FE and
+input schema restrictions still apply. A table name is required as `source`;
+an arbitrary DataFrame cannot prove which snapshot it represents.
+
+Both tables must already exist and use Delta. For a regression model with one
+`double` prediction, this is an example target schema:
+
+```sql
+CREATE TABLE analytics.customer_predictions (
+    customer_id BIGINT,
+    event_time TIMESTAMP,
+    prediction DOUBLE,
+    __skyulf_run_id STRING,
+    __skyulf_model_name STRING,
+    __skyulf_model_version STRING
+) USING DELTA;
+```
+
+Use the actual prediction columns and types from the bundle for classification,
+including class-ordered probability columns. The runner checks exact names and
+types against the target, then uses the target's column order. It does not create
+or evolve tables. Source keys must be non-null and unique within the selected
+period. `event_time` must be Spark `timestamp`, not a date, string or
+`timestamp_ntz`. Null period timestamps are rejected anywhere in the source.
+
+## Run a period
+
+This example assumes source version `42` was committed before the explicit
+February 2 cutoff, and the target's current version is `0`. Supply the actual
+versions for your data. Resolve any registry alias once before constructing
+the spec, then bind its concrete version and digest to the downloaded bundle.
+The runner checks the bundle digest; it does not independently contact the
+registry to verify the caller's model name/version association.
+
+```python
+from datetime import UTC, datetime
+from importlib.metadata import version
+
+from skyulf.core.execution import ExecutionOptions
+from skyulf.integrations.databricks import BatchSpec, run_batch
+from skyulf.integrations.databricks.admission import LocalTableLock
+
+spec = BatchSpec(
+    period_start=datetime(2026, 1, 1, tzinfo=UTC),
+    period_end=datetime(2026, 2, 1, tzinfo=UTC),
+    as_of=datetime(2026, 2, 2, tzinfo=UTC),
+    row_keys=("customer_id",),
+    output_table="analytics.customer_predictions",
+    model_name="customer-risk",
+    model_version="7",
+    model_digest=bundle.semantic_digest,
+    source_version=42,
+    code_version=version("skyulf-core"),
+    run_id="customer-risk-2026-01-v7",
+    expected_target_version=0,
+    mode="native_features",  # alternatively: "python_pipeline"
+)
+
+result = run_batch(
+    spark,
+    spec,
+    source="analytics.customer_features",
+    bundle=bundle,
+    options=ExecutionOptions("spark"),
+    admission=LocalTableLock("/var/lib/skyulf/publish-locks"),
+)
+print(result.commit_version, result.output_count, result.replayed)
+```
+
+`LocalTableLock` is for local Spark drivers on **one host**, all sharing the same
+lock directory. Use a writable directory managed for this purpose. Lock files
+are intentionally retained; do not delete them while publishers may run. The
+OS releases ownership when the process exits. This implementation is rejected
+on distributed Spark masters, including `local-cluster`.
+
+The `PublishAdmission` protocol is an extension boundary, not an implemented
+Databricks coordinator. A distributed implementation must hold exclusive
+ownership by immutable Delta table ID throughout validation, write and receipt
+verification. The current API does not pass fencing tokens to Delta, so an
+expiring lease is insufficient. Every publisher must participate in the same
+authority. Uncoordinated external writes are outside this guarantee; detected
+Delta conflicts still raise `BatchConflictError`.
+
+## Time and reproducibility
+
+The period is half-open: the start is included and the end is excluded. Aware
+datetimes are converted to UTC instants independently of the Spark session's
+timezone. For a business calendar month, construct boundaries explicitly:
+
+```python
+from zoneinfo import ZoneInfo
+
+zone = ZoneInfo("Europe/Vilnius")
+start = datetime(2026, 3, 1, tzinfo=zone)  # 2026-02-28 22:00 UTC
+end = datetime(2026, 4, 1, tzinfo=zone)    # 2026-03-31 21:00 UTC
+# Pass these as period_start/period_end and business_timezone="Europe/Vilnius".
+```
+
+`business_timezone` records calendar intent; it does not reinterpret the supplied
+instants. Naive datetimes and nonexistent local DST times are rejected. For an
+ambiguous local time, select the intended `fold` when constructing the datetime.
+
+`as_of` is a **snapshot availability cutoff**. The runner checks the selected
+Delta version's commit timestamp and then reads that exact `versionAsOf`. A newer
+snapshot or expired history fails. This does not establish point-in-time
+correctness of upstream feature joins: the source producer must implement its
+own historical feature and availability rules. No timestamp-column filter can
+retroactively reconstruct overwritten source rows. For a backfill, explicitly
+choose the intended model version and source snapshot; scheduler time is never
+silently substituted for either the period or cutoff.
+
+The Delta commit's `userMetadata` records the full request fingerprint, UTC
+period/cutoff, source table ID/version/commit time, model name/version/digest,
+installed Skyulf version, run ID and input/output counts. Only the three
+`__skyulf_*` columns shown above are repeated on each output row.
+
+## Retries, conflicts and empty periods
+
+- Reuse the **same spec and logical run ID** for a retry. A matching committed
+  receipt returns its original version and counts with `replayed=True`. It does
+  not write again, even if a newer run has since recomputed the same period.
+  The runner still reads and validates the source and bundle before checking
+  the sink receipt, so retries require those inputs to remain available.
+- Reusing a run ID with a changed request raises `BatchConflictError`.
+- To intentionally recompute a period, choose a new run ID and explicitly set
+  `expected_target_version` to the version you have reviewed. Any intervening
+  target commit makes that expectation stale. Do not automatically refresh it
+  and retry a conflict: that would silently authorize replacing another run.
+- Empty output fails unless `allow_empty=True`. With that explicit setting,
+  the same atomic replacement removes the selected period and records a receipt.
+  Other periods remain unchanged. Out-of-period/null output and incorrect run
+  metadata are rejected before writing.
+- Success is returned only after verifying the committed receipt. If the client
+  loses contact after commit, the outcome may be unknown: retry the unchanged
+  request to check the receipt. Preserve Delta history and transaction retention
+  for the supported retry window; this is not unlimited replay storage.
+
+The first mode is `replace_period`. Append, key `MERGE`, automatic schema
+evolution, streaming and endpoint deployment remain unsupported here. The sink
+helper is lower-level: direct callers must supply output and a manifest with
+the same provenance guarantees as `run_batch`.
+
+## Local verification
+
+Use Linux (or WSL) with Python 3.12 and Java 17. Windows Spark inference alone
+does not establish that Hadoop's filesystem support can write Delta locally.
+Keep this test environment separate from Databricks Runtime's bundled packages.
+
+```bash
+uv venv .venv-delta
+uv pip install --python .venv-delta/bin/python -r requirements-delta.txt
+SKYULF_REQUIRE_DELTA=1 .venv-delta/bin/python -m pytest \
+  skyulf-core/tests/integrations/test_batch_contract.py \
+  skyulf-core/tests/integrations/test_batch_admission.py \
+  skyulf-core/tests/integrations/test_delta_publish.py -q -o addopts=
+```
+
+The fixture configures the Delta extension/catalog and creates only temporary
+test tables. Its first launch downloads the matching Maven jars. For an offline
+run, `SKYULF_DELTA_JARS` may point to a prepared directory containing compatible
+Delta and transitive dependency jars. Required lanes fail when Delta is missing;
+the base environment skips optional Delta tests.
+
+Relevant upstream behavior: [Delta selective overwrite and idempotent writes](https://docs.delta.io/delta-batch/)
+and [Delta concurrency control](https://docs.delta.io/concurrency-control/).

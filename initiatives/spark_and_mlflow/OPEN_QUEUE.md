@@ -1,9 +1,9 @@
 # Spark ve MLflow — Open Queue
 
-Güncelleme: 2026-09-22. **SM-00–SM-13 tamamlandı; sıradaki SM-14. Hedef: 0.9.0.**
+Updated: 2026-09-22. **SM-00–SM-15 complete; SM-16 is next. Target: 0.9.0.**
 Bu dosya kısa çalışma sırasıdır; detaylar bağlantılı planlarda.
 
-Session resumed on 2026-09-22: read [HANDOFF.md](HANDOFF.md) before starting SM-14.
+Session resumed on 2026-09-22: read [HANDOFF.md](HANDOFF.md) before starting SM-16.
 
 Durumlar: READY = başlanabilir; WAIT = önceki görev bekleniyor;
 LATER = son aşama; ACTIVE = yürütülüyor; BLOCKED = somut dış engel;
@@ -26,8 +26,8 @@ DONE = kanıtla tamamlandı. SM-00 commit: `105a6fe4`.
 | SM-12 | Opsiyonel MLflow tracking | SM-11 | DONE | Off bağımsız; gerçek run lifecycle ve izolasyon |
 | SM-13 | MLflow model packaging | SM-12 | DONE | Temiz ortamda pyfunc yükleme ve parity |
 | SM-14 | Registry/Unity Catalog adapter | SM-13 | DONE | Explicit publish; alias/version pinning; local evidence |
-| SM-15 | Monthly batch + Delta sink | SM-14 | READY | Period isolation, retry and conflict control |
-| SM-16 | Gerçek Databricks kapısı | SM-15 | WAIT | Job/run kanıtı; UC load; iki inference yolu |
+| SM-15 | Monthly batch + Delta sink | SM-14 | DONE | 43 local Delta/contract/admission tests; evidence below |
+| SM-16 | Gerçek Databricks kapısı | SM-15 | READY | Platform setup, distributed admission, job/run evidence |
 | SM-17 | Kalan node aileleri | SM-16 | WAIT | Aile bazlı port; her kayıt supported/unsupported |
 | SM-18 | Backend/Canvas ve custom FE | SM-17 | LATER | Capability UI/API; DAG/artifact uyumu |
 | SM-19 | HTTP/SQL erişimi; optional streaming | SM-18 | LATER | Desteklenen erişimlerde batch ile aynı tahmin |
@@ -46,6 +46,74 @@ test/review kapısı vardır. Tüm node'ların native olması zorunlu değildir;
 gerçekten desteklenen kapsam ilan edilerek G5 kapatılır.
 SM-19 streaming isteğe bağlıdır; HTTP/SQL bittiğinde streaming unsupported
 olarak açıkça kaydedilebilir, template'i belirsiz süre bloke etmez.
+
+## SM-15 — 2026-09-22 validation record
+
+- Baseline `4a613cb5`; branch `090`. The delivery commit containing this record
+  adds `skyulf.integrations.databricks`, three batch test modules and a real
+  Delta fixture, the optional Delta dependency profile/CI lane, and the English
+  [monthly batch guide](../../docs/user_guide/databricks_batch.md).
+- `run_batch` pins a concrete Delta source version and verifies snapshot
+  availability at the explicit cutoff. Both existing Spark inference modes
+  feed a precreated Delta target. A committed manifest records request identity,
+  model digest, installed code version and counts. Source history newer than
+  `as_of`, mismatched bundle digest/runtime and ambiguous contracts fail.
+- Atomic `replaceWhere` preserves other periods. Empty deletion requires opt-in.
+  Run receipts prevent duplicate publication and prevent an old retry undoing
+  a newer recomputation. Changed requests under one run ID and stale target
+  versions fail. Local OS admission locks are tested across processes; both
+  runner and public sink reject local locks on distributed masters.
+- Final required Linux/WSL lane: **43 passed**, including **18 real Delta
+  integration cases** and **25 contract/admission cases**, no skips, 111.95s.
+  Python **3.12.3**, PySpark **4.0.3**, Delta Python/JVM **4.0.0**, Java 17;
+  pandas **2.3.3**, Polars **1.44.2**, Arrow **25.0.1**, sklearn **1.9.1**.
+  Initial exploratory tests used newer Python-package patch versions; the final
+  gate was rerun after aligning the environment with `requirements-delta.txt`.
+- Cases include a pinned old source after a newer commit, a non-UTC Spark
+  session, exact period boundaries, null/wrong metadata/count rejection with
+  target version unchanged, stale/new/old retries and committed empty deletion.
+  Admission permission denial uses fault injection; it is not live UC evidence.
+- Base regression: **105 passed, 26 skipped** with MLflow/Delta absent, plus
+  existing sklearn interchange and Windows physical-core warnings. Final narrow
+  Windows contract/admission run: **25 passed**. Ruff check/format, repository
+  Ty and strict MkDocs passed; the guide's Mermaid parsed with the real parser.
+  Repository pre-commit hooks passed, including the synchronized optional
+  dependency lock. GitHub Actions was added but has not run remotely.
+- Windows Hadoop filesystem support could not run real Delta I/O, so the
+  required transaction gate used an isolated Linux/WSL environment. No runtime
+  authentication or Databricks job was performed. Preserve pre-existing temp
+  folders and editor-created Databricks configuration outside this commit.
+- Remaining scope: the cutoff proves snapshot availability only, not upstream
+  point-in-time feature joins. Model registry identity is bound by the caller;
+  bundle digest is checked. Receipt/history retention bounds the retry window.
+  A shared local lock directory protects cooperative local writers on one host;
+  distributed admission requires a separate implementation with ownership held
+  throughout the commit. Expiring leases without sink fencing are unsupported.
+  These platform concerns and the carried registry-to-Spark gate belong to SM-16.
+
+Reproducible commands (Linux with Java 17 and an isolated environment):
+
+```bash
+uv venv .venv-delta
+uv pip install --python .venv-delta/bin/python -r requirements-delta.txt
+SKYULF_REQUIRE_DELTA=1 .venv-delta/bin/python -m pytest \
+  skyulf-core/tests/integrations/test_batch_contract.py \
+  skyulf-core/tests/integrations/test_batch_admission.py \
+  skyulf-core/tests/integrations/test_delta_publish.py -q -o addopts=
+```
+
+Exact local invocation used the prepared WSL environment and cached official jars:
+
+```powershell
+wsl -d Ubuntu -- bash .cache/sm15-linux-run.sh -m pytest skyulf-core/tests/integrations/test_batch_contract.py skyulf-core/tests/integrations/test_batch_admission.py skyulf-core/tests/integrations/test_delta_publish.py -q -p no:cacheprovider -o addopts= --basetemp /tmp/sm15-delta-pinned-final --tb=short
+.venv/Scripts/python.exe -m pytest skyulf-core/tests/spark/test_inference_bundle.py skyulf-core/tests/unit/test_pipeline_inference_schema.py skyulf-core/tests/integrations -q -o addopts= --basetemp .cache/sm15-base-final --tb=short
+.venv/Scripts/ty.exe check backend skyulf-core/skyulf skyulf-core/tests run_skyulf.py celery_worker.py
+.venv/Scripts/python.exe -m mkdocs build --strict --site-dir .cache/sm15-docs
+```
+
+The local shell wrapper exports Java 17, its Python worker executable is selected
+by the fixture, and `SKYULF_DELTA_JARS` points to the cached Delta 4.0.0 jars.
+The portable command above downloads those jars through Delta's normal helper.
 
 ## SM-13 — 2026-09-22 validation record
 
