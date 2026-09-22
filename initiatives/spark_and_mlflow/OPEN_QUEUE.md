@@ -1,9 +1,9 @@
 # Spark ve MLflow — Open Queue
 
-Güncelleme: 2026-09-22. **SM-00–SM-12 tamamlandı; sıradaki SM-13. Hedef: 0.9.0.**
+Güncelleme: 2026-09-22. **SM-00–SM-13 tamamlandı; sıradaki SM-14. Hedef: 0.9.0.**
 Bu dosya kısa çalışma sırasıdır; detaylar bağlantılı planlarda.
 
-Session resumed on 2026-09-22: read [HANDOFF.md](HANDOFF.md) before starting SM-12.
+Session resumed on 2026-09-22: read [HANDOFF.md](HANDOFF.md) before starting SM-14.
 
 Durumlar: READY = başlanabilir; WAIT = önceki görev bekleniyor;
 LATER = son aşama; ACTIVE = yürütülüyor; BLOCKED = somut dış engel;
@@ -24,8 +24,8 @@ DONE = kanıtla tamamlandı. SM-00 commit: `105a6fe4`.
 | SM-10 | Worker Python FE + model | SM-09 | DONE | Batch-safe portable FE; window gibi yollar açık ret |
 | SM-11 | Classification ve ölçek kapısı | SM-10 | DONE | Class/proba/threshold parity; transport, packaging and scale evidence |
 | SM-12 | Opsiyonel MLflow tracking | SM-11 | DONE | Off bağımsız; gerçek run lifecycle ve izolasyon |
-| SM-13 | MLflow model packaging | SM-12 | READY | Temiz ortamda pyfunc yükleme ve parity |
-| SM-14 | Registry/Unity Catalog adapter | SM-13 | WAIT | URI/signature; alias → sabit version |
+| SM-13 | MLflow model packaging | SM-12 | DONE | Temiz ortamda pyfunc yükleme ve parity |
+| SM-14 | Registry/Unity Catalog adapter | SM-13 | READY | URI/signature; alias → sabit version |
 | SM-15 | Aylık batch + Delta sink | SM-14 | WAIT | Dönem izolasyonu, retry ve conflict kontrolü |
 | SM-16 | Gerçek Databricks kapısı | SM-15 | WAIT | Job/run kanıtı; UC load; iki inference yolu |
 | SM-17 | Kalan node aileleri | SM-16 | WAIT | Aile bazlı port; her kayıt supported/unsupported |
@@ -46,6 +46,49 @@ test/review kapısı vardır. Tüm node'ların native olması zorunlu değildir;
 gerçekten desteklenen kapsam ilan edilerek G5 kapatılır.
 SM-19 streaming isteğe bağlıdır; HTTP/SQL bittiğinde streaming unsupported
 olarak açıkça kaydedilebilir, template'i belirsiz süre bloke etmez.
+
+## SM-13 — 2026-09-22 validation record
+
+- Added optional MLflow `pyfunc` packaging in
+  `skyulf/integrations/mlflow/model.py`. `log_model` serializes the existing
+  `InferenceBundle`, records a manifest-derived named signature and synthetic
+  input example, and uploads the model directory to the explicitly supplied
+  run ID through `MlflowClient`. `tracking_uri` can be passed when the run was
+  created by a client-bound tracker; no global active run is used to select the
+  destination.
+- Raw and features bundles preserve local prediction results after MLflow
+  save/load for pandas and Polars-trained pipelines. Classification tests cover
+  class order, probabilities and tuned thresholds. Positional NumPy/list input
+  is rejected. Dtypes without an exact MLflow column representation are rejected
+  during signature creation rather than silently widened.
+- Baseline `67315253`; this delivery commit includes implementation, tests,
+  English guide and validation records. Python 3.12.10 / MLflow 3.16.1:
+  **31 passed** (23 model, 8 tracking) with the wheel subprocess gate enabled.
+  Base bundle/schema/integration regression: **80 passed, 7 skipped** with
+  existing numeric/protocol warnings. Base tracking/model alone: **4 passed,
+  5 skipped**; MLflow is absent. Ruff, repository Ty/pre-commit and strict
+  MkDocs passed. Only MLflow 3.16.1 was exercised.
+- The isolated consumer environment reused installed dependencies and replaced
+  editable Skyulf with the final 0.9.0 wheel. Python `-I` loaded the model from
+  a temporary working directory, asserted imports from site-packages and
+  matched producer predictions. This verifies independent package imports,
+  not a fresh network dependency install.
+- MLflow aligns named columns, ignores extras and safely casts compatible
+  request types before bundle validation; direct `predict_local` still requires
+  exact names/order/dtypes. This transport boundary has an explicit regression.
+  Tests also exclude the producer's uv project and temporary source paths and
+  preserve an unrelated active run on a different tracking store.
+- Scope boundary: registry/Unity Catalog resolution, G2 runner evidence,
+  Databricks jobs, Spark UDF/endpoint adapters and Delta batch publication stay
+  in SM-14–SM-16. SM-14 is now the next task.
+
+Reproducible verification (consumer Python must contain the final built wheel):
+
+```powershell
+$env:SKYULF_MLFLOW_WHEEL_PYTHON = (Resolve-Path .cache/sm13-clean-env/Scripts/python.exe).Path
+.cache/sm12-mlflow-env/Scripts/python.exe -m pytest skyulf-core/tests/integrations/test_mlflow_tracking.py skyulf-core/tests/integrations/test_mlflow_model.py -q -o addopts= --basetemp .cache/sm13-delivery --tb=short
+.venv/Scripts/python.exe -m pytest skyulf-core/tests/spark/test_inference_bundle.py skyulf-core/tests/unit/test_pipeline_inference_schema.py skyulf-core/tests/integrations -q -o addopts= --basetemp .cache/sm13-base-regression --tb=short
+```
 
 ## SM-12 — 2026-09-22 validation record
 

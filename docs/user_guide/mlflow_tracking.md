@@ -54,6 +54,6 @@ does not write backend job metadata itself. A successful context terminates its
 own run as `FINISHED`; an exception in the training body terminates it as
 `FAILED`.
 
-This integration creates tracking metadata only. Model packaging, registry or
-Unity Catalog resolution, Delta batch publication, and Databricks deployment
-are separate later stages of the 0.9.0 initiative.
+This adapter creates tracking metadata. See [MLflow models](mlflow_models.md)
+to package a fitted inference bundle in the same run. Registry/Unity Catalog,
+Delta batch publication and Databricks deployment remain later stages.

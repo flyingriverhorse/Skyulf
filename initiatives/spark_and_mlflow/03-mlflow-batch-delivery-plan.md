@@ -61,39 +61,45 @@ MLflow 3.16.1 environment passed all 8 tracking tests, including SQLite
 FINISHED/FAILED lifecycle, concurrent run-ID isolation, caller active-run
 preservation, explicit config digest/artifact, and warn-mode failure handling.
 
-## SM-13 — MLflow model flavor ve bağımsız yükleme
+## SM-13 — MLflow model packaging and independent loading
 
-**Bağımlılık:** SM-12. **Oluştur:** `skyulf/integrations/mlflow/model.py`,
+**Dependency:** SM-12. **Files:** `skyulf/integrations/mlflow/model.py`,
 `tests/integrations/test_mlflow_model.py`.
-**Üretir:** `log_model(bundle, *, run_id, artifact_path) -> model_uri`;
-`SkyulfPythonModel` pyfunc adapter; `load_context` bundle yükler,
-`predict` SM-08 `predict_local` kullanır.
+**API:** `log_model(bundle, *, run_id, artifact_path, tracking_uri=None) -> model_uri`;
+`SkyulfPythonModel.load_context` loads the existing bundle and `predict`
+delegates to SM-08 `predict_local` after MLflow signature enforcement.
 
-- [ ] pyfunc save/load sonrası raw/features giriş sözleşmesi, class/threshold,
-  dtype ve feature order parity testi yaz. NumPy positional girdiye sessiz uyarlama yok.
-- [ ] Signature/input example oluştur; küçük sentetik örnek kullan, üretim
-  verisini model example içine otomatik koyma. Wheel sürümü ve requirements kayıtlı.
-- [ ] Model loglama açık run_id kullanır; track_run'ın run nesnesi bu kimliği
-  sunar. Süreç genelindeki active run durumuna dayanarak başka işe artifact yazma.
-- [ ] Temiz subprocess/venv'de modeli yükle; çalışma dizinindeki repo importuna
-  güvenmediğini doğrula. Notebook closure veya SparkSession pickle etme.
-- [ ] G2 runner ile registry URI'den indirilen aynı bundle'ı çalıştır. MLflow
-  spark_udf kullanılırsa adapter yine aynı prediction sözleşmesini uygulasın;
-  ikinci ayrı preprocessing implementation yazma.
+- [x] Real pyfunc save/load preserves raw/features predictions for pandas and
+  Polars-trained pipelines, class probabilities, thresholds, index and dtypes.
+  Named columns reach the estimator in its recorded feature order.
+- [x] Record the manifest-derived signature, a synthetic zero-like row, pinned
+  requirements and wheel version. Never auto-capture production examples,
+  notebook closures, Spark sessions or the producer's uv project.
+- [x] Log through an explicit client/run ID, including when an unrelated fluent
+  run is active on a different store; preserve that run and global URI.
+- [x] Load from a wheel-installed interpreter with Python `-I`, assert import
+  from site-packages, and compare predictions with the producer's bundle.
 
-```python
-def test_pyfunc_matches_bundle(logged_pyfunc, regression_bundle, raw_frame):
-    """MLflow packaging must not alter the established local prediction semantics."""
-    import numpy as np
-    from skyulf.inference.bundle import predict_local
-    expected = predict_local(raw_frame, regression_bundle)["prediction"]
-    actual = logged_pyfunc.predict(raw_frame)["prediction"]
-    np.testing.assert_allclose(actual, expected, rtol=1e-10, atol=1e-12)
-```
+**Transport boundary:** MLflow's named signature may reorder columns, ignore
+extras and perform safe casts before the adapter receives the frame. This is
+explicitly tested and documented; direct `predict_local` still requires exact
+schema/order. Positional arrays/lists and missing names fail. Bundle input
+types without an exact MLflow representation (`int8`, `int16`, unsigned ints)
+are rejected before contacting a store; bool/int32/int64/float32/float64 work.
 
-`logged_pyfunc` fixture geçici local MLflow store'da log_model + load_model yapar.
-**Komut:** `python -m pytest skyulf-core/tests/integrations/test_mlflow_model.py -q`
-**Kabul:** G3a: MLflow artifact bağımsız Python ortamında doğru tahmin verir.
+**Validation (2026-09-22, Python 3.12.10, MLflow 3.16.1):** **31 passed** for
+tracking and model tests with the wheel subprocess gate enabled (23 model,
+8 tracking). Base bundle/schema/integration regression: **80 passed, 7 skipped**;
+optional dependencies are absent there. Scoped Ruff, repository Ty/pre-commit
+and strict MkDocs checks pass. Exact commands and evidence are in
+[OPEN_QUEUE.md](OPEN_QUEUE.md#sm-13--2026-09-22-validation-record).
+The isolated consumer environment reused installed dependencies and replaced
+editable Skyulf with the final 0.9.0 wheel; this verifies independent imports,
+not a fresh network dependency install. Only MLflow 3.16.1 was exercised.
+
+**Acceptance:** G3a is complete for local pyfunc packaging. The registry-to-G2
+item originally listed here requires SM-14 and is carried forward below;
+real Unity Catalog/Databricks evidence stays in SM-16. No Spark UDF was added.
 
 ## SM-14 — Registry ve Unity Catalog adapter'ı
 
@@ -105,6 +111,9 @@ URI çözümleme ile eşdeğer sayma, eski metotların return tipi değişmesin.
 ResolvedModel(name, version, model_uri, signature, digest).
 `register_model(model_uri, name)` explicit publish işlemidir; tahmin sırasında çağrılmaz.
 
+- [ ] Carry-forward from SM-13: run the G2 Spark runner on the same bundle
+  downloaded through a concrete registry URI. If an MLflow Spark UDF is added,
+  reuse the existing prediction contract rather than duplicating FE.
 - [ ] Alias/version aynı anda verilirse ve ikisi de yoksa açık config hatası;
   missing model/permission failure ile dependency failure ayrı hatalar olsun.
 - [ ] Alias'ı bir kez resolve et, concrete version URI'yi bütün iş boyunca taşı.
