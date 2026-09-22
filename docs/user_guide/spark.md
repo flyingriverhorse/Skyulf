@@ -121,10 +121,15 @@ responsibility. In particular, Spark's
 [`toPandas`](https://spark.apache.org/docs/4.0.3/api/python/reference/pyspark.sql/api/pyspark.sql.DataFrame.toPandas.html)
 collects data into driver memory.
 
-Validation currently covers classic PySpark 4.0.3 on the local test runtime.
-The adapter uses public dataframe APIs, but Databricks and Spark Connect have
-not been integration-tested yet. Engine detection does not authorize a Spark
-frame to run through existing local-only FE nodes.
+Validation covers classic PySpark 4.0.3 locally and a limited live Databricks
+serverless Spark Connect 4.2.0 inference path. The latter loads a Polars-trained
+regression bundle from Unity Catalog and applies mean imputation/StandardScaler
+in both inference modes. It does not certify every Spark fit operation or compute
+type. Engine detection does not authorize local-only FE nodes on Spark input.
+
+Serverless hides `spark.sql.caseSensitive`. Skyulf handles that specific
+unavailable-configuration condition with conservative case-insensitive collision
+checks; unrelated connection and permission failures still propagate.
 
 ## Execution contracts
 
@@ -546,10 +551,12 @@ explains how existing pipeline pickle and backend joblib artifacts relate to
 the new bundle. Saving fitted FE with a model already existed; distributed
 execution requires explicit support for the transformations in that artifact.
 
-Current distributed model support is regression with native mean/constant
-imputation and StandardScaler, including an empty FE chain. Local training can
-use pandas or Polars. Classification, MLflow packaging and Databricks runtime
-validation have separate later gates.
+Distributed inference supports raw regression and classification in both modes,
+with the documented portable FE restrictions. Local training can use pandas or
+Polars. MLflow packaging and registry loading are available. Live Databricks
+serverless regression parity, monthly Delta publication, writer coordination
+and restricted-principal write denial have passed the selected SM-16 workflow.
+This does not extend cloud validation to every node or classification path.
 
 ## Capability declarations
 

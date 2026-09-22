@@ -11,6 +11,49 @@ import pytest
 from skyulf.integrations.databricks.admission import BatchConflictError
 
 
+class ServerlessRefreshError(Exception):
+    """Represent the structured error observed from serverless REFRESH TABLE."""
+
+    def getCondition(self):
+        """Expose the public Spark error condition without parsing its message."""
+        return "NOT_SUPPORTED_WITH_SERVERLESS"
+
+
+def test_serverless_refresh_restriction_preserves_identity_read(monkeypatch):
+    """Serverless must still read the Delta identity when explicit refresh is unavailable."""
+    from types import SimpleNamespace
+
+    module = importlib.import_module("skyulf.integrations.databricks.delta_admission")
+    reads = []
+
+    def sql(statement):
+        """Reproduce the exact live failure before DESCRIBE DETAIL can execute."""
+        assert statement == "REFRESH TABLE `default`.`authority`"
+        raise ServerlessRefreshError()
+
+    def identity(spark, table):
+        """Record the identity read that must follow a rejected cache operation."""
+        reads.append(table)
+        return "immutable-control-id"
+
+    monkeypatch.setattr(module, "table_identity", identity)
+    provider = module.DeltaTableAdmission(SimpleNamespace(sql=sql), "default.authority")
+    assert provider._control_id == "immutable-control-id"
+    assert reads == ["default.authority"]
+
+
+def test_refresh_permission_failure_is_not_suppressed():
+    """A missing privilege must never be treated as an unsupported cache operation."""
+    from types import SimpleNamespace
+
+    def sql(statement):
+        """Refuse access before any ownership operation can begin."""
+        raise PermissionError("refresh access denied")
+
+    with pytest.raises(PermissionError, match="refresh access denied"):
+        _provider(SimpleNamespace(sql=sql), "default.authority")
+
+
 def _provider(spark, table):
     """Load the optional provider without importing Spark in the base test lane."""
     module = importlib.import_module("skyulf.integrations.databricks.delta_admission")
@@ -51,6 +94,28 @@ def test_held_claim_rejects_second_session_then_releases(control):
     with second.hold(target):
         assert spark.table(table).first().owner != token
     assert first.local_only is False
+
+
+def test_serverless_refresh_restriction_preserves_committed_ownership(control, monkeypatch):
+    """Fresh Delta reads must see another owner's claim even without REFRESH TABLE."""
+    spark, table, target = control
+    original = type(spark).sql
+
+    def restricted(self, statement, *args, **kwargs):
+        """Reject only the cache command that real serverless compute rejects."""
+        if statement.startswith("REFRESH TABLE "):
+            raise ServerlessRefreshError()
+        return original(self, statement, *args, **kwargs)
+
+    monkeypatch.setattr(type(spark), "sql", restricted)
+    first = _provider(spark, table)
+    second = _provider(spark.newSession(), table)
+    with first.hold(target):
+        owner = spark.table(table).first().owner
+        with pytest.raises(BatchConflictError), second.hold(target):
+            pytest.fail("A second publisher ignored committed ownership.")
+        assert spark.table(table).first().owner == owner
+    assert spark.table(table).first().owner is None
 
 
 def test_body_failure_releases_claim(control):

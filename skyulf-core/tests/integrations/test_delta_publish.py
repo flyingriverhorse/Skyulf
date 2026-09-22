@@ -289,3 +289,86 @@ def test_admission_permission_failure_preserves_target(harness):
             admission=DeniedAdmission(),
         )
     assert h.spark.sql(f"DESCRIBE HISTORY {h.target}").first().version == 0
+
+
+@pytest.mark.parametrize(
+    "mode,condition_api",
+    [("native_features", "getCondition"), ("python_pipeline", "getErrorClass")],
+)
+def test_serverless_cache_rejection_publishes_and_replays(
+    harness, monkeypatch, mode, condition_api
+):
+    """Only structured serverless cache rejection may use distributed uncached publication."""
+    h = harness
+    error = RuntimeError("cache unsupported")
+    monkeypatch.setattr(
+        error, condition_api, lambda: "NOT_SUPPORTED_WITH_SERVERLESS", raising=False
+    )
+
+    def reject_persist(frame, *args, **kwargs):
+        """Represent the rejected cache API while keeping every Spark/Delta action real."""
+        raise error
+
+    def reject_unpersist(frame, *args, **kwargs):
+        """Unpersist is also unsupported and must not follow a failed persist."""
+        raise AssertionError("Unpersist called after rejected persistence.")
+
+    frame_type = type(h.spark.table(h.source))
+    monkeypatch.setattr(frame_type, "persist", reject_persist)
+    monkeypatch.setattr(frame_type, "unpersist", reject_unpersist)
+    spec = replace(h.spec, mode=mode)
+    first, replay = _run(h, spec), _run(h, spec)
+    rows = h.spark.table(h.target).orderBy("id").collect()
+    assert [row.id for row in rows] == [1, 2, 9]
+    assert [row.prediction for row in rows] == pytest.approx([2.0, 4.0, 99.0])
+    assert rows[-1]["__skyulf_run_id"] == "prior"
+    assert first.input_count == first.output_count == 2
+    assert first.commit_version == replay.commit_version == 1
+    assert first.replayed is False
+    assert replay.replayed is True
+    assert first.manifest == replay.manifest
+
+
+@pytest.mark.parametrize("structured", [False, True])
+def test_other_cache_errors_propagate_before_target_mutation(harness, monkeypatch, structured):
+    """Neither message text nor unrelated structured failures may bypass cache errors."""
+    h = harness
+    error = RuntimeError("NOT_SUPPORTED_WITH_SERVERLESS")
+    if structured:
+        monkeypatch.setattr(error, "getCondition", lambda: "PERMISSION_DENIED", raising=False)
+
+    def reject_persist(frame, *args, **kwargs):
+        """Fail only at the real prediction frame's optional cache boundary."""
+        raise error
+
+    monkeypatch.setattr(type(h.spark.table(h.source)), "persist", reject_persist)
+    before = h.spark.table(h.target).collect()
+    with pytest.raises(RuntimeError) as caught:
+        _run(h)
+    assert caught.value is error
+    assert h.spark.table(h.target).collect() == before
+    assert h.spark.sql(f"DESCRIBE HISTORY {h.target}").first().version == 0
+
+
+def test_classic_cache_is_released_after_success_and_conflict(harness, monkeypatch):
+    """Classic runtimes retain caching but release real persisted frames on every exit."""
+    from skyulf.integrations.databricks.admission import BatchConflictError
+
+    h = harness
+    frame_type = type(h.spark.table(h.source))
+    persist = frame_type.persist
+    persisted = []
+
+    def retain_persisted_frame(frame, *args, **kwargs):
+        """Observe actual cache state without replacing Spark's persistence behavior."""
+        result = persist(frame, *args, **kwargs)
+        assert result.storageLevel.useMemory
+        persisted.append(result)
+        return result
+
+    monkeypatch.setattr(frame_type, "persist", retain_persisted_frame)
+    _run(h)
+    with pytest.raises(BatchConflictError):
+        _run(h, replace(h.spec, run_id="stale-cached-run"))
+    assert len(persisted) == 2
+    assert all(not frame.storageLevel.useMemory for frame in persisted)

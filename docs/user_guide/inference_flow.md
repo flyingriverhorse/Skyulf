@@ -203,8 +203,10 @@ backend artifact format is a separate delivery.
 
 Local/Spark describes where and how computation runs. Monthly batch scheduling,
 HTTP endpoints and SQL access describe how it is invoked; they are separate from
-the training or FE algorithm. MLflow/Unity Catalog packaging and registry support,
-real Databricks validation, endpoints and templates remain later stages.
+the training or FE algorithm. MLflow packaging and registry loading are available;
+both Spark modes have passed a real Databricks serverless regression probe using
+a Polars-trained model from Unity Catalog. The monthly Delta runner has separate
+publication checks. Endpoints and reusable templates remain later stages.
 
 For runnable code, see the [Spark batch inference example](inference_bundles.md#native-spark-fe-and-worker-model-inference).
 The SVG diagrams on this page display without Mermaid support; each has an

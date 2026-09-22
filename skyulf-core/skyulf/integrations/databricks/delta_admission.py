@@ -36,8 +36,18 @@ class DeltaTableAdmission:
         self._control_id = self._identity()
 
     def _identity(self) -> str:
-        """Invalidate cached metadata and read the authority's current Delta ID."""
-        self._spark.sql(f"REFRESH TABLE {self._quoted_table}").collect()
+        """Refresh where supported, then read the authority's current Delta ID.
+
+        Serverless disallows both explicit refresh and user-managed Spark caches.
+        There we issue fresh Delta reads without a refresh command. The authority
+        must retain its fixed name/identity; external DDL remains unsupported.
+        """
+        try:
+            self._spark.sql(f"REFRESH TABLE {self._quoted_table}").collect()
+        except Exception as exc:  # noqa: BLE001 - classic and Connect expose different classes
+            condition = getattr(exc, "getCondition", None) or getattr(exc, "getErrorClass", None)
+            if not callable(condition) or condition() != "NOT_SUPPORTED_WITH_SERVERLESS":
+                raise
         return table_identity(self._spark, self._table)
 
     def _state(self, target_id: str) -> str | None:

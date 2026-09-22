@@ -61,9 +61,12 @@ validation data, not a second feature-engineering implementation.
 
 For Unity Catalog, pass a three-part model name (`catalog.schema.model`) and a
 `databricks-uc` registry URI. Tracking and registry URIs remain separate. The
-local tests cover this configuration validation and separate local stores; a
-live Databricks/Unity Catalog connection is deliberately reserved for the SM-16
-platform gate.
+local tests cover configuration validation and separate stores. A live
+Databricks serverless Spark Connect 4.2.0 test registered and loaded a
+Polars-trained regression bundle, then verified both Spark inference modes.
+A separate restricted service principal loaded an allowed model and received
+`RegistryAccessError` for a model without `EXECUTE` permission. This evidence
+does not establish compatibility with every compute type or registry backend.
 
 Load the selected artifact with `load_registered_bundle`. It uses the pinned
 name/version and the package's declared bundle path, rejects paths outside the

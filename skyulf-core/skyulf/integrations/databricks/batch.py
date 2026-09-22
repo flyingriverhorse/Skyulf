@@ -33,6 +33,8 @@ def run_batch(
     correctness of upstream feature joins. The caller binds a concrete registry
     version to ``model_digest`` when constructing the spec. Both existing Spark
     inference modes are supported. Tables and Spark sessions remain caller-owned.
+    Output stays distributed when serverless rejects persistence; classic Spark
+    caches it through receipt validation and then releases the cached frame.
     """
     if not isinstance(options, ExecutionOptions) or options.engine != "spark":
         raise ValueError("run_batch requires ExecutionOptions(engine='spark').")
@@ -97,7 +99,18 @@ def run_batch(
     target = spark.table(spec.output_table)
     if {f.name: f.dataType for f in output.schema} != {f.name: f.dataType for f in target.schema}:
         raise ValueError("Output schema must match the precreated Delta target exactly.")
-    output = output.select(*target.columns).persist()
+    output = output.select(*target.columns)
+    persisted = False
+    try:
+        output = output.persist()
+    except Exception as exc:  # noqa: BLE001 - Spark Connect wraps structured runtime errors
+        condition = getattr(exc, "getCondition", None)
+        if not callable(condition):
+            condition = getattr(exc, "getErrorClass", None)
+        if not callable(condition) or condition() != "NOT_SUPPORTED_WITH_SERVERLESS":
+            raise
+    else:
+        persisted = True
     try:
         output_count = output.count()
         if input_count != output_count:
@@ -117,7 +130,8 @@ def run_batch(
             replayed,
         )
     finally:
-        output.unpersist()
+        if persisted:
+            output.unpersist()
 
 
 def _manifest(

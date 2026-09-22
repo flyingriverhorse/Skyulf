@@ -1,0 +1,190 @@
+{
+  "validated_on": "2026-09-22",
+  "platform_gate_complete": true,
+  "scope": "Selected serverless Connect regression workflow; bounded synthetic scale smoke.",
+  "runtime": {
+    "python": "3.12.3",
+    "spark": "4.2.0",
+    "mlflow": "3.16.1",
+    "pyarrow": "25.0.1",
+    "pandas": "2.2.3",
+    "polars": "1.44.2",
+    "scikit_learn": "1.6.1",
+    "databricks_runtime": "client.4.10"
+  },
+  "wheel_version": "0.9.0",
+  "r3_wheel_sha256": "e2ce61eb3f11f25dd334934b9b45832cc3901ceba2aa04a5a28bb091232a29c5",
+  "model_name": "workspace.skyulf_sm16_20260922.probe_3e8e88a3d2f2435a9c2b7b280a184bc2",
+  "model_version": "1",
+  "model_digest": "66890475ca608271a6115ed2505890740bd6669fd9301711f9032390b4ea8084",
+  "prediction_parity_passed": true,
+  "input_snapshots": {
+    "initial_and_replay": 0,
+    "empty_and_replay": 1,
+    "contention": 0
+  },
+  "job_run_ids": {
+    "registry": 447606109645160,
+    "permissions_and_scale": 2921374308246,
+    "monthly": 783094949884769,
+    "winner": 973709879452231,
+    "contender_failed_assertion": 404334394214907,
+    "write_denial": 977447944071613
+  },
+  "contention_evidence": "Winner SUCCESS after waiting for contender REJECTED acknowledgement. Contender FAILED only in subsequent write-denial error-code assertion; its prior conflict/owner/version checks passed. Final restricted-only run verifies actual denial and unchanged data/version/released owner.",
+  "monthly_report": {
+    "stage": "delta_publication",
+    "platform_gate_complete": false,
+    "checks": {
+      "publication": true,
+      "replay": true,
+      "stale_rejected": true,
+      "empty_rejected": true,
+      "empty_replacement": true,
+      "empty_replay": true,
+      "ownership_released": true,
+      "prior_period_preserved": true
+    },
+    "model_name": "workspace.skyulf_sm16_20260922.probe_3e8e88a3d2f2435a9c2b7b280a184bc2",
+    "model_version": "1",
+    "model_digest": "66890475ca608271a6115ed2505890740bd6669fd9301711f9032390b4ea8084",
+    "code_version": "0.9.0",
+    "tables": {
+      "source": {
+        "name": "workspace.skyulf_sm16_20260922.skyulf_delta_smoke_4bbeac1816a04bbe854c85903256c41d_source",
+        "id": "36b4f01d-3378-48e9-a93f-c593b634acef",
+        "version": 1,
+        "count": 1
+      },
+      "target": {
+        "name": "workspace.skyulf_sm16_20260922.skyulf_delta_smoke_4bbeac1816a04bbe854c85903256c41d_target",
+        "id": "f16a3d46-8a00-4c55-9ac8-8f7690b17647",
+        "version": 2,
+        "count": 1
+      },
+      "control": {
+        "name": "workspace.skyulf_sm16_20260922.skyulf_delta_smoke_4bbeac1816a04bbe854c85903256c41d_control",
+        "id": "fe57f94d-a91a-44c1-a294-d0caaee19f7f",
+        "version": 10,
+        "count": 1
+      }
+    },
+    "receipts": {
+      "first": {
+        "commit_version": 1,
+        "input_count": 2,
+        "output_count": 2,
+        "replayed": false
+      },
+      "replay": {
+        "commit_version": 1,
+        "input_count": 2,
+        "output_count": 2,
+        "replayed": true
+      },
+      "empty": {
+        "commit_version": 2,
+        "input_count": 0,
+        "output_count": 0,
+        "replayed": false
+      },
+      "empty_replay": {
+        "commit_version": 2,
+        "input_count": 0,
+        "output_count": 0,
+        "replayed": true
+      }
+    },
+    "alias_report": {
+      "pinned_version": "1",
+      "alias_version": "2",
+      "alias": "sm16_validation",
+      "checks": {
+        "reload_after_prior_alias_movement": true
+      },
+      "movement_run": 810044894558535
+    },
+    "worker_report": [
+      {
+        "rows": 8,
+        "files": 225,
+        "package_digest": "2d5da10303be00bd58c2cb5f6f2e468ad54bfd683181c5b511f09fa2aedd78f0"
+      },
+      {
+        "rows": 8,
+        "files": 225,
+        "package_digest": "2d5da10303be00bd58c2cb5f6f2e468ad54bfd683181c5b511f09fa2aedd78f0"
+      }
+    ]
+  },
+  "winner_report": {
+    "role": "winner",
+    "commit_version": 3,
+    "ownership_released": true,
+    "run_id": "sm16-3d74ef662d5047dfb90a13ec42dc5eaa-winner",
+    "trial": "3d74ef662d5047dfb90a13ec42dc5eaa",
+    "source": "workspace.skyulf_sm16_20260922.skyulf_delta_smoke_4bbeac1816a04bbe854c85903256c41d_source",
+    "target": "workspace.skyulf_sm16_20260922.skyulf_delta_smoke_4bbeac1816a04bbe854c85903256c41d_target",
+    "control": "workspace.skyulf_sm16_20260922.skyulf_delta_smoke_4bbeac1816a04bbe854c85903256c41d_control",
+    "signal": "workspace.skyulf_sm16_20260922.skyulf_contention_3d74ef662d5047dfb90a13ec42dc5eaa",
+    "platform_gate_complete": false
+  },
+  "loser_report": {
+    "stage": "restricted_delta_write_denial",
+    "principal": "9559edaa-81e3-434b-a679-35703510c134",
+    "trial": "3d74ef662d5047dfb90a13ec42dc5eaa",
+    "target_write_denied": true,
+    "denied_condition": "UNAUTHORIZED_ACCESS",
+    "target_version_before": 3,
+    "target_version_after": 3,
+    "target_data_unchanged": true,
+    "ownership_released": true,
+    "original_winner_rows_verified": true,
+    "source": "workspace.skyulf_sm16_20260922.skyulf_delta_smoke_4bbeac1816a04bbe854c85903256c41d_source",
+    "target": "workspace.skyulf_sm16_20260922.skyulf_delta_smoke_4bbeac1816a04bbe854c85903256c41d_target",
+    "control": "workspace.skyulf_sm16_20260922.skyulf_delta_smoke_4bbeac1816a04bbe854c85903256c41d_control",
+    "signal": "workspace.skyulf_sm16_20260922.skyulf_contention_3d74ef662d5047dfb90a13ec42dc5eaa",
+    "platform_gate_complete": false
+  },
+  "registry_denial_type": "RegistryAccessError",
+  "scale_observations": [
+    {
+      "rows": 10000,
+      "requested_partitions": 2,
+      "mode": "native_features",
+      "elapsed_seconds": 9.908594848000007,
+      "max_error": 8.881784197001252e-16,
+      "driver_process_peak_rss_kib": 2276596
+    },
+    {
+      "rows": 10000,
+      "requested_partitions": 2,
+      "mode": "python_pipeline",
+      "elapsed_seconds": 2.073023195000019,
+      "max_error": 8.881784197001252e-16,
+      "driver_process_peak_rss_kib": 2276596
+    },
+    {
+      "rows": 50000,
+      "requested_partitions": 8,
+      "mode": "native_features",
+      "elapsed_seconds": 20.367470204999904,
+      "max_error": 8.881784197001252e-16,
+      "driver_process_peak_rss_kib": 2276596
+    },
+    {
+      "rows": 50000,
+      "requested_partitions": 8,
+      "mode": "python_pipeline",
+      "elapsed_seconds": 2.3294997059999787,
+      "max_error": 8.881784197001252e-16,
+      "driver_process_peak_rss_kib": 2276596
+    }
+  ],
+  "memory_scope": "driver_process_peak_rss_kib is notebook/Connect client Python lifetime peak; not Spark JVM or cluster memory. Worker import RSS was a separate probe, not inference memory.",
+  "limitations": [
+    "No production performance claim.",
+    "No classification or Spark-fit cloud certification.",
+    "Admission covers cooperating writers using the same fixed control authority."
+  ]
+}

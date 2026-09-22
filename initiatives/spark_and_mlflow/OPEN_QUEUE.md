@@ -1,9 +1,9 @@
 # Spark ve MLflow — Open Queue
 
-Updated: 2026-09-22. **SM-00–SM-15 complete; SM-16 ACTIVE. Target: 0.9.0.**
+Updated: 2026-09-22. **SM-00–SM-16 complete; SM-15L READY. Target: 0.9.0.**
 Bu dosya kısa çalışma sırasıdır; detaylar bağlantılı planlarda.
 
-Session resumed on 2026-09-22: read [HANDOFF.md](HANDOFF.md) before starting SM-16.
+Read [HANDOFF.md](HANDOFF.md) before starting SM-15L.
 
 Durumlar: READY = başlanabilir; WAIT = önceki görev bekleniyor;
 LATER = son aşama; ACTIVE = yürütülüyor; BLOCKED = somut dış engel;
@@ -27,8 +27,8 @@ DONE = kanıtla tamamlandı. SM-00 commit: `105a6fe4`.
 | SM-13 | MLflow model packaging | SM-12 | DONE | Temiz ortamda pyfunc yükleme ve parity |
 | SM-14 | Registry/Unity Catalog adapter | SM-13 | DONE | Explicit publish; alias/version pinning; local evidence |
 | SM-15 | Monthly batch + Delta sink | SM-14 | DONE | 43 local Delta/contract/admission tests; evidence below |
-| SM-16 | Gerçek Databricks kapısı | SM-15 | ACTIVE | Live UC/Spark parity passed: `447606109645160`; remaining platform gates open |
-| SM-15L | Local pandas/Polars Delta sink | SM-16 | WAIT | Same period/retry guarantees; real local writer and UC access tests |
+| SM-16 | Gerçek Databricks kapısı | SM-15 | DONE | Selected serverless workflow passed; live evidence below |
+| SM-15L | Local pandas/Polars Delta sink | SM-16 | READY | Next: same period/retry guarantees; local writer and UC access tests |
 | SM-17 | Kalan node aileleri | SM-16 | WAIT | Aile bazlı port; her kayıt supported/unsupported |
 | SM-18 | Backend/Canvas ve custom FE | SM-17 | LATER | Capability UI/API; DAG/artifact uyumu | Parked
 | SM-19 | HTTP/SQL erişimi; optional streaming | SM-18 | LATER | Desteklenen erişimlerde batch ile aynı tahmin | Parked
@@ -36,7 +36,7 @@ DONE = kanıtla tamamlandı. SM-00 commit: `105a6fe4`.
 
 ## Detay planlar
 
-- Active SM-16 preparation and remaining gates: [PLATFORM_VALIDATION.md](PLATFORM_VALIDATION.md).
+- Completed SM-16 evidence and scope: [PLATFORM_VALIDATION.md](PLATFORM_VALIDATION.md).
 - SM-15 currently provides the Spark writer only. The user's local-engine
   Delta requirement is tracked separately as SM-15L and must be satisfied before
   SM-20 offers that template combination. Template work remains last.
@@ -54,7 +54,7 @@ gerçekten desteklenen kapsam ilan edilerek G5 kapatılır.
 SM-19 streaming isteğe bağlıdır; HTTP/SQL bittiğinde streaming unsupported
 olarak açıkça kaydedilebilir, template'i belirsiz süre bloke etmez.
 
-## SM-16 — 2026-09-22 local preparation, still ACTIVE
+## SM-16 — 2026-09-22 local and live validation, DONE
 
 - Baseline `d43e74ca`. Added a trusted pinned registry-bundle loader and a
   templates-free `databricks_batch_smoke.py` probe with pandas/Polars training,
@@ -64,13 +64,25 @@ olarak açıkça kaydedilebilir, template'i belirsiz süre bloke etmez.
   Ruff/format, repository Ty and strict MkDocs passed. Wheel built locally;
   checksum, exact commands and remaining gates are in
   [PLATFORM_VALIDATION.md](PLATFORM_VALIDATION.md).
-- Databricks plugin installed; CLI **1.17.0** verified. No profile was selected,
-  no authentication performed and no workspace resources created. The user
-  will provide the test namespace and compute. `databricks.yml` is absent as
-  requested; DAB/template generation remains later work.
-- SM-16 is **not DONE**: live UC/job evidence, clean worker wheel deployment,
-  distributed admission, Delta platform retries/permissions and scale are open.
-  SM-15L separately tracks the newly clarified local-engine Delta sink requirement.
+- Databricks CLI **1.17.0**, profile `skyulf`, approved isolated schema
+  `workspace.skyulf_sm16_20260922`. Live regression parity passed both Spark
+  modes in run `447606109645160`; restricted-principal model allow/deny and
+  10k/50k synthetic parity passed in run `2921374308246`.
+- Checkpoint `311547fc` adds serverless identifier handling and shared Delta
+  admission. Local gates passed 75 inference tests and 18 admission/batch tests.
+  The reusable monthly Delta probe passed 5 real Delta tests; live Delta/alias
+  run `810044894558535` reached an unsupported `REFRESH TABLE` command.
+  Narrow refresh/cache compatibility fixes passed 48 real Delta tests; corrected
+  run `783094949884769` passed monthly replacement/replay, alias pinning and
+  full worker package-content checks. `databricks.yml` remains absent.
+- SM-16 is **DONE** for the selected serverless workflow: winner job
+  `973709879452231` committed only after the contender verified held-owner
+  rejection. Contender `404334394214907` then failed a test-only permission-code
+  assertion; final restricted job `977447944071613` passed actual MODIFY denial,
+  unchanged data/version and owner release. The failed run remains documented.
+- SM-15L is **READY** and next: local pandas/Polars Delta sink with explicit
+  storage/provenance limits and separately validated UC access. No implementation
+  of that local sink is included in SM-16.
 
 ## SM-15 — 2026-09-22 validation record
 

@@ -5,16 +5,28 @@ and atomically replaces the requested period in a precreated Delta table.
 It reuses both [Spark inference modes](inference_flow.md), without refitting
 feature engineering or the model. Scheduling remains the caller's responsibility.
 
-The current validation covers **local Spark 4.0.3 with Delta Lake 4.0.0 on Linux**.
-Live Databricks, Unity Catalog, distributed publish admission and wheel delivery
-remain the SM-16 platform gate. Installing this adapter does not certify those
-platforms. Tracking and registry remain optional and independent of the engine.
+Validation covers **local Spark 4.0.3 with Delta Lake 4.0.0 on Linux** and a live
+Databricks serverless Spark Connect 4.2.0 regression probe using Unity Catalog
+tables. The live probe verified monthly replacement, replay, empty protection,
+prior-period preservation and worker wheel contents. Separate live jobs verified
+exclusive admission and a restricted principal's target-write denial, with
+unchanged data/version and released ownership afterward. This is a bounded
+regression workflow, not certification of every runtime or production workload.
+Tracking and registry remain optional and independent of the engine.
 
 This runner currently requires Spark. Delta itself can also be written from
 pandas/Polars through [Arrow and delta-rs](https://delta-io.github.io/delta-rs/usage/writing/); a local-engine Skyulf Delta sink
 with the same period/retry guarantees is planned separately as SM-15L. Choosing
 Delta as the output format should not force the inference engine to be Spark.
 Unity Catalog access and supported Delta features need validation for each writer.
+
+The runner caches predictions when the runtime supports `persist()`. If
+Databricks serverless rejects that operation with its specific structured
+restriction, validation and publication use the distributed frame without a
+cache, and no `unpersist()` call is made. Separate actions can recompute
+predictions from the pinned source and frozen bundle; this trades repeated work
+for compatibility and never collects the dataset into driver memory. Other
+cache failures propagate before publication.
 
 ```mermaid
 flowchart LR
@@ -112,7 +124,8 @@ on distributed Spark masters, including `local-cluster`.
 
 `DeltaTableAdmission` coordinates participating publishers through one shared
 Delta control table. Real local Delta tests cover independent Spark sessions and
-simultaneous claims; live Databricks validation is still pending. Operators must
+simultaneous claims. A live serverless test also rejected a second job while the
+first held ownership, then allowed the first job to commit. Operators must
 provision the authority once, before starting publishers:
 
 ```python
@@ -143,6 +156,18 @@ target binding fixed. External control-row edits, DDL and writers bypassing this
 protocol are outside the guarantee. Grant operators provisioning rights and
 publishers only the required read/update access under your platform's policy.
 
+In Unity Catalog, the scoring identity needs `USE CATALOG` and `USE SCHEMA`,
+`SELECT` on the source, and `SELECT`/`MODIFY` on the target and control tables.
+Loading a registered model additionally needs its own model access, including
+`EXECUTE`; table access does not grant model access. Provisioning new tables is
+an operator step, so the scoring identity does not need schema-wide creation
+rights for an existing source, target and authority.
+
+Admission does not bypass target permissions. A caller may acquire the control
+row and still be denied `MODIFY` on the prediction table. The sink preserves the
+underlying runtime error as the cause of `DeltaPublishError`, and the admission
+context releases its claim when that write fails normally.
+
 Ownership never expires. A driver crash or an uncertain acquisition can leave a
 claim behind: inspect the job and prove that the original driver can no longer
 publish before an operator clears it. Never clear a live owner's claim to unblock
@@ -150,8 +175,13 @@ another job. The sink has no fencing-token mechanism, so time-based expiry would
 allow an old publisher to write after a new publisher acquired ownership.
 
 The provider uses Spark SQL parameter markers (Spark 3.4+) without a SparkContext
-or data caching requirement. That API choice is not proof of compatibility with
-every Databricks compute type; the platform gate records tested environments.
+or data caching requirement. Classic Spark explicitly refreshes the control
+table before identity reads. When serverless rejects `REFRESH TABLE` with its
+specific unsupported-operation condition, the provider proceeds with fresh
+Delta identity/ownership reads; user-managed cache APIs are unavailable there.
+Conditional updates and unique-token verification still control ownership.
+Other errors propagate. The platform gate records tested environments rather
+than assuming all compute types support the same APIs.
 
 ## Time and reproducibility
 
@@ -213,6 +243,16 @@ helper is lower-level: direct callers must supply output and a manifest with
 the same provenance guarantees as `run_batch`.
 
 ## Local verification
+
+The repository's `skyulf-core/examples/databricks_delta_smoke.py` accepts an
+existing Spark session, a pinned raw `y=2*x` regression bundle and an existing
+test namespace. Its `run_smoke(...)` creates and prints three unique Delta table
+names, verifies monthly publication/replay and explicit empty replacement, and
+retains the tables for inspection. Use only a test namespace where you are
+authorized to create and modify tables. The returned report includes table IDs,
+versions and receipts and deliberately keeps `platform_gate_complete=False`.
+Unexpected runtime failures propagate; the probe does not change runtime settings
+or replace admission with a no-op provider.
 
 Use Linux (or WSL) with Python 3.12 and Java 17. Windows Spark inference alone
 does not establish that Hadoop's filesystem support can write Delta locally.

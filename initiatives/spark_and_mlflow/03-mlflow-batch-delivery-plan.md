@@ -191,44 +191,38 @@ The fixture performs real Delta I/O; permission denial at the admission boundary
 is a fault-injection test, not evidence of live UC permissions. Exact versions,
 commands and results are recorded in [OPEN_QUEUE.md](OPEN_QUEUE.md).
 
-## SM-16 — Gerçek Databricks doğrulaması
+## SM-16 - Real Databricks validation
 
-**Bağımlılık:** SM-15. **Oluştur:** `skyulf-core/examples/databricks_batch_smoke.py`,
-`initiatives/spark_and_mlflow/PLATFORM_VALIDATION.md` (uygulama sırasında).
-**Üretir:** Bir wheel ile gerçek FE → registry load → Spark inference → test Delta table.
+**Dependency:** SM-15. **Status:** DONE on 2026-09-22 for the selected serverless
+Spark Connect workflow. Evidence: [PLATFORM_VALIDATION.md](PLATFORM_VALIDATION.md)
+and its linked machine-readable live report.
 
-- [ ] Implement and verify shared publish admission for the selected runtime.
-  SM-15's local file locks are rejected on distributed masters. The provider
-  must hold exclusive ownership through commit and receipt verification;
-  expiring leases require a new sink fencing design before they can be used.
-  Include actual UC write-permission and concurrent-publisher evidence.
-- [ ] Kullanılan DBR/Python/Spark/MLflow/Arrow, compute türü, izinli catalog/schema
-  ve test resource isimlerini kaydet. Workspace bilgisi yoksa yalnız bu görev WAIT
-  olur; local testler Databricks geçti sayılmaz.
-- [ ] Wheel'i build et; temiz job ortamında kur. DBR'ın Spark'ını körlemesine
-  pip extra ile değiştirme. OSS Spark, DBR ve Connect ayrı dependency profilleri.
-- [ ] Native FE ve Python pipeline yollarını aynı küçük gold dataset ile
-  karşılaştır; büyük sentetik dataset'te bellek/runtime ölç. UC alias pinning
-  ve monthly retry testini test catalog'unda çalıştır.
-- [ ] İlk doğrulama job/script ile; DAB template üretme. Serverless/Connect ancak
-  ayrıca test edilirse supported ilan edilir; classic başarılarını genelleme.
+- [x] Implement shared, non-expiring Delta publish admission. Verify ownership
+  through commit and receipt validation, actual target-write denial and two-job
+  contention. The initial contender probe failed only on its permission-code
+  assertion; its preceding contention checks and the final successful restricted
+  probe jointly establish the result. Preserve that failed-run record.
+- [x] Record workspace/profile, test namespace/resources, serverless environment,
+  Python/Spark/MLflow/Arrow versions and concrete run IDs/URLs.
+- [x] Install the built wheel in clean jobs without replacing Databricks Spark.
+  Check all 225 installed worker package files against the r3 content digest;
+  verify current source files also match the tested wheel.
+- [x] Compare native FE and Python-pipeline predictions with independent gold
+  values. Measure 10k/50k synthetic runtime and scoped memory observations.
+  Notebook/client Python lifetime RSS is not cluster or inference-worker peak.
+- [x] Verify UC version pinning after alias movement, monthly replacement/replay,
+  empty protection and preservation of other periods using actual transactions.
+- [x] Use one-time CLI jobs and scripts. No DAB template or root databricks.yml.
 
-```python
-def test_platform_evidence_has_concrete_versions(platform_evidence):
-    """A successful job without runtime and model identity is not reproducible."""
-    assert platform_evidence["model_version"]
-    assert platform_evidence["wheel_version"]
-    assert platform_evidence["input_snapshot"]
-    assert platform_evidence["job_run_id"]
-    assert platform_evidence["prediction_parity_passed"] is True
-```
-
-Bu kontrol gerçek job çıktısına uygulanır; elle doldurulmuş dict platform testi değildir.
-**Kabul:** G4 platform kapısı: run URL/id, sürümler, parity ve tekrar yazma kanıtı.
+**Acceptance:** G4 passed for serverless Connect 4.2.0 / Python 3.12.3 /
+MLflow 3.16.1, client environment 4.10. The aggregate evidence is generated from
+actual job outputs after checking success states, expected results, matching
+model/table/trial identities and the wheel checksum. This is not a production
+benchmark or blanket certification of all engines, node families or runtimes.
 
 ## SM-15L — Local-engine Delta publication
 
-**Dependency:** SM-16. **Status:** WAIT; clarified by the user on 2026-09-22.
+**Dependency:** SM-16. **Status:** READY; SM-16 completed on 2026-09-22.
 The SM-15 delivery covers only the Spark runner. A Delta destination must not
 imply Spark inference; support for pandas/Polars publication needs its own sink.
 

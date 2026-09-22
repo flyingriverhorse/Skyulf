@@ -1,7 +1,15 @@
 # SM-16 platform validation
 
-Status: **ACTIVE — live registry/Spark parity passed; remaining platform gates open**.
+Status: **DONE — selected serverless Connect workflow validated on 2026-09-22**.
 Baseline: `d43e74ca`, branch `090`, target release `0.9.0`.
+
+The [machine-readable evidence](reports/2026-09-22-sm16-live-evidence.json) was
+generated after asserting the actual live results, matching model/table/trial
+identities and the r3 wheel checksum. It combines five successful reports and
+the explicitly retained contender assertion failure. Individual stage reports
+keep `platform_gate_complete: false`; the aggregate records completion of G4.
+This certifies the selected regression workflow, not every FE node, cloud
+runtime, classification path or production workload. SM-15L remains separate.
 
 ## Local preparation evidence — 2026-09-22
 
@@ -22,8 +30,8 @@ Baseline: `d43e74ca`, branch `090`, target release `0.9.0`.
   artifact root was moved under its temporary directory before the final gate.
 - Wheel built locally: `.cache/sm16-dist/skyulf_core-0.9.0-py3-none-any.whl`.
   SHA-256: `ede03a571bf3de480e1acca8ddd9c5179efd832906c410f4a0a98f50709b4779`.
-  The wheel was uploaded to the approved workspace test folder. Installation and
-  worker execution remain pending the live job. Rebuild after code changes.
+  This was the first uploaded wheel; the corrected r2/r3 hashes and successful
+  driver/worker checks are recorded below. Rebuild after code changes.
 
 Exact local commands:
 
@@ -129,11 +137,121 @@ the isolated test folder. It has no admin role, data-modification grant or
 created token/secret. The requesting account retains its existing manager role
 and gained the user role on this test principal so it can submit `run_as` jobs.
 
-Run `2921374308246` was submitted with this `run_as` identity and a 900-second
-timeout. It checks allowed model loading, denied access to the first test model,
-worker package provenance and 10k/50k synthetic prediction aggregates. It does
-not write tables. Its result is pending; submitting a job is not permission-test
-evidence. Prepared notebook/request are under `.cache/sm16-live-permissions*`.
+Run `2921374308246`, task `479913572085165`, completed **SUCCESS** with this
+`run_as` identity. Allowed model loading passed and the first test model returned
+`RegistryAccessError`. No token/secret was created and no data table was written.
+Two worker probes imported non-editable `skyulf-core 0.9.0` from ephemeral
+`site-packages`; package-content digests are checked in the next stage.
+
+| Rows / requested partitions | Mode | Action time | Maximum absolute error |
+| --- | --- | --- | --- |
+| 10,000 / 2 | `native_features` | 9.91s | 8.89e-16 |
+| 10,000 / 2 | `python_pipeline` | 2.07s | 8.89e-16 |
+| 50,000 / 8 | `native_features` | 20.37s | 8.89e-16 |
+| 50,000 / 8 | `python_pipeline` | 2.33s | 8.89e-16 |
+
+Each aggregate checked row count, distinct key count and the independent `2*x`
+oracle. These sequential synthetic runs include different validation work and
+warm-up effects; they are not a controlled engine benchmark or capacity claim.
+Notebook/Connect client Python process-lifetime peak RSS was 2,276,596 KiB
+for all four observations. This is not Spark JVM or total cluster memory.
+The separate worker import probes recorded 536,040 and 534,688 KiB peak RSS;
+those are not peak measurements of the inference task itself. Raw evidence and
+the prepared notebook/request are under `.cache/sm16-live-permissions*`.
+
+### Monthly Delta and alias stage
+
+The reusable `examples/databricks_delta_smoke.py` passed **5 real Delta tests**
+in 62.76s, plus Ruff/format/Ty and independent review. It retains three unique
+test-owned tables and exercises real public batch publication, replay,
+stale-version rejection, empty protection and explicit empty replacement.
+Parent run `810044894558535`, task `499533558954860`, used the same `r2` wheel
+and **FAILED** at the admission provider's `REFRESH TABLE` call with structured
+`NOT_SUPPORTED_WITH_SERVERLESS`. It created the seeded test tables
+`workspace.skyulf_sm16_20260922.skyulf_delta_smoke_837cbd4e7c274c0f905f84adce1d8c89_{source,target,control}`;
+no batch publication began. These resources are retained.
+
+Before that failure, worker package assertions and the alias test completed.
+The worker check compared all 225 installed Skyulf package files with the
+wheel's package-content digest
+`f887a4251f03fddb478b0d263afcd8328d9f7f81398e7da857c00d694a8cf97b`.
+The test created alias `sm16_validation`, pinned version 1, registered a
+numerically different `3*x` model version and moved the alias. The pinned bundle
+still predicted 4 for x=2 while the alias-selected bundle predicted 6. The failure
+trace reached the subsequent Delta stage; the notebook's final JSON was not
+produced. The successful r3 retry below repeated the content and pinned-load
+assertions without moving the alias again.
+
+The admission correction preserves refresh on classic Spark and catches only
+the structured serverless restriction. It still reads identity and ownership;
+exclusivity comes from the conditional Delta UPDATE and a fresh UUID token.
+Other failures propagate. The official serverless limitations also prohibit
+DataFrame `persist`/`unpersist`. The batch runner now catches only the same
+structured serverless restriction from `persist`, preserves the distributed
+frame, and calls `unpersist` only after successful caching. Other cache errors
+propagate. Validation/publication can recompute uncached predictions.
+
+The combined real Delta gate passed **48 tests** in 173.18s: 24 batch tests,
+19 admission tests and 5 probe tests. It covers both inference modes without
+caching, unrelated-error propagation, classic cache cleanup, fresh ownership
+reads with refresh rejected, and actual monthly transactions. Independent review
+found no blocker. The base integration lane passed 41 with 53 optional skips.
+
+Retry parent run `783094949884769` completed **SUCCESS** using
+`.cache/sm16-dist-r3/skyulf_core-0.9.0-py3-none-any.whl`:
+
+- Wheel SHA-256: `e2ce61eb3f11f25dd334934b9b45832cc3901ceba2aa04a5a28bb091232a29c5`.
+- Package-content digest (225 files): `2d5da10303be00bd58c2cb5f6f2e468ad54bfd683181c5b511f09fa2aedd78f0`.
+
+Task run `26007003170545` returned all eight monthly checks as true: publication,
+replay, stale-version rejection, empty rejection, explicit empty replacement,
+empty replay, ownership release and preservation of the prior period. Initial
+publication and replay used source snapshot 0 and returned commit 1; empty
+replacement and its replay used source snapshot 1 and returned commit 2.
+The target ended at version 2 with only the prior-period row.
+
+Retained tables share prefix
+`workspace.skyulf_sm16_20260922.skyulf_delta_smoke_4bbeac1816a04bbe854c85903256c41d_`:
+
+| Suffix | Delta table ID | Version after monthly probe | Rows |
+| --- | --- | --- | --- |
+| `source` | `36b4f01d-3378-48e9-a93f-c593b634acef` | 1 | 1 |
+| `target` | `f16a3d46-8a00-4c55-9ac8-8f7690b17647` | 2 | 1 |
+| `control` | `fe57f94d-a91a-44c1-a294-d0caaee19f7f` | 10 | 1 |
+
+The report confirms reloading pinned version 1 after alias `sm16_validation`
+moved to version 2, with distinct digests and the expected 4 versus 6 predictions.
+Two worker partitions each checked all 225 installed package files against the
+r3 package-content digest. The full result is saved locally in
+`.cache/sm16-live-delta-output-r3.json`.
+
+Independent contention jobs used the same r3 wheel: winner
+`973709879452231` and restricted-principal contender `404334394214907`.
+They share trial `3d74ef662d5047dfb90a13ec42dc5eaa` and the retained tables above.
+The restricted principal has SELECT on source/target and SELECT/MODIFY on the
+control table. The winner completed **SUCCESS**, committing version 3 and
+releasing ownership. The contender passed the held-owner conflict, unchanged
+owner/version-2 assertions and acknowledgement before the winner could commit.
+It then acquired admission and reached an actual target write denial.
+
+The contender run is **FAILED**, because its test accepted only condition names
+containing `PERMISSION` or `PRIVILEGE`. Databricks returned `UNAUTHORIZED_ACCESS`;
+the chained error explicitly states `PERMISSION_DENIED` and missing `MODIFY` on
+the exact target. This is a probe assertion mismatch, not a successful job or a
+product-code defect. Its final preservation assertions were not executed.
+The restricted-only follow-up run `977447944071613`, task `396353814917782`,
+completed **SUCCESS**. It verified the winner's rows/metadata, target version 3
+and released ownership before and after another denied write, accepting only
+the observed exact condition and message. Data and version remained unchanged.
+The paired-run contention assertions and this final permission probe jointly
+close admission and write-denial gates; the initial failed run remains failed.
+
+Live records: [winner](https://dbc-45604623-c18b.cloud.databricks.com/?o=7474646244882000#job/970586457713217/run/973709879452231),
+[contender with assertion mismatch](https://dbc-45604623-c18b.cloud.databricks.com/?o=7474646244882000#job/602255242801236/run/404334394214907),
+[final write-denial probe](https://dbc-45604623-c18b.cloud.databricks.com/?o=7474646244882000#job/555471604714601/run/977447944071613).
+The signal table is
+`workspace.skyulf_sm16_20260922.skyulf_contention_3d74ef662d5047dfb90a13ec42dc5eaa`.
+All test resources and the restricted identity are retained for inspection.
 
 References: [Serverless restrictions](https://docs.databricks.com/aws/en/compute/serverless/limitations),
 [Databricks identifier rules](https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-identifiers).
@@ -153,8 +271,8 @@ shared Delta admission. Predictions, prior-period rows, the original receipt
 and owner release after both calls were verified. Base regression passed
 **80 tests**, with **48 optional-runtime skips** and one known Windows physical
 core detection warning. Ruff/format/Ty, strict MkDocs and independent review
-passed. Live serverless/UC admission,
-competing jobs and permission enforcement remain pending. See the
+passed. The later live monthly run verified serverless/UC admission;
+independent contention and permission runs are recorded above. See the
 [batch guide](../../docs/user_guide/databricks_batch.md) for provisioning and
 the explicit cooperative-writer and manual-recovery boundaries.
 
@@ -204,18 +322,18 @@ contain pickle. Digests detect mismatched artifacts; they do not authenticate
 an untrusted producer. Downloads use explicit stores and the pinned version,
 including when a previously resolved alias has moved.
 
-## Full platform gate still required
+## Completed platform gate and evidence boundaries
 
 | Gate | Required evidence | Current state |
 | --- | --- | --- |
 | Selected environment | Profile, workspace, compute ID/type, DBR/Python/Spark/MLflow/Arrow | `skyulf`; serverless Connect; successful runtime recorded above |
-| Package delivery | Exact wheel/checksum, installed distribution on clean driver/workers | Non-editable driver + worker prediction passed; per-worker provenance pending |
-| Real UC round-trip | Concrete model version, alias pinning and trusted bundle download | Register/download/local checks reached; alias gate pending |
+| Package delivery | Exact wheel/checksum, installed distribution on clean driver/workers | Non-editable driver and workers passed; 225-file content checks passed in r3 |
+| Real UC round-trip | Concrete model version, alias pinning and trusted bundle download | Register/download passed; pinned version 1 survives alias movement to version 2 |
 | Spark parity | Gold data, both FE modes, key-based predictions, job run ID/URL | Passed in live corrected run `447606109645160` |
-| Monthly publication | Real test Delta tables, snapshots, commits, replay, other periods preserved | SM-15 local evidence only |
-| Distributed admission | Shared authority, ownership through commit, competing-job result | Implemented; real local Delta tests passed; live gate pending |
-| UC permissions | Actual denied and allowed access in the approved namespace | Pending |
-| Scale | Synthetic distributed dataset, runtime and driver/worker memory evidence | Pending |
+| Monthly publication | Real test Delta tables, snapshots, commits, replay, other periods preserved | Passed in live run `783094949884769`; source versions 0/1, target commits 1/2 |
+| Distributed admission | Shared authority, ownership through commit, competing-job result | Winner committed version 3 only after contender verified held-owner rejection; released afterward |
+| UC permissions | Actual denied and allowed access in the approved namespace | Model allow/deny passed; target MODIFY denied with unchanged version/data and released admission in final probe |
+| Scale | Synthetic distributed dataset, runtime and scoped memory observations | 10k/50k parity/timing + client Python lifetime peak and separate worker import RSS recorded; not inference-worker or cluster peak |
 
 Do not use `LocalTableLock` on a distributed Databricks driver. Limiting one
 job's concurrent runs does not coordinate other jobs or external writers.
@@ -231,8 +349,8 @@ template is optional. Even Python-defined bundle resources use a root
 `databricks.yml` entry point. A model artifact does not automatically generate
 the code, compute selection, permissions and job definition needed for a bundle.
 
-For SM-16, prepare the script/wheel and use a reviewed job request after the
-user selects the platform. Reusable templates remain SM-20. A future generated
+SM-16 used script/wheel uploads and reviewed one-time job requests against the
+user-selected workspace. Reusable templates remain SM-20. A future generated
 project can contain its own `databricks.yml`; the Skyulf library repository does
 not need one for these tests.
 
@@ -256,4 +374,13 @@ Track **SM-15L** before template support advertises local-engine Delta output:
   Catalog managed table can be written through that path.
 - Validate UC access separately; fail unsupported combinations explicitly.
 
-Reference: [delta-rs writing](https://delta-io.github.io/delta-rs/usage/writing/).
+As of 2026-09-22, Databricks documents external managed-table writes through
+Unity REST as preview functionality requiring catalog commits and a supported
+client. Its supported-client list does not establish delta-rs support. Therefore
+a local filesystem delta-rs test cannot close the UC writer requirement. Evaluate
+an explicit pandas/Polars inference plus Spark catalog-I/O path separately from
+the optional standalone delta-rs sink; keep local data collection bounded and
+visible in that API. This is a follow-up design constraint, not implemented support.
+
+References: [delta-rs transactions](https://delta-io.github.io/delta-rs/api/transaction/),
+[Databricks external Delta access](https://docs.databricks.com/aws/en/external-access/unity-rest).
