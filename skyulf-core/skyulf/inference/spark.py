@@ -23,9 +23,9 @@ def predict_spark(
     options: ExecutionOptions,
     mode: str,
 ) -> Any:
-    """Apply frozen FE and distribute a regression estimator over Spark workers.
+    """Apply frozen FE and distribute a regression or classification estimator.
 
-    Raw regression bundles support native Spark FE (``native_features``) and
+    Raw bundles support native Spark FE (``native_features``) and
     portable pandas FE in each worker iterator (``python_pipeline``).
     Supply unique non-null integer, string or boolean keys; output contains
     those keys and prediction, with no row ordering guarantee. Extra unused
@@ -60,10 +60,6 @@ def predict_spark(
     manifest = bundle.manifest
     if manifest.input_stage != "raw":
         raise ValueError(f"{mode} currently requires a raw input_stage bundle.")
-    if manifest.task != "regression":
-        raise UnsupportedExecutionError(
-            "inference", "predict", "spark", "Only regression bundles are currently supported."
-        )
     native = _native(frame)
     if native.isStreaming:
         raise UnsupportedExecutionError(
@@ -122,10 +118,24 @@ def _prediction_schema(native: Any, manifest: BundleManifest, spec: FrameSpec) -
     return types.StructType(
         [native.schema[key] for key in spec.row_keys]
         + [
-            types.StructField(column.name, types.DoubleType(), True)
+            types.StructField(column.name, _spark_output_type(types, column.dtype), True)
             for column in manifest.output_schema
         ]
     )
+
+
+def _spark_output_type(types: Any, dtype: str) -> Any:
+    """Map the manifest's primitive prediction dtype to an explicit Spark type."""
+    mapping = {
+        "bool": types.BooleanType,
+        "float64": types.DoubleType,
+        "int64": types.LongType,
+        "string": types.StringType,
+    }
+    try:
+        return mapping[dtype]()
+    except KeyError as error:
+        raise ValueError(f"Unsupported Spark prediction dtype {dtype!r}.") from error
 
 
 def _validate_python_pipeline(engineer: FeatureEngineer) -> None:

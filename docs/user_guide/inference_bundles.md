@@ -2,7 +2,7 @@
 
 The 0.9.0 development API packages a fitted feature pipeline and a Python
 estimator with an explicit inference contract. It supports local pandas/Polars
-prediction and native Spark FE followed by Python regression on Spark workers.
+prediction and native Spark FE followed by Python model inference on Spark workers.
 Importing `skyulf.inference` requires neither PySpark nor MLflow.
 
 Start with [How inference works](inference_flow.md) for training and inference
@@ -141,8 +141,8 @@ batch or a loaded estimator can use more memory than its serialized form.
 
 ## Native Spark FE and worker model inference
 
-`predict_spark(..., mode="native_features")` accepts a raw-input regression
-bundle and a Spark DataFrame. The fitted FE runs as native Spark expressions.
+`predict_spark(..., mode="native_features")` accepts a raw-input regression or
+classification bundle and a Spark DataFrame. The fitted FE runs as native Spark expressions.
 Only the prepared feature columns and row keys reach the Python workers;
 the estimator receives the features in the saved training order. Pandas/NumPy
 batches exist inside those workers, without collecting the dataset to the driver.
@@ -174,6 +174,19 @@ rows = predictions.orderBy("id").collect()
 assert [row.id for row in rows] == [101, 102]
 np.testing.assert_allclose([row.prediction for row in rows], [40.0, 20.0], atol=1e-12)
 ```
+
+The runnable `skyulf-core/examples/spark_batch_inference.py` example trains a
+small pandas classification model, builds a bundle, and runs the same keyed
+batch through either mode:
+
+```text
+.venv-spark/Scripts/python.exe skyulf-core/examples/spark_batch_inference.py --mode native_features
+.venv-spark/Scripts/python.exe skyulf-core/examples/spark_batch_inference.py --mode python_pipeline
+```
+
+Both modes return `prediction`, `probability_0` and `probability_1` in the
+declared class order. A production job can replace the final `show()` action
+with a Delta-table write or another caller-owned sink.
 
 Production consumers receive a Spark DataFrame and can select their own action
 or output sink. Output rows have no guaranteed physical order; match them by
@@ -216,10 +229,12 @@ before prediction; prediction itself remains a lazy Spark computation.
 Validation does not freeze a changing source. The caller owns any snapshot or
 persist policy needed to keep validation and later actions on the same input.
 
-The distributed runners accept `input_stage="raw"` and regression only.
-Prepared-feature bundles, classification and streaming remain unsupported.
-The Python FE worker mode is available for the portable row-independent path;
-local classification remains available. Databricks,
+The distributed runners accept `input_stage="raw"` with regression or
+classification. Prepared-feature bundles and streaming remain unsupported.
+Classification output includes `prediction` plus `probability_*` columns in the
+manifest class order. Saved tuning or pipeline thresholds are applied in the
+same precedence order as local inference. The Python FE worker mode is
+available for the portable row-independent path. Databricks,
 Spark Connect and worker-wheel isolation still require their later validation
 gates; local PySpark tests do not establish those deployment guarantees.
 

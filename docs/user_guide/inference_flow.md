@@ -98,7 +98,7 @@ transfer. Raw data is not collected into a pandas DataFrame on the driver.
 `predict_spark(..., mode="native_features")` follows these steps:
 
 1. The driver validates the bundle and execution request: supported FE, raw input,
-   a regression model, column order/dtypes and compatible package versions.
+   a regression or classification model, column order/dtypes and compatible package versions.
 2. Spark FE appliers turn the learned rules into Spark expressions. Their model
    output schema is checked before any data action.
 3. Spark validates unique, non-null row keys and applies FE across the distributed
@@ -106,7 +106,8 @@ transfer. Raw data is not collected into a pandas DataFrame on the driver.
 4. Only prepared model features and row keys reach the Python workers.
 5. Each worker iterator loads the same model payload. It predicts on its
    pandas/NumPy batches without applying FE again.
-6. The result is a Spark DataFrame containing `row_keys + prediction`.
+6. The result is a Spark DataFrame containing `row_keys + prediction`; classifiers
+   also expose probability columns in the manifest class order.
 
 **Pandas describes the small piece being processed inside a worker.** The entire
 Spark table is not collected to the driver for local prediction. Spark continues
@@ -123,7 +124,7 @@ results to the driver. Prediction remains a lazy Spark DataFrame: an action such
 as `show`, `collect` or writing to a sink executes model prediction. The runner
 does not itself write a table or schedule a monthly job.
 
-## 5. Python FE + model inside workers — available in SM-10
+## 5. Python FE + model inside workers — available in SM-10/SM-11
 
 ![Spark distributes raw batches and workers apply fitted Python FE and the model](../assets/diagrams/inference/spark_python_planned.svg)
 
@@ -151,7 +152,9 @@ Being batch-independent does not automatically make a node supported today.
 Packaging, execution and compatibility checks must also be implemented. An
 unsupported native FE step will not silently fall back to this worker path.
 The current worker path accepts portable SimpleImputer `mean`/`constant`,
-StandardScaler and an empty FE chain; classification remains a later gate.
+StandardScaler and an empty FE chain. Regression and classification are both
+supported; classifiers preserve string, integer or boolean labels and the saved
+threshold decision rule.
 
 ## 6. What compatibility means
 
@@ -195,14 +198,14 @@ backend artifact format is a separate delivery.
 | --- | --- | --- | --- |
 | Local raw | Local pandas/Polars | The same local Python process | Available |
 | Local prepared features | Already prepared; FE is bypassed here | Local Python process | Available |
-| Spark native features | Native Spark operations | Spark Python worker batches | SM-09: raw + regression |
-| Spark Python pipeline | Python FE inside a Spark worker | Python model in the same worker | SM-10: available for raw regression |
+| Spark native features | Native Spark operations | Spark Python worker batches | SM-11: raw regression/classification |
+| Spark Python pipeline | Python FE inside a Spark worker | Python model in the same worker | SM-11: raw regression/classification |
 
 Local/Spark describes where and how computation runs. Monthly batch scheduling,
 HTTP endpoints and SQL access describe how it is invoked; they are separate from
 the training or FE algorithm. MLflow/Unity Catalog packaging and registry support,
 real Databricks validation, endpoints and templates remain later stages.
 
-For runnable code, see the [native Spark inference example](inference_bundles.md#native-spark-fe-and-worker-model-inference).
+For runnable code, see the [Spark batch inference example](inference_bundles.md#native-spark-fe-and-worker-model-inference).
 The SVG diagrams on this page display without Mermaid support; each has an
 editable source linked above.

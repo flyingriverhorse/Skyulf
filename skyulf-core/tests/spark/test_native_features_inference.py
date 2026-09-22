@@ -230,21 +230,19 @@ def test_native_feature_dtype_mismatch_is_rejected_before_actions(spark, monkeyp
         _predict(frame, bundle)
 
 
-def test_classification_is_rejected_before_actions(spark, monkeypatch):
-    """Unimplemented distributed class semantics must not silently use a regression schema."""
+def test_classification_is_supported_with_manifest_output(spark):
+    """Distributed classification must return the declared label and probabilities."""
     train = pd.DataFrame({"x": [-2.0, -1.0, 1.0, 2.0], "y": ["no", "no", "yes", "yes"]})
     pipeline = SkyulfPipeline({"preprocessing": [], "modeling": {"type": "logistic_regression"}})
     pipeline.fit(SplitDataset(train=train, test=train.head(0)), target_column="y")
     bundle = build_bundle(pipeline, input_stage="raw", feature_order=("x",))
     frame = spark.createDataFrame([(1, 2.0)], "id long, x double")
 
-    def forbidden(*args, **kwargs):
-        """Unsupported tasks must fail before even bounded validation actions."""
-        pytest.fail("Classification reached a Spark action")
-
-    monkeypatch.setattr(type(frame), "collect", forbidden)
-    with pytest.raises(UnsupportedExecutionError, match="regression"):
-        _predict(frame, bundle)
+    rows = _predict(frame, bundle).collect()
+    assert len(rows) == 1
+    assert rows[0].id == 1
+    assert rows[0].prediction == "yes"
+    assert rows[0].probability_0 < rows[0].probability_1
 
 
 @pytest.mark.parametrize("kind", ["integer", "boolean"])

@@ -1,9 +1,9 @@
 # Spark ve MLflow — Open Queue
 
-Güncelleme: 2026-09-22. **SM-00–SM-10 tamamlandı; sıradaki SM-11. Hedef: 0.9.0.**
+Güncelleme: 2026-09-22. **SM-00–SM-11 tamamlandı; sıradaki SM-12. Hedef: 0.9.0.**
 Bu dosya kısa çalışma sırasıdır; detaylar bağlantılı planlarda.
 
-Session parked on 2026-09-21: read [HANDOFF.md](HANDOFF.md) before resuming SM-10.
+Session resumed on 2026-09-22: read [HANDOFF.md](HANDOFF.md) before starting SM-12.
 
 Durumlar: READY = başlanabilir; WAIT = önceki görev bekleniyor;
 LATER = son aşama; ACTIVE = yürütülüyor; BLOCKED = somut dış engel;
@@ -22,8 +22,8 @@ DONE = kanıtla tamamlandı. SM-00 commit: `105a6fe4`.
 | SM-08 | Ortak inference bundle | SM-07 | DONE | Raw/features ayrımı; model metadata round-trip; aşağıda kanıt |
 | SM-09 | Native FE + worker model | SM-08 | DONE | Spark tahmini local ile key bazında aynı; aşağıda kanıt |
 | SM-10 | Worker Python FE + model | SM-09 | DONE | Batch-safe portable FE; window gibi yollar açık ret |
-| SM-11 | Classification ve ölçek kapısı | SM-10 | READY | Class/proba/threshold parity; worker kanıtı |
-| SM-12 | Opsiyonel MLflow tracking | SM-11 | WAIT | Off bağımsız; gerçek run lifecycle ve izolasyon |
+| SM-11 | Classification ve ölçek kapısı | SM-10 | DONE | Class/proba/threshold parity; worker kanıtı |
+| SM-12 | Opsiyonel MLflow tracking | SM-11 | READY | Off bağımsız; gerçek run lifecycle ve izolasyon |
 | SM-13 | MLflow model packaging | SM-12 | WAIT | Temiz ortamda pyfunc yükleme ve parity |
 | SM-14 | Registry/Unity Catalog adapter | SM-13 | WAIT | URI/signature; alias → sabit version |
 | SM-15 | Aylık batch + Delta sink | SM-14 | WAIT | Dönem izolasyonu, retry ve conflict kontrolü |
@@ -510,3 +510,47 @@ destek ve sınırlar tamamlanan görevlerin kayıtlarında belirtilir.
 - Sınır: bu G2a / native FE + regression teslimatıdır. SM-10 Python FE worker
   modu, SM-11 classification/worker wheel/ölçek kapısıdır. Databricks/Connect,
   MLflow/UC, endpoint ve template doğrulaması yoktur. Sıradaki görev SM-10.
+
+## SM-11 — 2026-09-22 completion record
+
+- Starting point: `a930f8a5`; implementation commits are recorded separately
+  after the focused review and verification gates.
+- `predict_spark` now accepts raw regression and classification bundles in both
+  `native_features` and `python_pipeline` modes. The output schema maps
+  manifest label dtypes to Spark types and keeps probability columns in the
+  estimator class order. Saved tuning and explicit pipeline threshold rules
+  reuse the local `_predict_features` contract.
+- Added `tests/spark/test_prediction_contract.py` for string binary labels,
+  integer multiclass labels, probability ordering, saved thresholds, two
+  partition layouts and two Arrow batch limits. Added
+  `tests/spark/test_worker_isolation.py` to verify one model load per iterator
+  and bounded model calls. The former classification rejection regression test
+  now asserts the supported output contract.
+- Added `skyulf-core/examples/spark_batch_inference.py`, which runs the same
+  classification bundle through both Spark modes. The example sets the current
+  interpreter as the Python worker on Windows when no worker override exists.
+- Focused verification:
+  `.venv-spark/Scripts/python.exe -m pytest -o addopts='' --basetemp
+  .tmp-sm11-regression skyulf-core/tests/spark/test_native_features_inference.py
+  skyulf-core/tests/spark/test_python_pipeline_inference.py
+  skyulf-core/tests/spark/test_prediction_contract.py
+  skyulf-core/tests/spark/test_worker_isolation.py
+  skyulf-core/tests/spark/test_inference_bundle.py -q --disable-warnings
+  --maxfail=1` → **123 passed**. JVM cleanup prints the
+  existing Windows `ERROR: Access denied` after a successful exit.
+- Full Spark gate:
+  `.venv-spark/Scripts/python.exe -m pytest -o addopts='' --basetemp
+  .tmp-sm11-spark-all skyulf-core/tests/spark
+  skyulf-core/tests/unit/test_execution_capabilities.py
+  skyulf-core/tests/unit/test_feature_state.py
+  skyulf-core/tests/unit/test_pipeline_inference_schema.py -q --disable-warnings
+  --maxfail=1` → **415 passed, 2 warnings**, 516.51 seconds. The warnings are
+  existing; Windows prints the cleanup access-denied line after exit 0.
+- Both example commands completed with exit code 0 and printed matching
+  `prediction`, `probability_0` and `probability_1` results. Ruff check and
+  format passed for all changed Python files.
+- Nullable integer/boolean model-feature transport remains rejected because
+  Arrow can widen values with nulls. Worker wheel isolation, scale/RSS
+  measurements, MLflow, Databricks, endpoints and templates remain later work.
+- Next task: SM-12 optional MLflow tracking, with tracking disabled remaining a
+  valid local/Spark workflow.

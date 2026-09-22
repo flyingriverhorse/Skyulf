@@ -174,13 +174,14 @@ boundary remains a separate explicit engine capability.
 `skyulf-core/examples/spark_batch_inference.py` (repo köküne göre).
 **Değiştir:** Bundle/prediction output contract yalnız mevcut model semantiğiyle.
 
-- [ ] String binary labels, çok sınıf, positive label, probability sütun sırası,
+- [x] String binary labels, çok sınıf, positive label, probability sütun sırası,
   saved threshold ve override precedence için local/Spark key parity testleri.
-- [ ] Spark'ın lazy olması nedeniyle assertion'lar action çağırmalı. İki
+- [x] Spark'ın lazy olması nedeniyle assertion'lar action çağırmalı. İki
   repartition ve en az iki Arrow batch limitinde aynı tahmini doğrula.
-- [ ] Worker'ın wheel'i kullanması ve eksik dependency'nin anlaşılır hatası için
-  ayrı-process testi ekle. Model her satır için yüklenmesin; iterator seviyesinde
-  yükleme helper'ını ölç. Task sayısına eşit tam bir global yükleme sayısı varsayma.
+- [x] Eksik dependency'nin anlaşılır hatası için ayrı-process testi ekle. Model
+  her satır için yüklenmesin; iterator seviyesinde yükleme helper'ını ölç. Task
+  sayısına eşit tam bir global yükleme sayısı varsayma. Worker wheel packaging
+  remains a later platform gate.
 - [ ] SM-09'un nullable integer/boolean model-feature schema sınırını yeniden
   değerlendir. Arrow → pandas null dönüşümünde büyük integer hassasiyeti
   korunmadan desteği genişletme; float'tan integer'a geri cast çözüm değildir.
@@ -188,7 +189,7 @@ boundary remains a separate explicit engine capability.
 - [ ] Büyük sentetik veri üzerinde driver RSS, worker peak ve wall time ölç;
   row count/feature width/partition sayısını kaydet. Driver belleğinin input
   boyutuyla doğrusal büyümemesini araştır; sabit hızlanma oranı vaat etme.
-- [ ] Güncel core suite ve optional-dependency import testini çalıştır;
+- [x] Güncel core suite ve optional-dependency import testini çalıştır;
   bilinen failure varsa neden/izolasyon kanıtıyla release kararına yaz.
 
 ```python
@@ -207,5 +208,14 @@ estimator.classes_ ile karşılaştırılır. Sum testi tek başına yeterli de�
 Spark probability değerleri local estimator.predict_proba ile sınıf bazında
 karşılaştırılır; threshold label sonucu ayrıca assertion alır.
 **Komut:** `python -m pytest skyulf-core/tests/spark -q`
-**Kabul:** G2: iki yol, regression/classification ve worker packaging kanıtlı.
+**Kabul:** G2: iki yol, regression/classification and worker isolation are
+tested. Worker wheel/Databricks deployment validation remains a later platform
+gate; local Spark proves the iterator contract only.
 Endpoint yok; [MLflow/batch](03-mlflow-batch-delivery-plan.md) aşamasına geçilir.
+
+2026-09-22: Classification is available for raw bundles in both Spark modes.
+String binary labels, integer multiclass labels, probability ordering, saved
+threshold precedence, two partition layouts and two Arrow batch limits are
+covered. The worker loads the model once per iterator and calls it on bounded
+chunks. Nullable integral/boolean model features remain rejected before Arrow
+execution; worker wheel and scale measurements are explicit later gates.

@@ -1,11 +1,11 @@
-# Session handoff - 2026-09-21
+# Session handoff - 2026-09-22
 
-Work is parked at the user's request after completing SM-10. Resume with SM-11 when requested.
+Work is parked after completing SM-11. Resume with SM-12 when requested.
 Target release: 0.9.0. Branch: `090`.
 
 ## Starting point
 
-- SM-00 through SM-10 are complete; SM-11 is the next READY task.
+- SM-00 through SM-11 are complete; SM-12 is the next READY task.
 - Last implementation commit: `df63d231` (worker-local Python FE and model inference).
 - Last guide commit: `add50eb7` (SM-10 availability docs and updated worker diagram).
 - Read [OPEN_QUEUE.md](OPEN_QUEUE.md), [ARCHITECTURE.md](ARCHITECTURE.md) and
@@ -39,26 +39,32 @@ Keep new documentation and diagram labels in English.
   call it yet. Frontend inference uses `POST /deployment/predict` and
   `DeploymentService`, which loads the existing artifact, applies FE, aligns
   model columns and predicts. The backend artifact bridge belongs to SM-18.
-- `predict_spark(mode="native_features")` supports raw regression bundles
-  with supported native FE. Spark applies the saved rules; Python workers run
-  the same fitted model on batches. There is no full-data driver collection.
+- `predict_spark(mode="native_features")` supports raw regression and
+  classification bundles with supported native FE. Spark applies the saved
+  rules; Python workers run the same fitted model on batches. There is no
+  full-data driver collection.
 - Portable FE currently supports SimpleImputer mean/constant, StandardScaler
   and an empty chain. Unsupported steps fail explicitly.
 - Spark FE fit -> export -> restore -> Spark apply is available. This does
   not imply that end-to-end distributed model training is implemented.
-- `mode="python_pipeline"` now runs compatible fitted Python FE and model
-  execution together inside workers, without refitting. It rejects unsupported
-  context-dependent, row-changing and non-portable FE operations.
+- `mode="python_pipeline"` runs compatible fitted Python FE and model
+  execution together inside workers, without refitting. It supports raw
+  regression and classification, and rejects unsupported context-dependent,
+  row-changing and non-portable FE operations.
+- Classification output preserves manifest label types, class-ordered
+  probability columns and saved threshold precedence in both Spark modes.
 
 ## Verification and workspace
 
 Before parking, the English guide's example was checked with both pandas and
 Polars training: local and Spark predictions matched `[400.0, 200.0]`. SM-10
-also passed its focused 14-test Spark lane and the native inference file passed
-52 tests.
+passed its focused 14-test Spark lane; SM-11 classification and isolation
+regressions passed in the combined 123-test focused lane. The standalone Spark
+batch example completed in both modes with matching string labels and
+probability columns.
 The strict documentation build, four rendered diagrams and commit hooks passed.
-Broader implementation evidence is recorded under SM-09 in OPEN_QUEUE.md;
-those suites were not rerun for this handoff-only update.
+Broader implementation evidence is recorded under SM-11 in OPEN_QUEUE.md;
+the full Spark lane remains the next verification gate before SM-12 delivery.
 
 Three pre-existing untracked directories remain outside this change:
 `.tmp-review-model/`, `.tmp-spark-review-full/`, `.tmp-spark-review-pytest/`.
