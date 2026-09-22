@@ -111,9 +111,9 @@ URI çözümleme ile eşdeğer sayma, eski metotların return tipi değişmesin.
 ResolvedModel(name, version, model_uri, signature, digest).
 `register_model(model_uri, name)` explicit publish işlemidir; tahmin sırasında çağrılmaz.
 
-- [ ] Carry-forward from SM-13: run the G2 Spark runner on the same bundle
-  downloaded through a concrete registry URI. If an MLflow Spark UDF is added,
-  reuse the existing prediction contract rather than duplicating FE.
+- [x] Carry-forward from SM-13: the SM-16 preparation probe loads the bundle
+  selected by a concrete registry version and exercises both G2 Spark modes
+  against an independent gold oracle in local SQLite/Spark. Live UC remains SM-16.
 - [x] Alias/version aynı anda verilirse ve ikisi de yoksa açık config hatası;
   missing model/permission failure ile dependency failure ayrı hatalar olsun.
 - [x] Resolve an alias once and carry the concrete version URI through the job.
@@ -225,6 +225,24 @@ def test_platform_evidence_has_concrete_versions(platform_evidence):
 
 Bu kontrol gerçek job çıktısına uygulanır; elle doldurulmuş dict platform testi değildir.
 **Kabul:** G4 platform kapısı: run URL/id, sürümler, parity ve tekrar yazma kanıtı.
+
+## SM-15L — Local-engine Delta publication
+
+**Dependency:** SM-16. **Status:** WAIT; clarified by the user on 2026-09-22.
+The SM-15 delivery covers only the Spark runner. A Delta destination must not
+imply Spark inference; support for pandas/Polars publication needs its own sink.
+
+- [ ] Design explicit local source/target references and snapshot provenance;
+  do not pass filesystem paths into the Spark-only table-name contract.
+- [ ] Implement an optional Arrow/delta-rs writer for supported local data sizes.
+  No implicit collection of distributed Spark data into pandas/Polars.
+- [ ] Match period, UTC/schema, empty-result, receipt, retry and admission
+  guarantees using actual Delta transactions, including stale concurrent runs.
+- [ ] Validate storage access, table protocol features and UC compatibility for
+  each supported target type. Direct path writes do not establish UC table access.
+- [ ] Expose the supported engine/sink combinations before SM-20 offers them.
+
+This is planned work, not an available `run_batch(engine="polars")` feature.
 
 ## SM-17 — Kalan node aileleri ve context desteği
 

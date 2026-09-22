@@ -10,6 +10,12 @@ Live Databricks, Unity Catalog, distributed publish admission and wheel delivery
 remain the SM-16 platform gate. Installing this adapter does not certify those
 platforms. Tracking and registry remain optional and independent of the engine.
 
+This runner currently requires Spark. Delta itself can also be written from
+pandas/Polars through [Arrow and delta-rs](https://delta-io.github.io/delta-rs/usage/writing/); a local-engine Skyulf Delta sink
+with the same period/retry guarantees is planned separately as SM-15L. Choosing
+Delta as the output format should not force the inference engine to be Spark.
+Unity Catalog access and supported Delta features need validation for each writer.
+
 ```mermaid
 flowchart LR
     A["Delta source: fixed version"] --> B["Select UTC period [start, end)"]

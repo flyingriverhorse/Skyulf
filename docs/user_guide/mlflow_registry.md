@@ -65,7 +65,35 @@ local tests cover this configuration validation and separate local stores; a
 live Databricks/Unity Catalog connection is deliberately reserved for the SM-16
 platform gate.
 
-Registry resolution does not run prediction, mutate aliases, start Spark, or
-write a table. A later Spark runner downloads the concrete model artifact and
-uses the existing inference-bundle contract. HTTP/SQL endpoints, scheduled
-Delta delivery, and Databricks Bundle generation remain later initiative tasks.
+Load the selected artifact with `load_registered_bundle`. It uses the pinned
+name/version and the package's declared bundle path, rejects paths outside the
+downloaded package, and checks the package/bundle digest against `resolved.digest`.
+The same bundle can then be passed to `predict_local` or either Spark inference
+mode, subject to their existing schema and FE capabilities.
+
+```python
+from skyulf.integrations.mlflow.registry import load_registered_bundle
+
+bundle = load_registered_bundle(
+    resolved,
+    tracking_uri="sqlite:///tracking.db",
+    registry_uri="sqlite:///registry.db",
+)
+assert bundle.semantic_digest == resolved.digest
+```
+
+Only load trusted registry artifacts: bundle loading deserializes pickle, and
+digest matching is an identity check, not authentication of an unknown producer.
+Missing bundle metadata/artifacts or mismatched digests fail explicitly. A later
+alias move does not redirect the pinned reference.
+
+The `databricks_batch_smoke.py` example logs a uniquely named test model, loads
+its concrete registry version, and compares known gold predictions through both
+Spark inference modes. It accepts pandas or Polars training and emits a partial
+validation report. Local SQLite/Spark evidence does not certify live Unity Catalog,
+wheel deployment, distributed admission, Delta publication or platform scale.
+
+Registry resolution/loading does not predict, mutate aliases, start Spark or
+write a table. HTTP/SQL endpoints and Databricks Bundle generation remain later
+initiative tasks; the monthly Spark/Delta runner has its own
+[batch contract](databricks_batch.md).

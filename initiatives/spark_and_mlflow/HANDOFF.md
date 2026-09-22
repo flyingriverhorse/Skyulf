@@ -1,12 +1,19 @@
 # Session handoff - 2026-09-22
 
-SM-00 through SM-15 are complete. Resume with SM-16 platform preparation;
+SM-00 through SM-15 are complete. SM-16 platform preparation is ACTIVE;
 live Databricks execution has not been validated.
 Target release: 0.9.0. Branch: `090`.
 
 ## Starting point
 
-- SM-00 through SM-15 are complete; SM-16 is READY for platform preparation.
+- SM-00 through SM-15 are complete; SM-16 local preparation is in progress.
+- The registry-bundle loader and first registry-to-Spark probe are implemented.
+  Local validation passed 29 combined tests; the complete platform gate remains
+  open. A 0.9.0 wheel was built, with its checksum recorded in the platform file.
+- See [PLATFORM_VALIDATION.md](PLATFORM_VALIDATION.md). The user will provide
+  the CLI profile, test namespace and compute; no workspace has been selected.
+- Local-engine pandas/Polars Delta writing is tracked as SM-15L. The current
+  Spark writer does not implement it; templates remain SM-20.
 - SM-15 baseline: `4a613cb5`. Its implementation and verification are in the
   delivery commit containing this handoff. No live Databricks validation yet.
 - SM-13 starts from `67315253`; its implementation, guide and evidence are in
@@ -126,9 +133,11 @@ receipt returns the old committed version even after a newer recomputation,
 without writing again. New computation needs a new run ID and reviewed target
 version. History and transaction retention must cover the allowed retry window.
 
-Next, prepare the SM-16 wheel/job smoke and platform evidence record, including
-the carried registry-to-Spark path, without creating a DAB template or endpoints.
-Actual execution needs an explicitly selected runtime, permitted test namespace,
-and authentication. The user retracted an accidentally pasted login command;
-do not treat its host or editor-created `databricks.yml` as authorization to log
-in, submit jobs or use that workspace. Those editor files remain outside SM-15.
+The first SM-16 registry-to-Spark smoke and platform evidence file are prepared;
+see that file for the current wheel checksum and local evidence. After the user
+supplies the CLI profile, permitted test namespace and compute, prepare the
+reviewable job request and finish the remaining platform gates. Databricks CLI
+1.17.0 is installed but absent from the current shell PATH; use its existing
+WinGet executable or a refreshed shell. The user confirmed `databricks.yml` is
+not needed in this repository; it is absent. DAB/templates and endpoints remain
+later work. Do not reuse the previously retracted login host as authorization.

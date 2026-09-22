@@ -10,8 +10,11 @@ requested.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from pathlib import Path
-from typing import Any
+from pathlib import Path, PureWindowsPath
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from ...inference.bundle import InferenceBundle
 
 __all__ = [
     "RegistryAccessError",
@@ -20,6 +23,7 @@ __all__ = [
     "RegistryModelNotFoundError",
     "RegistryOperationError",
     "ResolvedModel",
+    "load_registered_bundle",
     "register_model",
     "resolve_model",
 ]
@@ -54,6 +58,92 @@ class ResolvedModel:
     model_uri: str
     signature: Any | None
     digest: str | None
+
+
+def load_registered_bundle(
+    resolved: ResolvedModel,
+    *,
+    tracking_uri: str | None = None,
+    registry_uri: str | None = None,
+) -> InferenceBundle:
+    """Load a trusted packaged bundle using a previously pinned registry version.
+
+    The client uses explicit stores without changing MLflow's global URIs or
+    active run. The concrete name/version selects the package even if an alias
+    has since moved. Its pyfunc artifact map locates the bundle; package and
+    bundle digests must agree with the resolved identity.
+
+    This operation deserializes pickle. Only use trusted registry artifacts;
+    digest checks do not authenticate producers. Local MLflow stores are covered
+    by integration tests; remote Unity Catalog execution requires deployment
+    validation.
+    """
+    if not isinstance(resolved, ResolvedModel):
+        raise TypeError("resolved must be a ResolvedModel.")
+    _validate_registry_options(resolved.name, tracking_uri, registry_uri)
+    if (
+        not isinstance(resolved.version, str)
+        or not resolved.version.isascii()
+        or not resolved.version.isdigit()
+        or int(resolved.version) <= 0
+        or resolved.model_uri != f"models:/{resolved.name}/{resolved.version}"
+    ):
+        raise ValueError("resolved must identify a concrete positive model version.")
+    if not isinstance(resolved.digest, str) or not resolved.digest.strip():
+        raise ValueError("resolved must include the Skyulf bundle digest.")
+    mlflow = _require_mlflow()
+    client = _make_client(mlflow, tracking_uri, registry_uri)
+    try:
+        version = client.get_model_version(resolved.name, resolved.version)
+        source = getattr(version, "source", None)
+        artifact_uri = source if isinstance(source, str) and source else resolved.model_uri
+        local_path = mlflow.artifacts.download_artifacts(
+            artifact_uri=artifact_uri,
+            tracking_uri=tracking_uri,
+            registry_uri=registry_uri,
+        )
+        model = mlflow.models.Model.load(Path(local_path))
+    except Exception as exc:  # noqa: BLE001 - translate registry and artifact transport failures
+        raise _translate_error(exc, name=resolved.name, version=resolved.version) from exc
+    metadata = model.metadata or {}
+    if metadata.get("skyulf_bundle_digest") != resolved.digest:
+        raise ValueError(
+            "Packaged Skyulf bundle digest is missing or differs from resolved digest."
+        )
+    bundle_path = _packaged_bundle_path(Path(local_path), model.flavors)
+    from ...inference.bundle import (  # noqa: PLC0415 - lazy bundle dependency
+        load_bundle,
+    )
+
+    bundle = load_bundle(bundle_path)
+    if bundle.semantic_digest != resolved.digest:
+        raise ValueError("Loaded Skyulf bundle digest differs from resolved digest.")
+    return bundle
+
+
+def _packaged_bundle_path(package: Path, flavors: dict[str, Any]) -> Path:
+    """Find the declared bundle directory and reject paths escaping the package."""
+    try:
+        relative = flavors["python_function"]["artifacts"]["bundle"]["path"]
+    except (KeyError, TypeError) as exc:
+        raise ValueError("MLflow model is missing the Skyulf bundle artifact path.") from exc
+    if (
+        not isinstance(relative, str)
+        or not relative.strip()
+        or Path(relative).is_absolute()
+        or PureWindowsPath(relative).anchor
+        or ".." in PureWindowsPath(relative).parts
+    ):
+        raise ValueError(
+            "Skyulf bundle artifact path must be relative and contained in the package."
+        )
+    root = package.resolve()
+    candidate = (root / relative).resolve()
+    if not candidate.is_relative_to(root) or candidate == root:
+        raise ValueError("Skyulf bundle artifact path must be contained in the package.")
+    if not candidate.is_dir():
+        raise ValueError("MLflow model is missing the Skyulf bundle artifact directory.")
+    return candidate
 
 
 def resolve_model(
