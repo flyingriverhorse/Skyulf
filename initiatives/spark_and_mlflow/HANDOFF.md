@@ -6,8 +6,8 @@ Target release: 0.9.0. Branch: `090`.
 ## Starting point
 
 - SM-00 through SM-10 are complete; SM-11 is the next READY task.
-- Last implementation commit: `74ceacb9` (native Spark batch model inference).
-- Last guide commit: `a910e08b` (English inference explanation and four diagrams).
+- Last implementation commit: `df63d231` (worker-local Python FE and model inference).
+- Last guide commit: `add50eb7` (SM-10 availability docs and updated worker diagram).
 - Read [OPEN_QUEUE.md](OPEN_QUEUE.md), [ARCHITECTURE.md](ARCHITECTURE.md) and
   the SM-11 section of [02-inference-plan.md](02-inference-plan.md) before coding.
 - User-facing guide: [How inference works](../../docs/user_guide/inference_flow.md).
