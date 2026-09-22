@@ -87,7 +87,8 @@ not an atomic publish operation and may overwrite files. Logging failures
 propagate to the caller even when tracking was configured with `warn`.
 Producer project files and the temporary source bundle path are excluded.
 
-This stage provides local MLflow pyfunc packaging. Registry and Unity Catalog
-resolution, Databricks job delivery, Delta batch sinks, and Spark UDF/endpoint
-adapters remain later initiative tasks. Until those gates are complete,
-`load_model` plus `predict` is the supported packaging contract.
+This stage provides local MLflow pyfunc packaging. The optional registry adapter
+can now publish and resolve concrete local registry versions; live Unity Catalog,
+Databricks job delivery, Delta batch sinks, and Spark UDF/endpoint adapters
+remain later initiative tasks. Until those platform gates are complete,
+`load_model` plus `predict` is the supported pyfunc packaging contract.

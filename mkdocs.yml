@@ -78,6 +78,7 @@ nav:
     - Inference Flow (Development): user_guide/inference_flow.md
     - MLflow Tracking (Development): user_guide/mlflow_tracking.md
     - MLflow Models (Development): user_guide/mlflow_models.md
+    - MLflow Registry (Development): user_guide/mlflow_registry.md
     - Pipeline Quickstart: user_guide/pipeline_quickstart.md
     - Step-by-Step (No Config): user_guide/step_by_step_no_config.md
     - Automated EDA: user_guide/eda_profiling.md

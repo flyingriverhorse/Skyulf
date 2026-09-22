@@ -114,13 +114,13 @@ ResolvedModel(name, version, model_uri, signature, digest).
 - [ ] Carry-forward from SM-13: run the G2 Spark runner on the same bundle
   downloaded through a concrete registry URI. If an MLflow Spark UDF is added,
   reuse the existing prediction contract rather than duplicating FE.
-- [ ] Alias/version aynı anda verilirse ve ikisi de yoksa açık config hatası;
+- [x] Alias/version aynı anda verilirse ve ikisi de yoksa açık config hatası;
   missing model/permission failure ile dependency failure ayrı hatalar olsun.
-- [ ] Alias'ı bir kez resolve et, concrete version URI'yi bütün iş boyunca taşı.
-  İlk local registry store testleri, sonra UC integration fixture'ı.
-- [ ] UC için üç parçalı model ismi, signature ve ayrı registry URI doğrula;
-  local client'tan erişim de test senaryosuna dahil olsun.
-- [ ] Alias değiştirme otomatik başarı yan etkisi olmasın; model kaydı ve
+- [x] Resolve an alias once and carry the concrete version URI through the job.
+  Local registry tests are complete; the live UC integration fixture remains in SM-16.
+- [x] Validate the UC three-part model name, signature and separate registry URI
+  with a local client; live UC access remains in the SM-16 platform gate.
+- [x] Alias değiştirme otomatik başarı yan etkisi olmasın; model kaydı ve
   promotion ayrı explicit operasyonlar olsun. Testten sonra yalnız test-owned
   kaynaklar temizlenir; var olan alias değiştirilmez.
 
@@ -135,6 +135,17 @@ def test_registry_rejects_ambiguous_reference():
 
 **Komut:** `python -m pytest skyulf-core/tests/integrations/test_mlflow_registry.py -q`
 **Kabul:** G3b: local registry gerçek test; UC smoke için SM-16 platform kanıtı gerekir.
+
+**Validation record (2026-09-22):** `register_model` publishes only
+`runs:/...` artifacts through an explicit MLflow client and does not assign an
+alias. `resolve_model` requires exactly one alias or version, resolves aliases
+once, downloads the version's recorded source URI, and returns the concrete
+`models:/name/version` URI with the packaged signature and bundle digest. Local
+SQLite tests cover missing-model, permission, dependency, separate
+tracking/registry stores, alias movement, and Unity Catalog three-part-name
+validation. MLflow 3.16.1 isolated lane: **10 passed**. Base environment:
+registry module skipped because MLflow is absent. Live Unity Catalog and Spark
+runner validation remain SM-16 carry-forward items.
 
 ## SM-15 — Aylık batch ve Delta yayınlama
 

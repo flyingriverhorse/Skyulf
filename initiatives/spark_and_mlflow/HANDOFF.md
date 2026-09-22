@@ -1,17 +1,17 @@
 # Session handoff - 2026-09-22
 
-SM-11 is complete after the corrective validation gate. SM-12 and SM-13 are
-now complete; resume with SM-14.
+SM-11 is complete after the corrective validation gate. SM-12, SM-13 and SM-14
+are now complete; resume with SM-15.
 Target release: 0.9.0. Branch: `090`.
 
 ## Starting point
 
-- SM-00 through SM-13 are complete; SM-14 is READY.
+- SM-00 through SM-14 are complete; SM-15 is READY.
 - SM-13 starts from `67315253`; its implementation, guide and evidence are in
   the delivery commit containing this handoff.
 - Previous guide/queue commit: `80dc9ee9` (SM-11 closure and SM-12 handoff).
 - Read [OPEN_QUEUE.md](OPEN_QUEUE.md), [ARCHITECTURE.md](ARCHITECTURE.md) and
-  the SM-14 section of [03-mlflow-batch-delivery-plan.md](03-mlflow-batch-delivery-plan.md).
+  the SM-15 section of [03-mlflow-batch-delivery-plan.md](03-mlflow-batch-delivery-plan.md).
 - User-facing guide: [How inference works](../../docs/user_guide/inference_flow.md).
 
 ## Confirmed terminology and intended workflow
@@ -85,6 +85,15 @@ prediction; direct `predict_local` remains strict. Unsupported bundle integer
 dtypes fail at packaging. Producer uv files and temporary paths are excluded.
 Registry-to-G2 evidence is carried into SM-14; live UC/Databricks, scheduled
 batch delivery, endpoints and templates remain later gates.
+
+SM-14 added explicit MLflow registry publication and resolution. The adapter
+publishes only `runs:/...` artifacts, leaves alias promotion explicit, resolves
+an alias once to a concrete `models:/name/version` URI, and returns the packaged
+signature and bundle digest. MLflow 3.16.1 local validation passed 10 tests,
+including separate tracking/registry stores, missing/access/dependency failures,
+alias movement and Unity Catalog name validation. Live UC and Databricks
+validation remain SM-16; the G2 Spark runner consumes this concrete artifact in
+that later platform gate.
 
 Pre-existing `.tmp-*` directories remain outside this change. Preserve them;
 do not stage or delete them as part of the next task.

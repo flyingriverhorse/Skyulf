@@ -25,8 +25,8 @@ DONE = kanıtla tamamlandı. SM-00 commit: `105a6fe4`.
 | SM-11 | Classification ve ölçek kapısı | SM-10 | DONE | Class/proba/threshold parity; transport, packaging and scale evidence |
 | SM-12 | Opsiyonel MLflow tracking | SM-11 | DONE | Off bağımsız; gerçek run lifecycle ve izolasyon |
 | SM-13 | MLflow model packaging | SM-12 | DONE | Temiz ortamda pyfunc yükleme ve parity |
-| SM-14 | Registry/Unity Catalog adapter | SM-13 | READY | URI/signature; alias → sabit version |
-| SM-15 | Aylık batch + Delta sink | SM-14 | WAIT | Dönem izolasyonu, retry ve conflict kontrolü |
+| SM-14 | Registry/Unity Catalog adapter | SM-13 | DONE | Explicit publish; alias/version pinning; local evidence |
+| SM-15 | Monthly batch + Delta sink | SM-14 | READY | Period isolation, retry and conflict control |
 | SM-16 | Gerçek Databricks kapısı | SM-15 | WAIT | Job/run kanıtı; UC load; iki inference yolu |
 | SM-17 | Kalan node aileleri | SM-16 | WAIT | Aile bazlı port; her kayıt supported/unsupported |
 | SM-18 | Backend/Canvas ve custom FE | SM-17 | LATER | Capability UI/API; DAG/artifact uyumu |
@@ -111,6 +111,24 @@ $env:SKYULF_MLFLOW_WHEEL_PYTHON = (Resolve-Path .cache/sm13-clean-env/Scripts/py
 - Scope boundary: this task adds run tracking only. MLflow model packaging,
   registry/Unity Catalog, Databricks batch delivery, endpoints, and templates
   remain SM-13 onward.
+
+## SM-14 — 2026-09-22 validation record
+
+- Added `skyulf/integrations/mlflow/registry.py` and
+  `tests/integrations/test_mlflow_registry.py`. Publication accepts only the
+  `runs:/...` URI produced by the packaging adapter, uses explicit tracking and
+  registry clients, and leaves alias promotion to the caller.
+- Resolution requires exactly one alias or version, pins an alias to a concrete
+  `models:/name/version` URI, and returns the packaged signature and bundle
+  digest. The version's recorded source URI is used for artifact metadata so
+  separate tracking and registry stores work without process-global MLflow state.
+- The isolated MLflow 3.16.1 lane passed **10 tests**. It covers local SQLite
+  registration, alias movement, separate stores, missing model, access and
+  dependency failures, non-run publication rejection, and Unity Catalog
+  three-part-name validation. The base environment skips the optional module
+  because MLflow is absent.
+- Scope boundary: live Unity Catalog/Databricks validation and the G2 Spark
+  runner remain SM-16 carry-forward work. SM-15 is now READY.
 
 ## Bir görevi kapatma kaydı
 
