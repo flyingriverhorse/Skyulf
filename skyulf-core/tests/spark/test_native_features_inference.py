@@ -246,7 +246,8 @@ def test_classification_is_supported_with_manifest_output(spark):
 
 
 @pytest.mark.parametrize("kind", ["integer", "boolean"])
-def test_nullable_integral_features_are_rejected_before_actions(spark, monkeypatch, kind):
+@pytest.mark.parametrize("mode", ["native_features", "python_pipeline"])
+def test_nullable_integral_features_are_rejected_before_actions(spark, monkeypatch, kind, mode):
     """Arrow must not silently widen nullable integral or boolean model features."""
     values = [1, 3, 5, 7] if kind == "integer" else [False, True, False, True]
     train = pd.DataFrame({"x": values, "y": [2.0, 6.0, 10.0, 14.0]})
@@ -273,7 +274,49 @@ def test_nullable_integral_features_are_rejected_before_actions(spark, monkeypat
 
     monkeypatch.setattr(type(frame), "collect", forbidden)
     with pytest.raises(UnsupportedExecutionError, match="[Nn]ullable.*Arrow"):
-        _predict(frame, bundle)
+        _predict(frame, bundle, mode=mode)
+
+
+def test_python_pipeline_rejects_nullable_integer_before_arrow_with_frozen_fe(spark, monkeypatch):
+    """Python FE workers must reject nullable integer raw inputs before precision loss."""
+    types = importlib.import_module("pyspark.sql.types")
+    train = pd.DataFrame({"x": [1, 3, 5, 7], "y": [2.0, 6.0, 10.0, 14.0]})
+    pipeline = SkyulfPipeline(
+        {
+            "preprocessing": [
+                {
+                    "name": "fill",
+                    "transformer": "SimpleImputer",
+                    "params": {"columns": ["x"]},
+                },
+                {
+                    "name": "scale",
+                    "transformer": "StandardScaler",
+                    "params": {"columns": ["x"]},
+                },
+            ],
+            "modeling": {"type": "linear_regression"},
+        }
+    )
+    pipeline.fit(SplitDataset(train=train, test=train.head(0)), target_column="y")
+    bundle = build_bundle(pipeline, input_stage="raw", feature_order=("x",))
+    frame = spark.createDataFrame(
+        [(1, 2**53 + 1), (2, None)],
+        types.StructType(
+            [
+                types.StructField("id", types.LongType(), False),
+                types.StructField("x", types.LongType(), True),
+            ]
+        ),
+    )
+
+    def forbidden(*args, **kwargs):
+        """Transport safety must fail before distributed key validation."""
+        pytest.fail("Nullable raw integer reached a Spark action")
+
+    monkeypatch.setattr(type(frame), "collect", forbidden)
+    with pytest.raises(UnsupportedExecutionError, match="[Nn]ullable.*Arrow"):
+        _predict(frame, bundle, mode="python_pipeline")
 
 
 def test_nonnullable_integer_features_preserve_supported_inference(spark):

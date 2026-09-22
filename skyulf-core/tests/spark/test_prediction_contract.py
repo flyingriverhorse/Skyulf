@@ -72,17 +72,20 @@ def test_binary_string_labels_and_probability_order_match_local(
     pipeline, query = _binary_pipeline()
     bundle = build_bundle(pipeline, input_stage="raw", feature_order=("x",))
     expected = predict_local(query, bundle).reset_index(drop=True)
+    assert pipeline.model_estimator is not None and pipeline.model_estimator.model is not None
+    model = pipeline.model_estimator.model
     rows = _spark_output(spark, bundle, query, mode, partitions=partitions, arrow_rows=arrow_rows)
 
     assert bundle.classes == ("no", "yes")
     assert bundle.positive_label == "yes"
+    assert bundle.classes == tuple(model.classes_)
     assert tuple(row.asDict() for row in rows)
     actual = pd.DataFrame([row.asDict() for row in rows]).drop(columns="id")
     assert list(actual.columns) == ["prediction", *bundle.probability_columns]
     np.testing.assert_array_equal(actual.prediction.to_numpy(), expected.prediction.to_numpy())
     np.testing.assert_allclose(
         actual[list(bundle.probability_columns)].to_numpy(),
-        expected[list(bundle.probability_columns)].to_numpy(),
+        model.predict_proba(query.to_numpy()),
         rtol=1e-10,
         atol=1e-12,
     )
@@ -93,17 +96,19 @@ def test_multiclass_integer_labels_match_local(spark, mode):
     """Multiclass integer predictions and class-ordered probabilities must remain aligned."""
     pipeline, query = _multiclass_pipeline()
     bundle = build_bundle(pipeline, input_stage="raw", feature_order=("x", "z"))
-    expected = predict_local(query, bundle).reset_index(drop=True)
+    assert pipeline.model_estimator is not None and pipeline.model_estimator.model is not None
+    model = pipeline.model_estimator.model
     rows = _spark_output(spark, bundle, query, mode)
     actual = pd.DataFrame([row.asDict() for row in rows]).drop(columns="id")
 
     assert bundle.classes == (10, 20, 30)
     assert bundle.positive_label is None
+    assert bundle.classes == tuple(model.classes_)
     assert actual.prediction.dtype.kind in "iu"
-    np.testing.assert_array_equal(actual.prediction.to_numpy(), expected.prediction.to_numpy())
+    np.testing.assert_array_equal(actual.prediction.to_numpy(), model.predict(query.to_numpy()))
     np.testing.assert_allclose(
         actual[list(bundle.probability_columns)].to_numpy(),
-        expected[list(bundle.probability_columns)].to_numpy(),
+        model.predict_proba(query.to_numpy()),
         rtol=1e-10,
         atol=1e-12,
     )
@@ -114,7 +119,7 @@ def test_saved_threshold_decisions_match_local(spark, mode):
     """A frozen tuned threshold must have the same precedence in local and Spark inference."""
     pipeline, query = _binary_pipeline()
     pipeline.optimize_thresholds(
-        query, np.array(["no", "no", "yes", "yes"]), accuracy_score, grid_points=5
+        query, np.array(["no", "yes", "yes", "yes"]), accuracy_score, grid_points=5
     )
     bundle = build_bundle(
         pipeline, input_stage="raw", feature_order=("x",), use_tuned_thresholds=True
@@ -124,6 +129,10 @@ def test_saved_threshold_decisions_match_local(spark, mode):
     actual = pd.DataFrame([row.asDict() for row in rows]).drop(columns="id")
 
     assert bundle.manifest.thresholds.source == "pipeline_override"
+    assert bundle.manifest.thresholds.values != (0.5, 0.5)
+    assert pipeline.model_estimator is not None and pipeline.model_estimator.model is not None
+    default_predictions = pipeline.model_estimator.model.predict(query.to_numpy())
+    assert np.any(actual.prediction.to_numpy() != default_predictions)
     np.testing.assert_array_equal(actual.prediction.to_numpy(), expected.prediction.to_numpy())
     np.testing.assert_allclose(
         actual[list(bundle.probability_columns)].to_numpy(),

@@ -76,6 +76,7 @@ def predict_spark(
     )
     selected = native.select(*[_column(native, name) for name in selected_names])
     if mode == "python_pipeline":
+        _validate_python_input_transport(native, manifest)
         engineer = FeatureEngineer.from_state(
             bundle.feature_state,
             execution_options=ExecutionOptions("pandas", state_max_bytes=options.state_max_bytes),
@@ -160,6 +161,22 @@ def _validate_python_pipeline(engineer: FeatureEngineer) -> None:
                 "apply",
                 "spark",
                 "python_pipeline requires portable row-independent, row-preserving FE.",
+            )
+
+
+def _validate_python_input_transport(native: Any, manifest: BundleManifest) -> None:
+    """Reject nullable integral inputs before Arrow can widen them in Python workers."""
+    integral = {"byte", "short", "integer", "long", "boolean"}
+    fields = {field.name: field for field in native.schema.fields}
+    for column in manifest.input_schema:
+        field = fields[column.name]
+        if field.nullable and field.dataType.typeName() in integral:
+            raise UnsupportedExecutionError(
+                "inference",
+                "predict",
+                "spark",
+                f"Nullable model input {field.name!r} risks Arrow dtype conversion. "
+                "Use a nonnullable Spark schema, or normalize to floats before training.",
             )
 
 
