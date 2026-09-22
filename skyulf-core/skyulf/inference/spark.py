@@ -8,7 +8,13 @@ import pandas as pd
 
 from ..core.capabilities import UnsupportedExecutionError
 from ..core.execution import ExecutionOptions, FrameSpec
-from ..preprocessing._spark import _column, _native, _resolved_names, _validate_keys
+from ..preprocessing._spark import (
+    _case_sensitive,
+    _column,
+    _native,
+    _resolved_names,
+    _validate_keys,
+)
 from ..preprocessing.pipeline import FeatureEngineer
 from ._manifest import BundleManifest, check_runtime, checksum
 from ._model import load_model
@@ -246,7 +252,7 @@ def _validate_names_and_keys(frame: Any, manifest: BundleManifest, spec: FrameSp
     resolved = _resolved_names(frame)
     if len(resolved) != len(set(resolved)):
         raise ValueError("Duplicate Spark column names are unsupported.")
-    sensitive = frame.sparkSession.conf.get("spark.sql.caseSensitive") == "true"
+    sensitive = _case_sensitive(frame)
 
     def names(columns: tuple[str, ...]) -> set[str]:
         """Apply the same identifier resolution used by Spark for collision checks."""

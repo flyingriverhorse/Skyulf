@@ -1,6 +1,6 @@
 # SM-16 platform validation
 
-Status: **ACTIVE — local preparation; no live Databricks evidence yet**.
+Status: **ACTIVE — live registry/Spark parity passed; remaining platform gates open**.
 Baseline: `d43e74ca`, branch `090`, target release `0.9.0`.
 
 ## Local preparation evidence — 2026-09-22
@@ -22,8 +22,8 @@ Baseline: `d43e74ca`, branch `090`, target release `0.9.0`.
   artifact root was moved under its temporary directory before the final gate.
 - Wheel built locally: `.cache/sm16-dist/skyulf_core-0.9.0-py3-none-any.whl`.
   SHA-256: `ede03a571bf3de480e1acca8ddd9c5179efd832906c410f4a0a98f50709b4779`.
-  This proves a local build only; the wheel has not been installed on Databricks
-  workers, uploaded or deployed. Rebuild/recompute the hash after code changes.
+  The wheel was uploaded to the approved workspace test folder. Installation and
+  worker execution remain pending the live job. Rebuild after code changes.
 
 Exact local commands:
 
@@ -49,10 +49,116 @@ Databricks runtime dependency profile.
   explicit executable path is needed until that shell is refreshed.
 - The repository root has no `databricks.yml`. The user confirmed it is not
   needed here. No bundle, deployment or authentication was created.
-- The user will provide the CLI profile, permitted test `catalog.schema`
-  and compute selection. None has been inferred from an earlier pasted host.
+- On 2026-09-22 the user explicitly authorized using the supplied workspace
+  and existing `skyulf` or default CLI profile. `auth profiles` returned one
+  matching profile: `skyulf`, default, valid, OAuth CLI authentication.
+  `current-user me` succeeded without another login.
+- Read-only discovery found catalogs `workspace`, `samples`, `system`; the
+  `workspace` catalog has `default` and `information_schema` schemas. No classic
+  clusters were listed. One stopped serverless SQL warehouse is available.
+- A one-time serverless registry/Spark probe request was prepared with a
+  900-second timeout and no retries. Proposed resources are the isolated
+  `workspace.skyulf_sm16_20260922` schema and a same-named folder under the
+  authenticated user's workspace directory. It uses the locally built wheel
+  and explicitly requests MLflow 3.16.1 without installing OSS PySpark.
+- Automatic approval review initially rejected schema creation. The user then
+  explicitly approved these resources, uploads and the bounded serverless job.
+  Schema/folder creation and uploads succeeded. Parent run `245612415275039`
+  and task run `45737629137632` were submitted with a 900-second timeout.
+  [Live run](https://dbc-45604623-c18b.cloud.databricks.com/?o=7474646244882000#job/94637315302832/run/245612415275039).
 
 ## Stage 1: registry-to-Spark probe
+
+### First live result and correction — 2026-09-22
+
+- Parent run `245612415275039`, task `45737629137632`: **FAILED** during
+  Spark inference identifier validation. The traceback reached `predict_spark`
+  after model registration, pinned bundle download and both local gold checks.
+- Retained test model:
+  `workspace.skyulf_sm16_20260922.probe_b6b83b505a4145c192cc6be6c1ab7569`.
+- Imported Skyulf came from the job's ephemeral Python 3.12 `site-packages`.
+  Clean worker prediction did not run, so worker wheel delivery is still open.
+- Live failure: `CONFIG_NOT_AVAILABLE.WITHOUT_SUGGESTION` when reading
+  `spark.sql.caseSensitive`. Serverless restricts configuration access.
+- Added one shared identifier-rule helper at all three read sites. Only the
+  structured unavailable-configuration condition falls back to conservative
+  case-insensitive collision checks; transport and permission failures propagate.
+- Reproduced the failure before the fix. The real Spark regression gate passed
+  **75 tests** in 76.42s, including pandas/Polars training, both inference modes,
+  hidden configuration and ambiguous-case rejection. Independent review found
+  no blocker; scoped Ruff and Ty passed.
+- Corrected wheel: `.cache/sm16-dist-r2/skyulf_core-0.9.0-py3-none-any.whl`.
+  SHA-256: `b10a7172cd268deec9b06168987a4d2ee4a19259417fc230d9a0bb3b5ea1b211`.
+  Automatic approval review initially rejected the additional upload/run as
+  exceeding the single-run approval. The user explicitly approved the retry;
+  `r2` uploads succeeded and parent run `447606109645160` was submitted with
+  the same 900-second timeout. Task run `987386852945959` finished **SUCCESS**.
+
+### Successful serverless rerun
+
+[Run `447606109645160`](https://dbc-45604623-c18b.cloud.databricks.com/?o=7474646244882000#job/541401697073405/run/447606109645160)
+completed the Polars-trained bundle round-trip through Unity Catalog. Both
+`native_features` and `python_pipeline` produced the keyed gold predictions
+`[-2, 3, 5]`. The report intentionally keeps `platform_gate_complete: false`.
+
+| Evidence | Value |
+| --- | --- |
+| Model | `workspace.skyulf_sm16_20260922.probe_3e8e88a3d2f2435a9c2b7b280a184bc2`, version `1` |
+| MLflow run | `81e30610dba14c52ae0e7e478b5abf50` |
+| Bundle digest | `66890475ca608271a6115ed2505890740bd6669fd9301711f9032390b4ea8084` |
+| Python / Spark | `3.12.3` / `4.2.0` |
+| MLflow / Arrow | `3.16.1` / `25.0.1` |
+| pandas / Polars / scikit-learn | `2.2.3` / `1.44.2` / `1.6.1` |
+| Runtime environment | `client.4.10`, `pyspark.sql.connect.session.SparkSession` |
+| Skyulf driver installation | `0.9.0`, non-editable ephemeral `site-packages` |
+
+The exact uploaded wheel is the `r2` artifact identified above. Both distributed
+prediction actions succeeded; per-worker package/checksum provenance and scale
+measurements were not collected by this three-row probe. Raw task output is
+retained locally at `.cache/sm16-live-registry-output-r2.json` and in the run UI.
+Test models and tracking runs remain in the approved namespace for inspection.
+
+### Restricted identity preparation
+
+The user requested creation of a separate test identity. Created
+`skyulf-sm16-restricted-20260922`, application ID
+`9559edaa-81e3-434b-a679-35703510c134` (workspace principal `75734274047655`).
+It has workspace access, inherited `USE_CATALOG`, explicit `USE_SCHEMA` on the
+test schema, `EXECUTE` on only the successful rerun's model and `CAN_READ` on
+the isolated test folder. It has no admin role, data-modification grant or
+created token/secret. The requesting account retains its existing manager role
+and gained the user role on this test principal so it can submit `run_as` jobs.
+
+Run `2921374308246` was submitted with this `run_as` identity and a 900-second
+timeout. It checks allowed model loading, denied access to the first test model,
+worker package provenance and 10k/50k synthetic prediction aggregates. It does
+not write tables. Its result is pending; submitting a job is not permission-test
+evidence. Prepared notebook/request are under `.cache/sm16-live-permissions*`.
+
+References: [Serverless restrictions](https://docs.databricks.com/aws/en/compute/serverless/limitations),
+[Databricks identifier rules](https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-identifiers).
+
+### Shared Delta admission preparation
+
+`DeltaTableAdmission` now provides non-expiring conditional ownership through
+an operator-provisioned singleton Delta table. Independent real Spark sessions
+share that authority. The final focused gate passed **16 tests** in 59.07s,
+including a forced race after both readers see a free row and acknowledgement
+loss after acquisition commits. The failed caller never enters publication;
+its retained claim blocks others until deliberate operator recovery.
+
+The final combined gate passed **18 tests** in 87.00s: the 16 provider tests,
+the existing OS-process lock and public `run_batch` publication/replay through
+shared Delta admission. Predictions, prior-period rows, the original receipt
+and owner release after both calls were verified. Base regression passed
+**80 tests**, with **48 optional-runtime skips** and one known Windows physical
+core detection warning. Ruff/format/Ty, strict MkDocs and independent review
+passed. Live serverless/UC admission,
+competing jobs and permission enforcement remain pending. See the
+[batch guide](../../docs/user_guide/databricks_batch.md) for provisioning and
+the explicit cooperative-writer and manual-recovery boundaries.
+
+### Probe contract
 
 Script: [databricks_batch_smoke.py](../../skyulf-core/examples/databricks_batch_smoke.py).
 
@@ -102,20 +208,20 @@ including when a previously resolved alias has moved.
 
 | Gate | Required evidence | Current state |
 | --- | --- | --- |
-| Selected environment | Profile, workspace, compute ID/type, DBR/Python/Spark/MLflow/Arrow | Awaiting user selection |
-| Package delivery | Exact wheel/checksum, installed distribution on clean driver/workers | Pending |
-| Real UC round-trip | Concrete model version, alias pinning and trusted bundle download | Pending live execution |
-| Spark parity | Gold data, both FE modes, key-based predictions, job run ID/URL | Local probe preparation |
+| Selected environment | Profile, workspace, compute ID/type, DBR/Python/Spark/MLflow/Arrow | `skyulf`; serverless Connect; successful runtime recorded above |
+| Package delivery | Exact wheel/checksum, installed distribution on clean driver/workers | Non-editable driver + worker prediction passed; per-worker provenance pending |
+| Real UC round-trip | Concrete model version, alias pinning and trusted bundle download | Register/download/local checks reached; alias gate pending |
+| Spark parity | Gold data, both FE modes, key-based predictions, job run ID/URL | Passed in live corrected run `447606109645160` |
 | Monthly publication | Real test Delta tables, snapshots, commits, replay, other periods preserved | SM-15 local evidence only |
-| Distributed admission | Shared authority, ownership through commit, competing-job result | Not implemented/validated |
+| Distributed admission | Shared authority, ownership through commit, competing-job result | Implemented; real local Delta tests passed; live gate pending |
 | UC permissions | Actual denied and allowed access in the approved namespace | Pending |
 | Scale | Synthetic distributed dataset, runtime and driver/worker memory evidence | Pending |
 
 Do not use `LocalTableLock` on a distributed Databricks driver. Limiting one
 job's concurrent runs does not coordinate other jobs or external writers.
 An expiring lease without sink-enforced fencing is insufficient. The platform
-admission choice remains an explicit design/validation step after runtime
-selection, not a no-op context manager pretending to own a distributed lock.
+admission implementation now uses a shared non-expiring Delta claim. Its local
+concurrency evidence does not substitute for validation on the selected platform.
 
 ## DAB and templates
 

@@ -108,13 +108,50 @@ are intentionally retained; do not delete them while publishers may run. The
 OS releases ownership when the process exits. This implementation is rejected
 on distributed Spark masters, including `local-cluster`.
 
-The `PublishAdmission` protocol is an extension boundary, not an implemented
-Databricks coordinator. A distributed implementation must hold exclusive
-ownership by immutable Delta table ID throughout validation, write and receipt
-verification. The current API does not pass fencing tokens to Delta, so an
-expiring lease is insufficient. Every publisher must participate in the same
-authority. Uncoordinated external writes are outside this guarantee; detected
-Delta conflicts still raise `BatchConflictError`.
+### Shared Delta admission
+
+`DeltaTableAdmission` coordinates participating publishers through one shared
+Delta control table. Real local Delta tests cover independent Spark sessions and
+simultaneous claims; live Databricks validation is still pending. Operators must
+provision the authority once, before starting publishers:
+
+```python
+from skyulf.integrations.databricks.delta_admission import DeltaTableAdmission
+
+target_id = spark.sql(
+    "DESCRIBE DETAIL analytics.customer_predictions"
+).first()["id"]
+# One-time provisioning only; do not overwrite an existing authority.
+spark.createDataFrame(
+    [(target_id, None)], "target_id string, owner string"
+).write.format("delta").mode("errorifexists").saveAsTable(
+    "analytics.customer_predictions_admission"
+)
+
+admission = DeltaTableAdmission(spark, "analytics.customer_predictions_admission")
+# Supply admission=admission to run_batch(...).
+```
+
+The provider requires exactly one row with the immutable output table ID and a
+nullable string owner. It uses a conditional Delta UPDATE to claim ownership,
+checks the committed token before entering, and clears only its own token after
+publication and receipt verification. A competing publisher fails with
+`BatchConflictError`; the provider does not automatically retry it.
+
+Every publisher must use the same authority. Keep its identity, schema and
+target binding fixed. External control-row edits, DDL and writers bypassing this
+protocol are outside the guarantee. Grant operators provisioning rights and
+publishers only the required read/update access under your platform's policy.
+
+Ownership never expires. A driver crash or an uncertain acquisition can leave a
+claim behind: inspect the job and prove that the original driver can no longer
+publish before an operator clears it. Never clear a live owner's claim to unblock
+another job. The sink has no fencing-token mechanism, so time-based expiry would
+allow an old publisher to write after a new publisher acquired ownership.
+
+The provider uses Spark SQL parameter markers (Spark 3.4+) without a SparkContext
+or data caching requirement. That API choice is not proof of compatibility with
+every Databricks compute type; the platform gate records tested environments.
 
 ## Time and reproducibility
 

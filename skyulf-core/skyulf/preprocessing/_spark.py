@@ -107,9 +107,26 @@ def _validate_keys(frame: Any, spec: FrameSpec) -> None:
         raise ValueError("Spark row_keys must be unique and non-null.")
 
 
+def _case_sensitive(frame: Any) -> bool:
+    """Read identifier rules, conservatively folding names when config is hidden.
+
+    Databricks serverless rejects this configuration read. Its identifiers are
+    case-insensitive; folding also rejects ambiguous names conservatively on any
+    runtime hiding this setting. Unrelated transport/access errors still surface.
+    """
+    try:
+        return frame.sparkSession.conf.get("spark.sql.caseSensitive") == "true"
+    except Exception as exc:  # noqa: BLE001 - optional classic/Connect error classes differ
+        condition = getattr(exc, "getCondition", None) or getattr(exc, "getErrorClass", None)
+        code = condition() if callable(condition) else None
+        if isinstance(code, str) and code.split(".")[0] == "CONFIG_NOT_AVAILABLE":
+            return False
+        raise
+
+
 def _resolved_names(frame: Any) -> list[str]:
     """Use session identifier rules for schema collisions and internal aliases."""
-    if frame.sparkSession.conf.get("spark.sql.caseSensitive") == "true":
+    if _case_sensitive(frame):
         return frame.columns
     return [name.lower() for name in frame.columns]
 

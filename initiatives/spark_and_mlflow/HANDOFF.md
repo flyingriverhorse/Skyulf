@@ -1,7 +1,7 @@
 # Session handoff - 2026-09-22
 
-SM-00 through SM-15 are complete. SM-16 platform preparation is ACTIVE;
-live Databricks execution has not been validated.
+SM-00 through SM-15 are complete. SM-16 is ACTIVE; live Databricks registry/Spark
+parity passed, with Delta/concurrency/permissions/scale gates still outstanding.
 Target release: 0.9.0. Branch: `090`.
 
 ## Starting point
@@ -10,8 +10,18 @@ Target release: 0.9.0. Branch: `090`.
 - The registry-bundle loader and first registry-to-Spark probe are implemented.
   Local validation passed 29 combined tests; the complete platform gate remains
   open. A 0.9.0 wheel was built, with its checksum recorded in the platform file.
-- See [PLATFORM_VALIDATION.md](PLATFORM_VALIDATION.md). The user will provide
-  the CLI profile, test namespace and compute; no workspace has been selected.
+- See [PLATFORM_VALIDATION.md](PLATFORM_VALIDATION.md). The user authorized the
+  supplied workspace and `skyulf` profile; OAuth authentication is verified.
+  No classic clusters exist. The user explicitly approved the isolated resources
+  and serverless probe. Run `245612415275039` failed on restricted
+  `spark.sql.caseSensitive` access after the UC/local round-trip. The fix passed
+  75 real Spark tests. The user approved the corrected rerun; parent run
+  `447606109645160` completed SUCCESS. The Polars-trained registered bundle
+  produced the expected gold predictions in both Spark modes on serverless
+  Spark Connect 4.2.0 / Python 3.12.3 / MLflow 3.16.1.
+- Shared `DeltaTableAdmission` is implemented. The final 18-test real Delta gate
+  covers forced acquisition races, lost acknowledgements and public batch replay.
+  Live validation is pending.
 - Local-engine pandas/Polars Delta writing is tracked as SM-15L. The current
   Spark writer does not implement it; templates remain SM-20.
 - SM-15 baseline: `4a613cb5`. Its implementation and verification are in the
@@ -134,10 +144,10 @@ without writing again. New computation needs a new run ID and reviewed target
 version. History and transaction retention must cover the allowed retry window.
 
 The first SM-16 registry-to-Spark smoke and platform evidence file are prepared;
-see that file for the current wheel checksum and local evidence. After the user
-supplies the CLI profile, permitted test namespace and compute, prepare the
-reviewable job request and finish the remaining platform gates. Databricks CLI
+see that file for the current wheel checksum, approved namespace and live run.
+Inspect the submitted job result and finish the remaining platform gates. Databricks CLI
 1.17.0 is installed but absent from the current shell PATH; use its existing
 WinGet executable or a refreshed shell. The user confirmed `databricks.yml` is
 not needed in this repository; it is absent. DAB/templates and endpoints remain
-later work. Do not reuse the previously retracted login host as authorization.
+later work. The user's subsequent explicit authorization covers the `skyulf`
+profile and the named isolated serverless test resources.

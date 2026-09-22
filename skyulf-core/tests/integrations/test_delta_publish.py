@@ -101,6 +101,37 @@ def test_retry_preserves_other_periods_and_predictions(harness, mode):
     assert first.manifest["model_digest"] == h.bundle.semantic_digest
 
 
+def test_delta_admission_publishes_and_replays_with_released_owner(harness):
+    """Public batch publication and replay release shared admission and preserve prior rows."""
+    from skyulf.integrations.databricks.delta_admission import DeltaTableAdmission
+
+    h = harness
+    control = "default.batch_admission_" + uuid4().hex
+    target_id = h.spark.sql(f"DESCRIBE DETAIL {h.target}").first()["id"]
+    prior = h.spark.table(h.target).first()
+    h.spark.createDataFrame([(target_id, None)], "target_id string, owner string").write.format(
+        "delta"
+    ).saveAsTable(control)
+    try:
+        h.lock = DeltaTableAdmission(h.spark, control)
+        first = _run(h)
+        assert h.spark.table(control).first().owner is None
+        rows = h.spark.table(h.target).orderBy("id").collect()
+        assert [row.id for row in rows] == [1, 2, 9]
+        assert [row.prediction for row in rows] == pytest.approx([2.0, 4.0, 99.0])
+        assert rows[-1] == prior
+        second = _run(h)
+        assert h.spark.table(control).first().owner is None
+        assert h.spark.table(h.target).orderBy("id").collect() == rows
+        assert first.input_count == first.output_count == 2
+        assert first.commit_version == second.commit_version == 1
+        assert first.replayed is False
+        assert second.replayed is True
+        assert second.manifest == first.manifest
+    finally:
+        h.spark.sql(f"DROP TABLE IF EXISTS {control}").collect()
+
+
 def test_stale_writer_and_reused_run_identity_fail(harness):
     """Stale expectations and changed requests cannot silently replace a committed month."""
     from skyulf.integrations.databricks.delta import BatchConflictError

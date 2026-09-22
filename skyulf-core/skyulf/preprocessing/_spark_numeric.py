@@ -2,7 +2,7 @@
 
 from typing import Any
 
-from ._spark import _column, _resolved_names
+from ._spark import _case_sensitive, _column, _resolved_names
 
 NUMERIC_DTYPES = {"byte", "short", "integer", "long", "float", "double"}
 
@@ -13,7 +13,7 @@ def validate_names(frame: Any, extra: tuple | list = ()) -> None:
     if len(set(names)) != len(names):
         raise ValueError("Duplicate Spark column names.")
     combined = list(dict.fromkeys([*frame.columns, *extra]))
-    if frame.sparkSession.conf.get("spark.sql.caseSensitive") != "true":
+    if not _case_sensitive(frame):
         combined = [name.lower() for name in combined]
     if len(set(combined)) != len(combined):
         raise ValueError("Fitted columns collide under Spark column name resolution.")

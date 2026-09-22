@@ -27,12 +27,12 @@ DONE = kanıtla tamamlandı. SM-00 commit: `105a6fe4`.
 | SM-13 | MLflow model packaging | SM-12 | DONE | Temiz ortamda pyfunc yükleme ve parity |
 | SM-14 | Registry/Unity Catalog adapter | SM-13 | DONE | Explicit publish; alias/version pinning; local evidence |
 | SM-15 | Monthly batch + Delta sink | SM-14 | DONE | 43 local Delta/contract/admission tests; evidence below |
-| SM-16 | Gerçek Databricks kapısı | SM-15 | ACTIVE | Local preparation; profile/test namespace/compute pending |
+| SM-16 | Gerçek Databricks kapısı | SM-15 | ACTIVE | Live UC/Spark parity passed: `447606109645160`; remaining platform gates open |
 | SM-15L | Local pandas/Polars Delta sink | SM-16 | WAIT | Same period/retry guarantees; real local writer and UC access tests |
 | SM-17 | Kalan node aileleri | SM-16 | WAIT | Aile bazlı port; her kayıt supported/unsupported |
-| SM-18 | Backend/Canvas ve custom FE | SM-17 | LATER | Capability UI/API; DAG/artifact uyumu |
-| SM-19 | HTTP/SQL erişimi; optional streaming | SM-18 | LATER | Desteklenen erişimlerde batch ile aynı tahmin |
-| SM-20 | Template / Databricks Bundle | SM-19 | LATER | Seçilebilir working runner; validate ve smoke |
+| SM-18 | Backend/Canvas ve custom FE | SM-17 | LATER | Capability UI/API; DAG/artifact uyumu | Parked
+| SM-19 | HTTP/SQL erişimi; optional streaming | SM-18 | LATER | Desteklenen erişimlerde batch ile aynı tahmin | Parked
+| SM-20 | Template / Databricks Bundle | SM-19 | LATER | Seçilebilir working runner; validate ve smoke | Parked
 
 ## Detay planlar
 
@@ -40,6 +40,7 @@ DONE = kanıtla tamamlandı. SM-00 commit: `105a6fe4`.
 - SM-15 currently provides the Spark writer only. The user's local-engine
   Delta requirement is tracked separately as SM-15L and must be satisfied before
   SM-20 offers that template combination. Template work remains last.
+- The user confirmed the immediate order: finish SM-16, then SM-15L.
 
 - SM-00–SM-07: [Core/Spark](01-core-spark-plan.md)
 - SM-08–SM-11: [Inference](02-inference-plan.md)
