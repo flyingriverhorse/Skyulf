@@ -124,7 +124,6 @@ def test_empty_partitions_and_composite_key_schema(spark, regression_bundle, emp
         ("date_key", "key.*dtype|key.*type"),
         ("target", "target"),
         ("stage", "raw|stage"),
-        ("mode", "mode|native_features"),
         ("engine", "engine|spark"),
         ("checksum", "checksum"),
         ("runtime", "runtime"),

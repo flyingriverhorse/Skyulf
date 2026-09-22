@@ -1,4 +1,4 @@
-"""Native Spark preprocessing followed by bounded worker-side Python prediction."""
+"""Spark inference with native or worker-local portable Python preprocessing."""
 
 import importlib
 from collections.abc import Callable, Iterator
@@ -8,7 +8,7 @@ import pandas as pd
 
 from ..core.capabilities import UnsupportedExecutionError
 from ..core.execution import ExecutionOptions, FrameSpec
-from ..preprocessing._spark import _column, _native, _resolved_names
+from ..preprocessing._spark import _column, _native, _resolved_names, _validate_keys
 from ..preprocessing.pipeline import FeatureEngineer
 from ._manifest import BundleManifest, check_runtime, checksum
 from ._model import load_model
@@ -23,9 +23,10 @@ def predict_spark(
     options: ExecutionOptions,
     mode: str,
 ) -> Any:
-    """Apply frozen native FE and distribute a regression estimator over Spark workers.
+    """Apply frozen FE and distribute a regression estimator over Spark workers.
 
-    Currently accepts raw regression bundles with native row-preserving FE.
+    Raw regression bundles support native Spark FE (``native_features``) and
+    portable pandas FE in each worker iterator (``python_pipeline``).
     Supply unique non-null integer, string or boolean keys; output contains
     those keys and prediction, with no row ordering guarantee. Extra unused
     input columns are projected away. Declared features must retain their
@@ -48,14 +49,17 @@ def predict_spark(
         raise ValueError("predict_spark requires ExecutionOptions(engine='spark').")
     if frame_spec.target is not None:
         raise ValueError("Inference frame_spec must not declare a target.")
-    if mode != "native_features":
+    if mode not in ("native_features", "python_pipeline"):
         raise UnsupportedExecutionError(
-            "inference", "predict", "spark", "Only mode='native_features' is implemented."
+            "inference",
+            "predict",
+            "spark",
+            "Only mode='native_features' or mode='python_pipeline' is implemented.",
         )
     _validate_bundle(bundle, options)
     manifest = bundle.manifest
     if manifest.input_stage != "raw":
-        raise ValueError("native_features currently requires a raw input_stage bundle.")
+        raise ValueError(f"{mode} currently requires a raw input_stage bundle.")
     if manifest.task != "regression":
         raise UnsupportedExecutionError(
             "inference", "predict", "spark", "Only regression bundles are currently supported."
@@ -66,12 +70,31 @@ def predict_spark(
             "inference", "predict", "spark", "Streaming inference is not supported."
         )
     _validate_names_and_keys(native, manifest, frame_spec)
-    raw_names = {column.name for column in manifest.input_schema}
-    raw = native.select(*[_column(native, name) for name in native.columns if name in raw_names])
+    input_names = {column.name for column in manifest.input_schema}
+    raw = native.select(*[_column(native, name) for name in native.columns if name in input_names])
     _validate_frame(raw, manifest.input_schema, "bundle input")
-    selected = native.select(
-        *[_column(native, name) for name in (*frame_spec.row_keys, *raw.columns)]
+    selected_names = (
+        tuple(frame_spec.row_keys) + tuple(column.name for column in manifest.input_schema)
+        if mode == "python_pipeline"
+        else tuple(frame_spec.row_keys) + tuple(raw.columns)
     )
+    selected = native.select(*[_column(native, name) for name in selected_names])
+    if mode == "python_pipeline":
+        engineer = FeatureEngineer.from_state(
+            bundle.feature_state,
+            execution_options=ExecutionOptions("pandas", state_max_bytes=options.state_max_bytes),
+        )
+        _validate_python_pipeline(engineer)
+        _validate_keys(native, frame_spec)
+        worker = _python_pipeline_prediction_iterator(
+            bundle.feature_state,
+            bundle.model_payload,
+            manifest,
+            frame_spec.row_keys,
+            options.python_batch_rows,
+            options.state_max_bytes,
+        )
+        return selected.mapInPandas(worker, schema=_prediction_schema(native, manifest, frame_spec))
     engineer = FeatureEngineer.from_state(
         bundle.feature_state, execution_options=options, frame_spec=frame_spec
     )
@@ -86,18 +109,90 @@ def predict_spark(
     worker_frame = transformed.select(
         *[_column(transformed, name) for name in (*frame_spec.row_keys, *features.columns)]
     )
+    schema = _prediction_schema(native, manifest, frame_spec)
+    worker = _prediction_iterator(
+        bundle.model_payload, manifest, frame_spec.row_keys, options.python_batch_rows
+    )
+    return worker_frame.mapInPandas(worker, schema=schema)
+
+
+def _prediction_schema(native: Any, manifest: BundleManifest, spec: FrameSpec) -> Any:
+    """Build the stable Spark output schema from source key fields and the manifest."""
     types = importlib.import_module("pyspark.sql.types")
-    schema = types.StructType(
-        [native.schema[key] for key in frame_spec.row_keys]
+    return types.StructType(
+        [native.schema[key] for key in spec.row_keys]
         + [
             types.StructField(column.name, types.DoubleType(), True)
             for column in manifest.output_schema
         ]
     )
-    worker = _prediction_iterator(
-        bundle.model_payload, manifest, frame_spec.row_keys, options.python_batch_rows
-    )
-    return worker_frame.mapInPandas(worker, schema=schema)
+
+
+def _validate_python_pipeline(engineer: FeatureEngineer) -> None:
+    """Allow only the frozen, row-independent portable FE nodes in worker mode."""
+    supported = {"SimpleImputer", "StandardScaler"}
+    for step in engineer.fitted_steps:
+        node_type = step["type"]
+        params = step.get("params", {})
+        if node_type == "SimpleImputer" and params.get("strategy", "mean") not in (
+            "mean",
+            "constant",
+        ):
+            raise UnsupportedExecutionError(
+                node_type,
+                "apply",
+                "spark",
+                "python_pipeline supports only mean or constant SimpleImputer state.",
+            )
+        if node_type not in supported:
+            raise UnsupportedExecutionError(
+                node_type,
+                "apply",
+                "spark",
+                "python_pipeline requires portable row-independent, row-preserving FE.",
+            )
+
+
+def _python_pipeline_prediction_iterator(
+    feature_state: bytes,
+    payload: bytes,
+    manifest: BundleManifest,
+    row_keys: tuple[str, ...],
+    batch_rows: int,
+    state_max_bytes: int,
+) -> Callable[[Iterator[pd.DataFrame]], Iterator[pd.DataFrame]]:
+    """Restore portable pandas FE once, then apply it to each Arrow batch before prediction."""
+
+    def predict_batches(batches: Iterator[pd.DataFrame]) -> Iterator[pd.DataFrame]:
+        """Run frozen local FE and one loaded estimator across worker batches."""
+        check_runtime(manifest)
+        if checksum(feature_state) != manifest.fe_sha256:
+            raise ValueError("Bundle feature state checksum mismatch on worker.")
+        if checksum(payload) != manifest.model_sha256:
+            raise ValueError("Bundle payload checksum mismatch on worker.")
+        engineer = FeatureEngineer.from_state(
+            feature_state,
+            execution_options=ExecutionOptions("pandas", state_max_bytes=state_max_bytes),
+        )
+        _validate_python_pipeline(engineer)
+        model = load_model(payload, manifest)
+        raw_columns = [column.name for column in manifest.input_schema]
+        for batch in batches:
+            if batch.empty:
+                continue
+            source = batch.loc[:, [*row_keys, *raw_columns]]
+            transformed = engineer.transform(source, preserve_rows=True)
+            features = transformed.loc[:, list(manifest.feature_order)]
+            _validate_frame(features, manifest.feature_schema, "worker model features")
+            for offset in range(0, len(features), batch_rows):
+                chunk = features.iloc[offset : offset + batch_rows]
+                keys = source.iloc[offset : offset + batch_rows].loc[:, list(row_keys)]
+                predictions = _predict_features(chunk, model, manifest, chunk.index)
+                yield pd.concat(
+                    [keys.reset_index(drop=True), predictions.reset_index(drop=True)], axis=1
+                )
+
+    return predict_batches
 
 
 def _model_features(frame: Any, manifest: BundleManifest) -> Any:
