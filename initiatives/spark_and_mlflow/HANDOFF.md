@@ -6,8 +6,9 @@ Target release: 0.9.0. Branch: `090`.
 ## Starting point
 
 - SM-00 through SM-11 are complete; SM-12 is the next READY task.
-- Last implementation commit: `df63d231` (worker-local Python FE and model inference).
-- Last guide commit: `add50eb7` (SM-10 availability docs and updated worker diagram).
+- Last implementation commit: `04dbe303` (distributed classification inference,
+  output schema and worker isolation tests).
+- Last guide commit: `04dbe303` (SM-11 guide, example, queue and handoff update).
 - Read [OPEN_QUEUE.md](OPEN_QUEUE.md), [ARCHITECTURE.md](ARCHITECTURE.md) and
   the SM-11 section of [02-inference-plan.md](02-inference-plan.md) before coding.
 - User-facing guide: [How inference works](../../docs/user_guide/inference_flow.md).
