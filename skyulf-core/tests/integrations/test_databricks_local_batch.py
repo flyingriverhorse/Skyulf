@@ -186,10 +186,20 @@ def test_heldout_regression_metrics_use_saved_pipeline_and_200_test_rows(tmp_pat
 
     metrics = local_batch.evaluate_local_holdout(artifact, native[800:], target_column="target")
 
-    assert set(metrics) == {"heldout_mae", "heldout_rmse", "heldout_r2"}
+    assert set(metrics) == {
+        "heldout_mae",
+        "heldout_mse",
+        "heldout_rmse",
+        "heldout_r2",
+        "heldout_mape",
+        "heldout_explained_variance",
+    }
     assert metrics["heldout_mae"] == pytest.approx(0.0, abs=1e-8)
     assert metrics["heldout_rmse"] == pytest.approx(0.0, abs=1e-8)
     assert metrics["heldout_r2"] == pytest.approx(1.0)
+    assert metrics["heldout_mse"] == pytest.approx(0.0, abs=1e-8)
+    assert metrics["heldout_mape"] == pytest.approx(0.0, abs=1e-8)
+    assert metrics["heldout_explained_variance"] == pytest.approx(1.0)
 
 
 @pytest.mark.parametrize("engine", ["pandas", "polars"])
@@ -217,6 +227,11 @@ def test_heldout_classification_metrics_use_reserved_labels(tmp_path, engine) ->
     assert metrics["heldout_accuracy"] == pytest.approx(0.8)
     assert metrics["heldout_f1"] == pytest.approx(0.8)
     assert metrics["heldout_f1_weighted"] == pytest.approx(0.8)
+    assert metrics["heldout_balanced_accuracy"] == pytest.approx(0.8)
+    assert metrics["heldout_precision"] == pytest.approx(0.8)
+    assert metrics["heldout_recall"] == pytest.approx(0.8)
+    assert metrics["heldout_roc_auc"] > 0.5
+    assert np.isfinite(metrics["heldout_log_loss"]) and metrics["heldout_log_loss"] > 0.0
 
 
 def test_scoring_rejects_changed_identity_and_raw_column_order_before_read(tmp_path) -> None:

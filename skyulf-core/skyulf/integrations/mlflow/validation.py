@@ -13,10 +13,43 @@ from ...inference.local_evaluation import evaluate_local_holdout
 from ...inference.local_pipeline import LocalPipelineArtifact
 from .registry import ResolvedModel, load_registered_local_pipeline
 
-_MINIMIZE = {"heldout_mae", "heldout_rmse"}
-_MAXIMIZE = {"heldout_r2", "heldout_accuracy", "heldout_f1_weighted", "heldout_f1"}
-_REGRESSION = _MINIMIZE | {"heldout_r2"}
-_CLASSIFICATION = _MAXIMIZE - {"heldout_r2"}
+_REGRESSION = {
+    "heldout_mae",
+    "heldout_mse",
+    "heldout_rmse",
+    "heldout_r2",
+    "heldout_mape",
+    "heldout_explained_variance",
+}
+_CLASSIFICATION = {
+    "heldout_accuracy",
+    "heldout_balanced_accuracy",
+    "heldout_precision_weighted",
+    "heldout_recall_weighted",
+    "heldout_f1_weighted",
+    "heldout_matthews_corrcoef",
+    "heldout_precision",
+    "heldout_recall",
+    "heldout_f1",
+    "heldout_g_score",
+    "heldout_log_loss",
+    "heldout_roc_auc",
+    "heldout_pr_auc",
+    "heldout_roc_auc_ovr_weighted",
+    "heldout_roc_auc_weighted",
+    "heldout_roc_auc_ovr",
+    "heldout_roc_auc_ovo",
+    "heldout_roc_auc_ovo_weighted",
+    "heldout_pr_auc_weighted",
+}
+_MINIMIZE = {
+    "heldout_mae",
+    "heldout_mse",
+    "heldout_rmse",
+    "heldout_mape",
+    "heldout_log_loss",
+}
+_MAXIMIZE = (_REGRESSION | _CLASSIFICATION) - _MINIMIZE
 
 
 @dataclass(frozen=True, slots=True)

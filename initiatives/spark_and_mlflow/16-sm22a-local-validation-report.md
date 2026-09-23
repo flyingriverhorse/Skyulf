@@ -9,15 +9,17 @@ validated before closing the platform gate. No Bundle or alias mutation was run.
   versions and their checked local pipeline digests. It scores both versions on
   the same bounded pandas/Polars labeled frame and reports dataset ID, row count,
   model and code identities, metrics, improvement, quality threshold and decision reason.
-- RMSE/MAE minimize; R2, accuracy and F1 maximize. Ties cannot qualify. A
+- Core evaluation metrics now supply the full finite held-out metric set. Error
+  metrics minimize and scores maximize. Ties cannot qualify. A
   missing champion yields a candidate report without implicit initialization.
   Task and class-label contracts must agree; non-finite metrics fail closed.
-- Held-out metric calculation moved from the Databricks adapter to a shared
-  inference module. The old Databricks import remains available for callers.
+- Held-out evaluation reuses Core model metric calculators with the saved
+  pipeline predictions and class-ordered probabilities. The old Databricks
+  import remains available for callers.
 
 ## Evidence
 
-The isolated MLflow 3.16.1 environment passed 25 focused tests with one
+The isolated MLflow 3.16.1 environment passed 65 related tests with one
 optional Spark skip. The tests cover pandas regression, Polars classification,
 minimum-improvement and absolute quality gates, malformed references, access denial and
 a real local SQLite MLflow registry with two registered local pipeline

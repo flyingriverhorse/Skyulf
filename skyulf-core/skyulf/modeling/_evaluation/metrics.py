@@ -156,7 +156,7 @@ def _select_silhouette_sample_indices(
 
 def calculate_classification_metrics(
     model: Any,
-    X: pd.DataFrame | SkyulfDataFrame,
+    X: pd.DataFrame | pl.DataFrame | SkyulfDataFrame,
     y: pd.Series | Any,
     *,
     X_np: Any = None,
@@ -396,7 +396,7 @@ def _add_probability_based_metrics(
 
 def calculate_regression_metrics(
     model: Any,
-    X: pd.DataFrame | SkyulfDataFrame,
+    X: pd.DataFrame | pl.DataFrame | SkyulfDataFrame,
     y: pd.Series | Any,
     *,
     X_np: Any = None,

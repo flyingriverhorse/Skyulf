@@ -182,8 +182,11 @@ def test_invalid_comparison_fails_before_model_load(
         )
 
 
-def test_polars_classification_comparison_maximizes_accuracy(tmp_path, monkeypatch) -> None:
-    """A candidate with correct class semantics should beat a biased champion."""
+@pytest.mark.parametrize("metric", ["heldout_accuracy", "heldout_roc_auc", "heldout_log_loss"])
+def test_polars_classification_comparison_selects_core_metrics(
+    tmp_path, monkeypatch, metric
+) -> None:
+    """A candidate must beat a biased champion in the chosen metric direction."""
     import polars as pl
 
     x = np.r_[np.arange(-12, 0), np.arange(1, 13)].astype("float64")
@@ -221,17 +224,21 @@ def test_polars_classification_comparison_maximizes_accuracy(tmp_path, monkeypat
         heldout,
         target_column="target",
         dataset_id="workspace.test.labels@6/class-holdout",
-        metric="heldout_accuracy",
+        metric=metric,
         min_improvement=0.2,
         quality_threshold=0.9,
         max_rows=10,
         max_bytes=10_000,
     )
 
-    assert report.metric_direction == "maximize"
-    assert report.candidate_metrics["heldout_accuracy"] == pytest.approx(1.0)
     assert report.champion_metrics is not None
-    assert report.champion_metrics["heldout_accuracy"] == pytest.approx(0.0)
+    if metric == "heldout_log_loss":
+        assert report.metric_direction == "minimize"
+        assert report.candidate_metrics[metric] < report.champion_metrics[metric]
+    else:
+        assert report.metric_direction == "maximize"
+        assert report.candidate_metrics[metric] == pytest.approx(1.0)
+        assert report.champion_metrics[metric] == pytest.approx(0.0)
     assert report.eligible is True
 
 

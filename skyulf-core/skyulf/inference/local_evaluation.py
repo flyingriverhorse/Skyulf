@@ -1,17 +1,13 @@
 """Held-out metrics for a saved pandas/Polars local pipeline."""
 
-import math
-
 import pandas as pd
 import polars as pl
-from sklearn.metrics import (
-    accuracy_score,
-    f1_score,
-    mean_absolute_error,
-    mean_squared_error,
-    r2_score,
-)
 
+from ..modeling._evaluation.common import sanitize_metrics
+from ..modeling._evaluation.metrics import (
+    calculate_classification_metrics,
+    calculate_regression_metrics,
+)
 from .local_pipeline import LocalPipelineArtifact, predict_local_pipeline
 
 
@@ -40,21 +36,29 @@ def evaluate_local_holdout(
         heldout.select(columns) if isinstance(heldout, pl.DataFrame) else heldout.loc[:, columns]
     )
     actual = heldout[target_column].to_numpy()
-    predicted = predict_local_pipeline(features, artifact)["prediction"].to_numpy()
-    if artifact.manifest.task == "regression":
-        return {
-            "heldout_mae": float(mean_absolute_error(actual, predicted)),
-            "heldout_rmse": float(math.sqrt(mean_squared_error(actual, predicted))),
-            "heldout_r2": float(r2_score(actual, predicted)),
-        }
-    metrics = {
-        "heldout_accuracy": float(accuracy_score(actual, predicted)),
-        "heldout_f1_weighted": float(
-            f1_score(actual, predicted, average="weighted", zero_division=0)
-        ),
+    predictions = predict_local_pipeline(features, artifact)
+    estimator = artifact.pipeline.model_estimator
+    if estimator is None:
+        raise ValueError("Local artifact has no fitted model.")
+    model = estimator._unwrap_tuned_model()
+    scoring_args = {
+        "X_np": features.to_numpy(),
+        "y_np": actual,
+        "predictions": predictions["prediction"].to_numpy(),
     }
-    if len(artifact.manifest.classes) == 2:
-        metrics["heldout_f1"] = float(
-            f1_score(actual, predicted, pos_label=artifact.manifest.classes[1], zero_division=0)
+    if artifact.manifest.task == "regression":
+        raw_metrics = calculate_regression_metrics(
+            model, features, heldout[target_column], **scoring_args
         )
-    return metrics
+    else:
+        probability_columns = [
+            f"probability_{position}" for position in range(len(artifact.manifest.classes))
+        ]
+        raw_metrics = calculate_classification_metrics(
+            model,
+            features,
+            heldout[target_column],
+            proba=predictions.loc[:, probability_columns].to_numpy(),
+            **scoring_args,
+        )
+    return {f"heldout_{name}": value for name, value in sanitize_metrics(raw_metrics).items()}

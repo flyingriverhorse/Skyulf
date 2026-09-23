@@ -91,6 +91,32 @@ bundle = load_registered_bundle(
 assert bundle.semantic_digest == resolved.digest
 ```
 
+## How the adapters use Skyulf Core
+
+The Databricks local workflow calls Skyulf Core's existing pipeline fit and
+prediction methods. Its UC reader and Delta writer handle transport and
+publication; they do not reimplement feature engineering or model behavior.
+The MLflow adapter packages that same saved pipeline, resolves a registry
+alias to a concrete version, and loads the artifact for prediction or
+comparison. Held-out evaluation runs the saved pipeline once and passes its
+predictions and class-ordered probabilities to Core's model metric calculators.
+There is no separate Databricks or MLflow training algorithm.
+
+For example, a training job can log every available held-out metric to
+its own MLflow run without implementing a second evaluator:
+
+```python
+from skyulf.inference.local_evaluation import evaluate_local_holdout
+from skyulf.integrations.mlflow.tracking import TrackingConfig, track_run
+
+metrics = evaluate_local_holdout(artifact, heldout, target_column="target")
+with track_run(
+    TrackingConfig(enabled=True, experiment_name="customer-risk"),
+    run_name="candidate-training",
+) as run:
+    run.log_metrics(metrics)
+```
+
 ## Compare a local challenger before promotion
 
 For a fitted pandas/Polars pipeline, resolve both registered versions to
@@ -127,10 +153,23 @@ report = compare_registered_local_models(
 print(report.eligible, report.reason, report.candidate_metrics)
 ```
 
-For MAE/RMSE a lower value wins; for R2, accuracy and F1 a higher value
-wins. `quality_threshold` is an upper limit for error metrics and a lower
-limit for score metrics. A tie does not qualify. If no champion exists, pass
-`None` and inspect the candidate report; this never creates a champion.
+The report contains all finite metrics available for the task and labeled
+holdout. Regression includes MAE, MSE, RMSE, R2, MAPE and explained variance.
+Classification includes accuracy, balanced accuracy, weighted precision/recall/F1,
+Matthews correlation, binary precision/recall/F1 and, when defined, log loss,
+ROC-AUC and PR-AUC variants. Optional metrics such as geometric-mean score may
+be absent when their dependency or the required label distribution is unavailable.
+Probability metrics use the saved model's class order; hard-label metrics use
+its effective prediction thresholds.
+
+Choose one primary metric before evaluating candidates. Error metrics
+(MAE/MSE/RMSE/MAPE/log loss) minimize; the other selectable scores maximize.
+`quality_threshold` is an upper limit for error metrics and a lower limit for
+scores. A tie does not qualify. If no champion exists, pass `None` and
+inspect the candidate report; this never creates a champion. The report is
+read-only; the caller explicitly logs the desired numeric metrics to its
+MLflow run. Unlabeled production predictions cannot produce supervised
+quality metrics until their true labels arrive.
 Evaluation does not move aliases, publish predictions or deploy endpoints.
 Explicit version-checked promotion and rollback are the next SM-22b task;
 monthly candidate training follows in SM-28a before Bundle generation.
