@@ -9,6 +9,7 @@ from .local_batch import (
     read_local_source,
     score_local_source,
 )
+from .local_incremental import IncrementalBatchResult, run_incremental_local_batch
 from .local_publish import run_local_batch
 from .local_sdk import (
     InputSource,
@@ -26,6 +27,7 @@ from .local_sdk import (
 __all__ = [
     "BatchResult",
     "BatchSpec",
+    "IncrementalBatchResult",
     "InputSource",
     "LocalWorkflowConfig",
     "LocalScoreResult",
@@ -42,6 +44,7 @@ __all__ = [
     "prepare_local_workflow",
     "read_local_source",
     "run_batch",
+    "run_incremental_local_batch",
     "run_local_batch",
     "score_local_source",
 ]

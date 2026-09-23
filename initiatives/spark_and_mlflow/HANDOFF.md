@@ -1,20 +1,23 @@
 # Session handoff - 2026-09-23
 
-SM-00 through SM-16, SM-15L and SM-24a/25/26 are complete for their
+SM-00 through SM-16, SM-15L/15I and SM-24a/25/26 are complete for their
 documented scopes. The selected Databricks serverless local monthly UC
 publication passed with 80 pandas January and 80 Polars February predictions.
-Latest user direction: **Build the first small-data pandas/Polars Databricks
-Bundle next (SM-20a). Spark handles table I/O; Spark FE/model execution follows
-the first working local Bundle. SM-18 and streaming remain parked.**
+Latest user direction: **Do not require manual period/source-version
+values for recurring jobs. SM-15I now provides automatic new-row scoring
+for the first small-data pandas/Polars Databricks Bundle (SM-20a). Spark handles table
+I/O; Spark FE/model execution follows the Bundle. SM-18 and streaming remain
+parked.**
 After the first Bundle, SM-27 adds explicit full-history rescore and
 SM-22/SM-28 add optional monthly retraining with controlled candidate/champion
 promotion. Target release: 0.9.0. Branch: `090`.
 
 ## Starting point
 
-- SM-00 through SM-16, SM-15L, SM-24a, SM-25 and SM-26 are complete. Start
-  SM-20a from [05-sm20-bundle-plan.md](05-sm20-bundle-plan.md), including
-  its two-month table rehearsal.
+- SM-00 through SM-16, SM-15L, SM-15I, SM-24a, SM-25 and SM-26 are complete.
+  Start SM-20a from [05-sm20-bundle-plan.md](05-sm20-bundle-plan.md).
+  SM-15I [live evidence](13-sm15i-live-validation-report.md) proves automatic
+  80+80 insert-only scoring with no date column or per-run version input.
   SM-26 added local artifact and MLflow packaging without cloud execution. The
   SM-25 SDK adds immutable local workflow configuration, local/remote preflight,
   explicit path or pinned registry artifact selection and caller-frame limits.
@@ -102,7 +105,8 @@ The first deliverable is:
 Databricks training job: pandas/Polars FE + sklearn model
     -> Save fitted FE, model and input contract through MLflow
     -> Databricks scoring job: pandas/Polars local batch on bounded data
-    -> Spark handles final UC Delta table publication only (SM-15L)
+    -> Spark reads bounded UC source changes and publishes UC Delta predictions
+       (SM-15I automatic incremental path)
     -> Generate and run the first local-engine Bundle (SM-20a)
 ```
 

@@ -8,9 +8,9 @@ The same code also runs with `runtime="local"`. No Bundle project or
 
 SM-25 provides configuration, artifact selection and preflight. It accepts a
 caller-owned, bounded pandas/Polars frame and returns predictions. SM-24a adds
-an explicit, versioned UC Delta source reader for monthly local batches.
-Guarded UC Delta publication remains SM-15L; choosing that sink still produces
-a `PreflightError` before a job is submitted.
+an explicit, versioned UC Delta source reader for selected-period local batches.
+SM-15L publishes an explicitly selected period to UC Delta. The separate
+incremental runner below discovers new source inserts automatically.
 
 ## Fit and score a small batch
 
@@ -338,3 +338,65 @@ result both enforce the configured local row and memory budgets; this does not
 measure Spark's private wire bytes. The control-row admission protocol protects
 participating writers only; do not let other jobs bypass it or manually clear
 an owner while a writer may still be active.
+
+
+## Score newly inserted rows automatically
+
+`run_incremental_local_batch` selects records by **Delta source commits**, not
+by calendar date. On the first run it scores the existing bounded snapshot. On
+later runs it reads only inserts after the source version recorded in the last
+prediction-table commit. It appends predictions without replacing an older
+period. A source `event_time` column is optional; if you want to carry it into
+the target, set `period_column="event_time"` in the stable job configuration.
+It never filters rows by that column, including late arrivals.
+
+Provision a distinct, initially empty Delta prediction table with the
+globally unique key, saved model output columns and
+`__skyulf_run_id`, `__skyulf_model_name`, `__skyulf_model_version` string
+columns. If carrying an event timestamp, add a matching Spark `timestamp`
+column to both tables. Enable Delta Change Data Feed on the source **before**
+any changes that the job must consume. Provision the same shared admission
+control table used by the explicit-period writer; all target writers must use
+that admission authority. The job identity needs source, model, target and
+control-table permissions.
+
+```python
+from skyulf.integrations.databricks import (
+    InputSource, LocalWorkflowConfig, ModelSelection, OutputSink,
+    prepare_local_workflow, run_incremental_local_batch,
+)
+from skyulf.integrations.databricks.delta_admission import DeltaTableAdmission
+
+config = LocalWorkflowConfig(
+    runtime="databricks",
+    engine="polars",
+    source=InputSource(
+        kind="uc_table", table="catalog.schema.new_records",
+        read_mode="incremental", max_rows=10_000, max_bytes=32_000_000,
+    ),
+    model=ModelSelection(
+        kind="local_pipeline", name="catalog.schema.customer_model", version="7",
+        tracking_uri="databricks", registry_uri="databricks-uc",
+    ),
+    sink=OutputSink(kind="uc_delta", table="catalog.schema.predictions"),
+)
+prepared = prepare_local_workflow(config)
+result = run_incremental_local_batch(
+    spark, prepared, row_keys=("event_id",),
+    admission=DeltaTableAdmission(spark, "catalog.schema.prediction_admission"),
+)
+print(result.input_count, result.commit_version, result.noop)
+```
+
+Keep this configuration for scheduled runs; do not supply a period or source
+version on each invocation. A repeat run with no new source inserts makes no
+target write. If an append succeeds but its acknowledgement is lost, the next
+run reads its committed receipt and continues after that source version.
+Source updates and deletes, duplicate keys, a missing or expired change feed,
+and an unrecognized target commit fail without advancing the watermark.
+Key uniqueness must hold across all runs, not only within one batch. Oversized
+increments fail under the same local row/decoded-memory limits; increase the
+budget deliberately or handle such a source with a separate distributed path.
+The target receipt is in the same Delta commit as the predictions. This
+protects participating writers only; changes outside the admission protocol
+must be handled explicitly.

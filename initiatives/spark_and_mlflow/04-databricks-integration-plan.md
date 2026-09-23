@@ -1,7 +1,7 @@
 # Local-first Databricks integration and Bundle plan
 
-Updated: 2026-09-23. SM-26, SM-25, SM-24a and SM-15L are implemented and
-validated; the first Bundle remains planned.
+Updated: 2026-09-23. SM-26, SM-25, SM-24a, SM-15L and SM-15I are implemented
+and validated for their documented scopes; the first Bundle remains planned.
 Baseline: `63dd3e21` and the completed, scoped SM-16 evidence.
 
 ## Current direction
@@ -11,8 +11,8 @@ for fitted FE and a Python model. Local means one Python process, which may run
 inside a Databricks job; it does not mean the user's laptop. A bounded Spark
 bridge may handle UC table I/O after local prediction; native Spark FE/model
 execution remains a later task. Build and validate that project before extending
-its prediction jobs with Spark. The latest direction reopens
-SM-15L as a prerequisite for monthly UC table output in the first Bundle.
+its prediction jobs with Spark. SM-15L handles explicit-period backfills;
+SM-15I provides automatic new-row scoring required by the first Bundle.
 SM-18 Backend/Canvas work and continuous streaming remain parked. Full SM-17
 node/model expansion waits until the first local Bundle works.
 
@@ -22,8 +22,8 @@ first bounded local-engine Databricks training and scoring path; see its
 [live report](08-sm24a-live-validation-report.md).
 
 The first scenario is pandas/Polars FE and Python-model training, followed by
-local Python batch prediction in a Databricks job and monthly publication to a
-UC Delta table. Existing Spark support is limited:
+local Python batch prediction in a Databricks job and automatic incremental
+publication to a UC Delta table. Existing Spark support is limited:
 native portable FE covers mean/constant SimpleImputer, StandardScaler and an
 empty chain; model bundles support the documented sklearn regression/classification
 contract. The worker Python-pipeline mode is also capability-gated, not a generic
@@ -43,16 +43,16 @@ UC publication and Bundle claims need their own cloud evidence.
 ## Boundaries and reuse
 
 - Reuse existing `predict_local` and MLflow tracking/model/registry adapters for
-  the first Bundle. Evaluate a bounded local-result -> Spark DataFrame bridge
-  to reuse guarded Delta publication, with a distinct local batch contract.
+  the first Bundle. SM-15L and SM-15I provide bounded local-result -> Spark
+  DataFrame bridges with separate period-replacement and append contracts.
   Later Spark inference variants reuse `predict_spark` and `run_batch`.
 - Keep platform, FE engine, model execution, sink and optional tracking/registry
   independent. Local execution can run inside a Databricks job.
 - No implicit Spark-to-pandas collection, node substitution, refitting or alias
   promotion. Known artifact schema/order/digests should be derived once.
-- Keep `as_of`, period, source snapshot, target version and logical retry identity
-  explicit. The local publication path needs its own verified retry/transaction
-  guard before the template advertises monthly UC output.
+- Keep explicit period and `as_of` pins for backfills. Scheduled SM-15I jobs
+  derive source versions and retry identity from committed Delta receipts;
+  both writers use the verified shared admission.
 - Config parsing and validation have no remote mutation. Resource provisioning,
   submission, endpoint updates, promotions and cleanup are explicit operations.
 - Databricks optional dependencies belong in integration modules, not core nodes.
@@ -70,15 +70,16 @@ UC publication and Bundle claims need their own cloud evidence.
 | 2 | SM-25: local-first SDK configuration and preflight | SM-26 | DONE |
 | 3 | SM-24a: local training and bounded batch prediction | SM-25 | DONE |
 | 4 | SM-15L: local prediction -> UC Delta monthly publication | SM-24a | DONE |
-| 5 | SM-20a: first pandas/Polars Databricks Bundle/template | SM-24a; verified SM-15L | READY |
+| 5 | SM-15I: automatic incremental local scoring | SM-15L | DONE |
+| 6 | SM-20a: first pandas/Polars Databricks Bundle/template | SM-24a; SM-15I | READY |
 | After first Bundle | SM-27: bounded full-history rescore and selectable Bundle mode | SM-20a; SM-15L | LATER |
 | After first Bundle | SM-22 then SM-28: validation/promotion and optional monthly retraining | SM-20a; SM-22 for SM-28 | LATER |
 | Later | SM-24b, SM-19, SM-21, SM-23: optional Jobs API, serving, feature lookup and monitoring | Relevant local adapters | LATER |
 | After local Bundle | SM-24c and SM-17: Spark workflow then broader Spark coverage | SM-20a | LATER |
 | After selected Spark gates | SM-20b: add tested Spark option to the Bundle | SM-24c; relevant SM-17 slices | LATER |
 
-The first Bundle needs a working, bounded local input and a verified monthly
-UC output; it does not need model promotion, online lookup, HTTP, SQL, A/B,
+The first Bundle needs a working, bounded local input and verified
+automatic new-row UC output; it does not need model promotion, online lookup, HTTP, SQL, A/B,
 Canvas, or Spark FE/model execution. Spark may handle UC table I/O only.
 The local-first follow-ups add full-history rescore and optional monthly
 retraining before broad Spark inference expansion.
@@ -212,6 +213,19 @@ This gate passed in the isolated serverless jobs documented in the
 [SM-15L live report](11-sm15l-live-validation-report.md). The first Bundle can
 now use this path, subject to its own generated-project validation.
 
+## SM-15I - Automatic incremental local scoring
+
+The explicit-period SM-15L job and its live rehearsal supplied period/source
+version values in code. They do not satisfy the user's no-manual-input
+requirement. The separate
+[SM-15I live report](13-sm15i-live-validation-report.md) validates the implementation:
+first
+bounded snapshot, later only newly inserted source rows, an append-safe Delta
+writer, and a source watermark in the same committed output receipt. Do not
+feed an insert-only change batch into `replaceWhere`, which would delete
+earlier predictions in an overlapping event-time period. Reject update/delete
+events until a separate policy is tested.
+
 ## SM-24b - Optional Databricks Jobs API operations
 
 Reference: developer resource scope and cleanup patterns. The first Bundle
@@ -259,14 +273,14 @@ evaluation remains parked and does not block current compatible bundles.
 
 ## SM-27 - Full-history local rescore and selectable Bundle mode
 
-Keep `period_update` as the first Bundle's default: score only the requested
-closed month and replace that period idempotently. Add an explicit
+Keep `incremental_append` as the first Bundle's scheduled default. Retain
+SM-15L's `period_update` for explicit backfills. Add an explicit
 `full_rebuild` choice after SM-20a; it reads one pinned, bounded source snapshot
 and scores the requested historical scope with one pinned model version. Publish
 to a new prediction generation or table, validate counts, keys, parity and
 provenance, then activate it explicitly. Preserve the previous generation for
 rollback and keep original decision-time forecasts auditable. An ordinary
-monthly run must never trigger a full rescore because an alias moved.
+scheduled run must never trigger a full rescore because an alias moved.
 
 - [ ] Define generation identity, source/model/version receipt, active-view
   cutover and rollback; reject unbounded reads and overlapping writes.
@@ -357,7 +371,8 @@ no requirement to move existing core metrics into Databricks-specific code.
 
 ## SM-20a - First local Databricks Bundle and project template
 
-This is the first deployable milestone after SM-26, SM-25, SM-24a and SM-15L.
+This is the first deployable milestone after SM-26, SM-25, SM-24a,
+SM-15L and SM-15I.
 Generate a project using tested local services, with a `databricks.yml` in the
 generated project root, job resources, thin Python entry points, pinned package
 dependencies, dev/prod targets and a short README. Do not add a YAML file to
@@ -367,8 +382,9 @@ source/target, schedule and limits; credentials remain in Databricks
 authentication or secrets, never generated source. Tracking-off or registry-off
 Bundle variants require a separately tested durable artifact handoff.
 
-- [ ] Generate local training and monthly local batch jobs. Pass data period,
-  timezone, source snapshot and model version as explicit job parameters.
+- [ ] Generate local training and automatic incremental batch jobs. Pin
+  model selection in configuration; derive source versions from committed
+  receipts. Scheduled runs require no manual period or source-version input.
   Serverless Python script/wheel tasks declare their required environment key
   and installed package dependencies in the generated job resources.
 - [ ] Generate tests for config/imports, `databricks bundle validate`, a
@@ -382,10 +398,10 @@ Bundle variants require a separately tested durable artifact handoff.
 
 Acceptance: a fresh generated project can be validated, deployed and run on
 the chosen Databricks environment; its pandas/Polars model produces the
-expected pinned monthly table rows. Generated-file checks alone are not runtime
+expected pinned incremental table rows. Generated-file checks alone are not runtime
 evidence. A supported no-UC-output variant may be offered separately; it does
 not satisfy the monthly table gate.
-See [the dedicated SM-20 plan](05-sm20-bundle-plan.md) for the two-month
+See [the dedicated SM-20 plan](05-sm20-bundle-plan.md) for the two-run incremental
 source/output-table rehearsal and the later Spark inference variant.
 
 ## SM-24c / SM-17 / SM-20b - Spark enhancement after the first Bundle

@@ -39,6 +39,7 @@ class InputSource(BaseModel):
     kind: Literal["caller_frame", "uc_table"]
     table: str | None = None
     version: int | None = None
+    read_mode: Literal["snapshot", "incremental"] = "snapshot"
     max_rows: int = Field(default=100_000, gt=0)
     max_bytes: int = Field(default=128 * 1024 * 1024, gt=0)
 
@@ -187,16 +188,27 @@ def _config_issues(config: LocalWorkflowConfig) -> list[PreflightIssue]:
             )
         )
     if config.source.kind == "uc_table":
-        if not config.source.table or config.source.version is None or config.source.version < 0:
+        if (
+            not config.source.table
+            or (
+                config.source.read_mode == "snapshot"
+                and (config.source.version is None or config.source.version < 0)
+            )
+            or (config.source.read_mode == "incremental" and config.source.version is not None)
+        ):
             issues.append(
                 PreflightIssue(
                     "source_unbounded",
                     "source",
-                    "UC source needs a table and fixed nonnegative snapshot version.",
-                    "Specify table and version; retain explicit max_rows and max_bytes limits.",
+                    "Snapshot reads need a fixed nonnegative version; incremental reads derive it.",
+                    "Set a version for snapshot reads or omit it for incremental reads.",
                 )
             )
-    elif config.source.table is not None or config.source.version is not None:
+    elif (
+        config.source.table is not None
+        or config.source.version is not None
+        or config.source.read_mode != "snapshot"
+    ):
         issues.append(
             PreflightIssue(
                 "source_conflict",

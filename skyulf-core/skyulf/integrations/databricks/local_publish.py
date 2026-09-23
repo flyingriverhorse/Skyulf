@@ -72,20 +72,28 @@ def _check_target(
     spark: Any,
     source_frame: Any,
     target: Any,
-    source: LocalSourceSpec,
+    row_keys: tuple[str, ...],
+    period_column: str | None,
     prepared: PreparedLocalWorkflow,
 ) -> tuple[str, ...]:
     """Require a precreated target with exact key, output and metadata types."""
     outputs = prepared.preflight.output_schema
     names = tuple(column.name for column in outputs)
-    expected = {*source.row_keys, source.period_column, *names, *_METADATA}
-    if len(expected) != len(source.row_keys) + len(names) + 4 or set(target.columns) != expected:
+    expected = {*row_keys, *names, *_METADATA}
+    if period_column is not None:
+        expected.add(period_column)
+    if (
+        len(expected)
+        != len(row_keys) + len(names) + len(_METADATA) + int(period_column is not None)
+        or set(target.columns) != expected
+    ):
         raise ValueError("Prediction target columns differ from the explicit local output schema.")
-    if target.schema[source.period_column].dataType.typeName() != "timestamp":
-        raise ValueError("Prediction target period must be a Spark timestamp.")
-    if source_frame.schema[source.period_column].dataType.typeName() != "timestamp":
-        raise ValueError("Source period must be a Spark timestamp.")
-    for name in source.row_keys:
+    if period_column is not None:
+        if target.schema[period_column].dataType.typeName() != "timestamp":
+            raise ValueError("Prediction target period must be a Spark timestamp.")
+        if source_frame.schema[period_column].dataType.typeName() != "timestamp":
+            raise ValueError("Source period must be a Spark timestamp.")
+    for name in row_keys:
         target_type = target.schema[name].dataType
         if target_type != source_frame.schema[name].dataType or target_type.typeName() not in (
             "long",
@@ -146,7 +154,9 @@ def run_local_batch(
         spark.read.format("delta").option("versionAsOf", source.version).table(source.table)
     )
     target = spark.table(spec.output_table)
-    output_names = _check_target(spark, source_frame, target, source, prepared)
+    output_names = _check_target(
+        spark, source_frame, target, source.row_keys, source.period_column, prepared
+    )
     bridge_names = (*source.row_keys, *output_names)
     if list(scored.predictions.columns) != list(bridge_names):
         raise ValueError("Local prediction columns differ from the saved model output.")

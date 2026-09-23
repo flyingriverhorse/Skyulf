@@ -298,3 +298,20 @@ def test_preflight_accepts_bounded_uc_delta_sink(tmp_path) -> None:
     )
     result = preflight_local(config, artifact=artifact)
     assert result.ready
+
+
+def test_incremental_source_config_omits_manual_snapshot_version(tmp_path) -> None:
+    """Scheduled local scoring can preflight without a user-supplied source version."""
+    path, artifact = _artifact(tmp_path)
+    source = InputSource(kind="uc_table", table="c.s.source", read_mode="incremental")
+    config = _config(path, source=source, sink=OutputSink(kind="uc_delta", table="c.s.predictions"))
+    ready = preflight_local(config, artifact=artifact)
+    pinned = config.model_copy(
+        update={
+            "source": InputSource(
+                kind="uc_table", table="c.s.source", read_mode="incremental", version=1
+            )
+        }
+    )
+    invalid = preflight_local(pinned, artifact=artifact)
+    assert ready.ready and "source_unbounded" in {issue.code for issue in invalid.issues}
