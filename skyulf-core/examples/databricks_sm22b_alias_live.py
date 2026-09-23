@@ -14,6 +14,7 @@ from skyulf.integrations.mlflow.promotion import (
     alias_resource_id,
     promote_candidate,
     rollback_promotion,
+    stage_challenger,
 )
 from skyulf.integrations.mlflow.registry import resolve_model
 from skyulf.integrations.mlflow.validation import compare_registered_local_models
@@ -77,6 +78,19 @@ def run() -> dict[str, Any]:
                 raise AssertionError("Contender entered while owner held admission.")
         except AliasConflictError:
             pass
+    staging = stage_challenger(
+        report,
+        heldout,
+        target_column="target",
+        expected_champion_version=reference_version,
+        admission=admission,
+        max_rows=100,
+        max_bytes=100_000,
+        tracking_uri="databricks",
+        registry_uri="databricks-uc",
+    )
+    if str(client.get_model_version_by_alias(MODEL, "challenger").version) != candidate_version:
+        raise AssertionError("Staging did not select the candidate.")
     receipt = promote_candidate(
         report,
         heldout,
@@ -90,6 +104,19 @@ def run() -> dict[str, Any]:
     )
     if str(client.get_model_version_by_alias(MODEL, "champion").version) != candidate_version:
         raise AssertionError("Promotion did not select the candidate.")
+    if (
+        str(client.get_model_version_by_alias(MODEL, "previous_champion").version)
+        != reference_version
+    ):
+        raise AssertionError("Promotion did not preserve the previous champion.")
+    if "challenger_current_event" in client.get_registered_model(MODEL).tags:
+        raise AssertionError("Promotion left a stale challenger event marker.")
+    try:
+        client.get_model_version_by_alias(MODEL, "challenger")
+    except mlflow.exceptions.MlflowException:
+        pass
+    else:
+        raise AssertionError("Promotion left the challenger alias assigned.")
     reversal = rollback_promotion(
         receipt,
         expected_current_version=candidate_version,
@@ -99,6 +126,12 @@ def run() -> dict[str, Any]:
     )
     if str(client.get_model_version_by_alias(MODEL, "champion").version) != reference_version:
         raise AssertionError("Rollback did not restore the reference.")
+    try:
+        client.get_model_version_by_alias(MODEL, "previous_champion")
+    except mlflow.exceptions.MlflowException:
+        pass
+    else:
+        raise AssertionError("Rollback left a stale previous champion alias.")
     return {
         "model": MODEL,
         "control_table": CONTROL,
@@ -108,6 +141,7 @@ def run() -> dict[str, Any]:
         "reference_mse": report.champion_metrics["heldout_mse"]
         if report.champion_metrics is not None
         else None,
+        "staging_event": staging.event_id,
         "promotion_event": receipt.event_id,
         "rollback_event": reversal.event_id,
         "final_alias_version": reference_version,

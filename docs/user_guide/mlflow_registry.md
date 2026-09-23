@@ -174,12 +174,19 @@ Evaluation does not move aliases, publish predictions or deploy endpoints.
 Promotion is a separate, explicit operation. SM-28a monthly candidate training
 follows before Bundle generation.
 
-## Promote and roll back a local pipeline
+## Stage, promote, and roll back a local pipeline
+
+After a successful comparison, stage_challenger re-evaluates the same pinned
+holdout and assigns the concrete candidate version to `@challenger`. It does
+not move `@champion`. A replacement challenger requires an explicit
+`expected_challenger_version`; staging cannot silently overwrite another
+candidate. Merely registering or comparing a model never assigns an alias.
 
 The promote_candidate function re-resolves both concrete model versions and
 re-evaluates the same bounded labeled holdout. It rejects a changed comparison
-report, an ineligible candidate, a missing champion alias, or a stale expected
-champion version. The caller must pin the holdout's source snapshot externally;
+report, an ineligible candidate, a missing champion alias, a stale expected
+champion version, or a challenger alias without a matching committed staging
+event. The caller must pin the holdout's source snapshot externally;
 dataset_id alone is not proof of the underlying data. There is no implicit
 first-champion initialization.
 
@@ -193,9 +200,21 @@ from skyulf.integrations.mlflow.promotion import (
     LocalAliasAdmission,
     promote_candidate,
     rollback_promotion,
+    stage_challenger,
 )
 
 admission = LocalAliasAdmission("/var/lib/skyulf/alias-locks")
+staging = stage_challenger(
+    report,
+    heldout,
+    target_column="target",
+    expected_champion_version="1",
+    admission=admission,
+    max_rows=10_000,
+    max_bytes=20_000_000,
+    tracking_uri="sqlite:///tracking.db",
+    registry_uri="sqlite:///registry.db",
+)
 receipt = promote_candidate(
     report,
     heldout,
@@ -235,18 +254,30 @@ admission = DeltaAliasAdmission(
 )
 ~~~
 
-All participating promotion and rollback jobs must point to that same table.
+All participating staging, promotion and rollback jobs must point to that same table.
 Do not use the predictions-table admission row for aliases. Local file locks
 are rejected when the registry URI is databricks-uc.
 
-The transition writes a prepared model-version tag before changing the alias,
-then verifies the new alias, writes a committed event tag and an active-event
-registered-model tag. The returned receipt names both versions and the event
-ID. Rollback verifies the committed promotion event and refuses a later event,
-even if it happens to select the same model version. If the alias write or
-receipt update has an uncertain outcome, AliasOutcomeUnknownError includes
-the event ID: inspect the alias and tags before retrying. A prepared tag is
-not proof that promotion completed. Registry tags are audit records for
+Staging writes a prepared model-version tag, assigns `@challenger`, verifies
+the alias, and commits a staging event. Promotion assigns
+`@previous_champion` to the old champion, moves `@champion` to the
+challenger, then removes `@challenger`. The returned receipt records the
+concrete model versions, event ID, and the previous value of
+`@previous_champion`. Rollback verifies the committed promotion event,
+restores `@champion` and the previous rollback pointer, and does not
+reinstate the rolled-back model as challenger. A prior release's single-alias
+promotion receipt remains reversible. A staged newer challenger blocks
+rollback until the operator reconciles it.
+
+MLflow performs these alias changes as separate calls, not one atomic
+transaction. If a later call fails after an earlier alias moved, the operation
+reports an unknown outcome; inspect all three aliases and the prepared event
+before retrying. `@previous_champion` identifies only the latest rollback
+pointer, not the full history. Concrete versions and promotion/rollback event
+tags retain that history; predictions should record the resolved model version.
+Rollback refuses a later promotion, even if it selects the same version.
+AliasOutcomeUnknownError includes the event ID for inspection. A prepared tag
+is not proof that promotion completed. Registry tags are audit records for
 controlled writers, not tamper-proof authorization tokens.
 The event tag key uses underscores, and its compact value stays within Unity
 Catalog's 256-byte tag-value limit.

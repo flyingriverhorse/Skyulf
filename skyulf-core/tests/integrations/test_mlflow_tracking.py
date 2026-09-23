@@ -167,8 +167,12 @@ def test_tracking_does_not_close_callers_active_run(tmp_path: Path) -> None:
 
     with mlflow.start_run(experiment_id=experiment_id, run_name="caller") as caller:
         with tracking.track_run(config, run_name="skyulf"):
-            assert mlflow.active_run().info.run_id == caller.info.run_id
-        assert mlflow.active_run().info.run_id == caller.info.run_id
+            active = mlflow.active_run()
+            assert active is not None
+            assert active.info.run_id == caller.info.run_id
+        active = mlflow.active_run()
+        assert active is not None
+        assert active.info.run_id == caller.info.run_id
 
 
 def test_warn_policy_preserves_body_result_when_logging_fails(

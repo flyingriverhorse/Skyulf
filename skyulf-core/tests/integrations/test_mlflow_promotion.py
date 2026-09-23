@@ -3,7 +3,7 @@
 import json
 from dataclasses import replace
 from pathlib import Path
-from typing import cast
+from typing import Any, cast
 
 import numpy as np
 import pandas as pd
@@ -13,6 +13,7 @@ from skyulf.data.dataset import SplitDataset
 from skyulf.inference.local_pipeline import save_local_pipeline
 from skyulf.integrations.mlflow.local_model import log_local_model
 from skyulf.integrations.mlflow.promotion import (
+    AliasChangeReceipt,
     AliasConflictError,
     AliasOutcomeUnknownError,
     LocalAliasAdmission,
@@ -20,6 +21,7 @@ from skyulf.integrations.mlflow.promotion import (
     alias_resource_id,
     promote_candidate,
     rollback_promotion,
+    stage_challenger,
 )
 from skyulf.integrations.mlflow.registry import RegistryAccessError, register_model, resolve_model
 from skyulf.integrations.mlflow.tracking import TrackingConfig, track_run
@@ -79,7 +81,7 @@ def case(tmp_path: Path):
 def _promote(case, **changes):
     """Call the real promotion path with one validated local comparison."""
     _, uri, _, heldout, report, admission = case
-    options = {
+    options: dict[str, Any] = {
         "target_column": "target",
         "expected_champion_version": "1",
         "admission": admission,
@@ -93,14 +95,67 @@ def _promote(case, **changes):
     return promote_candidate(selected, heldout, **options)
 
 
+def _stage(case, **changes):
+    """Publish a verified challenger before an explicit champion promotion."""
+    _, uri, _, heldout, report, admission = case
+    options: dict[str, Any] = {
+        "target_column": "target",
+        "expected_champion_version": "1",
+        "admission": admission,
+        "max_rows": 10,
+        "max_bytes": 10_000,
+        "tracking_uri": uri,
+        "registry_uri": uri,
+    }
+    options.update(changes)
+    selected = cast(ModelComparisonReport, options.pop("report", report))
+    return stage_challenger(selected, heldout, **options)
+
+
+def test_stage_challenger_requires_validation_and_preserves_champion(case) -> None:
+    """Only a freshly eligible candidate becomes challenger without moving production."""
+    client, _, name, _, report, _ = case
+    staged = _stage(case)
+    assert staged.kind == "challenger"
+    assert staged.new_version == "2"
+    assert str(client.get_model_version_by_alias(name, "challenger").version) == "2"
+    assert str(client.get_model_version_by_alias(name, "champion").version) == "1"
+    assert json.loads(client.get_registered_model(name).tags["challenger_current_event"]) == {
+        "event_id": staged.event_id,
+        "version": "2",
+    }
+
+    with pytest.raises(AliasConflictError, match="[Cc]hallenger"):
+        _stage(case)
+    with pytest.raises(ValueError, match="comparison"):
+        _stage(case, report=replace(report, eligible=True, candidate_metrics={"heldout_mse": -1.0}))
+
+
+def test_promotion_requires_staged_challenger(case) -> None:
+    """A direct or tampered challenger alias must not bypass the validated staging step."""
+    client, _, name, _, _, _ = case
+    with pytest.raises(AliasConflictError, match="[Cc]hallenger"):
+        _promote(case)
+    _stage(case)
+    client.set_registered_model_alias(name, "challenger", "1")
+    with pytest.raises(AliasConflictError, match="[Cc]hallenger"):
+        _promote(case)
+    assert str(client.get_model_version_by_alias(name, "champion").version) == "1"
+
+
 def test_promote_and_rollback_persist_receipts(case) -> None:
     """An accepted candidate moves the alias and leaves auditable forward and reverse receipts."""
     client, uri, name, _, _, admission = case
 
+    _stage(case)
     receipt = _promote(case)
     assert receipt.prior_version == "1"
     assert receipt.new_version == "2"
     assert str(client.get_model_version_by_alias(name, "champion").version) == "2"
+    assert str(client.get_model_version_by_alias(name, "previous_champion").version) == "1"
+    with pytest.raises(mlflow.exceptions.MlflowException):
+        client.get_model_version_by_alias(name, "challenger")
+    assert "challenger_current_event" not in client.get_registered_model(name).tags
     tag = client.get_model_version(name, "2").tags[f"promotion_{receipt.event_id}"]
     assert len(tag.encode("utf-8")) <= 256
     assert json.loads(tag)["s"] == "committed"
@@ -119,10 +174,110 @@ def test_promote_and_rollback_persist_receipts(case) -> None:
     assert reversal.prior_version == "2"
     assert reversal.new_version == "1"
     assert str(client.get_model_version_by_alias(name, "champion").version) == "1"
+    with pytest.raises(mlflow.exceptions.MlflowException):
+        client.get_model_version_by_alias(name, "previous_champion")
     assert json.loads(client.get_registered_model(name).tags["champion_current_event"]) == {
         "event_id": reversal.event_id,
         "version": "1",
     }
+
+
+def test_rollback_restores_prior_previous_champion_pointer(case) -> None:
+    """Rollback restores the preceding rollback pointer rather than leaving a stale one."""
+    client, uri, name, _, _, admission = case
+    client.set_registered_model_alias(name, "previous_champion", "2")
+    _stage(case)
+    receipt = _promote(case)
+    assert receipt.previous_champion_version == "2"
+    assert str(client.get_model_version_by_alias(name, "previous_champion").version) == "1"
+
+    rollback_promotion(
+        receipt,
+        expected_current_version="2",
+        admission=admission,
+        tracking_uri=uri,
+        registry_uri=uri,
+    )
+    assert str(client.get_model_version_by_alias(name, "previous_champion").version) == "2"
+
+
+def test_rollback_rejects_changed_previous_pointer(case) -> None:
+    """A bypass edit to the rollback target cannot silently be accepted."""
+    client, uri, name, _, _, admission = case
+    _stage(case)
+    receipt = _promote(case)
+    client.set_registered_model_alias(name, "previous_champion", "2")
+    with pytest.raises(AliasConflictError, match="Previous champion"):
+        rollback_promotion(
+            receipt,
+            expected_current_version="2",
+            admission=admission,
+            tracking_uri=uri,
+            registry_uri=uri,
+        )
+    assert str(client.get_model_version_by_alias(name, "champion").version) == "2"
+
+
+def test_legacy_champion_receipt_can_still_roll_back(case) -> None:
+    """A receipt written before the challenger aliases existed stays reversible."""
+    client, uri, name, _, _, admission = case
+    legacy = AliasChangeReceipt(
+        event_id="legacy",
+        kind="promotion",
+        model_name=name,
+        alias="champion",
+        prior_version="1",
+        new_version="2",
+        comparison_sha256="old-comparison",
+        parent_event_id=None,
+    )
+    client.set_model_version_tag(
+        name,
+        "2",
+        "promotion_legacy",
+        json.dumps(
+            {"k": "promotion", "p": "1", "h": "old-comparison", "e": None, "s": "committed"},
+            sort_keys=True,
+            separators=(",", ":"),
+        ),
+    )
+    client.set_registered_model_alias(name, "champion", "2")
+    client.set_registered_model_tag(
+        name, "champion_current_event", json.dumps({"event_id": "legacy", "version": "2"})
+    )
+
+    reversal = rollback_promotion(
+        legacy,
+        expected_current_version="2",
+        admission=admission,
+        tracking_uri=uri,
+        registry_uri=uri,
+    )
+    assert reversal.new_version == "1"
+    assert str(client.get_model_version_by_alias(name, "champion").version) == "1"
+
+
+def test_partial_promotion_reports_unknown_outcome(case, monkeypatch) -> None:
+    """A failure after changing the previous pointer requires reconciliation."""
+    client, _, name, _, _, _ = case
+    _stage(case)
+    original = client.set_registered_model_alias
+    error = mlflow.exceptions.MlflowException("denied")
+    error.error_code = "PERMISSION_DENIED"
+
+    def deny_champion(model_name, alias, version):
+        """Allow the first alias update, then deny the champion move."""
+        if alias == "champion":
+            raise error
+        return original(model_name, alias, version)
+
+    monkeypatch.setattr(client, "set_registered_model_alias", deny_champion)
+    monkeypatch.setattr("skyulf.integrations.mlflow.promotion._make_client", lambda *args: client)
+    with pytest.raises(AliasOutcomeUnknownError, match="inspect prepared event"):
+        _promote(case)
+    assert str(client.get_model_version_by_alias(name, "champion").version) == "1"
+    assert str(client.get_model_version_by_alias(name, "previous_champion").version) == "1"
+    assert str(client.get_model_version_by_alias(name, "challenger").version) == "2"
 
 
 def test_stale_alias_and_modified_report_cannot_promote(case) -> None:
@@ -156,6 +311,7 @@ def test_missing_champion_and_contention_refuse_promotion(case) -> None:
 def test_rollback_rejects_newer_alias_state(case) -> None:
     """A receipt cannot roll back a different current model version."""
     client, uri, name, _, _, admission = case
+    _stage(case)
     receipt = _promote(case)
     client.set_registered_model_alias(name, "champion", "1")
     with pytest.raises(AliasConflictError, match="expected"):
@@ -178,6 +334,7 @@ def test_permission_denial_does_not_move_alias(case, monkeypatch) -> None:
         """Simulate a restricted registry principal at the mutation boundary."""
         raise error
 
+    _stage(case)
     monkeypatch.setattr(client, "set_registered_model_alias", denied)
     monkeypatch.setattr("skyulf.integrations.mlflow.promotion._make_client", lambda *args: client)
     with pytest.raises(RegistryAccessError):
@@ -188,12 +345,14 @@ def test_permission_denial_does_not_move_alias(case, monkeypatch) -> None:
 def test_lost_alias_write_response_is_reported_as_unknown(case, monkeypatch) -> None:
     """A committed alias move with a lost response must never be reported as safely denied."""
     client, _, name, _, _, _ = case
+    _stage(case)
     original = client.set_registered_model_alias
 
     def move_then_fail(model_name, alias, version):
-        """Simulate a transport failure after the registry accepted the alias move."""
+        """Simulate a transport failure after the champion alias moved."""
         original(model_name, alias, version)
-        raise mlflow.exceptions.MlflowException("response lost")
+        if alias == "champion":
+            raise mlflow.exceptions.MlflowException("response lost")
 
     monkeypatch.setattr(client, "set_registered_model_alias", move_then_fail)
     monkeypatch.setattr("skyulf.integrations.mlflow.promotion._make_client", lambda *args: client)
@@ -205,6 +364,7 @@ def test_lost_alias_write_response_is_reported_as_unknown(case, monkeypatch) -> 
 def test_old_receipt_cannot_rollback_newer_promotion_to_same_version(case) -> None:
     """An old receipt must not undo a later promotion even when its version numbers match."""
     client, uri, name, _, _, admission = case
+    _stage(case)
     old_receipt = _promote(case)
     rollback_promotion(
         old_receipt,
@@ -213,6 +373,7 @@ def test_old_receipt_cannot_rollback_newer_promotion_to_same_version(case) -> No
         tracking_uri=uri,
         registry_uri=uri,
     )
+    _stage(case)
     new_receipt = _promote(case)
     assert new_receipt.event_id != old_receipt.event_id
     with pytest.raises(AliasConflictError, match="superseded"):
