@@ -71,16 +71,19 @@ UC publication and Bundle claims need their own cloud evidence.
 | 3 | SM-24a: local training and bounded batch prediction | SM-25 | DONE |
 | 4 | SM-15L: local prediction -> UC Delta monthly publication | SM-24a | DONE |
 | 5 | SM-15I: automatic incremental local scoring | SM-15L | DONE |
-| 6 | SM-20a: first pandas/Polars Databricks Bundle/template | SM-24a; SM-15I | READY |
+| 6 | SM-22a/b: candidate/champion comparison and controlled promotion | Current evaluation/registry | ACTIVE |
+| 7 | SM-28a: label-aware candidate retraining service | SM-22a/b; SM-24a | WAIT |
+| 8 | SM-20a: first pandas/Polars Databricks Bundle/template | SM-24a; SM-15I; SM-22b; SM-28a | WAIT |
+| After first Bundle | SM-28b: optional monthly schedule wiring | SM-20a; SM-28a | LATER |
 | After first Bundle | SM-27: bounded full-history rescore and selectable Bundle mode | SM-20a; SM-15L | LATER |
-| After first Bundle | SM-22 then SM-28: validation/promotion and optional monthly retraining | SM-20a; SM-22 for SM-28 | LATER |
 | Later | SM-24b, SM-19, SM-21, SM-23: optional Jobs API, serving, feature lookup and monitoring | Relevant local adapters | LATER |
 | After local Bundle | SM-24c and SM-17: Spark workflow then broader Spark coverage | SM-20a | LATER |
 | After selected Spark gates | SM-20b: add tested Spark option to the Bundle | SM-24c; relevant SM-17 slices | LATER |
 
-The first Bundle needs a working, bounded local input and verified
-automatic new-row UC output; it does not need model promotion, online lookup, HTTP, SQL, A/B,
-Canvas, or Spark FE/model execution. Spark may handle UC table I/O only.
+The first Bundle needs bounded local input, verified automatic new-row UC
+output and the already-tested lifecycle services. Its promotion job is an
+explicit operation, never an automatic result of evaluation. Online lookup,
+HTTP, SQL, A/B, Canvas and Spark FE/model execution remain outside SM-20a. Spark may handle UC table I/O only.
 The local-first follow-ups add full-history rescore and optional monthly
 retraining before broad Spark inference expansion.
 
@@ -245,11 +248,12 @@ Acceptance: request generation is offline; scoped live tests validate submitted
 parameters, runtime dependencies and identity. No notifications are sent by
 merely configuring them. This task is not a gate for SM-20a.
 
-## Optional local/platform additions after the first Bundle
+## Model lifecycle before the first Bundle
 
-SM-22, SM-19, SM-21 and SM-23 can extend a generated project after SM-20a.
-They are not prerequisites for the first local training and monthly batch
-Bundle. Endpoint and `ai_query` work do not require Spark; feature-table
+SM-22a/b and SM-28a are prerequisites for SM-20a. They implement validation,
+explicit promotion/rollback and label-aware candidate training as reusable
+services. SM-28b wires an optional schedule after the Bundle exists. SM-19,
+SM-21 and SM-23 remain later platform additions. Endpoint and `ai_query` work do not require Spark; feature-table
 adapters must declare any Spark dependency rather than pulling it into the
 first local path. The tasks below remain open with their own acceptance gates.
 
@@ -264,7 +268,10 @@ reuse Skyulf evaluation and explicit MLflow clients rather than duplicate metric
 - [ ] Produce a comparison report with model/data/code identities and reasons;
   evaluation alone must not mutate aliases or endpoints.
 - [ ] SM-22b: separate explicit promotion/rollback operations, recording prior and
-  requested versions. Detect conflicting state instead of overwriting silently.
+  requested versions. Require shared alias admission and restricted registry writers; re-read
+  the expected prior version under admission before mutation. The MLflow/UC
+  alias APIs do not expose compare-and-swap, so external bypass writers
+  remain outside this guarantee.
 - [ ] Test first-model behavior without automatic first-champion promotion.
 
 Acceptance: deterministic report fixture, real registry alias/version tests,
@@ -291,12 +298,13 @@ scheduled run must never trigger a full rescore because an alias moved.
   runs leave month one unchanged; an explicit full rebuild creates a complete
   second generation; failed validation leaves the first active.
 
-## SM-28 - Monthly retraining and challenger workflow
+## SM-28a/b - Monthly retraining and challenger workflow
 
 The reference project wires feature engineering, training, validation and
-inference jobs, but its sample inference schedule is commented out. Monthly
-retraining is therefore an explicit Skyulf follow-up, not inherited behavior.
-It is independent of `period_update` and `full_rebuild` scoring choices.
+inference jobs, but its sample inference schedule is commented out. SM-28a
+implements the label-aware training and challenger comparison before the
+Bundle. SM-28b later wires an opt-in schedule. Both are independent of
+`period_update` and `full_rebuild` scoring choices.
 
 - [ ] Provide an opt-in monthly schedule with business timezone, label
   availability cutoff, pinned training snapshot and reproducible temporal
@@ -372,7 +380,7 @@ no requirement to move existing core metrics into Databricks-specific code.
 ## SM-20a - First local Databricks Bundle and project template
 
 This is the first deployable milestone after SM-26, SM-25, SM-24a,
-SM-15L and SM-15I.
+SM-15L, SM-15I, SM-22a/b and SM-28a.
 Generate a project using tested local services, with a `databricks.yml` in the
 generated project root, job resources, thin Python entry points, pinned package
 dependencies, dev/prod targets and a short README. Do not add a YAML file to
@@ -382,7 +390,9 @@ source/target, schedule and limits; credentials remain in Databricks
 authentication or secrets, never generated source. Tracking-off or registry-off
 Bundle variants require a separately tested durable artifact handoff.
 
-- [ ] Generate local training and automatic incremental batch jobs. Pin
+- [ ] Package separate local training, comparison, explicit promotion and
+  automatic incremental batch jobs. Promotion remains opt-in and cannot
+  follow evaluation automatically. Pin
   model selection in configuration; derive source versions from committed
   receipts. Scheduled runs require no manual period or source-version input.
   Serverless Python script/wheel tasks declare their required environment key

@@ -408,6 +408,10 @@ follow the first working local Bundle. This planning update starts no deployment
 
 ### SM-22 - Validation and controlled promotion
 
+Current order: SM-22a comparison and SM-22b promotion/rollback precede
+SM-28a candidate retraining and the first local Bundle. SM-28b later wires
+an optional schedule. See [the lifecycle plan](06-prebundle-model-lifecycle-plan.md).
+
 - [ ] Candidate/champion evaluation reports using existing Skyulf metrics and
   model output contracts; configured minimum quality and regression thresholds.
 - [ ] Explicit version-pinned promotion, rollback and audit metadata. Evaluating

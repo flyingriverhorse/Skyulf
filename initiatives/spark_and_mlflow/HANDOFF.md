@@ -8,14 +8,20 @@ values for recurring jobs. SM-15I now provides automatic new-row scoring
 for the first small-data pandas/Polars Databricks Bundle (SM-20a). Spark handles table
 I/O; Spark FE/model execution follows the Bundle. SM-18 and streaming remain
 parked.**
-After the first Bundle, SM-27 adds explicit full-history rescore and
-SM-22/SM-28 add optional monthly retraining with controlled candidate/champion
-promotion. Target release: 0.9.0. Branch: `090`.
+The revised order completes SM-22a/b comparison and controlled promotion,
+then SM-28a label-aware challenger training before SM-20a. SM-28b adds the
+optional monthly schedule after the Bundle; SM-27 remains later. Target release: 0.9.0. Branch: `090`.
+
+SM-22a now has a locally verified, read-only comparison API; see
+[its report](16-sm22a-local-validation-report.md). The isolated UC gate is
+pending, and SM-22b has not started. Alias writes lack native compare-and-swap,
+so SM-22b needs shared admission and restricted writers before promotion.
 
 ## Starting point
 
 - SM-00 through SM-16, SM-15L, SM-15I, SM-24a, SM-25 and SM-26 are complete.
-  Start SM-20a from [05-sm20-bundle-plan.md](05-sm20-bundle-plan.md).
+  Start SM-22a from [06-prebundle-model-lifecycle-plan.md](06-prebundle-model-lifecycle-plan.md).
+  SM-20a follows the verified SM-22a/b and SM-28a services.
   SM-15I [live evidence](13-sm15i-live-validation-report.md) proves automatic
   80+80 insert-only scoring with no date column or per-run version input.
   A later [real NYC taxi rehearsal](15-sm15i-real-nyctaxi-live-report.md)
@@ -110,6 +116,7 @@ Databricks training job: pandas/Polars FE + sklearn model
     -> Databricks scoring job: pandas/Polars local batch on bounded data
     -> Spark reads bounded UC source changes and publishes UC Delta predictions
        (SM-15I automatic incremental path)
+    -> Compare candidate/champion, promote explicitly, train challenger (SM-22a/b, SM-28a)
     -> Generate and run the first local-engine Bundle (SM-20a)
 ```
 

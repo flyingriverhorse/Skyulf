@@ -70,20 +70,32 @@ The SQL Connector is an alternative, not a required part of the first Bundle.
    watermark. The current `replaceWhere` path cannot accept only new rows
    when they overlap a previously written period.
 
+6. SM-22a/b produce a read-only candidate/champion comparison and separate,
+   version-checked promotion/rollback operations.
+7. SM-28a trains and registers a label-aware candidate from a pinned snapshot,
+   then compares it without automatic promotion. The optional monthly schedule
+   is wired in SM-28b after the Bundle exists.
+
 The custom template should generate a project with these responsibilities:
 
 ```text
 templates/databricks/databricks_template_schema.json
 templates/databricks/template/{{.project_name}}/databricks.yml.tmpl
 templates/databricks/template/{{.project_name}}/resources/train_job.yml.tmpl
+templates/databricks/template/{{.project_name}}/resources/compare_job.yml.tmpl
+templates/databricks/template/{{.project_name}}/resources/promote_job.yml.tmpl
 templates/databricks/template/{{.project_name}}/resources/batch_job.yml.tmpl
 templates/databricks/template/{{.project_name}}/src/train.py.tmpl
+templates/databricks/template/{{.project_name}}/src/compare.py.tmpl
+templates/databricks/template/{{.project_name}}/src/promote.py.tmpl
 templates/databricks/template/{{.project_name}}/src/score_month.py.tmpl
 templates/databricks/template/{{.project_name}}/README.md.tmpl
 ```
 
 The generated Python files call Skyulf services; they do not copy FE, model,
-MLflow or Delta publication implementations. The first verified cross-job
+MLflow, comparison, promotion or Delta publication implementations. Separate
+train, compare, explicit-promote and score jobs preserve the decision boundary.
+The first verified cross-job
 artifact path uses MLflow and a concrete UC model version. Tracking-off and
 registry-off variants need their own durable artifact-handoff test before they
 are offered. Configuration includes source/target table names, a globally
@@ -138,9 +150,9 @@ rescores using later information must be labeled as current-state results.
 SM-27 adds a separate rehearsal: rescore all four rows into a new
 generation, activate it, and verify rollback.
 
-SM-28 separately adds optional monthly retraining after labels are available.
-It trains a candidate, uses SM-22 to compare against a pinned champion, and
-requires explicit promotion. The scoring job pins the chosen concrete model
+SM-28a adds label-aware candidate training and uses SM-22a/b before the
+Bundle is generated. SM-28b later wires its optional monthly schedule.
+Comparison never promotes implicitly. The scoring job pins the chosen concrete model
 version once per run. A new champion does not retroactively alter previous
 months; `full_rebuild` remains a separate request.
 

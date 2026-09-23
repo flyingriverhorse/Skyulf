@@ -91,6 +91,50 @@ bundle = load_registered_bundle(
 assert bundle.semantic_digest == resolved.digest
 ```
 
+## Compare a local challenger before promotion
+
+For a fitted pandas/Polars pipeline, resolve both registered versions to
+concrete identities and evaluate them on the **same held-out labeled rows**.
+Pin the source snapshot and split in the caller; `dataset_id` records that
+identity in the report but does not verify the underlying table by itself.
+The report also records the running Skyulf Core version and both model digests.
+The comparison uses the saved FE, model, class order and tuned thresholds.
+It accepts a row/memory budget and rejects incompatible tasks or class labels.
+
+```python
+from skyulf.integrations.mlflow.registry import resolve_model
+from skyulf.integrations.mlflow.validation import compare_registered_local_models
+
+candidate = resolve_model(
+    "catalog.schema.customer_risk", version="2", registry_uri="databricks-uc"
+)
+champion = resolve_model(
+    "catalog.schema.customer_risk", alias="champion", registry_uri="databricks-uc"
+)
+report = compare_registered_local_models(
+    candidate,
+    champion,
+    heldout,  # bounded pandas or Polars frame with raw inputs and true labels
+    target_column="target",
+    dataset_id="catalog.schema.labels@version=42/split=holdout-v1",
+    metric="heldout_rmse",
+    min_improvement=0.1,
+    quality_threshold=5.0,  # maximum acceptable RMSE
+    max_rows=10_000,
+    max_bytes=20_000_000,
+    registry_uri="databricks-uc",
+)
+print(report.eligible, report.reason, report.candidate_metrics)
+```
+
+For MAE/RMSE a lower value wins; for R2, accuracy and F1 a higher value
+wins. `quality_threshold` is an upper limit for error metrics and a lower
+limit for score metrics. A tie does not qualify. If no champion exists, pass
+`None` and inspect the candidate report; this never creates a champion.
+Evaluation does not move aliases, publish predictions or deploy endpoints.
+Explicit version-checked promotion and rollback are the next SM-22b task;
+monthly candidate training follows in SM-28a before Bundle generation.
+
 Only load trusted registry artifacts: bundle loading deserializes pickle, and
 digest matching is an identity check, not authentication of an unknown producer.
 Missing bundle metadata/artifacts or mismatched digests fail explicitly. A later

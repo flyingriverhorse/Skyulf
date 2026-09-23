@@ -490,3 +490,302 @@
   performance guarantee.
 - Next task: SM-12 optional MLflow tracking, with tracking disabled remaining a
   valid local/Spark workflow.
+
+## SM-15I - automatic new-row scoring, DONE
+
+The user requires scheduled jobs to discover new source rows automatically.
+The first run must score the existing bounded snapshot; later runs must score
+only inserts since the last successful target commit, including late-arriving
+rows in an earlier calendar period. The current `replaceWhere` writer cannot
+publish only new rows in an overlapping period without deleting older
+predictions. Implement a separate append-safe publisher and derive the source
+watermark from the committed output receipt. See the
+[SM-15I plan](12-sm15i-incremental-scoring-plan.md). This is a prerequisite
+for SM-20a. The runner passed local real-Delta gates and the isolated two-job Databricks
+rehearsal, including a source with no date column; see the
+[SM-15I validation report](13-sm15i-live-validation-report.md). A separate
+[real NYC taxi rehearsal](15-sm15i-real-nyctaxi-live-report.md) trained a Skyulf
+pipeline with MLflow metrics and registered UC model version 1, then passed
+200 initial + 100 later real-row predictions with an unchanged prior batch and
+no-op replay. SM-20a remains the next task.
+
+## SM-15L - 2026-09-23 monthly local UC Delta publication, DONE
+
+- Added `run_local_batch` with truthful `local_pipeline` publication mode.
+  It loads one pinned UC source month under row/byte limits, scores through
+  fitted pandas or Polars FE/model code, converts only final keyed results to
+  an explicitly typed Spark DataFrame, and reuses guarded Delta period writes.
+  The target and admission control table are provisioned separately.
+- Focused SDK/reader tests: **32 passed, 1 optional Spark skip**; batch
+  contracts: **25 passed**. Real local Spark/Delta: **6 passed**, including
+  two months, exact replay, stale version, accidental empty period, admission
+  denial, invalid target schema and stale model/source pins without mutation. Ruff, Ty and strict
+  MkDocs passed for the changed scope.
+- Two isolated Databricks serverless jobs completed **SUCCESS**. January
+  published 80 pandas predictions to target version 1. February appended 80
+  source rows, published 80 Polars predictions to target version 2, preserved
+  all January rows/metadata, replayed without a new commit, and rejected a
+  stale logical request. Both periods matched direct local gold by key.
+  See the [SM-15L live report](11-sm15l-live-validation-report.md) for run IDs,
+  model digests, test resources and scope limits. The date/version choices
+  were scripted for this proof; automatic new-row scoring is SM-15I.
+
+## SM-24a — 2026-09-23 local and Databricks validation, DONE
+
+- Added explicit bounded pandas/Polars training and a pinned UC Delta monthly
+  reader. Spark filters/projects/limits the source; saved local FE/model runs in
+  one Python process. This stage returns predictions and diagnostics, not a
+  Delta prediction table. The [local guide](../../docs/user_guide/databricks_local_sdk.md)
+  includes code and the decoded-byte boundary.
+- Five pandas/Polars model packages trained and registered in isolated schema
+  `workspace.skyulf_sm24a_20260923`; an independent serverless scoring job
+  matched both 80-row months by key. Replay and negative cases passed. All 30
+  additional inference-eligible preprocessing registrations passed on both
+  engines in a separate live audit, making 41 live-evidenced eligible IDs in
+  the [62-ID matrix](07-sm24a-node-matrix.csv). Train-only, inspection,
+  optional and unsupported IDs remain explicit.
+- An unknown registry version failed preflight. A disposable alias moved to
+  R1 version 2 after preparation; the prepared predictor remained on version 1
+  and returned the expected 80 rows. The alias was deleted. The full
+  [report](08-sm24a-live-validation-report.md) lists runs, versions, resources
+  and test results.
+- A follow-up [scaler and outlier audit](09-sm24a-scaler-outlier-audit.md)
+  registered 10 pandas/Polars MLflow models with held-out metrics and passed
+  a separate two-month scoring replay. Four filtering outlier nodes reject
+  shortened prediction batches; Winsorize clips and preserves rows.
+- A [200-row held-out metrics audit](10-sm24a-heldout-metrics-report.md)
+  logged regression MAE/RMSE/R2 and classification accuracy/F1 in the same
+  MLflow runs as five new test models. All five registered versions passed a
+  separate two-month scoring replay. R2/R3 had negative held-out R2; those
+  example models are not approved for production promotion.
+- The Spark iterator does not expose actual wire-byte counts. `max_bytes`
+  bounds accepted decoded rows and local-frame memory; a very wide row can
+  arrive before rejection. [SM-24d](OPEN_QUEUE.md) retains the stronger
+  transport-budget option for wider or larger workloads. SM-15I then added
+  automatic new-row scoring; next is SM-20a.
+
+## SM-25 — 2026-09-23 local SDK validation, DONE
+
+- Added frozen `LocalWorkflowConfig` with explicit runtime, pandas/Polars engine,
+  bounded caller frame or declared future UC source, local/portable artifact
+  selection, optional MLflow store URIs and return/declared future Delta sink.
+  Config parsing performs no remote call and rejects embedded URI credentials.
+- Local preflight reports actionable config, source, sink, artifact, engine,
+  node-contract and model-contract issues. Optional read-only registry preparation
+  resolves an alias once, loads the concrete version, and checks package digest.
+  The SDK has no separate FE/model allowlist; a fitted SkyulfPipeline controls
+  local prediction. An optional representative-frame probe exercises that
+  actual path before submission. Inference input is capped by rows and bytes.
+- After the allowlist correction, **20 local SDK tests passed**, including
+  pandas/Polars MinMaxScaler + random-forest replay. The combined isolated
+  MLflow SDK, local-package and registry gate passed **39/39**.
+  The broader Core unit run completed **3927 passed, 71 skipped** before that
+  narrow correction; Ruff, repository Ty and strict MkDocs passed after it. No
+  Databricks job, UC source adapter or Delta writer was added in SM-25.
+- [Local-engine SDK guide](../../docs/user_guide/databricks_local_sdk.md).
+  Next: SM-24a local training and bounded batch workflow.
+
+## SM-26 — 2026-09-23 local packaging validation, DONE
+
+- Added a versioned, trusted local pipeline artifact with recorded pandas/Polars
+  fit engine, raw/model feature schemas, model class, exact dependency versions,
+  payload checksum, classification classes and explicit tuned-threshold choice.
+  Legacy pipeline pickles still load; those without a recorded engine require a
+  refit before local MLflow packaging.
+- Added MLflow pyfunc packaging and a synthetic input example/signature for the
+  supported scalar inputs. Its pandas boundary converts back to the recorded
+  Polars engine when needed. Whole-frame local is the only declared execution
+  scope; HTTP row-local and Spark scopes are rejected. Existing explicit registry
+  publication and pinned-version resolution now carry the local payload digest.
+- Isolated MLflow 3.16.1 integration: **16 local artifact/pyfunc tests passed**
+  for categorical encoding, binning, null input, classes/probabilities, tuned
+  thresholds, cross-engine requests, and a fresh isolated Python subprocess
+  load. The 0.9.0 wheel was built from the changed source and installed into the
+  isolated environment; `python -I` resolved the new module from site-packages.
+  Existing MLflow packaging and registry compatibility: **47 passed, 1 skipped**.
+  Pipeline unit regression: **385 passed, 2 skipped**. Focused Ruff and ty checks
+  passed. No Databricks job or Delta writer was added in this task.
+- [MLflow model guide](../../docs/user_guide/mlflow_models.md) lists the tested
+  model families and the wheel, serving and Spark limits. This task handed off
+  to SM-25 and then SM-24a.
+
+## SM-16 — 2026-09-22 local and live validation, DONE
+
+- Baseline `d43e74ca`. Added a trusted pinned registry-bundle loader and a
+  templates-free `databricks_batch_smoke.py` probe with pandas/Polars training,
+  an independent numerical oracle and both existing Spark inference modes.
+- Combined local registry/worker gate: **29 passed**, no skips, MLflow 3.16.1 /
+  PySpark 4.0.3 / Python 3.12.3. Base regression: **77 passed, 28 optional skips**.
+  Ruff/format, repository Ty and strict MkDocs passed. Wheel built locally;
+  checksum, exact commands and remaining gates are in
+  [PLATFORM_VALIDATION.md](PLATFORM_VALIDATION.md).
+- Databricks CLI **1.17.0**, profile `skyulf`, approved isolated schema
+  `workspace.skyulf_sm16_20260922`. Live regression parity passed both Spark
+  modes in run `447606109645160`; restricted-principal model allow/deny and
+  10k/50k synthetic parity passed in run `2921374308246`.
+- Checkpoint `311547fc` adds serverless identifier handling and shared Delta
+  admission. Local gates passed 75 inference tests and 18 admission/batch tests.
+  The reusable monthly Delta probe passed 5 real Delta tests; live Delta/alias
+  run `810044894558535` reached an unsupported `REFRESH TABLE` command.
+  Narrow refresh/cache compatibility fixes passed 48 real Delta tests; corrected
+  run `783094949884769` passed monthly replacement/replay, alias pinning and
+  full worker package-content checks. `databricks.yml` remains absent.
+- SM-16 is **DONE** for the selected serverless workflow: winner job
+  `973709879452231` committed only after the contender verified held-owner
+  rejection. Contender `404334394214907` then failed a test-only permission-code
+  assertion; final restricted job `977447944071613` passed actual MODIFY denial,
+  unchanged data/version and owner release. The failed run remains documented.
+- SM-15L was deferred immediately after SM-16; the later local-first Bundle
+  request reopens it after SM-24a. No implementation of that local sink is
+  included in SM-16, and real UC access remains an acceptance requirement.
+
+## SM-15 — 2026-09-22 validation record
+
+- Baseline `4a613cb5`; branch `090`. The delivery commit containing this record
+  adds `skyulf.integrations.databricks`, three batch test modules and a real
+  Delta fixture, the optional Delta dependency profile/CI lane, and the English
+  [monthly batch guide](../../docs/user_guide/databricks_batch.md).
+- `run_batch` pins a concrete Delta source version and verifies snapshot
+  availability at the explicit cutoff. Both existing Spark inference modes
+  feed a precreated Delta target. A committed manifest records request identity,
+  model digest, installed code version and counts. Source history newer than
+  `as_of`, mismatched bundle digest/runtime and ambiguous contracts fail.
+- Atomic `replaceWhere` preserves other periods. Empty deletion requires opt-in.
+  Run receipts prevent duplicate publication and prevent an old retry undoing
+  a newer recomputation. Changed requests under one run ID and stale target
+  versions fail. Local OS admission locks are tested across processes; both
+  runner and public sink reject local locks on distributed masters.
+- Final required Linux/WSL lane: **43 passed**, including **18 real Delta
+  integration cases** and **25 contract/admission cases**, no skips, 111.95s.
+  Python **3.12.3**, PySpark **4.0.3**, Delta Python/JVM **4.0.0**, Java 17;
+  pandas **2.3.3**, Polars **1.44.2**, Arrow **25.0.1**, sklearn **1.9.1**.
+  Initial exploratory tests used newer Python-package patch versions; the final
+  gate was rerun after aligning the environment with `requirements-delta.txt`.
+- Cases include a pinned old source after a newer commit, a non-UTC Spark
+  session, exact period boundaries, null/wrong metadata/count rejection with
+  target version unchanged, stale/new/old retries and committed empty deletion.
+  Admission permission denial uses fault injection; it is not live UC evidence.
+- Base regression: **105 passed, 26 skipped** with MLflow/Delta absent, plus
+  existing sklearn interchange and Windows physical-core warnings. Final narrow
+  Windows contract/admission run: **25 passed**. Ruff check/format, repository
+  Ty and strict MkDocs passed; the guide's Mermaid parsed with the real parser.
+  Repository pre-commit hooks passed, including the synchronized optional
+  dependency lock. GitHub Actions was added but has not run remotely.
+- Windows Hadoop filesystem support could not run real Delta I/O, so the
+  required transaction gate used an isolated Linux/WSL environment. No runtime
+  authentication or Databricks job was performed. Preserve pre-existing temp
+  folders and editor-created Databricks configuration outside this commit.
+- Remaining scope: the cutoff proves snapshot availability only, not upstream
+  point-in-time feature joins. Model registry identity is bound by the caller;
+  bundle digest is checked. Receipt/history retention bounds the retry window.
+  A shared local lock directory protects cooperative local writers on one host;
+  distributed admission requires a separate implementation with ownership held
+  throughout the commit. Expiring leases without sink fencing are unsupported.
+  These platform concerns and the carried registry-to-Spark gate belong to SM-16.
+
+Reproducible commands (Linux with Java 17 and an isolated environment):
+
+```bash
+uv venv .venv-delta
+uv pip install --python .venv-delta/bin/python -r requirements-delta.txt
+SKYULF_REQUIRE_DELTA=1 .venv-delta/bin/python -m pytest \
+  skyulf-core/tests/integrations/test_batch_contract.py \
+  skyulf-core/tests/integrations/test_batch_admission.py \
+  skyulf-core/tests/integrations/test_delta_publish.py -q -o addopts=
+```
+
+Exact local invocation used the prepared WSL environment and cached official jars:
+
+```powershell
+wsl -d Ubuntu -- bash .cache/sm15-linux-run.sh -m pytest skyulf-core/tests/integrations/test_batch_contract.py skyulf-core/tests/integrations/test_batch_admission.py skyulf-core/tests/integrations/test_delta_publish.py -q -p no:cacheprovider -o addopts= --basetemp /tmp/sm15-delta-pinned-final --tb=short
+.venv/Scripts/python.exe -m pytest skyulf-core/tests/spark/test_inference_bundle.py skyulf-core/tests/unit/test_pipeline_inference_schema.py skyulf-core/tests/integrations -q -o addopts= --basetemp .cache/sm15-base-final --tb=short
+.venv/Scripts/ty.exe check backend skyulf-core/skyulf skyulf-core/tests run_skyulf.py celery_worker.py
+.venv/Scripts/python.exe -m mkdocs build --strict --site-dir .cache/sm15-docs
+```
+
+The local shell wrapper exports Java 17, its Python worker executable is selected
+by the fixture, and `SKYULF_DELTA_JARS` points to the cached Delta 4.0.0 jars.
+The portable command above downloads those jars through Delta's normal helper.
+
+## SM-13 — 2026-09-22 validation record
+
+- Added optional MLflow `pyfunc` packaging in
+  `skyulf/integrations/mlflow/model.py`. `log_model` serializes the existing
+  `InferenceBundle`, records a manifest-derived named signature and synthetic
+  input example, and uploads the model directory to the explicitly supplied
+  run ID through `MlflowClient`. `tracking_uri` can be passed when the run was
+  created by a client-bound tracker; no global active run is used to select the
+  destination.
+- Raw and features bundles preserve local prediction results after MLflow
+  save/load for pandas and Polars-trained pipelines. Classification tests cover
+  class order, probabilities and tuned thresholds. Positional NumPy/list input
+  is rejected. Dtypes without an exact MLflow column representation are rejected
+  during signature creation rather than silently widened.
+- Baseline `67315253`; this delivery commit includes implementation, tests,
+  English guide and validation records. Python 3.12.10 / MLflow 3.16.1:
+  **31 passed** (23 model, 8 tracking) with the wheel subprocess gate enabled.
+  Base bundle/schema/integration regression: **80 passed, 7 skipped** with
+  existing numeric/protocol warnings. Base tracking/model alone: **4 passed,
+  5 skipped**; MLflow is absent. Ruff, repository Ty/pre-commit and strict
+  MkDocs passed. Only MLflow 3.16.1 was exercised.
+- The isolated consumer environment reused installed dependencies and replaced
+  editable Skyulf with the final 0.9.0 wheel. Python `-I` loaded the model from
+  a temporary working directory, asserted imports from site-packages and
+  matched producer predictions. This verifies independent package imports,
+  not a fresh network dependency install.
+- MLflow aligns named columns, ignores extras and safely casts compatible
+  request types before bundle validation; direct `predict_local` still requires
+  exact names/order/dtypes. This transport boundary has an explicit regression.
+  Tests also exclude the producer's uv project and temporary source paths and
+  preserve an unrelated active run on a different tracking store.
+- Scope boundary: registry/Unity Catalog resolution, G2 runner evidence,
+  Databricks jobs, Spark UDF/endpoint adapters and Delta batch publication stay
+  in SM-14–SM-16. SM-14 is now the next task.
+
+Reproducible verification (consumer Python must contain the final built wheel):
+
+```powershell
+$env:SKYULF_MLFLOW_WHEEL_PYTHON = (Resolve-Path .cache/sm13-clean-env/Scripts/python.exe).Path
+.cache/sm12-mlflow-env/Scripts/python.exe -m pytest skyulf-core/tests/integrations/test_mlflow_tracking.py skyulf-core/tests/integrations/test_mlflow_model.py -q -o addopts= --basetemp .cache/sm13-delivery --tb=short
+.venv/Scripts/python.exe -m pytest skyulf-core/tests/spark/test_inference_bundle.py skyulf-core/tests/unit/test_pipeline_inference_schema.py skyulf-core/tests/integrations -q -o addopts= --basetemp .cache/sm13-base-regression --tb=short
+```
+
+## SM-12 — 2026-09-22 validation record
+
+- Added the optional `skyulf.integrations.mlflow` adapter, the `mlflow` package
+  extra, `requirements-mlflow.txt`, and the English tracking guide. Importing
+  the adapter does not import MLflow; disabled tracking is a no-op with no
+  client construction or network access.
+- `TrackingConfig` and `track_run` use an explicit `MlflowClient` and run ID.
+  They do not mutate MLflow's process-global active run, so concurrent contexts
+  remain isolated and a caller-owned run stays open. Explicit metrics, params,
+  tags, and an opt-in config artifact/digest are supported.
+- Successful contexts terminate `FINISHED`; body exceptions terminate `FAILED`.
+  The default `raise` policy propagates tracking failures. `warn` preserves the
+  body result and exposes `run.tracking_error`; an outer runner may propagate
+  that value into its own result metadata.
+- Base verification (`.venv`): **4 passed, 4 skipped** for the integration
+  tests; MLflow is absent in that environment. Optional verification in an
+  isolated MLflow 3.16.1 environment: **8 passed**. Ruff and ty checks passed
+  for the new Python files.
+- Scope boundary: this task adds run tracking only. MLflow model packaging,
+  registry/Unity Catalog, Databricks batch delivery, endpoints, and templates
+  remain SM-13 onward.
+
+## SM-14 — 2026-09-22 validation record
+
+- Added `skyulf/integrations/mlflow/registry.py` and
+  `tests/integrations/test_mlflow_registry.py`. Publication accepts only the
+  `runs:/...` URI produced by the packaging adapter, uses explicit tracking and
+  registry clients, and leaves alias promotion to the caller.
+- Resolution requires exactly one alias or version, pins an alias to a concrete
+  `models:/name/version` URI, and returns the packaged signature and bundle
+  digest. The version's recorded source URI is used for artifact metadata so
+  separate tracking and registry stores work without process-global MLflow state.
+- The isolated MLflow 3.16.1 lane passed **10 tests**. It covers local SQLite
+  registration, alias movement, separate stores, missing model, access and
+  dependency failures, non-run publication rejection, and Unity Catalog
+  three-part-name validation. The base environment skips the optional module
+  because MLflow is absent.
+- Scope boundary: live Unity Catalog/Databricks validation and the G2 Spark
+  runner remain SM-16 carry-forward work. SM-15 is now READY.
