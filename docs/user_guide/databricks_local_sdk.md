@@ -400,3 +400,22 @@ budget deliberately or handle such a source with a separate distributed path.
 The target receipt is in the same Delta commit as the predictions. This
 protects participating writers only; changes outside the admission protocol
 must be handled explicitly.
+
+## Real-data end-to-end example
+
+`skyulf-core/examples/databricks_local_real_taxi_job.py` is a one-time
+Databricks notebook using the public `samples.nyctaxi.trips` dataset. It
+materializes a bounded copy in an isolated Unity Catalog schema, trains a
+Skyulf `SimpleImputer` -> `StandardScaler` -> `OneHotEncoder` ->
+`random_forest_regressor` pipeline, saves its full artifact, logs held-out
+MAE/RMSE/R2 in MLflow and registers a concrete UC model version. Separate
+`score_initial` and `score_append` jobs then call the incremental runner on
+200 existing and 100 subsequently inserted trips. Both persist keyed Delta
+predictions; the second job checks prior rows and a no-op replay. See the
+SM-15I real NYC taxi live report under `initiatives/spark_and_mlflow/` for
+run IDs and measured results.
+
+The example's trip duration and dropoff ZIP are known only after a trip, so
+it demonstrates retrospective batch fare estimation. Its hard-coded schema,
+experiment and workspace folder are test resources; select your own names
+before using it elsewhere. The example is not a scheduled Bundle job.

@@ -18,6 +18,9 @@ promotion. Target release: 0.9.0. Branch: `090`.
   Start SM-20a from [05-sm20-bundle-plan.md](05-sm20-bundle-plan.md).
   SM-15I [live evidence](13-sm15i-live-validation-report.md) proves automatic
   80+80 insert-only scoring with no date column or per-run version input.
+  A later [real NYC taxi rehearsal](15-sm15i-real-nyctaxi-live-report.md)
+  trained a Skyulf model with held-out MLflow metrics, registered UC model
+  version 1, then passed 200 initial + 100 new-row predictions and a no-op replay.
   SM-26 added local artifact and MLflow packaging without cloud execution. The
   SM-25 SDK adds immutable local workflow configuration, local/remote preflight,
   explicit path or pinned registry artifact selection and caller-frame limits.

@@ -38,7 +38,7 @@ DEFERRED = user postponed this work; PARKED = do not implement until resumed.
 | SM-15 | Monthly batch + Delta sink | SM-14 | DONE | 43 local Delta/contract/admission tests; evidence below |
 | SM-16 | Gerçek Databricks kapısı | SM-15 | DONE | Selected serverless workflow passed; live evidence below |
 | SM-15L | Explicit-period local predictions -> UC Delta | SM-24a | DONE | Score requested period; preserve rows outside it; Spark only for bounded I/O |
-| SM-15I | Automatic incremental local scoring | SM-15L | DONE | No date/source-version input; 80+80 live Delta rows, no-op replay; [evidence](13-sm15i-live-validation-report.md) |
+| SM-15I | Automatic incremental local scoring | SM-15L | DONE | No date/source-version input; 80+80 synthetic and 200+100 real taxi rows; no-op replay; [core evidence](13-sm15i-live-validation-report.md), [real-data proof](15-sm15i-real-nyctaxi-live-report.md) |
 | SM-17 | Complete existing Spark node/model coverage | SM-20a | LATER | Resume only after the first local Bundle; preserve all inventoried gaps |
 | SM-18 | Backend/Canvas and legacy artifact bridge | SM-17 | PARKED | Capability UI/API, DAG contracts and existing deployment compatibility |
 | SM-26 | Local pandas/Polars pipeline MLflow packaging | SM-16, existing local persistence | DONE | Fitted FE/model/engine, schema and thresholds preserved; MLflow 3.16.1 isolated-process parity; Spark/HTTP scopes rejected |
@@ -165,7 +165,11 @@ watermark from the committed output receipt. See the
 [SM-15I plan](12-sm15i-incremental-scoring-plan.md). This is a prerequisite
 for SM-20a. The runner passed local real-Delta gates and the isolated two-job Databricks
 rehearsal, including a source with no date column; see the
-[SM-15I validation report](13-sm15i-live-validation-report.md).
+[SM-15I validation report](13-sm15i-live-validation-report.md). A separate
+[real NYC taxi rehearsal](15-sm15i-real-nyctaxi-live-report.md) trained a Skyulf
+pipeline with MLflow metrics and registered UC model version 1, then passed
+200 initial + 100 later real-row predictions with an unchanged prior batch and
+no-op replay. SM-20a remains the next task.
 
 ## SM-15L - 2026-09-23 monthly local UC Delta publication, DONE
 
