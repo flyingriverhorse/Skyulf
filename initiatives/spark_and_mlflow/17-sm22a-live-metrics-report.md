@@ -12,7 +12,10 @@ Unity Catalog model comparison. It does not promote an alias.
   parent run `402693440245633`, task run `779149119285800`,
   `TERMINATED / SUCCESS`, one attempt, 15-minute task timeout.
 - Notebook: `/Workspace/Users/edwardwolfe99@gmail.com/skyulf_sm24a_20260923/sm22_metrics_r1/live_metrics`;
-  source: `skyulf-core/examples/databricks_local_sm22_metrics_live.py`.
+  uploaded from `skyulf-core/examples/databricks_local_sm22_metrics_live.py` at commit
+  `68d90c0a`. The current example now calls `SkyulfPipeline.fit` directly;
+  that refactor passed a local pandas/Polars artifact smoke test but was not
+  rerun on Databricks.
 - Wheel: `skyulf_core-0.9.0-py3-none-any.whl`, SHA-256
   `B8ACD810FAF0AC07E1A066B4E186F485CFD4B0A60DADDF7C24F45BDD2C39050C`.
 - Runtime: skyulf-core 0.9.0, MLflow 3.16.1, pandas 2.2.3,

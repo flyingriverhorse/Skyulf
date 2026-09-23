@@ -14,10 +14,11 @@ import polars as pl
 
 from skyulf.data.dataset import SplitDataset
 from skyulf.inference.local_evaluation import evaluate_local_holdout
-from skyulf.integrations.databricks.local_batch import fit_local_workflow
+from skyulf.inference.local_pipeline import load_local_pipeline, save_local_pipeline
 from skyulf.integrations.mlflow.local_model import log_local_model
 from skyulf.integrations.mlflow.registry import register_model, resolve_model
 from skyulf.integrations.mlflow.validation import compare_registered_local_models
+from skyulf.pipeline import SkyulfPipeline
 
 EXPERIMENT = "/Users/edwardwolfe99@gmail.com/skyulf_sm24a_20260923/sm22_metrics_r1_experiment"
 MODEL_NAME = "workspace.skyulf_sm24a_20260923.skyulf_sm22_metrics_r1"
@@ -59,14 +60,13 @@ def _fit(
 ):
     """Fit and reload a real Skyulf local artifact."""
     model_type = "linear_regression" if task == "regression" else "logistic_regression"
-    return fit_local_workflow(
-        {"preprocessing": [], "modeling": {"type": model_type}},
+    pipeline = SkyulfPipeline({"preprocessing": [], "modeling": {"type": model_type}})
+    pipeline.fit(
         SplitDataset(train=_native(train, engine), test=_native(heldout, engine)),
         target_column="target",
-        artifact_path=path,
-        max_rows=200,
-        max_bytes=200_000,
     )
+    save_local_pipeline(pipeline, path)
+    return load_local_pipeline(path)
 
 
 def _log_metrics(
