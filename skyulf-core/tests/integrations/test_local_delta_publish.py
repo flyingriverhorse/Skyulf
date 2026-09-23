@@ -40,8 +40,8 @@ def local_delta_case(delta_spark, tmp_path):
     ).write.format("delta").saveAsTable(source)
     spark.createDataFrame(
         [(9, datetime(2025, 12, 1, tzinfo=UTC), 99.0, "prior", "risk", "1")],
-        "id long, event_time timestamp, prediction double, __skyulf_run_id string, "
-        "__skyulf_model_name string, __skyulf_model_version string",
+        "id long, event_time timestamp, prediction double, run_id string, "
+        "model_name string, model_version string",
     ).write.format("delta").saveAsTable(target)
     values = np.arange(20, dtype="float64")
     data = pd.DataFrame({"x": values, "target": 2.0 * values})
@@ -135,7 +135,7 @@ def test_local_predictions_publish_two_months_and_replay(local_delta_case):
     second = run_local_batch(spark, february, prepared_february, next_request, admission=admission)
     replay = run_local_batch(spark, february, prepared_february, next_request, admission=admission)
     rows = spark.table(target).orderBy("id").collect()
-    assert [(row.id, round(row.prediction), row["__skyulf_run_id"]) for row in rows] == [
+    assert [(row.id, round(row.prediction), row["run_id"]) for row in rows] == [
         (1, 4, "january-local"),
         (2, 8, "january-local"),
         (3, 12, "february-local"),
@@ -291,8 +291,8 @@ def test_incremental_local_batch_discovers_appends_without_period_inputs(local_d
     assert [(row.id, round(row.prediction)) for row in rows] == [(1, 4), (2, 8), (3, 12)]
     assert first.input_count == 2 and second.input_count == 1
     assert replay.input_count == 0 and replay.noop
-    assert rows[0]["__skyulf_run_id"] == rows[1]["__skyulf_run_id"]
-    assert rows[2]["__skyulf_run_id"] != rows[1]["__skyulf_run_id"]
+    assert rows[0]["run_id"] == rows[1]["run_id"]
+    assert rows[2]["run_id"] != rows[1]["run_id"]
 
 
 def test_incremental_local_batch_does_not_require_a_date_column(local_delta_case):
@@ -308,8 +308,7 @@ def test_incremental_local_batch_does_not_require_a_date_column(local_delta_case
     ).saveAsTable(source)
     spark.createDataFrame(
         [],
-        "id long, prediction double, __skyulf_run_id string, "
-        "__skyulf_model_name string, __skyulf_model_version string",
+        "id long, prediction double, run_id string, model_name string, model_version string",
     ).write.format("delta").saveAsTable(target)
     config = prepared.config.model_copy(
         update={

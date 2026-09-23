@@ -10,7 +10,7 @@ from typing import Any
 from ...core.execution import ExecutionOptions, FrameSpec
 from ...inference.bundle import InferenceBundle, _validate_bundle
 from ...inference.spark import predict_spark
-from ._contracts import BatchResult, BatchSpec, table_name
+from ._contracts import PREDICTION_METADATA_COLUMNS, BatchResult, BatchSpec, table_name
 from .admission import PublishAdmission, validate_admission
 from .delta import history, publish_replace_period, table_identity
 
@@ -82,6 +82,8 @@ def run_batch(
     output_names = {column.name.lower() for column in bundle.manifest.output_schema}
     if spec.period_column.lower() in output_names:
         raise ValueError("period_column collides with a model output column.")
+    if output_names.intersection(PREDICTION_METADATA_COLUMNS):
+        raise ValueError("Model output column collides with prediction metadata.")
     predictions = predict_spark(
         selected,
         bundle,
@@ -93,9 +95,9 @@ def run_batch(
         selected.select(*spec.row_keys, spec.period_column), on=list(spec.row_keys), how="inner"
     )
     for name, value in (
-        ("__skyulf_run_id", spec.run_id),
-        ("__skyulf_model_name", spec.model_name),
-        ("__skyulf_model_version", spec.model_version),
+        ("run_id", spec.run_id),
+        ("model_name", spec.model_name),
+        ("model_version", spec.model_version),
     ):
         output = output.withColumn(name, functions.lit(value))
     target = spark.table(spec.output_table)

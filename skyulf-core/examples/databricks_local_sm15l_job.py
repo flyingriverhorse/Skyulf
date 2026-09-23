@@ -125,13 +125,13 @@ def _verify_month(
             (F.col("event_time") >= F.lit(source.period_start))
             & (F.col("event_time") < F.lit(source.period_end))
         )
-        .select("entity_id", "prediction", "__skyulf_run_id")
+        .select("entity_id", "prediction", "run_id")
         .orderBy("entity_id")
         .collect()
     )
     actual_keys = [row["entity_id"] for row in rows]
     expected_keys = sorted(gold.index.tolist())
-    if actual_keys != expected_keys or any(row["__skyulf_run_id"] != run_id for row in rows):
+    if actual_keys != expected_keys or any(row["run_id"] != run_id for row in rows):
         raise AssertionError("Persisted keys or run metadata differ from the local gold rows.")
     np.testing.assert_allclose(
         [row["prediction"] for row in rows],
@@ -156,7 +156,7 @@ def january(spark: Any) -> dict[str, Any]:
     ).write.format("delta").saveAsTable(SOURCE)
     spark.sql(
         f"CREATE TABLE {TARGET} (entity_id STRING, event_time TIMESTAMP, prediction DOUBLE, "
-        "__skyulf_run_id STRING, __skyulf_model_name STRING, __skyulf_model_version STRING) USING DELTA"
+        "run_id STRING, model_name STRING, model_version STRING) USING DELTA"
     )
     spark.sql(f"CREATE TABLE {CONTROL} (target_id STRING, owner STRING) USING DELTA")
     target_id = table_identity(spark, TARGET)

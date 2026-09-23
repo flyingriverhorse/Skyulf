@@ -44,6 +44,8 @@ def test_naive_dates_fail(spec, field):
         {"period_end": datetime(2025, 12, 1, tzinfo=UTC)},
         {"row_keys": ("id", "id")},
         {"row_keys": ("__skyulf_run_id",)},
+        {"row_keys": ("run_id",)},
+        {"period_column": "model_name"},
         {"output_table": "default.x; DROP TABLE x"},
         {"model_version": "champion"},
         {"model_version": "-1"},

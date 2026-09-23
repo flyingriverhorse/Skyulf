@@ -60,9 +60,9 @@ CREATE TABLE analytics.customer_predictions (
     customer_id BIGINT,
     event_time TIMESTAMP,
     prediction DOUBLE,
-    __skyulf_run_id STRING,
-    __skyulf_model_name STRING,
-    __skyulf_model_version STRING
+    run_id STRING,
+    model_name STRING,
+    model_version STRING
 ) USING DELTA;
 ```
 

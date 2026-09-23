@@ -262,7 +262,12 @@ job. The source and target must be different Delta tables. The target must have
 the row-key columns with the same Spark types as the source (`long` or
 `string`), a `timestamp` period column, the saved model's output columns at
 their declared types, and three string columns:
-`__skyulf_run_id`, `__skyulf_model_name` and `__skyulf_model_version`.
+`run_id`, `model_name` and `model_version`.
+Here `run_id` identifies the prediction publication, not the MLflow training run;
+the incremental writer derives it from the source/model snapshot. Existing test
+targets with `__skyulf_*` columns retain their historical schema; create a
+new target with these names for the updated writer.
+
 The control table has exactly one row, `target_id STRING` equal to the target
 Delta table ID and nullable `owner STRING` initially null. Every publisher
 of this target must use that same control table. The job identity needs read
@@ -352,7 +357,7 @@ It never filters rows by that column, including late arrivals.
 
 Provision a distinct, initially empty Delta prediction table with the
 globally unique key, saved model output columns and
-`__skyulf_run_id`, `__skyulf_model_name`, `__skyulf_model_version` string
+`run_id`, `model_name`, `model_version` string
 columns. If carrying an event timestamp, add a matching Spark `timestamp`
 column to both tables. Enable Delta Change Data Feed on the source **before**
 any changes that the job must consume. Provision the same shared admission

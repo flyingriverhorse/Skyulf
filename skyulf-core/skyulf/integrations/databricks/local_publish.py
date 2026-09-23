@@ -11,7 +11,7 @@ import numpy as np
 import pandas as pd
 
 from ...inference.local_pipeline import LocalPipelineArtifact
-from ._contracts import BatchResult, BatchSpec
+from ._contracts import PREDICTION_METADATA_COLUMNS, BatchResult, BatchSpec
 from .admission import PublishAdmission, validate_admission
 from .batch import _manifest
 from .delta import history, publish_replace_period, table_identity
@@ -19,7 +19,7 @@ from .local_batch import LocalSourceSpec, score_local_source
 from .local_sdk import PreparedLocalWorkflow
 
 _OUTPUT_TYPES = {"float64": "double", "int64": "long", "string": "string", "bool": "boolean"}
-_METADATA = ("__skyulf_run_id", "__skyulf_model_name", "__skyulf_model_version")
+_METADATA = PREDICTION_METADATA_COLUMNS
 
 
 def _validate_request(
@@ -177,9 +177,9 @@ def run_local_batch(
     ).select(*source.row_keys, source.period_column)
     output = bridge.join(source_period, on=list(source.row_keys), how="inner")
     for name, value in (
-        ("__skyulf_run_id", spec.run_id),
-        ("__skyulf_model_name", spec.model_name),
-        ("__skyulf_model_version", spec.model_version),
+        ("run_id", spec.run_id),
+        ("model_name", spec.model_name),
+        ("model_version", spec.model_version),
     ):
         output = output.withColumn(name, functions.lit(value))
     if {field.name: field.dataType for field in output.schema} != {

@@ -117,9 +117,9 @@ def _validate_frame(frame: Any, spec: BatchSpec, manifest: dict[str, Any]) -> No
         | (period >= functions.lit(spec.period_end_utc))
     )
     for name, expected in (
-        ("__skyulf_run_id", spec.run_id),
-        ("__skyulf_model_name", spec.model_name),
-        ("__skyulf_model_version", spec.model_version),
+        ("run_id", spec.run_id),
+        ("model_name", spec.model_name),
+        ("model_version", spec.model_version),
     ):
         invalid = invalid | frame[name].isNull() | (frame[name] != functions.lit(expected))
     if frame.where(invalid).limit(1).count():

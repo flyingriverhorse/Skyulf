@@ -13,7 +13,7 @@ from typing import Any
 import pandas as pd
 
 from ...inference.local_pipeline import LocalPipelineArtifact
-from ._contracts import column_name, table_name
+from ._contracts import PREDICTION_METADATA_COLUMNS, column_name, table_name
 from .admission import BatchConflictError, PublishAdmission, validate_admission
 from .delta import DeltaPublishError, history, table_identity
 from .local_batch import _frame_bytes
@@ -103,6 +103,8 @@ def _validate_prepared(
     names = (*row_keys, *((period_column,) if period_column is not None else ()))
     if len({name.lower() for name in names}) != len(names):
         raise ValueError("row_keys and period_column must be distinct.")
+    if any(name.lower() in PREDICTION_METADATA_COLUMNS for name in names):
+        raise ValueError("row_keys and period_column collide with prediction metadata.")
     inputs = prepared.artifact.manifest.input_columns
     if any(key in inputs for key in row_keys) or (
         period_column is not None and period_column in inputs
@@ -288,9 +290,9 @@ def run_incremental_local_batch(
         ).hexdigest()
         manifest = {**run_input, "run_id": digest, "request_digest": digest}
         for name, value in (
-            ("__skyulf_run_id", digest),
-            ("__skyulf_model_name", config.model.name),
-            ("__skyulf_model_version", config.model.version),
+            ("run_id", digest),
+            ("model_name", config.model.name),
+            ("model_version", config.model.version),
         ):
             output = output.withColumn(name, functions.lit(value))
         if {field.name: field.dataType for field in output.schema} != {

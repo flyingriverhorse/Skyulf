@@ -42,8 +42,8 @@ def harness(delta_spark, tmp_path):
         [
             (9, datetime(2025, 12, 1, tzinfo=UTC), 99.0, "prior", "risk", "6"),
         ],
-        "id long, event_time timestamp, prediction double, __skyulf_run_id string, "
-        "__skyulf_model_name string, __skyulf_model_version string",
+        "id long, event_time timestamp, prediction double, run_id string, "
+        "model_name string, model_version string",
     ).write.format("delta").saveAsTable(target)
     spec = BatchSpec(
         period_start=datetime(2026, 1, 1, tzinfo=UTC),
@@ -153,7 +153,7 @@ def test_old_retry_cannot_undo_explicit_recomputation(harness):
     old = _run(h)
     assert newer.commit_version == 2
     assert old.commit_version == 1 and old.replayed
-    assert h.spark.table(h.target).where("id = 1").first()["__skyulf_run_id"] == "recompute"
+    assert h.spark.table(h.target).where("id = 1").first()["run_id"] == "recompute"
 
 
 def test_empty_replacement_is_explicit_and_records_a_commit(harness):
@@ -238,11 +238,11 @@ def test_sink_rejects_invalid_rows_without_modifying_target(harness, violation):
     output = (
         h.spark.table(h.target)
         .withColumn("event_time", functions.lit(instant).cast("timestamp"))
-        .withColumn("__skyulf_run_id", functions.lit(h.spec.run_id))
-        .withColumn("__skyulf_model_version", functions.lit(h.spec.model_version))
+        .withColumn("run_id", functions.lit(h.spec.run_id))
+        .withColumn("model_version", functions.lit(h.spec.model_version))
     )
     if violation == "metadata":
-        output = output.withColumn("__skyulf_model_name", functions.lit(None).cast("string"))
+        output = output.withColumn("model_name", functions.lit(None).cast("string"))
     manifest = {"output_count": 2 if violation == "count" else 1, "request_digest": "unused"}
     with pytest.raises(ValueError, match="Output"):
         publish_replace_period(h.spark, output, h.spec, manifest=manifest, admission=h.lock)
@@ -321,7 +321,7 @@ def test_serverless_cache_rejection_publishes_and_replays(
     rows = h.spark.table(h.target).orderBy("id").collect()
     assert [row.id for row in rows] == [1, 2, 9]
     assert [row.prediction for row in rows] == pytest.approx([2.0, 4.0, 99.0])
-    assert rows[-1]["__skyulf_run_id"] == "prior"
+    assert rows[-1]["run_id"] == "prior"
     assert first.input_count == first.output_count == 2
     assert first.commit_version == replay.commit_version == 1
     assert first.replayed is False

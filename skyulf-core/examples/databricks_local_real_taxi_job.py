@@ -121,8 +121,8 @@ def _new_tables(spark: Any) -> None:
     spark.sql(f"ALTER TABLE {SOURCE} SET TBLPROPERTIES (delta.enableChangeDataFeed = true)")
     spark.sql(
         f"CREATE TABLE {TARGET} (entity_id STRING, prediction DOUBLE, "
-        "__skyulf_run_id STRING, __skyulf_model_name STRING, "
-        "__skyulf_model_version STRING) USING DELTA"
+        "run_id STRING, model_name STRING, "
+        "model_version STRING) USING DELTA"
     )
     spark.sql(f"CREATE TABLE {CONTROL} (target_id STRING, owner STRING) USING DELTA")
     spark.sql(

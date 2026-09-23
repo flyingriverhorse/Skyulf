@@ -85,8 +85,8 @@ def run_smoke(
     ).write.format("delta").saveAsTable(names["source"])
     spark.createDataFrame(
         [(9, datetime(2025, 12, 1, tzinfo=UTC), 99.0, "prior", model_name, model_version)],
-        "id long, event_time timestamp, prediction double, __skyulf_run_id string, "
-        "__skyulf_model_name string, __skyulf_model_version string",
+        "id long, event_time timestamp, prediction double, run_id string, "
+        "model_name string, model_version string",
     ).write.format("delta").saveAsTable(names["target"])
     prior = spark.table(names["target"]).first()
     spark.createDataFrame(
