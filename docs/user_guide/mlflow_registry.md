@@ -171,8 +171,89 @@ read-only; the caller explicitly logs the desired numeric metrics to its
 MLflow run. Unlabeled production predictions cannot produce supervised
 quality metrics until their true labels arrive.
 Evaluation does not move aliases, publish predictions or deploy endpoints.
-Explicit version-checked promotion and rollback are the next SM-22b task;
-monthly candidate training follows in SM-28a before Bundle generation.
+Promotion is a separate, explicit operation. SM-28a monthly candidate training
+follows before Bundle generation.
+
+## Promote and roll back a local pipeline
+
+The promote_candidate function re-resolves both concrete model versions and
+re-evaluates the same bounded labeled holdout. It rejects a changed comparison
+report, an ineligible candidate, a missing champion alias, or a stale expected
+champion version. The caller must pin the holdout's source snapshot externally;
+dataset_id alone is not proof of the underlying data. There is no implicit
+first-champion initialization.
+
+Alias writes have no expected-prior-version parameter. Every alias writer
+must use the same non-expiring admission authority, and registry write
+permissions must be restricted to that controlled path. A local development
+store can use LocalAliasAdmission with a shared lock directory:
+
+~~~python
+from skyulf.integrations.mlflow.promotion import (
+    LocalAliasAdmission,
+    promote_candidate,
+    rollback_promotion,
+)
+
+admission = LocalAliasAdmission("/var/lib/skyulf/alias-locks")
+receipt = promote_candidate(
+    report,
+    heldout,
+    target_column="target",
+    expected_champion_version="1",
+    admission=admission,
+    max_rows=10_000,
+    max_bytes=20_000_000,
+    tracking_uri="sqlite:///tracking.db",
+    registry_uri="sqlite:///registry.db",
+)
+reversal = rollback_promotion(
+    receipt,
+    expected_current_version=receipt.new_version,
+    admission=admission,
+    tracking_uri="sqlite:///tracking.db",
+    registry_uri="sqlite:///registry.db",
+)
+~~~
+
+For Unity Catalog, use DeltaAliasAdmission(spark, control_table) with a
+separate, preprovisioned Delta control table containing exactly one row:
+target_id = alias_resource_id(model_name, "champion") and nullable owner = NULL.
+Provision it once with a plain CREATE TABLE statement so an existing authority
+cannot be overwritten:
+
+~~~python
+from skyulf.integrations.mlflow.promotion import DeltaAliasAdmission, alias_resource_id
+
+key = alias_resource_id("catalog.schema.customer_risk", "champion")
+spark.sql(
+    "CREATE TABLE catalog.schema.customer_risk_alias_admission USING DELTA AS "
+    f"SELECT '{key}' AS target_id, CAST(NULL AS STRING) AS owner"
+)
+admission = DeltaAliasAdmission(
+    spark, "catalog.schema.customer_risk_alias_admission"
+)
+~~~
+
+All participating promotion and rollback jobs must point to that same table.
+Do not use the predictions-table admission row for aliases. Local file locks
+are rejected when the registry URI is databricks-uc.
+
+The transition writes a prepared model-version tag before changing the alias,
+then verifies the new alias, writes a committed event tag and an active-event
+registered-model tag. The returned receipt names both versions and the event
+ID. Rollback verifies the committed promotion event and refuses a later event,
+even if it happens to select the same model version. If the alias write or
+receipt update has an uncertain outcome, AliasOutcomeUnknownError includes
+the event ID: inspect the alias and tags before retrying. A prepared tag is
+not proof that promotion completed. Registry tags are audit records for
+controlled writers, not tamper-proof authorization tokens.
+The event tag key uses underscores, and its compact value stays within Unity
+Catalog's 256-byte tag-value limit.
+
+The lock protects only participating jobs. A principal with direct registry
+write permission can bypass it. A crashed Delta admission owner does not
+expire; clear it only after proving the original job cannot publish.
 
 Only load trusted registry artifacts: bundle loading deserializes pickle, and
 digest matching is an identity check, not authentication of an unknown producer.

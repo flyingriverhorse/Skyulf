@@ -138,15 +138,18 @@ target_id = spark.sql(
     "DESCRIBE DETAIL analytics.customer_predictions"
 ).first()["id"]
 # One-time provisioning only; do not overwrite an existing authority.
-spark.createDataFrame(
-    [(target_id, None)], "target_id string, owner string"
-).write.format("delta").mode("errorifexists").saveAsTable(
-    "analytics.customer_predictions_admission"
+spark.sql(
+    "CREATE TABLE analytics.customer_predictions_admission USING DELTA AS "
+    f"SELECT '{target_id}' AS target_id, CAST(NULL AS STRING) AS owner"
 )
 
 admission = DeltaTableAdmission(spark, "analytics.customer_predictions_admission")
 # Supply admission=admission to run_batch(...).
 ```
+
+The plain CREATE TABLE statement fails if the authority already exists; it does
+not overwrite an existing control row. Serverless Spark Connect rejects the
+DataFrameWriter errorifexists save mode for this provisioning step.
 
 The provider requires exactly one row with the immutable output table ID and a
 nullable string owner. It uses a conditional Delta UPDATE to claim ownership,

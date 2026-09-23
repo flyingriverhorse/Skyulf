@@ -55,9 +55,9 @@ operational limitation and must not be described as race-safe.
 
 The promotion path must revalidate the pinned model identities and decision; an in-memory comparison report is not an authorization token and its metric dictionaries can be changed by a caller.
 
-- [ ] Write failing tests for normal promotion, stale alias, missing champion, access denial, no implicit first champion and rollback conflicts.
-- [ ] Implement explicit version-checked operations without changing the tracking run or inference code path.
-- [ ] Verify with a disposable local MLflow registry; perform isolated UC permission/conflict validation before marking SM-22b done.
+- [x] Write failing tests for normal promotion, stale alias, missing champion, access denial, no implicit first champion and rollback conflicts.
+- [x] Implement explicit version-checked operations without changing the tracking run or inference code path.
+- [x] Verify with a disposable local MLflow registry and an isolated UC permission/conflict run; see [live evidence](18-sm22b-live-validation-report.md).
 
 ### Task 3: SM-28a label-aware retraining workflow
 

@@ -15,14 +15,15 @@ optional monthly schedule after the Bundle; SM-27 remains later. Target release:
 SM-22a has a locally verified, read-only comparison API and passed its
 isolated Databricks metrics and UC comparison gate; see the
 [local report](16-sm22a-local-validation-report.md) and
-[live report](17-sm22a-live-metrics-report.md). SM-22b is next and has not
-started. Alias writes lack native compare-and-swap, so SM-22b needs shared
-admission and restricted writers before promotion.
+[live report](17-sm22a-live-metrics-report.md). SM-22b has explicit
+version-checked promotion and rollback with shared admission. Its isolated
+UC promotion, conflict, rollback and restricted-principal denial passed; see
+[live evidence](18-sm22b-live-validation-report.md). SM-28a is next.
 
 ## Starting point
 
-- SM-00 through SM-16, SM-15L, SM-15I, SM-24a, SM-25, SM-26 and SM-22a are complete.
-  Start SM-22b from [06-prebundle-model-lifecycle-plan.md](06-prebundle-model-lifecycle-plan.md).
+- SM-00 through SM-16, SM-15L, SM-15I, SM-24a, SM-25, SM-26 and SM-22a/b are complete.
+  Start SM-28a from [06-prebundle-model-lifecycle-plan.md](06-prebundle-model-lifecycle-plan.md).
   SM-20a follows the verified SM-22a/b and SM-28a services.
   SM-15I [live evidence](13-sm15i-live-validation-report.md) proves automatic
   80+80 insert-only scoring with no date column or per-run version input.
