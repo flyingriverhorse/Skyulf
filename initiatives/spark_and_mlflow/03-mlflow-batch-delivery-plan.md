@@ -2,12 +2,14 @@
 
 > **For agentic workers:** Use `executing-plans`. Read
 > [ARCHITECTURE.md](ARCHITECTURE.md) and [OPEN_QUEUE.md](OPEN_QUEUE.md).
-> SM-18–SM-20 start only after the core and platform gates.
+> The first local Bundle is SM-20a; Spark enhancement follows it.
 
-**Goal:** Opsiyonel tracking/registry, aylık tablo çıktısı ve son aşamada ürünleştirme.
+**Goal:** Optional tracking/registry, local monthly UC output and a first local Bundle;
+Spark becomes a later Bundle option.
 **Architecture:** Core sözleşmeleri platform I/O'dan ayrılır. MLflow pyfunc,
 SM-08 bundle'ını yükler; Databricks runner aynı inference girişini kullanır.
-**Tech Stack:** MLflow, Unity Catalog, Spark/Delta, Databricks Jobs; en son DAB.
+**Tech Stack:** MLflow, Unity Catalog, pandas/Polars, Databricks Jobs/Bundle;
+Spark/Delta adapters extend the Bundle later.
 **Spec:** [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ## Global constraints
@@ -222,61 +224,77 @@ benchmark or blanket certification of all engines, node families or runtimes.
 
 ## SM-15L — Local-engine Delta publication
 
-**Dependency:** SM-16. **Status:** READY; SM-16 completed on 2026-09-22.
+**Dependency:** SM-24a. **Status:** WAIT; reopened by the later local-first Bundle request.
 The SM-15 delivery covers only the Spark runner. A Delta destination must not
 imply Spark inference; support for pandas/Polars publication needs its own sink.
 
 - [ ] Design explicit local source/target references and snapshot provenance;
   do not pass filesystem paths into the Spark-only table-name contract.
-- [ ] Implement an optional Arrow/delta-rs writer for supported local data sizes.
-  No implicit collection of distributed Spark data into pandas/Polars.
-- [ ] Match period, UTC/schema, empty-result, receipt, retry and admission
-  guarantees using actual Delta transactions, including stale concurrent runs.
-- [ ] Validate storage access, table protocol features and UC compatibility for
-  each supported target type. Direct path writes do not establish UC table access.
-- [ ] Expose the supported engine/sink combinations before SM-20 offers them.
+- [ ] Prefer a bounded local-predictions -> Spark DataFrame bridge for UC Delta
+  publication. Use explicit output schema and preserve pandas/Polars prediction
+  values, row keys, labels and nulls. SQL Connector is an alternative, not required.
+- [ ] Reuse guarded `publish_replace_period` logic where valid, but separate
+  the local publication request from `BatchSpec`'s Spark inference modes.
+- [ ] Match period, UTC/schema, empty-result, receipt, retry and concurrency
+  guarantees with real UC transactions, including stale concurrent runs.
+- [ ] Validate selected compute, storage, table protocol and permissions.
+  A direct delta-rs path write does not establish UC managed-table access.
+- [ ] Expose only tested engine/sink combinations before SM-20a generates them.
 
 This is planned work, not an available `run_batch(engine="polars")` feature.
 
-## SM-17 — Kalan node aileleri ve context desteği
+## SM-17 - Complete existing Spark node and model coverage
 
-**Bağımlılık:** SM-16. **Kaynak:** rapordaki aile matrisi;
-`skyulf/preprocessing/{encoding,feature_selection,vectorization,transformations}`
-ve diğer ailelerin mevcut modülleri; capability tablosu.
-**Oluştur:** `NODE_SUPPORT.md`, `tests/spark/test_node_support_matrix.py`;
-her kabul edilen aile için `tests/spark/test_<family>_parity.py`.
+**Dependency:** SM-20a. **Status:** LATER, after the first local Bundle.
+The scope below is retained for Spark enhancement. Current local integration
+work uses fitted pandas/Polars packages; see [the current plan](04-databricks-integration-plan.md).
+The user's 2026-09-22 direction supersedes the earlier limited-family acceptance:
+cover existing nodes and model paths, track every remaining gap, and do not close
+SM-17 merely because unsupported combinations are listed.
 
-- [ ] İlk genişletme: column/cast/date/arithmetic, minmax/maxabs ve selection apply.
-  Fit local-only olsa da seçilmiş kolonları Spark apply destekleyebilir.
-- [ ] İkinci genişletme: median/quantile ve kategorik encode. Exact/approximate
-  algoritma ayrı config; category order, unseen/null, büyük state tablo lookup
-  ve hash algoritması korunmadan native etiketi verme.
-- [ ] Üçüncü: group fitted lookup, rolling/lag ve custom FE. Group/order/tie-break,
-  history cutoff, geçmiş veri erişimi ve partition boundary testleri zorunlu.
-- [ ] Dördüncü: OOF target/WOE. Her fold'da train-only fit ve out-of-fold train
-  representation testleri. Dataset split/hash kuralı engine değişince değişmesin.
-- [ ] SMOTE, yüksek boyutlu vectorizer/embedding, SHAP/CV/tuning ve native model
-  training için native/explicit bounded local/unsupported kararlarını kaydet.
-  Bağımsız algoritma portları aile bazlı ayrı testli alt görevler olur; SM-17
-  bütün node'ların desteklendiği iddiasıyla kapatılamaz.
+Starting artifacts:
+- [NODE_SUPPORT.md](NODE_SUPPORT.md): 100 literal source registrations, including
+  aliases and optional model dependencies; all assigned to an owning task.
+- [Gap review](reports/2026-09-22-spark-databricks-gap-review.md): source findings,
+  template-service comparison, training/inference distinctions and runtime constraints.
+- [OPEN_QUEUE.md](OPEN_QUEUE.md): ordered SM-17-00 through SM-17k deliverables.
 
-```python
-def test_declared_support_has_evidence(support_matrix):
-    """An advertised engine-operation pair must point to a passing parity case."""
-    for entry in support_matrix:
-        if entry["status"] == "supported":
-            assert entry["fit_test"] or entry["operation"] == "apply"
-            assert entry["apply_test"] or entry["operation"] == "fit"
-            assert entry["runtime_evidence"]
-```
+- [ ] SM-17-00: expand every registration to per-configuration fit/apply/codec,
+  row/context and model-output contracts, with an inventory coverage guard.
+- [ ] SM-17a-f: implement the complete FE/data families in the queue, retaining
+  existing pandas/Polars behavior. Test exact versus approximate statistics,
+  category order, missing/unseen values, sparse/vector output, partition boundaries,
+  row membership, deterministic split and train-only/OOF state as applicable.
+- [ ] SM-17g: extend explicit model serialization/prediction adapters to existing
+  model families. The current sklearn-only, single-output, probability-capable
+  regression/classification bundle is not a general model support guarantee.
+- [ ] SM-17h: introduce explicit Spark-native distributed estimator training and
+  transform, artifact/version metadata and MLflow persistence. Preserve the local
+  estimator path; never silently substitute an algorithm or collect all training data.
+- [ ] SM-17i: evaluation, CV/tuning, thresholds and explainability/SHAP for the
+  declared model backends. Distinguish parallel trials from one estimator learning
+  on distributed data; define explicit bounded/local or native explanation paths
+  and fail clearly when unavailable. No implicit full-data collection for SHAP.
+- [ ] SM-17j: config-driven SDK entry point and runtime preflight, with independent
+  platform, FE/model engine, sink and optional tracking/registry selections.
+- [ ] SM-17k: real per-family tests, artifact round trips, full pipeline gates and
+  selected Databricks evidence. Supported rows require actual matching evidence.
 
-`support_matrix` fixture registry/capability anahtarlarını NODE_SUPPORT ile
-eşleştirir; eski tarihli test yolu tek başına evidence değildir. Her alt aile
-uygulanmadan exact dosya/test/API dilimine ayrılır; unsupported aileler kullanıcıya
-açıkça gösterilir. İlk release için tüm ailelerin native olması şart değildir.
-**Kabul:** G5: ilan edilen support matrix gerçek testlerle tutarlı, diğerleri açık ret.
+Each implementation slice must identify exact APIs/files and tests before coding.
+Native models may require a new artifact kind; maintain old bundle compatibility.
+A Spark ML model and similarly named sklearn estimator are not automatically
+numerically equivalent. Every source model ID needs an explicit disposition.
+If equivalent native execution is infeasible, explain the limitation and keep
+that work open for an explicit backend decision or user-approved deferral.
+
+**Acceptance:** G5 closes when the requested tracked coverage is implemented and
+verified, or any remaining exclusions have been explicitly agreed with the user.
+A rejection is the correct current runtime behavior for missing capabilities,
+but does not by itself satisfy the requested feature-completion task.
 
 ## SM-18 — Backend/Canvas ve custom feature kullanımı
+
+**Status: PARKED by the user on 2026-09-22. Do not implement until resumed.**
 
 **Bağımlılık:** SM-17. **Mevcut:**
 `backend/ml_pipeline/_execution/engine/{__init__,_feature_eng,_artifacts,_node_runners}.py`,
@@ -306,7 +324,9 @@ ve `npm run build` kanıtı kayıtlı.
 
 ## SM-19 — En son inference erişim biçimleri
 
-**Bağımlılık:** SM-18. **Oluştur:**
+**Status: LATER - optional after the first local Bundle.**
+
+**Bağımlılık:** SM-25 and the current compatible pyfunc contract; no SM-18 dependency. **Oluştur:**
 `skyulf-core/examples/serving_prediction.py`,
 `skyulf-core/examples/sql_batch_prediction.sql` (repo köküne göre).
 **Mevcut:** `backend/deployment/service.py`, bundle/MLflow model adapter'ları.
@@ -326,22 +346,126 @@ ve `npm run build` kanıtı kayıtlı.
 
 ## SM-20 — Template ve Databricks Bundle
 
-**Bağımlılık:** SM-19. **Oluştur:** repo kökünde `templates/databricks/` ve
+**Status: WAIT - SM-20a builds the local Bundle before Spark; SM-20b adds Spark later.**
+
+**Dependencies:** SM-20a needs SM-26, SM-25, SM-24a and verified SM-15L.
+SM-20b needs selected validated Spark adapters; SM-19 only if endpoints are selected.
+See [the dedicated SM-20 plan](05-sm20-bundle-plan.md) for generated resources
+and the two-month UC source/output-table rehearsal.
+**Planned files:** `templates/databricks/` and
 `tests/templates/test_databricks_template.py`; template dosyaları
 `databricks.yml`, `resources/batch_job.yml`, `README.md`, `src/run_batch.py`.
 
-- [ ] Sorular: platform, FE engine, tracking, registry, batch/HTTP/SQL; birbirinden
-  bağımsız ve capability validation ile. Local + MLflow/UC geçerli; Databricks +
-  pandas/Polars küçük veri yolu geçerli. Unsupported kombinasyon açıklanır.
+- [ ] Ask for platform, FE engine, artifact store and output only when the
+  combination has passed preflight. The first Databricks Bundle pins an
+  MLflow/UC model version; a tracking-off or registry-off Bundle needs its own
+  tested durable artifact handoff before it is offered.
 - [ ] Generated run_batch yalnız test edilmiş runner'ı çağırır; FE config ve
   custom feature module açık düzenleme noktalarıdır. İş mantığı kopyalanmaz.
 - [ ] Aylık schedule timezone, period/as_of parametreleri ve dev hedefi üret;
   secret value üretme. Schedule ile backfill data period'ünü karıştırma.
-- [ ] İki fixture üret: local+Polars+tracking off ve Databricks+Spark+MLflow/UC.
-  Config syntax, import smoke ve bundle validate çalıştır; kullanıcıya ait ortamda
-  deploy/run ayrıca gerçek smoke ve yetkilendirme sınırıyla yapılır.
+- [ ] İlk iki fixture: Databricks+pandas+MLflow/UC ve
+  Databricks+Polars+MLflow/UC; ayrıca tracking-off yerel kullanım testi.
+  Generated config/import ve bundle validate sonrasında ilk local Bundle için
+  gerçek deploy/run, UC table parity ve replay kanıtı topla.
+- [ ] SM-20b'de yalnız doğrulanmış Spark kombinasyonunu ikinci seçenek olarak
+  ekle; local engine seçeneği korunur ve ayrı Spark bundle run testi yapılır.
 
 **Örnek assertion:** Generate → config load → runner preflight; engine seçimi
 manifestte korunur, endpoint seçilmediyse endpoint resource üretilmez.
 **Kabul:** G8: template çalışan core/runner'ları paketler; endpoint/batch seçimi
 isteğe bağlı; gerçek deployment kanıtı config validation'dan ayrı yazılır.
+
+## Selected Databricks follow-ups discovered during the reference review
+
+The user has selected these integrations for task definition before implementation.
+Their current dependencies, sequence, proposed code areas and acceptance checks
+are in [04-databricks-integration-plan.md](04-databricks-integration-plan.md).
+SM-26 local pipeline packaging is READY; SM-25, SM-24a, SM-15L and SM-20a
+follow. SM-24b is optional later. SM-18 and SM-19c remain PARKED. Spark SM-17/SM-24c/SM-20b
+follow the first working local Bundle. This planning update starts no deployment.
+
+### SM-19a/b/c/d - Endpoint detail
+
+- [ ] SM-19a: live HTTP endpoint create/update/readiness and inference parity using
+  a pinned compatible model package; dependency build, request schema, ACL and
+  timeout/error tests. No implicit SparkSession inside serving.
+- [ ] SM-19b: SQL ai_query against the same existing endpoint; named feature struct,
+  return schema, CAN QUERY, row-level failures and capacity/rate handling. Preserve
+  model/version identity; SQL invocation is not a separate estimator backend.
+- [ ] SM-19c (PARKED): optional streaming with explicit checkpoint, history/state and model
+  update contracts. Serverless continuous-trigger support must be checked separately.
+- [ ] SM-19d: endpoint operations: scaling/cold start, A/B routing, rollback,
+  bounded retry/backoff, inference logging and real HTTP/SQL/load tests.
+
+### SM-21 - Feature tables and optional online lookup
+
+- [ ] Optional Databricks Feature Engineering adapter, separate from core FE nodes.
+- [ ] Explicit primary/timestamp keys, point-in-time joins and training-set lineage.
+- [ ] Packaged lookup metadata and batch score semantics, with same-model parity.
+- [ ] Optional online publication/freshness and identity-only serving inputs;
+  absence/staleness behavior, privileges and offline/online parity tests.
+
+### SM-22 - Validation and controlled promotion
+
+- [ ] Candidate/champion evaluation reports using existing Skyulf metrics and
+  model output contracts; configured minimum quality and regression thresholds.
+- [ ] Explicit version-pinned promotion, rollback and audit metadata. Evaluating
+  a model must not implicitly move production aliases or create a first champion.
+- [ ] Reproducible validation dataset/split identity and promotion permission tests.
+- [ ] Keep monthly retraining orchestration separate (SM-28): labels, temporal
+  cutoff, candidate training and validation precede any explicit promotion;
+  scoring resolves and pins the selected version once per run.
+
+### SM-23 - Monitoring and inference observability
+
+- [ ] Reuse current Skyulf quality/drift logic; optional Databricks monitoring
+  adapters and inference-table integration rather than duplicated metrics.
+- [ ] Delayed labels, classification/regression output schemas, model version,
+  aggregation windows, freshness and observability coverage.
+- [ ] Payload retention/redaction and monitoring/refresh permissions are explicit.
+
+### SM-24 - Job operation helpers
+
+- [ ] Validated period/backfill parameters, timezone, source snapshot, stable run
+  identity and resource scope, independent of a generated DAB project.
+- [ ] Bounded timeout/retry policies, publication receipts, orphan-claim recovery
+  instructions and structured logs; no automatic takeover of a live owner.
+- [ ] Optional job schedule/notification configuration and test/prod separation.
+- [ ] Evaluate append/MERGE or other sink policies only as explicit separately
+  tested extensions; current replace-period guarantees do not transfer implicitly.
+
+### SM-25 - Supported-workflow SDK configuration and preflight
+
+**Dependency:** SM-26. **Status:** WAIT; follows the local artifact contract.
+See [the detailed integration plan](04-databricks-integration-plan.md).
+This extracts only the usability subset for current compatible bundles from
+parked SM-17j; it does not implement broader native node/model coverage.
+
+- [ ] Independent runtime/engine/sink/tracking/registry configuration without secrets.
+- [ ] Resolve bundle metadata and pinned model identity once; retain explicit
+  source snapshot, period, target version and retry identity.
+- [ ] Preflight unsupported FE/model/runtime combinations before submission.
+- [ ] Short pandas/Polars training -> local Databricks batch examples first;
+  Spark batch examples follow SM-20a.
+- [ ] No remote mutations during validation; optional integration dependencies.
+
+### SM-26 - Local pandas/Polars pipeline MLflow packaging
+
+**Dependency:** SM-16 and existing standalone local persistence. **Status:** READY.
+First in the revised local-first integration lane; see
+[04-databricks-integration-plan.md](04-databricks-integration-plan.md) for code
+areas, artifact boundaries and acceptance criteria.
+
+- [ ] SM-26a: audit local fitted pipeline/engine/model semantics and define a
+  versioned local artifact contract distinct from the portable Spark bundle.
+- [ ] SM-26b: MLflow pyfunc package/load with no refit, explicit engine/input
+  conversion, signatures, original feature order and required dependencies.
+- [ ] SM-26c: original/save/load/clean-environment parity for pandas and Polars,
+  including FE beyond the current portable subset; per-model eligibility evidence.
+- [ ] Classify local whole-frame, row-local serving and distributed eligibility
+  independently; unsupported serving/Spark behavior remains an explicit rejection.
+
+Native Spark expansion follows the first local Bundle in SM-17; backend legacy
+artifact bridging remains parked SM-18. Local UC Delta publication is SM-15L
+on the critical path to SM-20a.

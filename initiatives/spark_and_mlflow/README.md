@@ -1,68 +1,66 @@
-# Spark ve MLflow initiative
+# Spark and MLflow initiative
 
-Tarih: 2026-09-21. Durum: **SM-00–SM-09 tamamlandı; sıradaki görev SM-10.**
-Hedef sürüm [0.9.0 — Unreleased](../../changelog/0.9.x.md).
-Geliştirme sürümü 0.9.0; yayın yapılmadı. [Güncel baseline](BASELINE.md).
+Updated: 2026-09-22. **SM-00–SM-16 are complete for their documented scopes;
+SM-26 is next.** Target: [0.9.0 — Unreleased](../../changelog/0.9.x.md).
+The first new deliverable is a pandas/Polars Databricks Bundle for bounded
+training and monthly local prediction. Spark can handle UC table I/O, while
+Spark FE/model execution becomes a later Bundle option. Read the current
+[queue](OPEN_QUEUE.md) for the authoritative status and order.
 
-Amaç: Skyulf Core'un mevcut pandas/Polars davranışını koruyarak gerçek Spark
-feature engineering, dağıtık Python inference ve opsiyonel MLflow/Unity Catalog
-entegrasyonu sağlamak. Aylık batch teslimatından sonra endpoint'ler, en son
-template/Databricks Bundle gelir.
+## Reading order
 
-## Okuma ve uygulama sırası
+1. [OPEN_QUEUE.md](OPEN_QUEUE.md): current task status and order.
+2. [HANDOFF.md](HANDOFF.md): verified baseline and execution boundaries.
+3. [04-databricks-integration-plan.md](04-databricks-integration-plan.md): local-first adapters.
+4. [05-sm20-bundle-plan.md](05-sm20-bundle-plan.md): separate Bundle plan and two-month UC table rehearsal.
+5. [01-core-spark-plan.md](01-core-spark-plan.md),
+   [02-inference-plan.md](02-inference-plan.md) and
+   [03-mlflow-batch-delivery-plan.md](03-mlflow-batch-delivery-plan.md): earlier task detail.
+6. [ARCHITECTURE.md](ARCHITECTURE.md) and [VALIDATION.md](VALIDATION.md): contracts and gates.
 
-1. [OPEN_QUEUE.md](OPEN_QUEUE.md): kısa, sıralı görev kuyruğu ve sonraki iş.
-2. [ARCHITECTURE.md](ARCHITECTURE.md): kapsam, değişmez kurallar ve dosya sınırları.
-3. [01-core-spark-plan.md](01-core-spark-plan.md): SM-00–SM-07, engine ve fit/apply.
-4. [02-inference-plan.md](02-inference-plan.md): SM-08–SM-11, iki inference yolu.
-5. [03-mlflow-batch-delivery-plan.md](03-mlflow-batch-delivery-plan.md):
-   SM-12–SM-20, MLflow, registry, batch ve son teslimatlar.
-6. [VALIDATION.md](VALIDATION.md): test matrisi, ortamlar ve tamamlanma kanıtı.
+Historical research:
 
-Tarihsel araştırma:
+- [Readiness review](reports/2026-09-21-spark-databricks-readiness.md)
+- [Source, node and test inventory](reports/2026-09-21-spark-core-inventory.md)
 
-- [Hazırlık incelemesi](reports/2026-09-21-spark-databricks-readiness.md)
-- [Kaynak/node/test envanteri](reports/2026-09-21-spark-core-inventory.md)
+These reports describe their inspected commits, not the current branch.
+The original planning HEAD was `2397c11648c27645a4ee332412a503c394c1c2f2`;
+branch `090` and local master later advanced past the 0.8.24 merge point
+`97536eae20e5422220f9824bc591ceb05576ee50`. That restored the current
+Polars/ContextVar engine behavior, so the older pandas-default observation is
+historical. SM-00 recorded a 231-test baseline and two Spark smoke tests.
+The user guide is [Spark](../../docs/user_guide/spark.md). This initiative
+does not change the global default engine.
 
-Bu iki rapor `initiatives/reports/` içinden taşındı. Rapordaki sayılar ve test
-sonuçları raporun incelediği commit'e aittir; güncel dalın sonucu değildir.
-Plan hazırlanırken HEAD `2397c11648c27645a4ee332412a503c394c1c2f2` idi.
-Özellikle güncel `engines/registry.py` pandas varsayılanı ve sınıf değişkeni
-kullanıyor; eski rapordaki Polars/ContextVar ifadesi güncel varsayım yapılmamalı.
-SM-00 mevcut davranışı yeniden kaydeder. Bu initiative global varsayılan engine'i
-değiştirmeyi gerektirmez; ileride wizard önerisi ayrı bir kullanıcı tercihidir.
+## Completed foundation and next deliverable
 
-Güncelleme: 090 ve yerel master 0.8.24 merge noktası
-`97536eae20e5422220f9824bc591ceb05576ee50` üzerine ilerletildi. Yukarıdaki
-pandas-default notu önceki checkout'u anlatır; güncel kaynak Polars/ContextVar
-davranışını geri içeriyor. Güncel tekrar: 231 baseline + 2 Spark smoke geçti.
-Kullanıcı belgeleri: [Spark rehberi](../../docs/user_guide/spark.md).
+The initial SimpleImputer/StandardScaler Spark paths, compatible Python-worker
+inference, MLflow packaging/registry and a selected serverless Delta batch path
+have documented evidence through SM-16. This does not cover every node or model.
+The next deliverable strengthens fitted pandas/Polars packaging and uses it in
+a generated local-engine Bundle. Its monthly output is tested across two
+consecutive months and source versions with one pinned model version. The
+second run scores only the new month. See the separate SM-20 plan.
 
-## İlk teslimat
+## Working rules
 
-Kolon seçimi → SimpleImputer(mean/constant) → StandardScaler → kayıt/yükleme →
-Spark apply. Sonra aynı feature'larla mevcut bir Python modelinin Spark worker
-tahmini. Spark verisini driver'a indirmek hiçbir aşamanın gizli çözümü değildir.
-Median/quantile, kategorik state ve zaman pencereleri ilk teslimattan ayrı tutulur.
+- The next task is **SM-26**. Complete each queue dependency before its consumer.
+- For each task, show a failing test, implement the narrow change and record
+  the passing gate. New tests have a docstring and a real assertion.
+- Recheck source paths before implementation; planned APIs are not current APIs.
+- A written file, passing local tests and a successful Databricks run are
+  separate claims. A DONE task records commands, results, runtime and commit
+  or working-tree state.
+- Commit and push are separate actions. A requested commit needs fresh checks
+  and DCO sign-off.
+- Core/SDK and the local UC output precede SM-20a. Backend/Canvas remains
+  parked SM-18; endpoints and streaming are not first-Bundle dependencies.
 
-## Çalışma kuralları
+## Related initiatives
 
-- Sonraki görev **SM-10**. Bir sonraki satıra geçmeden önce bağımlılıklarını bitir.
-- Her görevde test → beklenen başarısızlık → dar uygulama → test/gate kanıtı.
-- Yeni testler docstring ve gerçek assertion içerir. Uygulama sırasında kaynak
-  yollarını yeniden doğrula; planlanan API'ler bugün mevcut API gibi kullanılmaz.
-- Dosya yazılmış olması, testlerin geçmesi ve Databricks'te çalışması ayrı durumlar.
-- Queue'da DONE için komut, sonuç, runtime ve commit/çalışma ağacı kaydı gerekir.
-- Commit/push bu planın otomatik adımı değildir; yalnız kullanıcı istediğinde
-  güncel kontrollerle DCO commit hazırlanır.
-- Önce core/SDK; backend/Canvas değişikliği SM-18. Endpoint SM-19,
-  template SM-20. Streaming ilk release'in zorunlu koşulu değildir.
-
-## Diğer initiative'lerle ilişki
-
-[Önceki MLflow planı](../analysis/skyulf-core-mlflow-integration-plan.md)
-tarihsel girdidir. Bu çalışma için sıra ve karar kaynağı burasıdır: global fit
-callback veya backend job'a zorunlu bağlı tracking yerine açık run kapsamı;
-ilk teslimatta UI yok. Joblib/ONNX, Ray ve deep-learning planları bu çalışmanın
-önkoşulu değildir. Paylaşılan artifact/pipeline dosyalarındaki eşzamanlı
-değişiklikler her görev başında kontrol edilir.
+Earlier MLflow proposals are historical input. This initiative uses explicit
+run scopes instead of
+global fit callbacks or mandatory backend-job tracking. The first Bundle has
+no Canvas work. Joblib/ONNX, Ray and deep-learning initiatives are not its
+prerequisites. Check shared artifact and pipeline files for concurrent changes
+before each implementation task.

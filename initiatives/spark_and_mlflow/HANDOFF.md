@@ -1,12 +1,37 @@
 # Session handoff - 2026-09-22
 
 SM-00 through SM-16 are complete for their documented scopes. The selected
-Databricks serverless regression workflow passed. SM-15L is READY and next.
+Databricks serverless regression workflow passed. Latest user direction:
+**Build a small-data pandas/Polars training and local batch path, then its first
+working Databricks Bundle. Spark may handle table I/O in that first path;
+Spark FE/model execution and its Bundle option follow.
+SM-15L is reopened for monthly UC output; SM-18 remains parked. Start with
+SM-26 local MLflow packaging, then SM-25. After the first Bundle, SM-27 adds
+explicit full-history rescore and SM-22/SM-28 add optional monthly retraining
+with controlled candidate/champion promotion.**
 Target release: 0.9.0. Branch: `090`.
 
 ## Starting point
 
-- SM-00 through SM-16 are complete; local pandas/Polars Delta writing is next.
+- SM-00 through SM-16 are complete. Start SM-26 from
+  [04-databricks-integration-plan.md](04-databricks-integration-plan.md).
+  The first Bundle and its two-month table rehearsal are specified in
+  [05-sm20-bundle-plan.md](05-sm20-bundle-plan.md).
+  This planning update changed priorities only; no implementation or new cloud
+  execution. The previous Spark-first direction is superseded. Preserve the later
+  [NODE_SUPPORT.md](NODE_SUPPORT.md) inventory and
+  [gap review](reports/2026-09-22-spark-databricks-gap-review.md).
+  The review enumerated all 100 source registration IDs and added model training,
+  broader model inference, configuration usability and parked platform follow-ups.
+  It did not implement those features. Missing node/model coverage must remain
+  open unless implemented or explicitly deferred by the user. Broad SM-17
+  follows the first local Bundle. The current Spark integration uses compatible bundles;
+  pandas/Polars -> Spark is not support for arbitrary local FE or model artifacts.
+- SM-26 explicitly separates broader local pipeline packaging from native Spark
+  porting. Preserve the fitted local FE/model behavior and test clean-environment
+  MLflow parity; classify local, row-local serving and distributed eligibility
+  separately. SM-25, SM-24a, SM-15L and SM-20a follow this artifact
+  contract. No new support is implemented by this planning update.
 - The registry-bundle loader and first registry-to-Spark probe are implemented.
   Local validation passed 29 combined tests; the selected live platform gate is
   now complete. Tested 0.9.0 wheel hashes are recorded in the platform file.
@@ -35,9 +60,13 @@ Target release: 0.9.0. Branch: `090`.
   remains documented, not relabeled. The aggregate report was generated from
   actual results and checked against the r3 wheel; all 225 current package files
   match that wheel. See the platform evidence file for retained resources.
-- Local-engine pandas/Polars Delta writing is tracked as SM-15L. The current
-  Spark writer does not implement it; templates remain SM-20. Start with explicit
-  local source/target and memory/provenance contracts. A delta-rs filesystem test
+- Local-engine pandas/Polars UC Delta writing is tracked as SM-15L after SM-24a.
+  The current Spark `run_batch` performs inference itself and cannot be used
+  for local predictions unchanged. Prefer a bounded local-result -> Spark
+  DataFrame bridge into guarded Delta publication; SQL Connector is optional.
+  The later local-first Bundle request supersedes the earlier one-day deferral.
+  Start with explicit local source/target, memory/provenance and transaction
+  contracts. A delta-rs filesystem test
   must not be presented as UC managed-table writer support; see the current
   platform document's external-client constraints.
 - SM-15 baseline: `4a613cb5`. Its implementation and verification are in the
@@ -56,18 +85,20 @@ The runtime environment and the execution engine are independent choices.
 Local pandas/Polars FE and sklearn training may run inside Databricks; a later
 Spark inference job may also run inside Databricks.
 
-The user's intended workflow is:
+The first deliverable is:
 
 ```text
 Databricks training job: pandas/Polars FE + sklearn model
-    -> Save fitted FE, model and input contract
-    -> Databricks scoring job: Spark FE + Python model on workers
-    -> Write predictions to a Delta table, for example monthly
+    -> Save fitted FE, model and input contract through MLflow
+    -> Databricks scoring job: pandas/Polars local batch on bounded data
+    -> Spark handles final UC Delta table publication only (SM-15L)
+    -> Generate and run the first local-engine Bundle (SM-20a)
 ```
 
-SM-16 validated this regression workflow on the selected serverless environment.
-It does not certify arbitrary FE nodes, classification or every runtime.
-Scheduling configuration, endpoints and reusable templates remain later scope.
+SM-16 validated an earlier compatible Polars-trained -> Spark regression path
+on selected serverless compute. It does not validate the new local UC sink or
+generated Bundle. Spark becomes a later optional Bundle choice in SM-20b.
+Endpoint and online-lookup resources are separate optional work.
 Keep new documentation and diagram labels in English.
 
 ## Current execution boundaries
@@ -159,7 +190,7 @@ without writing again. New computation needs a new run ID and reviewed target
 version. History and transaction retention must cover the allowed retry window.
 
 SM-16 is complete; see its evidence file for wheel checksums, approved namespace,
-retained resources and finished runs. Start SM-15L without repeating these cloud
+retained resources and finished runs. Start SM-26 without repeating these cloud
 tests unless a new change requires them. Databricks CLI
 1.17.0 is installed but absent from the current shell PATH; use its existing
 WinGet executable or a refreshed shell. The user confirmed `databricks.yml` is
