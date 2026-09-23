@@ -1,7 +1,7 @@
 # Local-first Databricks integration and Bundle plan
 
-Updated: 2026-09-23. SM-26, SM-25 and SM-24a are implemented and validated;
-SM-15L and the first Bundle remain planned.
+Updated: 2026-09-23. SM-26, SM-25, SM-24a and SM-15L are implemented and
+validated; the first Bundle remains planned.
 Baseline: `63dd3e21` and the completed, scoped SM-16 evidence.
 
 ## Current direction
@@ -69,8 +69,8 @@ UC publication and Bundle claims need their own cloud evidence.
 | 1 | SM-26: local pipeline MLflow packaging | SM-16; existing local persistence | DONE |
 | 2 | SM-25: local-first SDK configuration and preflight | SM-26 | DONE |
 | 3 | SM-24a: local training and bounded batch prediction | SM-25 | DONE |
-| 4 | SM-15L: local prediction -> UC Delta monthly publication | SM-24a | READY |
-| 5 | SM-20a: first pandas/Polars Databricks Bundle/template | SM-24a; verified SM-15L | WAIT |
+| 4 | SM-15L: local prediction -> UC Delta monthly publication | SM-24a | DONE |
+| 5 | SM-20a: first pandas/Polars Databricks Bundle/template | SM-24a; verified SM-15L | READY |
 | After first Bundle | SM-27: bounded full-history rescore and selectable Bundle mode | SM-20a; SM-15L | LATER |
 | After first Bundle | SM-22 then SM-28: validation/promotion and optional monthly retraining | SM-20a; SM-22 for SM-28 | LATER |
 | Later | SM-24b, SM-19, SM-21, SM-23: optional Jobs API, serving, feature lookup and monitoring | Relevant local adapters | LATER |
@@ -174,33 +174,33 @@ success is claimed here. The stronger transport guarantee is SM-24d.
 
 ## SM-15L - Local monthly UC Delta publication
 
-The earlier one-day deferral is superseded by the local-first Bundle request.
-Proposed area: a local prediction -> UC output adapter and integration tests.
-Prefer an explicit local-result -> Spark DataFrame bridge followed by guarded
-Delta period replacement, subject to live validation. Databricks documents
+The earlier one-day deferral was superseded by the local-first Bundle
+request. The verified adapter converts bounded local results to a Spark
+DataFrame and uses guarded Delta period replacement. Databricks documents
 [`spark.createDataFrame` from local data on serverless](https://docs.databricks.com/aws/en/compute/serverless/limitations)
 and [atomic selective overwrite](https://docs.databricks.com/aws/en/delta/selective-overwrite).
 The [Python SQL Connector](https://docs.databricks.com/aws/en/dev-tools/python-sql-connector)
 remains an alternative when a Spark bridge is unavailable; it is not required.
 
-- [ ] Choose and test a bounded UC source reader. After local pandas/Polars
+- [x] Choose and test a bounded UC source reader. After local pandas/Polars
   prediction, convert only the final result to a Spark DataFrame using an
   explicit target schema. Retain named columns, dtypes, nulls, row keys,
   labels and model-version metadata; avoid silent Polars-to-pandas semantics.
-- [ ] Publish exactly one requested period using a safe, verified transaction
+- [x] Publish exactly one requested period using a safe, verified transaction
   design. Test replay, empty period, stale model/source, concurrent writers,
   permission denial and failed staging; reject unsupported overwrite policies.
   A new month adds its predictions while prior-month rows and run metadata stay
   unchanged. Only an explicit backfill may rescore an earlier month.
-- [ ] Reuse the existing guarded `publish_replace_period` where its contract
+- [x] Reuse the existing guarded `publish_replace_period` where its contract
   applies. Its current `BatchSpec` includes Spark inference modes, so define
   a truthful local publication request or extract shared publication fields;
   do not label local prediction as `native_features` or `python_pipeline`.
-- [ ] Require explicit `as_of`, source snapshot/version, period, target identity,
+- [x] Require explicit `as_of`, source snapshot/version, period, target identity,
   logical run identity and maximum local row/byte limits. Table setup and
-  cleanup are explicit, and credentials use supported providers. State the
-  selected Spark compute or SQL warehouse requirement in config and preflight.
-- [ ] Record a durable publication receipt and compare rows by key after commit.
+  cleanup are explicit, and credentials use supported providers. The publisher
+  requires an explicit Spark session for UC I/O; the job or Bundle selects its
+  compatible compute. No SQL warehouse is required for this tested path.
+- [x] Record a durable publication receipt and compare rows by key after commit.
   A filesystem delta-rs test alone does not prove UC managed-table behavior.
 
 Acceptance: pandas and Polars local predictions reach the monthly UC target
@@ -208,7 +208,9 @@ with tested replay/concurrency semantics on the chosen Databricks runtime.
 Spark performs only bounded source/result I/O in this first path; it does not
 apply FE or run the model. The output equals local gold predictions by row key,
 and a second monthly run does not recompute the first month.
-The first Bundle cannot advertise a monthly UC output until this gate passes.
+This gate passed in the isolated serverless jobs documented in the
+[SM-15L live report](11-sm15l-live-validation-report.md). The first Bundle can
+now use this path, subject to its own generated-project validation.
 
 ## SM-24b - Optional Databricks Jobs API operations
 

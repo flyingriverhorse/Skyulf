@@ -29,6 +29,7 @@ from ..mlflow.registry import (
     RegistryModelNotFoundError,
     ResolvedModel,
 )
+from ._contracts import table_name
 
 
 class InputSource(BaseModel):
@@ -103,7 +104,7 @@ class ModelSelection(BaseModel):
 
 
 class OutputSink(BaseModel):
-    """Select returned predictions or a declared future UC Delta target."""
+    """Select returned predictions or a precreated UC Delta target."""
 
     model_config = ConfigDict(frozen=True, extra="forbid", strict=True)
     kind: Literal["return_frame", "uc_delta"]
@@ -205,14 +206,46 @@ def _config_issues(config: LocalWorkflowConfig) -> list[PreflightIssue]:
             )
         )
     if config.sink.kind == "uc_delta":
-        issues.append(
-            PreflightIssue(
-                "sink_unavailable",
-                "sink",
-                "Local-result UC Delta publication is scheduled for SM-15L.",
-                "Use return_frame until the guarded local-result sink is available.",
+        if config.runtime != "databricks":
+            issues.append(
+                PreflightIssue(
+                    "sink_runtime_mismatch",
+                    "sink",
+                    "UC Delta publication requires the Databricks runtime.",
+                    "Choose runtime='databricks' for this sink.",
+                )
             )
-        )
+        if config.source.kind != "uc_table":
+            issues.append(
+                PreflightIssue(
+                    "sink_source_mismatch",
+                    "sink",
+                    "UC Delta publication requires a pinned UC source.",
+                    "Choose an existing UC source table and concrete Delta version.",
+                )
+            )
+        try:
+            if config.sink.table is None or len(config.sink.table.split(".")) != 3:
+                raise ValueError("A three-part UC target is required.")
+            table_name(config.sink.table)
+        except ValueError:
+            issues.append(
+                PreflightIssue(
+                    "sink_invalid_target",
+                    "sink",
+                    "UC Delta publication requires a three-part target table.",
+                    "Specify an existing catalog.schema.table target.",
+                )
+            )
+        if config.sink.table and config.sink.table.lower() == (config.source.table or "").lower():
+            issues.append(
+                PreflightIssue(
+                    "sink_source_conflict",
+                    "sink",
+                    "Source and target tables must be different.",
+                    "Choose a separate prediction target table.",
+                )
+            )
     elif config.sink.table is not None:
         issues.append(
             PreflightIssue(

@@ -122,3 +122,17 @@ def test_direct_sink_rejects_local_admission_on_distributed_runtime(spec, tmp_pa
         publish_replace_period(
             spark, object(), spec, manifest={}, admission=LocalTableLock(tmp_path)
         )
+
+
+def test_local_publication_mode_is_distinct_from_spark_inference(spec) -> None:
+    """Local model output must declare its actual execution mode."""
+    local = replace(spec, mode="local_pipeline")
+    assert local.mode == "local_pipeline"
+    with pytest.raises(ValueError, match="Spark inference mode"):
+        run_batch(
+            None,
+            local,
+            source="default.source",
+            bundle=cast(Any, object()),
+            options=ExecutionOptions("spark"),
+        )

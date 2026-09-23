@@ -1,15 +1,16 @@
 # Spark ve MLflow — Open Queue
 
-Updated: 2026-09-23. **SM-00–SM-16 and SM-24a/25/26 complete; SM-15L next. Target: 0.9.0.**
+Updated: 2026-09-23. **SM-00–SM-16 and SM-15L/24a/25/26 complete; SM-20a next. Target: 0.9.0.**
 First deliverable: pandas/Polars training and local batch on Databricks, then a
-working local-engine Bundle. Spark expansion follows that Bundle. SM-15L is
-reopened for monthly UC output; SM-18 and continuous streaming remain parked.
+working local-engine Bundle. Spark expansion follows that Bundle. SM-15L now
+provides monthly UC output; SM-18 and continuous streaming remain parked.
 
 Read [HANDOFF.md](HANDOFF.md), [the integration plan](04-databricks-integration-plan.md)
-and [the separate SM-20 Bundle plan](05-sm20-bundle-plan.md) before starting SM-15L.
+and [the separate SM-20 Bundle plan](05-sm20-bundle-plan.md) before starting SM-20a.
 Historical completion evidence is preserved in
 [OPEN_QUEUE_tamamlanmakaydi.md](OPEN_QUEUE_tamamlanmakaydi.md).
-SM-26 added a local MLflow package; no Bundle was generated or cloud job started.
+SM-26 added a local MLflow package; SM-15L validated a UC writer.
+No Bundle has been generated.
 
 Durumlar: READY = başlanabilir; WAIT = önceki görev bekleniyor;
 LATER = son aşama; ACTIVE = yürütülüyor; BLOCKED = somut dış engel;
@@ -35,13 +36,13 @@ DEFERRED = user postponed this work; PARKED = do not implement until resumed.
 | SM-14 | Registry/Unity Catalog adapter | SM-13 | DONE | Explicit publish; alias/version pinning; local evidence |
 | SM-15 | Monthly batch + Delta sink | SM-14 | DONE | 43 local Delta/contract/admission tests; evidence below |
 | SM-16 | Gerçek Databricks kapısı | SM-15 | DONE | Selected serverless workflow passed; live evidence below |
-| SM-15L | Local predictions -> UC Delta monthly sink | SM-24a | READY | Score only requested month; keep prior months; Spark only for bounded I/O; real UC replay/concurrency proof |
+| SM-15L | Local predictions -> UC Delta monthly sink | SM-24a | DONE | Score only requested month; keep prior months; Spark only for bounded I/O; real UC replay/concurrency proof |
 | SM-17 | Complete existing Spark node/model coverage | SM-20a | LATER | Resume only after the first local Bundle; preserve all inventoried gaps |
 | SM-18 | Backend/Canvas and legacy artifact bridge | SM-17 | PARKED | Capability UI/API, DAG contracts and existing deployment compatibility |
 | SM-26 | Local pandas/Polars pipeline MLflow packaging | SM-16, existing local persistence | DONE | Fitted FE/model/engine, schema and thresholds preserved; MLflow 3.16.1 isolated-process parity; Spark/HTTP scopes rejected |
 | SM-25 | Local-first config / SDK preflight | SM-26 | DONE | Immutable local config; pinned artifact load, bounded frame and actionable preflight; no node/model allowlist |
 | SM-24a | Local training and bounded batch prediction | SM-25 | DONE | Two UC source tables, five live cross-job models, 62-ID FE audit and bounded monthly reads; [evidence](08-sm24a-live-validation-report.md) |
-| SM-20a | First local-engine Bundle/template | SM-24a, verified SM-15L | WAIT | Generate, validate, deploy and run pandas/Polars train/monthly batch with pinned MLflow/UC model |
+| SM-20a | First local-engine Bundle/template | SM-24a, verified SM-15L | READY | Generate, validate, deploy and run pandas/Polars train/monthly batch with pinned MLflow/UC model |
 | SM-24b | Optional Databricks Jobs API operations | SM-20a | LATER | Add dynamic submit/status/cancel only if Bundle jobs are insufficient |
 | SM-24d | Hard transport budget for wide UC rows | SM-24a | LATER | Add a proven paged/size-limited source adapter when exact transfer-byte enforcement is required; current Spark iterator bounds accepted decoded rows and frame memory only |
 | SM-22 | Optional model validation and controlled promotion | SM-20a, current evaluation/registry | LATER | Pinned candidate/champion comparison, explicit version promotion and rollback |
@@ -143,6 +144,26 @@ SM-17 requires the full tracked scope above. Some algorithms may need an explici
 alternative backend rather than an equivalent native Spark implementation; that
 decision must not hide missing support. SM-19 streaming remains optional and parked.
 
+## SM-15L - 2026-09-23 monthly local UC Delta publication, DONE
+
+- Added `run_local_batch` with truthful `local_pipeline` publication mode.
+  It loads one pinned UC source month under row/byte limits, scores through
+  fitted pandas or Polars FE/model code, converts only final keyed results to
+  an explicitly typed Spark DataFrame, and reuses guarded Delta period writes.
+  The target and admission control table are provisioned separately.
+- Focused SDK/reader tests: **32 passed, 1 optional Spark skip**; batch
+  contracts: **25 passed**. Real local Spark/Delta: **6 passed**, including
+  two months, exact replay, stale version, accidental empty period, admission
+  denial, invalid target schema and stale model/source pins without mutation. Ruff, Ty and strict
+  MkDocs passed for the changed scope.
+- Two isolated Databricks serverless jobs completed **SUCCESS**. January
+  published 80 pandas predictions to target version 1. February appended 80
+  source rows, published 80 Polars predictions to target version 2, preserved
+  all January rows/metadata, replayed without a new commit, and rejected a
+  stale logical request. Both periods matched direct local gold by key.
+  See the [SM-15L live report](11-sm15l-live-validation-report.md) for run IDs,
+  model digests, test resources and scope limits. Next: SM-20a Bundle.
+
 ## SM-24a — 2026-09-23 local and Databricks validation, DONE
 
 - Added explicit bounded pandas/Polars training and a pinned UC Delta monthly
@@ -174,7 +195,7 @@ decision must not hide missing support. SM-19 streaming remains optional and par
 - The Spark iterator does not expose actual wire-byte counts. `max_bytes`
   bounds accepted decoded rows and local-frame memory; a very wide row can
   arrive before rejection. [SM-24d](OPEN_QUEUE.md) retains the stronger
-  transport-budget option for wider or larger workloads. Next: SM-15L.
+  transport-budget option for wider or larger workloads. Next: SM-20a.
 
 ## SM-25 — 2026-09-23 local SDK validation, DONE
 

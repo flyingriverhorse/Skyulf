@@ -40,6 +40,8 @@ def run_batch(
         raise ValueError("run_batch requires ExecutionOptions(engine='spark').")
     if not isinstance(spec, BatchSpec):
         raise TypeError("spec must be BatchSpec.")
+    if spec.mode == "local_pipeline":
+        raise ValueError("run_batch requires a Spark inference mode.")
     admission = validate_admission(spark, admission)
     table_name(source)
     _validate_bundle(bundle, options)

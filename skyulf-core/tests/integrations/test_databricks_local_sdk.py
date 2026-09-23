@@ -79,7 +79,7 @@ def test_preflight_selects_local_predictor_and_metadata(tmp_path) -> None:
     ("changes", "code"),
     [
         ({"engine": "polars"}, "engine_mismatch"),
-        ({"sink": OutputSink(kind="uc_delta", table="c.s.predictions")}, "sink_unavailable"),
+        ({"sink": OutputSink(kind="uc_delta", table="c.s.predictions")}, "sink_source_mismatch"),
         ({"source": InputSource(kind="uc_table", table="c.s.source")}, "source_unbounded"),
         ({"runtime": "spark"}, "runtime_unsupported"),
     ],
@@ -286,3 +286,15 @@ def test_existing_library_node_and_model_need_no_sdk_allowlist(engine, tmp_path)
     prepared = prepare_local_workflow(_config(path, engine=engine))
     assert prepared.preflight.ready
     np.testing.assert_allclose(prepared.predict(query)["prediction"], expected)
+
+
+def test_preflight_accepts_bounded_uc_delta_sink(tmp_path) -> None:
+    """A pinned UC source and explicit target can pass local publish preflight."""
+    path, artifact = _artifact(tmp_path)
+    config = _config(
+        path,
+        source=InputSource(kind="uc_table", table="c.s.source", version=2),
+        sink=OutputSink(kind="uc_delta", table="c.s.predictions"),
+    )
+    result = preflight_local(config, artifact=artifact)
+    assert result.ready

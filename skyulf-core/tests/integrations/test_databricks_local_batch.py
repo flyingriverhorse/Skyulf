@@ -305,3 +305,43 @@ def test_real_spark_iterator_filters_requested_month(monkeypatch) -> None:
         assert result.to_dict("records") == [{"entity_id": "jan", "x": 1.0}]
     finally:
         spark.stop()
+
+
+def test_reader_rejects_null_row_keys_before_scoring() -> None:
+    """A missing business key cannot be repaired after local prediction."""
+    with pytest.raises(ValueError, match="row keys must not be null"):
+        read_local_source(_Spark([{"entity_id": None, "x": 2.0}], []), _spec())
+
+
+def test_scoring_rejects_output_that_exceeds_local_byte_budget(tmp_path) -> None:
+    """Probability columns must stay inside the declared local memory cap."""
+    frame = pd.DataFrame(
+        {"x": [-4.0, -3.0, -2.0, -1.0, 1.0, 2.0, 3.0, 4.0], "target": [0, 0, 0, 0, 1, 1, 1, 1]}
+    )
+    path = tmp_path / "classifier"
+    fit_local_workflow(
+        {"preprocessing": [], "modeling": {"type": "logistic_regression"}},
+        SplitDataset(train=frame.iloc[[0, 1, 2, 4, 5, 6]], test=frame.iloc[[3, 7]]),
+        target_column="target",
+        artifact_path=path,
+        max_rows=8,
+        max_bytes=4096,
+    )
+    prepared = prepare_local_workflow(
+        LocalWorkflowConfig(
+            runtime="databricks",
+            engine="pandas",
+            source=InputSource(
+                kind="uc_table",
+                table="workspace.test.score_source",
+                version=2,
+                max_rows=3,
+                max_bytes=180,
+            ),
+            model=ModelSelection(kind="local_pipeline", path=str(path)),
+            sink=OutputSink(kind="return_frame"),
+        )
+    )
+    rows = [{"entity_id": 1, "x": 2.0}, {"entity_id": 2, "x": 4.0}]
+    with pytest.raises(ValueError, match="Prediction result exceeds max_bytes"):
+        score_local_source(_Spark(rows, []), _spec(max_bytes=180), prepared)

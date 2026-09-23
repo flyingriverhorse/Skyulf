@@ -1,23 +1,20 @@
 # Session handoff - 2026-09-23
 
-SM-00 through SM-16 are complete for their documented scopes. The selected
-Databricks serverless regression workflow passed. Latest user direction:
-**Build a small-data pandas/Polars training and local batch path, then its first
-working Databricks Bundle. Spark may handle table I/O in that first path;
-Spark FE/model execution and its Bundle option follow.
-SM-15L is reopened for monthly UC output; SM-18 remains parked. SM-26 local
-MLflow packaging, SM-25 SDK preflight and SM-24a live local batch are complete;
-start with SM-15L. After the first Bundle, SM-27 adds
-explicit full-history rescore and SM-22/SM-28 add optional monthly retraining
-with controlled candidate/champion promotion.**
-Target release: 0.9.0. Branch: `090`.
+SM-00 through SM-16, SM-15L and SM-24a/25/26 are complete for their
+documented scopes. The selected Databricks serverless local monthly UC
+publication passed with 80 pandas January and 80 Polars February predictions.
+Latest user direction: **Build the first small-data pandas/Polars Databricks
+Bundle next (SM-20a). Spark handles table I/O; Spark FE/model execution follows
+the first working local Bundle. SM-18 and streaming remain parked.**
+After the first Bundle, SM-27 adds explicit full-history rescore and
+SM-22/SM-28 add optional monthly retraining with controlled candidate/champion
+promotion. Target release: 0.9.0. Branch: `090`.
 
 ## Starting point
 
-- SM-00 through SM-16, SM-24a, SM-25 and SM-26 are complete. Start SM-15L from
-  [04-databricks-integration-plan.md](04-databricks-integration-plan.md).
-  The first Bundle and its two-month table rehearsal are specified in
-  [05-sm20-bundle-plan.md](05-sm20-bundle-plan.md).
+- SM-00 through SM-16, SM-15L, SM-24a, SM-25 and SM-26 are complete. Start
+  SM-20a from [05-sm20-bundle-plan.md](05-sm20-bundle-plan.md), including
+  its two-month table rehearsal.
   SM-26 added local artifact and MLflow packaging without cloud execution. The
   SM-25 SDK adds immutable local workflow configuration, local/remote preflight,
   explicit path or pinned registry artifact selection and caller-frame limits.
@@ -28,7 +25,7 @@ Target release: 0.9.0. Branch: `090`.
   [live report](08-sm24a-live-validation-report.md) records two isolated UC
   source tables in `workspace.skyulf_sm24a_20260923`, five cross-job models,
   replay/negative checks and the 62-ID preprocessing matrix. Local-result
-  Delta writes remain SM-15L; no prediction table or Bundle was created.
+  Delta writes were subsequently proven in SM-15L; no Bundle was created.
   The current `max_bytes` limit measures decoded payload and local frame
   memory, not exact Spark wire bytes; SM-24d tracks a hard transport budget.
   previous Spark-first direction is superseded. Preserve the later
@@ -74,13 +71,13 @@ Target release: 0.9.0. Branch: `090`.
   remains documented, not relabeled. The aggregate report was generated from
   actual results and checked against the r3 wheel; all 225 current package files
   match that wheel. See the platform evidence file for retained resources.
-- Local-engine pandas/Polars UC Delta writing is tracked as SM-15L after SM-24a.
+- Local-engine pandas/Polars UC Delta writing passed SM-15L after SM-24a.
   The current Spark `run_batch` performs inference itself and cannot be used
   for local predictions unchanged. Prefer a bounded local-result -> Spark
   DataFrame bridge into guarded Delta publication; SQL Connector is optional.
   The later local-first Bundle request supersedes the earlier one-day deferral.
-  Start with explicit local source/target, memory/provenance and transaction
-  contracts. A delta-rs filesystem test
+  See the [SM-15L report](11-sm15l-live-validation-report.md) for pinned
+  models, monthly UC rows, replay, stale rejection and local negative tests. A delta-rs filesystem test
   must not be presented as UC managed-table writer support; see the current
   platform document's external-client constraints.
 - SM-15 baseline: `4a613cb5`. Its implementation and verification are in the

@@ -247,3 +247,94 @@ the prepared workflow. The result keeps row keys outside the model input and
 records the source version, period, model digest and concrete model version.
 No prediction table is created here. Whole-frame FE retains local pandas or
 Polars behavior even though Spark performs the bounded UC read.
+
+## Publish one local-scored month to a UC Delta table
+
+`run_local_batch` keeps feature engineering and model prediction in the saved
+pandas or Polars engine. Spark reads the pinned UC source and converts only the
+bounded final prediction rows to a DataFrame with the target's explicit schema.
+The guarded Delta writer then replaces exactly the requested half-open period.
+A second month therefore leaves the first month's predictions and run metadata
+unchanged; a backfill must explicitly name the earlier period.
+
+Provision the source, prediction target and admission control table before the
+job. The source and target must be different Delta tables. The target must have
+the row-key columns with the same Spark types as the source (`long` or
+`string`), a `timestamp` period column, the saved model's output columns at
+their declared types, and three string columns:
+`__skyulf_run_id`, `__skyulf_model_name` and `__skyulf_model_version`.
+The control table has exactly one row, `target_id STRING` equal to the target
+Delta table ID and nullable `owner STRING` initially null. Every publisher
+of this target must use that same control table. The job identity needs read
+access to the source/model and write access to the target/control tables.
+
+```python
+from datetime import UTC, datetime, timedelta
+from importlib.metadata import version
+
+from skyulf.integrations.databricks import (
+    BatchSpec, InputSource, LocalSourceSpec, LocalWorkflowConfig,
+    ModelSelection, OutputSink, prepare_local_workflow, run_local_batch,
+)
+from skyulf.integrations.databricks.delta_admission import DeltaTableAdmission
+
+source_table = "catalog.schema.scoring_source"
+target_table = "catalog.schema.predictions"
+control_table = "catalog.schema.prediction_admission"
+source_version = 12
+source = LocalSourceSpec(
+    table=source_table,
+    version=source_version,
+    period_start=datetime(2026, 1, 1, tzinfo=UTC),
+    period_end=datetime(2026, 2, 1, tzinfo=UTC),
+    row_keys=("entity_id",),
+    input_columns=("amount", "city"),
+    max_rows=10_000,
+    max_bytes=32_000_000,
+)
+config = LocalWorkflowConfig(
+    runtime="databricks",
+    engine="polars",
+    source=InputSource(
+        kind="uc_table", table=source_table, version=source_version,
+        max_rows=source.max_rows, max_bytes=source.max_bytes,
+    ),
+    model=ModelSelection(
+        kind="local_pipeline", name="catalog.schema.customer_model", version="7",
+        tracking_uri="databricks", registry_uri="databricks-uc",
+    ),
+    sink=OutputSink(kind="uc_delta", table=target_table),
+)
+prepared = prepare_local_workflow(config)
+spec = BatchSpec(
+    period_start=source.period_start,
+    period_end=source.period_end,
+    as_of=datetime.now(UTC) + timedelta(minutes=2),
+    row_keys=source.row_keys,
+    output_table=target_table,
+    model_name=config.model.name,
+    model_version=prepared.preflight.model_version,
+    model_digest=prepared.preflight.model_digest,
+    source_version=source_version,
+    code_version=version("skyulf-core"),
+    run_id="january-2026-v1",
+    expected_target_version=0,  # read and pin before submission
+    mode="local_pipeline",
+)
+result = run_local_batch(
+    spark, source, prepared, spec,
+    admission=DeltaTableAdmission(spark, control_table),
+)
+print(result.commit_version, result.replayed, result.manifest)
+```
+
+Use a new logical run ID and the current target version for the next month's
+job. Retry an uncertain job with the *identical* spec, including its original
+run ID and expected target version; a successful replay returns the existing
+receipt. A new run with a stale expected version fails instead of overwriting
+newer results. An empty period fails unless `allow_empty=True` is explicit.
+The source snapshot must have been committed by `as_of`. The reader and
+result both enforce the configured local row and memory budgets; this does not
+measure Spark's private wire bytes. The control-row admission protocol protects
+participating writers only; do not let other jobs bypass it or manually clear
+an owner while a writer may still be active.

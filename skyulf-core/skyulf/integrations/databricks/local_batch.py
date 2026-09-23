@@ -204,6 +204,8 @@ def read_local_source(spark: Any, spec: LocalSourceSpec) -> pd.DataFrame:
     frame = pd.DataFrame.from_records(records, columns=names)
     if _frame_bytes(frame) > spec.max_bytes:
         raise ValueError("Source local frame exceeds max_bytes.")
+    if frame.loc[:, list(spec.row_keys)].isna().any().any():
+        raise ValueError("Source row keys must not be null.")
     if frame.duplicated(subset=list(spec.row_keys)).any():
         raise ValueError("Source row keys must be unique within the requested period.")
     return frame
@@ -228,7 +230,11 @@ def score_local_source(
     if spec.input_columns != expected:
         raise ValueError("Source inputs must match the saved model's raw column order.")
     frame = read_local_source(spark, spec)
-    predictions = prepared.predict(frame.loc[:, list(spec.input_columns)])
+    predictions = (
+        pd.DataFrame(columns=pd.Index(prepared.preflight.output_columns))
+        if frame.empty
+        else prepared.predict(frame.loc[:, list(spec.input_columns)])
+    )
     if len(predictions) != len(frame):
         raise ValueError("Prediction changed source row membership.")
     result = pd.concat(
@@ -238,6 +244,8 @@ def score_local_source(
         ],
         axis=1,
     )
+    if _frame_bytes(result) > spec.max_bytes:
+        raise ValueError("Prediction result exceeds max_bytes.")
     diagnostics: dict[str, str | int] = {
         "source_table": spec.table,
         "source_version": spec.version,

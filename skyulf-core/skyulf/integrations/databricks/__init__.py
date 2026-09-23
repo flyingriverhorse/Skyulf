@@ -9,6 +9,7 @@ from .local_batch import (
     read_local_source,
     score_local_source,
 )
+from .local_publish import run_local_batch
 from .local_sdk import (
     InputSource,
     LocalWorkflowConfig,
@@ -41,5 +42,6 @@ __all__ = [
     "prepare_local_workflow",
     "read_local_source",
     "run_batch",
+    "run_local_batch",
     "score_local_source",
 ]

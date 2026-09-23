@@ -1,7 +1,7 @@
 # SM-20: local-first Databricks Bundle, then Spark enhancement
 
-Updated: 2026-09-22. Planning only; no generated project or Databricks job has
-been created by this plan. Current baseline is the scoped SM-16 serverless probe.
+Updated: 2026-09-23. Planning only; no generated project has been created
+by this plan. The SM-15L local monthly writer passed its separate live gate.
 The [open queue](OPEN_QUEUE.md) owns status and task order.
 
 ## Outcome and engine boundary
@@ -52,9 +52,9 @@ of a particular schedule or period-publication policy.
 This separates the prediction engine from table I/O. Databricks documents
 [`spark.createDataFrame` from local data on serverless](https://docs.databricks.com/aws/en/compute/serverless/limitations)
 and [atomic selective Delta overwrite](https://docs.databricks.com/aws/en/delta/selective-overwrite).
-That makes a Spark write bridge feasible, but its schema, conversion and
-publication guarantees still need a live Skyulf test. The SQL Connector is an
-alternative, not a required part of the first Bundle.
+The [SM-15L live test](11-sm15l-live-validation-report.md) passed the
+Skyulf bridge, explicit schema, replay and monthly publication checks.
+The SQL Connector is an alternative, not a required part of the first Bundle.
 
 ## SM-20a prerequisites and generated project
 
@@ -62,11 +62,12 @@ alternative, not a required part of the first Bundle.
 2. SM-25 selects pandas or Polars, a pinned model version, bounded source,
    output table and publication mode before the job starts.
 3. SM-24a exposes a local training and batch prediction entry point.
-4. SM-15L proves local prediction -> UC Delta publication, including replay,
-   stale requests and concurrent writers. The current `run_batch` performs
+4. [SM-15L](11-sm15l-live-validation-report.md) proves local prediction -> UC
+   Delta publication, including replay, stale requests and reuse of the
+   previously tested shared admission. The current `run_batch` performs
    Spark inference and cannot be called as if it performed local prediction.
-   Its `publish_replace_period` logic can be reused only with a truthful local
-   request contract and explicit final-result conversion.
+   Its `publish_replace_period` logic is reused by `run_local_batch` with a
+   truthful local request contract and explicit final-result conversion.
 
 The custom template should generate a project with these responsibilities:
 

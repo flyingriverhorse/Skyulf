@@ -91,8 +91,8 @@ class BatchSpec:
             r"[0-9a-f]{64}", self.model_digest
         ):
             raise ValueError("model_digest must be a SHA-256 bundle digest.")
-        if self.mode not in ("native_features", "python_pipeline"):
-            raise ValueError("mode must be native_features or python_pipeline.")
+        if self.mode not in ("native_features", "python_pipeline", "local_pipeline"):
+            raise ValueError("mode must be native_features, python_pipeline or local_pipeline.")
         if self.publish_mode != "replace_period":
             raise ValueError("Only replace_period publication is supported.")
         if type(self.allow_empty) is not bool:
