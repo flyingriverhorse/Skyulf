@@ -145,6 +145,7 @@ class SkyulfPipeline:
         self._target_column: str | None = None
         self._tuned_thresholds: dict[Any, float] | None = None
         self._inference_schemas: tuple[SkyulfSchema, SkyulfSchema] | None = None
+        self._fitted_engine: str | None = None
 
         # Initialize model estimator if config is present
         if self.modeling_config:
@@ -342,6 +343,7 @@ class SkyulfPipeline:
         self._target_column = None
         self._tuned_thresholds = None
         self._inference_schemas = None
+        self._fitted_engine = None
         if self.model_estimator is not None:
             self.model_estimator.model = None
         try:
@@ -363,10 +365,12 @@ class SkyulfPipeline:
         """Fit validated data, publishing metadata only after all stages complete."""
         metrics = {}
         input_schema = None
+        fitted_engine = None
         if self.model_estimator is not None:
             raw_train = data.train if isinstance(data, SplitDataset) else data
             raw_features = raw_train[0] if isinstance(raw_train, tuple) else raw_train
             input_schema = SkyulfSchema.from_dataframe(raw_features).drop((target_column,))
+            fitted_engine = str(get_engine(raw_features).name)
 
         # 1. Feature Engineering
         logger.info("Starting Feature Engineering...")
@@ -423,6 +427,7 @@ class SkyulfPipeline:
 
             if self.model_estimator.model is not None and input_schema is not None:
                 self._inference_schemas = (input_schema, model_schema)
+                self._fitted_engine = fitted_engine
 
         self._fit_metrics = metrics
         self._target_column = target_column
@@ -500,12 +505,16 @@ class SkyulfPipeline:
             _to_pandas(y_test),
         )
 
-    def _predict_proba_transformed(self, transformed_data: pd.DataFrame | SkyulfDataFrame) -> Any:
+    def _predict_proba_transformed(
+        self, transformed_data: pd.DataFrame | pl.DataFrame | SkyulfDataFrame
+    ) -> Any:
         """Run predict_proba on already-transformed data, raising if unsupported."""
         if self.model_estimator is None or self.model_estimator.model is None:
             raise ValueError("Pipeline not fitted or no model configured.")
+        # Existing model appliers dispatch Polars at runtime, although their
+        # shared annotation names only pandas and the Skyulf frame protocol.
         proba = self.model_estimator.applier.predict_proba(
-            transformed_data, self.model_estimator.model
+            cast(Any, transformed_data), self.model_estimator.model
         )
         if proba is None:
             raise ValueError(
@@ -516,7 +525,7 @@ class SkyulfPipeline:
 
     def optimize_thresholds(
         self,
-        X_val: pd.DataFrame | SkyulfDataFrame,
+        X_val: pd.DataFrame | pl.DataFrame | SkyulfDataFrame,
         y_val: pd.Series | Any,
         metric: Callable[[Any, Any], float],
         strategy: str | None = None,
@@ -600,7 +609,7 @@ class SkyulfPipeline:
 
     def predict(
         self,
-        data: pd.DataFrame | SkyulfDataFrame,
+        data: pd.DataFrame | pl.DataFrame | SkyulfDataFrame,
         use_tuned_thresholds: bool = False,
     ) -> Any:
         """Generate predictions.
@@ -640,7 +649,7 @@ class SkyulfPipeline:
         # 2. Modeling
         if not use_tuned_thresholds:
             predictions = self.model_estimator.applier.predict(
-                transformed_data, self.model_estimator.model
+                cast(Any, transformed_data), self.model_estimator.model
             )
             validate_prediction_rows(
                 len(data), prediction_row_count(predictions), stage="Model prediction"
@@ -727,6 +736,11 @@ class SkyulfPipeline:
         if self.feature_engineer.fitted_steps:
             return True
         return self.model_estimator is not None and self.model_estimator.model is not None
+
+    @property
+    def fitted_engine(self) -> str | None:
+        """Return the successful model fit's frame engine, if recorded."""
+        return getattr(self, "_fitted_engine", None)
 
     def fingerprint(self) -> str:
         """Return a deterministic SHA-256 over topology + fitted artifacts.

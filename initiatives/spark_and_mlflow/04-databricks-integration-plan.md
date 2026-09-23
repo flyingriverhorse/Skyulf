@@ -87,23 +87,23 @@ Proposed areas: standalone pipeline persistence/prediction contracts,
 `skyulf-core/skyulf/integrations/mlflow/`, integration tests and the MLflow guide.
 Reuse existing fitted pipeline behavior; do not implement another FE engine.
 
-- [ ] SM-26a: audit existing standalone save/load/predict semantics, fitted FE,
+- [x] SM-26a: audit existing standalone save/load/predict semantics, fitted FE,
   local engine selection, schema/order, labels/probabilities/thresholds and model
   dependencies. Define a versioned local artifact contract distinct from the
   existing portable bundle; retain backward compatibility and trusted loading.
-- [ ] SM-26b: package and restore the fitted local pipeline through MLflow pyfunc.
+- [x] SM-26b: package and restore the fitted local pipeline through MLflow pyfunc.
   Preserve learned state without refit. An MLflow pandas input boundary must not
   silently switch an engine-sensitive Polars pipeline; any conversion is explicit
   and preserves dtypes, nulls, column order and output semantics.
-- [ ] Include the required code/dependencies and a signature/input example.
+- [x] Include the required code/dependencies and a signature/input example.
   Use the current registry/version-pinning services; do not promote aliases.
-- [ ] SM-26c: prove original -> saved -> clean-environment MLflow predictions for
+- [x] SM-26c: prove original -> saved -> clean-environment MLflow predictions for
   pandas and Polars. Include representative FE beyond mean imputation/scaling,
   such as encoding/binning, and explicitly track each advertised model family.
-- [ ] Separate whole-frame local prediction eligibility, row-local HTTP eligibility
+- [x] Separate whole-frame local prediction eligibility, row-local HTTP eligibility
   and Spark-worker/native eligibility. Context-dependent or row-changing FE does
   not become safe for requests or partitions merely because it can be serialized.
-- [ ] Keep Python local batch prediction available without a Delta writer. No
+- [x] Keep Python local batch prediction available without a Delta writer. No
   implicit Spark collection, new native Spark ports or backend artifact bridge.
 
 Acceptance: new local-package paths reproduce the original fitted pipeline under

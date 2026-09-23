@@ -1,15 +1,15 @@
 # Spark ve MLflow — Open Queue
 
-Updated: 2026-09-22. **SM-00–SM-16 complete; SM-26 next. Target: 0.9.0.**
+Updated: 2026-09-23. **SM-00–SM-16 and SM-26 complete; SM-25 next. Target: 0.9.0.**
 First deliverable: pandas/Polars training and local batch on Databricks, then a
 working local-engine Bundle. Spark expansion follows that Bundle. SM-15L is
 reopened for monthly UC output; SM-18 and continuous streaming remain parked.
 
 Read [HANDOFF.md](HANDOFF.md), [the integration plan](04-databricks-integration-plan.md)
-and [the separate SM-20 Bundle plan](05-sm20-bundle-plan.md) before starting SM-26.
+and [the separate SM-20 Bundle plan](05-sm20-bundle-plan.md) before starting SM-25.
 Historical completion evidence is preserved in
 [OPEN_QUEUE_tamamlanmakaydi.md](OPEN_QUEUE_tamamlanmakaydi.md).
-This planning update has not generated a project or started a job.
+SM-26 added a local MLflow package; no Bundle was generated or cloud job started.
 
 Durumlar: READY = başlanabilir; WAIT = önceki görev bekleniyor;
 LATER = son aşama; ACTIVE = yürütülüyor; BLOCKED = somut dış engel;
@@ -38,8 +38,8 @@ DEFERRED = user postponed this work; PARKED = do not implement until resumed.
 | SM-15L | Local predictions -> UC Delta monthly sink | SM-24a | WAIT | Score only requested month; keep prior months; Spark only for bounded I/O; real UC replay/concurrency proof |
 | SM-17 | Complete existing Spark node/model coverage | SM-20a | LATER | Resume only after the first local Bundle; preserve all inventoried gaps |
 | SM-18 | Backend/Canvas and legacy artifact bridge | SM-17 | PARKED | Capability UI/API, DAG contracts and existing deployment compatibility |
-| SM-26 | Local pandas/Polars pipeline MLflow packaging | SM-16, existing local persistence | READY | Preserve fitted FE/model/engine semantics beyond the portable Spark subset; clean-environment prediction parity; Spark eligibility separate |
-| SM-25 | Local-first config / SDK preflight | SM-26 | WAIT | Choose pandas/Polars, runtime, store and sink; reject incompatible local packages before jobs |
+| SM-26 | Local pandas/Polars pipeline MLflow packaging | SM-16, existing local persistence | DONE | Fitted FE/model/engine, schema and thresholds preserved; MLflow 3.16.1 isolated-process parity; Spark/HTTP scopes rejected |
+| SM-25 | Local-first config / SDK preflight | SM-26 | READY | Choose pandas/Polars, runtime, store and sink; reject incompatible local packages before jobs |
 | SM-24a | Local training and bounded batch prediction | SM-25 | WAIT | Reuse fitted pandas/Polars pipeline and pinned MLflow model; no Spark FE/model dependency |
 | SM-20a | First local-engine Bundle/template | SM-24a, verified SM-15L | WAIT | Generate, validate, deploy and run pandas/Polars train/monthly batch with pinned MLflow/UC model |
 | SM-24b | Optional Databricks Jobs API operations | SM-20a | LATER | Add dynamic submit/status/cancel only if Bundle jobs are insufficient |
@@ -139,6 +139,30 @@ Details, reference-repo comparison and parked endpoint tasks:
 SM-17 requires the full tracked scope above. Some algorithms may need an explicit
 alternative backend rather than an equivalent native Spark implementation; that
 decision must not hide missing support. SM-19 streaming remains optional and parked.
+
+## SM-26 — 2026-09-23 local packaging validation, DONE
+
+- Added a versioned, trusted local pipeline artifact with recorded pandas/Polars
+  fit engine, raw/model feature schemas, model class, exact dependency versions,
+  payload checksum, classification classes and explicit tuned-threshold choice.
+  Legacy pipeline pickles still load; those without a recorded engine require a
+  refit before local MLflow packaging.
+- Added MLflow pyfunc packaging and a synthetic input example/signature for the
+  supported scalar inputs. Its pandas boundary converts back to the recorded
+  Polars engine when needed. Whole-frame local is the only declared execution
+  scope; HTTP row-local and Spark scopes are rejected. Existing explicit registry
+  publication and pinned-version resolution now carry the local payload digest.
+- Isolated MLflow 3.16.1 integration: **16 local artifact/pyfunc tests passed**
+  for categorical encoding, binning, null input, classes/probabilities, tuned
+  thresholds, cross-engine requests, and a fresh isolated Python subprocess
+  load. The 0.9.0 wheel was built from the changed source and installed into the
+  isolated environment; `python -I` resolved the new module from site-packages.
+  Existing MLflow packaging and registry compatibility: **47 passed, 1 skipped**.
+  Pipeline unit regression: **385 passed, 2 skipped**. Focused Ruff and ty checks
+  passed. No Databricks job or Delta writer was added in this task.
+- [MLflow model guide](../../docs/user_guide/mlflow_models.md) lists the tested
+  model families and the wheel, serving and Spark limits. Next: SM-25 config and
+  preflight, then SM-24a local Databricks batch workflow.
 
 ## SM-16 — 2026-09-22 local and live validation, DONE
 

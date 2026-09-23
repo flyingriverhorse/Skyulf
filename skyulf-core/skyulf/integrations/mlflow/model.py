@@ -124,14 +124,14 @@ def _make_client(tracking_uri: str | None) -> Any:
     return MlflowClient(tracking_uri=tracking_uri)
 
 
-def _scrub_local_artifact_uri(model_path: Path) -> None:
+def _scrub_local_artifact_uri(model_path: Path, artifact_key: str = "bundle") -> None:
     """Remove the temporary producer path from the portable MLflow metadata."""
     model = mlflow.models.Model.load(str(model_path))
     flavor = model.flavors[mlflow.pyfunc.FLAVOR_NAME]
     artifacts = flavor.get("artifacts", {})
-    bundle_artifact = artifacts.get("bundle")
-    if isinstance(bundle_artifact, dict) and "uri" in bundle_artifact:
-        bundle_artifact["uri"] = "bundle"
+    saved_artifact = artifacts.get(artifact_key)
+    if isinstance(saved_artifact, dict) and "uri" in saved_artifact:
+        saved_artifact["uri"] = artifact_key
     model.save(str(model_path / "MLmodel"))
 
 

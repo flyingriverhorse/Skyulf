@@ -1,24 +1,24 @@
-# Session handoff - 2026-09-22
+# Session handoff - 2026-09-23
 
 SM-00 through SM-16 are complete for their documented scopes. The selected
 Databricks serverless regression workflow passed. Latest user direction:
 **Build a small-data pandas/Polars training and local batch path, then its first
 working Databricks Bundle. Spark may handle table I/O in that first path;
 Spark FE/model execution and its Bundle option follow.
-SM-15L is reopened for monthly UC output; SM-18 remains parked. Start with
-SM-26 local MLflow packaging, then SM-25. After the first Bundle, SM-27 adds
+SM-15L is reopened for monthly UC output; SM-18 remains parked. SM-26 local
+MLflow packaging is complete; start with SM-25. After the first Bundle, SM-27 adds
 explicit full-history rescore and SM-22/SM-28 add optional monthly retraining
 with controlled candidate/champion promotion.**
 Target release: 0.9.0. Branch: `090`.
 
 ## Starting point
 
-- SM-00 through SM-16 are complete. Start SM-26 from
+- SM-00 through SM-16 and SM-26 are complete. Start SM-25 from
   [04-databricks-integration-plan.md](04-databricks-integration-plan.md).
   The first Bundle and its two-month table rehearsal are specified in
   [05-sm20-bundle-plan.md](05-sm20-bundle-plan.md).
-  This planning update changed priorities only; no implementation or new cloud
-  execution. The previous Spark-first direction is superseded. Preserve the later
+  SM-26 added local artifact and MLflow packaging without cloud execution. The
+  previous Spark-first direction is superseded. Preserve the later
   [NODE_SUPPORT.md](NODE_SUPPORT.md) inventory and
   [gap review](reports/2026-09-22-spark-databricks-gap-review.md).
   The review enumerated all 100 source registration IDs and added model training,
@@ -27,11 +27,12 @@ Target release: 0.9.0. Branch: `090`.
   open unless implemented or explicitly deferred by the user. Broad SM-17
   follows the first local Bundle. The current Spark integration uses compatible bundles;
   pandas/Polars -> Spark is not support for arbitrary local FE or model artifacts.
-- SM-26 explicitly separates broader local pipeline packaging from native Spark
-  porting. Preserve the fitted local FE/model behavior and test clean-environment
-  MLflow parity; classify local, row-local serving and distributed eligibility
-  separately. SM-25, SM-24a, SM-15L and SM-20a follow this artifact
-  contract. No new support is implemented by this planning update.
+- SM-26 separates fitted pandas/Polars pipeline packaging from native Spark
+  porting. The versioned trusted-pickle artifact records fit engine, schemas,
+  model class, runtime versions and a checksum; the MLflow pyfunc restores it
+  without refitting. Its declared scope is whole-frame local prediction;
+  row-local HTTP and Spark modes fail a scope check. SM-25, SM-24a, SM-15L
+  and SM-20a follow this artifact contract.
 - The registry-bundle loader and first registry-to-Spark probe are implemented.
   Local validation passed 29 combined tests; the selected live platform gate is
   now complete. Tested 0.9.0 wheel hashes are recorded in the platform file.
@@ -103,7 +104,8 @@ Keep new documentation and diagram labels in English.
 
 ## Current execution boundaries
 
-- `predict_local` consumes the new standalone bundle; the frontend does not
+- `predict_local_pipeline` consumes the new fitted local artifact, while
+  `predict_local` consumes the portable standalone bundle. The frontend does not
   call it yet. Frontend inference uses `POST /deployment/predict` and
   `DeploymentService`, which loads the existing artifact, applies FE, aligns
   model columns and predicts. The backend artifact bridge belongs to SM-18.
@@ -151,6 +153,18 @@ prediction; direct `predict_local` remains strict. Unsupported bundle integer
 dtypes fail at packaging. Producer uv files and temporary paths are excluded.
 Registry-to-G2 evidence continued through SM-14 and the completed SM-16 live
 gate. Scheduling configuration, endpoints and templates remain later work.
+
+SM-26 added `save_local_pipeline`/`load_local_pipeline`/`predict_local_pipeline`
+and `log_local_model`. The pandas and Polars MLflow 3.16.1 lane proved
+categorical encoding, null input, classification probabilities and tuned
+decisions after load; an isolated subprocess also reloaded the logged model.
+The changed 0.9.0 wheel was installed into the isolated environment and
+`python -I` resolved the new module from site-packages.
+Custom binning followed by encoding passed both local engines. The registry
+adapter now resolves the local payload digest alongside the existing portable
+bundle digest; no alias was promoted. This was local validation only. The
+matching Skyulf wheel remains an explicit deployment dependency, and broader
+model families still require parity evidence. See the MLflow model guide.
 
 SM-14 added explicit MLflow registry publication and resolution. The adapter
 publishes only `runs:/...` artifacts, leaves alias promotion explicit, resolves

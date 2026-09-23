@@ -190,7 +190,7 @@ def resolve_model(
     except Exception as exc:  # noqa: BLE001 - artifact metadata is another registry boundary
         raise _translate_error(exc, name=name, version=concrete_version) from exc
     metadata = model.metadata or {}
-    digest = metadata.get("skyulf_bundle_digest")
+    digest = metadata.get("skyulf_bundle_digest") or metadata.get("skyulf_local_pipeline_digest")
     return ResolvedModel(
         name=name,
         version=concrete_version,
