@@ -29,7 +29,9 @@
 - [x] Keep report creation read-only and deterministic; test that no MLflow alias changes.
 - [x] Run focused tests, Ruff, ty and the existing local MLflow/holdout suites.
 
-Local implementation and tests are complete; the isolated Unity Catalog gate is still pending.
+Local implementation and tests are complete. The isolated Unity Catalog gate
+passed with four pandas/Polars metric runs and one pinned model comparison;
+see the [live report](17-sm22a-live-metrics-report.md). No alias was mutated.
 
 ## Alias concurrency decision
 

@@ -1,7 +1,8 @@
 # SM-22a local candidate/champion validation
 
-Status: LOCAL VERIFIED, 2026-09-23. Unity Catalog comparison remains to be
-validated before closing the platform gate. No Bundle or alias mutation was run.
+Status: LOCAL VERIFIED, 2026-09-23. The subsequent isolated Unity Catalog
+comparison is documented in the [live report](17-sm22a-live-metrics-report.md).
+No Bundle or alias mutation was run.
 
 ## Delivered
 
