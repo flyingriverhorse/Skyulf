@@ -1,8 +1,6 @@
 # Databricks notebook source
 """One-time Databricks validation of Core-held-out metrics and UC comparison."""
 
-from __future__ import annotations
-
 import json
 import tempfile
 from importlib.metadata import version
