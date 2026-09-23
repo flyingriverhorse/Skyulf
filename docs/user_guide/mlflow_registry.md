@@ -74,6 +74,12 @@ downloaded package, and checks the package/bundle digest against `resolved.diges
 The same bundle can then be passed to `predict_local` or either Spark inference
 mode, subject to their existing schema and FE capabilities.
 
+For fitted pandas/Polars packages created with `log_local_model`, use
+`load_registered_local_pipeline(resolved, ...)` instead. It verifies the
+declared local artifact path, scope, engine and payload digest against the
+pinned registry version. That package supports whole-frame local inference;
+it does not become a Spark bundle merely because it is registered.
+
 ```python
 from skyulf.integrations.mlflow.registry import load_registered_bundle
 

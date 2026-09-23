@@ -6,6 +6,7 @@ import json
 import subprocess
 import sys
 from pathlib import Path
+from typing import Literal, cast
 
 import numpy as np
 import pandas as pd
@@ -23,7 +24,11 @@ from skyulf.pipeline import SkyulfPipeline
 
 mlflow = pytest.importorskip("mlflow")
 from skyulf.integrations.mlflow.local_model import log_local_model  # noqa: E402
-from skyulf.integrations.mlflow.registry import register_model, resolve_model  # noqa: E402
+from skyulf.integrations.mlflow.registry import (  # noqa: E402
+    load_registered_local_pipeline,
+    register_model,
+    resolve_model,
+)
 from skyulf.integrations.mlflow.tracking import TrackingConfig, track_run  # noqa: E402
 
 
@@ -119,6 +124,41 @@ def test_local_pyfunc_matches_saved_categorical_pipeline(
     )
     assert resolved.model_uri == f"models:/local_{engine}/{registered.version}"
     assert resolved.digest == load_local_pipeline(artifact_path).manifest.pipeline_sha256
+    pinned = load_registered_local_pipeline(
+        resolved, tracking_uri=config.tracking_uri, registry_uri=config.tracking_uri
+    )
+    pd.testing.assert_frame_equal(
+        predict_local_pipeline(query, pinned).reset_index(drop=True),
+        saved.reset_index(drop=True),
+    )
+
+    from skyulf.integrations.databricks.local_sdk import (  # noqa: PLC0415 - integration boundary
+        InputSource,
+        LocalWorkflowConfig,
+        ModelSelection,
+        OutputSink,
+        prepare_local_workflow,
+    )
+
+    workflow = prepare_local_workflow(
+        LocalWorkflowConfig(
+            runtime="databricks",
+            engine=cast(Literal["pandas", "polars"], engine),
+            source=InputSource(kind="caller_frame"),
+            model=ModelSelection(
+                kind="local_pipeline",
+                name=f"local_{engine}",
+                version=str(registered.version),
+                tracking_uri=config.tracking_uri,
+                registry_uri=config.tracking_uri,
+            ),
+            sink=OutputSink(kind="return_frame"),
+        )
+    )
+    assert workflow.preflight.model_version == str(registered.version)
+    pd.testing.assert_frame_equal(
+        workflow.predict(query).reset_index(drop=True), saved.reset_index(drop=True)
+    )
 
     child = subprocess.run(
         [
@@ -177,3 +217,72 @@ def test_local_pyfunc_preserves_tuned_classification(engine: str, tmp_path, monk
     actual = mlflow.pyfunc.load_model(model_uri).predict(query)
     pd.testing.assert_frame_equal(actual, expected)
     assert actual.columns.tolist() == ["prediction", "probability_0", "probability_1"]
+
+
+@pytest.mark.parametrize("engine", ["pandas", "polars"])
+def test_mlflow_split_pipeline_replays_encoding_winsorize_and_scaling(
+    engine: str, tmp_path, monkeypatch
+) -> None:
+    """An extreme inference row must remain scoreable after the full MLflow round trip."""
+    monkeypatch.chdir(tmp_path)
+    values = np.arange(60, dtype="float64")
+    source = pd.DataFrame(
+        {
+            "x": values,
+            "city": np.where(np.arange(60) % 2 == 0, "Riga", "Vilnius"),
+            "target": 2.0 * values + (np.arange(60) % 2) * 3.0,
+        }
+    )
+    if engine == "polars":
+        native = pl.from_pandas(source)
+        train, heldout = native.slice(0, 48), native.slice(48, 12)
+    else:
+        train, heldout = source.iloc[:48], source.iloc[48:]
+    pipeline = SkyulfPipeline(
+        {
+            "preprocessing": [
+                {"name": "clip", "transformer": "Winsorize", "params": {"columns": ["x"]}},
+                {
+                    "name": "encode",
+                    "transformer": "OneHotEncoder",
+                    "params": {
+                        "columns": ["city"],
+                        "drop_original": True,
+                        "handle_unknown": "ignore",
+                    },
+                },
+                {"name": "scale", "transformer": "StandardScaler", "params": {"columns": ["x"]}},
+            ],
+            "modeling": {"type": "linear_regression"},
+        }
+    )
+    pipeline.fit(SplitDataset(train=train, test=heldout), target_column="target")
+    bounds = pipeline.feature_engineer.fitted_steps[0]["artifact"]["bounds"]["x"]
+    query = pd.DataFrame(
+        {
+            "x": [1000.0, bounds["upper"], -1000.0, bounds["lower"]],
+            "city": ["Riga"] * 4,
+        }
+    )
+    artifact_path = tmp_path / "local"
+    save_local_pipeline(pipeline, artifact_path)
+    expected = predict_local_pipeline(query, load_local_pipeline(artifact_path))
+    uri = f"sqlite:///{(tmp_path / 'tracking.db').as_posix()}"
+    config = TrackingConfig(enabled=True, tracking_uri=uri, experiment_name=f"clip-{engine}")
+    assert config.tracking_uri is not None
+
+    with track_run(config, run_name="split-clip-scale-encode") as run:
+        assert run.run_id is not None
+        model_uri = log_local_model(
+            artifact_path,
+            run_id=run.run_id,
+            artifact_path="model",
+            tracking_uri=config.tracking_uri,
+        )
+
+    mlflow.set_tracking_uri(config.tracking_uri)
+    actual = mlflow.pyfunc.load_model(model_uri).predict(query)
+    pd.testing.assert_frame_equal(actual, expected)
+    assert len(actual) == len(query)
+    assert np.isfinite(actual["prediction"]).all()
+    np.testing.assert_allclose(actual["prediction"].iloc[[0, 2]], actual["prediction"].iloc[[1, 3]])

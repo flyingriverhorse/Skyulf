@@ -1,12 +1,12 @@
 # Spark ve MLflow — Open Queue
 
-Updated: 2026-09-23. **SM-00–SM-16 and SM-26 complete; SM-25 next. Target: 0.9.0.**
+Updated: 2026-09-23. **SM-00–SM-16 and SM-24a/25/26 complete; SM-15L next. Target: 0.9.0.**
 First deliverable: pandas/Polars training and local batch on Databricks, then a
 working local-engine Bundle. Spark expansion follows that Bundle. SM-15L is
 reopened for monthly UC output; SM-18 and continuous streaming remain parked.
 
 Read [HANDOFF.md](HANDOFF.md), [the integration plan](04-databricks-integration-plan.md)
-and [the separate SM-20 Bundle plan](05-sm20-bundle-plan.md) before starting SM-25.
+and [the separate SM-20 Bundle plan](05-sm20-bundle-plan.md) before starting SM-15L.
 Historical completion evidence is preserved in
 [OPEN_QUEUE_tamamlanmakaydi.md](OPEN_QUEUE_tamamlanmakaydi.md).
 SM-26 added a local MLflow package; no Bundle was generated or cloud job started.
@@ -35,14 +35,15 @@ DEFERRED = user postponed this work; PARKED = do not implement until resumed.
 | SM-14 | Registry/Unity Catalog adapter | SM-13 | DONE | Explicit publish; alias/version pinning; local evidence |
 | SM-15 | Monthly batch + Delta sink | SM-14 | DONE | 43 local Delta/contract/admission tests; evidence below |
 | SM-16 | Gerçek Databricks kapısı | SM-15 | DONE | Selected serverless workflow passed; live evidence below |
-| SM-15L | Local predictions -> UC Delta monthly sink | SM-24a | WAIT | Score only requested month; keep prior months; Spark only for bounded I/O; real UC replay/concurrency proof |
+| SM-15L | Local predictions -> UC Delta monthly sink | SM-24a | READY | Score only requested month; keep prior months; Spark only for bounded I/O; real UC replay/concurrency proof |
 | SM-17 | Complete existing Spark node/model coverage | SM-20a | LATER | Resume only after the first local Bundle; preserve all inventoried gaps |
 | SM-18 | Backend/Canvas and legacy artifact bridge | SM-17 | PARKED | Capability UI/API, DAG contracts and existing deployment compatibility |
 | SM-26 | Local pandas/Polars pipeline MLflow packaging | SM-16, existing local persistence | DONE | Fitted FE/model/engine, schema and thresholds preserved; MLflow 3.16.1 isolated-process parity; Spark/HTTP scopes rejected |
-| SM-25 | Local-first config / SDK preflight | SM-26 | READY | Choose pandas/Polars, runtime, store and sink; reject incompatible local packages before jobs |
-| SM-24a | Local training and bounded batch prediction | SM-25 | WAIT | Reuse fitted pandas/Polars pipeline and pinned MLflow model; no Spark FE/model dependency |
+| SM-25 | Local-first config / SDK preflight | SM-26 | DONE | Immutable local config; pinned artifact load, bounded frame and actionable preflight; no node/model allowlist |
+| SM-24a | Local training and bounded batch prediction | SM-25 | DONE | Two UC source tables, five live cross-job models, 62-ID FE audit and bounded monthly reads; [evidence](08-sm24a-live-validation-report.md) |
 | SM-20a | First local-engine Bundle/template | SM-24a, verified SM-15L | WAIT | Generate, validate, deploy and run pandas/Polars train/monthly batch with pinned MLflow/UC model |
 | SM-24b | Optional Databricks Jobs API operations | SM-20a | LATER | Add dynamic submit/status/cancel only if Bundle jobs are insufficient |
+| SM-24d | Hard transport budget for wide UC rows | SM-24a | LATER | Add a proven paged/size-limited source adapter when exact transfer-byte enforcement is required; current Spark iterator bounds accepted decoded rows and frame memory only |
 | SM-22 | Optional model validation and controlled promotion | SM-20a, current evaluation/registry | LATER | Pinned candidate/champion comparison, explicit version promotion and rollback |
 | SM-27 | Full-history local rescore and selectable Bundle mode | SM-20a, SM-15L | LATER | Score a pinned, bounded source snapshot into a new prediction generation; validate and activate explicitly; preserve prior generation |
 | SM-28 | Monthly retraining and challenger workflow | SM-20a, SM-22 | LATER | Label-aware schedule, leakage-safe training, candidate/champion report, explicit promotion, and independent pinned scoring job |
@@ -68,12 +69,14 @@ in [04-databricks-integration-plan.md](04-databricks-integration-plan.md).
 1. **SM-26:** fitted pandas/Polars pipeline -> MLflow package -> same local predictions.
 2. **SM-25:** config, pinned local artifact loading, limits and preflight.
 3. **SM-24a:** local training and bounded local batch prediction in Databricks.
+   Its [live validation report](08-sm24a-live-validation-report.md) records two
+   source tables, five cross-job models and every preprocessing registration ID.
 4. **SM-15L:** convert only final local predictions for guarded Spark Delta publication; each new month adds results while earlier months remain unchanged.
 5. **SM-20a:** generate, validate, deploy and run the first local-engine Bundle using the [two-month rehearsal](05-sm20-bundle-plan.md).
 6. **After SM-20a:** SM-27 adds explicit `full_rebuild` alongside the default
    `period_update`; SM-22 then SM-28 add candidate/champion validation and
    optional monthly retraining. These are separate from monthly scoring.
-7. **Later:** optional SM-24b/19/21/23 adapters; Spark SM-24c/SM-17, then SM-20b Bundle enhancement.
+7. **Later:** optional SM-24b/24d/19/21/23 adapters; Spark SM-24c/SM-17, then SM-20b Bundle enhancement.
 
 SM-26 is the explicit packaging task added after the local-first MLflow discussion.
 It reuses the fitted local pipeline rather than requiring every FE node to gain a
@@ -140,6 +143,60 @@ SM-17 requires the full tracked scope above. Some algorithms may need an explici
 alternative backend rather than an equivalent native Spark implementation; that
 decision must not hide missing support. SM-19 streaming remains optional and parked.
 
+## SM-24a — 2026-09-23 local and Databricks validation, DONE
+
+- Added explicit bounded pandas/Polars training and a pinned UC Delta monthly
+  reader. Spark filters/projects/limits the source; saved local FE/model runs in
+  one Python process. This stage returns predictions and diagnostics, not a
+  Delta prediction table. The [local guide](../../docs/user_guide/databricks_local_sdk.md)
+  includes code and the decoded-byte boundary.
+- Five pandas/Polars model packages trained and registered in isolated schema
+  `workspace.skyulf_sm24a_20260923`; an independent serverless scoring job
+  matched both 80-row months by key. Replay and negative cases passed. All 30
+  additional inference-eligible preprocessing registrations passed on both
+  engines in a separate live audit, making 41 live-evidenced eligible IDs in
+  the [62-ID matrix](07-sm24a-node-matrix.csv). Train-only, inspection,
+  optional and unsupported IDs remain explicit.
+- An unknown registry version failed preflight. A disposable alias moved to
+  R1 version 2 after preparation; the prepared predictor remained on version 1
+  and returned the expected 80 rows. The alias was deleted. The full
+  [report](08-sm24a-live-validation-report.md) lists runs, versions, resources
+  and test results.
+- A follow-up [scaler and outlier audit](09-sm24a-scaler-outlier-audit.md)
+  registered 10 pandas/Polars MLflow models with held-out metrics and passed
+  a separate two-month scoring replay. Four filtering outlier nodes reject
+  shortened prediction batches; Winsorize clips and preserves rows.
+- A [200-row held-out metrics audit](10-sm24a-heldout-metrics-report.md)
+  logged regression MAE/RMSE/R2 and classification accuracy/F1 in the same
+  MLflow runs as five new test models. All five registered versions passed a
+  separate two-month scoring replay. R2/R3 had negative held-out R2; those
+  example models are not approved for production promotion.
+- The Spark iterator does not expose actual wire-byte counts. `max_bytes`
+  bounds accepted decoded rows and local-frame memory; a very wide row can
+  arrive before rejection. [SM-24d](OPEN_QUEUE.md) retains the stronger
+  transport-budget option for wider or larger workloads. Next: SM-15L.
+
+## SM-25 — 2026-09-23 local SDK validation, DONE
+
+- Added frozen `LocalWorkflowConfig` with explicit runtime, pandas/Polars engine,
+  bounded caller frame or declared future UC source, local/portable artifact
+  selection, optional MLflow store URIs and return/declared future Delta sink.
+  Config parsing performs no remote call and rejects embedded URI credentials.
+- Local preflight reports actionable config, source, sink, artifact, engine,
+  node-contract and model-contract issues. Optional read-only registry preparation
+  resolves an alias once, loads the concrete version, and checks package digest.
+  The SDK has no separate FE/model allowlist; a fitted SkyulfPipeline controls
+  local prediction. An optional representative-frame probe exercises that
+  actual path before submission. Inference input is capped by rows and bytes.
+- After the allowlist correction, **20 local SDK tests passed**, including
+  pandas/Polars MinMaxScaler + random-forest replay. The combined isolated
+  MLflow SDK, local-package and registry gate passed **39/39**.
+  The broader Core unit run completed **3927 passed, 71 skipped** before that
+  narrow correction; Ruff, repository Ty and strict MkDocs passed after it. No
+  Databricks job, UC source adapter or Delta writer was added in SM-25.
+- [Local-engine SDK guide](../../docs/user_guide/databricks_local_sdk.md).
+  Next: SM-24a local training and bounded batch workflow.
+
 ## SM-26 — 2026-09-23 local packaging validation, DONE
 
 - Added a versioned, trusted local pipeline artifact with recorded pandas/Polars
@@ -161,8 +218,8 @@ decision must not hide missing support. SM-19 streaming remains optional and par
   Pipeline unit regression: **385 passed, 2 skipped**. Focused Ruff and ty checks
   passed. No Databricks job or Delta writer was added in this task.
 - [MLflow model guide](../../docs/user_guide/mlflow_models.md) lists the tested
-  model families and the wheel, serving and Spark limits. Next: SM-25 config and
-  preflight, then SM-24a local Databricks batch workflow.
+  model families and the wheel, serving and Spark limits. This task handed off
+  to SM-25 and then SM-24a.
 
 ## SM-16 — 2026-09-22 local and live validation, DONE
 

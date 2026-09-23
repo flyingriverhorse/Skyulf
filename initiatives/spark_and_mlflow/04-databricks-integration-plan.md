@@ -1,6 +1,7 @@
 # Local-first Databricks integration and Bundle plan
 
-Updated: 2026-09-22. Planning only; no implementation or new cloud execution.
+Updated: 2026-09-23. SM-26, SM-25 and SM-24a are implemented and validated;
+SM-15L and the first Bundle remain planned.
 Baseline: `63dd3e21` and the completed, scoped SM-16 evidence.
 
 ## Current direction
@@ -15,9 +16,10 @@ SM-15L as a prerequisite for monthly UC table output in the first Bundle.
 SM-18 Backend/Canvas work and continuous streaming remain parked. Full SM-17
 node/model expansion waits until the first local Bundle works.
 
-Latest refinement: **SM-26 comes first**, making broader existing fitted local
-pandas/Polars pipelines usable through MLflow without waiting for native Spark
-node ports. This is planned packaging work, not existing support.
+SM-26 made broader existing fitted local pandas/Polars pipelines usable through
+MLflow without waiting for native Spark node ports. SM-24a then validated the
+first bounded local-engine Databricks training and scoring path; see its
+[live report](08-sm24a-live-validation-report.md).
 
 The first scenario is pandas/Polars FE and Python-model training, followed by
 local Python batch prediction in a Databricks job and monthly publication to a
@@ -64,10 +66,10 @@ UC publication and Bundle claims need their own cloud evidence.
 
 | Order | Task | Depends on | State |
 | --- | --- | --- | --- |
-| 1 | SM-26: local pipeline MLflow packaging | SM-16; existing local persistence | READY |
-| 2 | SM-25: local-first SDK configuration and preflight | SM-26 | WAIT |
-| 3 | SM-24a: local training and bounded batch prediction | SM-25 | WAIT |
-| 4 | SM-15L: local prediction -> UC Delta monthly publication | SM-24a | WAIT |
+| 1 | SM-26: local pipeline MLflow packaging | SM-16; existing local persistence | DONE |
+| 2 | SM-25: local-first SDK configuration and preflight | SM-26 | DONE |
+| 3 | SM-24a: local training and bounded batch prediction | SM-25 | DONE |
+| 4 | SM-15L: local prediction -> UC Delta monthly publication | SM-24a | READY |
 | 5 | SM-20a: first pandas/Polars Databricks Bundle/template | SM-24a; verified SM-15L | WAIT |
 | After first Bundle | SM-27: bounded full-history rescore and selectable Bundle mode | SM-20a; SM-15L | LATER |
 | After first Bundle | SM-22 then SM-28: validation/promotion and optional monthly retraining | SM-20a; SM-22 for SM-28 | LATER |
@@ -119,16 +121,16 @@ Proposed implementation area: `skyulf-core/skyulf/integrations/databricks/`;
 config/preflight/workflow modules, integration tests and an English SDK guide.
 Names below describe responsibilities; settle public signatures in the task design.
 
-- [ ] Define immutable configuration for runtime, input source, FE/model execution,
+- [x] Define immutable configuration for runtime, input source, FE/model execution,
   optional stores and output sink without embedding credentials.
-- [ ] Reuse bundle metadata to resolve feature order, model digest and output schema;
+- [x] Reuse bundle metadata to resolve feature order, model digest and output schema;
   resolve an alias once to a pinned version. Preserve explicit caller-owned inputs.
-- [ ] Provide a preflight result with node/config/model/runtime incompatibilities
+- [x] Provide a preflight result with node/config/model/runtime incompatibilities
   and actionable fixes. Distinguish local checks from optional read-only remote checks.
-- [ ] Document a short pandas/Polars fit -> local batch workflow that can run
+- [x] Document a short pandas/Polars fit -> local batch workflow that can run
   on Databricks job compute, plus an advanced custom-code entry point. Keep
   source size limits explicit and do not generate a project to use the SDK.
-- [ ] Select among verified local-package and portable-bundle contracts explicitly.
+- [x] Select among verified local-package and portable-bundle contracts explicitly.
   Keep wider native engine/model choices in parked SM-17j; packaging a local
   pipeline is not a shortcut to claim broader Spark support.
 
@@ -140,30 +142,35 @@ decisions. Spark preflight expands only with later tested Spark options.
 ## SM-24a - Reusable training and batch workflows
 
 Reference: inference/data/config services; reuse Skyulf's fitted local pipeline.
-Proposed files: a workflow module in the Databricks integration, a thin executable
-example, integration tests and `docs/user_guide/databricks_batch.md` updates.
+Delivered in `integrations/databricks/local_batch.py`, the
+[local-engine guide](../../docs/user_guide/databricks_local_sdk.md), runnable
+examples and integration tests. The [live validation report](08-sm24a-live-validation-report.md)
+records separate UC training and inference tables, five cross-job model cases
+and a per-node preprocessing audit.
 
-- [ ] Compose existing local pandas/Polars SkyulfPipeline fit, SM-26 local
+- [x] Compose existing local pandas/Polars SkyulfPipeline fit, SM-26 local
   package export and optional tracking/registration as a thin training entry
   point. Accept explicit training/split inputs and a bounded local source.
-- [ ] Read a named UC table or other declared source through an explicit bounded
+- [x] Read a named UC table or other declared source through an explicit bounded
   local adapter. Filter the requested month at the pinned source version
   before collecting locally; enforce row/byte ceilings. A full two-month
   table download or an implicit unbounded Spark collect is not acceptable.
-- [ ] Expose pure Python batch prediction for verified SM-26 local packages;
+- [x] Expose pure Python batch prediction for verified SM-26 local packages;
   preserve required whole-frame context and input order. This task returns
   predictions; SM-15L handles publication.
-- [ ] Compose pinned registry load, package preflight and local prediction.
-- [ ] Return structured diagnostics with source, period, model and code identity;
-  do not claim the Spark runner's durable publication receipt.
-- [ ] Accept explicit period/backfill parameters and business timezone; retries
+- [x] Compose pinned registry load, package preflight and local prediction.
+- [x] Return structured diagnostics with source, period and model identity;
+  the separate job report records installed code versions. Do not claim the
+  Spark runner's durable publication receipt.
+- [x] Accept explicit period/backfill parameters and business timezone; retries
   reuse the same request rather than refreshing the target version silently.
-- [ ] Keep table/control provisioning an explicit setup step, separate from scoring.
+- [x] Keep table/control provisioning an explicit setup step, separate from scoring.
 
-Acceptance: pandas/Polars training and local batch prediction preserve the
-declared engine and clean-environment model parity, including tracking-off
-behavior. Bounded reads fail before exhausting process memory. Registration
-never promotes an alias implicitly; no table-write success is claimed here.
+Acceptance evidence: pandas/Polars training and local batch prediction preserve
+the declared engine and cross-job model parity. Bounded reads reject excess
+rows and decoded/local-frame bytes; Spark wire bytes and one-row peak transport
+are not capped. Registration never promotes an alias implicitly; no table-write
+success is claimed here. The stronger transport guarantee is SM-24d.
 
 ## SM-15L - Local monthly UC Delta publication
 

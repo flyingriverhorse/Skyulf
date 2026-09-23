@@ -6,18 +6,31 @@ Databricks serverless regression workflow passed. Latest user direction:
 working Databricks Bundle. Spark may handle table I/O in that first path;
 Spark FE/model execution and its Bundle option follow.
 SM-15L is reopened for monthly UC output; SM-18 remains parked. SM-26 local
-MLflow packaging is complete; start with SM-25. After the first Bundle, SM-27 adds
+MLflow packaging, SM-25 SDK preflight and SM-24a live local batch are complete;
+start with SM-15L. After the first Bundle, SM-27 adds
 explicit full-history rescore and SM-22/SM-28 add optional monthly retraining
 with controlled candidate/champion promotion.**
 Target release: 0.9.0. Branch: `090`.
 
 ## Starting point
 
-- SM-00 through SM-16 and SM-26 are complete. Start SM-25 from
+- SM-00 through SM-16, SM-24a, SM-25 and SM-26 are complete. Start SM-15L from
   [04-databricks-integration-plan.md](04-databricks-integration-plan.md).
   The first Bundle and its two-month table rehearsal are specified in
   [05-sm20-bundle-plan.md](05-sm20-bundle-plan.md).
   SM-26 added local artifact and MLflow packaging without cloud execution. The
+  SM-25 SDK adds immutable local workflow configuration, local/remote preflight,
+  explicit path or pinned registry artifact selection and caller-frame limits.
+  It has no separate FE node or model-family allowlist: the fitted local
+  pipeline's own prediction contract governs them. A representative sample can
+  be probed before job submission. SM-24a added versioned UC reads, bounded
+  local training and monthly pandas/Polars scoring. Its
+  [live report](08-sm24a-live-validation-report.md) records two isolated UC
+  source tables in `workspace.skyulf_sm24a_20260923`, five cross-job models,
+  replay/negative checks and the 62-ID preprocessing matrix. Local-result
+  Delta writes remain SM-15L; no prediction table or Bundle was created.
+  The current `max_bytes` limit measures decoded payload and local frame
+  memory, not exact Spark wire bytes; SM-24d tracks a hard transport budget.
   previous Spark-first direction is superseded. Preserve the later
   [NODE_SUPPORT.md](NODE_SUPPORT.md) inventory and
   [gap review](reports/2026-09-22-spark-databricks-gap-review.md).

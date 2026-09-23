@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from ...inference.bundle import InferenceBundle
+    from ...inference.local_pipeline import LocalPipelineArtifact
 
 __all__ = [
     "RegistryAccessError",
@@ -24,6 +25,7 @@ __all__ = [
     "RegistryOperationError",
     "ResolvedModel",
     "load_registered_bundle",
+    "load_registered_local_pipeline",
     "register_model",
     "resolve_model",
 ]
@@ -121,12 +123,78 @@ def load_registered_bundle(
     return bundle
 
 
+def load_registered_local_pipeline(
+    resolved: ResolvedModel,
+    *,
+    tracking_uri: str | None = None,
+    registry_uri: str | None = None,
+) -> LocalPipelineArtifact:
+    """Load a trusted local pipeline from one concrete registered-model version.
+
+    The package's declared artifact path and both digests are checked before the
+    fitted pipeline is returned. A digest is an integrity check, not a signature.
+    """
+    if not isinstance(resolved, ResolvedModel):
+        raise TypeError("resolved must be a ResolvedModel.")
+    _validate_registry_options(resolved.name, tracking_uri, registry_uri)
+    if (
+        not isinstance(resolved.version, str)
+        or not resolved.version.isascii()
+        or not resolved.version.isdigit()
+        or int(resolved.version) <= 0
+        or resolved.model_uri != f"models:/{resolved.name}/{resolved.version}"
+    ):
+        raise ValueError("resolved must identify a concrete positive model version.")
+    if not isinstance(resolved.digest, str) or not resolved.digest.strip():
+        raise ValueError("resolved must include the Skyulf local pipeline digest.")
+    mlflow = _require_mlflow()
+    client = _make_client(mlflow, tracking_uri, registry_uri)
+    try:
+        version = client.get_model_version(resolved.name, resolved.version)
+        source = getattr(version, "source", None)
+        artifact_uri = source if isinstance(source, str) and source else resolved.model_uri
+        local_path = mlflow.artifacts.download_artifacts(
+            artifact_uri=artifact_uri,
+            tracking_uri=tracking_uri,
+            registry_uri=registry_uri,
+        )
+        model = mlflow.models.Model.load(Path(local_path))
+    except Exception as exc:  # noqa: BLE001 - translate registry and transport failures
+        raise _translate_error(exc, name=resolved.name, version=resolved.version) from exc
+    metadata = model.metadata or {}
+    if (
+        metadata.get("skyulf_artifact_kind") != "local_pipeline"
+        or metadata.get("skyulf_execution_scope") != "whole_frame_local"
+        or metadata.get("skyulf_local_pipeline_digest") != resolved.digest
+    ):
+        raise ValueError(
+            "Packaged Skyulf local pipeline metadata differs from resolved digest or scope."
+        )
+    artifact_path = _packaged_artifact_path(Path(local_path), model.flavors, "local_pipeline")
+    from ...inference.local_pipeline import (  # noqa: PLC0415 - lazy pickle dependency
+        load_local_pipeline,
+    )
+
+    artifact = load_local_pipeline(artifact_path)
+    if (
+        artifact.manifest.pipeline_sha256 != resolved.digest
+        or artifact.manifest.fitted_engine != metadata.get("skyulf_fitted_engine")
+    ):
+        raise ValueError("Loaded Skyulf local pipeline identity differs from resolved package.")
+    return artifact
+
+
 def _packaged_bundle_path(package: Path, flavors: dict[str, Any]) -> Path:
     """Find the declared bundle directory and reject paths escaping the package."""
+    return _packaged_artifact_path(package, flavors, "bundle")
+
+
+def _packaged_artifact_path(package: Path, flavors: dict[str, Any], key: str) -> Path:
+    """Locate a declared artifact directory without allowing package traversal."""
     try:
-        relative = flavors["python_function"]["artifacts"]["bundle"]["path"]
+        relative = flavors["python_function"]["artifacts"][key]["path"]
     except (KeyError, TypeError) as exc:
-        raise ValueError("MLflow model is missing the Skyulf bundle artifact path.") from exc
+        raise ValueError(f"MLflow model is missing the Skyulf {key} artifact path.") from exc
     if (
         not isinstance(relative, str)
         or not relative.strip()

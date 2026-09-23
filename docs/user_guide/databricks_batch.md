@@ -13,6 +13,9 @@ exclusive admission and a restricted principal's target-write denial, with
 unchanged data/version and released ownership afterward. This is a bounded
 regression workflow, not certification of every runtime or production workload.
 Tracking and registry remain optional and independent of the engine.
+For small-data pandas/Polars scoring on Databricks job compute, see the
+[local-engine SDK](databricks_local_sdk.md). Its UC source and Delta target
+adapters are still separate follow-up tasks.
 
 This runner currently requires Spark. Delta itself can also be written from
 pandas/Polars through [Arrow and delta-rs](https://delta-io.github.io/delta-rs/usage/writing/); a local-engine Skyulf Delta sink
