@@ -1,6 +1,7 @@
 {
   "project_name": "my_model",
   "engine": "pandas",
+  "row_key": "customer_id",
   "compute_mode": "serverless",
   "catalog": "workspace",
   "schema": "my_dev_schema"

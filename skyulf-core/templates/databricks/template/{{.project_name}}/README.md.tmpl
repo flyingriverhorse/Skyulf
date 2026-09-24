@@ -26,6 +26,14 @@ You may give them different UC names when the labeled training data and new
 inference data have different lifecycles. Neither is created by this Bundle.
 `prediction_table` is the single model output table. `model_name` is a
 registered UC model, not a table. The Bundle creates no admission table.
+The `row_key` selected during initialization names an existing source column;
+`score` copies it into the prediction table for SQL lookups. It must be
+non-null, `STRING` or `BIGINT`, and unique across all scored rows, including
+later inserts. If a customer can have multiple prediction rows, edit
+`row_keys` in `config/workflow.json` to a jointly unique list such as
+`["customer_id", "observation_id"]` before deployment. The initialization
+prompt chooses one column; it never creates an ID in the source. Keep key
+columns out of `input_columns`; they identify predictions, not model features.
 The score job has `max_concurrent_runs: 1`; grant write access to the
 prediction table only to this job's identity. Other jobs must not write it.
 Skyulf Core's shared-admission option remains available when multiple jobs

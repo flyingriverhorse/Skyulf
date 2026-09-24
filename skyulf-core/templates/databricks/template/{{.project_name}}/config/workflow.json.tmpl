@@ -7,7 +7,7 @@
   "model_name": "{catalog}.{metadata_schema}.{{.project_name}}_model{resource_suffix}",
   "model_version": "1",
   "champion_version": null,
-  "row_keys": ["entity_id"],
+  "row_keys": ["{{.row_key}}"],
   "input_columns": ["feature_value"],
   "target_column": "target",
   "event_column": "event_time",

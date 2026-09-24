@@ -1,6 +1,7 @@
 {
   "project_name": "my_model",
   "engine": "pandas",
+  "row_key": "entity_id",
   "compute_mode": "policy_cluster",
   "catalog": "REPLACE_DEV_CATALOG",
   "schema": "REPLACE_DEV_SCHEMA",

@@ -202,6 +202,7 @@ def test_generated_config_keeps_company_output_in_each_target():
         template.read_text(encoding="utf-8")
         .replace("{{.project_name}}", "customer_model")
         .replace("{{.engine}}", "pandas")
+        .replace("{{.row_key}}", "entity_id")
     )
     outputs = {}
     for target, catalog, suffix in (
@@ -237,6 +238,7 @@ def test_minimal_generated_config_uses_one_existing_source():
         template.read_text(encoding="utf-8")
         .replace("{{.project_name}}", "customer_model")
         .replace("{{.engine}}", "pandas")
+        .replace("{{.row_key}}", "entity_id")
     )
     bound = workflow.resolve_target_config(
         config,
@@ -372,11 +374,41 @@ def test_generated_config_has_no_admission_or_alias_state():
         template.read_text(encoding="utf-8")
         .replace("{{.project_name}}", "customer_model")
         .replace("{{.engine}}", "pandas")
-        .replace("{{.include_lifecycle}}", "no")
+        .replace("{{.row_key}}", "entity_id")
     )
     assert "score_admission_table" not in config
     assert "alias_admission_table" not in config
     assert "include_lifecycle" not in config
+
+
+def test_init_row_key_becomes_prediction_table_key():
+    """A chosen source identity must be carried into the generated output schema."""
+    root = WORKFLOW.parents[3]
+    schema = json.loads((root / "databricks_template_schema.json").read_text(encoding="utf-8"))
+    assert schema["properties"]["row_key"]["default"] == "entity_id"
+
+    template = WORKFLOW.parents[1] / "config/workflow.json.tmpl"
+    config = json.loads(
+        template.read_text(encoding="utf-8")
+        .replace("{{.project_name}}", "customer_model")
+        .replace("{{.engine}}", "pandas")
+        .replace("{{.row_key}}", "customer_id")
+    )
+    source = SimpleNamespace(
+        columns=["customer_id", "feature_value"],
+        schema={
+            "customer_id": SimpleNamespace(dataType=SimpleNamespace(typeName=lambda: "string"))
+        },
+    )
+    prepared = SimpleNamespace(
+        artifact=SimpleNamespace(manifest=SimpleNamespace(input_columns=("feature_value",))),
+        preflight=SimpleNamespace(
+            output_schema=(SimpleNamespace(name="prediction", dtype="float64"),)
+        ),
+    )
+    columns = _workflow()._prediction_columns(config, prepared, source)
+    assert config["row_keys"] == ["customer_id"]
+    assert columns[0] == ("customer_id", "string", "STRING")
 
 
 def test_generated_bundle_has_only_train_and_serialized_score_jobs():

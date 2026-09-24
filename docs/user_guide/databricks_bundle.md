@@ -11,8 +11,9 @@ Initialize a project from a Skyulf checkout:
 databricks bundle init skyulf-core/templates/databricks --output-dir ./generated
 ```
 
-The short path asks for project name, engine, serverless or policy-backed job
-compute and the existing `dev` catalog/schema. Serverless is the default. Reviewable
+The short path asks for project name, engine, one existing source row-key
+column, serverless or policy-backed job compute and the existing `dev`
+catalog/schema. Serverless is the default. Reviewable
 noninteractive examples are in `skyulf-core/templates/databricks/examples/`. The generated
 project has its own `databricks.yml`; Skyulf's root has no Bundle config.
 
@@ -52,6 +53,23 @@ Neither reference creates a table. Separate them only when labeled training
 data and new scoring data have different lifecycles. If they stay together,
 the first `score` run predicts all existing rows, including historical labeled
 rows; review whether that is intended for your use case.
+
+The initialization question `row_key` defaults to `entity_id`, but you can
+choose an existing `customer_id` column. It becomes `row_keys` in the generated
+configuration, and the same column appears in the prediction table. It must
+be non-null, `STRING` or `BIGINT`, and unique across the initial data and all
+later inserts. For multiple predictions per customer, edit the generated
+configuration to a composite key such as
+`"row_keys": ["customer_id", "observation_id"]` before deployment. The Bundle
+does not create an ID in the source. Keep keys out of `input_columns`. With
+`customer_id` in the output, a query
+can find a customer's predictions:
+
+```sql
+SELECT customer_id, prediction, model_version
+FROM catalog.schema.predictions
+WHERE customer_id = 'C123';
+```
 
 ## First run
 
