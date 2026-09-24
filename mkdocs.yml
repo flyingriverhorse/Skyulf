@@ -81,6 +81,7 @@ nav:
     - MLflow Registry (Development): user_guide/mlflow_registry.md
     - Databricks Batch (Development): user_guide/databricks_batch.md
     - Databricks Local SDK (Development): user_guide/databricks_local_sdk.md
+    - Databricks Local Bundle (Development): user_guide/databricks_bundle.md
     - Pipeline Quickstart: user_guide/pipeline_quickstart.md
     - Step-by-Step (No Config): user_guide/step_by_step_no_config.md
     - Automated EDA: user_guide/eda_profiling.md

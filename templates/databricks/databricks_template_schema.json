@@ -1,0 +1,33 @@
+{
+  "welcome_message": "Create a bounded Skyulf local-engine Databricks Bundle. Edit config/workflow.json for your data before running jobs.",
+  "properties": {
+    "project_name": {
+      "order": 1,
+      "type": "string",
+      "default": "skyulf_local",
+      "description": "Bundle name (letters, digits and underscores)",
+      "pattern": "^[a-z][a-z0-9_]*$"
+    },
+    "engine": {
+      "order": 2,
+      "type": "string",
+      "default": "pandas",
+      "description": "Local feature and model engine",
+      "enum": ["pandas", "polars"]
+    },
+    "catalog": {
+      "order": 3,
+      "type": "string",
+      "default": "workspace",
+      "description": "Existing Unity Catalog catalog (simple identifier)",
+      "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+    },
+    "schema": {
+      "order": 4,
+      "type": "string",
+      "default": "default",
+      "description": "Existing Unity Catalog schema (simple identifier)",
+      "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+    }
+  }
+}

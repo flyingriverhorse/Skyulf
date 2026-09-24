@@ -1,0 +1,16 @@
+bundle:
+  name: {{.project_name}}
+
+include:
+  - resources/*.yml
+
+sync:
+  include:
+    - dist/*.whl
+    - config/workflow.json
+    - src/workflow.py
+
+targets:
+  dev:
+    default: true
+    mode: development

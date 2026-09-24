@@ -22,14 +22,17 @@ UC promotion, conflict, rollback and restricted-principal denial passed; see
 and previous-champion aliases; see [its report](19-sm22c-lifecycle-alias-validation-report.md).
 SM-28a now trains from a pinned label-aware Delta snapshot and compares a
 registered candidate without promotion; see [its local and live report](20-sm28a-label-aware-retraining-report.md).
-SM-20a is next.
+SM-20a now generates and deploys the first local-engine Bundle. Its own jobs
+passed Polars training, 2+2 incremental scoring/no-op, read-only comparison,
+challenger staging and explicit promotion; see [the report](21-sm20a-local-bundle-validation-report.md).
+SM-28b optional monthly retraining scheduling is next.
 
 ## Starting point
 
 - SM-00 through SM-16, SM-15L, SM-15I, SM-24a, SM-25, SM-26,
-  SM-22a/b/c and SM-28a are complete. Start SM-20a from
-  [05-sm20-bundle-plan.md](05-sm20-bundle-plan.md), using the services in
-  [06-prebundle-model-lifecycle-plan.md](06-prebundle-model-lifecycle-plan.md).
+  SM-22a/b/c, SM-28a and SM-20a are complete. Start SM-28b from
+  [the open queue](OPEN_QUEUE.md), using the generated Bundle and the
+  [pre-Bundle lifecycle plan](06-prebundle-model-lifecycle-plan.md).
   SM-15I [live evidence](13-sm15i-live-validation-report.md) proves automatic
   80+80 insert-only scoring with no date column or per-run version input.
   A later [real NYC taxi rehearsal](15-sm15i-real-nyctaxi-live-report.md)

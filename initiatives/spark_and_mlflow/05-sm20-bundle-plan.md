@@ -1,8 +1,8 @@
 # SM-20: local-first Databricks Bundle, then Spark enhancement
 
-Updated: 2026-09-23. Planning only; no generated project has been created
-by this plan. SM-15L proved explicit-period writes and SM-15I proved
-automatic new-row scoring. The generated Bundle still needs validation.
+Updated: 2026-09-24. The first local-engine Bundle is implemented and validated;
+see [SM-20a live evidence](21-sm20a-local-bundle-validation-report.md). SM-15L
+proved explicit-period writes and SM-15I proved automatic new-row scoring.
 The [open queue](OPEN_QUEUE.md) owns status and task order.
 
 ## Outcome and engine boundary
@@ -76,23 +76,18 @@ The SQL Connector is an alternative, not a required part of the first Bundle.
    then compares it without automatic promotion. The optional monthly schedule
    is wired in SM-28b after the Bundle exists.
 
-The custom template should generate a project with these responsibilities:
+The delivered custom template generates a project with these responsibilities:
 
 ```text
 templates/databricks/databricks_template_schema.json
 templates/databricks/template/{{.project_name}}/databricks.yml.tmpl
-templates/databricks/template/{{.project_name}}/resources/train_job.yml.tmpl
-templates/databricks/template/{{.project_name}}/resources/compare_job.yml.tmpl
-templates/databricks/template/{{.project_name}}/resources/promote_job.yml.tmpl
-templates/databricks/template/{{.project_name}}/resources/batch_job.yml.tmpl
-templates/databricks/template/{{.project_name}}/src/train.py.tmpl
-templates/databricks/template/{{.project_name}}/src/compare.py.tmpl
-templates/databricks/template/{{.project_name}}/src/promote.py.tmpl
-templates/databricks/template/{{.project_name}}/src/score_month.py.tmpl
+templates/databricks/template/{{.project_name}}/config/workflow.json.tmpl
+templates/databricks/template/{{.project_name}}/resources/workflow.jobs.yml
+templates/databricks/template/{{.project_name}}/src/workflow.py
 templates/databricks/template/{{.project_name}}/README.md.tmpl
 ```
 
-The generated Python files call Skyulf services; they do not copy FE, model,
+The generated Python entry point calls Skyulf services; it does not copy FE, model,
 MLflow, comparison, promotion or Delta publication implementations. Separate
 train, compare, explicit-promote and score jobs preserve the decision boundary.
 The first verified cross-job

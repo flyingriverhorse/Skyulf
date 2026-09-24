@@ -1,0 +1,52 @@
+# {{.project_name}}
+
+This is a Skyulf 0.9.0 local-engine Databricks Bundle. The selected fit and
+prediction engine is **{{.engine}}**. Spark is used to read bounded Delta rows
+and publish the prediction table; Skyulf runs feature engineering and model
+prediction on the selected local engine.
+
+## Before the first run
+
+1. Put the matching, trusted `skyulf_core-0.9.0-py3-none-any.whl` in `dist/`.
+   From a Skyulf source checkout, run `uv build --wheel --no-build-isolation
+   --out-dir <this-project>/dist skyulf-core`. Rebuild the wheel whenever the
+   source changes. The serverless job also installs MLflow 3.16.1.
+2. Edit `config/workflow.json`: set real training and scoring tables, features,
+   temporal split, preprocessing/model config, memory bounds and the concrete
+   training Delta version. The generated values are examples, not a dataset.
+3. Create the source and empty prediction Delta tables. Enable Change Data
+   Feed on the scoring source **before** new rows arrive. The prediction table
+   needs `row_keys`, `prediction`, `run_id`, `model_name`, and `model_version`
+   with types matching the Skyulf output. Create the separate score admission
+   table with `(target_id STRING, owner STRING)` and one row whose `target_id`
+   is the prediction table's Delta identity and `owner` is null. If using the
+   stage/promote jobs, create a separate alias admission table with the same
+   columns and one row with `target_id` equal to
+   `skyulf.integrations.mlflow.promotion.alias_resource_id(model_name)`.
+4. Authenticate the Databricks CLI, then run `databricks bundle validate
+   --strict -t dev` and `databricks bundle deploy -t dev`. The CLI profile is
+   selected by `--profile`; no credentials are stored here.
+
+Run `databricks bundle run train -t dev` to train one candidate, log held-out
+metrics and register its model. Inspect the resulting model version in Unity
+Catalog, and set `model_version` in the JSON to that **concrete version** before
+running `databricks bundle run score -t dev`. Redeploy after changing the
+configuration. Each score run handles the initial bounded source snapshot or
+only inserts since the last committed receipt. Run it again with no new rows
+to see a no-op; no date or source-version argument is needed. Source updates
+and deletes require a separate rescore policy.
+
+The first model has no champion by default. Once a champion alias has been
+explicitly initialized, set `champion_version` and `candidate_version` to
+concrete versions from the **same** pinned labeled holdout. The `compare` job
+is read-only. `stage` and `promote` are separate manual jobs: they re-evaluate
+the comparison and use the distributed alias admission row. Promotion requires
+the matching candidate to have been staged as `@challenger`. Neither training
+nor comparison changes aliases automatically. Keep scoring pinned to a
+concrete `model_version` until you explicitly decide to move it; an alias
+change does not rescore historical rows.
+
+The default jobs have no schedules. Add a scoring schedule after checking the
+source append policy and table permissions. Optional retraining schedules,
+full-history rescores, Spark feature engineering and endpoints are separate
+future extensions.

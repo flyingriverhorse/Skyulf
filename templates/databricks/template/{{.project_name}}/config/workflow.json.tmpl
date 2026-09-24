@@ -1,0 +1,30 @@
+{
+  "engine": "{{.engine}}",
+  "training_table": "{{.catalog}}.{{.schema}}.{{.project_name}}_training",
+  "training_version": 0,
+  "score_source_table": "{{.catalog}}.{{.schema}}.{{.project_name}}_source",
+  "prediction_table": "{{.catalog}}.{{.schema}}.{{.project_name}}_predictions",
+  "score_admission_table": "{{.catalog}}.{{.schema}}.{{.project_name}}_score_admission",
+  "alias_admission_table": "{{.catalog}}.{{.schema}}.{{.project_name}}_alias_admission",
+  "model_name": "{{.catalog}}.{{.schema}}.{{.project_name}}_model",
+  "model_version": "1",
+  "champion_version": null,
+  "candidate_version": "2",
+  "row_keys": ["entity_id"],
+  "input_columns": ["feature_value"],
+  "target_column": "target",
+  "event_column": "event_time",
+  "label_time_column": "label_at",
+  "start": "2025-01-01T00:00:00+00:00",
+  "holdout_start": "2025-02-01T00:00:00+00:00",
+  "cutoff": "2025-03-01T00:00:00+00:00",
+  "max_rows": 10000,
+  "max_bytes": 67108864,
+  "metric": "heldout_rmse",
+  "min_improvement": 0.0,
+  "quality_threshold": null,
+  "pipeline": {
+    "preprocessing": [],
+    "modeling": {"type": "linear_regression"}
+  }
+}
