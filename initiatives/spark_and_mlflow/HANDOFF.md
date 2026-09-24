@@ -1,5 +1,18 @@
 # Session handoff - 2026-09-24
 
+## Current state after SM-28b
+
+The latest first Bundle has exactly two jobs (`train`, `score`), and its first
+score creates only the prediction table; see
+[SM-20S](26-sm20s-two-job-live-validation-report.md). SM-28b adds an optional
+paused monthly schedule to that same `train` job. Manual and monthly generated
+projects passed strict CLI validation; no monthly live job was deployed or
+run. See [SM-28b validation](28-sm28b-monthly-retraining-validation-report.md).
+The next open item is SM-27, a bounded full-history local rescore with a new
+prediction generation and explicit activation. Company workspace targets
+remain unconfigured and unverified. The remainder of this file is historical
+context from earlier Bundle stages.
+
 SM-00 through SM-16, SM-15L/15I and SM-24a/25/26 are complete for their
 documented scopes. The selected Databricks serverless local monthly UC
 publication passed with 80 pandas January and 80 Polars February predictions.

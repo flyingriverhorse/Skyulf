@@ -12,7 +12,7 @@ databricks bundle init skyulf-core/templates/databricks --output-dir ./generated
 ```
 
 The short path asks for project name, engine, one existing source row-key
-column, serverless or policy-backed job compute and the existing `dev`
+column, optional retraining mode, serverless or policy-backed job compute and the existing `dev`
 catalog/schema. Serverless is the default. Reviewable
 noninteractive examples are in `skyulf-core/templates/databricks/examples/`. The generated
 project has its own `databricks.yml`; Skyulf's root has no Bundle config.
@@ -34,7 +34,10 @@ initialization. Serverless compute needs none of those fields.
 | `train` | Fit one candidate and log held-out metrics | One registered model/version |
 | `score` | Verify the source and pinned model, create output if absent, then score initial and later CDF inserts | One prediction table, only if absent; rows in that table |
 
-No schedule, endpoint or Unity Catalog table is created by deployment alone.
+The default project has no schedule. Choosing `monthly_paused` at initialization
+adds a paused monthly schedule to the existing `train` job, without adding a
+third job or running it at deployment. No endpoint or Unity Catalog table is
+created by deployment alone.
 The starting Bundle has no alias lifecycle job. Skyulf Core's registry
 comparison and promotion services remain available for a separately designed
 champion/challenger workflow.
@@ -100,14 +103,24 @@ pinned to its configured model version; changing aliases does not rewrite old
 predictions. `max_concurrent_runs: 1` serializes the generated score job, but
 does not coordinate other jobs. Grant prediction-table writes only to this
 job's identity. For multiple publishers, use Skyulf Core's shared admission
-provider. Full-history rescore, schedules, online endpoints and Spark-native
-FE/model execution are separate work.
+provider. Full-history rescore, online endpoints and Spark-native FE/model
+execution are separate work.
+
+The optional monthly `train` schedule runs at 03:00 UTC on day three and starts
+paused. After configuring real labeled data and verifying a manual run, unpause
+it deliberately. Each run pins the source's latest Delta version and uses the
+first day of the current UTC month as the label cutoff. The preceding month is
+holdout; `monthly_lookback_months` (default four) controls the full window.
+Only labels available by the cutoff are eligible. `@champion` is resolved to a
+concrete version for comparison if present; the new candidate is never
+promoted or substituted into `score` automatically. The source version is
+pinned at run start, so `label_at` must faithfully record availability.
 
 The older SM-20a personal serverless rehearsal passed, but its jobs and test
 schemas were removed at the user's request. The subsequent clean generic
 `dev` rehearsal trained a Polars model from 600 real taxi rows, wrote 600
 initial and 50 later predictions to one table, and replayed without another
-commit. The personal test resources remain available for inspection. The
-That rehearsal used the earlier three-job template; the two-job design needs
-its own live validation. The `test`, `syst` and `prod` placeholders have not
-been deployed in a company workspace.
+commit. The later two-job design passed a separate personal serverless
+rehearsal: 650 existing source rows, one later insert, and a no-op replay
+left one prediction table with 651 rows. The `test`, `syst` and `prod`
+placeholders have not been deployed in a company workspace.

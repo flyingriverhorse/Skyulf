@@ -3,6 +3,7 @@
 import importlib.util
 import json
 import re
+from datetime import UTC, datetime, timedelta, timezone
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock
@@ -67,6 +68,83 @@ def test_train_preserves_selected_polars_engine_and_never_promotes(monkeypatch, 
     assert result.model_version == "2"
     assert train.call_args.kwargs["engine"] == "polars"
     assert train.call_args.args[1].version == 0
+
+
+def test_monthly_window_pins_current_delta_version_across_year_boundary():
+    """A delayed or timezone-shifted run must pin one reproducible monthly window."""
+    workflow = _workflow()
+    history = Mock()
+    history.select.return_value.orderBy.return_value.first.return_value = {"version": 7}
+    spark = Mock()
+    spark.sql.return_value = history
+    config = _config()
+    config["monthly_lookback_months"] = 4
+    spec = workflow._monthly_training_spec(
+        spark, config, datetime(2027, 1, 3, 5, tzinfo=timezone(timedelta(hours=2)))
+    )
+    assert (spec.version, spec.start, spec.holdout_start, spec.cutoff) == (
+        7,
+        datetime(2026, 9, 1, tzinfo=UTC),
+        datetime(2026, 12, 1, tzinfo=UTC),
+        datetime(2027, 1, 1, tzinfo=UTC),
+    )
+    spark.sql.assert_called_once_with("DESCRIBE HISTORY workspace.test.training")
+
+
+def test_monthly_training_rejects_missing_version_and_invalid_lookback():
+    """A scheduled run must fail before fitting an unpinned or empty window."""
+    workflow = _workflow()
+    spark = Mock()
+    spark.sql.return_value.select.return_value.orderBy.return_value.first.return_value = None
+    config = _config()
+    config["monthly_lookback_months"] = 1
+    with pytest.raises(ValueError, match="monthly_lookback_months"):
+        workflow._monthly_training_spec(spark, config, datetime(2027, 1, 3, tzinfo=UTC))
+    config["monthly_lookback_months"] = 3
+    with pytest.raises(ValueError, match="version"):
+        workflow._monthly_training_spec(spark, config, datetime(2027, 1, 3, tzinfo=UTC))
+
+
+def test_monthly_train_compares_pinned_champion_without_activation(monkeypatch, tmp_path):
+    """A monthly candidate must not change aliases or the scorer's pinned model."""
+    workflow = _workflow()
+    spec = workflow._training_spec(_config())
+    train = Mock(return_value=SimpleNamespace(model_version="3"))
+    champion = Mock(return_value=SimpleNamespace(version="2"))
+    monkeypatch.setattr(workflow, "_monthly_training_spec", lambda *args: spec)
+    monkeypatch.setattr(workflow, "resolve_model", champion)
+    monkeypatch.setattr(workflow, "train_local_candidate", train)
+    config = _config()
+    original_version = config["model_version"]
+    workflow.run_action(
+        object(),
+        config,
+        "train_monthly",
+        experiment_name="/Users/test/experiment",
+        artifact_path=tmp_path / "artifact",
+        now=datetime(2027, 1, 3, tzinfo=UTC),
+    )
+    assert train.call_args.kwargs["champion_version"] == "2"
+    assert config["model_version"] == original_version
+    champion.assert_called_once()
+
+
+def test_monthly_train_allows_first_model_but_propagates_registry_errors(monkeypatch):
+    """Only a missing champion alias is a valid first-training condition."""
+    workflow = _workflow()
+    from skyulf.integrations.mlflow.registry import RegistryModelNotFoundError
+
+    def missing(*args, **kwargs):
+        """Represent a registry without a champion alias."""
+        raise RegistryModelNotFoundError("alias missing")
+
+    monkeypatch.setattr(workflow, "resolve_model", missing)
+    assert workflow._monthly_champion_version(_config()) is None
+    monkeypatch.setattr(
+        workflow, "resolve_model", Mock(side_effect=RuntimeError("permission denied"))
+    )
+    with pytest.raises(RuntimeError, match="permission denied"):
+        workflow._monthly_champion_version(_config())
 
 
 def test_score_uses_incremental_service_without_period_or_source_version(monkeypatch):
@@ -419,3 +497,9 @@ def test_generated_bundle_has_only_train_and_serialized_score_jobs():
     assert re.search(
         r"^    score:\n      name:.*\n      max_concurrent_runs: 1$", template, re.MULTILINE
     )
+    assert re.search(
+        r"^    train:\n      name:.*\n      max_concurrent_runs: 1$", template, re.MULTILINE
+    )
+    assert 'if eq .retraining_mode "monthly_paused"' in template
+    assert "pause_status: PAUSED" in template
+    assert 'action: {{if eq .retraining_mode "monthly_paused"}}train_monthly' in template

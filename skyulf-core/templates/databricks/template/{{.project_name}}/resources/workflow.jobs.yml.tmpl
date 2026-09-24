@@ -2,12 +2,19 @@ resources:
   jobs:
     train:
       name: ${bundle.name}_train
+      max_concurrent_runs: 1
+{{if eq .retraining_mode "monthly_paused"}}
+      schedule:
+        quartz_cron_expression: "0 0 3 3 * ?"
+        timezone_id: UTC
+        pause_status: PAUSED
+{{end}}
       tasks:
         - task_key: train
           notebook_task:
             notebook_path: ../src/workflow.py
             base_parameters:
-              action: train
+              action: {{if eq .retraining_mode "monthly_paused"}}train_monthly{{else}}train{{end}}
               config_path: ${workspace.file_path}/config/workflow.json
               experiment_name: ${workspace.root_path}/experiment
               catalog: ${var.catalog}

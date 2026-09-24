@@ -5,7 +5,7 @@ import json
 import re
 import tempfile
 from dataclasses import asdict
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -20,6 +20,7 @@ from skyulf.integrations.databricks import (
     train_local_candidate,
 )
 from skyulf.integrations.databricks.admission import SingleWriterAdmission
+from skyulf.integrations.mlflow.registry import RegistryModelNotFoundError, resolve_model
 
 _TABLE_FIELDS = (
     "training_table",
@@ -184,6 +185,61 @@ def _training_spec(config: dict[str, Any]) -> LocalTrainingSpec:
     )
 
 
+def _monthly_training_spec(spark: Any, config: dict[str, Any], now: datetime) -> LocalTrainingSpec:
+    """Pin one Delta version and a UTC calendar window for monthly training."""
+    if now.tzinfo is None or now.utcoffset() is None:
+        raise ValueError("Monthly training needs a timezone-aware run instant.")
+    lookback = config.get("monthly_lookback_months")
+    if type(lookback) is not int or not 2 <= lookback <= 120:
+        raise ValueError("monthly_lookback_months must be an integer from 2 to 120.")
+    cutoff = now.astimezone(UTC).replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
+    def months_before(count: int) -> datetime:
+        """Preserve the first-of-month boundary across year rollover."""
+        index = cutoff.year * 12 + cutoff.month - 1 - count
+        return datetime(index // 12, index % 12 + 1, 1, tzinfo=UTC)
+
+    table = config["training_table"]
+    if not _TABLE_NAME.fullmatch(table):
+        raise ValueError("training_table must be a three-part UC name.")
+    latest = (
+        spark.sql(f"DESCRIBE HISTORY {table}")
+        .select("version")
+        .orderBy("version", ascending=False)
+        .first()
+    )
+    if latest is None or type(latest["version"]) is not int:
+        raise ValueError("Training source has no concrete Delta version.")
+    return LocalTrainingSpec(
+        table=table,
+        version=latest["version"],
+        start=months_before(lookback),
+        holdout_start=months_before(1),
+        cutoff=cutoff,
+        event_column=config["event_column"],
+        label_time_column=config["label_time_column"],
+        row_keys=tuple(config["row_keys"]),
+        input_columns=tuple(config["input_columns"]),
+        target_column=config["target_column"],
+        max_rows=config["max_rows"],
+        max_bytes=config["max_bytes"],
+    )
+
+
+def _monthly_champion_version(config: dict[str, Any]) -> str | None:
+    """Resolve the current champion once while allowing first-model training."""
+    try:
+        champion = resolve_model(
+            config["model_name"],
+            alias="champion",
+            tracking_uri=config.get("tracking_uri", "databricks"),
+            registry_uri=config.get("registry_uri", "databricks-uc"),
+        )
+    except RegistryModelNotFoundError:
+        return None
+    return champion.version
+
+
 def run_action(
     spark: Any,
     config: dict[str, Any],
@@ -191,16 +247,26 @@ def run_action(
     *,
     experiment_name: str | None = None,
     artifact_path: str | Path | None = None,
+    now: datetime | None = None,
 ) -> Any:
     """Delegate training or scoring to Skyulf's existing services."""
     tracking_uri = config.get("tracking_uri", "databricks")
     registry_uri = config.get("registry_uri", "databricks-uc")
-    if action == "train":
+    if action in {"train", "train_monthly"}:
         if experiment_name is None or artifact_path is None:
             raise ValueError("Training needs an experiment and temporary artifact path.")
+        monthly = action == "train_monthly"
+        spec = (
+            _monthly_training_spec(spark, config, now or datetime.now(UTC))
+            if monthly
+            else _training_spec(config)
+        )
+        champion_version = (
+            _monthly_champion_version(config) if monthly else config.get("champion_version")
+        )
         return train_local_candidate(
             spark,
-            _training_spec(config),
+            spec,
             config["pipeline"],
             model_name=config["model_name"],
             tracking_uri=tracking_uri,
@@ -211,7 +277,7 @@ def run_action(
             metric=config["metric"],
             min_improvement=config["min_improvement"],
             engine=config["engine"],
-            champion_version=config.get("champion_version"),
+            champion_version=champion_version,
             quality_threshold=config.get("quality_threshold"),
         )
     if action == "score":
@@ -249,8 +315,8 @@ def main() -> None:
             globals()["spark"],
             config,
             action,
-            experiment_name=widgets.get("experiment_name") if action == "train" else None,
-            artifact_path=Path(directory) / "artifact" if action == "train" else None,
+            experiment_name=widgets.get("experiment_name") if action.startswith("train") else None,
+            artifact_path=Path(directory) / "artifact" if action.startswith("train") else None,
         )
     output = json.dumps(asdict(result), default=str, allow_nan=False)
     print(output)

@@ -22,6 +22,13 @@
       "description": "Existing source column identifying one prediction row (also copied to output)",
       "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
     },
+    "retraining_mode": {
+      "order": 12,
+      "type": "string",
+      "default": "manual",
+      "description": "Train manually, or add a paused monthly schedule to the same train job",
+      "enum": ["manual", "monthly_paused"]
+    },
     "compute_mode": {
       "order": 4,
       "type": "string",

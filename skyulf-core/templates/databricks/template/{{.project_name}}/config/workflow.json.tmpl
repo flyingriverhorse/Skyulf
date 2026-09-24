@@ -2,6 +2,7 @@
   "engine": "{{.engine}}",
   "training_table": "{catalog}.{input_schema}.{{.project_name}}_source",
   "training_version": 0,
+  "monthly_lookback_months": 4,
   "score_source_table": "{catalog}.{input_schema}.{{.project_name}}_source",
   "prediction_table": "{catalog}.{output_schema}.{{.project_name}}_predictions{resource_suffix}",
   "model_name": "{catalog}.{metadata_schema}.{{.project_name}}_model{resource_suffix}",

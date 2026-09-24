@@ -9,16 +9,32 @@ same Skyulf workflow code with different target bindings.
 
 `bundle deploy` uploads the wheel, notebook and configuration, and creates
 two jobs. It creates **no** Unity Catalog table or registered model.
+The initialization choice `retraining_mode=monthly_paused` adds a paused
+schedule to the existing `train` job; the default `manual` choice adds none.
 
 | Job | Run it when | UC effect |
 | --- | --- | --- |
-| `train` | A labeled snapshot is ready | Registers one candidate model and logs MLflow metrics |
+| `train` | A labeled snapshot is ready, or a reviewed monthly schedule is unpaused | Registers one candidate model and logs MLflow metrics |
 | `score` | The model version is pinned and rows need predictions | Creates the prediction table if absent, then appends predictions for initial or new rows |
 
 Champion/challenger management is available through Skyulf Core but has no
 job in this starting Bundle. Training a candidate does not activate it for
 scoring. Set `model_version` to a concrete registered version and redeploy
 when you want scoring to use it.
+
+In monthly mode, the job runs at 03:00 UTC on the third day of each month only
+after you unpause it. Each run captures the latest concrete Delta source
+version, uses the first day of that month as its UTC label cutoff, holds out
+the preceding calendar month, and starts fit data
+`monthly_lookback_months` months before the cutoff. The default lookback is
+four months. `label_at` must reflect when a label became available: rows with
+later labels are excluded. The captured Delta version is pinned at run start;
+it is not a historical snapshot as of the cutoff. If the source has too few
+labeled rows in either partition, training fails without publishing a model.
+The run compares against the concrete version behind `@champion` if present;
+a missing alias means first-model training. Registry access failures still
+fail the job. Retry runs can create additional candidate versions; none is
+promoted or used by `score` automatically.
 
 `training_table` is the existing labeled input. `score_source_table` is the
 existing input to predict; the generated config points both at **one table**.
@@ -91,5 +107,5 @@ clusters are a separate compute choice at project initialization.
 
 `score` always uses its configured concrete model version. Training a new
 candidate or changing a registry alias does not rewrite old prediction rows.
-There is no schedule, online endpoint or Spark-native FE/model execution in
-this starting project.
+The optional training schedule does not run `score`. There is no online
+endpoint or Spark-native FE/model execution in this starting project.
