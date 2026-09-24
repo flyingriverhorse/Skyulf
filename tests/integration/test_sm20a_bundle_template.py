@@ -1,6 +1,7 @@
 """The generated local Bundle delegates to Skyulf's verified services."""
 
 import importlib.util
+import json
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock
@@ -119,3 +120,144 @@ def test_ineligible_candidate_cannot_reach_alias_writer(monkeypatch):
     with pytest.raises(ValueError, match="not eligible"):
         workflow.run_action(object(), _config(), "promote")
     promote.assert_not_called()
+
+
+def test_target_binding_separates_test_and_prod_outputs():
+    """One generated workflow must never reuse a test prediction table in prod."""
+    workflow = _workflow()
+    config = _config()
+    config.update(
+        training_table="{catalog}.{input_schema}.labeled_events",
+        score_source_table="shared.raw.events",
+        prediction_table="{catalog}.{output_schema}.predictions{resource_suffix}",
+        model_name="{catalog}.{metadata_schema}.model{resource_suffix}",
+        score_admission_table="{catalog}.{metadata_schema}.score_control{resource_suffix}",
+        alias_admission_table="{catalog}.{metadata_schema}.alias_control{resource_suffix}",
+    )
+    shared = {
+        "input_schema": "refined",
+        "output_schema": "mlresult",
+        "metadata_schema": "metadata",
+    }
+    test_config = workflow.resolve_target_config(
+        config, {**shared, "catalog": "test_catalog", "resource_suffix": "_murat"}
+    )
+    syst_config = workflow.resolve_target_config(
+        config, {**shared, "catalog": "syst_catalog", "resource_suffix": ""}
+    )
+    prod_config = workflow.resolve_target_config(
+        config, {**shared, "catalog": "prod_catalog", "resource_suffix": ""}
+    )
+    assert test_config["prediction_table"] == "test_catalog.mlresult.predictions_murat"
+    assert syst_config["prediction_table"] == "syst_catalog.mlresult.predictions"
+    assert prod_config["prediction_table"] == "prod_catalog.mlresult.predictions"
+    assert prod_config["score_source_table"] == "shared.raw.events"
+    assert test_config["model_name"] != prod_config["model_name"]
+    assert (
+        len(
+            {
+                test_config["prediction_table"],
+                syst_config["prediction_table"],
+                prod_config["prediction_table"],
+            }
+        )
+        == 3
+    )
+    assert config["prediction_table"] == "{catalog}.{output_schema}.predictions{resource_suffix}"
+
+
+def test_target_binding_rejects_unsafe_catalog_before_any_job():
+    """A malformed target parameter must fail before it reaches a UC operation."""
+    workflow = _workflow()
+    with pytest.raises(ValueError, match="catalog"):
+        workflow.resolve_target_config(
+            _config(),
+            {
+                "catalog": "prod;DROP TABLE x",
+                "input_schema": "refined",
+                "output_schema": "mlresult",
+                "metadata_schema": "metadata",
+                "resource_suffix": "",
+            },
+        )
+
+
+def test_target_binding_rejects_cross_environment_output():
+    """A prod job cannot write a model or prediction into a test catalog."""
+    workflow = _workflow()
+    config = _config()
+    config.update(
+        score_admission_table="prod_catalog.metadata.score_control",
+        alias_admission_table="prod_catalog.metadata.alias_control",
+        model_name="prod_catalog.metadata.model",
+    )
+    config["prediction_table"] = "test_catalog.mlresult.predictions"
+    with pytest.raises(ValueError, match="prediction_table"):
+        workflow.resolve_target_config(
+            config,
+            {
+                "catalog": "prod_catalog",
+                "input_schema": "refined",
+                "output_schema": "mlresult",
+                "metadata_schema": "metadata",
+                "resource_suffix": "",
+            },
+        )
+
+
+def test_target_binding_rejects_cross_environment_model():
+    """A prod train job cannot register a model in a test catalog."""
+    workflow = _workflow()
+    config = _config()
+    config.update(
+        prediction_table="prod_catalog.mlresult.predictions",
+        score_admission_table="prod_catalog.metadata.score_control",
+        alias_admission_table="prod_catalog.metadata.alias_control",
+    )
+    config["model_name"] = "test_catalog.metadata.model"
+    with pytest.raises(ValueError, match="model_name"):
+        workflow.resolve_target_config(
+            config,
+            {
+                "catalog": "prod_catalog",
+                "input_schema": "refined",
+                "output_schema": "mlresult",
+                "metadata_schema": "metadata",
+                "resource_suffix": "",
+            },
+        )
+
+
+def test_generated_config_keeps_company_output_in_each_target():
+    """The actual JSON template must bind its outputs separately in every target."""
+    workflow = _workflow()
+    template = WORKFLOW.parents[1] / "config/workflow.json.tmpl"
+    config = json.loads(
+        template.read_text(encoding="utf-8")
+        .replace("{{.project_name}}", "customer_model")
+        .replace("{{.engine}}", "pandas")
+    )
+    outputs = {}
+    for target, catalog, suffix in (
+        ("test", "test_catalog", "_murat"),
+        ("syst", "syst_catalog", ""),
+        ("prod", "prod_catalog", ""),
+    ):
+        bound = workflow.resolve_target_config(
+            config,
+            {
+                "catalog": catalog,
+                "input_schema": "dsp_refined",
+                "output_schema": "dsp_mlresult",
+                "metadata_schema": "dsp_metadata",
+                "resource_suffix": suffix,
+            },
+        )
+        assert bound["score_source_table"] == f"{catalog}.dsp_refined.customer_model_source"
+        assert bound["model_name"] == f"{catalog}.dsp_metadata.customer_model_model{suffix}"
+        outputs[target] = bound["prediction_table"]
+    assert outputs == {
+        "test": "test_catalog.dsp_mlresult.customer_model_predictions_murat",
+        "syst": "syst_catalog.dsp_mlresult.customer_model_predictions",
+        "prod": "prod_catalog.dsp_mlresult.customer_model_predictions",
+    }

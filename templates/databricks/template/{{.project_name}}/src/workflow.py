@@ -2,6 +2,7 @@
 """Run one bounded Skyulf local training, comparison, alias or scoring action."""
 
 import json
+import re
 import tempfile
 from dataclasses import asdict
 from datetime import datetime
@@ -30,6 +31,50 @@ from skyulf.integrations.mlflow.promotion import (
 )
 from skyulf.integrations.mlflow.registry import resolve_model
 from skyulf.integrations.mlflow.validation import compare_registered_local_models
+
+_TABLE_FIELDS = (
+    "training_table",
+    "score_source_table",
+    "prediction_table",
+    "score_admission_table",
+    "alias_admission_table",
+    "model_name",
+)
+_IDENTIFIER = re.compile(r"[A-Za-z_][A-Za-z0-9_]*\Z")
+_TABLE_NAME = re.compile(r"[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*){2}\Z")
+
+
+def resolve_target_config(config: dict[str, Any], bindings: dict[str, str]) -> dict[str, Any]:
+    """Bind only UC object names to one validated Bundle target."""
+    for name in ("catalog", "input_schema", "output_schema", "metadata_schema"):
+        if not _IDENTIFIER.fullmatch(bindings.get(name, "")):
+            raise ValueError(f"Invalid {name} for a Unity Catalog identifier.")
+    suffix = bindings.get("resource_suffix", "")
+    if suffix and (not suffix.startswith("_") or not _IDENTIFIER.fullmatch(suffix)):
+        raise ValueError("Invalid resource_suffix for a Unity Catalog identifier.")
+    resolved = config.copy()
+    for name in _TABLE_FIELDS:
+        value = config[name]
+        if type(value) is not str:
+            raise ValueError(f"{name} must be a string.")
+        for key, replacement in bindings.items():
+            value = value.replace("{" + key + "}", replacement)
+        if not _TABLE_NAME.fullmatch(value):
+            raise ValueError(f"{name} must resolve to a three-part UC name.")
+        if name in {
+            "prediction_table",
+            "score_admission_table",
+            "alias_admission_table",
+            "model_name",
+        }:
+            schema = "output_schema" if name == "prediction_table" else "metadata_schema"
+            expected = f"{bindings['catalog']}.{bindings[schema]}."
+            if not value.startswith(expected):
+                raise ValueError(f"{name} must use the active target's {schema}.")
+            if suffix and not value.endswith(suffix):
+                raise ValueError(f"{name} must include the active target's resource_suffix.")
+        resolved[name] = value
+    return resolved
 
 
 def _training_spec(config: dict[str, Any]) -> LocalTrainingSpec:
@@ -176,6 +221,19 @@ def main() -> None:
     """Read deployed configuration and job widgets only at the notebook boundary."""
     widgets = globals()["dbutils"].widgets
     config = json.loads(Path(widgets.get("config_path")).read_text(encoding="utf-8"))
+    config = resolve_target_config(
+        config,
+        {
+            name: widgets.get(name)
+            for name in (
+                "catalog",
+                "input_schema",
+                "output_schema",
+                "metadata_schema",
+                "resource_suffix",
+            )
+        },
+    )
     action = widgets.get("action")
     with tempfile.TemporaryDirectory(prefix="skyulf-bundle-") as directory:
         result = run_action(

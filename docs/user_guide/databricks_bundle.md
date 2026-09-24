@@ -15,7 +15,13 @@ Generate a project from a Skyulf checkout:
 databricks bundle init templates/databricks --output-dir ./generated
 ```
 
-The four questions are project name, local engine, catalog and schema. The
+Choose `personal` for a serverless `dev` target, or `company` for
+policy-backed `test`, `syst` and `prod` targets. Personal mode asks for project
+name, local engine, catalog and schema. Company mode asks for the workspace
+host, target catalogs, input/metadata/result schemas, approved cluster policy
+and `PayingRegNo`. Supply reviewed answers with `bundle init --config-file`
+when the team has them; the company examples in the questionnaire are not
+verified production settings. The
 generated project contains its own `databricks.yml`, `config/workflow.json`,
 Skyulf job entry point and five job resources. It does not put a
 `databricks.yml` in the Skyulf repository root. Follow the generated README
@@ -24,6 +30,30 @@ features, preprocessing/model configuration and temporal split, then provision
 the source, target and admission tables. The generated JSON is an editable
 starting point; there is no claim that arbitrary feature engineering can be
 inferred from a table name.
+
+For company mode, copy and review
+`templates/databricks/examples/company-init.example.json`, especially its
+placeholder host and policy/tag values, then initialize with:
+
+```powershell
+databricks bundle init templates/databricks --config-file <reviewed-config.json> --output-dir ./generated
+```
+
+| Job | Purpose | Normal cadence |
+| --- | --- | --- |
+| `train` | Fit and register a candidate with held-out MLflow metrics | When labeled data warrants a new model |
+| `compare` | Read-only candidate/champion check | During model review |
+| `stage` | Assign an eligible `@challenger` | Explicit release step |
+| `promote` | Move staged candidate to `@champion` | Explicit approval step |
+| `score` | Append predictions for new source inserts | Every scoring run |
+
+Only `score` is needed for recurring inference. A generated project has one
+prediction table per model. Its existing labeled/source tables are inputs; the
+score and alias admission tables are internal coordination state in the
+metadata schema. They are not additional prediction outputs. Company `test`
+adds a per-user suffix to output/model/control names, while `syst` and `prod`
+use stable names in their respective catalogs. The notebook verifies that
+these writes stay in the active target's catalog and schema.
 
 ```powershell
 databricks bundle validate --strict -t dev --profile <profile>
@@ -63,3 +93,10 @@ source's append policy and data permissions. Monthly retraining scheduling,
 full-history rescores, Spark-native execution and endpoints are separate
 extensions. See [the local SDK](databricks_local_sdk.md) for the underlying
 configuration and [MLflow registry](mlflow_registry.md) for model resolution.
+
+The personal `dev` Bundle was live-tested on serverless compute. Company
+targets are generated but have not been validated or run in the company
+workspace. Before a company rollout, verify host/catalog/policy/tag values,
+validate each target with its own CLI profile and perform an isolated `test`
+run. A different company workspace per target requires editing each target's
+`workspace.host` after initialization.

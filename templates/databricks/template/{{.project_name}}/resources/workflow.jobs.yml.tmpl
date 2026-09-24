@@ -1,0 +1,223 @@
+resources:
+  jobs:
+    train:
+      name: ${bundle.name}_train
+      tasks:
+        - task_key: train
+          notebook_task:
+            notebook_path: ../src/workflow.py
+            base_parameters:
+              action: train
+              config_path: ${workspace.file_path}/config/workflow.json
+              experiment_name: ${workspace.root_path}/experiment
+              catalog: ${var.catalog}
+              input_schema: ${var.input_schema}
+              output_schema: ${var.output_schema}
+              metadata_schema: ${var.metadata_schema}
+              resource_suffix: ${var.resource_suffix}
+{{if eq .deployment_mode "personal"}}
+          environment_key: skyulf
+{{else}}
+          job_cluster_key: skyulf
+          libraries:
+            - whl: ${workspace.file_path}/dist/skyulf_core-0.9.0-py3-none-any.whl
+            - pypi:
+                package: mlflow==3.16.1
+{{end}}
+{{if eq .deployment_mode "personal"}}
+      environments:
+        - environment_key: skyulf
+          spec:
+            client: "4"
+            dependencies:
+              - ${workspace.file_path}/dist/skyulf_core-0.9.0-py3-none-any.whl
+              - mlflow==3.16.1
+{{else}}
+      job_clusters:
+        - job_cluster_key: skyulf
+          new_cluster:
+            spark_version: 17.3.x-cpu-ml-scala2.13
+            node_type_id: m5d.2xlarge
+            policy_id: ${var.cluster_policy_id}
+            custom_tags:
+              PayingRegNo: ${var.paying_reg_no}
+            autoscale:
+              min_workers: 2
+              max_workers: 4
+{{end}}
+    compare:
+      name: ${bundle.name}_compare
+      tasks:
+        - task_key: compare
+          notebook_task:
+            notebook_path: ../src/workflow.py
+            base_parameters:
+              action: compare
+              config_path: ${workspace.file_path}/config/workflow.json
+              catalog: ${var.catalog}
+              input_schema: ${var.input_schema}
+              output_schema: ${var.output_schema}
+              metadata_schema: ${var.metadata_schema}
+              resource_suffix: ${var.resource_suffix}
+{{if eq .deployment_mode "personal"}}
+          environment_key: skyulf
+{{else}}
+          job_cluster_key: skyulf
+          libraries:
+            - whl: ${workspace.file_path}/dist/skyulf_core-0.9.0-py3-none-any.whl
+            - pypi:
+                package: mlflow==3.16.1
+{{end}}
+{{if eq .deployment_mode "personal"}}
+      environments:
+        - environment_key: skyulf
+          spec:
+            client: "4"
+            dependencies:
+              - ${workspace.file_path}/dist/skyulf_core-0.9.0-py3-none-any.whl
+              - mlflow==3.16.1
+{{else}}
+      job_clusters:
+        - job_cluster_key: skyulf
+          new_cluster:
+            spark_version: 17.3.x-cpu-ml-scala2.13
+            node_type_id: m5d.2xlarge
+            policy_id: ${var.cluster_policy_id}
+            custom_tags:
+              PayingRegNo: ${var.paying_reg_no}
+            autoscale:
+              min_workers: 2
+              max_workers: 4
+{{end}}
+    stage:
+      name: ${bundle.name}_stage
+      tasks:
+        - task_key: stage
+          notebook_task:
+            notebook_path: ../src/workflow.py
+            base_parameters:
+              action: stage
+              config_path: ${workspace.file_path}/config/workflow.json
+              catalog: ${var.catalog}
+              input_schema: ${var.input_schema}
+              output_schema: ${var.output_schema}
+              metadata_schema: ${var.metadata_schema}
+              resource_suffix: ${var.resource_suffix}
+{{if eq .deployment_mode "personal"}}
+          environment_key: skyulf
+{{else}}
+          job_cluster_key: skyulf
+          libraries:
+            - whl: ${workspace.file_path}/dist/skyulf_core-0.9.0-py3-none-any.whl
+            - pypi:
+                package: mlflow==3.16.1
+{{end}}
+{{if eq .deployment_mode "personal"}}
+      environments:
+        - environment_key: skyulf
+          spec:
+            client: "4"
+            dependencies:
+              - ${workspace.file_path}/dist/skyulf_core-0.9.0-py3-none-any.whl
+              - mlflow==3.16.1
+{{else}}
+      job_clusters:
+        - job_cluster_key: skyulf
+          new_cluster:
+            spark_version: 17.3.x-cpu-ml-scala2.13
+            node_type_id: m5d.2xlarge
+            policy_id: ${var.cluster_policy_id}
+            custom_tags:
+              PayingRegNo: ${var.paying_reg_no}
+            autoscale:
+              min_workers: 2
+              max_workers: 4
+{{end}}
+    promote:
+      name: ${bundle.name}_promote
+      tasks:
+        - task_key: promote
+          notebook_task:
+            notebook_path: ../src/workflow.py
+            base_parameters:
+              action: promote
+              config_path: ${workspace.file_path}/config/workflow.json
+              catalog: ${var.catalog}
+              input_schema: ${var.input_schema}
+              output_schema: ${var.output_schema}
+              metadata_schema: ${var.metadata_schema}
+              resource_suffix: ${var.resource_suffix}
+{{if eq .deployment_mode "personal"}}
+          environment_key: skyulf
+{{else}}
+          job_cluster_key: skyulf
+          libraries:
+            - whl: ${workspace.file_path}/dist/skyulf_core-0.9.0-py3-none-any.whl
+            - pypi:
+                package: mlflow==3.16.1
+{{end}}
+{{if eq .deployment_mode "personal"}}
+      environments:
+        - environment_key: skyulf
+          spec:
+            client: "4"
+            dependencies:
+              - ${workspace.file_path}/dist/skyulf_core-0.9.0-py3-none-any.whl
+              - mlflow==3.16.1
+{{else}}
+      job_clusters:
+        - job_cluster_key: skyulf
+          new_cluster:
+            spark_version: 17.3.x-cpu-ml-scala2.13
+            node_type_id: m5d.2xlarge
+            policy_id: ${var.cluster_policy_id}
+            custom_tags:
+              PayingRegNo: ${var.paying_reg_no}
+            autoscale:
+              min_workers: 2
+              max_workers: 4
+{{end}}
+    score:
+      name: ${bundle.name}_score
+      tasks:
+        - task_key: score
+          notebook_task:
+            notebook_path: ../src/workflow.py
+            base_parameters:
+              action: score
+              config_path: ${workspace.file_path}/config/workflow.json
+              catalog: ${var.catalog}
+              input_schema: ${var.input_schema}
+              output_schema: ${var.output_schema}
+              metadata_schema: ${var.metadata_schema}
+              resource_suffix: ${var.resource_suffix}
+{{if eq .deployment_mode "personal"}}
+          environment_key: skyulf
+{{else}}
+          job_cluster_key: skyulf
+          libraries:
+            - whl: ${workspace.file_path}/dist/skyulf_core-0.9.0-py3-none-any.whl
+            - pypi:
+                package: mlflow==3.16.1
+{{end}}
+{{if eq .deployment_mode "personal"}}
+      environments:
+        - environment_key: skyulf
+          spec:
+            client: "4"
+            dependencies:
+              - ${workspace.file_path}/dist/skyulf_core-0.9.0-py3-none-any.whl
+              - mlflow==3.16.1
+{{else}}
+      job_clusters:
+        - job_cluster_key: skyulf
+          new_cluster:
+            spark_version: 17.3.x-cpu-ml-scala2.13
+            node_type_id: m5d.2xlarge
+            policy_id: ${var.cluster_policy_id}
+            custom_tags:
+              PayingRegNo: ${var.paying_reg_no}
+            autoscale:
+              min_workers: 2
+              max_workers: 4
+{{end}}

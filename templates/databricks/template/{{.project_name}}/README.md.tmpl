@@ -3,14 +3,15 @@
 This is a Skyulf 0.9.0 local-engine Databricks Bundle. The selected fit and
 prediction engine is **{{.engine}}**. Spark is used to read bounded Delta rows
 and publish the prediction table; Skyulf runs feature engineering and model
-prediction on the selected local engine.
+prediction on the selected local engine. This project was generated for the
+**{{.deployment_mode}}** deployment profile.
 
 ## Before the first run
 
 1. Put the matching, trusted `skyulf_core-0.9.0-py3-none-any.whl` in `dist/`.
    From a Skyulf source checkout, run `uv build --wheel --no-build-isolation
    --out-dir <this-project>/dist skyulf-core`. Rebuild the wheel whenever the
-   source changes. The serverless job also installs MLflow 3.16.1.
+   source changes. The jobs also install MLflow 3.16.1.
 2. Edit `config/workflow.json`: set real training and scoring tables, features,
    temporal split, preprocessing/model config, memory bounds and the concrete
    training Delta version. The generated values are examples, not a dataset.
@@ -23,14 +24,45 @@ prediction on the selected local engine.
    stage/promote jobs, create a separate alias admission table with the same
    columns and one row with `target_id` equal to
    `skyulf.integrations.mlflow.promotion.alias_resource_id(model_name)`.
-4. Authenticate the Databricks CLI, then run `databricks bundle validate
-   --strict -t dev` and `databricks bundle deploy -t dev`. The CLI profile is
-   selected by `--profile`; no credentials are stored here.
+4. Authenticate the Databricks CLI, then validate and deploy the intended
+   target with `databricks bundle validate --strict -t <target> --profile
+   <profile>` and `databricks bundle deploy -t <target> --profile <profile>`.
+   The CLI profile supplies credentials; none are stored here.
 
-Run `databricks bundle run train -t dev` to train one candidate, log held-out
+{{if eq .deployment_mode "personal"}}
+The only target is `dev`, using serverless jobs. The initial catalog and schema
+come from the two initialization questions. Use this mode in a personal
+workspace for development and isolated live tests.
+{{else}}
+The company targets are `test`, `syst` and `prod`. They use the approved job
+cluster policy and `PayingRegNo` cost tag supplied at initialization. Verify
+the workspace host, three catalog mappings, schema names, policy name, tag and
+CLI profile with your team before deployment. The questionnaire defaults are
+examples from the supplied company reference, not confirmed production values.
+`test` adds a per-user suffix to the registered model, prediction and internal
+admission tables. `syst` and `prod` use stable names in distinct catalogs.
+The input tables are existing tables; edit their full UC names if another team
+owns them. If the three targets live in different workspaces, set each target's
+`workspace.host` separately before validation.
+{{end}}
+
+| Job | When to run | Effect |
+| --- | --- | --- |
+| `train` | New labeled data or model candidate | Fits and registers a candidate, logs held-out MLflow metrics |
+| `compare` | Review a candidate | Read-only comparison with the current champion |
+| `stage` | After an eligible comparison | Assigns the candidate to `@challenger` |
+| `promote` | Explicit release decision | Moves the staged candidate to `@champion` |
+| `score` | Each new source increment | Appends only new-row predictions to one target table |
+
+The project uses one prediction table per model. Its score and alias admission
+tables are internal coordination tables in the metadata schema, not prediction
+outputs. Normal recurring inference runs only `score`; training and alias jobs
+have their own release cadence.
+
+Run `databricks bundle run train -t <target>` to train one candidate, log held-out
 metrics and register its model. Inspect the resulting model version in Unity
 Catalog, and set `model_version` in the JSON to that **concrete version** before
-running `databricks bundle run score -t dev`. Redeploy after changing the
+running `databricks bundle run score -t <target>`. Redeploy after changing the
 configuration. Each score run handles the initial bounded source snapshot or
 only inserts since the last committed receipt. Run it again with no new rows
 to see a no-op; no date or source-version argument is needed. Source updates
