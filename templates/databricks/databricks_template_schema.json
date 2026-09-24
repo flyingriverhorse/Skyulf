@@ -1,5 +1,5 @@
 {
-  "welcome_message": "Create a bounded Skyulf local-engine Databricks Bundle. Choose personal serverless or company policy-backed targets, then edit config/workflow.json for your data.",
+  "welcome_message": "Create a bounded Skyulf pandas/Polars Bundle. dev is ready for your CLI profile; edit test, syst and prod target settings before using them.",
   "properties": {
     "project_name": {
       "order": 1,
@@ -12,101 +12,72 @@
       "order": 2,
       "type": "string",
       "default": "pandas",
-      "description": "Local feature and model engine",
+      "description": "Local fit and prediction engine",
       "enum": ["pandas", "polars"]
     },
-    "deployment_mode": {
+    "compute_mode": {
       "order": 3,
       "type": "string",
-      "default": "personal",
-      "description": "Deployment profile",
-      "enum": ["personal", "company"]
+      "default": "serverless",
+      "description": "Job compute mode for this project",
+      "enum": ["serverless", "policy_cluster"]
     },
-    "catalog": {
+    "include_lifecycle": {
       "order": 4,
       "type": "string",
-      "default": "workspace",
-      "description": "Existing Unity Catalog catalog (simple identifier)",
-      "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
-      "skip_prompt_if": {"properties": {"deployment_mode": {"const": "company"}}}
+      "default": "no",
+      "description": "Add optional compare, stage and promote jobs?",
+      "enum": ["no", "yes"]
     },
-    "schema": {
+    "catalog": {
       "order": 5,
       "type": "string",
-      "default": "default",
-      "description": "Existing Unity Catalog schema (simple identifier)",
-      "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
-      "skip_prompt_if": {"properties": {"deployment_mode": {"const": "company"}}}
+      "default": "workspace",
+      "description": "Existing dev Unity Catalog catalog",
+      "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
     },
-    "company_host": {
+    "schema": {
       "order": 6,
       "type": "string",
-      "default": "https://example.invalid",
-      "description": "Company Databricks workspace host; verify before deployment",
-      "pattern": "^https://[^/]+$",
-      "skip_prompt_if": {"properties": {"deployment_mode": {"const": "personal"}}}
-    },
-    "test_catalog": {
-      "order": 7,
-      "type": "string",
-      "default": "dpt_analytics_test",
-      "description": "Test Unity Catalog catalog; reference example, verify with the team",
-      "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
-      "skip_prompt_if": {"properties": {"deployment_mode": {"const": "personal"}}}
-    },
-    "syst_catalog": {
-      "order": 8,
-      "type": "string",
-      "default": "dpt_analytics_syst",
-      "description": "System-test Unity Catalog catalog; reference example, verify with the team",
-      "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
-      "skip_prompt_if": {"properties": {"deployment_mode": {"const": "personal"}}}
-    },
-    "prod_catalog": {
-      "order": 9,
-      "type": "string",
-      "default": "dpt_analytics_prod",
-      "description": "Production Unity Catalog catalog; reference example, verify with the team",
-      "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
-      "skip_prompt_if": {"properties": {"deployment_mode": {"const": "personal"}}}
-    },
-    "input_schema": {
-      "order": 10,
-      "type": "string",
-      "default": "dsp_refined",
-      "description": "Existing labeled and scoring input schema",
-      "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
-      "skip_prompt_if": {"properties": {"deployment_mode": {"const": "personal"}}}
-    },
-    "metadata_schema": {
-      "order": 11,
-      "type": "string",
-      "default": "dsp_metadata",
-      "description": "Registered model and internal admission schema",
-      "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
-      "skip_prompt_if": {"properties": {"deployment_mode": {"const": "personal"}}}
-    },
-    "output_schema": {
-      "order": 12,
-      "type": "string",
-      "default": "dsp_mlresult",
-      "description": "One prediction table per model in this schema",
-      "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
-      "skip_prompt_if": {"properties": {"deployment_mode": {"const": "personal"}}}
+      "default": "default",
+      "description": "Existing dev Unity Catalog schema",
+      "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
     },
     "cluster_policy_name": {
-      "order": 13,
+      "order": 7,
       "type": "string",
-      "default": "[32] Job ML - ML-JOB-Training-Inference-S2M",
-      "description": "Approved company job-cluster policy name; verify with the team",
-      "skip_prompt_if": {"properties": {"deployment_mode": {"const": "personal"}}}
+      "default": "REPLACE_WITH_APPROVED_POLICY",
+      "description": "Approved job-cluster policy name",
+      "skip_prompt_if": {"properties": {"compute_mode": {"const": "serverless"}}}
     },
-    "paying_reg_no": {
-      "order": 14,
+    "spark_version": {
+      "order": 8,
       "type": "string",
-      "default": "34BG",
-      "description": "Approved company PayingRegNo cost tag; verify with the team",
-      "skip_prompt_if": {"properties": {"deployment_mode": {"const": "personal"}}}
+      "default": "17.3.x-cpu-ml-scala2.13",
+      "description": "Approved Databricks ML Runtime for the job cluster",
+      "skip_prompt_if": {"properties": {"compute_mode": {"const": "serverless"}}}
+    },
+    "node_type_id": {
+      "order": 9,
+      "type": "string",
+      "default": "REPLACE_WITH_NODE_TYPE",
+      "description": "Approved job-cluster node type",
+      "skip_prompt_if": {"properties": {"compute_mode": {"const": "serverless"}}}
+    },
+    "cost_tag_key": {
+      "order": 10,
+      "type": "string",
+      "default": "CostCenter",
+      "description": "Approved cluster cost tag key",
+      "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+      "skip_prompt_if": {"properties": {"compute_mode": {"const": "serverless"}}}
+    },
+    "cost_tag_value": {
+      "order": 11,
+      "type": "string",
+      "default": "REPLACE_WITH_COST_TAG",
+      "description": "Approved cluster cost tag value",
+      "skip_prompt_if": {"properties": {"compute_mode": {"const": "serverless"}}}
     }
   }
 }

@@ -1,5 +1,10 @@
 # SM-20P production Bundle implementation plan
 
+Superseded by [SM-20R reset and generic Bundle plan](23-sm20-reset-and-generic-bundle-plan.md)
+after the user's request for a reusable four-target project and a fresh
+personal-workspace test. The company-shaped implementation was never deployed
+to a company workspace.
+
 Updated: 2026-09-24. SM-20a is a live-validated **test/development Bundle
 template**, not a company production deployment. This plan compares it with
 `C:\Users\Murat\Downloads\codes-main (2)\codes-main\dbml-mlops-template`

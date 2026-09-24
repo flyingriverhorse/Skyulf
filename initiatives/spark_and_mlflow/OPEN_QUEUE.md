@@ -1,8 +1,7 @@
 # Spark ve MLflow — Open Queue
 
-Updated: 2026-09-24. **SM-00 through SM-16, SM-15L/15I/24a/25/26, SM-22a/b/c/28a and SM-20a complete. SM-20P active before SM-28b. Target: 0.9.0.**
-Next deliverable: production-target Bundle hardening, then optional monthly
-local retraining schedule. Spark
+Updated: 2026-09-24. **SM-00 through SM-16, SM-15L/15I/24a/25/26, SM-22a/b/c/28a and SM-20a/20R complete. SM-28b is next. Target: 0.9.0.**
+Next deliverable: optional monthly local retraining schedule. Spark
 expansion follows the validated first Bundle. SM-15L
 provides explicit-period UC output. SM-15I adds automatic new-row scoring
 for the first Bundle; SM-18 and streaming remain parked.
@@ -20,6 +19,7 @@ Durumlar: READY = başlanabilir; WAIT = önceki görev bekleniyor;
 LATER = son aşama; ACTIVE = yürütülüyor; BLOCKED = somut dış engel;
 DONE = kanıtla tamamlandı. SM-00 commit: `105a6fe4`.
 DEFERRED = user postponed this work; PARKED = do not implement until resumed.
+SUPERSEDED = replaced by a later user-directed scope; not a completed feature.
 
 | Sıra | Görev | Bağımlılık | Durum | Kısa bitiş ölçütü |
 | --- | --- | --- | --- | --- |
@@ -52,7 +52,8 @@ DEFERRED = user postponed this work; PARKED = do not implement until resumed.
 | SM-22c | Challenger and previous-champion aliases | SM-22b | DONE | Validated challenger staging; guarded three-alias promotion/rollback; legacy receipts and partial-write tests; [local and UC evidence](19-sm22c-lifecycle-alias-validation-report.md) |
 | SM-28a | Label-aware retraining service | SM-22a, SM-22b, SM-22c, SM-24a | DONE | Pinned training snapshot, temporal holdout, candidate registration/comparison; no automatic promotion; [evidence](20-sm28a-label-aware-retraining-report.md) |
 | SM-20a | First local-engine Bundle/template | SM-24a, SM-15I, SM-22b, SM-22c, SM-28a | DONE | Generated/deployed Polars Bundle; train/compare/stage/promote and 2+2 incremental score/no-op live; [evidence](21-sm20a-local-bundle-validation-report.md) |
-| SM-20P | Company Bundle target and provisioning hardening | SM-20a | ACTIVE | Personal serverless and company policy-backed target shapes generated and validated locally; one-time setup and real company test profile/policy gate remain; [plan](22-sm20p-production-bundle-plan.md) |
+| SM-20P | Company-shaped Bundle draft | SM-20a | SUPERSEDED | Replaced by the generic four-target SM-20R direction; no company workspace deployment |
+| SM-20R | Reset personal tests; generic minimal Bundle | SM-20a | DONE | Ten test jobs and three schemas removed; four target shapes validated, personal dev deployed with three jobs; one source, one prediction, one internal control, one UC model; Polars 600+50-row scoring and no-op replay; [live evidence](24-sm20r-clean-generic-bundle-validation-report.md) |
 | SM-28b | Optional monthly retraining schedule | SM-20a, SM-28a | READY | Wire separate train/compare/explicit-promote/score jobs with label cutoff and pinned versions |
 | SM-24b | Optional Databricks Jobs API operations | SM-20a | LATER | Add dynamic submit/status/cancel only if Bundle jobs are insufficient |
 | SM-24d | Hard transport budget for wide UC rows | SM-24a | LATER | Add a proven paged/size-limited source adapter when exact transfer-byte enforcement is required; current Spark iterator bounds accepted decoded rows and frame memory only |
@@ -63,8 +64,8 @@ DEFERRED = user postponed this work; PARKED = do not implement until resumed.
 | SM-24c | Spark batch workflow adapter | SM-20a, existing Spark sink | LATER | Expose tested Spark runner after first local Bundle |
 | SM-20b | Spark Bundle enhancement | SM-24c, selected SM-17 slices | LATER | Add tested Spark engine choice while preserving local variant |
 
-SM-20P is the active production-readiness work after the first Bundle. Its
-company profile/policy execution remains unverified. SM-22a/b/c and SM-28a
+SM-20R replaces SM-20P after the user's reset and generic-template direction.
+Company profile/policy execution remains unverified. SM-22a/b/c and SM-28a
 are prerequisites for the first Bundle. SM-28b only
 wires their optional monthly schedule after the Bundle exists. SM-27 remains
 post-Bundle and independent. Endpoint, feature lookup and monitoring remain

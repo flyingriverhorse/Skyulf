@@ -12,73 +12,72 @@ sync:
 
 variables:
   catalog:
-    description: Unity Catalog catalog for the active target
-{{if eq .deployment_mode "personal"}}
+    description: Unity Catalog catalog selected by the active target
     default: {{.catalog}}
-{{end}}
   input_schema:
-    description: Existing labeled and scoring source tables
-{{if eq .deployment_mode "personal"}}
+    description: Existing training and scoring source schema
     default: {{.schema}}
-{{else}}
-    default: {{.input_schema}}
-{{end}}
   output_schema:
-    description: Prediction Delta table
-{{if eq .deployment_mode "personal"}}
+    description: Prediction output schema
     default: {{.schema}}
-{{else}}
-    default: {{.output_schema}}
-{{end}}
   metadata_schema:
-    description: Registered model and internal admission tables
-{{if eq .deployment_mode "personal"}}
+    description: Model and internal coordination schema
     default: {{.schema}}
-{{else}}
-    default: {{.metadata_schema}}
-{{end}}
   resource_suffix:
-    description: Non-production namespace suffix; empty for the initial dev project
+    description: Optional namespace suffix for shared development targets
     default: ""
-{{if eq .deployment_mode "company"}}
+{{if eq .compute_mode "policy_cluster"}}
   cluster_policy_id:
-    description: Approved job-cluster policy resolved in this workspace
+    description: Approved policy looked up in the active workspace
     lookup:
       cluster_policy: "{{.cluster_policy_name}}"
-  paying_reg_no:
-    description: Approved PayingRegNo cost allocation tag
-    default: "{{.paying_reg_no}}"
+  cost_tag_value:
+    description: Approved cluster cost allocation tag value
+    default: "{{.cost_tag_value}}"
 {{end}}
 
 targets:
-{{if eq .deployment_mode "personal"}}
   dev:
     default: true
     mode: development
-{{else}}
+    variables:
+      catalog: {{.catalog}}
+      input_schema: {{.schema}}
+      output_schema: {{.schema}}
+      metadata_schema: {{.schema}}
+      resource_suffix: ""
+  # Replace each placeholder before deploying outside dev. Hosts are distinct
+  # on purpose: a personal dev profile cannot become a production default.
   test:
-    default: true
     mode: development
     variables:
-      catalog: {{.test_catalog}}
+      catalog: REPLACE_TEST_CATALOG
+      input_schema: REPLACE_TEST_INPUT_SCHEMA
+      output_schema: REPLACE_TEST_OUTPUT_SCHEMA
+      metadata_schema: REPLACE_TEST_METADATA_SCHEMA
       resource_suffix: _${workspace.current_user.short_name}
     workspace:
-      host: {{.company_host}}
+      host: https://replace-test.example.invalid
       root_path: ~/{{.project_name}}/test
   syst:
     mode: production
     variables:
-      catalog: {{.syst_catalog}}
+      catalog: REPLACE_SYST_CATALOG
+      input_schema: REPLACE_SYST_INPUT_SCHEMA
+      output_schema: REPLACE_SYST_OUTPUT_SCHEMA
+      metadata_schema: REPLACE_SYST_METADATA_SCHEMA
       resource_suffix: ""
     workspace:
-      host: {{.company_host}}
+      host: https://replace-syst.example.invalid
       root_path: ~/{{.project_name}}/syst
   prod:
     mode: production
     variables:
-      catalog: {{.prod_catalog}}
+      catalog: REPLACE_PROD_CATALOG
+      input_schema: REPLACE_PROD_INPUT_SCHEMA
+      output_schema: REPLACE_PROD_OUTPUT_SCHEMA
+      metadata_schema: REPLACE_PROD_METADATA_SCHEMA
       resource_suffix: ""
     workspace:
-      host: {{.company_host}}
+      host: https://replace-prod.example.invalid
       root_path: ~/{{.project_name}}/prod
-{{end}}

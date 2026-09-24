@@ -1,84 +1,90 @@
 # {{.project_name}}
 
-This is a Skyulf 0.9.0 local-engine Databricks Bundle. The selected fit and
-prediction engine is **{{.engine}}**. Spark is used to read bounded Delta rows
-and publish the prediction table; Skyulf runs feature engineering and model
-prediction on the selected local engine. This project was generated for the
-**{{.deployment_mode}}** deployment profile.
+This Skyulf 0.9.0 Bundle fits and predicts with **{{.engine}}**. Spark reads
+bounded Unity Catalog Delta rows and writes predictions. The selected job
+compute mode is **{{.compute_mode}}**. `dev`, `test`, `syst` and `prod` use the
+same Skyulf workflow code with different target bindings.
 
-## Before the first run
+## What deployment creates
 
-1. Put the matching, trusted `skyulf_core-0.9.0-py3-none-any.whl` in `dist/`.
-   From a Skyulf source checkout, run `uv build --wheel --no-build-isolation
-   --out-dir <this-project>/dist skyulf-core`. Rebuild the wheel whenever the
-   source changes. The jobs also install MLflow 3.16.1.
-2. Edit `config/workflow.json`: set real training and scoring tables, features,
-   temporal split, preprocessing/model config, memory bounds and the concrete
-   training Delta version. The generated values are examples, not a dataset.
-3. Create the source and empty prediction Delta tables. Enable Change Data
-   Feed on the scoring source **before** new rows arrive. The prediction table
-   needs `row_keys`, `prediction`, `run_id`, `model_name`, and `model_version`
-   with types matching the Skyulf output. Create the separate score admission
-   table with `(target_id STRING, owner STRING)` and one row whose `target_id`
-   is the prediction table's Delta identity and `owner` is null. If using the
-   stage/promote jobs, create a separate alias admission table with the same
-   columns and one row with `target_id` equal to
-   `skyulf.integrations.mlflow.promotion.alias_resource_id(model_name)`.
-4. Authenticate the Databricks CLI, then validate and deploy the intended
-   target with `databricks bundle validate --strict -t <target> --profile
-   <profile>` and `databricks bundle deploy -t <target> --profile <profile>`.
-   The CLI profile supplies credentials; none are stored here.
+`bundle deploy` uploads the wheel, notebook and configuration, and creates
+{{if eq .include_lifecycle "yes"}}six{{else}}three{{end}} jobs. It creates **no**
+Unity Catalog table or registered model. The default jobs are:
 
-{{if eq .deployment_mode "personal"}}
-The only target is `dev`, using serverless jobs. The initial catalog and schema
-come from the two initialization questions. Use this mode in a personal
-workspace for development and isolated live tests.
+| Job | Run it when | UC effect |
+| --- | --- | --- |
+| `train` | A labeled snapshot is ready | Registers one candidate model and logs MLflow metrics |
+| `setup` | The model version and source are ready | Creates one empty prediction table and one score-control table if absent |
+| `score` | New rows need predictions | Appends only new-row predictions to the same prediction table |
+
+{{if eq .include_lifecycle "yes"}}
+The optional `compare`, `stage` and `promote` jobs are also generated. Setup
+then creates a separate alias-control table. Those jobs review and explicitly
+move `@challenger` and `@champion`; they never run as part of ordinary scoring.
 {{else}}
-The company targets are `test`, `syst` and `prod`. They use the approved job
-cluster policy and `PayingRegNo` cost tag supplied at initialization. Verify
-the workspace host, three catalog mappings, schema names, policy name, tag and
-CLI profile with your team before deployment. The questionnaire defaults are
-examples from the supplied company reference, not confirmed production values.
-`test` adds a per-user suffix to the registered model, prediction and internal
-admission tables. `syst` and `prod` use stable names in distinct catalogs.
-The input tables are existing tables; edit their full UC names if another team
-owns them. If the three targets live in different workspaces, set each target's
-`workspace.host` separately before validation.
+The champion/challenger jobs and alias-control table are absent in this
+minimal project. Generate with `include_lifecycle=yes` when needed.
 {{end}}
 
-| Job | When to run | Effect |
-| --- | --- | --- |
-| `train` | New labeled data or model candidate | Fits and registers a candidate, logs held-out MLflow metrics |
-| `compare` | Review a candidate | Read-only comparison with the current champion |
-| `stage` | After an eligible comparison | Assigns the candidate to `@challenger` |
-| `promote` | Explicit release decision | Moves the staged candidate to `@champion` |
-| `score` | Each new source increment | Appends only new-row predictions to one target table |
+`training_table` is the existing labeled input. `score_source_table` is the
+existing input to predict; the generated config points both at **one table**.
+You may give them different UC names when the labeled training data and new
+inference data have different lifecycles. Neither is created by this Bundle.
+`prediction_table` is the single model output table. `score_admission_table`
+holds one internal ownership row so concurrent writers cannot silently
+duplicate an increment. `model_name` is a registered UC model, not a table.
 
-The project uses one prediction table per model. Its score and alias admission
-tables are internal coordination tables in the metadata schema, not prediction
-outputs. Normal recurring inference runs only `score`; training and alias jobs
-have their own release cadence.
+## Prepare the project
 
-Run `databricks bundle run train -t <target>` to train one candidate, log held-out
-metrics and register its model. Inspect the resulting model version in Unity
-Catalog, and set `model_version` in the JSON to that **concrete version** before
-running `databricks bundle run score -t <target>`. Redeploy after changing the
-configuration. Each score run handles the initial bounded source snapshot or
-only inserts since the last committed receipt. Run it again with no new rows
-to see a no-op; no date or source-version argument is needed. Source updates
-and deletes require a separate rescore policy.
+1. Build a matching, trusted wheel from a Skyulf checkout with `uv build
+   --wheel --no-build-isolation --out-dir <this-project>/dist skyulf-core`.
+2. Edit `config/workflow.json` for real source/model names, row keys, model
+   inputs, preprocessing, estimator, temporal split and size limits. The
+   generated JSON is an example, not a usable dataset. Enable Delta Change
+   Data Feed on the scoring source before new rows arrive. Check that the
+   source's initial rows are the rows you intend to score: the first `score`
+   run predicts **all** existing source rows, including labeled training rows
+   when one table is used for both purposes.
+3. Authenticate a Databricks CLI profile and validate/deploy the `dev` target:
 
-The first model has no champion by default. Once a champion alias has been
-explicitly initialized, set `champion_version` and `candidate_version` to
-concrete versions from the **same** pinned labeled holdout. The `compare` job
-is read-only. `stage` and `promote` are separate manual jobs: they re-evaluate
-the comparison and use the distributed alias admission row. Promotion requires
-the matching candidate to have been staged as `@challenger`. Neither training
-nor comparison changes aliases automatically. Keep scoring pinned to a
-concrete `model_version` until you explicitly decide to move it; an alias
-change does not rescore historical rows.
+   ```powershell
+   databricks bundle validate --strict -t dev --profile <profile>
+   databricks bundle deploy -t dev --profile <profile>
+   ```
 
-The default jobs have no schedules. Add a scoring schedule after checking the
-source append policy and table permissions. Optional retraining schedules,
-full-history rescores, Spark feature engineering and endpoints are separate
-future extensions.
+   `dev` uses the profile's workspace host and the catalog/schema chosen at
+   initialization. The three other targets contain **different placeholder
+   hosts and catalogs**. Replace each with an approved value and use its own
+   profile before validation or deployment. Credentials are never saved here.
+   The generated target variables also let each environment use different
+   input, output and metadata schemas.
+
+{{if eq .compute_mode "policy_cluster"}}
+The selected policy-backed jobs look up the policy name supplied during
+initialization. Confirm its runtime, node type and cost tag in each workspace.
+An example init config lives in `templates/databricks/examples/policy-init.example.json`
+in the Skyulf checkout. Its placeholders must be reviewed before use.
+{{else}}
+The generated jobs use Databricks serverless Python environment 4. Policy
+clusters are a separate compute choice at project initialization.
+{{end}}
+
+## First run and later increments
+
+1. Run `train` against a pinned labeled Delta version. It logs held-out MLflow
+   metrics and registers a concrete model version.
+2. Put that concrete version in `model_version` in `config/workflow.json` and
+   redeploy. Run `setup`. Setup verifies the source, Change Data Feed, model
+   outputs, row keys and existing target/control schemas before writing. It
+   creates only missing output/control tables; it never overwrites existing
+   tables or creates the source. Its row check is bounded by `max_rows`; the
+   scoring job also enforces `max_bytes` on the local transfer.
+3. Run `score`. Add new rows to the existing source Delta table and run `score`
+   again. An unchanged replay is a no-op. No date or source-version argument
+   is entered for each run. Source updates or deletes require a separate
+   rescore policy.
+
+`score` always uses its configured concrete model version. Training a new
+candidate or changing a registry alias does not rewrite old prediction rows.
+There is no schedule, online endpoint or Spark-native FE/model execution in
+this starting project.

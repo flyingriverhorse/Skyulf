@@ -25,21 +25,25 @@ registered candidate without promotion; see [its local and live report](20-sm28a
 SM-20a now generates and deploys the first local-engine Bundle. Its own jobs
 passed Polars training, 2+2 incremental scoring/no-op, read-only comparison,
 challenger staging and explicit promotion; see [the report](21-sm20a-local-bundle-validation-report.md).
-SM-20P now hardens the Bundle for a company environment before SM-28b. The
-personal `dev` shape remains serverless; generated company `test/syst/prod`
-targets use a looked-up job-cluster policy and `PayingRegNo`. Both templates
-rendered, personal strict CLI validation passed, and company target shapes
-passed strict CLI validation with a dummy policy ID in the personal workspace.
-This is not a company deployment or policy execution check. Company profile,
-host, catalog, schema, policy and cost-tag values still need confirmation;
-one-time provisioning/preflight is open. See
-[the production hardening plan](22-sm20p-production-bundle-plan.md).
+The user requested a clean reset and a generic Bundle. The personal `skyulf`
+workspace's ten SM-20a jobs and three Skyulf test schemas were deleted; post-
+deletion job listing was empty and only default/system schemas remained. The
+company-shaped SM-20P draft is superseded. SM-20R now generates one editable
+`dev/test/syst/prod` project: serverless is the easy default, policy compute
+and champion/challenger jobs are optional, and test/syst/prod have distinct
+unconfigured host/catalog placeholders. Deployment itself creates no UC
+tables. The clean personal test passed: one existing source, registered Polars
+model version 1, one prediction table and one internal score-control table;
+600 initial and 50 later predictions, followed by a no-op replay. The final
+read-only check found 650 unique predictions. See [the live report](24-sm20r-clean-generic-bundle-validation-report.md)
+and [the reset plan](23-sm20-reset-and-generic-bundle-plan.md). Those test
+resources remain for inspection. Company targets are still placeholders.
 
 ## Starting point
 
 - SM-00 through SM-16, SM-15L, SM-15I, SM-24a, SM-25, SM-26,
-  SM-22a/b/c, SM-28a and SM-20a are complete. Continue SM-20P from
-  [the open queue](OPEN_QUEUE.md), using the generated Bundle and the
+  SM-22a/b/c, SM-28a and SM-20a/20R are complete. Continue SM-28b from
+  [the open queue](OPEN_QUEUE.md), using the generic Bundle and the
   [pre-Bundle lifecycle plan](06-prebundle-model-lifecycle-plan.md).
   SM-15I [live evidence](13-sm15i-live-validation-report.md) proves automatic
   80+80 insert-only scoring with no date column or per-run version input.

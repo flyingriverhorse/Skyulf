@@ -1,6 +1,7 @@
 {
   "engine": "{{.engine}}",
-  "training_table": "{catalog}.{input_schema}.{{.project_name}}_training",
+  "include_lifecycle": "{{.include_lifecycle}}",
+  "training_table": "{catalog}.{input_schema}.{{.project_name}}_source",
   "training_version": 0,
   "score_source_table": "{catalog}.{input_schema}.{{.project_name}}_source",
   "prediction_table": "{catalog}.{output_schema}.{{.project_name}}_predictions{resource_suffix}",

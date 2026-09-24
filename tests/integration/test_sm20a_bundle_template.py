@@ -236,6 +236,7 @@ def test_generated_config_keeps_company_output_in_each_target():
         template.read_text(encoding="utf-8")
         .replace("{{.project_name}}", "customer_model")
         .replace("{{.engine}}", "pandas")
+        .replace("{{.include_lifecycle}}", "no")
     )
     outputs = {}
     for target, catalog, suffix in (
@@ -261,3 +262,111 @@ def test_generated_config_keeps_company_output_in_each_target():
         "syst": "syst_catalog.dsp_mlresult.customer_model_predictions",
         "prod": "prod_catalog.dsp_mlresult.customer_model_predictions",
     }
+
+
+def test_minimal_generated_config_uses_one_existing_source():
+    """Default training and scoring should reference one existing source table."""
+    workflow = _workflow()
+    template = WORKFLOW.parents[1] / "config/workflow.json.tmpl"
+    config = json.loads(
+        template.read_text(encoding="utf-8")
+        .replace("{{.project_name}}", "customer_model")
+        .replace("{{.engine}}", "pandas")
+        .replace("{{.include_lifecycle}}", "no")
+    )
+    bound = workflow.resolve_target_config(
+        config,
+        {
+            "catalog": "test_catalog",
+            "input_schema": "input_schema",
+            "output_schema": "output_schema",
+            "metadata_schema": "metadata_schema",
+            "resource_suffix": "",
+        },
+    )
+    assert bound["training_table"] == bound["score_source_table"]
+
+
+def test_setup_rejects_missing_source_without_creating_tables():
+    """A wrong source reference must not create partial prediction resources."""
+    workflow = _workflow()
+    spark = Mock()
+    spark.catalog.tableExists.return_value = False
+    with pytest.raises(ValueError, match="source"):
+        workflow.provision_local_tables(spark, _config(), object())
+    spark.sql.assert_not_called()
+
+
+def test_setup_creates_only_prediction_and_score_control(monkeypatch):
+    """First setup must leave inputs alone and create no alias table by default."""
+    workflow = _workflow()
+    config = _config()
+    source = Mock()
+    source.columns = ["entity_id", "x"]
+    source.schema = {
+        "entity_id": SimpleNamespace(dataType=SimpleNamespace(typeName=lambda: "string"))
+    }
+    source.select.return_value.limit.return_value.count.return_value = 2
+    spark = Mock()
+    spark.catalog.tableExists.side_effect = lambda name: (
+        name
+        in {
+            config["training_table"],
+            config["score_source_table"],
+        }
+    )
+    spark.table.return_value = source
+    spark.sql.return_value.first.return_value = {
+        "properties": {"delta.enableChangeDataFeed": "true"}
+    }
+    monkeypatch.setattr(workflow, "table_identity", Mock(return_value="prediction-id"))
+    prepared = SimpleNamespace(
+        artifact=SimpleNamespace(manifest=SimpleNamespace(input_columns=("x",))),
+        preflight=SimpleNamespace(
+            ready=True,
+            output_schema=(SimpleNamespace(name="prediction", dtype="float64"),),
+        ),
+    )
+    result = workflow.provision_local_tables(spark, config, prepared)
+    statements = [call.args[0] for call in spark.sql.call_args_list]
+    creates = [statement for statement in statements if statement.startswith("CREATE TABLE")]
+    assert result.prediction_created and result.score_admission_created
+    assert result.alias_admission_table is None
+    assert len(creates) == 2
+    assert creates[0].startswith(f"CREATE TABLE {config['prediction_table']} (")
+    assert creates[1].startswith(f"CREATE TABLE {config['score_admission_table']} USING DELTA")
+
+
+def test_setup_replay_validates_existing_tables_without_creating_anything(monkeypatch):
+    """Rerunning setup must preserve the existing prediction and control tables."""
+    workflow = _workflow()
+    config = _config()
+    source = Mock()
+    source.columns = ["entity_id", "x"]
+    source.schema = {
+        "entity_id": SimpleNamespace(dataType=SimpleNamespace(typeName=lambda: "string"))
+    }
+    source.select.return_value.limit.return_value.count.return_value = 2
+    spark = Mock()
+    spark.catalog.tableExists.return_value = True
+    spark.table.return_value = source
+    spark.sql.return_value.first.return_value = {
+        "properties": {"delta.enableChangeDataFeed": "true"}
+    }
+    monkeypatch.setattr(workflow, "table_identity", Mock(return_value="prediction-id"))
+    check_target = Mock()
+    check_control = Mock()
+    monkeypatch.setattr(workflow, "_check_existing_table", check_target)
+    monkeypatch.setattr(workflow, "_check_existing_control", check_control)
+    prepared = SimpleNamespace(
+        artifact=SimpleNamespace(manifest=SimpleNamespace(input_columns=("x",))),
+        preflight=SimpleNamespace(
+            ready=True,
+            output_schema=(SimpleNamespace(name="prediction", dtype="float64"),),
+        ),
+    )
+    result = workflow.provision_local_tables(spark, config, prepared)
+    check_target.assert_called_once()
+    check_control.assert_called_once_with(spark, config["score_admission_table"], "prediction-id")
+    assert not result.prediction_created and not result.score_admission_created
+    assert all(not call.args[0].startswith("CREATE TABLE") for call in spark.sql.call_args_list)

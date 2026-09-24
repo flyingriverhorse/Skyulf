@@ -1,5 +1,50 @@
 resources:
   jobs:
+    setup:
+      name: ${bundle.name}_setup
+      max_concurrent_runs: 1
+      tasks:
+        - task_key: setup
+          notebook_task:
+            notebook_path: ../src/workflow.py
+            base_parameters:
+              action: setup
+              config_path: ${workspace.file_path}/config/workflow.json
+              catalog: ${var.catalog}
+              input_schema: ${var.input_schema}
+              output_schema: ${var.output_schema}
+              metadata_schema: ${var.metadata_schema}
+              resource_suffix: ${var.resource_suffix}
+{{if eq .compute_mode "serverless"}}
+          environment_key: skyulf
+{{else}}
+          job_cluster_key: skyulf
+          libraries:
+            - whl: ${workspace.file_path}/dist/skyulf_core-0.9.0-py3-none-any.whl
+            - pypi:
+                package: mlflow==3.16.1
+{{end}}
+{{if eq .compute_mode "serverless"}}
+      environments:
+        - environment_key: skyulf
+          spec:
+            client: "4"
+            dependencies:
+              - ${workspace.file_path}/dist/skyulf_core-0.9.0-py3-none-any.whl
+              - mlflow==3.16.1
+{{else}}
+      job_clusters:
+        - job_cluster_key: skyulf
+          new_cluster:
+            spark_version: {{.spark_version}}
+            node_type_id: {{.node_type_id}}
+            policy_id: ${var.cluster_policy_id}
+            custom_tags:
+              {{.cost_tag_key}}: ${var.cost_tag_value}
+            autoscale:
+              min_workers: 2
+              max_workers: 4
+{{end}}
     train:
       name: ${bundle.name}_train
       tasks:
@@ -15,7 +60,7 @@ resources:
               output_schema: ${var.output_schema}
               metadata_schema: ${var.metadata_schema}
               resource_suffix: ${var.resource_suffix}
-{{if eq .deployment_mode "personal"}}
+{{if eq .compute_mode "serverless"}}
           environment_key: skyulf
 {{else}}
           job_cluster_key: skyulf
@@ -24,7 +69,7 @@ resources:
             - pypi:
                 package: mlflow==3.16.1
 {{end}}
-{{if eq .deployment_mode "personal"}}
+{{if eq .compute_mode "serverless"}}
       environments:
         - environment_key: skyulf
           spec:
@@ -36,15 +81,16 @@ resources:
       job_clusters:
         - job_cluster_key: skyulf
           new_cluster:
-            spark_version: 17.3.x-cpu-ml-scala2.13
-            node_type_id: m5d.2xlarge
+            spark_version: {{.spark_version}}
+            node_type_id: {{.node_type_id}}
             policy_id: ${var.cluster_policy_id}
             custom_tags:
-              PayingRegNo: ${var.paying_reg_no}
+              {{.cost_tag_key}}: ${var.cost_tag_value}
             autoscale:
               min_workers: 2
               max_workers: 4
 {{end}}
+{{if eq .include_lifecycle "yes"}}
     compare:
       name: ${bundle.name}_compare
       tasks:
@@ -59,7 +105,7 @@ resources:
               output_schema: ${var.output_schema}
               metadata_schema: ${var.metadata_schema}
               resource_suffix: ${var.resource_suffix}
-{{if eq .deployment_mode "personal"}}
+{{if eq .compute_mode "serverless"}}
           environment_key: skyulf
 {{else}}
           job_cluster_key: skyulf
@@ -68,7 +114,7 @@ resources:
             - pypi:
                 package: mlflow==3.16.1
 {{end}}
-{{if eq .deployment_mode "personal"}}
+{{if eq .compute_mode "serverless"}}
       environments:
         - environment_key: skyulf
           spec:
@@ -80,11 +126,11 @@ resources:
       job_clusters:
         - job_cluster_key: skyulf
           new_cluster:
-            spark_version: 17.3.x-cpu-ml-scala2.13
-            node_type_id: m5d.2xlarge
+            spark_version: {{.spark_version}}
+            node_type_id: {{.node_type_id}}
             policy_id: ${var.cluster_policy_id}
             custom_tags:
-              PayingRegNo: ${var.paying_reg_no}
+              {{.cost_tag_key}}: ${var.cost_tag_value}
             autoscale:
               min_workers: 2
               max_workers: 4
@@ -103,7 +149,7 @@ resources:
               output_schema: ${var.output_schema}
               metadata_schema: ${var.metadata_schema}
               resource_suffix: ${var.resource_suffix}
-{{if eq .deployment_mode "personal"}}
+{{if eq .compute_mode "serverless"}}
           environment_key: skyulf
 {{else}}
           job_cluster_key: skyulf
@@ -112,7 +158,7 @@ resources:
             - pypi:
                 package: mlflow==3.16.1
 {{end}}
-{{if eq .deployment_mode "personal"}}
+{{if eq .compute_mode "serverless"}}
       environments:
         - environment_key: skyulf
           spec:
@@ -124,11 +170,11 @@ resources:
       job_clusters:
         - job_cluster_key: skyulf
           new_cluster:
-            spark_version: 17.3.x-cpu-ml-scala2.13
-            node_type_id: m5d.2xlarge
+            spark_version: {{.spark_version}}
+            node_type_id: {{.node_type_id}}
             policy_id: ${var.cluster_policy_id}
             custom_tags:
-              PayingRegNo: ${var.paying_reg_no}
+              {{.cost_tag_key}}: ${var.cost_tag_value}
             autoscale:
               min_workers: 2
               max_workers: 4
@@ -147,7 +193,7 @@ resources:
               output_schema: ${var.output_schema}
               metadata_schema: ${var.metadata_schema}
               resource_suffix: ${var.resource_suffix}
-{{if eq .deployment_mode "personal"}}
+{{if eq .compute_mode "serverless"}}
           environment_key: skyulf
 {{else}}
           job_cluster_key: skyulf
@@ -156,7 +202,7 @@ resources:
             - pypi:
                 package: mlflow==3.16.1
 {{end}}
-{{if eq .deployment_mode "personal"}}
+{{if eq .compute_mode "serverless"}}
       environments:
         - environment_key: skyulf
           spec:
@@ -168,17 +214,19 @@ resources:
       job_clusters:
         - job_cluster_key: skyulf
           new_cluster:
-            spark_version: 17.3.x-cpu-ml-scala2.13
-            node_type_id: m5d.2xlarge
+            spark_version: {{.spark_version}}
+            node_type_id: {{.node_type_id}}
             policy_id: ${var.cluster_policy_id}
             custom_tags:
-              PayingRegNo: ${var.paying_reg_no}
+              {{.cost_tag_key}}: ${var.cost_tag_value}
             autoscale:
               min_workers: 2
               max_workers: 4
 {{end}}
+{{end}}
     score:
       name: ${bundle.name}_score
+      max_concurrent_runs: 1
       tasks:
         - task_key: score
           notebook_task:
@@ -191,7 +239,7 @@ resources:
               output_schema: ${var.output_schema}
               metadata_schema: ${var.metadata_schema}
               resource_suffix: ${var.resource_suffix}
-{{if eq .deployment_mode "personal"}}
+{{if eq .compute_mode "serverless"}}
           environment_key: skyulf
 {{else}}
           job_cluster_key: skyulf
@@ -200,7 +248,7 @@ resources:
             - pypi:
                 package: mlflow==3.16.1
 {{end}}
-{{if eq .deployment_mode "personal"}}
+{{if eq .compute_mode "serverless"}}
       environments:
         - environment_key: skyulf
           spec:
@@ -212,11 +260,11 @@ resources:
       job_clusters:
         - job_cluster_key: skyulf
           new_cluster:
-            spark_version: 17.3.x-cpu-ml-scala2.13
-            node_type_id: m5d.2xlarge
+            spark_version: {{.spark_version}}
+            node_type_id: {{.node_type_id}}
             policy_id: ${var.cluster_policy_id}
             custom_tags:
-              PayingRegNo: ${var.paying_reg_no}
+              {{.cost_tag_key}}: ${var.cost_tag_value}
             autoscale:
               min_workers: 2
               max_workers: 4
