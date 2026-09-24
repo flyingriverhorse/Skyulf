@@ -2,6 +2,9 @@
 
 Date: 2026-09-24. Branch: `090`.
 
+Live closure: **PASS** for the selected Polars/serverless workflow. See
+[SM-27/SM-29 live evidence](35-sm27-sm29-live-validation-report.md).
+
 ## Delivered locally
 
 The existing two-job Bundle asks how a newly pinned concrete model version
@@ -39,15 +42,15 @@ schedule timezone.
 - A real local Delta v1/v2 generation test was added. The normal local venv
   skips optional Delta; the Spark venv cannot start local Delta on this Windows
   host because Hadoop's `winutils.exe` is absent. Its assertions have therefore
-  not passed yet, and no live Databricks full-rebuild job has run.
+  not passed on this Windows host. The subsequent live Databricks rehearsal
+  below provides the selected UC full-rebuild proof.
 
-## Live validation still needed
+## Live validation completed
 
-Use an isolated personal-workspace source, model and output prefix. Score an
-initial bounded source with v1, insert a new row, pin v2 and run the selected
-full-rebuild mode. Verify the v1 physical generation remains unchanged, the
-v2 generation contains all current source rows, the stable view points to v2,
-and a later insert appends only to v2. Repeat the test in append mode to show
-mixed `model_version` values in one physical target. Check the view's grants
-after `ALTER VIEW`; then remove the isolated test resources after recording
-evidence. Company targets remain untested.
+The approved personal-workspace rehearsal verified 160 initial v1 rows,
+complete v2 rescoring before view activation, then ten later inserts. The
+append target retains mixed v1/v2 rows, the full view exposes 170 v2 rows,
+and the v1 generation stays unchanged. The view's SELECT grant survived
+ALTER VIEW. A deliberate target-type failure preserved prior outputs;
+scoring-only retry succeeded. Resources remain for user inspection as the
+latest approval requested. Company targets remain untested.

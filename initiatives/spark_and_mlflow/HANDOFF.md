@@ -1,19 +1,35 @@
 # Session handoff - 2026-09-24
 
-## Current state after SM-28b
+## Current state after SM-27/SM-29
+
+The combined personal-workspace live rehearsal passed; SM-27 and SM-29 are
+DONE for the documented bounded Polars/serverless workflow. v1 initialized
+champion, improved v2 replaced it, and tied v3 was rejected. Append output
+contains 160 v1 plus ten v2 predictions; full output exposes all 170 v2 rows
+while retaining v1. Expected score failure, recovery, queued no-op runs,
+committed alias receipts and restricted-principal write denial passed. See
+[the final live report](35-sm27-sm29-live-validation-report.md).
+
+Retain `workspace.skyulf_sm27_sm29_20260924`, the two `skyulf_sm29_verify`
+jobs and their audit notebooks for user inspection. No schedule is active.
+Production still requires exclusive alias-writer ownership and serialized
+target publication. Company targets and policy compute remain unverified.
+Spark expansion and endpoint tasks remain later; do not treat this selected
+local-engine rehearsal as broad Spark coverage. The notes below preserve the
+earlier local delivery state.
 
 SM-29 now has an optional `auto_champion` Bundle selection. It asks for a
 heldout metric, minimum improvement and absolute quality threshold, uses the
 existing guarded alias receipts, and calls the serialized score job after
 train. Manual selection remains the default. Generated manual/automatic
-serverless projects passed strict CLI validation. Live alias-to-Delta evidence
-is pending, so keep SM-29 ACTIVE; see
+serverless projects passed strict CLI validation. This local phase was followed
+by the completed live rehearsal above; see
 [SM-29 validation](33-sm29-auto-champion-validation-report.md).
 
 SM-27 implementation now exposes append-vs-full-rebuild model-change scoring
 at Bundle initialization and editable paused-retraining cron/timezone
 variables. Generated-project CLI validation passed, but an actual v1-to-v2
-full-rebuild job has not run. Keep SM-27 ACTIVE until that live test verifies
+full-rebuild job had not run at that point. The live rehearsal above now verifies
 the versioned physical tables and stable view; see
 [SM-27 validation](30-sm27-model-change-validation-report.md).
 
@@ -23,8 +39,8 @@ score creates only the prediction table; see
 paused monthly schedule to that same `train` job. Manual and monthly generated
 projects passed strict CLI validation; no monthly live job was deployed or
 run. See [SM-28b validation](28-sm28b-monthly-retraining-validation-report.md).
-The next open item is the combined live SM-27/SM-29 verification of model
-selection and both scoring modes. Company workspace targets
+The combined live SM-27/SM-29 verification of model selection and both scoring
+modes is now complete. Company workspace targets
 remain unconfigured and unverified. The remainder of this file is historical
 context from earlier Bundle stages.
 

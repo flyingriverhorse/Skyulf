@@ -1,6 +1,7 @@
 # SM-27/SM-29 isolated live rehearsal
 
-Status: awaiting approval for personal-workspace resources and serverless runs.
+Status: approved by the user and completed on 2026-09-24; see
+[live evidence](35-sm27-sm29-live-validation-report.md).
 Catalog: `workspace`; proposed schema: `skyulf_sm27_sm29_20260924`.
 Profile: `skyulf`; target: `dev`. Company targets are out of scope.
 

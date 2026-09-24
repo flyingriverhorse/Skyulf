@@ -1,8 +1,12 @@
 # Spark ve MLflow — Open Queue
 
-Updated: 2026-09-24. **SM-00 through SM-16, SM-15L/15I/24a/25/26, SM-22a/b/c/28a/28b and SM-20a/20R/20S complete. SM-27 and SM-29 are active before Spark. Target: 0.9.0.**
-Next deliverable: live proof for selectable local rescoring and automatic
-champion selection. Spark
+Updated: 2026-09-24. **SM-00 through SM-16, SM-15L/15I/24a/25/26, SM-22a/b/c/28a/28b, SM-20a/20R/20S and SM-27/29 complete for their documented scopes. Target: 0.9.0.**
+The pre-Spark local Bundle lifecycle gate passed live: selectable rescoring,
+automatic champion selection, failed-score recovery and serialized handoff.
+This is functional completion for the selected workflow. Production must
+still enforce one exclusive alias writer; both test jobs used a human owner,
+and live contention was exercised for score requests, not concurrent trains.
+See [the combined live evidence](35-sm27-sm29-live-validation-report.md). Spark
 expansion follows the validated first Bundle. SM-15L
 provides explicit-period UC output. SM-15I adds automatic new-row scoring
 for the first Bundle; SM-18 and streaming remain parked.
@@ -59,8 +63,8 @@ SUPERSEDED = replaced by a later user-directed scope; not a completed feature.
 | SM-28b | Optional monthly retraining schedule | SM-20S, SM-28a | DONE | Two-job Bundle with optional paused train schedule, pinned monthly label window/version and explicit activation; [plan](27-sm28b-monthly-retraining-plan.md), [validation](28-sm28b-monthly-retraining-validation-report.md) |
 | SM-24b | Optional Databricks Jobs API operations | SM-20a | LATER | Add dynamic submit/status/cancel only if Bundle jobs are insufficient |
 | SM-24d | Hard transport budget for wide UC rows | SM-24a | LATER | Add a proven paged/size-limited source adapter when exact transfer-byte enforcement is required; current Spark iterator bounds accepted decoded rows and frame memory only |
-| SM-27 | Full-history local rescore and selectable Bundle mode | SM-20a, SM-15L | ACTIVE | Both modes and editable cron implemented; generated Bundle validation passed; live v1/v2 scoring/view proof pending; [plan](29-sm27-model-change-scoring-plan.md), [validation](30-sm27-model-change-validation-report.md) |
-| SM-29 | Gated automatic champion and score handoff | SM-22a/b/c, SM-28a/b, SM-27 | ACTIVE | First and later champion gates, existing two-job handoff and alias-pinned scoring implemented locally; live UC alias/score proof pending; [design](31-sm29-auto-champion-design.md), [plan](32-sm29-auto-champion-plan.md), [validation](33-sm29-auto-champion-validation-report.md) |
+| SM-27 | Full-history local rescore and selectable Bundle mode | SM-20a, SM-15L | DONE | Live append retained 160 v1 rows and added ten v2 rows; full view exposes 170 v2 rows, retains v1 and its SELECT grant; [plan](29-sm27-model-change-scoring-plan.md), [live evidence](35-sm27-sm29-live-validation-report.md) |
+| SM-29 | Gated automatic champion and score handoff | SM-22a/b/c, SM-28a/b, SM-27 | DONE | Live first champion, v2 promotion, tied v3 rejection, two-job handoff, score-failure recovery, queue/no-op and restricted alias-write denial passed; [design](31-sm29-auto-champion-design.md), [live evidence](35-sm27-sm29-live-validation-report.md) |
 | SM-19 | Optional live HTTP / SQL ai_query / endpoint operations | SM-20a, compatible pyfunc package | LATER | Add only after serving parity; streaming remains parked |
 | SM-21 | Optional Databricks feature tables / online lookup | SM-20a; SM-19a for online serving | LATER | Point-in-time lookups and optional online freshness; declare any Spark dependency |
 | SM-23 | Optional monitoring and inference observability | SM-20a, relevant batch/serving adapter | LATER | Existing Skyulf metrics + optional Databricks monitoring/inference tables |
@@ -75,6 +79,24 @@ are prerequisites for the first Bundle. SM-28b only
 wires their optional monthly schedule after the Bundle exists. SM-27 remains
 post-Bundle and independent. Endpoint, feature lookup and monitoring remain
 optional; broad Spark expansion follows the local Bundle.
+
+## SM-27/SM-29 closure record - 2026-09-24
+
+Implementation inspected: `68f64935`; approved test plan: `556b63f3`.
+The selected Polars/serverless generated Bundle passed first-champion
+initialization, improved v2 promotion, tied v3 rejection, both scoring
+policies, failed-score recovery, queued no-op requests and a restricted
+principal's real alias-write denial. Final rows: append 160 v1 + ten v2;
+full view 170 v2; retained v1 generation unchanged. Exactly two persistent
+test jobs and no admission table. The English
+[live report](35-sm27-sm29-live-validation-report.md) records every run URL,
+expected negative runs, exact commands, wheel hash, runtime configuration
+and scope limits. Strict Bundle validation, wheel build, local pandas/Polars
+precheck, live-evidence assertions and strict docs build passed. The prior
+94-test implementation gate is preserved in the SM-29 local report.
+No library fix was required by this rehearsal. Source updates/deletes,
+company targets, policy compute and broad Spark execution remain outside
+this evidence. Production must still enforce one serialized alias writer.
 
 ## Local-first path to the first Bundle
 

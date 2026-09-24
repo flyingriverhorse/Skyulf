@@ -61,6 +61,33 @@ training and scoring stop until that pending event is reconciled. An existing
 champion alias set outside this controlled lifecycle also needs reconciliation
 before automatic mode can use it.
 
+For example, a regression project can select its gate in the generated config:
+
+```json
+{
+  "engine": "polars",
+  "model_selection_mode": "auto_champion",
+  "metric": "heldout_rmse",
+  "min_improvement": 0.1,
+  "quality_threshold": 5.0,
+  "model_change_mode": "incremental_append"
+}
+```
+
+These example values mean RMSE must be at most `5.0`; a later candidate must
+reduce champion's RMSE by at least `0.1` on the same holdout. Improvement is
+an absolute metric difference, not a percentage. Skyulf derives the direction
+from the metric: RMSE/MAE/log loss are minimized, while R²/accuracy/F1 are
+maximized. Use a metric supported by the configured model task. The first
+comparison reports `reason=no_champion` and `eligible=false` because no
+baseline exists; successful bootstrap is recorded separately as
+`alias_change.kind=initial` after the absolute gate passes.
+
+If promotion succeeds but scoring fails, the train job reports a failed
+dependent score task. Correct the scoring problem and run `score` again;
+retraining is unnecessary. Full-rebuild output continues to expose the last
+successfully activated generation during this recovery.
+
 The four relevant Unity Catalog names have different roles:
 
 | Name | Meaning |

@@ -2,6 +2,9 @@
 
 Date: 2026-09-24. Branch: `090`.
 
+Live closure: **PASS** for the selected Polars/serverless workflow. See
+[SM-27/SM-29 live evidence](35-sm27-sm29-live-validation-report.md).
+
 ## Local result
 
 The Bundle offers `pinned_version` and `auto_champion`. Automatic mode
@@ -35,13 +38,15 @@ not a silent alias rollback.
 - A fresh `uv build --wheel --no-build-isolation` succeeded. Focused Ruff
   check/format, ty, `git diff --check` and `mkdocs build --strict` passed.
   The CLI projects were generated from the final template and validated
-  read-only; their jobs have not been deployed or run.
+  read-only. The separate approved rehearsal subsequently deployed and ran
+  the generated project as recorded in the live report.
 
-## Live validation still needed
+## Live validation completed
 
-In an isolated personal-workspace schema, test first champion, a passing v2,
-an ineligible v3, the train-to-score job handoff, and both append/rebuild
-scoring policies. Confirm model-version values in predictions, old-generation
-retention, view activation, queued score behavior, a failed-score retry, and
-the alias-write privilege boundary. Do not deploy to company targets until
-their hosts, catalogs and grants are configured and validated.
+The isolated personal-workspace rehearsal passed first champion, improved
+v2, ineligible v3, automatic train-to-score handoff and both scoring modes.
+It verified model-version metadata, retained v1 output, v2 view activation,
+queued no-op scores, expected score failure/retry and a restricted principal's
+real alias-write denial. Production still requires an exclusive serialized
+alias-writer identity; the personal test does not prove every administrative
+principal is excluded. Company targets remain unconfigured and untested.
