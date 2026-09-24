@@ -1,7 +1,8 @@
 # Spark ve MLflow — Open Queue
 
-Updated: 2026-09-24. **SM-00 through SM-16, SM-15L/15I/24a/25/26, SM-22a/b/c/28a/28b and SM-20a/20R/20S complete. SM-27 is next. Target: 0.9.0.**
-Next deliverable: bounded full-history local rescore with explicit activation. Spark
+Updated: 2026-09-24. **SM-00 through SM-16, SM-15L/15I/24a/25/26, SM-22a/b/c/28a/28b and SM-20a/20R/20S complete. SM-27 and SM-29 are active before Spark. Target: 0.9.0.**
+Next deliverable: live proof for selectable local rescoring and automatic
+champion selection. Spark
 expansion follows the validated first Bundle. SM-15L
 provides explicit-period UC output. SM-15I adds automatic new-row scoring
 for the first Bundle; SM-18 and streaming remain parked.
@@ -59,6 +60,7 @@ SUPERSEDED = replaced by a later user-directed scope; not a completed feature.
 | SM-24b | Optional Databricks Jobs API operations | SM-20a | LATER | Add dynamic submit/status/cancel only if Bundle jobs are insufficient |
 | SM-24d | Hard transport budget for wide UC rows | SM-24a | LATER | Add a proven paged/size-limited source adapter when exact transfer-byte enforcement is required; current Spark iterator bounds accepted decoded rows and frame memory only |
 | SM-27 | Full-history local rescore and selectable Bundle mode | SM-20a, SM-15L | ACTIVE | Both modes and editable cron implemented; generated Bundle validation passed; live v1/v2 scoring/view proof pending; [plan](29-sm27-model-change-scoring-plan.md), [validation](30-sm27-model-change-validation-report.md) |
+| SM-29 | Gated automatic champion and score handoff | SM-22a/b/c, SM-28a/b, SM-27 | ACTIVE | First and later champion gates, existing two-job handoff and alias-pinned scoring implemented locally; live UC alias/score proof pending; [design](31-sm29-auto-champion-design.md), [plan](32-sm29-auto-champion-plan.md), [validation](33-sm29-auto-champion-validation-report.md) |
 | SM-19 | Optional live HTTP / SQL ai_query / endpoint operations | SM-20a, compatible pyfunc package | LATER | Add only after serving parity; streaming remains parked |
 | SM-21 | Optional Databricks feature tables / online lookup | SM-20a; SM-19a for online serving | LATER | Point-in-time lookups and optional online freshness; declare any Spark dependency |
 | SM-23 | Optional monitoring and inference observability | SM-20a, relevant batch/serving adapter | LATER | Existing Skyulf metrics + optional Databricks monitoring/inference tables |

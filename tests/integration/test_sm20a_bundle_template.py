@@ -54,6 +54,23 @@ def _config():
     }
 
 
+def _render_default_config(row_key="entity_id"):
+    """Resolve the manual-mode template fields read by the generated-config tests."""
+    template = WORKFLOW.parents[1] / "config/workflow.json.tmpl"
+    content = (
+        template.read_text(encoding="utf-8")
+        .replace("{{.project_name}}", "customer_model")
+        .replace("{{.engine}}", "pandas")
+        .replace("{{.row_key}}", row_key)
+        .replace("{{.min_improvement}}", "0.0")
+        .replace(
+            '{{if eq .model_selection_mode "auto_champion"}}{{.quality_threshold}}{{else}}null{{end}}',
+            "null",
+        )
+    )
+    return json.loads(content)
+
+
 def _one_column_schema(kind):
     """Model the Spark field names/types used by view compatibility checks."""
     return SimpleNamespace(
@@ -153,6 +170,127 @@ def test_monthly_train_allows_first_model_but_propagates_registry_errors(monkeyp
     )
     with pytest.raises(RuntimeError, match="permission denied"):
         workflow._monthly_champion_version(_config())
+
+
+def test_auto_champion_train_promotes_only_an_eligible_candidate(monkeypatch, tmp_path):
+    """A passing candidate must use the pinned holdout and controlled alias APIs."""
+    workflow = _workflow()
+    config = _config()
+    config.update(model_selection_mode="auto_champion", quality_threshold=1.0, engine="pandas")
+    report = SimpleNamespace(champion_version="1", eligible=True)
+    candidate = SimpleNamespace(comparison=report)
+    frame = object()
+    heldout = object()
+    monkeypatch.setattr(workflow, "train_local_candidate", Mock(return_value=candidate))
+    monkeypatch.setattr(workflow, "controlled_champion_version", Mock(return_value="1"))
+    monkeypatch.setattr(workflow, "read_training_snapshot", Mock(return_value=frame), raising=False)
+    monkeypatch.setattr(
+        workflow,
+        "split_labeled_snapshot",
+        Mock(return_value=(object(), heldout, 0)),
+        raising=False,
+    )
+    stage = Mock(return_value=object())
+    promote = Mock(return_value=SimpleNamespace(new_version="2"))
+    monkeypatch.setattr(workflow, "stage_challenger", stage, raising=False)
+    monkeypatch.setattr(workflow, "promote_candidate", promote, raising=False)
+    result = workflow.run_action(
+        object(),
+        config,
+        "train",
+        experiment_name="/Users/test/experiment",
+        artifact_path=tmp_path / "artifact",
+    )
+    assert result.alias_change.new_version == "2"
+    assert stage.call_args.args[1] is heldout
+    assert promote.call_args.kwargs["expected_champion_version"] == "1"
+
+
+def test_auto_champion_train_leaves_alias_when_candidate_fails_gate(monkeypatch, tmp_path):
+    """A failed comparison must never stage or promote its registered model."""
+    workflow = _workflow()
+    config = _config()
+    config.update(model_selection_mode="auto_champion", quality_threshold=1.0, engine="pandas")
+    monkeypatch.setattr(
+        workflow,
+        "train_local_candidate",
+        Mock(
+            return_value=SimpleNamespace(
+                comparison=SimpleNamespace(champion_version="1", eligible=False)
+            )
+        ),
+    )
+    monkeypatch.setattr(workflow, "controlled_champion_version", Mock(return_value="1"))
+    stage = Mock()
+    monkeypatch.setattr(workflow, "stage_challenger", stage, raising=False)
+    result = workflow.run_action(
+        object(),
+        config,
+        "train",
+        experiment_name="/Users/test/experiment",
+        artifact_path=tmp_path / "artifact",
+    )
+    assert result.alias_change is None
+    stage.assert_not_called()
+
+
+def test_auto_champion_bootstraps_first_model_or_rejects_missing_threshold(monkeypatch, tmp_path):
+    """First-model selection requires a real absolute gate before fitting."""
+    workflow = _workflow()
+    config = _config()
+    config.update(model_selection_mode="auto_champion", quality_threshold=None, engine="pandas")
+    train = Mock(return_value=SimpleNamespace(comparison=SimpleNamespace(champion_version=None)))
+    monkeypatch.setattr(workflow, "train_local_candidate", train)
+    with pytest.raises(ValueError, match="quality_threshold"):
+        workflow.run_action(
+            object(),
+            config,
+            "train",
+            experiment_name="/Users/test/experiment",
+            artifact_path=tmp_path / "artifact",
+        )
+    train.assert_not_called()
+    config["quality_threshold"] = 1.0
+    monkeypatch.setattr(workflow, "controlled_champion_version", Mock(return_value=None))
+    monkeypatch.setattr(workflow, "read_training_snapshot", Mock(return_value=object()))
+    monkeypatch.setattr(
+        workflow,
+        "split_labeled_snapshot",
+        Mock(return_value=(object(), object(), 0)),
+    )
+    initialize = Mock(return_value=SimpleNamespace(new_version="1"))
+    monkeypatch.setattr(workflow, "initialize_champion", initialize)
+    result = workflow.run_action(
+        object(),
+        config,
+        "train",
+        experiment_name="/Users/test/experiment",
+        artifact_path=tmp_path / "artifact",
+    )
+    assert result.alias_change.new_version == "1"
+    initialize.assert_called_once()
+
+
+def test_auto_champion_score_pins_resolved_version_before_target_selection(monkeypatch):
+    """A moving alias must become one concrete model and full-rebuild table per run."""
+    workflow = _workflow()
+    config = _config()
+    config.update(model_selection_mode="auto_champion", model_change_mode="full_rebuild")
+    controlled = Mock(return_value="2")
+    prepare = Mock(return_value=object())
+    provision = Mock()
+    monkeypatch.setattr(workflow, "controlled_champion_version", controlled)
+    monkeypatch.setattr(workflow, "prepare_local_workflow", prepare)
+    monkeypatch.setattr(workflow, "provision_prediction_table", provision)
+    monkeypatch.setattr(workflow, "run_incremental_local_batch", Mock(return_value=object()))
+    monkeypatch.setattr(workflow, "_activate_prediction_view", Mock())
+    spark = Mock()
+    spark.catalog.tableExists.return_value = False
+    workflow.run_action(spark, config, "score")
+    assert controlled.call_args.args == (config["model_name"],)
+    assert prepare.call_args.args[0].model.version == "2"
+    assert provision.call_args.args[1]["prediction_table"] == "workspace.test.predictions_v2"
+    assert config["model_version"] == "1"
 
 
 def test_score_uses_incremental_service_without_period_or_source_version(monkeypatch):
@@ -435,13 +573,7 @@ def test_target_binding_rejects_cross_environment_model():
 def test_generated_config_keeps_company_output_in_each_target():
     """The actual JSON template must bind its outputs separately in every target."""
     workflow = _workflow()
-    template = WORKFLOW.parents[1] / "config/workflow.json.tmpl"
-    config = json.loads(
-        template.read_text(encoding="utf-8")
-        .replace("{{.project_name}}", "customer_model")
-        .replace("{{.engine}}", "pandas")
-        .replace("{{.row_key}}", "entity_id")
-    )
+    config = _render_default_config()
     outputs = {}
     for target, catalog, suffix in (
         ("test", "test_catalog", "_murat"),
@@ -471,13 +603,7 @@ def test_generated_config_keeps_company_output_in_each_target():
 def test_minimal_generated_config_uses_one_existing_source():
     """Default training and scoring should reference one existing source table."""
     workflow = _workflow()
-    template = WORKFLOW.parents[1] / "config/workflow.json.tmpl"
-    config = json.loads(
-        template.read_text(encoding="utf-8")
-        .replace("{{.project_name}}", "customer_model")
-        .replace("{{.engine}}", "pandas")
-        .replace("{{.row_key}}", "entity_id")
-    )
+    config = _render_default_config()
     bound = workflow.resolve_target_config(
         config,
         {
@@ -667,13 +793,7 @@ def test_full_rebuild_rejects_unrelated_or_changed_generation(monkeypatch, chang
 
 def test_generated_config_has_no_admission_or_alias_state():
     """The starting Bundle must not ask users to provision coordination tables."""
-    template = WORKFLOW.parents[1] / "config/workflow.json.tmpl"
-    config = json.loads(
-        template.read_text(encoding="utf-8")
-        .replace("{{.project_name}}", "customer_model")
-        .replace("{{.engine}}", "pandas")
-        .replace("{{.row_key}}", "entity_id")
-    )
+    config = _render_default_config()
     assert "score_admission_table" not in config
     assert "alias_admission_table" not in config
     assert "include_lifecycle" not in config
@@ -685,13 +805,7 @@ def test_init_row_key_becomes_prediction_table_key():
     schema = json.loads((root / "databricks_template_schema.json").read_text(encoding="utf-8"))
     assert schema["properties"]["row_key"]["default"] == "entity_id"
 
-    template = WORKFLOW.parents[1] / "config/workflow.json.tmpl"
-    config = json.loads(
-        template.read_text(encoding="utf-8")
-        .replace("{{.project_name}}", "customer_model")
-        .replace("{{.engine}}", "pandas")
-        .replace("{{.row_key}}", "customer_id")
-    )
+    config = _render_default_config("customer_id")
     source = SimpleNamespace(
         columns=["customer_id", "feature_value"],
         schema={
@@ -738,3 +852,25 @@ def test_init_exposes_both_model_change_modes_and_editable_training_cadence():
     bundle = (WORKFLOW.parents[1] / "databricks.yml.tmpl").read_text(encoding="utf-8")
     assert 'default: "{{.retraining_cron_expression}}"' in bundle
     assert 'default: "{{.retraining_timezone_id}}"' in bundle
+
+
+def test_auto_champion_init_exposes_metric_gates_and_reuses_score_job():
+    """Automatic selection must be explicit and call the serialized score job."""
+    root = WORKFLOW.parents[3]
+    schema = json.loads((root / "databricks_template_schema.json").read_text(encoding="utf-8"))
+    properties = schema["properties"]
+    assert properties["model_selection_mode"]["enum"] == [
+        "pinned_version",
+        "auto_champion",
+    ]
+    assert "heldout_rmse" in properties["metric"]["enum"]
+    assert "heldout_f1" in properties["metric"]["enum"]
+    assert properties["quality_threshold"]["type"] == "string"
+    assert properties["quality_threshold"]["default"] == "null"
+    config = (WORKFLOW.parents[1] / "config/workflow.json.tmpl").read_text(encoding="utf-8")
+    assert '"model_selection_mode": "{{.model_selection_mode}}"' in config
+    assert '"metric": "{{.metric}}"' in config
+    jobs = (WORKFLOW.parents[1] / "resources/workflow.jobs.yml.tmpl").read_text(encoding="utf-8")
+    assert "job_id: ${resources.jobs.score.id}" in jobs
+    assert "task_key: score_after_training" in jobs
+    assert jobs.count("queue:\n        enabled: true") == 2

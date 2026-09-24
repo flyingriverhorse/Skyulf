@@ -8,6 +8,7 @@
   "model_name": "{catalog}.{metadata_schema}.{{.project_name}}_model{resource_suffix}",
   "model_version": "1",
   "model_change_mode": "{{.model_change_mode}}",
+  "model_selection_mode": "{{.model_selection_mode}}",
   "champion_version": null,
   "row_keys": ["{{.row_key}}"],
   "input_columns": ["feature_value"],
@@ -19,9 +20,9 @@
   "cutoff": "2025-03-01T00:00:00+00:00",
   "max_rows": 10000,
   "max_bytes": 67108864,
-  "metric": "heldout_rmse",
-  "min_improvement": 0.0,
-  "quality_threshold": null,
+  "metric": "{{.metric}}",
+  "min_improvement": {{.min_improvement}},
+  "quality_threshold": {{if eq .model_selection_mode "auto_champion"}}{{.quality_threshold}}{{else}}null{{end}},
   "pipeline": {
     "preprocessing": [],
     "modeling": {"type": "linear_regression"}

@@ -4,6 +4,7 @@
   "row_key": "entity_id",
   "retraining_mode": "manual",
   "model_change_mode": "incremental_append",
+  "model_selection_mode": "pinned_version",
   "compute_mode": "policy_cluster",
   "catalog": "REPLACE_DEV_CATALOG",
   "schema": "REPLACE_DEV_SCHEMA",

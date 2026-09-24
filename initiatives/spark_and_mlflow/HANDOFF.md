@@ -2,6 +2,14 @@
 
 ## Current state after SM-28b
 
+SM-29 now has an optional `auto_champion` Bundle selection. It asks for a
+heldout metric, minimum improvement and absolute quality threshold, uses the
+existing guarded alias receipts, and calls the serialized score job after
+train. Manual selection remains the default. Generated manual/automatic
+serverless projects passed strict CLI validation. Live alias-to-Delta evidence
+is pending, so keep SM-29 ACTIVE; see
+[SM-29 validation](33-sm29-auto-champion-validation-report.md).
+
 SM-27 implementation now exposes append-vs-full-rebuild model-change scoring
 at Bundle initialization and editable paused-retraining cron/timezone
 variables. Generated-project CLI validation passed, but an actual v1-to-v2
@@ -15,8 +23,8 @@ score creates only the prediction table; see
 paused monthly schedule to that same `train` job. Manual and monthly generated
 projects passed strict CLI validation; no monthly live job was deployed or
 run. See [SM-28b validation](28-sm28b-monthly-retraining-validation-report.md).
-The next open item is SM-27, a bounded full-history local rescore with a new
-prediction generation and explicit activation. Company workspace targets
+The next open item is the combined live SM-27/SM-29 verification of model
+selection and both scoring modes. Company workspace targets
 remain unconfigured and unverified. The remainder of this file is historical
 context from earlier Bundle stages.
 

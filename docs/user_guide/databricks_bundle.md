@@ -12,7 +12,7 @@ databricks bundle init skyulf-core/templates/databricks --output-dir ./generated
 ```
 
 The short path asks for project name, engine, one existing source row-key
-column, model-change scoring mode, optional retraining mode and cron, serverless
+column, model-change and model-selection modes, optional retraining mode and cron, serverless
 or policy-backed job compute and the existing `dev`
 catalog/schema. Serverless is the default. Reviewable
 noninteractive examples are in `skyulf-core/templates/databricks/examples/`. The generated
@@ -40,9 +40,26 @@ adds a paused schedule to the existing `train` job, without adding a third
 job or running it at deployment. The Quartz cron and timezone are selected
 at initialization and remain editable Bundle variables. No endpoint or Unity Catalog table is
 created by deployment alone.
-The starting Bundle has no alias lifecycle job. Skyulf Core's registry
-comparison and promotion services remain available for a separately designed
-champion/challenger workflow.
+`pinned_version` keeps manual model selection. `auto_champion` uses the same
+train job to compare candidate and champion on a pinned temporal holdout. The
+selected `metric`, `min_improvement`, and absolute `quality_threshold` stay
+editable in `config/workflow.json`. A first champion requires a numeric
+absolute threshold because no prior version exists for comparison. Later
+versions must pass that threshold and improve on champion by the chosen
+minimum. A passing candidate is staged and promoted through checked registry
+receipts; an ineligible candidate leaves champion unchanged. The train job
+then calls the existing score job. No third job or control table is added.
+
+In automatic mode, score resolves `@champion` once to a concrete version per
+run. Only the serialized train job identity may write this model's aliases;
+other alias-write grants must be removed before enabling this table-free mode.
+Alias promotion and Delta scoring are separate transactions. If scoring fails
+after promotion, the last successful prediction output remains and the score
+job must be retried. Unknown alias outcomes need receipt reconciliation.
+Skyulf marks an alias transition as pending before writing it; automatic
+training and scoring stop until that pending event is reconciled. An existing
+champion alias set outside this controlled lifecycle also needs reconciliation
+before automatic mode can use it.
 
 The four relevant Unity Catalog names have different roles:
 
@@ -94,20 +111,21 @@ databricks bundle deploy -t dev --profile <profile>
 databricks bundle run train -t dev --profile <profile>
 ```
 
-Inspect the registered model version, put that concrete value in
-`model_version`, redeploy the changed JSON, then run `score`. The first score
+In manual mode, inspect the registered model version, put that concrete value
+in `model_version`, redeploy the changed JSON, then run `score`. In automatic
+mode, inspect the train and dependent score task results. The first score
 rejects a missing source, disabled CDF, unsuitable row keys, a model output
-mismatch or an existing target schema mismatch before it creates the single
-prediction table. It checks initial row count against `max_rows`; each score
+mismatch or an existing target schema mismatch before creating prediction
+output. It checks initial row count against `max_rows`; each score
 also checks decoded transfer bytes against `max_bytes`. Existing tables are
 never overwritten. The first score processes the current source
 snapshot; later runs process only new inserts since the committed Delta
 receipt. A repeat without new rows is a no-op. No monthly date or source
 version is entered for each run.
 
-The first candidate does not become champion automatically. Scoring stays
-pinned to its configured model version; changing aliases alone does not
-change predictions. At initialization, choose `incremental_append` to keep
+In manual mode, the first candidate does not become champion automatically;
+scoring stays pinned to its configured version. At initialization, choose
+`incremental_append` to keep
 v1 predictions and score only later source inserts with pinned v2. Choose
 `full_rebuild` to write a new physical `<prediction_table>_v2` generation,
 switch the stable `prediction_table` view after a successful complete score,
@@ -117,8 +135,8 @@ creation/ownership privileges and cannot silently turn an existing append-mode
 physical table into a view. `max_concurrent_runs: 1` serializes the generated score job, but
 does not coordinate other jobs. Grant prediction-table writes only to this
 job's identity. For multiple publishers, use Skyulf Core's shared admission
-provider. Full-history rescore, online endpoints and Spark-native FE/model
-execution are separate work.
+provider. Online endpoints and Spark-native FE/model execution remain
+separate work.
 
 The optional monthly `train` schedule defaults to 03:00 UTC on day three and
 starts paused. Edit its Bundle cron and timezone variables for the desired
@@ -127,8 +145,8 @@ run, unpause it deliberately. Each run pins the source's latest Delta version an
 first day of the current UTC month as the label cutoff. The preceding month is
 holdout; `monthly_lookback_months` (default four) controls the full window.
 Only labels available by the cutoff are eligible. `@champion` is resolved to a
-concrete version for comparison if present; the new candidate is never
-promoted or substituted into `score` automatically. The source version is
+concrete version for comparison if present. Manual mode leaves selection
+unchanged; automatic mode applies its metric gates and invokes score. The source version is
 pinned at run start, so `label_at` must faithfully record availability.
 
 The older SM-20a personal serverless rehearsal passed, but its jobs and test

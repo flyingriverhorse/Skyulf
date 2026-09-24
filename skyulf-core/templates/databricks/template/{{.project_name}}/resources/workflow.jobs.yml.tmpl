@@ -3,6 +3,8 @@ resources:
     train:
       name: ${bundle.name}_train
       max_concurrent_runs: 1
+      queue:
+        enabled: true
 {{if eq .retraining_mode "monthly_paused"}}
       schedule:
         quartz_cron_expression: ${var.retraining_cron_expression}
@@ -31,6 +33,13 @@ resources:
             - pypi:
                 package: mlflow==3.16.1
 {{end}}
+{{if eq .model_selection_mode "auto_champion"}}
+        - task_key: score_after_training
+          depends_on:
+            - task_key: train
+          run_job_task:
+            job_id: ${resources.jobs.score.id}
+{{end}}
 {{if eq .compute_mode "serverless"}}
       environments:
         - environment_key: skyulf
@@ -55,6 +64,8 @@ resources:
     score:
       name: ${bundle.name}_score
       max_concurrent_runs: 1
+      queue:
+        enabled: true
       tasks:
         - task_key: score
           notebook_task:

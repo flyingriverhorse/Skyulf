@@ -4,10 +4,12 @@
 import json
 import re
 import tempfile
-from dataclasses import asdict
+from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
+
+import polars as pl
 
 from skyulf.integrations.databricks import (
     InputSource,
@@ -16,10 +18,20 @@ from skyulf.integrations.databricks import (
     ModelSelection,
     OutputSink,
     prepare_local_workflow,
+    read_training_snapshot,
     run_incremental_local_batch,
+    split_labeled_snapshot,
     train_local_candidate,
 )
 from skyulf.integrations.databricks.admission import SingleWriterAdmission
+from skyulf.integrations.mlflow.promotion import (
+    AliasChangeReceipt,
+    ExclusiveAliasWriterAdmission,
+    controlled_champion_version,
+    initialize_champion,
+    promote_candidate,
+    stage_challenger,
+)
 from skyulf.integrations.mlflow.registry import RegistryModelNotFoundError, resolve_model
 
 _TABLE_FIELDS = (
@@ -36,6 +48,22 @@ _OUTPUT_TYPES = {
     "string": ("string", "STRING"),
     "bool": ("boolean", "BOOLEAN"),
 }
+
+
+@dataclass(frozen=True, slots=True)
+class AutoTrainingOutcome:
+    """Expose both candidate evidence and the optional alias change in job output."""
+
+    candidate: Any
+    alias_change: AliasChangeReceipt | None
+
+
+def _selection_mode(config: dict[str, Any]) -> str:
+    """Reject a selection policy that could silently load a wrong model."""
+    mode = config.get("model_selection_mode", "pinned_version")
+    if mode not in ("pinned_version", "auto_champion"):
+        raise ValueError("model_selection_mode must be pinned_version or auto_champion.")
+    return mode
 
 
 def resolve_target_config(config: dict[str, Any], bindings: dict[str, str]) -> dict[str, Any]:
@@ -339,6 +367,40 @@ def _monthly_champion_version(config: dict[str, Any]) -> str | None:
     return champion.version
 
 
+def _automatic_promotion(
+    spark: Any, config: dict[str, Any], spec: LocalTrainingSpec, candidate: Any
+) -> AliasChangeReceipt | None:
+    """Recheck the pinned holdout before one guarded champion transition."""
+    report = candidate.comparison
+    if report.champion_version is not None and not report.eligible:
+        return None
+    frame = read_training_snapshot(spark, spec)
+    _, heldout, _ = split_labeled_snapshot(frame, spec)
+    native = pl.from_pandas(heldout) if config["engine"] == "polars" else heldout
+    options = {
+        "target_column": spec.target_column,
+        "admission": ExclusiveAliasWriterAdmission(),
+        "max_rows": spec.max_rows,
+        "max_bytes": spec.max_bytes,
+        "tracking_uri": config.get("tracking_uri", "databricks"),
+        "registry_uri": config.get("registry_uri", "databricks-uc"),
+    }
+    if report.champion_version is None:
+        return initialize_champion(report, native, **options)
+    stage_challenger(
+        report,
+        native,
+        expected_champion_version=report.champion_version,
+        **options,
+    )
+    return promote_candidate(
+        report,
+        native,
+        expected_champion_version=report.champion_version,
+        **options,
+    )
+
+
 def run_action(
     spark: Any,
     config: dict[str, Any],
@@ -351,19 +413,27 @@ def run_action(
     """Delegate training or scoring to Skyulf's existing services."""
     tracking_uri = config.get("tracking_uri", "databricks")
     registry_uri = config.get("registry_uri", "databricks-uc")
+    selection_mode = _selection_mode(config)
     if action in {"train", "train_monthly"}:
         if experiment_name is None or artifact_path is None:
             raise ValueError("Training needs an experiment and temporary artifact path.")
         monthly = action == "train_monthly"
+        if selection_mode == "auto_champion" and config.get("quality_threshold") is None:
+            raise ValueError("auto_champion requires an absolute quality_threshold.")
         spec = (
             _monthly_training_spec(spark, config, now or datetime.now(UTC))
             if monthly
             else _training_spec(config)
         )
-        champion_version = (
-            _monthly_champion_version(config) if monthly else config.get("champion_version")
-        )
-        return train_local_candidate(
+        if selection_mode == "auto_champion":
+            champion_version = controlled_champion_version(
+                config["model_name"], tracking_uri=tracking_uri, registry_uri=registry_uri
+            )
+        elif monthly:
+            champion_version = _monthly_champion_version(config)
+        else:
+            champion_version = config.get("champion_version")
+        candidate = train_local_candidate(
             spark,
             spec,
             config["pipeline"],
@@ -379,7 +449,20 @@ def run_action(
             champion_version=champion_version,
             quality_threshold=config.get("quality_threshold"),
         )
+        if selection_mode == "auto_champion":
+            return AutoTrainingOutcome(
+                candidate=candidate,
+                alias_change=_automatic_promotion(spark, config, spec, candidate),
+            )
+        return candidate
     if action == "score":
+        if selection_mode == "auto_champion":
+            champion_version = controlled_champion_version(
+                config["model_name"], tracking_uri=tracking_uri, registry_uri=registry_uri
+            )
+            if champion_version is None:
+                raise ValueError("auto_champion scoring requires a committed champion.")
+            config = {**config, "model_version": champion_version}
         target = _scoring_target(config)
         if config.get("model_change_mode", "incremental_append") == "full_rebuild":
             _managed_prediction_view_exists(spark, config["prediction_table"])

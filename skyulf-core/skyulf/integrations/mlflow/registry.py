@@ -239,6 +239,15 @@ def resolve_model(
             else client.get_model_version(name, str(version))
         )
     except Exception as exc:  # noqa: BLE001 - translate MLflow's backend errors at the boundary
+        if (
+            alias is not None
+            and _error_code(exc) == "INVALID_PARAMETER_VALUE"
+            and "alias" in str(exc).lower()
+            and "not found" in str(exc).lower()
+        ):
+            raise RegistryModelNotFoundError(
+                f"Model '{name}' alias '{alias}' was not found."
+            ) from exc
         raise _translate_error(exc, name=name, version=str(version or alias)) from exc
 
     concrete_version = str(model_version.version)

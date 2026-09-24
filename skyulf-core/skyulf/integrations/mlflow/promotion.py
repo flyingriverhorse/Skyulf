@@ -35,6 +35,7 @@ _CHALLENGER = "challenger"
 _PREVIOUS = "previous_champion"
 _ACTIVE_TAG = "champion_current_event"
 _CHALLENGER_TAG = "challenger_current_event"
+_PENDING_TAG = "pending_alias_event"
 
 
 class AliasConflictError(RegistryError):
@@ -108,6 +109,23 @@ class DeltaAliasAdmission:
             raise AliasConflictError("Another writer holds alias admission.") from exc
 
 
+class ExclusiveAliasWriterAdmission:
+    """Use no control table when one serialized job owns all alias writes.
+
+    This provider does not lock. The caller must ensure that no other job or
+    principal can mutate the model aliases, including manual UI writes.
+    """
+
+    local_only = False
+
+    @contextmanager
+    def hold(self, resource_id: str) -> Iterator[None]:
+        """Enter the externally enforced exclusive alias-writer scope."""
+        if type(resource_id) is not str or not resource_id.startswith("mlflow-alias:"):
+            raise ValueError("Exclusive alias writing needs an alias resource ID.")
+        yield
+
+
 @dataclass(frozen=True, slots=True)
 class AliasChangeReceipt:
     """Record a verified alias transition and its durable registry event."""
@@ -155,6 +173,40 @@ def _read_alias(client: Any, name: str) -> str:
     current = _read_optional_alias(client, name, _ALIAS)
     if current is None:
         raise AliasConflictError("Champion alias is missing; initialize it explicitly.")
+    return current
+
+
+def _assert_no_pending(client: Any, name: str) -> None:
+    """Stop automatic alias work until an uncertain prior write is reconciled."""
+    tags = client.get_registered_model(name).tags or {}
+    if tags.get(_PENDING_TAG):
+        raise AliasConflictError("A pending alias event requires reconciliation.")
+
+
+def controlled_champion_version(
+    model_name: str,
+    *,
+    tracking_uri: str | None = None,
+    registry_uri: str | None = None,
+) -> str | None:
+    """Read a champion only when its last transition has a committed receipt."""
+    client = _make_client(_require_mlflow(), tracking_uri, registry_uri)
+    try:
+        registered = client.get_registered_model(model_name)
+    except Exception as exc:  # noqa: BLE001 - a new model has no registry object yet
+        if _error_code(exc) in {"RESOURCE_DOES_NOT_EXIST", "NOT_FOUND"}:
+            return None
+        raise _translate_error(exc, name=model_name, version=_ALIAS) from exc
+    tags = registered.tags or {}
+    if tags.get(_PENDING_TAG):
+        raise AliasConflictError("A pending alias event requires reconciliation.")
+    current = _read_optional_alias(client, model_name, _ALIAS)
+    if current is None:
+        if tags.get(_ACTIVE_TAG):
+            raise AliasConflictError("Champion receipt exists without its alias.")
+        return None
+    if _active_marker(client, model_name, current) is None:
+        raise AliasConflictError("Champion alias lacks a controlled committed receipt.")
     return current
 
 
@@ -237,10 +289,20 @@ def _commit_change(
     MLflow alias calls are not atomic. Once any call may have changed an alias,
     failures are reported as unknown and require reconciliation before retry.
     """
+    _assert_no_pending(client, receipt.model_name)
     try:
         _write_event(client, receipt, "prepared")
     except Exception as exc:  # noqa: BLE001 - registry transport boundary
         raise _translate_error(exc, name=receipt.model_name, version=receipt.new_version) from exc
+    try:
+        client.set_registered_model_tag(receipt.model_name, _PENDING_TAG, receipt.event_id)
+        pending = (client.get_registered_model(receipt.model_name).tags or {}).get(_PENDING_TAG)
+        if pending != receipt.event_id:
+            raise AliasOutcomeUnknownError("Pending alias event was not verified.")
+    except Exception as exc:  # noqa: BLE001 - pending marker may have been written
+        raise AliasOutcomeUnknownError(
+            f"Alias preparation outcome unknown; inspect event {receipt.event_id}."
+        ) from exc
     changed = False
     for alias, new_version, old_version in updates:
         try:
@@ -283,6 +345,8 @@ def _commit_change(
             != receipt.event_id
         ):
             raise AliasOutcomeUnknownError("Active receipt verification failed.")
+        client.delete_registered_model_tag(receipt.model_name, _PENDING_TAG)
+        _assert_no_pending(client, receipt.model_name)
     except Exception as exc:  # noqa: BLE001 - never imply rollback after a possible alias write
         raise AliasOutcomeUnknownError(
             f"Alias may have changed; inspect event {receipt.event_id} before retry."
@@ -343,6 +407,71 @@ def _validated_report(
     return hashlib.sha256(
         json.dumps(asdict(fresh), sort_keys=True, allow_nan=False).encode()
     ).hexdigest()
+
+
+def initialize_champion(
+    report: ModelComparisonReport,
+    heldout: pd.DataFrame | pl.DataFrame,
+    *,
+    target_column: str,
+    admission: AliasAdmission,
+    max_rows: int,
+    max_bytes: int,
+    tracking_uri: str | None = None,
+    registry_uri: str | None = None,
+) -> AliasChangeReceipt:
+    """Initialize an absent champion only after a fresh absolute-quality check."""
+    _admission(admission, registry_uri)
+    if not isinstance(report, ModelComparisonReport) or report.champion_version is not None:
+        raise ValueError("First champion needs a comparison without a champion.")
+    threshold = report.quality_threshold
+    if threshold is None:
+        raise ValueError("First champion needs an absolute quality threshold.")
+    candidate = resolve_model(
+        report.model_name,
+        version=report.candidate_version,
+        tracking_uri=tracking_uri,
+        registry_uri=registry_uri,
+    )
+    fresh = compare_registered_local_models(
+        candidate,
+        None,
+        heldout,
+        target_column=target_column,
+        dataset_id=report.dataset_id,
+        metric=report.metric,
+        min_improvement=report.min_improvement,
+        quality_threshold=report.quality_threshold,
+        max_rows=max_rows,
+        max_bytes=max_bytes,
+        tracking_uri=tracking_uri,
+        registry_uri=registry_uri,
+    )
+    if fresh != report:
+        raise ValueError("Pinned first-champion comparison changed before initialization.")
+    value = fresh.candidate_metrics[fresh.metric]
+    passed = value <= threshold if fresh.metric_direction == "minimize" else value >= threshold
+    if not passed:
+        raise ValueError("First champion failed the absolute quality threshold.")
+    digest = hashlib.sha256(json.dumps(asdict(fresh), sort_keys=True).encode()).hexdigest()
+    client = _make_client(_require_mlflow(), tracking_uri, registry_uri)
+    with admission.hold(alias_resource_id(report.model_name)):
+        if _read_optional_alias(client, report.model_name, _ALIAS) is not None:
+            raise AliasConflictError("Champion alias already exists.")
+        if (client.get_registered_model(report.model_name).tags or {}).get(_ACTIVE_TAG):
+            raise AliasConflictError("Champion receipt exists without its alias.")
+        receipt = AliasChangeReceipt(
+            event_id=uuid4().hex,
+            kind="initial",
+            model_name=report.model_name,
+            alias=_ALIAS,
+            prior_version=None,
+            new_version=report.candidate_version,
+            comparison_sha256=digest,
+            parent_event_id=None,
+        )
+        _commit_change(client, receipt, [(_ALIAS, report.candidate_version, None)])
+        return receipt
 
 
 def stage_challenger(

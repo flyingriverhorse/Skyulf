@@ -17,10 +17,30 @@ schedule to the existing `train` job; the default `manual` choice adds none.
 | `train` | Labeled data is ready or the schedule runs | Registers a candidate; logs metrics |
 | `score` | A model is pinned and rows need scoring | Appends rows or builds a new generation |
 
+{{if eq .model_selection_mode "auto_champion"}}
+This project uses automatic champion selection. `train` compares a candidate
+against champion on a pinned temporal holdout. The first champion needs a
+numeric absolute `quality_threshold`; later candidates need strictly positive
+improvement that meets `min_improvement`. A passing candidate is staged then
+promoted through checked registry receipts. A failed candidate leaves champion
+unchanged. The train job calls the existing score job after it succeeds.
+
+Score resolves `@champion` once to a concrete version at run start. Alias
+promotion and Delta publication are separate transactions. If scoring fails
+after promotion, retry `score`; the previous successful prediction output
+remains until a new score completes. Only the serialized train job identity
+may write this model's aliases. Restrict other alias writers before enabling
+automatic mode; table-free alias admission does not provide a lock. An
+unknown alias-write outcome leaves a pending marker and blocks later automatic
+training and scoring until registry receipt reconciliation. An existing
+`@champion` set outside Skyulf's guarded promotion path has no committed
+receipt and must be reconciled before automatic mode can use it.
+{{else}}
 Champion/challenger management is available through Skyulf Core but has no
 job in this starting Bundle. Training a candidate does not activate it for
 scoring. Set `model_version` to a concrete registered version and redeploy
 when you want scoring to use it.
+{{end}}
 
 In monthly mode, the schedule starts paused. Its Quartz cron and IANA timezone
 are selected at initialization and remain editable as
@@ -37,8 +57,9 @@ it is not a historical snapshot as of the cutoff. If the source has too few
 labeled rows in either partition, training fails without publishing a model.
 The run compares against the concrete version behind `@champion` if present;
 a missing alias means first-model training. Registry access failures still
-fail the job. Retry runs can create additional candidate versions; none is
-promoted or used by `score` automatically.
+fail the job. Retry runs can create additional candidate versions.
+{{if eq .model_selection_mode "pinned_version"}}None is promoted or used by
+`score` automatically.{{end}}
 
 `training_table` is the existing labeled input. `score_source_table` is the
 existing input to predict; the generated config points both at **one table**.
@@ -111,8 +132,15 @@ clusters are a separate compute choice at project initialization.
 
 1. Run `train` against a pinned labeled Delta version. It logs held-out MLflow
    metrics and registers a concrete model version.
+{{if eq .model_selection_mode "auto_champion"}}
+2. The train job evaluates the candidate and calls the existing score job.
+   Inspect both task results. The first score requires a champion that passed
+   the absolute threshold.
+{{else}}
 2. Put that concrete version in `model_version` in `config/workflow.json` and
-   redeploy. Run `score`. It verifies the source, Change Data Feed, model
+   redeploy. Run `score`.
+{{end}}
+   Scoring verifies the source, Change Data Feed, model
    outputs, row keys and any existing target schema before writing. It creates
    only a missing physical prediction table; it never overwrites an existing
    table or creates the source. Full mode then creates or updates its managed
@@ -123,13 +151,20 @@ clusters are a separate compute choice at project initialization.
    is entered for each run. Source updates or deletes require a separate
    rescore policy.
 
+{{if eq .model_selection_mode "pinned_version"}}
 `score` always uses its configured concrete model version. Training a new
 candidate or changing a registry alias alone does not change predictions.
+{{else}}
+`score` loads the concrete champion version at run start. A later alias change
+cannot alter that run's pinned model. The train job invokes scoring after
+selection; score remains independently runnable for new source rows.
+{{end}}
 After pinning v2 and redeploying, `incremental_append` leaves v1 rows intact
 and scores only new source inserts with v2. `full_rebuild` scores every current
 source row into a new v2 table, switches the view only after success, then
 uses that table's Delta receipt to append future inserts. A failed rebuild
 leaves the old view active. The new generation must retain the active output
 schema; an incompatible model needs a new logical view or an explicit migration.
-The optional training schedule does not run `score`. There is no online
+{{if eq .model_selection_mode "pinned_version"}}The optional training schedule
+does not run `score`.{{end}} There is no online
 endpoint or Spark-native FE/model execution in this starting project.

@@ -16,6 +16,7 @@ from skyulf.integrations.mlflow.promotion import (
     AliasChangeReceipt,
     AliasConflictError,
     AliasOutcomeUnknownError,
+    ExclusiveAliasWriterAdmission,
     LocalAliasAdmission,
     _admission,
     alias_resource_id,
@@ -23,7 +24,12 @@ from skyulf.integrations.mlflow.promotion import (
     rollback_promotion,
     stage_challenger,
 )
-from skyulf.integrations.mlflow.registry import RegistryAccessError, register_model, resolve_model
+from skyulf.integrations.mlflow.registry import (
+    RegistryAccessError,
+    RegistryModelNotFoundError,
+    register_model,
+    resolve_model,
+)
 from skyulf.integrations.mlflow.tracking import TrackingConfig, track_run
 from skyulf.integrations.mlflow.validation import (
     ModelComparisonReport,
@@ -308,6 +314,119 @@ def test_missing_champion_and_contention_refuse_promotion(case) -> None:
         _promote(case)
 
 
+def test_first_champion_needs_absolute_quality_and_verified_receipt(case) -> None:
+    """An unseeded registry must select only a rechecked, good first model."""
+    from skyulf.integrations.mlflow.promotion import (
+        controlled_champion_version,
+        initialize_champion,
+    )
+
+    client, uri, name, heldout, _, admission = case
+    client.delete_registered_model_alias(name, "champion")
+    with pytest.raises(RegistryModelNotFoundError):
+        resolve_model(name, alias="champion", tracking_uri=uri, registry_uri=uri)
+    assert controlled_champion_version(name, tracking_uri=uri, registry_uri=uri) is None
+    candidate = resolve_model(name, version="2", tracking_uri=uri, registry_uri=uri)
+    report = compare_registered_local_models(
+        candidate,
+        None,
+        heldout,
+        target_column="target",
+        dataset_id="labels@5/heldout",
+        metric="heldout_mse",
+        min_improvement=0.0,
+        quality_threshold=1.0,
+        max_rows=10,
+        max_bytes=10_000,
+        tracking_uri=uri,
+        registry_uri=uri,
+    )
+    receipt = initialize_champion(
+        report,
+        heldout,
+        target_column="target",
+        admission=admission,
+        max_rows=10,
+        max_bytes=10_000,
+        tracking_uri=uri,
+        registry_uri=uri,
+    )
+    assert receipt.kind == "initial"
+    assert receipt.new_version == "2"
+    assert str(client.get_model_version_by_alias(name, "champion").version) == "2"
+    assert controlled_champion_version(name, tracking_uri=uri, registry_uri=uri) == "2"
+    with pytest.raises(AliasConflictError):
+        initialize_champion(
+            report,
+            heldout,
+            target_column="target",
+            admission=admission,
+            max_rows=10,
+            max_bytes=10_000,
+            tracking_uri=uri,
+            registry_uri=uri,
+        )
+
+
+def test_first_champion_rejects_missing_or_failed_quality_threshold(case) -> None:
+    """Automatic bootstrap cannot use improvement alone without a baseline."""
+    from skyulf.integrations.mlflow.promotion import initialize_champion
+
+    client, uri, name, heldout, _, admission = case
+    client.delete_registered_model_alias(name, "champion")
+    candidate = resolve_model(name, version="2", tracking_uri=uri, registry_uri=uri)
+    for threshold in (None, -1.0):
+        report = compare_registered_local_models(
+            candidate,
+            None,
+            heldout,
+            target_column="target",
+            dataset_id="labels@5/heldout",
+            metric="heldout_mse",
+            min_improvement=0.0,
+            quality_threshold=threshold,
+            max_rows=10,
+            max_bytes=10_000,
+            tracking_uri=uri,
+            registry_uri=uri,
+        )
+        with pytest.raises(ValueError, match="quality threshold"):
+            initialize_champion(
+                report,
+                heldout,
+                target_column="target",
+                admission=admission,
+                max_rows=10,
+                max_bytes=10_000,
+                tracking_uri=uri,
+                registry_uri=uri,
+            )
+    with pytest.raises(mlflow.exceptions.MlflowException):
+        client.get_model_version_by_alias(name, "champion")
+
+
+def test_controlled_champion_rejects_alias_without_receipt(case) -> None:
+    """An alias set outside the guarded lifecycle must not feed automatic scoring."""
+    from skyulf.integrations.mlflow.promotion import controlled_champion_version
+
+    client, uri, name, _, _, _ = case
+    with pytest.raises(AliasConflictError, match="committed receipt"):
+        controlled_champion_version(name, tracking_uri=uri, registry_uri=uri)
+    client.set_registered_model_tag(name, "skyulf_pending_alias_event", "unresolved")
+    with pytest.raises(AliasConflictError, match="pending"):
+        controlled_champion_version(name, tracking_uri=uri, registry_uri=uri)
+
+
+def test_exclusive_alias_writer_requires_external_serialization() -> None:
+    """A table-free UC writer opts into an explicit alias resource contract."""
+    admission = ExclusiveAliasWriterAdmission()
+    assert _admission(admission, "databricks-uc") is admission
+    with admission.hold(alias_resource_id("catalog.schema.model")):
+        assert admission.local_only is False
+    with pytest.raises(ValueError, match="alias resource ID"), admission.hold("not-an-alias"):
+        pass
+
+
 def test_rollback_rejects_newer_alias_state(case) -> None:
     """A receipt cannot roll back a different current model version."""
     client, uri, name, _, _, admission = case
@@ -359,6 +478,11 @@ def test_lost_alias_write_response_is_reported_as_unknown(case, monkeypatch) -> 
     with pytest.raises(AliasOutcomeUnknownError, match="inspect prepared event"):
         _promote(case)
     assert str(client.get_model_version_by_alias(name, "champion").version) == "2"
+    assert client.get_registered_model(name).tags.get("skyulf_pending_alias_event")
+    from skyulf.integrations.mlflow.promotion import controlled_champion_version
+
+    with pytest.raises(AliasConflictError, match="pending"):
+        controlled_champion_version(name, tracking_uri=case[1], registry_uri=case[1])
 
 
 def test_old_receipt_cannot_rollback_newer_promotion_to_same_version(case) -> None:
