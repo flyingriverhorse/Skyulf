@@ -2,6 +2,7 @@
 
 import importlib.util
 import json
+import re
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock
@@ -31,12 +32,9 @@ def _config():
         "training_version": 0,
         "score_source_table": "workspace.test.source",
         "prediction_table": "workspace.test.predictions",
-        "score_admission_table": "workspace.test.score_admission",
-        "alias_admission_table": "workspace.test.alias_admission",
         "model_name": "workspace.test.model",
         "model_version": "1",
         "champion_version": "1",
-        "candidate_version": "2",
         "row_keys": ["entity_id"],
         "input_columns": ["x"],
         "target_column": "target",
@@ -59,7 +57,6 @@ def test_train_preserves_selected_polars_engine_and_never_promotes(monkeypatch, 
     workflow = _workflow()
     train = Mock(return_value=SimpleNamespace(model_version="2"))
     monkeypatch.setattr(workflow, "train_local_candidate", train)
-    monkeypatch.setattr(workflow, "promote_candidate", Mock(side_effect=AssertionError("promoted")))
     result = workflow.run_action(
         object(),
         _config(),
@@ -79,47 +76,22 @@ def test_score_uses_incremental_service_without_period_or_source_version(monkeyp
     score = Mock(return_value=SimpleNamespace(noop=False, input_count=2))
     monkeypatch.setattr(workflow, "prepare_local_workflow", prepare)
     monkeypatch.setattr(workflow, "run_incremental_local_batch", score)
-    monkeypatch.setattr(workflow, "DeltaTableAdmission", Mock(return_value=object()))
+    monkeypatch.setattr(workflow, "provision_prediction_table", Mock())
     result = workflow.run_action(object(), _config(), "score")
     assert result.input_count == 2
     assert score.call_args.kwargs["row_keys"] == ("entity_id",)
     assert "period_start" not in score.call_args.kwargs
     assert "source_version" not in score.call_args.kwargs
     assert prepare.call_args.args[0].engine == "polars"
+    assert isinstance(score.call_args.kwargs["admission"], workflow.SingleWriterAdmission)
 
 
-def test_compare_is_read_only_and_stage_does_not_promote(monkeypatch):
-    """An eligible comparison must still need a separate staging and promotion job."""
+def test_lifecycle_actions_are_not_bundle_entry_points():
+    """The minimal Bundle must not accidentally mutate registry aliases."""
     workflow = _workflow()
-    report = SimpleNamespace(eligible=True, reason="eligible")
-    heldout = object()
-    monkeypatch.setattr(workflow, "_comparison", Mock(return_value=(report, heldout)))
-    stage = Mock(return_value=SimpleNamespace(kind="challenger"))
-    promote = Mock(side_effect=AssertionError("promoted without approval"))
-    monkeypatch.setattr(workflow, "stage_challenger", stage)
-    monkeypatch.setattr(workflow, "promote_candidate", promote)
-    monkeypatch.setattr(workflow, "DeltaAliasAdmission", Mock(return_value=object()))
-    assert workflow.run_action(object(), _config(), "compare") is report
-    promote.assert_not_called()
-    result = workflow.run_action(object(), _config(), "stage")
-    assert result.kind == "challenger"
-    assert stage.call_args.kwargs["expected_champion_version"] == "1"
-    promote.assert_not_called()
-
-
-def test_ineligible_candidate_cannot_reach_alias_writer(monkeypatch):
-    """An inferior candidate cannot stage or promote through the Bundle entry point."""
-    workflow = _workflow()
-    monkeypatch.setattr(
-        workflow,
-        "_comparison",
-        Mock(return_value=(SimpleNamespace(eligible=False, reason="inferior"), object())),
-    )
-    promote = Mock()
-    monkeypatch.setattr(workflow, "promote_candidate", promote)
-    with pytest.raises(ValueError, match="not eligible"):
-        workflow.run_action(object(), _config(), "promote")
-    promote.assert_not_called()
+    for action in ("compare", "stage", "promote", "setup"):
+        with pytest.raises(ValueError, match="Unknown workflow action"):
+            workflow.run_action(object(), _config(), action)
 
 
 def test_target_binding_separates_test_and_prod_outputs():
@@ -131,8 +103,6 @@ def test_target_binding_separates_test_and_prod_outputs():
         score_source_table="shared.raw.events",
         prediction_table="{catalog}.{output_schema}.predictions{resource_suffix}",
         model_name="{catalog}.{metadata_schema}.model{resource_suffix}",
-        score_admission_table="{catalog}.{metadata_schema}.score_control{resource_suffix}",
-        alias_admission_table="{catalog}.{metadata_schema}.alias_control{resource_suffix}",
     )
     shared = {
         "input_schema": "refined",
@@ -187,8 +157,6 @@ def test_target_binding_rejects_cross_environment_output():
     workflow = _workflow()
     config = _config()
     config.update(
-        score_admission_table="prod_catalog.metadata.score_control",
-        alias_admission_table="prod_catalog.metadata.alias_control",
         model_name="prod_catalog.metadata.model",
     )
     config["prediction_table"] = "test_catalog.mlresult.predictions"
@@ -211,8 +179,6 @@ def test_target_binding_rejects_cross_environment_model():
     config = _config()
     config.update(
         prediction_table="prod_catalog.mlresult.predictions",
-        score_admission_table="prod_catalog.metadata.score_control",
-        alias_admission_table="prod_catalog.metadata.alias_control",
     )
     config["model_name"] = "test_catalog.metadata.model"
     with pytest.raises(ValueError, match="model_name"):
@@ -236,7 +202,6 @@ def test_generated_config_keeps_company_output_in_each_target():
         template.read_text(encoding="utf-8")
         .replace("{{.project_name}}", "customer_model")
         .replace("{{.engine}}", "pandas")
-        .replace("{{.include_lifecycle}}", "no")
     )
     outputs = {}
     for target, catalog, suffix in (
@@ -272,7 +237,6 @@ def test_minimal_generated_config_uses_one_existing_source():
         template.read_text(encoding="utf-8")
         .replace("{{.project_name}}", "customer_model")
         .replace("{{.engine}}", "pandas")
-        .replace("{{.include_lifecycle}}", "no")
     )
     bound = workflow.resolve_target_config(
         config,
@@ -287,18 +251,86 @@ def test_minimal_generated_config_uses_one_existing_source():
     assert bound["training_table"] == bound["score_source_table"]
 
 
-def test_setup_rejects_missing_source_without_creating_tables():
+def test_score_provision_rejects_missing_source_without_creating_tables():
     """A wrong source reference must not create partial prediction resources."""
     workflow = _workflow()
     spark = Mock()
     spark.catalog.tableExists.return_value = False
     with pytest.raises(ValueError, match="source"):
-        workflow.provision_local_tables(spark, _config(), object())
+        workflow.provision_prediction_table(spark, _config(), object())
     spark.sql.assert_not_called()
 
 
-def test_setup_creates_only_prediction_and_score_control(monkeypatch):
-    """First setup must leave inputs alone and create no alias table by default."""
+def test_score_does_not_require_labeled_training_table(monkeypatch):
+    """A retired training snapshot must not prevent scoring a live source."""
+    workflow = _workflow()
+    config = _config()
+    config["training_table"] = "workspace.test.retired_training"
+    spark = Mock()
+    spark.catalog.tableExists.side_effect = lambda name: name != config["training_table"]
+    spark.sql.return_value.first.return_value = {
+        "properties": {"delta.enableChangeDataFeed": "true"}
+    }
+    monkeypatch.setattr(workflow, "_prediction_columns", Mock(return_value=()))
+    monkeypatch.setattr(workflow, "_check_existing_table", Mock())
+    prepared = SimpleNamespace(preflight=SimpleNamespace(ready=True))
+    assert workflow.provision_prediction_table(spark, config, prepared) is False
+
+
+def test_score_replay_validates_existing_output_without_recounting_source(monkeypatch):
+    """A later score must accept a growing source without recreating its output."""
+    workflow = _workflow()
+    config = _config()
+    source = Mock()
+    source.columns = ["entity_id", "x"]
+    source.schema = {
+        "entity_id": SimpleNamespace(dataType=SimpleNamespace(typeName=lambda: "string"))
+    }
+    spark = Mock()
+    spark.catalog.tableExists.return_value = True
+    spark.table.return_value = source
+    spark.sql.return_value.first.return_value = {
+        "properties": {"delta.enableChangeDataFeed": "true"}
+    }
+    check_target = Mock()
+    monkeypatch.setattr(workflow, "_check_existing_table", check_target)
+    prepared = SimpleNamespace(
+        artifact=SimpleNamespace(manifest=SimpleNamespace(input_columns=("x",))),
+        preflight=SimpleNamespace(
+            ready=True,
+            output_schema=(SimpleNamespace(name="prediction", dtype="float64"),),
+        ),
+    )
+    result = workflow.provision_prediction_table(spark, config, prepared)
+    check_target.assert_called_once()
+    source.select.assert_not_called()
+    assert result is False
+    assert all(not call.args[0].startswith("CREATE TABLE") for call in spark.sql.call_args_list)
+
+
+def test_first_score_provisions_prediction_before_incremental_write(monkeypatch):
+    """The scheduled score job must handle first-run setup without another job."""
+    workflow = _workflow()
+    events = []
+    prepared = object()
+    monkeypatch.setattr(workflow, "prepare_local_workflow", Mock(return_value=prepared))
+    monkeypatch.setattr(
+        workflow,
+        "provision_prediction_table",
+        Mock(side_effect=lambda spark, config, model: events.append("provision")),
+        raising=False,
+    )
+    monkeypatch.setattr(
+        workflow,
+        "run_incremental_local_batch",
+        Mock(side_effect=lambda *args, **kwargs: events.append("score")),
+    )
+    workflow.run_action(object(), _config(), "score")
+    assert events == ["provision", "score"]
+
+
+def test_prediction_provision_creates_no_control_table(monkeypatch):
+    """First scoring must create only the output table, with no lock table."""
     workflow = _workflow()
     config = _config()
     source = Mock()
@@ -319,7 +351,6 @@ def test_setup_creates_only_prediction_and_score_control(monkeypatch):
     spark.sql.return_value.first.return_value = {
         "properties": {"delta.enableChangeDataFeed": "true"}
     }
-    monkeypatch.setattr(workflow, "table_identity", Mock(return_value="prediction-id"))
     prepared = SimpleNamespace(
         artifact=SimpleNamespace(manifest=SimpleNamespace(input_columns=("x",))),
         preflight=SimpleNamespace(
@@ -327,46 +358,32 @@ def test_setup_creates_only_prediction_and_score_control(monkeypatch):
             output_schema=(SimpleNamespace(name="prediction", dtype="float64"),),
         ),
     )
-    result = workflow.provision_local_tables(spark, config, prepared)
+    created = workflow.provision_prediction_table(spark, config, prepared)
     statements = [call.args[0] for call in spark.sql.call_args_list]
-    creates = [statement for statement in statements if statement.startswith("CREATE TABLE")]
-    assert result.prediction_created and result.score_admission_created
-    assert result.alias_admission_table is None
-    assert len(creates) == 2
-    assert creates[0].startswith(f"CREATE TABLE {config['prediction_table']} (")
-    assert creates[1].startswith(f"CREATE TABLE {config['score_admission_table']} USING DELTA")
+    assert created is True
+    assert len([statement for statement in statements if statement.startswith("CREATE TABLE")]) == 1
+    assert all("admission" not in statement for statement in statements)
 
 
-def test_setup_replay_validates_existing_tables_without_creating_anything(monkeypatch):
-    """Rerunning setup must preserve the existing prediction and control tables."""
-    workflow = _workflow()
-    config = _config()
-    source = Mock()
-    source.columns = ["entity_id", "x"]
-    source.schema = {
-        "entity_id": SimpleNamespace(dataType=SimpleNamespace(typeName=lambda: "string"))
-    }
-    source.select.return_value.limit.return_value.count.return_value = 2
-    spark = Mock()
-    spark.catalog.tableExists.return_value = True
-    spark.table.return_value = source
-    spark.sql.return_value.first.return_value = {
-        "properties": {"delta.enableChangeDataFeed": "true"}
-    }
-    monkeypatch.setattr(workflow, "table_identity", Mock(return_value="prediction-id"))
-    check_target = Mock()
-    check_control = Mock()
-    monkeypatch.setattr(workflow, "_check_existing_table", check_target)
-    monkeypatch.setattr(workflow, "_check_existing_control", check_control)
-    prepared = SimpleNamespace(
-        artifact=SimpleNamespace(manifest=SimpleNamespace(input_columns=("x",))),
-        preflight=SimpleNamespace(
-            ready=True,
-            output_schema=(SimpleNamespace(name="prediction", dtype="float64"),),
-        ),
+def test_generated_config_has_no_admission_or_alias_state():
+    """The starting Bundle must not ask users to provision coordination tables."""
+    template = WORKFLOW.parents[1] / "config/workflow.json.tmpl"
+    config = json.loads(
+        template.read_text(encoding="utf-8")
+        .replace("{{.project_name}}", "customer_model")
+        .replace("{{.engine}}", "pandas")
+        .replace("{{.include_lifecycle}}", "no")
     )
-    result = workflow.provision_local_tables(spark, config, prepared)
-    check_target.assert_called_once()
-    check_control.assert_called_once_with(spark, config["score_admission_table"], "prediction-id")
-    assert not result.prediction_created and not result.score_admission_created
-    assert all(not call.args[0].startswith("CREATE TABLE") for call in spark.sql.call_args_list)
+    assert "score_admission_table" not in config
+    assert "alias_admission_table" not in config
+    assert "include_lifecycle" not in config
+
+
+def test_generated_bundle_has_only_train_and_serialized_score_jobs():
+    """A new project must not silently bring back setup or control jobs."""
+    resource = WORKFLOW.parents[1] / "resources/workflow.jobs.yml.tmpl"
+    template = resource.read_text(encoding="utf-8")
+    assert re.findall(r"^    ([a-z_]+):$", template, flags=re.MULTILINE) == ["train", "score"]
+    assert re.search(
+        r"^    score:\n      name:.*\n      max_concurrent_runs: 1$", template, re.MULTILINE
+    )

@@ -8,31 +8,28 @@ same Skyulf workflow code with different target bindings.
 ## What deployment creates
 
 `bundle deploy` uploads the wheel, notebook and configuration, and creates
-{{if eq .include_lifecycle "yes"}}six{{else}}three{{end}} jobs. It creates **no**
-Unity Catalog table or registered model. The default jobs are:
+two jobs. It creates **no** Unity Catalog table or registered model.
 
 | Job | Run it when | UC effect |
 | --- | --- | --- |
 | `train` | A labeled snapshot is ready | Registers one candidate model and logs MLflow metrics |
-| `setup` | The model version and source are ready | Creates one empty prediction table and one score-control table if absent |
-| `score` | New rows need predictions | Appends only new-row predictions to the same prediction table |
+| `score` | The model version is pinned and rows need predictions | Creates the prediction table if absent, then appends predictions for initial or new rows |
 
-{{if eq .include_lifecycle "yes"}}
-The optional `compare`, `stage` and `promote` jobs are also generated. Setup
-then creates a separate alias-control table. Those jobs review and explicitly
-move `@challenger` and `@champion`; they never run as part of ordinary scoring.
-{{else}}
-The champion/challenger jobs and alias-control table are absent in this
-minimal project. Generate with `include_lifecycle=yes` when needed.
-{{end}}
+Champion/challenger management is available through Skyulf Core but has no
+job in this starting Bundle. Training a candidate does not activate it for
+scoring. Set `model_version` to a concrete registered version and redeploy
+when you want scoring to use it.
 
 `training_table` is the existing labeled input. `score_source_table` is the
 existing input to predict; the generated config points both at **one table**.
 You may give them different UC names when the labeled training data and new
 inference data have different lifecycles. Neither is created by this Bundle.
-`prediction_table` is the single model output table. `score_admission_table`
-holds one internal ownership row so concurrent writers cannot silently
-duplicate an increment. `model_name` is a registered UC model, not a table.
+`prediction_table` is the single model output table. `model_name` is a
+registered UC model, not a table. The Bundle creates no admission table.
+The score job has `max_concurrent_runs: 1`; grant write access to the
+prediction table only to this job's identity. Other jobs must not write it.
+Skyulf Core's shared-admission option remains available when multiple jobs
+need to publish to one target.
 
 ## Prepare the project
 
@@ -74,12 +71,12 @@ clusters are a separate compute choice at project initialization.
 1. Run `train` against a pinned labeled Delta version. It logs held-out MLflow
    metrics and registers a concrete model version.
 2. Put that concrete version in `model_version` in `config/workflow.json` and
-   redeploy. Run `setup`. Setup verifies the source, Change Data Feed, model
-   outputs, row keys and existing target/control schemas before writing. It
-   creates only missing output/control tables; it never overwrites existing
-   tables or creates the source. Its row check is bounded by `max_rows`; the
-   scoring job also enforces `max_bytes` on the local transfer.
-3. Run `score`. Add new rows to the existing source Delta table and run `score`
+   redeploy. Run `score`. It verifies the source, Change Data Feed, model
+   outputs, row keys and any existing target schema before writing. It creates
+   only the missing prediction table; it never overwrites an existing table
+   or creates the source. The initial row check is bounded by `max_rows`, and
+   scoring enforces `max_rows` and `max_bytes` for each local transfer.
+3. Add new rows to the existing source Delta table and run `score`
    again. An unchanged replay is a no-op. No date or source-version argument
    is entered for each run. Source updates or deletes require a separate
    rescore policy.

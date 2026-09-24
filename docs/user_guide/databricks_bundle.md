@@ -12,8 +12,7 @@ databricks bundle init templates/databricks --output-dir ./generated
 ```
 
 The short path asks for project name, engine, serverless or policy-backed job
-compute, optional champion/challenger lifecycle and the existing `dev`
-catalog/schema. Serverless and no lifecycle are the defaults. Reviewable
+compute and the existing `dev` catalog/schema. Serverless is the default. Reviewable
 noninteractive examples are in `templates/databricks/examples/`. The generated
 project has its own `databricks.yml`; Skyulf's root has no Bundle config.
 
@@ -27,28 +26,25 @@ initialization. Serverless compute needs none of those fields.
 
 ## What is created
 
-`bundle deploy` creates only three jobs by default and uploads their code:
+`bundle deploy` creates only two jobs and uploads their code:
 
 | Job | Purpose | UC objects created when run |
 | --- | --- | --- |
 | `train` | Fit one candidate and log held-out metrics | One registered model/version |
-| `setup` | Verify source and pinned model, then prepare output | One prediction table and one internal score-control table, only if absent |
-| `score` | Score the initial source, then new CDF inserts | Rows in the same prediction table |
+| `score` | Verify the source and pinned model, create output if absent, then score initial and later CDF inserts | One prediction table, only if absent; rows in that table |
 
-`compare`, `stage` and `promote` jobs are generated only with
-`include_lifecycle=yes`. In that case `setup` also creates one alias-control
-table. No schedule, endpoint or Unity Catalog table is created by deployment
-alone.
+No schedule, endpoint or Unity Catalog table is created by deployment alone.
+The starting Bundle has no alias lifecycle job. Skyulf Core's registry
+comparison and promotion services remain available for a separately designed
+champion/challenger workflow.
 
-The six relevant configuration names have different roles:
+The four relevant Unity Catalog names have different roles:
 
 | Name | Meaning |
 | --- | --- |
 | `training_table` | Existing labeled input table, pinned to a Delta version for training |
 | `score_source_table` | Existing CDF-enabled source of rows to predict |
 | `prediction_table` | The one output table for this model |
-| `score_admission_table` | Internal one-row Delta coordination table for safe incremental writes |
-| `alias_admission_table` | Optional coordination table for champion/challenger changes |
 | `model_name` | Registered Unity Catalog model, not a table |
 
 The first two references point to **the same existing table by default**.
@@ -71,28 +67,29 @@ databricks bundle run train -t dev --profile <profile>
 ```
 
 Inspect the registered model version, put that concrete value in
-`model_version`, redeploy the changed JSON, then run `setup` and `score`.
-`setup` rejects a missing source, disabled CDF, unsuitable row keys, a model
-output mismatch or an existing target/control schema mismatch before it
-creates missing output state. It checks initial row count against `max_rows`;
-`score` also checks decoded transfer bytes against `max_bytes`. Existing
-tables are never overwritten. `score` first processes the current source
+`model_version`, redeploy the changed JSON, then run `score`. The first score
+rejects a missing source, disabled CDF, unsuitable row keys, a model output
+mismatch or an existing target schema mismatch before it creates the single
+prediction table. It checks initial row count against `max_rows`; each score
+also checks decoded transfer bytes against `max_bytes`. Existing tables are
+never overwritten. The first score processes the current source
 snapshot; later runs process only new inserts since the committed Delta
 receipt. A repeat without new rows is a no-op. No monthly date or source
 version is entered for each run.
 
-The first candidate does not become champion automatically. Optional
-`compare` is read-only, `stage` assigns an eligible `@challenger`, and
-`promote` explicitly moves it to `@champion` while retaining the prior
-version as `@previous_champion`. Scoring stays pinned to its configured model
-version; changing aliases does not rewrite old predictions. Full-history
-rescore, schedules, online endpoints and Spark-native FE/model execution are
-separate work.
+The first candidate does not become champion automatically. Scoring stays
+pinned to its configured model version; changing aliases does not rewrite old
+predictions. `max_concurrent_runs: 1` serializes the generated score job, but
+does not coordinate other jobs. Grant prediction-table writes only to this
+job's identity. For multiple publishers, use Skyulf Core's shared admission
+provider. Full-history rescore, schedules, online endpoints and Spark-native
+FE/model execution are separate work.
 
 The older SM-20a personal serverless rehearsal passed, but its jobs and test
 schemas were removed at the user's request. The subsequent clean generic
 `dev` rehearsal trained a Polars model from 600 real taxi rows, wrote 600
 initial and 50 later predictions to one table, and replayed without another
 commit. The personal test resources remain available for inspection. The
-`test`, `syst` and `prod` placeholders have not been deployed in a company
-workspace.
+That rehearsal used the earlier three-job template; the two-job design needs
+its own live validation. The `test`, `syst` and `prod` placeholders have not
+been deployed in a company workspace.

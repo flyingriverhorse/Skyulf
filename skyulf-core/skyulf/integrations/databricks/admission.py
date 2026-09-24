@@ -15,11 +15,12 @@ class BatchConflictError(RuntimeError):
 
 
 class PublishAdmission(Protocol):
-    """Hold an exclusive table lock until the commit receipt has been read.
+    """Control publication until the commit receipt has been read.
 
-    All publishers must use the same authority keyed by immutable Delta table ID.
-    Ownership must not expire while the context is active. This API does not
-    pass fencing tokens to Delta; time-limited distributed leases are unsupported.
+    Shared providers must use the same authority keyed by immutable Delta table
+    ID. ``SingleWriterAdmission`` instead relies on caller-enforced exclusive
+    write access and serialized job runs. This API does not pass fencing tokens
+    to Delta; time-limited distributed leases are unsupported.
     """
 
     local_only: bool
@@ -30,14 +31,33 @@ class PublishAdmission(Protocol):
 
 
 def validate_admission(spark: Any, admission: PublishAdmission | None) -> PublishAdmission:
-    """Reject absent admission or local locks on a distributed runtime before I/O."""
+    """Require an explicit shared or externally enforced single-writer policy."""
     if admission is None or not callable(getattr(admission, "hold", None)):
-        raise ValueError("A shared publish admission is required.")
+        raise ValueError("An explicit publish admission is required.")
     if admission.local_only:
         master = spark.sparkContext.master
         if master != "local" and not master.startswith("local["):
             raise ValueError("LocalTableLock cannot coordinate distributed drivers.")
     return admission
+
+
+class SingleWriterAdmission:
+    """Opt in to table-free publication when one external writer is guaranteed.
+
+    This provider does not lock. Use it only when one job owns all target writes,
+    its runs cannot overlap, and other principals cannot modify the target.
+    Delta receipts and transaction IDs still detect/replay committed increments,
+    but they do not replace cross-job admission if another writer is allowed.
+    """
+
+    local_only = False
+
+    @contextmanager
+    def hold(self, table_id: str) -> Iterator[None]:
+        """Enter the caller's externally serialized single-writer scope."""
+        if type(table_id) is not str or not table_id:
+            raise ValueError("Single-writer publication needs a target table ID.")
+        yield
 
 
 class LocalTableLock:

@@ -3,6 +3,7 @@
 import os
 import subprocess
 import sys
+from types import SimpleNamespace
 
 
 def test_independent_process_cannot_enter_held_table_lock(tmp_path):
@@ -31,3 +32,16 @@ else:
     assert child.stdout.strip() == "BUSY"
     with lock.hold("table-id"):
         assert (tmp_path / "locks").is_dir()
+
+
+def test_explicit_single_writer_path_needs_no_control_table(tmp_path):
+    """A caller-controlled sole writer can publish without provisioning lock state."""
+    from skyulf.integrations.databricks.admission import (
+        SingleWriterAdmission,
+        validate_admission,
+    )
+
+    spark = SimpleNamespace(sparkContext=SimpleNamespace(master="spark://remote"))
+    provider = validate_admission(spark, SingleWriterAdmission())
+    with provider.hold("prediction-table-id"):
+        assert list(tmp_path.iterdir()) == []

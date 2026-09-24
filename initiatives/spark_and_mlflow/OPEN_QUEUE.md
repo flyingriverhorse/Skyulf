@@ -1,6 +1,6 @@
 # Spark ve MLflow — Open Queue
 
-Updated: 2026-09-24. **SM-00 through SM-16, SM-15L/15I/24a/25/26, SM-22a/b/c/28a and SM-20a/20R complete. SM-28b is next. Target: 0.9.0.**
+Updated: 2026-09-24. **SM-00 through SM-16, SM-15L/15I/24a/25/26, SM-22a/b/c/28a and SM-20a/20R/20S complete. SM-28b is next. Target: 0.9.0.**
 Next deliverable: optional monthly local retraining schedule. Spark
 expansion follows the validated first Bundle. SM-15L
 provides explicit-period UC output. SM-15I adds automatic new-row scoring
@@ -54,7 +54,8 @@ SUPERSEDED = replaced by a later user-directed scope; not a completed feature.
 | SM-20a | First local-engine Bundle/template | SM-24a, SM-15I, SM-22b, SM-22c, SM-28a | DONE | Generated/deployed Polars Bundle; train/compare/stage/promote and 2+2 incremental score/no-op live; [evidence](21-sm20a-local-bundle-validation-report.md) |
 | SM-20P | Company-shaped Bundle draft | SM-20a | SUPERSEDED | Replaced by the generic four-target SM-20R direction; no company workspace deployment |
 | SM-20R | Reset personal tests; generic minimal Bundle | SM-20a | DONE | Ten test jobs and three schemas removed; four target shapes validated, personal dev deployed with three jobs; one source, one prediction, one internal control, one UC model; Polars 600+50-row scoring and no-op replay; [live evidence](24-sm20r-clean-generic-bundle-validation-report.md) |
-| SM-28b | Optional monthly retraining schedule | SM-20a, SM-28a | READY | Wire separate train/compare/explicit-promote/score jobs with label cutoff and pinned versions |
+| SM-20S | Two-job, table-minimal local Bundle | SM-20R | DONE | First score creates only prediction output; no admission tables; 650+1 rows, replay no-op, final two jobs/two tables; [live evidence](26-sm20s-two-job-live-validation-report.md) |
+| SM-28b | Optional monthly retraining schedule | SM-20S, SM-28a | READY | Design one optional scheduled workflow around pinned labels, candidate comparison and explicit activation; keep the two-job starter unchanged and decide shared-target writer admission before wiring scoring |
 | SM-24b | Optional Databricks Jobs API operations | SM-20a | LATER | Add dynamic submit/status/cancel only if Bundle jobs are insufficient |
 | SM-24d | Hard transport budget for wide UC rows | SM-24a | LATER | Add a proven paged/size-limited source adapter when exact transfer-byte enforcement is required; current Spark iterator bounds accepted decoded rows and frame memory only |
 | SM-27 | Full-history local rescore and selectable Bundle mode | SM-20a, SM-15L | LATER | Score a pinned, bounded source snapshot into a new prediction generation; validate and activate explicitly; preserve prior generation |

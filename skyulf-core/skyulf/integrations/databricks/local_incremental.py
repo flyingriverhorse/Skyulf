@@ -154,8 +154,10 @@ def run_incremental_local_batch(
     """Score the initial snapshot, then only inserts since the last target receipt.
 
     Source and target tables already exist. The source must have Delta CDF
-    enabled before subsequent changes. All target writers must share admission;
-    a target commit outside this protocol halts automatic scoring.
+    enabled before subsequent changes. Multiple target writers must share
+    admission. A sole writer may instead use explicit SingleWriterAdmission
+    when its job is serialized and no other writer can modify the target.
+    A target commit outside this protocol halts automatic scoring.
     """
     inputs = _validate_prepared(prepared, row_keys, period_column)
     admission = validate_admission(spark, admission)

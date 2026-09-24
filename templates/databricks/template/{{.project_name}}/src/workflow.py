@@ -1,15 +1,13 @@
 # Databricks notebook source
-"""Run one bounded Skyulf local training, comparison, alias or scoring action."""
+"""Run one bounded Skyulf local training or incremental scoring action."""
 
 import json
 import re
 import tempfile
-from dataclasses import asdict, dataclass
+from dataclasses import asdict
 from datetime import datetime
 from pathlib import Path
 from typing import Any
-
-import polars as pl
 
 from skyulf.integrations.databricks import (
     InputSource,
@@ -18,28 +16,15 @@ from skyulf.integrations.databricks import (
     ModelSelection,
     OutputSink,
     prepare_local_workflow,
-    read_training_snapshot,
     run_incremental_local_batch,
-    split_labeled_snapshot,
     train_local_candidate,
 )
-from skyulf.integrations.databricks.delta import table_identity
-from skyulf.integrations.databricks.delta_admission import DeltaTableAdmission
-from skyulf.integrations.mlflow.promotion import (
-    DeltaAliasAdmission,
-    alias_resource_id,
-    promote_candidate,
-    stage_challenger,
-)
-from skyulf.integrations.mlflow.registry import resolve_model
-from skyulf.integrations.mlflow.validation import compare_registered_local_models
+from skyulf.integrations.databricks.admission import SingleWriterAdmission
 
 _TABLE_FIELDS = (
     "training_table",
     "score_source_table",
     "prediction_table",
-    "score_admission_table",
-    "alias_admission_table",
     "model_name",
 )
 _IDENTIFIER = re.compile(r"[A-Za-z_][A-Za-z0-9_]*\Z")
@@ -50,19 +35,6 @@ _OUTPUT_TYPES = {
     "string": ("string", "STRING"),
     "bool": ("boolean", "BOOLEAN"),
 }
-
-
-@dataclass(frozen=True, slots=True)
-class ProvisionResult:
-    """Report the UC objects verified or created by one explicit setup run."""
-
-    source_table: str
-    prediction_table: str
-    prediction_created: bool
-    score_admission_table: str
-    score_admission_created: bool
-    alias_admission_table: str | None
-    alias_admission_created: bool
 
 
 def resolve_target_config(config: dict[str, Any], bindings: dict[str, str]) -> dict[str, Any]:
@@ -76,20 +48,13 @@ def resolve_target_config(config: dict[str, Any], bindings: dict[str, str]) -> d
     resolved = config.copy()
     for name in _TABLE_FIELDS:
         value = config[name]
-        if name == "alias_admission_table" and value is None:
-            continue
         if type(value) is not str:
             raise ValueError(f"{name} must be a string.")
         for key, replacement in bindings.items():
             value = value.replace("{" + key + "}", replacement)
         if not _TABLE_NAME.fullmatch(value):
             raise ValueError(f"{name} must resolve to a three-part UC name.")
-        if name in {
-            "prediction_table",
-            "score_admission_table",
-            "alias_admission_table",
-            "model_name",
-        }:
+        if name in {"prediction_table", "model_name"}:
             schema = "output_schema" if name == "prediction_table" else "metadata_schema"
             expected = f"{bindings['catalog']}.{bindings[schema]}."
             if not value.startswith(expected):
@@ -101,7 +66,7 @@ def resolve_target_config(config: dict[str, Any], bindings: dict[str, str]) -> d
 
 
 def _scoring_config(config: dict[str, Any]) -> LocalWorkflowConfig:
-    """Bind the same pinned local model and source for setup and scoring."""
+    """Bind the pinned local model and source for incremental scoring."""
     return LocalWorkflowConfig(
         runtime="databricks",
         engine=config["engine"],
@@ -163,58 +128,21 @@ def _check_existing_table(spark: Any, name: str, columns: tuple[tuple[str, str, 
         raise ValueError(f"Existing prediction table {name} differs from the model output schema.")
 
 
-def _check_existing_control(spark: Any, name: str, target_id: str) -> None:
-    """Require exactly one idle admission row bound to the intended resource."""
-    frame = spark.table(name)
-    actual = {field.name: field.dataType.typeName() for field in frame.schema.fields}
-    if actual != {"target_id": "string", "owner": "string"}:
-        raise ValueError(f"Existing admission table {name} has an invalid schema.")
-    rows = frame.limit(2).collect()
-    if len(rows) != 1 or rows[0]["target_id"] != target_id or rows[0]["owner"] is not None:
-        raise ValueError(f"Existing admission table {name} is not idle for this resource.")
-
-
-def _create_control(spark: Any, name: str, target_id: str) -> None:
-    """Create an admission table and its single row in one Delta CTAS statement."""
-    spark.sql(
-        f"CREATE TABLE {name} USING DELTA AS "
-        "SELECT :target_id AS target_id, CAST(NULL AS STRING) AS owner",
-        args={"target_id": target_id},
-    ).collect()
-
-
-def provision_local_tables(spark: Any, config: dict[str, Any], prepared: Any) -> ProvisionResult:
-    """Preflight an existing source/model, then create only missing output state."""
+def provision_prediction_table(spark: Any, config: dict[str, Any], prepared: Any) -> bool:
+    """Preflight an existing source/model and create only a missing output table."""
     source_name = config["score_source_table"]
-    training_name = config["training_table"]
     target_name = config["prediction_table"]
-    control_name = config["score_admission_table"]
-    lifecycle = config.get("include_lifecycle", "no")
-    if lifecycle not in {"no", "yes"}:
-        raise ValueError("include_lifecycle must be 'yes' or 'no'.")
-    for name in (source_name, training_name, target_name, control_name, config["model_name"]):
+    for name in (source_name, target_name, config["model_name"]):
         if not _TABLE_NAME.fullmatch(name):
-            raise ValueError("Setup needs valid three-part Unity Catalog names.")
-    if lifecycle == "yes" and not config.get("alias_admission_table"):
-        raise ValueError("Lifecycle setup needs an alias admission table.")
-    if lifecycle == "yes" and not _TABLE_NAME.fullmatch(config["alias_admission_table"]):
-        raise ValueError("Lifecycle setup needs a valid alias admission table name.")
+            raise ValueError("Scoring needs valid three-part Unity Catalog names.")
     if source_name == target_name:
         raise ValueError("Prediction output must differ from the source table.")
-    for name in {source_name, training_name}:
-        if not spark.catalog.tableExists(name):
-            raise ValueError(f"Existing input source table is missing: {name}.")
+    if not spark.catalog.tableExists(source_name):
+        raise ValueError(f"Existing input source table is missing: {source_name}.")
     if not prepared.preflight.ready:
         raise ValueError("The pinned registered model failed Skyulf preflight.")
     source = spark.table(source_name)
     columns = _prediction_columns(config, prepared, source)
-    if (
-        source.select(*config["row_keys"], *config["input_columns"])
-        .limit(config["max_rows"] + 1)
-        .count()
-        > config["max_rows"]
-    ):
-        raise ValueError("Initial scoring source exceeds the configured max_rows budget.")
     detail = spark.sql(f"DESCRIBE DETAIL {source_name}").first()
     properties = detail["properties"] or {}
     if not any(
@@ -223,33 +151,19 @@ def provision_local_tables(spark: Any, config: dict[str, Any], prepared: Any) ->
     ):
         raise ValueError("Scoring source must have Delta Change Data Feed enabled.")
     target_exists = spark.catalog.tableExists(target_name)
-    control_exists = spark.catalog.tableExists(control_name)
-    if control_exists and not target_exists:
-        raise ValueError("Admission table exists while prediction target is missing.")
     if target_exists:
         _check_existing_table(spark, target_name, columns)
-        if control_exists:
-            _check_existing_control(spark, control_name, table_identity(spark, target_name))
-    alias_name = config.get("alias_admission_table") if lifecycle == "yes" else None
-    alias_exists = bool(alias_name and spark.catalog.tableExists(alias_name))
-    if alias_exists:
-        _check_existing_control(spark, alias_name, alias_resource_id(config["model_name"]))
     if not target_exists:
+        if (
+            source.select(*config["row_keys"], *config["input_columns"])
+            .limit(config["max_rows"] + 1)
+            .count()
+            > config["max_rows"]
+        ):
+            raise ValueError("Initial scoring source exceeds the configured max_rows budget.")
         definition = ", ".join(f"{name} {sql_type}" for name, _, sql_type in columns)
         spark.sql(f"CREATE TABLE {target_name} ({definition}) USING DELTA").collect()
-    if not control_exists:
-        _create_control(spark, control_name, table_identity(spark, target_name))
-    if alias_name and not alias_exists:
-        _create_control(spark, alias_name, alias_resource_id(config["model_name"]))
-    return ProvisionResult(
-        source_name,
-        target_name,
-        not target_exists,
-        control_name,
-        not control_exists,
-        alias_name,
-        bool(alias_name and not alias_exists),
-    )
+    return not target_exists
 
 
 def _training_spec(config: dict[str, Any]) -> LocalTrainingSpec:
@@ -270,45 +184,6 @@ def _training_spec(config: dict[str, Any]) -> LocalTrainingSpec:
     )
 
 
-def _comparison(spark: Any, config: dict[str, Any]) -> tuple[Any, Any]:
-    """Evaluate two pinned registry versions on one pinned held-out frame."""
-    spec = _training_spec(config)
-    frame = read_training_snapshot(spark, spec)
-    _, heldout, _ = split_labeled_snapshot(frame, spec)
-    if config["engine"] == "polars":
-        heldout = pl.from_pandas(heldout)
-    model_name = config["model_name"]
-    tracking_uri = config.get("tracking_uri", "databricks")
-    registry_uri = config.get("registry_uri", "databricks-uc")
-    candidate = resolve_model(
-        model_name,
-        version=config["candidate_version"],
-        tracking_uri=tracking_uri,
-        registry_uri=registry_uri,
-    )
-    champion = resolve_model(
-        model_name,
-        version=config["champion_version"],
-        tracking_uri=tracking_uri,
-        registry_uri=registry_uri,
-    )
-    report = compare_registered_local_models(
-        candidate,
-        champion,
-        heldout,
-        target_column=spec.target_column,
-        dataset_id=spec.dataset_id,
-        metric=config["metric"],
-        min_improvement=config["min_improvement"],
-        max_rows=spec.max_rows,
-        max_bytes=spec.max_bytes,
-        quality_threshold=config.get("quality_threshold"),
-        tracking_uri=tracking_uri,
-        registry_uri=registry_uri,
-    )
-    return report, heldout
-
-
 def run_action(
     spark: Any,
     config: dict[str, Any],
@@ -317,7 +192,7 @@ def run_action(
     experiment_name: str | None = None,
     artifact_path: str | Path | None = None,
 ) -> Any:
-    """Delegate each explicit job action to the corresponding Skyulf service."""
+    """Delegate training or scoring to Skyulf's existing services."""
     tracking_uri = config.get("tracking_uri", "databricks")
     registry_uri = config.get("registry_uri", "databricks-uc")
     if action == "train":
@@ -339,41 +214,15 @@ def run_action(
             champion_version=config.get("champion_version"),
             quality_threshold=config.get("quality_threshold"),
         )
-    if action in {"setup", "score"}:
+    if action == "score":
         prepared = prepare_local_workflow(_scoring_config(config))
-        if action == "setup":
-            return provision_local_tables(spark, config, prepared)
+        provision_prediction_table(spark, config, prepared)
         return run_incremental_local_batch(
             spark,
             prepared,
             row_keys=tuple(config["row_keys"]),
-            admission=DeltaTableAdmission(spark, config["score_admission_table"]),
+            admission=SingleWriterAdmission(),
         )
-    if action in {"compare", "stage", "promote"}:
-        if action != "compare" and config["alias_admission_table"] is None:
-            raise ValueError("Alias control is not configured; enable the lifecycle jobs first.")
-        report, heldout = _comparison(spark, config)
-        if action == "compare":
-            return report
-        if not report.eligible:
-            raise ValueError(f"Candidate is not eligible for {action}: {report.reason}.")
-        options = {
-            "target_column": config["target_column"],
-            "expected_champion_version": config["champion_version"],
-            "admission": DeltaAliasAdmission(spark, config["alias_admission_table"]),
-            "max_rows": config["max_rows"],
-            "max_bytes": config["max_bytes"],
-            "tracking_uri": tracking_uri,
-            "registry_uri": registry_uri,
-        }
-        if action == "stage":
-            return stage_challenger(
-                report,
-                heldout,
-                expected_challenger_version=config.get("expected_challenger_version"),
-                **options,
-            )
-        return promote_candidate(report, heldout, **options)
     raise ValueError(f"Unknown workflow action: {action}.")
 
 

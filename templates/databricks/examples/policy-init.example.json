@@ -2,7 +2,6 @@
   "project_name": "my_model",
   "engine": "pandas",
   "compute_mode": "policy_cluster",
-  "include_lifecycle": "yes",
   "catalog": "REPLACE_DEV_CATALOG",
   "schema": "REPLACE_DEV_SCHEMA",
   "cluster_policy_name": "REPLACE_WITH_APPROVED_POLICY",

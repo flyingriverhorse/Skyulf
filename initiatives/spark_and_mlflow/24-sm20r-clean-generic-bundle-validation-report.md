@@ -61,9 +61,10 @@ unverified by this clean run.
 
 The final read-only notebook found 650 source and 650 prediction rows, 650
 distinct prediction keys, and only registered model version 1 in the output.
-The final CLI inventory still listed exactly the three Bundle jobs and the
-three tables above. These resources remain in the personal test workspace so
-they can be inspected in the Databricks UI.
+The final CLI inventory at the time listed exactly the three Bundle jobs and
+the three tables above. SM-20S later removed those three old jobs and the old
+prediction/control tables after its two-job validation; see
+[SM-20S evidence](26-sm20s-two-job-live-validation-report.md).
 
 Local regression tests: `13 passed` with a workspace-local pytest
 temp directory. Ruff and Ty passed on the changed Python files; strict MkDocs

@@ -22,50 +22,43 @@
       "description": "Job compute mode for this project",
       "enum": ["serverless", "policy_cluster"]
     },
-    "include_lifecycle": {
-      "order": 4,
-      "type": "string",
-      "default": "no",
-      "description": "Add optional compare, stage and promote jobs?",
-      "enum": ["no", "yes"]
-    },
     "catalog": {
-      "order": 5,
+      "order": 4,
       "type": "string",
       "default": "workspace",
       "description": "Existing dev Unity Catalog catalog",
       "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
     },
     "schema": {
-      "order": 6,
+      "order": 5,
       "type": "string",
       "default": "default",
       "description": "Existing dev Unity Catalog schema",
       "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
     },
     "cluster_policy_name": {
-      "order": 7,
+      "order": 6,
       "type": "string",
       "default": "REPLACE_WITH_APPROVED_POLICY",
       "description": "Approved job-cluster policy name",
       "skip_prompt_if": {"properties": {"compute_mode": {"const": "serverless"}}}
     },
     "spark_version": {
-      "order": 8,
+      "order": 7,
       "type": "string",
       "default": "17.3.x-cpu-ml-scala2.13",
       "description": "Approved Databricks ML Runtime for the job cluster",
       "skip_prompt_if": {"properties": {"compute_mode": {"const": "serverless"}}}
     },
     "node_type_id": {
-      "order": 9,
+      "order": 8,
       "type": "string",
       "default": "REPLACE_WITH_NODE_TYPE",
       "description": "Approved job-cluster node type",
       "skip_prompt_if": {"properties": {"compute_mode": {"const": "serverless"}}}
     },
     "cost_tag_key": {
-      "order": 10,
+      "order": 9,
       "type": "string",
       "default": "CostCenter",
       "description": "Approved cluster cost tag key",
@@ -73,7 +66,7 @@
       "skip_prompt_if": {"properties": {"compute_mode": {"const": "serverless"}}}
     },
     "cost_tag_value": {
-      "order": 11,
+      "order": 10,
       "type": "string",
       "default": "REPLACE_WITH_COST_TAG",
       "description": "Approved cluster cost tag value",

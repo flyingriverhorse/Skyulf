@@ -295,6 +295,31 @@ def test_incremental_local_batch_discovers_appends_without_period_inputs(local_d
     assert rows[2]["run_id"] != rows[1]["run_id"]
 
 
+def test_incremental_single_writer_uses_receipts_without_control_table(local_delta_case):
+    """A sole writer can replay Delta receipts without provisioning lock state."""
+    from skyulf.integrations.databricks import run_incremental_local_batch
+    from skyulf.integrations.databricks.admission import SingleWriterAdmission
+
+    spark, source, target, prepared, _ = _prepared_incremental_case(local_delta_case)
+    admission = SingleWriterAdmission()
+    first = run_incremental_local_batch(
+        spark, prepared, row_keys=("id",), period_column="event_time", admission=admission
+    )
+    spark.createDataFrame(
+        [(3, datetime(2026, 1, 6, tzinfo=UTC), 6.0)],
+        "id long, event_time timestamp, x double",
+    ).write.format("delta").mode("append").saveAsTable(source)
+    second = run_incremental_local_batch(
+        spark, prepared, row_keys=("id",), period_column="event_time", admission=admission
+    )
+    replay = run_incremental_local_batch(
+        spark, prepared, row_keys=("id",), period_column="event_time", admission=admission
+    )
+    assert (first.input_count, second.input_count, replay.input_count) == (2, 1, 0)
+    assert replay.noop and replay.commit_version == second.commit_version
+    assert [row.id for row in spark.table(target).orderBy("id").collect()] == [1, 2, 3]
+
+
 def test_incremental_local_batch_does_not_require_a_date_column(local_delta_case):
     """New rows are found from Delta commits even when no event date exists."""
     from skyulf.integrations.databricks import run_incremental_local_batch
