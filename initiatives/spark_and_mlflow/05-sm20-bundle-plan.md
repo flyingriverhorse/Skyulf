@@ -79,12 +79,12 @@ The SQL Connector is an alternative, not a required part of the first Bundle.
 The delivered custom template generates a project with these responsibilities:
 
 ```text
-templates/databricks/databricks_template_schema.json
-templates/databricks/template/{{.project_name}}/databricks.yml.tmpl
-templates/databricks/template/{{.project_name}}/config/workflow.json.tmpl
-templates/databricks/template/{{.project_name}}/resources/workflow.jobs.yml
-templates/databricks/template/{{.project_name}}/src/workflow.py
-templates/databricks/template/{{.project_name}}/README.md.tmpl
+skyulf-core/templates/databricks/databricks_template_schema.json
+skyulf-core/templates/databricks/template/{{.project_name}}/databricks.yml.tmpl
+skyulf-core/templates/databricks/template/{{.project_name}}/config/workflow.json.tmpl
+skyulf-core/templates/databricks/template/{{.project_name}}/resources/workflow.jobs.yml.tmpl
+skyulf-core/templates/databricks/template/{{.project_name}}/src/workflow.py
+skyulf-core/templates/databricks/template/{{.project_name}}/README.md.tmpl
 ```
 
 The generated Python entry point calls Skyulf services; it does not copy FE, model,

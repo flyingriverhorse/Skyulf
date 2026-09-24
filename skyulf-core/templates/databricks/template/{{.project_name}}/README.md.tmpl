@@ -59,7 +59,7 @@ need to publish to one target.
 {{if eq .compute_mode "policy_cluster"}}
 The selected policy-backed jobs look up the policy name supplied during
 initialization. Confirm its runtime, node type and cost tag in each workspace.
-An example init config lives in `templates/databricks/examples/policy-init.example.json`
+An example init config lives in `skyulf-core/templates/databricks/examples/policy-init.example.json`
 in the Skyulf checkout. Its placeholders must be reviewed before use.
 {{else}}
 The generated jobs use Databricks serverless Python environment 4. Policy

@@ -173,7 +173,7 @@ decision must not hide missing support. SM-19 streaming remains optional and par
 
 Inspected branch `090` at the SM-28a baseline and added the custom template,
 generated-workflow tests, Databricks Bundle guide and isolated rehearsal example.
-`databricks bundle init templates/databricks --config-file ... --output-dir ...`,
+`databricks bundle init skyulf-core/templates/databricks --config-file ... --output-dir ...`,
 `databricks bundle validate --strict -t dev --profile skyulf`,
 `databricks bundle deploy -t dev --profile skyulf` and Bundle `run` commands for
 train/compare/stage/promote/score all succeeded in the test workspace. The

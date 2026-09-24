@@ -8,12 +8,12 @@ feature engineering and model prediction are not distributed Spark work.
 Initialize a project from a Skyulf checkout:
 
 ```powershell
-databricks bundle init templates/databricks --output-dir ./generated
+databricks bundle init skyulf-core/templates/databricks --output-dir ./generated
 ```
 
 The short path asks for project name, engine, serverless or policy-backed job
 compute and the existing `dev` catalog/schema. Serverless is the default. Reviewable
-noninteractive examples are in `templates/databricks/examples/`. The generated
+noninteractive examples are in `skyulf-core/templates/databricks/examples/`. The generated
 project has its own `databricks.yml`; Skyulf's root has no Bundle config.
 
 `dev` uses the selected CLI profile's workspace host. `test`, `syst` and

@@ -352,7 +352,7 @@ ve `npm run build` kanıtı kayıtlı.
 SM-20b needs selected validated Spark adapters; SM-19 only if endpoints are selected.
 See [the dedicated SM-20 plan](05-sm20-bundle-plan.md) for generated resources
 and the two-month UC source/output-table rehearsal.
-**Planned files:** `templates/databricks/` and
+**Planned files:** `skyulf-core/templates/databricks/` and
 `tests/templates/test_databricks_template.py`; template dosyaları
 `databricks.yml`, `resources/batch_job.yml`, `README.md`, `src/run_batch.py`.
 

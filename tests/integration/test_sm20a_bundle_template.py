@@ -11,7 +11,7 @@ import pytest
 
 WORKFLOW = (
     Path(__file__).resolve().parents[2]
-    / "templates/databricks/template/{{.project_name}}/src/workflow.py"
+    / "skyulf-core/templates/databricks/template/{{.project_name}}/src/workflow.py"
 )
 
 

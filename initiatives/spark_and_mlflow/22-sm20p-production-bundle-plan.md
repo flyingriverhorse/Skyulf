@@ -75,7 +75,7 @@ and promote are deliberate review actions.
 
 ### P1. Target-specific binding and generation
 
-**Files:** `templates/databricks/databricks_template_schema.json`, generated
+**Files:** `skyulf-core/templates/databricks/databricks_template_schema.json`, generated
 `databricks.yml`, `config/workflow.json`, `resources/workflow.jobs.yml`,
 `src/workflow.py`; extend `tests/integration/test_sm20a_bundle_template.py`.
 

@@ -71,6 +71,20 @@ pip install skyulf-core[mlflow]
 
 `all` intentionally excludes the native geospatial stack; add `[geo]` only when you need geospatial nodes.
 
+## Databricks Bundle template
+
+The source checkout includes a [local-engine Databricks Bundle template](templates/databricks/)
+for bounded pandas or Polars training and scoring with Skyulf Core. From the
+repository root, initialize an editable project with:
+
+```powershell
+databricks bundle init skyulf-core/templates/databricks --output-dir ./generated
+```
+
+The generated project has `train` and `score` jobs. The first score creates
+its prediction table; see the [Bundle guide](../docs/user_guide/databricks_bundle.md)
+for configuration and the single-writer requirement.
+
 ## Compute engines (pandas / Polars)
 
 Skyulf nodes run on a pandas or Polars engine, chosen per call:

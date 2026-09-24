@@ -7,7 +7,7 @@ profile. Target release remains 0.9.0.
 
 ## Delivered contract
 
-`templates/databricks` asks for project name, local engine and existing UC
+`skyulf-core/templates/databricks` asks for project name, local engine and existing UC
 catalog/schema. It emits its own `databricks.yml`, editable workflow JSON,
 one thin Skyulf entry point and five separate serverless jobs: `train`,
 `compare`, `stage`, `promote` and `score`. Each job installs the matching
@@ -26,7 +26,7 @@ admission rows as described in the generated README.
 
 ## Local and template gates
 
-- `databricks bundle init templates/databricks --config-file ... --output-dir ...`
+- `databricks bundle init skyulf-core/templates/databricks --config-file ... --output-dir ...`
   rendered the `skyulf_sm20a_r1` project with `engine=polars`.
 - `databricks bundle validate --strict -t dev --profile skyulf` passed after
   generation and after each test configuration change.
