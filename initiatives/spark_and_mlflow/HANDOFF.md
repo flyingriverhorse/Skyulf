@@ -1,4 +1,4 @@
-# Session handoff - 2026-09-23
+# Session handoff - 2026-09-24
 
 SM-00 through SM-16, SM-15L/15I and SM-24a/25/26 are complete for their
 documented scopes. The selected Databricks serverless local monthly UC
@@ -8,8 +8,8 @@ values for recurring jobs. SM-15I now provides automatic new-row scoring
 for the first small-data pandas/Polars Databricks Bundle (SM-20a). Spark handles table
 I/O; Spark FE/model execution follows the Bundle. SM-18 and streaming remain
 parked.**
-The revised order completes SM-22a/b comparison and controlled promotion,
-then SM-28a label-aware challenger training before SM-20a. SM-28b adds the
+The revised order completed SM-22a/b/c comparison and controlled promotion,
+then SM-28a label-aware candidate training before SM-20a. SM-28b adds the
 optional monthly schedule after the Bundle; SM-27 remains later. Target release: 0.9.0. Branch: `090`.
 
 SM-22a has a locally verified, read-only comparison API and passed its
@@ -18,13 +18,18 @@ isolated Databricks metrics and UC comparison gate; see the
 [live report](17-sm22a-live-metrics-report.md). SM-22b has explicit
 version-checked promotion and rollback with shared admission. Its isolated
 UC promotion, conflict, rollback and restricted-principal denial passed; see
-[live evidence](18-sm22b-live-validation-report.md). SM-28a is next.
+[live evidence](18-sm22b-live-validation-report.md). SM-22c added challenger
+and previous-champion aliases; see [its report](19-sm22c-lifecycle-alias-validation-report.md).
+SM-28a now trains from a pinned label-aware Delta snapshot and compares a
+registered candidate without promotion; see [its local and live report](20-sm28a-label-aware-retraining-report.md).
+SM-20a is next.
 
 ## Starting point
 
-- SM-00 through SM-16, SM-15L, SM-15I, SM-24a, SM-25, SM-26 and SM-22a/b are complete.
-  Start SM-28a from [06-prebundle-model-lifecycle-plan.md](06-prebundle-model-lifecycle-plan.md).
-  SM-20a follows the verified SM-22a/b and SM-28a services.
+- SM-00 through SM-16, SM-15L, SM-15I, SM-24a, SM-25, SM-26,
+  SM-22a/b/c and SM-28a are complete. Start SM-20a from
+  [05-sm20-bundle-plan.md](05-sm20-bundle-plan.md), using the services in
+  [06-prebundle-model-lifecycle-plan.md](06-prebundle-model-lifecycle-plan.md).
   SM-15I [live evidence](13-sm15i-live-validation-report.md) proves automatic
   80+80 insert-only scoring with no date column or per-run version input.
   A later [real NYC taxi rehearsal](15-sm15i-real-nyctaxi-live-report.md)

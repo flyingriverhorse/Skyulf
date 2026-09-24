@@ -1,14 +1,13 @@
 # Spark ve MLflow — Open Queue
 
-Updated: 2026-09-23. **SM-00 through SM-16, SM-15L/15I/24a/25/26 complete; SM-22a/b/c complete; SM-28a next before SM-20a. Target: 0.9.0.**
-Next deliverable: label-aware retraining service,
-then a working local-engine Bundle. Spark
+Updated: 2026-09-24. **SM-00 through SM-16, SM-15L/15I/24a/25/26 and SM-22a/b/c/28a complete. SM-20a next. Target: 0.9.0.**
+Next deliverable: the first working local-engine Bundle. Spark
 expansion follows that Bundle. SM-15L
 provides explicit-period UC output. SM-15I adds automatic new-row scoring
 for the first Bundle; SM-18 and streaming remain parked.
 
 Read [HANDOFF.md](HANDOFF.md), [the integration plan](04-databricks-integration-plan.md)
-and [the pre-Bundle lifecycle plan](06-prebundle-model-lifecycle-plan.md) before SM-28a.
+and [the pre-Bundle lifecycle plan](06-prebundle-model-lifecycle-plan.md) before SM-20a.
 The [SM-20 Bundle plan](05-sm20-bundle-plan.md) remains the packaging gate.
 Historical completion evidence is preserved in
 [OPEN_QUEUE_tamamlanmakaydi.md](OPEN_QUEUE_tamamlanmakaydi.md).
@@ -49,8 +48,8 @@ DEFERRED = user postponed this work; PARKED = do not implement until resumed.
 | SM-22a | Pinned candidate/champion validation | Current evaluation/registry | DONE | Local comparison/report and isolated UC metrics gate passed; [local evidence](16-sm22a-local-validation-report.md), [live evidence](17-sm22a-live-metrics-report.md) |
 | SM-22b | Explicit promotion and rollback | SM-22a | DONE | Version-checked alias changes, prior/new-version receipt, conflicts and permission tests; [live evidence](18-sm22b-live-validation-report.md) |
 | SM-22c | Challenger and previous-champion aliases | SM-22b | DONE | Validated challenger staging; guarded three-alias promotion/rollback; legacy receipts and partial-write tests; [local and UC evidence](19-sm22c-lifecycle-alias-validation-report.md) |
-| SM-28a | Label-aware retraining service | SM-22a, SM-22b, SM-22c, SM-24a | READY | Pinned training snapshot, temporal holdout, candidate registration/comparison; no automatic promotion |
-| SM-20a | First local-engine Bundle/template | SM-24a, SM-15I, SM-22b, SM-22c, SM-28a | WAIT | Package tested train/compare/promote/incremental-score services; validate, deploy and run |
+| SM-28a | Label-aware retraining service | SM-22a, SM-22b, SM-22c, SM-24a | DONE | Pinned training snapshot, temporal holdout, candidate registration/comparison; no automatic promotion; [evidence](20-sm28a-label-aware-retraining-report.md) |
+| SM-20a | First local-engine Bundle/template | SM-24a, SM-15I, SM-22b, SM-22c, SM-28a | READY | Package tested train/compare/promote/incremental-score services; validate, deploy and run |
 | SM-28b | Optional monthly retraining schedule | SM-20a, SM-28a | WAIT | Wire separate train/compare/explicit-promote/score jobs with label cutoff and pinned versions |
 | SM-24b | Optional Databricks Jobs API operations | SM-20a | LATER | Add dynamic submit/status/cancel only if Bundle jobs are insufficient |
 | SM-24d | Hard transport budget for wide UC rows | SM-24a | LATER | Add a proven paged/size-limited source adapter when exact transfer-byte enforcement is required; current Spark iterator bounds accepted decoded rows and frame memory only |

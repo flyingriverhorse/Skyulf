@@ -12,6 +12,54 @@ an explicit, versioned UC Delta source reader for selected-period local batches.
 SM-15L publishes an explicitly selected period to UC Delta. The separate
 incremental runner below discovers new source inserts automatically.
 
+## Train a candidate when labels are ready
+
+`train_local_candidate` reads a **specific Delta table version**, filters a
+bounded event window in Spark, then makes a temporal split in pandas. Rows whose
+labels were not available by `cutoff` are excluded from both fit and holdout.
+The feature/model pipeline fits only on events before `holdout_start`; later
+eligible events are reserved for evaluation. The fit engine can be pandas or
+Polars. The run logs the Skyulf config, source and code identities, fitted model,
+held-out metrics and `candidate_comparison.json`. It registers a new concrete
+model version but never assigns `@challenger` or `@champion`.
+
+```python
+from datetime import UTC, datetime
+from skyulf.integrations.databricks import LocalTrainingSpec, train_local_candidate
+
+spec = LocalTrainingSpec(
+    table="catalog.schema.labeled_events", version=12,
+    start=datetime(2026, 1, 1, tzinfo=UTC),
+    holdout_start=datetime(2026, 2, 1, tzinfo=UTC),
+    cutoff=datetime(2026, 3, 1, tzinfo=UTC),
+    event_column="event_time", label_time_column="label_available_at",
+    row_keys=("event_id",), input_columns=("feature_a", "feature_b"),
+    target_column="target", max_rows=10_000, max_bytes=32_000_000,
+)
+result = train_local_candidate(
+    spark, spec, pipeline_config,
+    model_name="catalog.schema.customer_model",
+    tracking_uri="databricks", registry_uri="databricks-uc",
+    experiment_name="/Users/me/customer-model", run_name="candidate-2026-03",
+    artifact_path="/tmp/customer-model", metric="heldout_rmse",
+    min_improvement=0.05, engine="polars",
+    champion_version="7",  # Pin this concrete version before the job starts.
+)
+print(result.model_version, result.comparison.eligible)
+```
+
+The example assumes event and label timestamps represent UTC instants. A
+missing or later label is not a training label, even if its target value is
+already present in the pinned table. The source must have unique nonnull row
+keys and distinct feature, target and timestamp columns. A nonempty training
+set and holdout of at least two rows each are required. The row and byte limits
+bound decoded rows and the local frame, not Spark's wire transfer size. The
+caller supplies a concrete `champion_version`; omit it for the first candidate.
+Review the comparison report, then use the separate guarded staging/promotion
+operations if a human approves a change. If fit, packaging, registration or
+comparison fails, no alias moves; a registered but unapproved candidate may
+remain for inspection. A scheduling policy is separate from this service.
+
 ## Fit and score a small batch
 
 Install the same `skyulf-core`, pandas, Polars and scikit-learn versions in the

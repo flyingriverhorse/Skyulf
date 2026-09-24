@@ -65,9 +65,9 @@ The promotion path must revalidate the pinned model identities and decision; an 
 
 **Interface:** Consume a caller-pinned bounded source snapshot, label availability cutoff and temporal holdout; fit with Skyulf, log metrics/artifact, register a candidate, then call SM-22a. Do not promote automatically.
 
-- [ ] Write failing tests for late labels, leakage across cutoff, reproducible split, failed candidate and unchanged champion.
-- [ ] Reuse current fitted artifact packaging and registry publication; store source/code/model/evaluation identities.
-- [ ] Run a small isolated Databricks validation after local tests pass, without touching production aliases.
+- [x] Write failing tests for late labels, leakage across cutoff, reproducible split, failed candidate and unchanged champion.
+- [x] Reuse current fitted artifact packaging and registry publication; store source/code/model/evaluation identities.
+- [x] Run a small isolated Databricks validation after local tests pass, without touching production aliases; see [SM-28a evidence](20-sm28a-label-aware-retraining-report.md).
 
 ### Task 4: SM-20a Bundle integration
 

@@ -11,6 +11,13 @@ from .local_batch import (
 )
 from .local_incremental import IncrementalBatchResult, run_incremental_local_batch
 from .local_publish import run_local_batch
+from .local_retraining import (
+    LocalCandidateResult,
+    LocalTrainingSpec,
+    read_training_snapshot,
+    split_labeled_snapshot,
+    train_local_candidate,
+)
 from .local_sdk import (
     InputSource,
     LocalWorkflowConfig,
@@ -32,6 +39,8 @@ __all__ = [
     "LocalWorkflowConfig",
     "LocalScoreResult",
     "LocalSourceSpec",
+    "LocalCandidateResult",
+    "LocalTrainingSpec",
     "ModelSelection",
     "OutputSink",
     "PreflightError",
@@ -43,8 +52,11 @@ __all__ = [
     "preflight_local",
     "prepare_local_workflow",
     "read_local_source",
+    "read_training_snapshot",
     "run_batch",
     "run_incremental_local_batch",
     "run_local_batch",
     "score_local_source",
+    "split_labeled_snapshot",
+    "train_local_candidate",
 ]
