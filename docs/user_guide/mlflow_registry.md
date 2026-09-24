@@ -176,11 +176,21 @@ follows before Bundle generation.
 
 ## Stage, promote, and roll back a local pipeline
 
-After a successful comparison, stage_challenger re-evaluates the same pinned
-holdout and assigns the concrete candidate version to `@challenger`. It does
+After a comparison, stage_challenger re-evaluates the same pinned
+holdout and assigns the concrete candidate version to `@challenger`, even
+when it fails the promotion gate. It records validation status and reason and does
 not move `@champion`. A replacement challenger requires an explicit
 `expected_challenger_version`; staging cannot silently overwrite another
 candidate. Merely registering or comparing a model never assigns an alias.
+
+An orchestrator can explicitly create `ChallengerLifecycle` from
+`skyulf.integrations.mlflow.challenger` and pass its `registered` method as
+`train_local_candidate(..., on_registered=...)`. This nominates a registered
+contender before comparison, with `validation_status=pending`. After evaluation,
+`stage_challenger` records `passed` or `rejected`; `lifecycle.failed()` records
+`error` for a still-pending comparison without overwriting a completed result.
+The caller must use the same serialized alias writer for all these operations.
+An uncertain registry write keeps its pending receipt and requires reconciliation.
 
 The promote_candidate function re-resolves both concrete model versions and
 re-evaluates the same bounded labeled holdout. It rejects a changed comparison
@@ -266,8 +276,9 @@ concrete model versions, event ID, and the previous value of
 `@previous_champion`. Rollback verifies the committed promotion event,
 restores `@champion` and the previous rollback pointer, and does not
 reinstate the rolled-back model as challenger. A prior release's single-alias
-promotion receipt remains reversible. A staged newer challenger blocks
-rollback until the operator reconciles it.
+promotion receipt remains reversible. A separate challenger with a verified
+committed lifecycle event survives rollback unchanged. An unverified alias,
+or one pointing at the champion or rollback destination, still blocks rollback.
 
 MLflow performs these alias changes as separate calls, not one atomic
 transaction. If a later call fails after an earlier alias moved, the operation

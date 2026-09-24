@@ -7,6 +7,11 @@ same Skyulf workflow code with different target bindings.
 
 ## What deployment creates
 
+`src/workflow.py` is a thin widget/JSON entry point. Common behavior is provided
+by the installed `skyulf.integrations.databricks.local_workflow` and
+`prediction_output` modules. Customize your preprocessing/model pipeline in
+`config/workflow.json`; common workflow changes belong in the Skyulf wheel.
+
 `bundle deploy` uploads the wheel, notebook and configuration, and creates
 two jobs. It creates **no** Unity Catalog table or registered model.
 The initialization choice `retraining_mode=monthly_paused` adds a paused
@@ -14,8 +19,27 @@ schedule to the existing `train` job; the default `manual` choice adds none.
 
 | Job | Run it when | UC effect |
 | --- | --- | --- |
-| `train` | Labeled data is ready or the schedule runs | Registers a candidate; logs metrics |
+| `train` | Labeled data is ready or the schedule runs | Registers and nominates a challenger; logs metrics and evaluation status |
 | `score` | A model is pinned and rows need scoring | Appends rows or builds a new generation |
+
+In both selection modes, each registered contender becomes `@challenger`
+before comparison. Model-version tags show `validation_status` (`pending`,
+`passed`, `rejected`, or `error`), `validation_reason`, and `promotion_status`.
+A tied or worse candidate remains challenger; a newer contender replaces the
+pointer while earlier version evidence remains. Only the serialized train job
+identity may write these aliases. Restrict other writers before running train;
+table-free alias admission relies on that externally enforced ownership.
+
+Run and model-version tags use `train_data_version`, `test_data_version`,
+`train_data_destination`, `test_data_destination`, `model_type`, and
+`candidate_date_tag`. Both data versions refer to the pinned source snapshot;
+`train_start`, `test_start`, and `data_end` describe its temporal split.
+Optional `risk_category` is selected at initialization and stays editable in
+config/workflow.json. Leaving it blank omits the tag; it never changes promotion gates.
+For policy compute, select `PayingRegNo` as the cost tag key when required by
+your company and provide the approved number as the cost tag value.
+The complete dataset identity is in the run's training_data.json artifact.
+Technical promotion event tags contain recovery receipts; do not edit them.
 
 {{if eq .model_selection_mode "auto_champion"}}
 This project uses automatic champion selection. `train` compares a candidate
@@ -28,16 +52,13 @@ unchanged. The train job calls the existing score job after it succeeds.
 Score resolves `@champion` once to a concrete version at run start. Alias
 promotion and Delta publication are separate transactions. If scoring fails
 after promotion, retry `score`; the previous successful prediction output
-remains until a new score completes. Only the serialized train job identity
-may write this model's aliases. Restrict other alias writers before enabling
-automatic mode; table-free alias admission does not provide a lock. An
+remains until a new score completes. An
 unknown alias-write outcome leaves a pending marker and blocks later automatic
 training and scoring until registry receipt reconciliation. An existing
 `@champion` set outside Skyulf's guarded promotion path has no committed
 receipt and must be reconciled before automatic mode can use it.
 {{else}}
-Champion/challenger management is available through Skyulf Core but has no
-job in this starting Bundle. Training a candidate does not activate it for
+Training records challenger status but never promotes it or activates it for
 scoring. Set `model_version` to a concrete registered version and redeploy
 when you want scoring to use it.
 {{end}}
@@ -56,7 +77,8 @@ later labels are excluded. The captured Delta version is pinned at run start;
 it is not a historical snapshot as of the cutoff. If the source has too few
 labeled rows in either partition, training fails without publishing a model.
 The run compares against the concrete version behind `@champion` if present;
-a missing alias means first-model training. Registry access failures still
+a missing alias means first-model training. An explicit `champion_version`
+must match the current champion or training fails before fit. Registry access failures still
 fail the job. Retry runs can create additional candidate versions.
 {{if eq .model_selection_mode "pinned_version"}}None is promoted or used by
 `score` automatically.{{end}}

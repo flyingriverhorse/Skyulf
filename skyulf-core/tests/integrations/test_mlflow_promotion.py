@@ -119,7 +119,7 @@ def _stage(case, **changes):
 
 
 def test_stage_challenger_requires_validation_and_preserves_champion(case) -> None:
-    """Only a freshly eligible candidate becomes challenger without moving production."""
+    """Staging verifies evidence while leaving the production version unchanged."""
     client, _, name, _, report, _ = case
     staged = _stage(case)
     assert staged.kind == "challenger"
@@ -137,6 +137,184 @@ def test_stage_challenger_requires_validation_and_preserves_champion(case) -> No
         _stage(case, report=replace(report, eligible=True, candidate_metrics={"heldout_mse": -1.0}))
 
 
+def test_rejected_challenger_is_visible_but_cannot_promote(case) -> None:
+    """A contender's identity must not imply approval to replace champion."""
+    client, uri, name, heldout, _, _ = case
+    report = compare_registered_local_models(
+        resolve_model(name, version="2", tracking_uri=uri, registry_uri=uri),
+        resolve_model(name, version="1", tracking_uri=uri, registry_uri=uri),
+        heldout,
+        target_column="target",
+        dataset_id="labels@5/heldout",
+        metric="heldout_mse",
+        min_improvement=1_000_000,
+        max_rows=10,
+        max_bytes=10_000,
+        tracking_uri=uri,
+        registry_uri=uri,
+    )
+    _stage(case, report=report)
+    assert str(client.get_model_version_by_alias(name, "challenger").version) == "2"
+    assert client.get_model_version(name, "2").tags["validation_status"] == "rejected"
+    assert (
+        client.get_model_version(name, "2").tags["validation_reason"]
+        == "Improvement below required minimum"
+    )
+    with pytest.raises(ValueError, match="approve"):
+        _promote(case, report=report)
+    assert str(client.get_model_version_by_alias(name, "champion").version) == "1"
+
+
+def test_nomination_precedes_evaluation_and_failure_keeps_challenger(case) -> None:
+    """An evaluation failure remains inspectable without moving production aliases."""
+    from skyulf.integrations.mlflow.challenger import ChallengerLifecycle
+
+    client, uri, name, _, _, admission = case
+    lifecycle = ChallengerLifecycle(
+        name,
+        expected_champion_version="1",
+        admission=admission,
+        tracking_uri=uri,
+        registry_uri=uri,
+    )
+    candidate = resolve_model(name, version="2", tracking_uri=uri, registry_uri=uri)
+    lifecycle.registered(candidate)
+    first = client.get_registered_model(name).tags["challenger_current_event"]
+    lifecycle.registered(candidate)
+    assert client.get_registered_model(name).tags["challenger_current_event"] == first
+    assert client.get_model_version(name, "2").tags["validation_status"] == "pending"
+    lifecycle.failed()
+    assert client.get_model_version(name, "2").tags["validation_status"] == "error"
+    assert str(client.get_model_version_by_alias(name, "challenger").version) == "2"
+    assert str(client.get_model_version_by_alias(name, "champion").version) == "1"
+
+
+def test_tied_v3_remains_challenger_through_rollback_and_v4_replaces_it(case) -> None:
+    """Retaining an unsuccessful contender must not block safe rollback or later training."""
+    from skyulf.integrations.mlflow.challenger import ChallengerLifecycle
+
+    client, uri, name, heldout, _, admission = case
+    _stage(case)
+    promoted = _promote(case)
+    source = client.get_model_version(name, "2").source
+    register_model(source, name, tracking_uri=uri, registry_uri=uri)
+    candidate = resolve_model(name, version="3", tracking_uri=uri, registry_uri=uri)
+    lifecycle = ChallengerLifecycle(
+        name,
+        expected_champion_version="2",
+        admission=admission,
+        tracking_uri=uri,
+        registry_uri=uri,
+    )
+    lifecycle.registered(candidate)
+    report = compare_registered_local_models(
+        candidate,
+        resolve_model(name, version="2", tracking_uri=uri, registry_uri=uri),
+        heldout,
+        target_column="target",
+        dataset_id="labels@5/heldout",
+        metric="heldout_mse",
+        min_improvement=0,
+        max_rows=10,
+        max_bytes=10_000,
+        tracking_uri=uri,
+        registry_uri=uri,
+    )
+    _stage(case, report=report, expected_champion_version="2", expected_challenger_version="3")
+    assert not report.eligible
+    rollback_promotion(
+        promoted,
+        expected_current_version="2",
+        admission=admission,
+        tracking_uri=uri,
+        registry_uri=uri,
+    )
+    assert str(client.get_model_version_by_alias(name, "champion").version) == "1"
+    assert str(client.get_model_version_by_alias(name, "challenger").version) == "3"
+    register_model(source, name, tracking_uri=uri, registry_uri=uri)
+    next_lifecycle = ChallengerLifecycle(
+        name,
+        expected_champion_version="1",
+        admission=admission,
+        tracking_uri=uri,
+        registry_uri=uri,
+    )
+    next_lifecycle.registered(resolve_model(name, version="4", tracking_uri=uri, registry_uri=uri))
+    with pytest.raises(AliasConflictError, match="newer"):
+        next_lifecycle.registered(candidate)
+    assert str(client.get_model_version_by_alias(name, "challenger").version) == "4"
+    assert client.get_model_version(name, "3").tags["validation_status"] == "rejected"
+
+
+def test_first_nominee_is_removed_from_challenger_when_initialized(case) -> None:
+    """The first champion must still pass quality and stop being its own challenger."""
+    from skyulf.integrations.mlflow.challenger import ChallengerLifecycle
+    from skyulf.integrations.mlflow.promotion import initialize_champion
+
+    client, uri, name, heldout, _, admission = case
+    client.delete_registered_model_alias(name, "champion")
+    candidate = resolve_model(name, version="2", tracking_uri=uri, registry_uri=uri)
+    lifecycle = ChallengerLifecycle(
+        name,
+        expected_champion_version=None,
+        admission=admission,
+        tracking_uri=uri,
+        registry_uri=uri,
+    )
+    lifecycle.registered(candidate)
+    report = compare_registered_local_models(
+        candidate,
+        None,
+        heldout,
+        target_column="target",
+        dataset_id="labels@5/heldout",
+        metric="heldout_mse",
+        min_improvement=0,
+        quality_threshold=1.0,
+        max_rows=10,
+        max_bytes=10_000,
+        tracking_uri=uri,
+        registry_uri=uri,
+    )
+    _stage(case, report=report, expected_champion_version=None, expected_challenger_version="2")
+    assert client.get_model_version(name, "2").tags["validation_status"] == "passed"
+    initialize_champion(
+        report,
+        heldout,
+        target_column="target",
+        admission=admission,
+        max_rows=10,
+        max_bytes=10_000,
+        tracking_uri=uri,
+        registry_uri=uri,
+    )
+    with pytest.raises(mlflow.exceptions.MlflowException):
+        client.get_model_version_by_alias(name, "challenger")
+    assert client.get_model_version(name, "2").tags["promotion_status"] == "promoted"
+
+
+def test_partial_challenger_status_write_keeps_pending_receipt(case, monkeypatch) -> None:
+    """Partial UI status must never be reported as a completed registry transition."""
+    from skyulf.integrations.mlflow.promotion import controlled_champion_version
+
+    client, uri, name, _, _, _ = case
+    original = client.set_model_version_tag
+
+    def fail_reason(model_name, version, key, value):
+        """Simulate loss of the status write after the alias and first tag changed."""
+        if key == "validation_reason":
+            raise RuntimeError("tag transport failed")
+        return original(model_name, version, key, value)
+
+    monkeypatch.setattr(client, "set_model_version_tag", fail_reason)
+    monkeypatch.setattr("skyulf.integrations.mlflow.promotion._make_client", lambda *args: client)
+    with pytest.raises(AliasOutcomeUnknownError, match="Alias may have changed"):
+        _stage(case)
+    with pytest.raises(AliasConflictError, match="pending"):
+        controlled_champion_version(name, tracking_uri=uri, registry_uri=uri)
+    assert str(client.get_model_version_by_alias(name, "champion").version) == "1"
+
+
 def test_promotion_requires_staged_challenger(case) -> None:
     """A direct or tampered challenger alias must not bypass the validated staging step."""
     client, _, name, _, _, _ = case
@@ -149,7 +327,8 @@ def test_promotion_requires_staged_challenger(case) -> None:
     assert str(client.get_model_version_by_alias(name, "champion").version) == "1"
 
 
-def test_promote_and_rollback_persist_receipts(case) -> None:
+@pytest.mark.parametrize("receipt_format", ["current", "readable_v1"])
+def test_promote_and_rollback_persist_receipts(case, receipt_format) -> None:
     """An accepted candidate moves the alias and leaves auditable forward and reverse receipts."""
     client, uri, name, _, _, admission = case
 
@@ -164,7 +343,16 @@ def test_promote_and_rollback_persist_receipts(case) -> None:
     assert "challenger_current_event" not in client.get_registered_model(name).tags
     tag = client.get_model_version(name, "2").tags[f"promotion_{receipt.event_id}"]
     assert len(tag.encode("utf-8")) <= 256
-    assert json.loads(tag)["s"] == "committed"
+    assert json.loads(tag)["state"] == "committed"
+    assert json.loads(tag)["action"] == "promotion"
+    assert json.loads(tag)["from_version"] == "1"
+    assert "from" not in json.loads(tag)
+    if receipt_format == "readable_v1":
+        old_payload = json.loads(tag)
+        old_payload["from"] = old_payload.pop("from_version")
+        client.set_model_version_tag(
+            name, "2", f"promotion_{receipt.event_id}", json.dumps(old_payload)
+        )
     assert json.loads(client.get_registered_model(name).tags["champion_current_event"]) == {
         "event_id": receipt.event_id,
         "version": "2",
@@ -412,7 +600,7 @@ def test_controlled_champion_rejects_alias_without_receipt(case) -> None:
     client, uri, name, _, _, _ = case
     with pytest.raises(AliasConflictError, match="committed receipt"):
         controlled_champion_version(name, tracking_uri=uri, registry_uri=uri)
-    client.set_registered_model_tag(name, "skyulf_pending_alias_event", "unresolved")
+    client.set_registered_model_tag(name, "pending_alias_event", "unresolved")
     with pytest.raises(AliasConflictError, match="pending"):
         controlled_champion_version(name, tracking_uri=uri, registry_uri=uri)
 
@@ -478,7 +666,7 @@ def test_lost_alias_write_response_is_reported_as_unknown(case, monkeypatch) -> 
     with pytest.raises(AliasOutcomeUnknownError, match="inspect prepared event"):
         _promote(case)
     assert str(client.get_model_version_by_alias(name, "champion").version) == "2"
-    assert client.get_registered_model(name).tags.get("skyulf_pending_alias_event")
+    assert client.get_registered_model(name).tags.get("pending_alias_event")
     from skyulf.integrations.mlflow.promotion import controlled_champion_version
 
     with pytest.raises(AliasConflictError, match="pending"):
@@ -516,3 +704,11 @@ def test_global_uc_registry_rejects_local_admission(tmp_path, monkeypatch) -> No
     monkeypatch.setattr(mlflow, "get_registry_uri", lambda: "databricks-uc")
     with pytest.raises(ValueError, match="distributed"):
         _admission(LocalAliasAdmission(tmp_path / "locks"), None)
+
+
+def test_receipt_rejects_conflicting_version_field_names() -> None:
+    """Legacy and current field names must never silently choose different prior versions."""
+    from skyulf.integrations.mlflow.promotion import _read_event
+
+    with pytest.raises(ValueError, match="[Dd]uplicate|[Aa]mbiguous"):
+        _read_event(json.dumps({"action": "promotion", "from": "1", "from_version": "2"}))

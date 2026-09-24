@@ -283,6 +283,7 @@ def register_model(
     *,
     tracking_uri: str | None = None,
     registry_uri: str | None = None,
+    tags: dict[str, str] | None = None,
 ) -> Any:
     """Publish a run artifact as a new registered-model version explicitly.
 
@@ -301,7 +302,8 @@ def register_model(
         if _error_code(exc) not in {"RESOURCE_ALREADY_EXISTS", "ALREADY_EXISTS"}:
             raise _translate_error(exc, name=name, version="new") from exc
     try:
-        return client.create_model_version(name=name, source=model_uri, run_id=run_id)
+        options = {"tags": tags} if tags is not None else {}
+        return client.create_model_version(name=name, source=model_uri, run_id=run_id, **options)
     except Exception as exc:  # noqa: BLE001 - translate MLflow's backend errors at the boundary
         raise _translate_error(exc, name=name, version="new") from exc
 

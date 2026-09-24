@@ -1,5 +1,56 @@
 # Session handoff - 2026-09-24
 
+## Current priority: SM-30 through SM-43
+
+The user approved the [local Bundle improvement program](37-local-bundle-improvement-program.md)
+and explicitly requested [independent scoring selection and promotion policy](38-model-selection-and-approval-design.md).
+**SM-30, company tags and SM-31 are complete; SM-32 is next READY.**
+Latest follow-up: Bundle initialization now asks for optional risk_category,
+PayingRegNo has an explicit policy-compute example, and new receipts use
+from_version while reading older formats. 44 relevant tests and real CLI
+generation/strict serverless validation passed. No live resources changed.
+The requested previous_challenger replacement-history alias is specified in
+the SM-32 design and queue, not implemented yet.
+The user requested readable/company-compatible tags and a clean live reset
+before SM-31. [The clean rehearsal](41-company-tags-and-clean-live-validation.md)
+passed all four tasks in run 607409241163605. [SM-31 evidence](42-sm31-refactor-plan-and-evidence.md)
+records 110 passing tests, Ruff, scoped ty, strict MkDocs, installed-wheel imports,
+and a successful deployed score run 383572337148835. Changes remain uncommitted.
+
+The old four test jobs and two schemas were deleted as requested. Retain the
+new workspace.skyulf_lifecycle_test schema and exactly two skyulf_lifecycle
+jobs (train 155738051514173, score 684955889505992). One source and two engine
+prediction tables each contain 170 rows. Main model_polars has champion=2,
+challenger=3 rejected. model_pandas has champion=1 and challenger=5 error after
+the explicit rollback test. Both scorers replayed without new commits.
+No schedule is active. The notebook is now 44 lines, delegating to Core
+local_workflow.py and prediction_output.py. Keep business config in the project.
+
+SM-30 changes challenger semantics: a trained/registered contender such as
+tied v3 remains challenger, with evaluation status/reason visible; only
+promotion depends on passing quality gates. Newer contenders replace that
+pointer while retaining history. Rollback now preserves a separate contender
+with a verified receipt. Real local MLflow tests cover pandas and Polars,
+including manual nomination, tied candidates and comparison errors.
+
+Next separate pinned/champion selection from
+manual/automatic promotion, expose validated runtime/configuration choices
+and independent schedules, improve metrics/search, identities/operations,
+packaging, generated CI, data recovery and documentation. SM-43a verifies the
+combined personal-workspace workflow; SM-43b separately gates company use.
+The explicitly requested serving, ai_query, A/B and offline/online feature
+tasks follow SM-43a; see [their contract](39-serving-and-feature-lookup-delivery-plan.md).
+Broad Spark and monitoring also remain later; SM-18 and
+continuous streaming remain parked. Keep two jobs and no default control tables.
+
+Preserve the earlier uncommitted two-literal test correction in
+`skyulf-core/tests/integrations/test_mlflow_promotion.py`: the actual tag is
+`pending_alias_event`. The preceding review ran 58 Bundle/promotion tests
+successfully; that evidence does not validate the newly planned semantics.
+The notes below describe historical resources that the user subsequently
+requested to delete. Use the new inventory above for the current workspace.
+SM-43a still owns combined acceptance for the remaining improvement program.
+
 ## Current state after SM-27/SM-29
 
 The combined personal-workspace live rehearsal passed; SM-27 and SM-29 are

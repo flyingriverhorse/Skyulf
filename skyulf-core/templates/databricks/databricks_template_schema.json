@@ -128,7 +128,7 @@
       "order": 10,
       "type": "string",
       "default": "CostCenter",
-      "description": "Approved cluster cost tag key",
+      "description": "Approved cluster cost tag key, for example CostCenter or PayingRegNo",
       "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
       "skip_prompt_if": {"properties": {"compute_mode": {"const": "serverless"}}}
     },
@@ -136,8 +136,15 @@
       "order": 11,
       "type": "string",
       "default": "REPLACE_WITH_COST_TAG",
-      "description": "Approved cluster cost tag value",
+      "description": "Approved cluster cost tag value; for PayingRegNo, enter your paying registration number",
       "skip_prompt_if": {"properties": {"compute_mode": {"const": "serverless"}}}
+    },
+    "risk_category": {
+      "order": 20,
+      "type": "string",
+      "default": "",
+      "description": "Optional business risk label (e.g. Low, Medium, High); leave blank when unused. This label does not change promotion gates.",
+      "pattern": "^(?:[A-Za-z0-9][A-Za-z0-9 ._-]{0,63})?$"
     }
   }
 }

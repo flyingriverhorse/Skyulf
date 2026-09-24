@@ -1,13 +1,14 @@
 """Bounded, label-aware local candidate training from a pinned Delta snapshot.
 
 This adapter uses Spark only for a narrow, bounded read. Fit and evaluation run
-on the recorded local engine; publication never changes a registry alias.
+on the recorded local engine. Alias management requires an explicit caller hook.
 """
 
 from __future__ import annotations
 
 import math
 import pickle
+from collections.abc import Callable
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from importlib.metadata import version
@@ -19,7 +20,7 @@ import polars as pl
 
 from ...data.dataset import SplitDataset
 from ...inference.local_evaluation import evaluate_local_holdout
-from ..mlflow.registry import register_model, resolve_model
+from ..mlflow.registry import ResolvedModel, register_model, resolve_model
 from ..mlflow.tracking import TrackingConfig, track_run
 from ..mlflow.validation import ModelComparisonReport, compare_registered_local_models
 from ._contracts import column_name, table_name
@@ -209,12 +210,23 @@ def train_local_candidate(
     engine: Literal["pandas", "polars"] = "pandas",
     champion_version: str | None = None,
     quality_threshold: float | None = None,
+    on_registered: Callable[[ResolvedModel], None] | None = None,
+    risk_category: str | None = None,
 ) -> LocalCandidateResult:
-    """Fit, log, register and compare a candidate without changing any aliases."""
+    """Fit, register and compare; optionally notify an explicit lifecycle owner.
+
+    By default no aliases change. The on_registered hook runs after successful
+    registration and before comparison, allowing the caller to nominate a
+    contender without making the generic training service an alias writer.
+    """
     if not isinstance(spec, LocalTrainingSpec):
         raise TypeError("spec must be LocalTrainingSpec.")
     if engine not in ("pandas", "polars"):
         raise ValueError("engine must be pandas or polars.")
+    if risk_category is not None and (
+        not isinstance(risk_category, str) or len(risk_category.encode("utf-8")) > 256
+    ):
+        raise ValueError("risk_category must be text of at most 256 UTF-8 bytes.")
     if (
         type(min_improvement) not in (int, float)
         or not math.isfinite(min_improvement)
@@ -279,7 +291,25 @@ def train_local_candidate(
                 "code_version": version("skyulf-core"),
             }
         )
-        run.set_tags({"dataset_id": spec.dataset_id, "phase": "candidate_training"})
+        tags = {
+            "task": "training",
+            "train_data_destination": spec.table,
+            "test_data_destination": spec.table,
+            "train_data_version": str(spec.version),
+            "test_data_version": str(spec.version),
+            "train_start": spec.start.astimezone(UTC).isoformat(),
+            "test_start": spec.holdout_start.astimezone(UTC).isoformat(),
+            "data_end": spec.cutoff.astimezone(UTC).isoformat(),
+            "model_type": str(config["modeling"]["type"]),
+            "candidate_date_tag": datetime.now(UTC).date().isoformat(),
+            "engine": engine,
+        }
+        if risk_category:
+            tags["risk_category"] = risk_category
+        run.set_tags(tags)
+        run.client.log_dict(
+            run.run_id, {"dataset_id": spec.dataset_id, **tags}, "training_data.json"
+        )
         run.log_metrics(metrics)
         model_uri = _log_local_model(artifact_path, run_id=run.run_id, tracking_uri=tracking_uri)
         run_id = run.run_id
@@ -288,6 +318,10 @@ def train_local_candidate(
         model_name,
         tracking_uri=tracking_uri,
         registry_uri=registry_uri,
+        tags={
+            key: value if len(value.encode("utf-8")) <= 256 else "See training_data.json"
+            for key, value in tags.items()
+        },
     )
     candidate = resolve_model(
         model_name,
@@ -295,6 +329,8 @@ def train_local_candidate(
         tracking_uri=tracking_uri,
         registry_uri=registry_uri,
     )
+    if on_registered is not None:
+        on_registered(candidate)
     report = compare_registered_local_models(
         candidate,
         champion,

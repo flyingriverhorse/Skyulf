@@ -1,5 +1,10 @@
 # Local-first Databricks integration and Bundle plan
 
+Current sequencing update (2026-09-24): the first local Bundle has been
+validated. The user now prioritizes [SM-30 through SM-43 improvements](37-local-bundle-improvement-program.md)
+before broad Spark work. [OPEN_QUEUE.md](OPEN_QUEUE.md) is authoritative;
+the earlier baseline and first-Bundle plan below are historical context.
+
 Updated: 2026-09-23. SM-26, SM-25, SM-24a, SM-15L and SM-15I are implemented
 and validated for their documented scopes; the first Bundle remains planned.
 Baseline: `63dd3e21` and the completed, scoped SM-16 evidence.

@@ -1,0 +1,17 @@
+{
+  "project_name": "my_model",
+  "engine": "pandas",
+  "row_key": "customer_id",
+  "retraining_mode": "manual",
+  "model_change_mode": "incremental_append",
+  "model_selection_mode": "pinned_version",
+  "compute_mode": "policy_cluster",
+  "catalog": "REPLACE_DEV_CATALOG",
+  "schema": "REPLACE_DEV_SCHEMA",
+  "cluster_policy_name": "REPLACE_WITH_APPROVED_POLICY",
+  "spark_version": "17.3.x-cpu-ml-scala2.13",
+  "node_type_id": "REPLACE_WITH_NODE_TYPE",
+  "cost_tag_key": "PayingRegNo",
+  "cost_tag_value": "REPLACE_WITH_PAYING_REG_NO",
+  "risk_category": "Low"
+}

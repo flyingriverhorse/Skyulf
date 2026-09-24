@@ -26,6 +26,31 @@ personal-workspace value is built into those three targets. Policy-backed
 compute uses the policy name, runtime, node type and cost tag supplied at
 initialization. Serverless compute needs none of those fields.
 
+For a company policy requiring `PayingRegNo`, select that value as
+`cost_tag_key` and supply the approved registration number as `cost_tag_value`.
+The `paying-reg-no-init.example.json` example demonstrates both settings;
+the generic default remains `CostCenter`. This tag applies to policy-cluster
+compute. Selecting it does not assign a model risk category.
+
+Initialization also asks for an optional `risk_category`, such as `Low`,
+`Medium`, or `High`. Leave it blank to omit the tag. The value remains editable
+in `config/workflow.json` and is recorded on future training runs and model
+versions; it does not change promotion gates or relabel existing versions.
+
+## Where the workflow lives
+
+The generated `src/workflow.py` reads job widgets and JSON, calls the installed
+library, and serializes its result. Reusable behavior lives in
+`skyulf.integrations.databricks.local_workflow`: `resolve_target_config` binds
+target names and `run_action` executes train, train_monthly or score.
+`prediction_output` validates and creates output tables and safely switches
+full-rebuild views. Both reuse the existing training, inference and registry
+services. Importing them does not create a Spark session or cloud resource.
+
+Edit the business pipeline in `config/workflow.json`. Model/preprocessing
+choices remain project configuration; common workflow fixes ship in the
+Skyulf wheel instead of requiring edits to every generated notebook.
+
 ## What is created
 
 `bundle deploy` creates only two jobs and uploads their code:
@@ -50,9 +75,33 @@ minimum. A passing candidate is staged and promoted through checked registry
 receipts; an ineligible candidate leaves champion unchanged. The train job
 then calls the existing score job. No third job or control table is added.
 
+In both modes, registration nominates `@challenger` before comparison. A tied
+or worse candidate retains that alias with `validation_status=rejected` and
+a reason; comparison errors retain it with `validation_status=error`.
+New contenders replace the pointer without deleting earlier version evidence.
+Manual mode records these results without promotion or changing pinned scoring.
+Training resolves the current champion; a stale explicit `champion_version`
+fails before fit. Generic Core training remains alias-free unless a caller
+supplies the explicit `on_registered` lifecycle callback.
+
+Training runs and model versions share readable metadata: `train_data_version`,
+`test_data_version`, `train_data_destination`, `test_data_destination`,
+`model_type`, `candidate_date_tag`, and `engine`. Optional `risk_category` is
+editable in workflow.json. Since fit and evaluation split one Delta snapshot,
+their table names and versions match; `train_start`, `test_start`, and
+`data_end` explain the split. The exact dataset identity is saved in
+`training_data.json`. Run tags use `task=training`.
+
+Validation reasons use plain English. Technical event tags retain unique IDs
+and evidence hashes for rollback/recovery; their JSON fields are `action`,
+`from_version`, `proof`, `parent`, `state`, and `previous`. `from_version`
+identifies the version previously held by the affected alias, not necessarily
+the previous champion. These are audit records,
+not settings to edit. Earlier compact receipts remain supported.
+
 In automatic mode, score resolves `@champion` once to a concrete version per
-run. Only the serialized train job identity may write this model's aliases;
-other alias-write grants must be removed before enabling this table-free mode.
+run. In both modes, only the serialized train job identity may write this
+model's aliases; other alias-write grants must be removed before training.
 Alias promotion and Delta scoring are separate transactions. If scoring fails
 after promotion, the last successful prediction output remains and the score
 job must be retried. Unknown alias outcomes need receipt reconciliation.

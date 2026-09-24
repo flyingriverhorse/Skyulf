@@ -10,6 +10,7 @@
   "model_change_mode": "{{.model_change_mode}}",
   "model_selection_mode": "{{.model_selection_mode}}",
   "champion_version": null,
+  "risk_category": {{if .risk_category}}"{{.risk_category}}"{{else}}null{{end}},
   "row_keys": ["{{.row_key}}"],
   "input_columns": ["feature_value"],
   "target_column": "target",

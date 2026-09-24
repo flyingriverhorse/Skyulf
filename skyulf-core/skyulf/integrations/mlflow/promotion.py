@@ -250,12 +250,42 @@ def _event_payload(receipt: AliasChangeReceipt, status: str) -> dict[str, str | 
 
 def _write_event(client: Any, receipt: AliasChangeReceipt, status: str) -> None:
     """Persist a prepared or committed transition on its destination version."""
-    value = json.dumps(_event_payload(receipt, status), sort_keys=True, separators=(",", ":"))
+    labels = {
+        "k": "action",
+        "p": "from_version",
+        "h": "proof",
+        "e": "parent",
+        "s": "state",
+        "o": "previous",
+    }
+    payload = {labels[key]: value for key, value in _event_payload(receipt, status).items()}
+    value = json.dumps(payload, sort_keys=True, separators=(",", ":"))
     if len(value.encode("utf-8")) > 256:
         raise ValueError("UC model-version receipt exceeds the 256-byte tag value limit.")
     client.set_model_version_tag(
         receipt.model_name, receipt.new_version, _event_tag(receipt.event_id), value
     )
+
+
+def _read_event(raw: str | None) -> Any:
+    """Decode readable receipts while retaining compatibility with compact receipts."""
+    payload = json.loads(raw) if raw is not None else None
+    if isinstance(payload, dict) and "action" in payload:
+        labels = {
+            "action": "k",
+            "from": "p",
+            "from_version": "p",
+            "proof": "h",
+            "parent": "e",
+            "state": "s",
+            "previous": "o",
+        }
+        if any(key not in labels for key in payload):
+            raise ValueError("Unexpected lifecycle receipt field.")
+        if "from" in payload and "from_version" in payload:
+            raise ValueError("Ambiguous prior-version fields in lifecycle receipt.")
+        return {labels[key]: value for key, value in payload.items()}
+    return payload
 
 
 def _verify_original_receipt(client: Any, receipt: AliasChangeReceipt) -> bool:
@@ -268,7 +298,7 @@ def _verify_original_receipt(client: Any, receipt: AliasChangeReceipt) -> bool:
         raise _translate_error(exc, name=receipt.model_name, version=receipt.new_version) from exc
     expected = _event_payload(receipt, "committed")
     try:
-        stored = json.loads(raw) if raw is not None else None
+        stored = _read_event(raw)
     except (TypeError, json.JSONDecodeError) as exc:
         raise ValueError("Promotion receipt is malformed.") from exc
     if stored == expected:
@@ -283,6 +313,8 @@ def _commit_change(
     client: Any,
     receipt: AliasChangeReceipt,
     updates: list[tuple[str, str | None, str | None]],
+    *,
+    version_tags: dict[str, str] | None = None,
 ) -> None:
     """Prepare, apply verified alias updates, then persist their common receipt.
 
@@ -331,8 +363,16 @@ def _commit_change(
                 f"Alias outcome unknown; inspect prepared event {receipt.event_id}."
             ) from exc
     try:
-        if receipt.kind == "promotion":
+        if receipt.kind in {"promotion", "initial"}:
             client.delete_registered_model_tag(receipt.model_name, _CHALLENGER_TAG)
+        tags = dict(version_tags or {})
+        if receipt.kind in {"promotion", "initial"}:
+            tags["promotion_status"] = "promoted"
+        for key, value in tags.items():
+            client.set_model_version_tag(receipt.model_name, receipt.new_version, key, value)
+        stored = client.get_model_version(receipt.model_name, receipt.new_version).tags or {}
+        if any(stored.get(key) != value for key, value in tags.items()):
+            raise AliasOutcomeUnknownError("Model version status was not verified.")
         _write_event(client, receipt, "committed")
         tag = _ACTIVE_TAG if receipt.alias == _ALIAS else _CHALLENGER_TAG
         client.set_registered_model_tag(
@@ -358,23 +398,26 @@ def _validated_report(
     heldout: pd.DataFrame | pl.DataFrame,
     *,
     target_column: str,
-    expected_champion_version: str,
+    expected_champion_version: str | None,
     max_rows: int,
     max_bytes: int,
     tracking_uri: str | None,
     registry_uri: str | None,
+    require_eligible: bool = True,
 ) -> str:
     """Re-evaluate the pinned candidate and return its comparison digest."""
     if not isinstance(report, ModelComparisonReport):
         raise TypeError("report must be a ModelComparisonReport.")
-    if (
-        type(expected_champion_version) is not str
-        or expected_champion_version != report.champion_version
-        or not expected_champion_version.isascii()
-        or not expected_champion_version.isdigit()
+    if expected_champion_version != report.champion_version or (
+        expected_champion_version is not None
+        and (
+            type(expected_champion_version) is not str
+            or not expected_champion_version.isascii()
+            or not expected_champion_version.isdigit()
+        )
     ):
         raise ValueError("Expected champion version must match the comparison report.")
-    if not report.eligible or report.reason != "candidate_improved":
+    if require_eligible and (not report.eligible or report.reason != "candidate_improved"):
         raise ValueError("Comparison does not approve candidate promotion.")
     candidate = resolve_model(
         report.model_name,
@@ -382,11 +425,15 @@ def _validated_report(
         tracking_uri=tracking_uri,
         registry_uri=registry_uri,
     )
-    champion = resolve_model(
-        report.model_name,
-        version=expected_champion_version,
-        tracking_uri=tracking_uri,
-        registry_uri=registry_uri,
+    champion = (
+        resolve_model(
+            report.model_name,
+            version=expected_champion_version,
+            tracking_uri=tracking_uri,
+            registry_uri=registry_uri,
+        )
+        if expected_champion_version is not None
+        else None
     )
     fresh = compare_registered_local_models(
         candidate,
@@ -402,7 +449,7 @@ def _validated_report(
         tracking_uri=tracking_uri,
         registry_uri=registry_uri,
     )
-    if fresh != report or not fresh.eligible:
+    if fresh != report or (require_eligible and not fresh.eligible):
         raise ValueError("Pinned comparison no longer matches the supplied report.")
     return hashlib.sha256(
         json.dumps(asdict(fresh), sort_keys=True, allow_nan=False).encode()
@@ -470,7 +517,16 @@ def initialize_champion(
             comparison_sha256=digest,
             parent_event_id=None,
         )
-        _commit_change(client, receipt, [(_ALIAS, report.candidate_version, None)])
+        challenger = _read_optional_alias(client, report.model_name, _CHALLENGER)
+        if challenger is not None and challenger != report.candidate_version:
+            raise AliasConflictError("A different challenger exists before initialization.")
+        updates: list[tuple[str, str | None, str | None]] = [
+            (_ALIAS, report.candidate_version, None)
+        ]
+        if challenger is not None:
+            _checked_challenger_event(client, report.model_name, challenger)
+            updates.append((_CHALLENGER, None, challenger))
+        _commit_change(client, receipt, updates)
         return receipt
 
 
@@ -479,7 +535,7 @@ def stage_challenger(
     heldout: pd.DataFrame | pl.DataFrame,
     *,
     target_column: str,
-    expected_champion_version: str,
+    expected_champion_version: str | None,
     admission: AliasAdmission,
     max_rows: int,
     max_bytes: int,
@@ -487,7 +543,7 @@ def stage_challenger(
     tracking_uri: str | None = None,
     registry_uri: str | None = None,
 ) -> AliasChangeReceipt:
-    """Assign a validated candidate to challenger without moving champion."""
+    """Record a freshly checked contender, even when promotion quality fails."""
     _admission(admission, registry_uri)
     digest = _validated_report(
         report,
@@ -498,16 +554,19 @@ def stage_challenger(
         max_bytes=max_bytes,
         tracking_uri=tracking_uri,
         registry_uri=registry_uri,
+        require_eligible=False,
     )
     client = _make_client(_require_mlflow(), tracking_uri, registry_uri)
     with admission.hold(alias_resource_id(report.model_name)):
-        if _read_alias(client, report.model_name) != expected_champion_version:
+        if _read_optional_alias(client, report.model_name, _ALIAS) != expected_champion_version:
             raise AliasConflictError("Champion alias differs from expected version.")
         existing = _read_optional_alias(client, report.model_name, _CHALLENGER)
         if existing != expected_challenger_version:
             raise AliasConflictError("Challenger alias differs from expected version.")
         if existing == report.candidate_version:
-            raise AliasConflictError("Candidate already holds challenger alias.")
+            _checked_challenger_event(client, report.model_name, existing)
+        if report.candidate_version == expected_champion_version:
+            raise AliasConflictError("Champion cannot also be its own challenger.")
         receipt = AliasChangeReceipt(
             event_id=uuid4().hex,
             kind="challenger",
@@ -516,10 +575,64 @@ def stage_challenger(
             prior_version=existing,
             new_version=report.candidate_version,
             comparison_sha256=digest,
-            parent_event_id=_active_marker(client, report.model_name, expected_champion_version),
+            parent_event_id=(
+                _active_marker(client, report.model_name, expected_champion_version)
+                if expected_champion_version is not None
+                else None
+            ),
         )
-        _commit_change(client, receipt, [(_CHALLENGER, report.candidate_version, existing)])
+        passed = report.eligible
+        reason = {
+            "candidate_improved": "Improved over champion",
+            "insufficient_improvement": "No improvement over champion",
+            "quality_gate_failed": "Quality threshold not met",
+        }.get(report.reason, report.reason)
+        if report.reason == "insufficient_improvement" and (report.improvement or 0) > 0:
+            reason = "Improvement below required minimum"
+        if report.champion_version is None:
+            value = report.candidate_metrics[report.metric]
+            threshold = report.quality_threshold
+            passed = threshold is not None and (
+                value <= threshold if report.metric_direction == "minimize" else value >= threshold
+            )
+            reason = (
+                "First model passed quality threshold"
+                if passed
+                else "First model quality not approved"
+            )
+        _commit_change(
+            client,
+            receipt,
+            [(_CHALLENGER, report.candidate_version, existing)],
+            version_tags={
+                "validation_status": "passed" if passed else "rejected",
+                "validation_reason": reason,
+                "promotion_status": "not_promoted",
+            },
+        )
         return receipt
+
+
+def _checked_challenger_event(client: Any, name: str, version: str) -> dict[str, Any]:
+    """Require a durable contender event before preserving or updating its alias."""
+    event_id = _active_marker(client, name, version, _CHALLENGER)
+    if event_id is None:
+        raise AliasConflictError("Challenger alias lacks a controlled lifecycle event.")
+    try:
+        raw = client.get_model_version(name, version).tags.get(_event_tag(event_id))
+        event = _read_event(raw)
+    except (TypeError, ValueError) as exc:
+        raise AliasConflictError("Challenger receipt is malformed.") from exc
+    if (
+        not event_id
+        or not isinstance(event, dict)
+        or (
+            event.get("s") != "committed"
+            or event.get("k") not in {"nomination", "challenger", "evaluation_error"}
+        )
+    ):
+        raise AliasConflictError("Challenger lacks a committed lifecycle receipt.")
+    return event
 
 
 def _verify_staged_challenger(
@@ -535,7 +648,7 @@ def _verify_staged_challenger(
         raw = client.get_model_version(report.model_name, report.candidate_version).tags.get(
             _event_tag(event_id)
         )
-        event = json.loads(raw) if raw is not None else None
+        event = _read_event(raw)
     except Exception as exc:  # noqa: BLE001 - registry transport boundary
         raise AliasConflictError("Challenger staging event cannot be verified.") from exc
     if not isinstance(event, dict) or (
@@ -628,8 +741,11 @@ def rollback_promotion(
         if _active_marker(client, receipt.model_name, current) != receipt.event_id:
             raise AliasConflictError("A newer promotion superseded this rollback receipt.")
         legacy = _verify_original_receipt(client, receipt)
-        if _read_optional_alias(client, receipt.model_name, _CHALLENGER) is not None:
-            raise AliasConflictError("Clear the newer challenger before rollback.")
+        challenger = _read_optional_alias(client, receipt.model_name, _CHALLENGER)
+        if challenger is not None:
+            _checked_challenger_event(client, receipt.model_name, challenger)
+            if challenger in {current, receipt.prior_version}:
+                raise AliasConflictError("Challenger conflicts with the rollback versions.")
         if not legacy and (
             _read_optional_alias(client, receipt.model_name, _PREVIOUS) != receipt.prior_version
         ):

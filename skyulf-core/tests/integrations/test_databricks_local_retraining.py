@@ -144,6 +144,7 @@ def test_failed_candidate_never_mutates_champion(monkeypatch, tmp_path):
         """Let publication fail after recording without contacting MLflow."""
         yield SimpleNamespace(
             run_id="run",
+            client=SimpleNamespace(log_dict=lambda *args, **kwargs: None),
             log_config=lambda *args, **kwargs: None,
             log_params=lambda *args, **kwargs: None,
             set_tags=lambda *args, **kwargs: None,
@@ -240,6 +241,25 @@ def test_candidate_workflow_logs_and_registers_without_alias(monkeypatch, tmp_pa
     assert run.data.metrics["heldout_rmse"] == pytest.approx(0.0, abs=1e-8)
     assert "candidate_comparison.json" in artifacts
     assert "model" in artifacts
+    assert run.data.tags["task"] == "training"
+    assert "dataset_id" not in run.data.tags and "phase" not in run.data.tags
+    assert run.data.tags["train_data_destination"] == _spec().table
+    assert run.data.tags["train_data_version"] == str(_spec().version)
+    assert run.data.tags["test_data_version"] == str(_spec().version)
+    assert "training_data.json" in artifacts
+    model_tags = client.get_model_version(f"candidate_{engine}", "1").tags
+    assert model_tags["engine"] == engine
+    assert model_tags["model_type"] == "linear_regression"
+    assert model_tags["train_data_destination"] == _spec().table
+    registrations = []
+    original_compare = retraining.compare_registered_local_models
+
+    def compare_after_registration(candidate, *args, **kwargs):
+        """Comparison must follow the orchestrator's explicit registration hook."""
+        assert registrations == [candidate]
+        return original_compare(candidate, *args, **kwargs)
+
+    monkeypatch.setattr(retraining, "compare_registered_local_models", compare_after_registration)
     next_result = retraining.train_local_candidate(
         None,
         _spec(max_rows=12, max_bytes=20000),
@@ -254,6 +274,7 @@ def test_candidate_workflow_logs_and_registers_without_alias(monkeypatch, tmp_pa
         min_improvement=0,
         engine=engine,
         champion_version=result.model_version,
+        on_registered=registrations.append,
     )
     assert next_result.model_version == "2"
     assert next_result.comparison.champion_version == "1"

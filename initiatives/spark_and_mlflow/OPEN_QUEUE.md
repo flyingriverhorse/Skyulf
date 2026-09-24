@@ -6,8 +6,10 @@ automatic champion selection, failed-score recovery and serialized handoff.
 This is functional completion for the selected workflow. Production must
 still enforce one exclusive alias writer; both test jobs used a human owner,
 and live contention was exercised for score requests, not concurrent trains.
-See [the combined live evidence](35-sm27-sm29-live-validation-report.md). Spark
-expansion follows the validated first Bundle. SM-15L
+See [the combined live evidence](35-sm27-sm29-live-validation-report.md). The
+current priority is the approved SM-30 through SM-43 local Bundle improvement
+program below, starting with challenger semantics. Broad Spark expansion
+waits for its local acceptance gate (SM-43a). SM-15L
 provides explicit-period UC output. SM-15I adds automatic new-row scoring
 for the first Bundle; SM-18 and streaming remain parked.
 
@@ -25,6 +27,72 @@ LATER = son aşama; ACTIVE = yürütülüyor; BLOCKED = somut dış engel;
 DONE = kanıtla tamamlandı. SM-00 commit: `105a6fe4`.
 DEFERRED = user postponed this work; PARKED = do not implement until resumed.
 SUPERSEDED = replaced by a later user-directed scope; not a completed feature.
+
+## Active priority: local Bundle improvements before Spark
+
+The user approved the comparison findings and clarified that a newly trained
+contender remains challenger even when it fails promotion. The user also
+explicitly approved separating manual/automatic promotion from score model
+selection. These are new requirements; prior DONE rows retain their original
+scope and do not imply the improvements below already exist.
+
+Read [the improvement program](37-local-bundle-improvement-program.md) and
+[the independent selection/approval design](38-model-selection-and-approval-design.md).
+Each task includes implementation locations and concrete acceptance checks.
+**SM-30, company-compatible tags and SM-31 are complete; SM-32 is READY.** See
+[the implementation evidence](40-sm30-challenger-validation-report.md): 104
+tests passed, including real MLflow lifecycles with pandas and Polars.
+See [the clean live rehearsal](41-company-tags-and-clean-live-validation.md).
+SM-31 passed 110 tests and its deployed thin score notebook passed live; see
+[the extraction evidence](42-sm31-refactor-plan-and-evidence.md).
+SM-43a remains the later combined acceptance for the full improvement program.
+Keep two jobs and reuse Core services. Manual approval must act
+on an existing candidate without retraining or reuploading the model.
+
+| Order | Task | Dependencies | Status | Acceptance / deliverable |
+| --- | --- | --- | --- | --- |
+| SM-30 | Challenger nomination and visible evaluation status | Existing SM-22c/29 | DONE | 104 local tests and live run 607409241163605 passed; company tags, both engines, retained contender, replacement, error and rollback verified |
+| SM-31 | Thin template and reusable workflow/publication services | SM-30 | DONE | 44-line notebook, two Core services, 110 tests, wheel installation/import, strict generation validation and live score run 383572337148835 passed |
+| SM-32 | Independent score selection and promotion policy | SM-31 | READY | Four pinned/champion and manual/automatic combinations; approve/reject/rollback existing versions via one writer; score handoff without fit; previous_challenger history on contender replacement |
+| SM-33 | Validated config, migration and runtime parameters | SM-32 | WAIT | Per-run version/action/evidence inputs; task/column/key setup; migrate old mode and reject config/job-graph disagreement |
+| SM-34 | Independent score/train schedules and training windows | SM-33 | WAIT | Editable paused score/train cron/timezone, explicit lookback/holdout/label windows; scoring needs no manual dates or retraining |
+| SM-35 | Multi-metric quality gates and clear thresholds | SM-33 | WAIT | One selection metric plus optional guardrails; task/domain validation, first-model gate, failed-gate explanations and no probability-threshold confusion |
+| SM-36 | Core tuning, model search and optional explainability | SM-35 | WAIT | Existing Core search/trials and FE reused with budgets, protected holdout, MLflow evidence and selected-model inference parity |
+| SM-37 | Production identities and enforced writer ownership | SM-32, SM-33 | WAIT | Per-target run_as/permissions/hosts/roots; one lifecycle writer; scoring cannot move aliases; actual denial and lifecycle queue evidence |
+| SM-38 | Operational limits, retry/recovery and run summaries | SM-34, SM-37 | WAIT | Configurable timeouts/retries/notifications; source/model/count/no-op summaries; score-only recovery and no blind alias retry |
+| SM-39 | Reproducible packaging and per-target compute | SM-33 | WAIT | Central compatible wheel/runtime pins, clean install/load, configurable policy/worker/cost settings and strict target validation |
+| SM-40 | Generated-project tests and generic CI/CD | SM-37, SM-38, SM-39 | WAIT | Standalone project tests/build/validate and optional company adapter; explicit deployment approvals; no default chargeable PR runs |
+| SM-41 | CDF recovery, full refresh and generation retention | SM-31, SM-33, SM-38 | WAIT | Explicit CDF-expiry/source-change recovery; preserve active outputs/grants and rollback generations; update/delete policy never silently inferred |
+| SM-42 | Complete first-run examples and operator guide | SM-30 through SM-41 | WAIT | pandas/Polars regression/classification examples; manual/auto and append/full instructions, config-vs-runtime settings, scheduling and recovery |
+| SM-43a | Combined personal-workspace acceptance | SM-42 | WAIT | Representative real-data FE/models, both engines, manual/auto, retained challenger, new rows, no-op, failure/rollback/queue; exact run/resource evidence |
+| SM-43b | Company-target production readiness gate | SM-43a; confirmed company environment | WAIT | Approved identities/UC/policy compute/dependency/CI/data checks in the actual company target; no inference from personal serverless tests |
+
+The tasks are sequenced by this table when dependencies allow. SM-43b needs
+actual company settings and access; it must not prevent unrelated local work.
+No new live resources or company deployments are authorized merely by a queue
+status. Existing explicit live authorizations retain their original scope.
+
+## Approved extensions after the local improvement gate
+
+The user explicitly requested serving, A/B, ai_query and online feature lookup.
+These existing IDs are required backlog work, implemented after SM-43a in the
+listed order, while each feature remains opt-in for generated projects.
+See [the delivery contract](39-serving-and-feature-lookup-delivery-plan.md).
+
+| Task | Status | Dependency / scope |
+| --- | --- | --- |
+| SM-19a | LATER | SM-43a; HTTP serving, fitted artifact parity, readiness and load/cold-start checks |
+| SM-19b | LATER | SM-19a; SQL ai_query invocation, named inputs, privileges and failure behavior |
+| SM-19d | LATER | SM-19a; A/B/canary routing, endpoint update/rollback; batch rollout separately explicit |
+| SM-21a | LATER | SM-43a; UC feature lookup, keys and point-in-time correctness |
+| SM-21b | LATER | SM-21a/19a; optional online publication, freshness and serving lookup |
+| SM-23a | LATER | SM-43a; batch quality/drift/delayed-label reporting and optional dashboards; SM-38 covers basic operations first |
+| SM-23b | LATER | SM-19a; endpoint inference tables and version-aware model-performance monitoring |
+| SM-19c | PARKED | Continuous streaming remains outside the current user-approved implementation sequence |
+
+SM-17/24c/20b remain later Spark enhancements after SM-43a. SM-18 stays parked.
+
+## Earlier implementation and live evidence
 
 | Sıra | Görev | Bağımlılık | Durum | Kısa bitiş ölçütü |
 | --- | --- | --- | --- | --- |
@@ -97,6 +165,13 @@ precheck, live-evidence assertions and strict docs build passed. The prior
 No library fix was required by this rehearsal. Source updates/deletes,
 company targets, policy compute and broad Spark execution remain outside
 this evidence. Production must still enforce one serialized alias writer.
+
+The subsequent [reference comparison and readiness review](36-bundle-reference-comparison-and-readiness.md)
+separates this completed functional scope from remaining production adoption
+work: manual approval UX, runtime parameters, independent score scheduling,
+workflow simplification, identities/operations and generated-project CI.
+The user subsequently approved that work; the new task definitions and the
+corrected challenger semantics are recorded in SM-30 through SM-43 above.
 
 ## Local-first path to the first Bundle
 
