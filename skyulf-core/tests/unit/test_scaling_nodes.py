@@ -33,6 +33,7 @@ def test_standard_scaler(sample_df):
 
     assert params["type"] == "standard_scaler"
     assert params["columns"] == ["A", "B"]
+    assert params["mean"] is not None
     assert np.isclose(params["mean"][0], 3.0)  # Mean of 1..5 is 3
     assert np.isclose(params["mean"][1], 30.0)  # Mean of 10..50 is 30
 
@@ -86,6 +87,7 @@ def test_robust_scaler(sample_df):
 
     # Median of 1,2,3,4,5,1000 is (3+4)/2 = 3.5
     # Center should be median
+    assert params["center"] is not None
     assert np.isclose(params["center"][0], 3.5)
 
     # Transformed values should be centered around 0 (roughly)
@@ -104,6 +106,7 @@ def test_maxabs_scaler(sample_df):
     params = calc.fit(df, config)
 
     assert params["type"] == "maxabs_scaler"
+    assert params["max_abs"] is not None
     assert np.isclose(params["max_abs"][0], 10.0)
 
     # 2. Apply

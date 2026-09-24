@@ -310,6 +310,12 @@ def train_local_candidate(
         run.client.log_dict(
             run.run_id, {"dataset_id": spec.dataset_id, **tags}, "training_data.json"
         )
+        saved_spec = asdict(spec)
+        for field in ("start", "holdout_start", "cutoff"):
+            saved_spec[field] = getattr(spec, field).isoformat()
+        run.client.log_dict(
+            run.run_id, {**saved_spec, "engine": engine}, "candidate_training_spec.json"
+        )
         run.log_metrics(metrics)
         model_uri = _log_local_model(artifact_path, run_id=run.run_id, tracking_uri=tracking_uri)
         run_id = run.run_id

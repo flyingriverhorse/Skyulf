@@ -4,7 +4,24 @@
 
 The user approved the [local Bundle improvement program](37-local-bundle-improvement-program.md)
 and explicitly requested [independent scoring selection and promotion policy](38-model-selection-and-approval-design.md).
-**SM-30, company tags and SM-31 are complete; SM-32 is next READY.**
+**SM-30, company tags and SM-31 are committed as `fcfcee31`; SM-32 is ACTIVE.**
+The requested commit passed 116 tests and all applicable hooks (including ty).
+SM-32 now separates score_model_selection and promotion_policy at the library
+run_action boundary. All four combinations passed on pandas and Polars;
+78 relevant tests include real local MLflow lifecycle artifacts. These library
+changes have not been deployed. See
+[the progress and next implementation steps](43-sm32-policy-separation-progress.md).
+Update: 36 Core-owned test files have moved from root tests into Core; see
+[the relocation inventory](44-core-test-relocation.md). 224 cases passed before
+and after relocation; Core collected 10,900 tests without collisions, and
+the relocated cases plus workflow tests passed 281 tests after type narrowing.
+Library approve now loads saved candidate evidence and rechecks it without fit
+or registration; see [manual approval progress](45-sm32-manual-approval-progress.md).
+Final combined regression suite passed 321 tests; full repository ty and
+scoped Ruff passed. This commit includes the SM-32 policy/approval slice and
+the Core test relocation; the complete SM-32 task remains open.
+Next implement reject/rollback, previous_challenger and matching Bundle actions/
+handoff; do not mark SM-32 complete yet. No new Databricks run was made.
 Latest follow-up: Bundle initialization now asks for optional risk_category,
 PayingRegNo has an explicit policy-compute example, and new receipts use
 from_version while reading older formats. 44 relevant tests and real CLI
@@ -15,7 +32,7 @@ The user requested readable/company-compatible tags and a clean live reset
 before SM-31. [The clean rehearsal](41-company-tags-and-clean-live-validation.md)
 passed all four tasks in run 607409241163605. [SM-31 evidence](42-sm31-refactor-plan-and-evidence.md)
 records 110 passing tests, Ruff, scoped ty, strict MkDocs, installed-wheel imports,
-and a successful deployed score run 383572337148835. Changes remain uncommitted.
+and a successful deployed score run 383572337148835. These changes are in `fcfcee31`.
 
 The old four test jobs and two schemas were deleted as requested. Retain the
 new workspace.skyulf_lifecycle_test schema and exactly two skyulf_lifecycle

@@ -240,6 +240,7 @@ def test_candidate_workflow_logs_and_registers_without_alias(monkeypatch, tmp_pa
     assert result.comparison.reason == "no_champion"
     assert run.data.metrics["heldout_rmse"] == pytest.approx(0.0, abs=1e-8)
     assert "candidate_comparison.json" in artifacts
+    assert "candidate_training_spec.json" in artifacts
     assert "model" in artifacts
     assert run.data.tags["task"] == "training"
     assert "dataset_id" not in run.data.tags and "phase" not in run.data.tags

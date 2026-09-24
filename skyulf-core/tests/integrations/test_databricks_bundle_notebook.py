@@ -18,7 +18,7 @@ def test_notebook_delegates_bound_target_and_selected_action(tmp_path, monkeypat
 
     path = (
         Path(__file__).resolve().parents[2]
-        / "skyulf-core/templates/databricks/template/{{.project_name}}/src/workflow.py"
+        / "templates/databricks/template/{{.project_name}}/src/workflow.py"
     )
     spec = importlib.util.spec_from_file_location("thin_notebook", path)
     assert spec is not None and spec.loader is not None

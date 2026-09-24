@@ -32,8 +32,12 @@ def test_scenario_1_xy_then_split_then_encode():
     split_data = tt_splitter.apply(xy_data, {"test_size": 0.2, "random_state": 42})
 
     assert isinstance(split_data, SplitDataset)
+    assert isinstance(split_data.train, tuple)
+    assert isinstance(split_data.test, tuple)
     X_train, y_train = split_data.train
     X_test, y_test = split_data.test
+    assert isinstance(X_train, pd.DataFrame)
+    assert isinstance(X_test, pd.DataFrame)
     print(f"Step 2 (Train/Test Split): Train size={len(X_train)}, Test size={len(X_test)}")
 
     # 3. Encoding
@@ -75,6 +79,7 @@ def test_scenario_2_split_then_xy_then_encode():
     # split_df.train is now a plain DataFrame (no target_column was set, so no
     # X/y split was performed at this stage).
     train_df = split_df.train
+    assert isinstance(train_df, pd.DataFrame)
     print(f"Step 1 (Train/Test Split): Train shape={train_df.shape}")
 
     # 2. Feature Target Split (on SplitDataset)
@@ -82,7 +87,9 @@ def test_scenario_2_split_then_xy_then_encode():
     split_xy = ft_splitter.apply(split_df, {"target_column": "species"})
 
     assert isinstance(split_xy, SplitDataset)
+    assert isinstance(split_xy.train, tuple)
     X_train, y_train = split_xy.train
+    assert isinstance(X_train, pd.DataFrame)
     print(f"Step 2 (XY Split): X_train shape={X_train.shape}, y_train shape={y_train.shape}")
 
     # 3. Encoding

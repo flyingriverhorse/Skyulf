@@ -12,10 +12,13 @@ mlflow = pytest.importorskip("mlflow")
 
 
 @pytest.mark.parametrize("engine", ["pandas", "polars"])
-def test_bundle_nomination_comparison_and_promotion_are_separate(tmp_path, monkeypatch, engine):
+@pytest.mark.parametrize("selection", ["pinned_version", "champion"])
+def test_bundle_nomination_comparison_and_promotion_are_separate(
+    tmp_path, monkeypatch, engine, selection
+):
     """Real artifacts must retain a tied contender and survive failed comparison on either engine."""
     path = Path(__file__).resolve().parents[2] / (
-        "skyulf-core/templates/databricks/template/{{.project_name}}/src/workflow.py"
+        "templates/databricks/template/{{.project_name}}/src/workflow.py"
     )
     spec = importlib.util.spec_from_file_location("sm30_workflow", path)
     assert spec is not None and spec.loader is not None
@@ -42,7 +45,8 @@ def test_bundle_nomination_comparison_and_promotion_are_separate(tmp_path, monke
         "model_name": "lifecycle_model",
         "tracking_uri": store,
         "registry_uri": store,
-        "model_selection_mode": "auto_champion",
+        "score_model_selection": selection,
+        "promotion_policy": "automatic",
         "model_version": "1",
         "row_keys": ["id"],
         "input_columns": ["x"],
@@ -86,7 +90,7 @@ def test_bundle_nomination_comparison_and_promotion_are_separate(tmp_path, monke
     assert str(client.get_model_version_by_alias("lifecycle_model", "champion").version) == "2"
     assert str(client.get_model_version_by_alias("lifecycle_model", "challenger").version) == "3"
     assert client.get_model_version("lifecycle_model", "3").tags["validation_status"] == "rejected"
-    config["model_selection_mode"] = "pinned_version"
+    config["promotion_policy"] = "manual_approval"
     fourth = run(4)
     assert fourth.model_version == "4" and config["model_version"] == "1"
     assert str(client.get_model_version_by_alias("lifecycle_model", "champion").version) == "2"

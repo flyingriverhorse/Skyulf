@@ -177,7 +177,8 @@ def test_advanced_tuning_nested_cv_uses_standard_fold(
         tuning_config.__dict__,
     )
 
-    _, tuning_result = tuning_est.model  # type: ignore[misc]
+    assert isinstance(tuning_est.model, tuple)
+    _, tuning_result = tuning_est.model
     best_params = tuning_result.best_params
 
     # Simulate engine.py fix: override nested_cv -> stratified_k_fold
@@ -242,7 +243,8 @@ def test_basic_vs_advanced_metric_keys_match(
         "target",
         tuning_config.__dict__,
     )
-    _, tuning_result = tuning_est.model  # type: ignore[misc]
+    assert isinstance(tuning_est.model, tuple)
+    _, tuning_result = tuning_est.model
     best_params = tuning_result.best_params
 
     adv_est = StatefulEstimator(calc, applier, "cv_node")
@@ -293,7 +295,8 @@ def test_regression_nested_cv_uses_k_fold(
         tuning_config.__dict__,
     )
 
-    _, tuning_result = tuning_est.model  # type: ignore[misc]
+    assert isinstance(tuning_est.model, tuple)
+    _, tuning_result = tuning_est.model
     best_params = tuning_result.best_params
 
     # Engine.py logic: regression -> k_fold
@@ -347,7 +350,8 @@ def test_classification_nested_cv_uses_stratified(
         tuning_config.__dict__,
     )
 
-    _, tuning_result = tuning_est.model  # type: ignore[misc]
+    assert isinstance(tuning_est.model, tuple)
+    _, tuning_result = tuning_est.model
     best_params = tuning_result.best_params
 
     # Engine.py logic: classification -> stratified_k_fold

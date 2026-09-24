@@ -20,9 +20,15 @@ def test_cross_validation_polars():
     calculator = LogisticRegressionCalculator()
     applier = LogisticRegressionApplier()
 
-    # Run CV
+    # Pin native Polars support; the public annotation currently omits this accepted input.
     results = perform_cross_validation(
-        calculator=calculator, applier=applier, X=X, y=y, config={}, n_folds=2, cv_type="k_fold"
+        calculator=calculator,
+        applier=applier,
+        X=X,  # ty: ignore[invalid-argument-type] - exercise the native Polars runtime contract
+        y=y,
+        config={},
+        n_folds=2,
+        cv_type="k_fold",
     )
 
     assert "aggregated_metrics" in results

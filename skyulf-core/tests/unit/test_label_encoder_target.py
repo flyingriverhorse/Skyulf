@@ -27,7 +27,8 @@ def test_label_encoder_on_target_after_split():
     # fit returns empty config
     split_params = split_calc.fit(dataset_tuple, split_config)
     # apply returns SplitDataset
-    split_dataset = split_applier.apply(dataset_tuple, split_params)
+    assert isinstance(split_params, dict)
+    split_dataset = split_applier.apply(dataset_tuple, dict(split_params))
 
     assert isinstance(split_dataset, SplitDataset)
     assert isinstance(split_dataset.train, tuple)
@@ -86,7 +87,9 @@ def test_label_encoder_on_target_after_split():
     assert set(y_test_new.unique()).issubset({0, 1})
 
     # Check consistency on Test
+    assert isinstance(split_dataset.test, tuple)
     original_y_test = split_dataset.test[1]
+    assert isinstance(original_y_test, pd.Series)
 
     # If Test has 'A', it must be encoded to same value as in Train
     if "A" in original_y_test.values:

@@ -58,6 +58,7 @@ def test_classification_target(sample_df):
     # Check Rule Discovery (Decision Tree)
     assert profile.rule_tree is not None
     assert len(profile.rule_tree.nodes) > 0
+    assert profile.rule_tree.rules is not None
     assert len(profile.rule_tree.rules) > 0
 
     # Check if rules look like classification rules
@@ -75,6 +76,7 @@ def test_regression_target(sample_df):
     # Check Rule Discovery (Decision Tree Regressor)
     assert profile.rule_tree is not None
     assert len(profile.rule_tree.nodes) > 0
+    assert profile.rule_tree.rules is not None
     assert len(profile.rule_tree.rules) > 0
 
     # Check if rules look like regression rules
@@ -83,10 +85,12 @@ def test_regression_target(sample_df):
 
     # Check Feature Importance
     # Age should be important because we engineered it
+    assert profile.rule_tree.feature_importances is not None
     importances = {
         item["feature"]: item["importance"] for item in profile.rule_tree.feature_importances
     }
     assert "age" in importances
+    assert isinstance(importances["age"], float)
     assert importances["age"] > 0.1  # Should be significant
 
 
@@ -176,6 +180,8 @@ def test_high_cardinality_classification():
 
     assert profile.rule_tree is not None
 
+    assert profile.rule_tree is not None
+    assert profile.rule_tree.rules is not None
     rules_text = "\n".join(profile.rule_tree.rules)
     assert "Other" in rules_text or "Class_0" in rules_text
 
@@ -189,6 +195,8 @@ def test_force_regression_on_id():
     profile = analyzer.analyze(target_col="id")
 
     # Check if it ran as regression (rules should have "Value =")
+    assert profile.rule_tree is not None
+    assert profile.rule_tree.rules is not None
     rules_text = "\n".join(profile.rule_tree.rules)
     assert "Value =" in rules_text
 
@@ -203,6 +211,8 @@ def test_force_classification_on_id():
 
     # Check if it ran as classification (rules should have "Class =" or just the class name)
     # And since it has 100 unique values, it should have grouped them.
+    assert profile.rule_tree is not None
+    assert profile.rule_tree.rules is not None
     rules_text = "\n".join(profile.rule_tree.rules)
     # Visualizer format is "THEN {class_name}"
     assert "THEN Other" in rules_text or "THEN" in rules_text

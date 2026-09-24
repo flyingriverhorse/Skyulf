@@ -15,7 +15,8 @@ def test_dataset_profile():
     applier = DatasetProfileApplier()
 
     artifacts = calc.fit(df, {})
-    result = applier.apply(df, artifacts)
+    assert isinstance(artifacts, dict)
+    result = applier.apply(df, dict(artifacts))
 
     assert result.equals(df)  # Should be identity
     assert "profile" in artifacts
@@ -30,8 +31,11 @@ def test_data_snapshot():
 
     config = {"n_rows": 2}
     artifacts = calc.fit(df, config)
-    result = applier.apply(df, artifacts)
+    assert isinstance(artifacts, dict)
+    result = applier.apply(df, dict(artifacts))
 
     assert result.equals(df)
     assert len(artifacts["snapshot"]) == 2
-    assert artifacts["snapshot"][0]["a"] == 0
+    snapshot = artifacts["snapshot"]
+    assert isinstance(snapshot, list)
+    assert snapshot[0]["a"] == 0

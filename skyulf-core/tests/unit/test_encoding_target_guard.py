@@ -173,7 +173,7 @@ class TestLabelEncoderKeepsTarget:
         calc = LabelEncoderCalculator()
         params = calc.fit(X_with_target, {"columns": ["Species"]})
         assert params.get("type") == "label_encoder"
-        assert "Species" in params.get("columns", []) or "Species" in params.get("mappings", {})
+        assert "Species" in (params.get("columns") or []) or "Species" in params.get("mappings", {})
 
 
 class TestOrdinalEncoderKeepsTarget:

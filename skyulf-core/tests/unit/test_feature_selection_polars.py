@@ -27,6 +27,7 @@ def test_variance_threshold_polars():
     # Threshold 0 drops constant
     config = {"method": "variance_threshold", "threshold": 0.0}
     params = calc.fit(df, config)
+    assert isinstance(params, dict)
     res = applier.apply(df, params)
 
     assert "B" not in res.columns
@@ -60,6 +61,7 @@ def test_univariate_k_best_regression_polars():
         "problem_type": "regression",
     }
     params = calc.fit(df, config)
+    assert isinstance(params, dict)
     res = applier.apply(df, params)
 
     assert "A" in res.columns

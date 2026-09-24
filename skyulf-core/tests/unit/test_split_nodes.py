@@ -21,7 +21,9 @@ def test_data_splitter_basic(sample_df):
 
     # split() now returns plain DataFrames in train/test (no placeholder y).
     train_df = ds.train
+    assert isinstance(train_df, pd.DataFrame)
     test_df = ds.test
+    assert isinstance(test_df, pd.DataFrame)
     assert len(train_df) == 80
     assert len(test_df) == 20
     assert ds.validation is None
@@ -33,8 +35,11 @@ def test_data_splitter_validation(sample_df):
 
     # Total 100. Test=20. Val=10. Train=70.
     test_df = ds.test
+    assert isinstance(test_df, pd.DataFrame)
     val_df = ds.validation
+    assert isinstance(val_df, pd.DataFrame)
     train_df = ds.train
+    assert isinstance(train_df, pd.DataFrame)
     assert len(test_df) == 20
     assert len(val_df) == 10
     assert len(train_df) == 70
@@ -47,5 +52,6 @@ def test_data_splitter_stratify(sample_df):
     # Check stratification in test set (should be 50/50 split of A/B roughly)
     # 20 samples total -> 10 A, 10 B
     test_df = ds.test
+    assert isinstance(test_df, pd.DataFrame)
     assert test_df["target"].value_counts()["A"] == 10
     assert test_df["target"].value_counts()["B"] == 10

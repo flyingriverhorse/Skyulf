@@ -12,6 +12,8 @@ Each method is tested for both classification and regression.
 Advanced Tuning flow tests each CV method inside hyperparameter search.
 """
 
+from typing import Literal
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -29,7 +31,7 @@ from skyulf.modeling.regression import (
 )
 
 # ---------------------------------------------------------------------------
-# Fixtures — larger datasets so multi-fold CV doesn't starve
+# Fixtures â€” larger datasets so multi-fold CV doesn't starve
 # ---------------------------------------------------------------------------
 
 
@@ -138,12 +140,12 @@ def _assert_cv_result(result: dict, n_folds: int, problem_type: str) -> None:
 
 
 # =========================================================================
-# SIMPLE FLOW — Basic Training cross_validate (all 5 CV methods)
+# SIMPLE FLOW â€” Basic Training cross_validate (all 5 CV methods)
 # =========================================================================
 
 
 class TestSimpleCVClassification:
-    """Basic Training CV — Classification with all 5 methods."""
+    """Basic Training CV â€” Classification with all 5 methods."""
 
     def test_k_fold(self, classification_dataset: SplitDataset) -> None:
         est = _make_classification_estimator()
@@ -243,7 +245,7 @@ class TestSimpleCVClassification:
 
 
 class TestSimpleCVRegression:
-    """Basic Training CV — Regression with all 5 methods."""
+    """Basic Training CV â€” Regression with all 5 methods."""
 
     def test_k_fold(self, regression_dataset: SplitDataset) -> None:
         est = _make_regression_estimator()
@@ -314,7 +316,7 @@ class TestSimpleCVRegression:
         assert any("sorted by 'date'" in log for log in logs)
 
     def test_time_series_split_no_datetime_column(self, regression_dataset: SplitDataset) -> None:
-        """Time Series Split without any datetime column — should warn and use row order."""
+        """Time Series Split without any datetime column â€” should warn and use row order."""
         est = _make_regression_estimator()
         logs: list[str] = []
         result = est.cross_validate(
@@ -346,7 +348,7 @@ class TestSimpleCVRegression:
 
 
 # =========================================================================
-# ADVANCED FLOW — Tuning with each CV method × each search strategy
+# ADVANCED FLOW â€” Tuning with each CV method Ã— each search strategy
 # =========================================================================
 
 # All 5 tuning strategies
@@ -359,12 +361,14 @@ CV_METHODS = ["k_fold", "stratified_k_fold", "shuffle_split", "time_series_split
 def _run_tuning_test(
     dataset: SplitDataset,
     problem_type: str,
-    cv_type: str,
-    strategy: str,
+    cv_type: Literal[
+        "k_fold", "stratified_k_fold", "time_series_split", "shuffle_split", "nested_cv"
+    ],
+    strategy: Literal["grid", "random", "optuna", "halving_grid", "halving_random"],
 ) -> None:
     """Run a tuning session with the given strategy and cv_type.
 
-    Halving strategies may fail on small data — we accept that as expected.
+    Halving strategies may fail on small data â€” we accept that as expected.
     """
     if problem_type == "classification":
         calculator = LogisticRegressionCalculator()
@@ -387,6 +391,7 @@ def _run_tuning_test(
         search_space=search_space,
     )
 
+    assert isinstance(dataset.train, pd.DataFrame)
     X = dataset.train.drop(columns=["target"])
     y = dataset.train["target"]
 
@@ -410,67 +415,111 @@ def _run_tuning_test(
 
 
 class TestAdvancedTuningCV:
-    """Grid Search — verify each CV method works."""
+    """Grid Search â€” verify each CV method works."""
 
     @pytest.mark.parametrize("cv_type", CV_METHODS)
-    def test_grid_classification(self, classification_dataset: SplitDataset, cv_type: str) -> None:
+    def test_grid_classification(
+        self,
+        classification_dataset: SplitDataset,
+        cv_type: Literal[
+            "k_fold", "stratified_k_fold", "time_series_split", "shuffle_split", "nested_cv"
+        ],
+    ) -> None:
         _run_tuning_test(classification_dataset, "classification", cv_type, "grid")
 
     @pytest.mark.parametrize("cv_type", CV_METHODS)
-    def test_grid_regression(self, regression_dataset: SplitDataset, cv_type: str) -> None:
+    def test_grid_regression(
+        self,
+        regression_dataset: SplitDataset,
+        cv_type: Literal[
+            "k_fold", "stratified_k_fold", "time_series_split", "shuffle_split", "nested_cv"
+        ],
+    ) -> None:
         _run_tuning_test(regression_dataset, "regression", cv_type, "grid")
 
 
 class TestRandomSearchCV:
-    """Random Search — verify each CV method works."""
+    """Random Search â€” verify each CV method works."""
 
     @pytest.mark.parametrize("cv_type", CV_METHODS)
     def test_random_classification(
-        self, classification_dataset: SplitDataset, cv_type: str
+        self,
+        classification_dataset: SplitDataset,
+        cv_type: Literal[
+            "k_fold", "stratified_k_fold", "time_series_split", "shuffle_split", "nested_cv"
+        ],
     ) -> None:
         _run_tuning_test(classification_dataset, "classification", cv_type, "random")
 
     @pytest.mark.parametrize("cv_type", CV_METHODS)
-    def test_random_regression(self, regression_dataset: SplitDataset, cv_type: str) -> None:
+    def test_random_regression(
+        self,
+        regression_dataset: SplitDataset,
+        cv_type: Literal[
+            "k_fold", "stratified_k_fold", "time_series_split", "shuffle_split", "nested_cv"
+        ],
+    ) -> None:
         _run_tuning_test(regression_dataset, "regression", cv_type, "random")
 
 
 class TestHalvingGridCV:
-    """Halving Grid Search — verify each CV method works."""
+    """Halving Grid Search â€” verify each CV method works."""
 
     @pytest.mark.parametrize("cv_type", CV_METHODS)
     def test_halving_grid_classification(
-        self, classification_dataset: SplitDataset, cv_type: str
+        self,
+        classification_dataset: SplitDataset,
+        cv_type: Literal[
+            "k_fold", "stratified_k_fold", "time_series_split", "shuffle_split", "nested_cv"
+        ],
     ) -> None:
         _run_tuning_test(classification_dataset, "classification", cv_type, "halving_grid")
 
     @pytest.mark.parametrize("cv_type", CV_METHODS)
-    def test_halving_grid_regression(self, regression_dataset: SplitDataset, cv_type: str) -> None:
+    def test_halving_grid_regression(
+        self,
+        regression_dataset: SplitDataset,
+        cv_type: Literal[
+            "k_fold", "stratified_k_fold", "time_series_split", "shuffle_split", "nested_cv"
+        ],
+    ) -> None:
         _run_tuning_test(regression_dataset, "regression", cv_type, "halving_grid")
 
 
 class TestHalvingRandomCV:
-    """Halving Random Search — verify each CV method works."""
+    """Halving Random Search â€” verify each CV method works."""
 
     @pytest.mark.parametrize("cv_type", CV_METHODS)
     def test_halving_random_classification(
-        self, classification_dataset: SplitDataset, cv_type: str
+        self,
+        classification_dataset: SplitDataset,
+        cv_type: Literal[
+            "k_fold", "stratified_k_fold", "time_series_split", "shuffle_split", "nested_cv"
+        ],
     ) -> None:
         _run_tuning_test(classification_dataset, "classification", cv_type, "halving_random")
 
     @pytest.mark.parametrize("cv_type", CV_METHODS)
     def test_halving_random_regression(
-        self, regression_dataset: SplitDataset, cv_type: str
+        self,
+        regression_dataset: SplitDataset,
+        cv_type: Literal[
+            "k_fold", "stratified_k_fold", "time_series_split", "shuffle_split", "nested_cv"
+        ],
     ) -> None:
         _run_tuning_test(regression_dataset, "regression", cv_type, "halving_random")
 
 
 class TestOptunaCV:
-    """Optuna Search — verify each CV method works."""
+    """Optuna Search â€” verify each CV method works."""
 
     @pytest.mark.parametrize("cv_type", CV_METHODS)
     def test_optuna_classification(
-        self, classification_dataset: SplitDataset, cv_type: str
+        self,
+        classification_dataset: SplitDataset,
+        cv_type: Literal[
+            "k_fold", "stratified_k_fold", "time_series_split", "shuffle_split", "nested_cv"
+        ],
     ) -> None:
         try:
             _run_tuning_test(classification_dataset, "classification", cv_type, "optuna")
@@ -478,7 +527,13 @@ class TestOptunaCV:
             pytest.skip("Optuna not installed")
 
     @pytest.mark.parametrize("cv_type", CV_METHODS)
-    def test_optuna_regression(self, regression_dataset: SplitDataset, cv_type: str) -> None:
+    def test_optuna_regression(
+        self,
+        regression_dataset: SplitDataset,
+        cv_type: Literal[
+            "k_fold", "stratified_k_fold", "time_series_split", "shuffle_split", "nested_cv"
+        ],
+    ) -> None:
         try:
             _run_tuning_test(regression_dataset, "regression", cv_type, "optuna")
         except ImportError:

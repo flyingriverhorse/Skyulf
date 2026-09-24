@@ -51,6 +51,82 @@ Edit the business pipeline in `config/workflow.json`. Model/preprocessing
 choices remain project configuration; common workflow fixes ship in the
 Skyulf wheel instead of requiring edits to every generated notebook.
 
+### Independent library policies (SM-32 in progress)
+
+Direct `run_action` callers can now separate these two decisions:
+
+| `score_model_selection` | `promotion_policy` | Behavior |
+| --- | --- | --- |
+| `pinned_version` | `manual_approval` | Register/evaluate the contender; score keeps the configured version |
+| `pinned_version` | `automatic` | Apply promotion gates; score still keeps the configured version |
+| `champion` | `manual_approval` | Register/evaluate the contender; score follows the existing champion |
+| `champion` | `automatic` | Apply promotion gates; the next score follows the resulting champion |
+
+For example, a library configuration containing `model_version: "2"`,
+`score_model_selection: "pinned_version"` and `promotion_policy: "automatic"`
+continues scoring with v2 after a successful promotion of v4. Selecting
+`champion` instead resolves the controlled alias once per score run. A missing
+champion fails before output preparation; there is no fallback to latest.
+
+Both new fields are required together. Remove `model_selection_mode` when
+using them; mixed or partial configurations fail before training or scoring.
+Legacy `auto_champion` retains champion/automatic behavior, and legacy
+`pinned_version` retains pinned/manual behavior, with a deprecation warning.
+Automatic promotion still requires `quality_threshold`, including when
+scoring is pinned. Scoring never updates the caller's configured version.
+
+This first slice is available at the library boundary. The generated Bundle
+still uses its existing `model_selection_mode` and job graph. Do not migrate
+only its JSON: the lifecycle actions and matching job handoff must be delivered
+together. `manual_approval` currently means no automatic promotion; approve,
+reject and rollback are separate operator actions. The library now supports
+`approve`; reject, rollback and `previous_challenger` remain the next SM-32 work.
+No new cloud deployment is implied by these library changes.
+
+### Approve an existing candidate without training
+
+Use an explicit manual policy and the comparison returned by the earlier
+training job. Review that saved result before passing its version and digest:
+
+```python
+import hashlib
+import json
+from dataclasses import asdict
+
+from skyulf.integrations.databricks.local_workflow import run_action
+
+# candidate is the result of an earlier training job; no training runs here.
+comparison = asdict(candidate.comparison)
+comparison_sha256 = hashlib.sha256(
+    json.dumps(comparison, sort_keys=True, allow_nan=False).encode()
+).hexdigest()
+receipt = run_action(
+    spark,
+    config,  # promotion_policy="manual_approval" and both independent fields
+    "approve",
+    candidate_version=candidate.model_version,
+    comparison_sha256=comparison_sha256,
+    expected_champion_version=candidate.comparison.champion_version,
+)
+```
+
+Approval downloads `candidate_comparison.json` and `candidate_training_spec.json`
+from the run associated with that registered version. It verifies the digest,
+current metric policy, expected champion and controlled challenger receipt.
+It then reads the original Delta version and evaluation window and rechecks
+quality using the existing Core comparison/promotion services. The original
+engine is preserved; current read budgets may tighten the saved limits.
+
+The action does not train, register or upload a model, rewrite `model_version`,
+or publish predictions. A later score run follows the configured selector.
+Retrying an unchanged successful approval returns its original committed
+receipt; changed champion, pending writes or incompatible evidence fail.
+Training runs created before the saved specification was introduced cannot
+use this action without explicitly supplying that missing provenance through
+a separately reviewed migration; there is no fallback to current training dates.
+Use the same externally serialized lifecycle writer as training. Bundle widgets
+and automatic score handoff for operator actions are still pending.
+
 ## What is created
 
 `bundle deploy` creates only two jobs and uploads their code:

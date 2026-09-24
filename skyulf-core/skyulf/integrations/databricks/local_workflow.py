@@ -4,6 +4,7 @@ The caller serializes all lifecycle writes for each model and output. Importing
 this module creates no Spark session, registry connection or cloud resource.
 """
 
+import warnings
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -22,6 +23,7 @@ from ..mlflow.promotion import (
 )
 from ..mlflow.registry import RegistryModelNotFoundError, resolve_model
 from .admission import SingleWriterAdmission
+from .local_approval import approve_local_candidate
 from .local_incremental import run_incremental_local_batch
 from .local_retraining import (
     LocalTrainingSpec,
@@ -67,6 +69,44 @@ def _selection_mode(config: dict[str, Any]) -> str:
     if mode not in ("pinned_version", "auto_champion"):
         raise ValueError("model_selection_mode must be pinned_version or auto_champion.")
     return mode
+
+
+def _workflow_policies(config: dict[str, Any]) -> tuple[str, str]:
+    """Validate independent policies while preserving legacy project behavior.
+
+    Migrate both fields together and remove model_selection_mode. A mixed or
+    partial configuration is ambiguous and must fail before any external work.
+    """
+    fields = {"score_model_selection", "promotion_policy"}
+    supplied = fields.intersection(config)
+    if supplied:
+        if supplied != fields or "model_selection_mode" in config:
+            raise ValueError(
+                "Set score_model_selection and promotion_policy together, "
+                "and remove legacy model_selection_mode."
+            )
+        selection = config["score_model_selection"]
+        policy = config["promotion_policy"]
+        if selection not in ("pinned_version", "champion"):
+            raise ValueError("score_model_selection must be pinned_version or champion.")
+        if policy not in ("manual_approval", "automatic"):
+            raise ValueError("promotion_policy must be manual_approval or automatic.")
+        return selection, policy
+    mode = _selection_mode(config)
+    if "model_selection_mode" in config:
+        warnings.warn(
+            "model_selection_mode is deprecated. Replace auto_champion with "
+            "score_model_selection=champion and promotion_policy=automatic; "
+            "replace pinned_version with score_model_selection=pinned_version "
+            "and promotion_policy=manual_approval.",
+            DeprecationWarning,
+            stacklevel=3,
+        )
+    return (
+        ("champion", "automatic")
+        if mode == "auto_champion"
+        else ("pinned_version", "manual_approval")
+    )
 
 
 def resolve_target_config(config: dict[str, Any], bindings: dict[str, str]) -> dict[str, Any]:
@@ -249,26 +289,46 @@ def run_action(
     experiment_name: str | None = None,
     artifact_path: str | Path | None = None,
     now: datetime | None = None,
+    candidate_version: str | None = None,
+    comparison_sha256: str | None = None,
+    expected_champion_version: str | None = None,
 ) -> Any:
     """Delegate training or scoring to Skyulf's existing services."""
     tracking_uri = config.get("tracking_uri", "databricks")
     registry_uri = config.get("registry_uri", "databricks-uc")
-    selection_mode = _selection_mode(config)
+    selection, policy = _workflow_policies(config)
+    if action == "approve":
+        if policy != "manual_approval" or "promotion_policy" not in config:
+            raise ValueError("Approval requires explicit promotion_policy=manual_approval.")
+        return approve_local_candidate(
+            spark,
+            config,
+            candidate_version=candidate_version,
+            comparison_sha256=comparison_sha256,
+            expected_champion_version=expected_champion_version,
+        )
     if action in {"train", "train_monthly"}:
         if experiment_name is None or artifact_path is None:
             raise ValueError("Training needs an experiment and temporary artifact path.")
         monthly = action == "train_monthly"
-        if selection_mode == "auto_champion" and config.get("quality_threshold") is None:
-            raise ValueError("auto_champion requires an absolute quality_threshold.")
+        if policy == "automatic" and config.get("quality_threshold") is None:
+            raise ValueError("Automatic promotion requires an absolute quality_threshold.")
         spec = (
             _monthly_training_spec(spark, config, now or datetime.now(UTC))
             if monthly
             else _training_spec(config)
         )
-        if selection_mode == "auto_champion":
+        if policy == "automatic" or "score_model_selection" in config:
             champion_version = controlled_champion_version(
                 config["model_name"], tracking_uri=tracking_uri, registry_uri=registry_uri
             )
+            expected = config.get("champion_version")
+            if (
+                "score_model_selection" in config
+                and expected is not None
+                and str(expected) != champion_version
+            ):
+                raise ValueError("champion_version does not match the current champion.")
         else:
             champion_version = _monthly_champion_version(config)
             expected = config.get("champion_version")
@@ -305,7 +365,7 @@ def run_action(
                 config,
                 spec,
                 candidate,
-                promote=selection_mode == "auto_champion",
+                promote=policy == "automatic",
             )
         except Exception as error:  # noqa: BLE001 - preserve failure and lifecycle evidence
             try:
@@ -313,19 +373,19 @@ def run_action(
             except Exception as status_error:  # noqa: BLE001 - retain the original failure
                 raise error from status_error
             raise
-        if selection_mode == "auto_champion":
+        if policy == "automatic":
             return AutoTrainingOutcome(
                 candidate=candidate,
                 alias_change=alias_change,
             )
         return candidate
     if action == "score":
-        if selection_mode == "auto_champion":
+        if selection == "champion":
             champion_version = controlled_champion_version(
                 config["model_name"], tracking_uri=tracking_uri, registry_uri=registry_uri
             )
             if champion_version is None:
-                raise ValueError("auto_champion scoring requires a committed champion.")
+                raise ValueError("Champion scoring requires a committed champion.")
             config = {**config, "model_version": champion_version}
         target = _scoring_target(config)
         if config.get("model_change_mode", "incremental_append") == "full_rebuild":

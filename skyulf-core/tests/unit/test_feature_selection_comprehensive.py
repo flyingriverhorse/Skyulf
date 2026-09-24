@@ -60,6 +60,7 @@ def test_variance_threshold(regression_data):
     # Threshold 0 drops constant
     config = {"method": "variance_threshold", "threshold": 0.0}
     params = calc.fit(df, config)
+    assert isinstance(params, dict)
     res = applier.apply(df, params)
 
     assert "constant" not in res.columns
@@ -80,6 +81,7 @@ def test_univariate_k_best_regression(regression_data):
         "problem_type": "regression",
     }
     params = calc.fit(regression_data, config)
+    assert isinstance(params, dict)
     res = applier.apply(regression_data, params)
 
     assert "A" in res.columns
@@ -102,6 +104,7 @@ def test_univariate_percentile_classification(classification_data):
         "problem_type": "classification",
     }
     params = calc.fit(classification_data, config)
+    assert isinstance(params, dict)
     res = applier.apply(classification_data, params)
 
     assert "A" in res.columns
@@ -119,6 +122,7 @@ def test_univariate_fpr(regression_data):
         "target_column": "target",
     }
     params = calc.fit(regression_data, config)
+    assert isinstance(params, dict)
     res = applier.apply(regression_data, params)
 
     # A and B should be significant
@@ -140,6 +144,7 @@ def test_generic_univariate(regression_data):
         "target_column": "target",
     }
     params = calc.fit(regression_data, config)
+    assert isinstance(params, dict)
     res = applier.apply(regression_data, params)
 
     # Should pick A (highest correlation)
@@ -159,6 +164,7 @@ def test_select_from_model_rf(regression_data):
         "problem_type": "regression",
     }
     params = calc.fit(regression_data, config)
+    assert isinstance(params, dict)
     res = applier.apply(regression_data, params)
 
     # RF should find A and B important
@@ -180,6 +186,7 @@ def test_rfe_linear(regression_data):
         "problem_type": "regression",
     }
     params = calc.fit(regression_data, config)
+    assert isinstance(params, dict)
     res = applier.apply(regression_data, params)
 
     assert "A" in res.columns

@@ -57,6 +57,169 @@ def _one_column_schema(kind):
     )
 
 
+@pytest.mark.parametrize("engine", ["pandas", "polars"])
+@pytest.mark.parametrize("selection", ["pinned_version", "champion"])
+@pytest.mark.parametrize("policy", ["manual_approval", "automatic"])
+def test_training_policy_and_scoring_selection_are_independent(
+    monkeypatch, tmp_path, engine, selection, policy
+):
+    """Changing registry policy must never silently change a scoring pin on either engine."""
+    workflow = _workflow()
+    config = _config()
+    config.update(
+        engine=engine,
+        score_model_selection=selection,
+        promotion_policy=policy,
+        quality_threshold=1.0,
+    )
+    candidate = SimpleNamespace(model_version="2")
+    train = Mock(return_value=candidate)
+    decision = Mock(return_value=SimpleNamespace(new_version="2"))
+    controlled = Mock(return_value="1")
+    prepare = Mock(return_value=object())
+    score = Mock(return_value=SimpleNamespace(input_count=2))
+    monkeypatch.setattr(workflow, "train_local_candidate", train)
+    monkeypatch.setattr(workflow, "_automatic_promotion", decision)
+    monkeypatch.setattr(workflow, "controlled_champion_version", controlled)
+    monkeypatch.setattr(workflow, "resolve_model", Mock(side_effect=AssertionError("raw alias")))
+    monkeypatch.setattr(workflow, "prepare_local_workflow", prepare)
+    monkeypatch.setattr(workflow, "provision_prediction_table", Mock())
+    monkeypatch.setattr(workflow, "run_incremental_local_batch", score)
+
+    result = workflow.run_action(
+        object(), config, "train", experiment_name="test", artifact_path=tmp_path / "model"
+    )
+    assert decision.call_args.kwargs["promote"] is (policy == "automatic")
+    assert train.call_args.kwargs["engine"] == engine
+    assert train.call_args.kwargs["champion_version"] == "1"
+    assert (result.candidate if policy == "automatic" else result) is candidate
+
+    controlled.reset_mock()
+    controlled.return_value = "2" if policy == "automatic" else "1"
+    workflow.run_action(object(), config, "score")
+    expected = "2" if selection == "champion" and policy == "automatic" else "1"
+    assert prepare.call_args.args[0].model.version == expected
+    assert prepare.call_args.args[0].engine == engine
+    assert controlled.call_count == (1 if selection == "champion" else 0)
+    assert config["model_version"] == "1"
+    assert train.call_count == 1
+    score.assert_called_once()
+
+
+@pytest.mark.parametrize(
+    "fields",
+    [
+        {"score_model_selection": "champion"},
+        {"promotion_policy": "automatic"},
+        {"score_model_selection": "latest", "promotion_policy": "automatic"},
+        {"score_model_selection": "champion", "promotion_policy": "force"},
+        {"score_model_selection": None, "promotion_policy": "automatic"},
+        {
+            "score_model_selection": "champion",
+            "promotion_policy": "automatic",
+            "model_selection_mode": "auto_champion",
+        },
+    ],
+)
+def test_invalid_policy_migrations_fail_before_training_or_scoring(monkeypatch, fields):
+    """Partial or ambiguous migrations must not execute with implicit defaults."""
+    workflow = _workflow()
+    train = Mock()
+    prepare = Mock()
+    monkeypatch.setattr(workflow, "train_local_candidate", train)
+    monkeypatch.setattr(workflow, "prepare_local_workflow", prepare)
+    monkeypatch.setattr(
+        workflow, "resolve_model", Mock(side_effect=AssertionError("registry read"))
+    )
+    monkeypatch.setattr(
+        workflow, "controlled_champion_version", Mock(side_effect=AssertionError("registry read"))
+    )
+    for action in ("train", "score"):
+        with pytest.raises(ValueError, match="selection|policy"):
+            workflow.run_action(
+                object(),
+                {**_config(), **fields},
+                action,
+                experiment_name="test",
+                artifact_path="unused",
+            )
+    train.assert_not_called()
+    prepare.assert_not_called()
+
+
+@pytest.mark.parametrize("policy", ["manual_approval", "automatic"])
+def test_champion_selection_without_champion_cannot_publish(monkeypatch, policy):
+    """Following champion must not fall back to a configured pin when no champion exists."""
+    workflow = _workflow()
+    config = {**_config(), "score_model_selection": "champion", "promotion_policy": policy}
+    prepare = Mock()
+    provision = Mock()
+    monkeypatch.setattr(workflow, "controlled_champion_version", Mock(return_value=None))
+    monkeypatch.setattr(workflow, "prepare_local_workflow", prepare)
+    monkeypatch.setattr(workflow, "provision_prediction_table", provision)
+    monkeypatch.setattr(
+        workflow, "run_incremental_local_batch", Mock(side_effect=AssertionError("score write"))
+    )
+    with pytest.raises(ValueError, match="committed champion"):
+        workflow.run_action(object(), config, "score")
+    prepare.assert_not_called()
+    provision.assert_not_called()
+
+
+def test_pinned_scoring_does_not_allow_ungated_automatic_training(monkeypatch, tmp_path):
+    """An explicit scoring pin must not disable the automatic promotion quality gate."""
+    workflow = _workflow()
+    config = {
+        **_config(),
+        "score_model_selection": "pinned_version",
+        "promotion_policy": "automatic",
+    }
+    train = Mock()
+    monkeypatch.setattr(workflow, "train_local_candidate", train)
+    monkeypatch.setattr(
+        workflow, "resolve_model", Mock(side_effect=AssertionError("registry read"))
+    )
+    with pytest.raises(ValueError, match="quality_threshold"):
+        workflow.run_action(
+            object(), config, "train", experiment_name="test", artifact_path=tmp_path / "model"
+        )
+    train.assert_not_called()
+
+
+@pytest.mark.parametrize("policy", ["manual_approval", "automatic"])
+def test_independent_training_checks_expected_champion_before_fit(monkeypatch, policy):
+    """A stale operator expectation must fail even when scoring keeps an explicit pin."""
+    workflow = _workflow()
+    config = {
+        **_config(),
+        "score_model_selection": "pinned_version",
+        "promotion_policy": policy,
+        "quality_threshold": 1.0,
+    }
+    train = Mock()
+    monkeypatch.setattr(workflow, "train_local_candidate", train)
+    monkeypatch.setattr(workflow, "controlled_champion_version", Mock(return_value="2"))
+    with pytest.raises(ValueError, match="champion_version"):
+        workflow.run_action(
+            object(), config, "train", experiment_name="test", artifact_path="unused"
+        )
+    train.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "legacy,expected",
+    [
+        ("auto_champion", ("champion", "automatic")),
+        ("pinned_version", ("pinned_version", "manual_approval")),
+    ],
+)
+def test_legacy_model_selection_has_an_explicit_compatible_migration(legacy, expected):
+    """Old projects must keep their behavior while receiving a concrete migration warning."""
+    workflow = _workflow()
+    with pytest.warns(DeprecationWarning, match="model_selection_mode is deprecated"):
+        assert workflow._workflow_policies({"model_selection_mode": legacy}) == expected
+
+
 def test_train_preserves_selected_polars_engine_and_never_promotes(monkeypatch, tmp_path):
     """A training job must only produce a candidate with the chosen fit engine."""
     workflow = _workflow()
