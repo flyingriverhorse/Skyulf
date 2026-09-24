@@ -2,6 +2,13 @@
 
 ## Current state after SM-28b
 
+SM-27 implementation now exposes append-vs-full-rebuild model-change scoring
+at Bundle initialization and editable paused-retraining cron/timezone
+variables. Generated-project CLI validation passed, but an actual v1-to-v2
+full-rebuild job has not run. Keep SM-27 ACTIVE until that live test verifies
+the versioned physical tables and stable view; see
+[SM-27 validation](30-sm27-model-change-validation-report.md).
+
 The latest first Bundle has exactly two jobs (`train`, `score`), and its first
 score creates only the prediction table; see
 [SM-20S](26-sm20s-two-job-live-validation-report.md). SM-28b adds an optional

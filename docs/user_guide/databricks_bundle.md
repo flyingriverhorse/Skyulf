@@ -12,7 +12,8 @@ databricks bundle init skyulf-core/templates/databricks --output-dir ./generated
 ```
 
 The short path asks for project name, engine, one existing source row-key
-column, optional retraining mode, serverless or policy-backed job compute and the existing `dev`
+column, model-change scoring mode, optional retraining mode and cron, serverless
+or policy-backed job compute and the existing `dev`
 catalog/schema. Serverless is the default. Reviewable
 noninteractive examples are in `skyulf-core/templates/databricks/examples/`. The generated
 project has its own `databricks.yml`; Skyulf's root has no Bundle config.
@@ -32,11 +33,12 @@ initialization. Serverless compute needs none of those fields.
 | Job | Purpose | UC objects created when run |
 | --- | --- | --- |
 | `train` | Fit one candidate and log held-out metrics | One registered model/version |
-| `score` | Verify the source and pinned model, create output if absent, then score initial and later CDF inserts | One prediction table, only if absent; rows in that table |
+| `score` | Score initial and later CDF rows | Prediction output and rows |
 
 The default project has no schedule. Choosing `monthly_paused` at initialization
-adds a paused monthly schedule to the existing `train` job, without adding a
-third job or running it at deployment. No endpoint or Unity Catalog table is
+adds a paused schedule to the existing `train` job, without adding a third
+job or running it at deployment. The Quartz cron and timezone are selected
+at initialization and remain editable Bundle variables. No endpoint or Unity Catalog table is
 created by deployment alone.
 The starting Bundle has no alias lifecycle job. Skyulf Core's registry
 comparison and promotion services remain available for a separately designed
@@ -48,7 +50,7 @@ The four relevant Unity Catalog names have different roles:
 | --- | --- |
 | `training_table` | Existing labeled input table, pinned to a Delta version for training |
 | `score_source_table` | Existing CDF-enabled source of rows to predict |
-| `prediction_table` | The one output table for this model |
+| `prediction_table` | The output table in append mode, or the stable active view in full-rebuild mode |
 | `model_name` | Registered Unity Catalog model, not a table |
 
 The first two references point to **the same existing table by default**.
@@ -56,6 +58,11 @@ Neither reference creates a table. Separate them only when labeled training
 data and new scoring data have different lifecycles. If they stay together,
 the first `score` run predicts all existing rows, including historical labeled
 rows; review whether that is intended for your use case.
+
+In `full_rebuild`, a version-specific physical table records the model name,
+version and artifact digest. Scoring rejects an existing table at that name
+when its model provenance differs. A new model with the same numeric version
+needs a different logical prediction name or a new model version.
 
 The initialization question `row_key` defaults to `entity_id`, but you can
 choose an existing `customer_id` column. It becomes `row_keys` in the generated
@@ -99,16 +106,24 @@ receipt. A repeat without new rows is a no-op. No monthly date or source
 version is entered for each run.
 
 The first candidate does not become champion automatically. Scoring stays
-pinned to its configured model version; changing aliases does not rewrite old
-predictions. `max_concurrent_runs: 1` serializes the generated score job, but
+pinned to its configured model version; changing aliases alone does not
+change predictions. At initialization, choose `incremental_append` to keep
+v1 predictions and score only later source inserts with pinned v2. Choose
+`full_rebuild` to write a new physical `<prediction_table>_v2` generation,
+switch the stable `prediction_table` view after a successful complete score,
+and append future inserts to v2. The previous generation remains available;
+a failed rebuild leaves the active view unchanged. Full mode needs view
+creation/ownership privileges and cannot silently turn an existing append-mode
+physical table into a view. `max_concurrent_runs: 1` serializes the generated score job, but
 does not coordinate other jobs. Grant prediction-table writes only to this
 job's identity. For multiple publishers, use Skyulf Core's shared admission
 provider. Full-history rescore, online endpoints and Spark-native FE/model
 execution are separate work.
 
-The optional monthly `train` schedule runs at 03:00 UTC on day three and starts
-paused. After configuring real labeled data and verifying a manual run, unpause
-it deliberately. Each run pins the source's latest Delta version and uses the
+The optional monthly `train` schedule defaults to 03:00 UTC on day three and
+starts paused. Edit its Bundle cron and timezone variables for the desired
+monthly run time. After configuring real labeled data and verifying a manual
+run, unpause it deliberately. Each run pins the source's latest Delta version and uses the
 first day of the current UTC month as the label cutoff. The preceding month is
 holdout; `monthly_lookback_months` (default four) controls the full window.
 Only labels available by the cutoff are eligible. `@champion` is resolved to a

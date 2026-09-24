@@ -29,6 +29,29 @@
       "description": "Train manually, or add a paused monthly schedule to the same train job",
       "enum": ["manual", "monthly_paused"]
     },
+    "model_change_mode": {
+      "order": 13,
+      "type": "string",
+      "default": "incremental_append",
+      "description": "Keep old predictions and append new rows, or rebuild all rows into a new model-version generation",
+      "enum": ["incremental_append", "full_rebuild"]
+    },
+    "retraining_cron_expression": {
+      "order": 14,
+      "type": "string",
+      "default": "0 0 3 3 * ?",
+      "description": "Editable Quartz cron for the paused training job; use one run per month",
+      "pattern": "^[A-Za-z0-9*?/,# +\\-]+$",
+      "skip_prompt_if": {"properties": {"retraining_mode": {"const": "manual"}}}
+    },
+    "retraining_timezone_id": {
+      "order": 15,
+      "type": "string",
+      "default": "UTC",
+      "description": "IANA timezone used by the paused training schedule; training windows remain UTC months",
+      "pattern": "^[A-Za-z_]+(?:/[A-Za-z0-9_+.-]+)*$",
+      "skip_prompt_if": {"properties": {"retraining_mode": {"const": "manual"}}}
+    },
     "compute_mode": {
       "order": 4,
       "type": "string",

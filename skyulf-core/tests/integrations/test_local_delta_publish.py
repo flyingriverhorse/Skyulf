@@ -320,6 +320,66 @@ def test_incremental_single_writer_uses_receipts_without_control_table(local_del
     assert [row.id for row in spark.table(target).orderBy("id").collect()] == [1, 2, 3]
 
 
+def test_new_model_generation_rebuilds_existing_rows_then_scores_new_inserts(local_delta_case):
+    """A v2 physical target must rescore all rows without changing v1's receipt."""
+    from skyulf.integrations.databricks import run_incremental_local_batch
+    from skyulf.integrations.databricks.admission import SingleWriterAdmission
+
+    spark, source, v1_target, prepared, _ = _prepared_incremental_case(local_delta_case)
+    v2_target = f"spark_catalog.default.local_predictions_v2_{uuid4().hex}"
+    try:
+        first = run_incremental_local_batch(
+            spark, prepared, row_keys=("id",), admission=SingleWriterAdmission()
+        )
+        spark.createDataFrame(
+            [(3, datetime(2026, 1, 8, tzinfo=UTC), 6.0)],
+            "id long, event_time timestamp, x double",
+        ).write.format("delta").mode("append").saveAsTable(source)
+        spark.createDataFrame([], spark.table(v1_target).schema).write.format("delta").saveAsTable(
+            v2_target
+        )
+        v2_config = prepared.config.model_copy(
+            update={
+                "model": ModelSelection(
+                    kind="local_pipeline", name="workspace.test.local_model", version="2"
+                ),
+                "sink": OutputSink(kind="uc_delta", table=v2_target),
+            }
+        )
+        v2_prepared = replace(
+            prepared,
+            config=v2_config,
+            preflight=replace(prepared.preflight, model_version="2"),
+        )
+        rebuilt = run_incremental_local_batch(
+            spark, v2_prepared, row_keys=("id",), admission=SingleWriterAdmission()
+        )
+        spark.createDataFrame(
+            [(4, datetime(2026, 1, 9, tzinfo=UTC), 8.0)],
+            "id long, event_time timestamp, x double",
+        ).write.format("delta").mode("append").saveAsTable(source)
+        continued = run_incremental_local_batch(
+            spark, v2_prepared, row_keys=("id",), admission=SingleWriterAdmission()
+        )
+        assert (first.input_count, rebuilt.input_count, continued.input_count) == (2, 3, 1)
+        assert [
+            (row.id, row.model_version) for row in spark.table(v1_target).orderBy("id").collect()
+        ] == [
+            (1, "1"),
+            (2, "1"),
+        ]
+        assert [
+            (row.id, row.model_version) for row in spark.table(v2_target).orderBy("id").collect()
+        ] == [
+            (1, "2"),
+            (2, "2"),
+            (3, "2"),
+            (4, "2"),
+        ]
+    finally:
+        spark.sql(f"DROP TABLE IF EXISTS {v2_target}")
+
+
 def test_incremental_local_batch_does_not_require_a_date_column(local_delta_case):
     """New rows are found from Delta commits even when no event date exists."""
     from skyulf.integrations.databricks import run_incremental_local_batch

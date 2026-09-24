@@ -7,6 +7,7 @@
   "prediction_table": "{catalog}.{output_schema}.{{.project_name}}_predictions{resource_suffix}",
   "model_name": "{catalog}.{metadata_schema}.{{.project_name}}_model{resource_suffix}",
   "model_version": "1",
+  "model_change_mode": "{{.model_change_mode}}",
   "champion_version": null,
   "row_keys": ["{{.row_key}}"],
   "input_columns": ["feature_value"],

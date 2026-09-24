@@ -3,6 +3,7 @@
   "engine": "pandas",
   "row_key": "customer_id",
   "retraining_mode": "manual",
+  "model_change_mode": "incremental_append",
   "compute_mode": "serverless",
   "catalog": "workspace",
   "schema": "my_dev_schema"

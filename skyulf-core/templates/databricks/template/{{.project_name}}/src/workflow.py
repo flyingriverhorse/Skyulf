@@ -89,6 +89,72 @@ def _scoring_config(config: dict[str, Any]) -> LocalWorkflowConfig:
     )
 
 
+def _scoring_target(config: dict[str, Any]) -> str:
+    """Choose a stable append target or a physical model-version generation."""
+    mode = config.get("model_change_mode", "incremental_append")
+    if type(mode) is not str or mode not in {"incremental_append", "full_rebuild"}:
+        raise ValueError("model_change_mode must be incremental_append or full_rebuild.")
+    base = config["prediction_table"]
+    version = config["model_version"]
+    if not _TABLE_NAME.fullmatch(base):
+        raise ValueError("prediction_table must be a three-part UC name.")
+    if (
+        type(version) is not str
+        or not version.isascii()
+        or not version.isdecimal()
+        or version[0] == "0"
+    ):
+        raise ValueError("model_version must be a concrete positive version.")
+    if mode == "full_rebuild":
+        return f"{base}_v{version}"
+    return base
+
+
+def _managed_prediction_view_exists(spark: Any, logical: str) -> bool:
+    """Reject a table or unrelated view before creating prediction resources."""
+    if not spark.catalog.tableExists(logical):
+        return False
+    if spark.catalog.getTable(logical).tableType.upper() != "VIEW":
+        raise ValueError("Full rebuild needs a view name, but a physical table already uses it.")
+    marker = spark.sql(f"SHOW TBLPROPERTIES {logical} ('skyulf.mode')").first()
+    if marker is None or marker["value"] != "full_rebuild":
+        raise ValueError("Existing prediction view is not managed by Skyulf full rebuild.")
+    return True
+
+
+def _activate_prediction_view(spark: Any, logical: str, generation: str) -> None:
+    """Expose a complete generation without replacing prior prediction tables."""
+    if (
+        not _TABLE_NAME.fullmatch(logical)
+        or not _TABLE_NAME.fullmatch(generation)
+        or not re.fullmatch(re.escape(logical) + r"_v[1-9][0-9]*", generation)
+    ):
+        raise ValueError("Prediction view and generation names must match one UC target.")
+    physical = spark.table(generation)
+    if not physical.limit(1).count():
+        raise ValueError("A full-rebuild generation must contain predictions before activation.")
+    if not _managed_prediction_view_exists(spark, logical):
+        spark.sql(
+            f"CREATE VIEW {logical} TBLPROPERTIES ('skyulf.mode' = 'full_rebuild') "
+            f"AS SELECT * FROM {generation}"
+        ).collect()
+        return
+    active_columns = tuple(
+        (field.name, field.dataType.typeName()) for field in spark.table(logical).schema.fields
+    )
+    candidate_columns = tuple(
+        (field.name, field.dataType.typeName()) for field in physical.schema.fields
+    )
+    if active_columns != candidate_columns:
+        raise ValueError("New prediction generation differs from the active view schema.")
+    definition = spark.sql(f"SHOW CREATE TABLE {logical}").first()
+    if definition is not None:
+        sql = definition["createtab_stmt"].casefold().replace("`", "")
+        if re.search(r"\bfrom\s+" + re.escape(generation.casefold()) + r"\b", sql):
+            return
+    spark.sql(f"ALTER VIEW {logical} AS SELECT * FROM {generation}").collect()
+
+
 def _prediction_columns(
     config: dict[str, Any], prepared: Any, source: Any
 ) -> tuple[tuple[str, str, str], ...]:
@@ -129,6 +195,19 @@ def _check_existing_table(spark: Any, name: str, columns: tuple[tuple[str, str, 
         raise ValueError(f"Existing prediction table {name} differs from the model output schema.")
 
 
+def _generation_properties(config: dict[str, Any], prepared: Any) -> dict[str, str]:
+    """Bind a full-rebuild table to one concrete saved model artifact."""
+    digest = prepared.preflight.model_digest
+    if type(digest) is not str or not re.fullmatch(r"[0-9a-f]{64}", digest):
+        raise ValueError("Pinned model has no valid artifact digest.")
+    return {
+        "skyulf.mode": "full_rebuild",
+        "skyulf.model_name": config["model_name"],
+        "skyulf.model_version": config["model_version"],
+        "skyulf.model_digest": digest,
+    }
+
+
 def provision_prediction_table(spark: Any, config: dict[str, Any], prepared: Any) -> bool:
     """Preflight an existing source/model and create only a missing output table."""
     source_name = config["score_source_table"]
@@ -152,7 +231,19 @@ def provision_prediction_table(spark: Any, config: dict[str, Any], prepared: Any
     ):
         raise ValueError("Scoring source must have Delta Change Data Feed enabled.")
     target_exists = spark.catalog.tableExists(target_name)
+    generation = config.get("model_change_mode") == "full_rebuild"
+    generation_properties = _generation_properties(config, prepared) if generation else {}
     if target_exists:
+        if generation:
+            actual_properties = (
+                spark.sql(f"DESCRIBE DETAIL {target_name}").first()["properties"] or {}
+            )
+            if any(
+                actual_properties.get(key) != value for key, value in generation_properties.items()
+            ):
+                raise ValueError(
+                    "Existing prediction generation belongs to another model or workflow."
+                )
         _check_existing_table(spark, target_name, columns)
     if not target_exists:
         if (
@@ -163,7 +254,15 @@ def provision_prediction_table(spark: Any, config: dict[str, Any], prepared: Any
         ):
             raise ValueError("Initial scoring source exceeds the configured max_rows budget.")
         definition = ", ".join(f"{name} {sql_type}" for name, _, sql_type in columns)
-        spark.sql(f"CREATE TABLE {target_name} ({definition}) USING DELTA").collect()
+        table_properties = ""
+        if generation:
+            properties = ", ".join(
+                f"'{key}' = '{value}'" for key, value in generation_properties.items()
+            )
+            table_properties = f" TBLPROPERTIES ({properties})"
+        spark.sql(
+            f"CREATE TABLE {target_name} ({definition}) USING DELTA{table_properties}"
+        ).collect()
     return not target_exists
 
 
@@ -281,14 +380,21 @@ def run_action(
             quality_threshold=config.get("quality_threshold"),
         )
     if action == "score":
-        prepared = prepare_local_workflow(_scoring_config(config))
-        provision_prediction_table(spark, config, prepared)
-        return run_incremental_local_batch(
+        target = _scoring_target(config)
+        if config.get("model_change_mode", "incremental_append") == "full_rebuild":
+            _managed_prediction_view_exists(spark, config["prediction_table"])
+        score_config = {**config, "prediction_table": target}
+        prepared = prepare_local_workflow(_scoring_config(score_config))
+        provision_prediction_table(spark, score_config, prepared)
+        result = run_incremental_local_batch(
             spark,
             prepared,
             row_keys=tuple(config["row_keys"]),
             admission=SingleWriterAdmission(),
         )
+        if config.get("model_change_mode", "incremental_append") == "full_rebuild":
+            _activate_prediction_view(spark, config["prediction_table"], target)
+        return result
     raise ValueError(f"Unknown workflow action: {action}.")
 
 

@@ -5,8 +5,8 @@ resources:
       max_concurrent_runs: 1
 {{if eq .retraining_mode "monthly_paused"}}
       schedule:
-        quartz_cron_expression: "0 0 3 3 * ?"
-        timezone_id: UTC
+        quartz_cron_expression: ${var.retraining_cron_expression}
+        timezone_id: ${var.retraining_timezone_id}
         pause_status: PAUSED
 {{end}}
       tasks:

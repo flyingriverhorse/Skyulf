@@ -35,6 +35,7 @@ def _config():
         "prediction_table": "workspace.test.predictions",
         "model_name": "workspace.test.model",
         "model_version": "1",
+        "model_change_mode": "incremental_append",
         "champion_version": "1",
         "row_keys": ["entity_id"],
         "input_columns": ["x"],
@@ -51,6 +52,13 @@ def _config():
         "quality_threshold": None,
         "pipeline": {"preprocessing": [], "modeling": {"type": "linear_regression"}},
     }
+
+
+def _one_column_schema(kind):
+    """Model the Spark field names/types used by view compatibility checks."""
+    return SimpleNamespace(
+        fields=[SimpleNamespace(name="prediction", dataType=SimpleNamespace(typeName=lambda: kind))]
+    )
 
 
 def test_train_preserves_selected_polars_engine_and_never_promotes(monkeypatch, tmp_path):
@@ -162,6 +170,158 @@ def test_score_uses_incremental_service_without_period_or_source_version(monkeyp
     assert "source_version" not in score.call_args.kwargs
     assert prepare.call_args.args[0].engine == "polars"
     assert isinstance(score.call_args.kwargs["admission"], workflow.SingleWriterAdmission)
+
+
+def test_full_rebuild_scores_new_generation_before_view_activation(monkeypatch):
+    """A v2 rebuild must fill a new table before changing the logical output view."""
+    workflow = _workflow()
+    config = _config()
+    config.update(model_version="2", model_change_mode="full_rebuild")
+    events = []
+    prepared = Mock()
+    provision = Mock(side_effect=lambda *args: events.append("provision"))
+    monkeypatch.setattr(
+        workflow,
+        "prepare_local_workflow",
+        Mock(side_effect=lambda cfg: events.append("prepare") or prepared),
+    )
+    monkeypatch.setattr(
+        workflow,
+        "provision_prediction_table",
+        provision,
+    )
+    monkeypatch.setattr(
+        workflow,
+        "run_incremental_local_batch",
+        Mock(side_effect=lambda *args, **kwargs: events.append("score") or object()),
+    )
+    activate = Mock(side_effect=lambda *args: events.append("activate"))
+    monkeypatch.setattr(workflow, "_activate_prediction_view", activate)
+    spark = Mock()
+    spark.catalog.tableExists.return_value = False
+    workflow.run_action(spark, config, "score")
+    assert events == ["prepare", "provision", "score", "activate"]
+    assert provision.call_args.args[1]["prediction_table"] == "workspace.test.predictions_v2"
+    assert activate.call_args.args[1:] == (
+        "workspace.test.predictions",
+        "workspace.test.predictions_v2",
+    )
+
+
+def test_full_rebuild_does_not_activate_a_failed_generation(monkeypatch):
+    """A failed full score must leave the active prediction view untouched."""
+    workflow = _workflow()
+    config = _config()
+    config["model_change_mode"] = "full_rebuild"
+    monkeypatch.setattr(workflow, "prepare_local_workflow", Mock(return_value=object()))
+    monkeypatch.setattr(workflow, "provision_prediction_table", Mock())
+    monkeypatch.setattr(
+        workflow, "run_incremental_local_batch", Mock(side_effect=RuntimeError("score failed"))
+    )
+    activate = Mock()
+    monkeypatch.setattr(workflow, "_activate_prediction_view", activate)
+    spark = Mock()
+    spark.catalog.tableExists.return_value = False
+    with pytest.raises(RuntimeError, match="score failed"):
+        workflow.run_action(spark, config, "score")
+    activate.assert_not_called()
+
+
+def test_full_rebuild_rejects_existing_table_before_creating_generation(monkeypatch):
+    """A mode switch must fail before creating an orphan physical generation."""
+    workflow = _workflow()
+    config = _config()
+    config["model_change_mode"] = "full_rebuild"
+    spark = Mock()
+    spark.catalog.tableExists.return_value = True
+    spark.catalog.getTable.return_value.tableType = "MANAGED"
+    prepare = Mock()
+    provision = Mock()
+    monkeypatch.setattr(workflow, "prepare_local_workflow", prepare)
+    monkeypatch.setattr(workflow, "provision_prediction_table", provision)
+    with pytest.raises(ValueError, match="view name"):
+        workflow.run_action(spark, config, "score")
+    prepare.assert_not_called()
+    provision.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "mode,version", [("unknown", "2"), ("full_rebuild", "@champion"), ("full_rebuild", "02")]
+)
+def test_scoring_rejects_unsafe_model_change_selection(mode, version):
+    """An invalid mode or moving version must fail before a score target is chosen."""
+    workflow = _workflow()
+    config = _config()
+    config.update(model_change_mode=mode, model_version=version)
+    with pytest.raises(ValueError):
+        workflow._scoring_target(config)
+
+
+def test_full_rebuild_refuses_existing_table_at_logical_view_name():
+    """Switching modes must never replace an existing prediction Delta table."""
+    workflow = _workflow()
+    spark = Mock()
+    spark.catalog.tableExists.return_value = True
+    spark.catalog.getTable.return_value.tableType = "MANAGED"
+    spark.table.return_value.limit.return_value.count.return_value = 2
+    with pytest.raises(ValueError, match="view name"):
+        workflow._activate_prediction_view(
+            spark, "workspace.test.predictions", "workspace.test.predictions_v2"
+        )
+    spark.sql.assert_not_called()
+
+
+def test_full_rebuild_refuses_foreign_view_and_incompatible_schema():
+    """Activation must neither hijack a foreign view nor break its output schema."""
+    workflow = _workflow()
+    spark = Mock()
+    spark.catalog.tableExists.return_value = True
+    spark.catalog.getTable.return_value.tableType = "VIEW"
+    spark.table.return_value.limit.return_value.count.return_value = 2
+    spark.sql.return_value.first.return_value = {"value": "other"}
+    with pytest.raises(ValueError, match="Skyulf"):
+        workflow._activate_prediction_view(
+            spark, "workspace.test.predictions", "workspace.test.predictions_v2"
+        )
+    spark.sql.reset_mock()
+    spark.sql.return_value.first.return_value = {"value": "full_rebuild"}
+    spark.table.side_effect = [
+        SimpleNamespace(
+            limit=Mock(return_value=SimpleNamespace(count=lambda: 2)),
+            schema=_one_column_schema("double"),
+        ),
+        SimpleNamespace(schema=_one_column_schema("string")),
+    ]
+    with pytest.raises(ValueError, match="schema"):
+        workflow._activate_prediction_view(
+            spark, "workspace.test.predictions", "workspace.test.predictions_v2"
+        )
+    assert all(not call.args[0].startswith("ALTER VIEW") for call in spark.sql.call_args_list)
+
+
+def test_full_rebuild_creates_owned_view_then_preserves_grants_on_switch():
+    """A validated generation becomes active through create then ALTER VIEW."""
+    workflow = _workflow()
+    spark = Mock()
+    spark.table.return_value.limit.return_value.count.return_value = 2
+    spark.table.return_value.schema = _one_column_schema("double")
+    spark.catalog.tableExists.side_effect = [False, True]
+    spark.catalog.getTable.return_value.tableType = "VIEW"
+    spark.sql.return_value.first.side_effect = [
+        {"value": "full_rebuild"},
+        {
+            "createtab_stmt": "CREATE VIEW workspace.test.predictions AS SELECT * FROM workspace.test.predictions_v1"
+        },
+    ]
+    workflow._activate_prediction_view(
+        spark, "workspace.test.predictions", "workspace.test.predictions_v1"
+    )
+    workflow._activate_prediction_view(
+        spark, "workspace.test.predictions", "workspace.test.predictions_v2"
+    )
+    statements = [call.args[0] for call in spark.sql.call_args_list]
+    assert any(statement.startswith("CREATE VIEW") for statement in statements)
+    assert any(statement.startswith("ALTER VIEW") for statement in statements)
 
 
 def test_lifecycle_actions_are_not_bundle_entry_points():
@@ -445,6 +605,66 @@ def test_prediction_provision_creates_no_control_table(monkeypatch):
     assert all("admission" not in statement for statement in statements)
 
 
+def test_full_rebuild_generation_records_model_identity(monkeypatch):
+    """A new generation must carry enough provenance to reject unrelated tables."""
+    workflow = _workflow()
+    config = _config()
+    config.update(
+        model_change_mode="full_rebuild", prediction_table="workspace.test.predictions_v2"
+    )
+    spark = Mock()
+    spark.catalog.tableExists.side_effect = lambda name: name == config["score_source_table"]
+    spark.sql.return_value.first.return_value = {
+        "properties": {"delta.enableChangeDataFeed": "true"}
+    }
+    spark.table.return_value.select.return_value.limit.return_value.count.return_value = 2
+    monkeypatch.setattr(
+        workflow, "_prediction_columns", Mock(return_value=(("prediction", "double", "DOUBLE"),))
+    )
+    prepared = SimpleNamespace(preflight=SimpleNamespace(ready=True, model_digest="a" * 64))
+    assert workflow.provision_prediction_table(spark, config, prepared) is True
+    created = next(
+        call.args[0] for call in spark.sql.call_args_list if call.args[0].startswith("CREATE TABLE")
+    )
+    assert "'skyulf.mode' = 'full_rebuild'" in created
+    assert "'skyulf.model_name' = 'workspace.test.model'" in created
+    assert "'skyulf.model_version' = '1'" in created
+    assert f"'skyulf.model_digest' = '{'a' * 64}'" in created
+
+
+@pytest.mark.parametrize("changed", ["mode", "name", "digest"])
+def test_full_rebuild_rejects_unrelated_or_changed_generation(monkeypatch, changed):
+    """A same-named table must not be scored or activated under another model."""
+    workflow = _workflow()
+    config = _config()
+    config.update(
+        model_change_mode="full_rebuild", prediction_table="workspace.test.predictions_v2"
+    )
+    expected = {
+        "skyulf.mode": "full_rebuild",
+        "skyulf.model_name": config["model_name"],
+        "skyulf.model_version": config["model_version"],
+        "skyulf.model_digest": "a" * 64,
+    }
+    key = {"mode": "skyulf.mode", "name": "skyulf.model_name", "digest": "skyulf.model_digest"}[
+        changed
+    ]
+    expected[key] = "other"
+    spark = Mock()
+    spark.catalog.tableExists.return_value = True
+    spark.sql.return_value.first.side_effect = [
+        {"properties": {"delta.enableChangeDataFeed": "true"}},
+        {"properties": expected},
+    ]
+    monkeypatch.setattr(workflow, "_prediction_columns", Mock(return_value=()))
+    check_target = Mock()
+    monkeypatch.setattr(workflow, "_check_existing_table", check_target)
+    prepared = SimpleNamespace(preflight=SimpleNamespace(ready=True, model_digest="a" * 64))
+    with pytest.raises(ValueError, match="another model or workflow"):
+        workflow.provision_prediction_table(spark, config, prepared)
+    check_target.assert_not_called()
+
+
 def test_generated_config_has_no_admission_or_alias_state():
     """The starting Bundle must not ask users to provision coordination tables."""
     template = WORKFLOW.parents[1] / "config/workflow.json.tmpl"
@@ -503,3 +723,18 @@ def test_generated_bundle_has_only_train_and_serialized_score_jobs():
     assert 'if eq .retraining_mode "monthly_paused"' in template
     assert "pause_status: PAUSED" in template
     assert 'action: {{if eq .retraining_mode "monthly_paused"}}train_monthly' in template
+    assert "quartz_cron_expression: ${var.retraining_cron_expression}" in template
+    assert "timezone_id: ${var.retraining_timezone_id}" in template
+
+
+def test_init_exposes_both_model_change_modes_and_editable_training_cadence():
+    """The generated Bundle must let users choose scoring semantics and cron."""
+    root = WORKFLOW.parents[3]
+    schema = json.loads((root / "databricks_template_schema.json").read_text(encoding="utf-8"))
+    properties = schema["properties"]
+    assert properties["model_change_mode"]["enum"] == ["incremental_append", "full_rebuild"]
+    assert properties["retraining_cron_expression"]["default"] == "0 0 3 3 * ?"
+    assert properties["retraining_timezone_id"]["default"] == "UTC"
+    bundle = (WORKFLOW.parents[1] / "databricks.yml.tmpl").read_text(encoding="utf-8")
+    assert 'default: "{{.retraining_cron_expression}}"' in bundle
+    assert 'default: "{{.retraining_timezone_id}}"' in bundle

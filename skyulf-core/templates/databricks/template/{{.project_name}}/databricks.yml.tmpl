@@ -26,6 +26,14 @@ variables:
   resource_suffix:
     description: Optional namespace suffix for shared development targets
     default: ""
+{{if eq .retraining_mode "monthly_paused"}}
+  retraining_cron_expression:
+    description: Editable Quartz cron for the paused training job
+    default: "{{.retraining_cron_expression}}"
+  retraining_timezone_id:
+    description: IANA timezone for the paused training schedule
+    default: "{{.retraining_timezone_id}}"
+{{end}}
 {{if eq .compute_mode "policy_cluster"}}
   cluster_policy_id:
     description: Approved policy looked up in the active workspace

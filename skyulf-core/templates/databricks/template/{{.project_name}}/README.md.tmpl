@@ -14,16 +14,20 @@ schedule to the existing `train` job; the default `manual` choice adds none.
 
 | Job | Run it when | UC effect |
 | --- | --- | --- |
-| `train` | A labeled snapshot is ready, or a reviewed monthly schedule is unpaused | Registers one candidate model and logs MLflow metrics |
-| `score` | The model version is pinned and rows need predictions | Creates the prediction table if absent, then appends predictions for initial or new rows |
+| `train` | Labeled data is ready or the schedule runs | Registers a candidate; logs metrics |
+| `score` | A model is pinned and rows need scoring | Appends rows or builds a new generation |
 
 Champion/challenger management is available through Skyulf Core but has no
 job in this starting Bundle. Training a candidate does not activate it for
 scoring. Set `model_version` to a concrete registered version and redeploy
 when you want scoring to use it.
 
-In monthly mode, the job runs at 03:00 UTC on the third day of each month only
-after you unpause it. Each run captures the latest concrete Delta source
+In monthly mode, the schedule starts paused. Its Quartz cron and IANA timezone
+are selected at initialization and remain editable as
+`retraining_cron_expression` and `retraining_timezone_id` Bundle variables.
+The default is 03:00 UTC on the third day of each month. Configure one run per
+month; a different cadence can retrain the same UTC month more than once.
+After you unpause it, each run captures the latest concrete Delta source
 version, uses the first day of that month as its UTC label cutoff, holds out
 the preceding calendar month, and starts fit data
 `monthly_lookback_months` months before the cutoff. The default lookback is
@@ -40,8 +44,19 @@ promoted or used by `score` automatically.
 existing input to predict; the generated config points both at **one table**.
 You may give them different UC names when the labeled training data and new
 inference data have different lifecycles. Neither is created by this Bundle.
-`prediction_table` is the single model output table. `model_name` is a
-registered UC model, not a table. The Bundle creates no admission table.
+`prediction_table` is the physical output table in `incremental_append` mode.
+In `full_rebuild` mode it is a stable **view**, backed by physical Delta
+generations named `<prediction_table>_v<model_version>`. A successful `score`
+fills a new generation before switching the view; previous generations stay
+available. The first full score creates one physical table and the view.
+Each generation records the registered model name, version and artifact digest.
+An existing generation with different provenance is rejected. If you change
+the registered model name while reusing the same numeric version, choose a
+different logical prediction name or a new model version before scoring.
+Moving an already deployed append-mode table to full mode under the same
+logical name is rejected; choose a new view name or migrate deliberately.
+`model_name` is a registered UC model, not a table. The Bundle creates no
+admission table.
 The `row_key` selected during initialization names an existing source column;
 `score` copies it into the prediction table for SQL lookups. It must be
 non-null, `STRING` or `BIGINT`, and unique across all scored rows, including
@@ -50,8 +65,10 @@ later inserts. If a customer can have multiple prediction rows, edit
 `["customer_id", "observation_id"]` before deployment. The initialization
 prompt chooses one column; it never creates an ID in the source. Keep key
 columns out of `input_columns`; they identify predictions, not model features.
-The score job has `max_concurrent_runs: 1`; grant write access to the
-prediction table only to this job's identity. Other jobs must not write it.
+The score job has `max_concurrent_runs: 1`; grant write access to its physical
+prediction targets only to this job's identity. In full mode the job also
+needs permission to create and own the active view. Other jobs must not write
+the targets.
 Skyulf Core's shared-admission option remains available when multiple jobs
 need to publish to one target.
 
@@ -97,8 +114,9 @@ clusters are a separate compute choice at project initialization.
 2. Put that concrete version in `model_version` in `config/workflow.json` and
    redeploy. Run `score`. It verifies the source, Change Data Feed, model
    outputs, row keys and any existing target schema before writing. It creates
-   only the missing prediction table; it never overwrites an existing table
-   or creates the source. The initial row check is bounded by `max_rows`, and
+   only a missing physical prediction table; it never overwrites an existing
+   table or creates the source. Full mode then creates or updates its managed
+   view after a complete nonempty score. The initial row check is bounded by `max_rows`, and
    scoring enforces `max_rows` and `max_bytes` for each local transfer.
 3. Add new rows to the existing source Delta table and run `score`
    again. An unchanged replay is a no-op. No date or source-version argument
@@ -106,6 +124,12 @@ clusters are a separate compute choice at project initialization.
    rescore policy.
 
 `score` always uses its configured concrete model version. Training a new
-candidate or changing a registry alias does not rewrite old prediction rows.
+candidate or changing a registry alias alone does not change predictions.
+After pinning v2 and redeploying, `incremental_append` leaves v1 rows intact
+and scores only new source inserts with v2. `full_rebuild` scores every current
+source row into a new v2 table, switches the view only after success, then
+uses that table's Delta receipt to append future inserts. A failed rebuild
+leaves the old view active. The new generation must retain the active output
+schema; an incompatible model needs a new logical view or an explicit migration.
 The optional training schedule does not run `score`. There is no online
 endpoint or Spark-native FE/model execution in this starting project.
