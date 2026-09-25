@@ -409,7 +409,196 @@ def test_tied_v3_remains_challenger_through_rollback_and_v4_replaces_it(case) ->
     with pytest.raises(AliasConflictError, match="newer"):
         next_lifecycle.registered(candidate)
     assert str(client.get_model_version_by_alias(name, "challenger").version) == "4"
+    assert str(client.get_model_version_by_alias(name, "previous_challenger").version) == "3"
+    before = client.get_registered_model(name).tags
+    next_lifecycle.registered(resolve_model(name, version="4", tracking_uri=uri, registry_uri=uri))
+    assert client.get_registered_model(name).tags == before
     assert client.get_model_version(name, "3").tags["validation_status"] == "rejected"
+    register_model(source, name, tracking_uri=uri, registry_uri=uri)
+    next_lifecycle.registered(resolve_model(name, version="5", tracking_uri=uri, registry_uri=uri))
+    assert str(client.get_model_version_by_alias(name, "previous_challenger").version) == "4"
+
+
+def _replace_challenger(case, *, replacement="nomination"):
+    """Displace an evaluated contender using the real registration lifecycle."""
+    from skyulf.integrations.mlflow.challenger import ChallengerLifecycle
+
+    client, uri, name, _, _, admission = case
+    _stage(case)
+    register_model(
+        client.get_model_version(name, "2").source, name, tracking_uri=uri, registry_uri=uri
+    )
+    lifecycle = ChallengerLifecycle(
+        name,
+        expected_champion_version="1",
+        admission=admission,
+        tracking_uri=uri,
+        registry_uri=uri,
+    )
+    candidate = resolve_model(name, version="3", tracking_uri=uri, registry_uri=uri)
+    if replacement == "nomination":
+        lifecycle.registered(candidate)
+    else:
+        _stage(case, report=_replacement_report(case, candidate), expected_challenger_version="2")
+    return lifecycle, candidate
+
+
+def _replacement_report(case, candidate):
+    """Compare a real replacement artifact against the original champion's pinned holdout."""
+    _, uri, name, heldout, _, _ = case
+    return compare_registered_local_models(
+        candidate,
+        resolve_model(name, version="1", tracking_uri=uri, registry_uri=uri),
+        heldout,
+        target_column="target",
+        dataset_id="labels@5/heldout",
+        metric="heldout_mse",
+        min_improvement=1.0,
+        quality_threshold=1.0,
+        max_rows=10,
+        max_bytes=10_000,
+        tracking_uri=uri,
+        registry_uri=uri,
+    )
+
+
+@pytest.mark.parametrize("replacement", ["nomination", "staging"])
+def test_challenger_history_survives_staging_promotion_and_rollback(case, replacement):
+    """Promoting a replacement must retain the displaced contender, not archive the champion."""
+    client, uri, name, _, _, admission = case
+    lifecycle, candidate = _replace_challenger(case, replacement=replacement)
+    report = _replacement_report(case, candidate)
+    _stage(case, report=report, expected_challenger_version="3")
+    assert str(client.get_model_version_by_alias(name, "previous_challenger").version) == "2"
+    receipt = _promote(case, report=report)
+    assert {
+        key: str(value) for key, value in client.get_registered_model(name).aliases.items()
+    } == {
+        "champion": "3",
+        "previous_champion": "1",
+        "previous_challenger": "2",
+    }
+    reversal = rollback_promotion(
+        receipt,
+        expected_current_version="3",
+        admission=admission,
+        tracking_uri=uri,
+        registry_uri=uri,
+    )
+    assert reversal.new_version == "1"
+    assert str(client.get_model_version_by_alias(name, "previous_challenger").version) == "2"
+    lifecycle.registered(resolve_model(name, version="2", tracking_uri=uri, registry_uri=uri))
+    assert {
+        key: str(value) for key, value in client.get_registered_model(name).aliases.items()
+    } == {
+        "champion": "1",
+        "challenger": "2",
+    }
+
+
+def test_rollback_clears_challenger_history_that_becomes_champion(case):
+    """A restored champion cannot simultaneously appear as a historical challenger."""
+    from skyulf.integrations.mlflow.challenger import ChallengerLifecycle
+
+    client, uri, name, _, _, admission = case
+    _stage(case)
+    promotion = _promote(case)
+    lifecycle = ChallengerLifecycle(
+        name,
+        expected_champion_version="2",
+        admission=admission,
+        tracking_uri=uri,
+        registry_uri=uri,
+    )
+    lifecycle.registered(resolve_model(name, version="1", tracking_uri=uri, registry_uri=uri))
+    register_model(
+        client.get_model_version(name, "2").source, name, tracking_uri=uri, registry_uri=uri
+    )
+    lifecycle.registered(resolve_model(name, version="3", tracking_uri=uri, registry_uri=uri))
+    assert str(client.get_model_version_by_alias(name, "previous_challenger").version) == "1"
+    options: dict[str, Any] = {
+        "expected_current_version": "2",
+        "admission": admission,
+        "tracking_uri": uri,
+        "registry_uri": uri,
+    }
+    reversal = rollback_promotion(promotion, **options)
+    assert rollback_promotion(promotion, **options) == reversal
+    assert {
+        key: str(value) for key, value in client.get_registered_model(name).aliases.items()
+    } == {
+        "champion": "1",
+        "challenger": "3",
+    }
+
+
+@pytest.mark.parametrize(
+    "corruption", ["raw_alias", "missing_alias", "missing_marker", "malformed", "prepared"]
+)
+def test_challenger_history_disagreement_blocks_nomination_retry(case, corruption):
+    """An unchanged nominee is not permission to ignore tampered history pointers."""
+    client, _, name, _, _, _ = case
+    lifecycle, candidate = _replace_challenger(case)
+    if corruption == "raw_alias":
+        client.set_registered_model_alias(name, "previous_challenger", "1")
+    elif corruption == "missing_alias":
+        client.delete_registered_model_alias(name, "previous_challenger")
+    elif corruption == "missing_marker":
+        client.delete_registered_model_tag(name, "previous_challenger_current_event")
+    else:
+        marker = json.loads(
+            client.get_registered_model(name).tags["previous_challenger_current_event"]
+        )
+        tag = f"challenger_history_{marker['event_id']}"
+        payload = client.get_model_version(name, marker["version"]).tags[tag]
+        value = "{" if corruption == "malformed" else payload.replace("committed", "prepared")
+        client.set_model_version_tag(name, marker["version"], tag, value)
+    before = client.get_registered_model(name).aliases
+    with pytest.raises(AliasConflictError, match="history|History"):
+        lifecycle.registered(candidate)
+    assert client.get_registered_model(name).aliases == before
+
+
+@pytest.mark.parametrize("failed_write", ["alias", "marker"])
+def test_partial_challenger_history_write_keeps_pending_event(case, monkeypatch, failed_write):
+    """A moved contender and failed history alias must remain an explicit unknown outcome."""
+    from skyulf.integrations.mlflow.challenger import ChallengerLifecycle
+
+    client, uri, name, _, _, admission = case
+    _stage(case)
+    register_model(
+        client.get_model_version(name, "2").source, name, tracking_uri=uri, registry_uri=uri
+    )
+    lifecycle = ChallengerLifecycle(
+        name,
+        expected_champion_version="1",
+        admission=admission,
+        tracking_uri=uri,
+        registry_uri=uri,
+    )
+    candidate = resolve_model(name, version="3", tracking_uri=uri, registry_uri=uri)
+    original = mlflow.MlflowClient.set_registered_model_alias
+    original_tag = mlflow.MlflowClient.set_registered_model_tag
+
+    def fail_history(self, model_name, alias, version):
+        """Lose the history update after the challenger pointer has already moved."""
+        if alias == "previous_challenger" and failed_write == "alias":
+            raise RuntimeError("lost history write")
+        return original(self, model_name, alias, version)
+
+    def fail_marker(self, model_name, key, value):
+        """Lose the marker write after both aliases and event tags have changed."""
+        if key == "previous_challenger_current_event" and failed_write == "marker":
+            raise RuntimeError("lost history marker")
+        return original_tag(self, model_name, key, value)
+
+    monkeypatch.setattr(mlflow.MlflowClient, "set_registered_model_alias", fail_history)
+    monkeypatch.setattr(mlflow.MlflowClient, "set_registered_model_tag", fail_marker)
+    with pytest.raises(AliasOutcomeUnknownError):
+        lifecycle.registered(candidate)
+    with pytest.raises(AliasConflictError, match="pending"):
+        lifecycle.registered(candidate)
+    assert client.get_registered_model(name).tags["pending_alias_event"]
 
 
 def test_first_nominee_is_removed_from_challenger_when_initialized(case) -> None:

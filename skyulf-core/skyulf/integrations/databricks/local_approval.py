@@ -35,6 +35,51 @@ from . import local_retraining
 from .local_retraining import LocalTrainingSpec
 
 
+def resolve_candidate_comparison_digest(
+    config: dict[str, Any], candidate_version: str, *, action: str
+) -> str:
+    """Resolve a named candidate's proof from its active committed lifecycle receipt.
+
+    This is the Bundle convenience path, not a latest-candidate lookup. The
+    strict approval/rejection service still verifies the downloaded comparison,
+    expected champion and active receipt against the full returned digest.
+    """
+    if config.get("promotion_policy") != "manual_approval" or action not in {"approve", "reject"}:
+        raise ValueError("Evidence lookup requires manual_approval and approve/reject.")
+    if not isinstance(candidate_version, str) or not re.fullmatch(
+        r"[1-9][0-9]*", candidate_version
+    ):
+        raise ValueError("Evidence lookup requires a concrete candidate_version.")
+    tracking_uri = config.get("tracking_uri", "databricks")
+    registry_uri = config.get("registry_uri", "databricks-uc")
+    name = config["model_name"]
+    current = controlled_champion_version(
+        name, tracking_uri=tracking_uri, registry_uri=registry_uri
+    )
+    client = _make_client(_require_mlflow(), tracking_uri, registry_uri)
+    replay = action == "approve" and current == candidate_version
+    alias = "champion" if replay else "challenger"
+    event_id = _active_marker(client, name, candidate_version, alias)
+    if event_id is None:
+        raise AliasConflictError("Candidate has no active saved comparison receipt.")
+    raw = (client.get_model_version(name, candidate_version).tags or {}).get(_event_tag(event_id))
+    try:
+        event = _read_event(raw)
+    except (TypeError, ValueError) as exc:
+        raise AliasConflictError("Saved comparison receipt is malformed.") from exc
+    kinds = {"initial", "promotion"} if replay else {"challenger"}
+    if action == "approve" and isinstance(event, dict) and event.get("k") == "rejection":
+        raise AliasConflictError("Candidate was explicitly rejected.")
+    if action == "reject":
+        kinds.add("rejection")
+    if not isinstance(event, dict) or event.get("s") != "committed" or event.get("k") not in kinds:
+        raise AliasConflictError("Candidate has no committed comparison for this action.")
+    digest = event.get("h")
+    if not isinstance(digest, str) or not re.fullmatch(r"[a-f0-9]{64}", digest):
+        raise AliasConflictError("Saved comparison receipt has no valid digest.")
+    return digest
+
+
 def _load_evidence(
     client: Any, name: str, version: str, digest: str
 ) -> tuple[ModelComparisonReport, LocalTrainingSpec, str]:

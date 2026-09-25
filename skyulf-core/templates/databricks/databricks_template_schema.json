@@ -36,35 +36,47 @@
       "description": "Keep old predictions and append new rows, or rebuild all rows into a new model-version generation",
       "enum": ["incremental_append", "full_rebuild"]
     },
-    "model_selection_mode": {
+    "score_model_selection": {
       "order": 16,
       "type": "string",
       "default": "pinned_version",
-      "description": "Pin one model version manually or select champion after a gated training run",
-      "enum": ["pinned_version", "auto_champion"]
+      "description": "Score with one pinned version or resolve the controlled champion on each run",
+      "enum": ["pinned_version", "champion"]
+    },
+    "promotion_policy": {
+      "order": 17,
+      "type": "string",
+      "default": "manual_approval",
+      "description": "Require operator approval or promote automatically after quality gates pass",
+      "enum": ["manual_approval", "automatic"]
+    },
+    "score_handoff": {
+      "order": 18,
+      "type": "string",
+      "default": "disabled",
+      "description": "Optionally run the existing score job after champion initialization, promotion or rollback; score keeps its selected model policy",
+      "enum": ["disabled", "after_alias_change"]
     },
     "metric": {
-      "order": 17,
+      "order": 19,
       "type": "string",
       "default": "heldout_rmse",
       "description": "Heldout metric for candidate/champion comparison; must match the model task",
       "enum": ["heldout_mae", "heldout_mse", "heldout_rmse", "heldout_r2", "heldout_mape", "heldout_explained_variance", "heldout_accuracy", "heldout_balanced_accuracy", "heldout_precision_weighted", "heldout_recall_weighted", "heldout_f1_weighted", "heldout_matthews_corrcoef", "heldout_precision", "heldout_recall", "heldout_f1", "heldout_g_score", "heldout_log_loss", "heldout_roc_auc", "heldout_pr_auc", "heldout_roc_auc_ovr_weighted", "heldout_roc_auc_weighted", "heldout_roc_auc_ovr", "heldout_roc_auc_ovo", "heldout_roc_auc_ovo_weighted", "heldout_pr_auc_weighted"]
     },
     "min_improvement": {
-      "order": 18,
+      "order": 20,
       "type": "number",
       "default": 0.0,
       "minimum": 0,
-      "description": "Minimum metric improvement over champion; ties never pass",
-      "skip_prompt_if": {"properties": {"model_selection_mode": {"const": "pinned_version"}}}
+      "description": "Minimum metric improvement required for manual or automatic promotion; ties never pass"
     },
     "quality_threshold": {
-      "order": 19,
+      "order": 21,
       "type": "string",
       "default": "null",
-      "description": "Enter a numeric absolute heldout gate for the first champion; null is rejected in automatic mode",
-      "pattern": "^(null|-?(?:0|[1-9][0-9]*)(?:\\.[0-9]+)?(?:[eE][+-]?[0-9]+)?)$",
-      "skip_prompt_if": {"properties": {"model_selection_mode": {"const": "pinned_version"}}}
+      "description": "Absolute quality gate; numeric required for automatic promotion or manual first-champion approval. Choose for your metric and task.",
+      "pattern": "^(null|-?(?:0|[1-9][0-9]*)(?:\\.[0-9]+)?(?:[eE][+-]?[0-9]+)?)$"
     },
     "retraining_cron_expression": {
       "order": 14,
@@ -140,7 +152,7 @@
       "skip_prompt_if": {"properties": {"compute_mode": {"const": "serverless"}}}
     },
     "risk_category": {
-      "order": 20,
+      "order": 22,
       "type": "string",
       "default": "",
       "description": "Optional business risk label (e.g. Low, Medium, High); leave blank when unused. This label does not change promotion gates.",

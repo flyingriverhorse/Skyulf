@@ -171,8 +171,8 @@ read-only; the caller explicitly logs the desired numeric metrics to its
 MLflow run. Unlabeled production predictions cannot produce supervised
 quality metrics until their true labels arrive.
 Evaluation does not move aliases, publish predictions or deploy endpoints.
-Promotion is a separate, explicit operation. SM-28a monthly candidate training
-follows before Bundle generation.
+Promotion is a separate, explicit operation. Monthly candidate training and
+the generated [local-engine Bundle](databricks_bundle.md) reuse these services.
 
 ## Stage, promote, and roll back a local pipeline
 
@@ -310,6 +310,24 @@ The local workflow wrapper additionally verifies controlled champion state and
 requires an explicit manual policy; the low-level registry API retains its
 existing legacy-champion compatibility.
 
+`previous_challenger` retains the last contender displaced by nomination or
+direct staging. Repeating a nomination does not rotate it. Promotion and
+rollback preserve a separate historical contender; if that version becomes
+champion or challenger, the conflicting history alias is cleared. Neither
+clearing nor replacing the pointer deletes model versions or event records.
+This is recent contender history, not an automatic model selection rule.
+
+History intent is stored in a separate `challenger_history_<event_id>`
+model-version tag with readable `from_version`, `to_version` and `state`
+fields, each value bounded to 256 UTF-8 bytes. These versions describe the
+history pointer's change. The registered-model marker
+`previous_challenger_current_event` identifies the event's owning version,
+which may differ from the historical version. Existing promotion receipt
+formats remain unchanged. A cleared pointer retains its event marker, so
+an incompatible manual alias addition is detected. Pending writes, malformed
+history evidence and alias disagreement fail rather than silently replacing
+that history. All mutations use the same lifecycle admission.
+
 The lock protects only participating jobs. A principal with direct registry
 write permission can bypass it. A crashed Delta admission owner does not
 expire; clear it only after proving the original job cannot publish.
@@ -326,6 +344,7 @@ validation report. Local SQLite/Spark evidence does not certify live Unity Catal
 wheel deployment, distributed admission, Delta publication or platform scale.
 
 Registry resolution/loading does not predict, mutate aliases, start Spark or
-write a table. HTTP/SQL endpoints and Databricks Bundle generation remain later
-initiative tasks; the monthly Spark/Delta runner has its own
+write a table. HTTP/SQL endpoints remain later initiative tasks. The
+[local-engine Bundle](databricks_bundle.md) integrates the existing services;
+the monthly Spark/Delta runner has its own
 [batch contract](databricks_batch.md).

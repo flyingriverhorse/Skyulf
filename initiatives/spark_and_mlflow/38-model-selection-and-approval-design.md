@@ -1,7 +1,8 @@
 # Independent model selection and approval
 
 Date: 2026-09-24. User-approved direction for SM-32/SM-33.
-Status: design; not current Bundle functionality.
+Status: SM-32 policies/operator actions are implemented and verified live;
+SM-33 runtime overrides and broader migration validation remain planned.
 Parent: [local Bundle improvement program](37-local-bundle-improvement-program.md).
 
 ## Two independent decisions
@@ -38,7 +39,10 @@ manual/automatic decision; no implicit ungated bootstrap.
 
 Add previous_challenger as a pointer to the last contender displaced by a
 new nomination. It is not the complete model history or an automatic fallback.
-This extension is planned for SM-32; the current implementation has no such alias.
+This extension is implemented locally in SM-32; see
+[history implementation evidence](47-sm32-challenger-history-progress.md).
+Matching Bundle wiring and personal-serverless validation passed; see
+[live evidence](51-sm32-live-validation-report.md).
 
 | Transition | Champion | Challenger | Previous challenger |
 | --- | --- | --- | --- |

@@ -8,7 +8,9 @@
   "model_name": "{catalog}.{metadata_schema}.{{.project_name}}_model{resource_suffix}",
   "model_version": "1",
   "model_change_mode": "{{.model_change_mode}}",
-  "model_selection_mode": "{{.model_selection_mode}}",
+  "score_model_selection": "{{.score_model_selection}}",
+  "promotion_policy": "{{.promotion_policy}}",
+  "score_handoff": "{{.score_handoff}}",
   "champion_version": null,
   "risk_category": {{if .risk_category}}"{{.risk_category}}"{{else}}null{{end}},
   "row_keys": ["{{.row_key}}"],
@@ -23,7 +25,7 @@
   "max_bytes": 67108864,
   "metric": "{{.metric}}",
   "min_improvement": {{.min_improvement}},
-  "quality_threshold": {{if eq .model_selection_mode "auto_champion"}}{{.quality_threshold}}{{else}}null{{end}},
+  "quality_threshold": {{.quality_threshold}},
   "pipeline": {
     "preprocessing": [],
     "modeling": {"type": "linear_regression"}

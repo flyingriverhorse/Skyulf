@@ -40,10 +40,7 @@ def _render_default_config(row_key="entity_id", risk_category=""):
             '{{if .risk_category}}"{{.risk_category}}"{{else}}null{{end}}',
             json.dumps(risk_category or None),
         )
-        .replace(
-            '{{if eq .model_selection_mode "auto_champion"}}{{.quality_threshold}}{{else}}null{{end}}',
-            "null",
-        )
+        .replace("{{.quality_threshold}}", "null")
     )
     return json.loads(content)
 
@@ -166,7 +163,7 @@ def test_generated_bundle_has_only_train_and_serialized_score_jobs():
     )
     assert 'if eq .retraining_mode "monthly_paused"' in template
     assert "pause_status: PAUSED" in template
-    assert 'action: {{if eq .retraining_mode "monthly_paused"}}train_monthly' in template
+    assert 'default: {{if eq .retraining_mode "monthly_paused"}}train_monthly' in template
     assert "quartz_cron_expression: ${var.retraining_cron_expression}" in template
     assert "timezone_id: ${var.retraining_timezone_id}" in template
 
@@ -189,18 +186,19 @@ def test_auto_champion_init_exposes_metric_gates_and_reuses_score_job():
     root = WORKFLOW.parents[3]
     schema = json.loads((root / "databricks_template_schema.json").read_text(encoding="utf-8"))
     properties = schema["properties"]
-    assert properties["model_selection_mode"]["enum"] == [
+    assert properties["score_model_selection"]["enum"] == [
         "pinned_version",
-        "auto_champion",
+        "champion",
     ]
+    assert properties["promotion_policy"]["enum"] == ["manual_approval", "automatic"]
     assert "heldout_rmse" in properties["metric"]["enum"]
     assert "heldout_f1" in properties["metric"]["enum"]
     assert properties["quality_threshold"]["type"] == "string"
     assert properties["quality_threshold"]["default"] == "null"
     config = (WORKFLOW.parents[1] / "config/workflow.json.tmpl").read_text(encoding="utf-8")
-    assert '"model_selection_mode": "{{.model_selection_mode}}"' in config
+    assert '"score_model_selection": "{{.score_model_selection}}"' in config
     assert '"metric": "{{.metric}}"' in config
     jobs = (WORKFLOW.parents[1] / "resources/workflow.jobs.yml.tmpl").read_text(encoding="utf-8")
     assert "job_id: ${resources.jobs.score.id}" in jobs
-    assert "task_key: score_after_training" in jobs
+    assert "task_key: score_after_lifecycle" in jobs
     assert jobs.count("queue:\n        enabled: true") == 2

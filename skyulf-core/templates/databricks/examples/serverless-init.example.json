@@ -4,7 +4,9 @@
   "row_key": "customer_id",
   "retraining_mode": "manual",
   "model_change_mode": "incremental_append",
-  "model_selection_mode": "pinned_version",
+  "score_model_selection": "pinned_version",
+  "promotion_policy": "manual_approval",
+  "score_handoff": "disabled",
   "compute_mode": "serverless",
   "catalog": "workspace",
   "schema": "my_dev_schema"

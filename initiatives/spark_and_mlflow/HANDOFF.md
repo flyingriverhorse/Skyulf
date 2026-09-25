@@ -1,10 +1,42 @@
 # Session handoff - 2026-09-25
 
-## Current priority: SM-30 through SM-43
+## Current snapshot after SM-32 delivery
+
+SM-32 is DONE for its documented local/personal-serverless scope; SM-33 is READY.
+The delivery includes checked challenger history, independent Bundle policies,
+serialized operator actions, score parameter-pushdown handling, automatic proof
+lookup, readable reports and the English operator walkthrough.
+
+The user approved Polars v5 in run `24807365707427`; its score child
+`379146043586828` succeeded with no new data. Current model:
+`workspace.skyulf_lifecycle_test.sm32_model_polars`; champion v5,
+previous_champion v1, previous_challenger v4. The former practice candidate
+has already been approved; do not treat the older report's v1/v5 state as current.
+
+Existing Bundle: Polars/manual_approval/champion/after_alias_change/incremental_append.
+Two persistent jobs remain: train `155738051514173`, score `684955889505992`.
+Schedules are inactive; both jobs use 900-second timeouts and the R5 wheel.
+Existing source and prediction resources are retained.
+
+R4 proved separate persisted HTML and JSON notebook cells. R5 makes rollback
+optional in the report, distinguishes required/restore versions and collapses
+the receipt. Requested R5 live acceptance: parent `769913416634457`;
+HTML assertions passed for task `1092954776398504`; child score
+`690155923861600` succeeded with a no-op and Delta version 2. All 144 affected
+tests and strict docs passed before commit. Final run/check results
+are in [the operator follow-up](52-sm32-operator-output-and-evidence.md).
+The broader SM-32 live evidence is [report 51](51-sm32-live-validation-report.md).
+The user guide is `docs/user_guide/databricks_bundle_walkthrough.md`.
+
+The SM-32 delivery commit follows `6a7f9e95`; use git log for its final hash.
+Reports 47 through 52 belong to that delivery. SM-33/37/43 retain
+config/identity/company gates; do not claim company production readiness.
+
+## Historical implementation context through SM-32 local preparation
 
 The user approved the [local Bundle improvement program](37-local-bundle-improvement-program.md)
 and explicitly requested [independent scoring selection and promotion policy](38-model-selection-and-approval-design.md).
-**SM-30, company tags and SM-31 are committed as `fcfcee31`; SM-32 is ACTIVE.**
+**Earlier baseline: SM-30, company tags and SM-31 committed as `fcfcee31`.**
 The requested commit passed 116 tests and all applicable hooks (including ty).
 SM-32 now separates score_model_selection and promotion_policy at the library
 run_action boundary. All four combinations passed on pandas and Polars;
@@ -20,19 +52,29 @@ or registration; see [manual approval progress](45-sm32-manual-approval-progress
 Final combined regression suite passed 321 tests; full repository ty and
 scoped Ruff passed. Commit `94b28320` includes the SM-32 policy/approval slice and
 the Core test relocation; the complete SM-32 task remains open.
-The continuation implements library reject/rollback and safe retries;
+Commit `6a7f9e95` implements library reject/rollback and safe retries;
 see [its evidence and limits](46-sm32-reject-rollback-progress.md).
 The combined affected suites passed 145 tests, scoped Ruff lint/format and full
 repository ty passed, and strict MkDocs built successfully. The progress
 report is included alongside this implementation.
-Next implement previous_challenger and matching Bundle actions/handoff;
-do not mark SM-32 complete yet. No new Databricks run was made.
+The subsequent uncommitted slice implements previous_challenger history;
+see [its evidence and boundaries](47-sm32-challenger-history-progress.md).
+Its combined affected suites passed 155 tests; Ruff, full ty and strict MkDocs
+passed. Include the new progress report explicitly at commit time because
+the repository's broad initiative ignore rule applies to new files.
+Matching Bundle choices and serialized operator actions/handoff are now
+implemented locally; see [the plan](48-sm32-bundle-actions-plan.md) and
+[validation](49-sm32-bundle-actions-validation.md). That local-only slice
+was followed by the completed live rehearsal in report 51. Combined affected regression: 188 passed; real CLI
+generation: 16 passed; all eight serverless configurations passed strict dev
+validation. Wheel import/source check, Ruff, full ty and strict MkDocs passed.
+Reports 47, 48 and 49 need explicit inclusion at commit time.
 Latest follow-up: Bundle initialization now asks for optional risk_category,
 PayingRegNo has an explicit policy-compute example, and new receipts use
 from_version while reading older formats. 44 relevant tests and real CLI
 generation/strict serverless validation passed. No live resources changed.
-The requested previous_challenger replacement-history alias is specified in
-the SM-32 design and queue, not implemented yet.
+The requested previous_challenger replacement-history alias now exists in
+Core; its live Databricks validation subsequently passed in report 51.
 The user requested readable/company-compatible tags and a clean live reset
 before SM-31. [The clean rehearsal](41-company-tags-and-clean-live-validation.md)
 passed all four tasks in run 607409241163605. [SM-31 evidence](42-sm31-refactor-plan-and-evidence.md)
@@ -45,8 +87,10 @@ jobs (train 155738051514173, score 684955889505992). One source and two engine
 prediction tables each contain 170 rows. Main model_polars has champion=2,
 challenger=3 rejected. model_pandas has champion=1 and challenger=5 error after
 the explicit rollback test. Both scorers replayed without new commits.
-No schedule is active. The notebook is now 44 lines, delegating to Core
-local_workflow.py and prediction_output.py. Keep business config in the project.
+No schedule is active. That deployed notebook delegates to Core local_workflow.py
+and prediction_output.py. The new, locally verified template uses separate
+seven-line lifecycle and score entrypoints calling job_runtime. Keep business
+config in the project.
 
 SM-30 changes challenger semantics: a trained/registered contender such as
 tied v3 remains challenger, with evaluation status/reason visible; only
@@ -55,8 +99,7 @@ pointer while retaining history. Rollback now preserves a separate contender
 with a verified receipt. Real local MLflow tests cover pandas and Polars,
 including manual nomination, tied candidates and comparison errors.
 
-Next separate pinned/champion selection from
-manual/automatic promotion, expose validated runtime/configuration choices
+After SM-32 live acceptance, expose validated runtime/configuration choices
 and independent schedules, improve metrics/search, identities/operations,
 packaging, generated CI, data recovery and documentation. SM-43a verifies the
 combined personal-workspace workflow; SM-43b separately gates company use.

@@ -1,6 +1,6 @@
 # Spark ve MLflow — Open Queue
 
-Updated: 2026-09-24. **SM-00 through SM-16, SM-15L/15I/24a/25/26, SM-22a/b/c/28a/28b, SM-20a/20R/20S and SM-27/29 complete for their documented scopes. Target: 0.9.0.**
+Updated: 2026-09-25. **SM-00 through SM-16, SM-15L/15I/24a/25/26, SM-22a/b/c/28a/28b, SM-20a/20R/20S and SM-27/29 complete for their documented scopes. Target: 0.9.0.**
 The pre-Spark local Bundle lifecycle gate passed live: selectable rescoring,
 automatic champion selection, failed-score recovery and serialized handoff.
 This is functional completion for the selected workflow. Production must
@@ -39,14 +39,27 @@ scope and do not imply the improvements below already exist.
 Read [the improvement program](37-local-bundle-improvement-program.md) and
 [the independent selection/approval design](38-model-selection-and-approval-design.md).
 Each task includes implementation locations and concrete acceptance checks.
-**SM-30, company-compatible tags and SM-31 are committed; SM-32 is ACTIVE.**
+**SM-32 is DONE for the documented local/personal-serverless scope; SM-33 is READY.**
+User-requested operator usability follow-up: readable notebook reports and
+automatic full-proof lookup are implemented and verified locally and in the
+same personal Bundle; see [the follow-up evidence](52-sm32-operator-output-and-evidence.md).
+See [live operator evidence and practice instructions](51-sm32-live-validation-report.md).
+The SM-32 delivery includes the history/Bundle/live-fix and operator usability
+slices with reports 47 through 52; it follows baseline commit `6a7f9e95`.
 Commit `fcfcee31` passed 116 tests and all applicable commit hooks.
 The first SM-32 library policy slice passed 78 tests; see
 [policy separation progress](43-sm32-policy-separation-progress.md).
 The [manual approve library action](45-sm32-manual-approval-progress.md) now
 rechecks saved candidate evidence without training. Library reject/rollback
 and checked retries are implemented in the [current slice](46-sm32-reject-rollback-progress.md);
-145 affected tests passed locally; contender history and Bundle wiring remain open.
+145 affected tests passed locally. The subsequent
+[challenger history slice](47-sm32-challenger-history-progress.md) is implemented
+locally with 155 affected tests passing. Matching Bundle choices, serialized
+operator actions and optional score handoff are now implemented locally; see
+[Bundle validation](49-sm32-bundle-actions-validation.md). The subsequent
+[live rehearsal](51-sm32-live-validation-report.md) passed: 194 local tests,
+manual/automatic decisions, history, conditional score, rollback/retry and
+170+10-row inference/no-op for both engines. The user has a pending v5 to practice.
 [36 misplaced Core test files](44-core-test-relocation.md)
 were relocated and verified before this continuation. See
 [the implementation evidence](40-sm30-challenger-validation-report.md): 104
@@ -62,8 +75,8 @@ on an existing candidate without retraining or reuploading the model.
 | --- | --- | --- | --- | --- |
 | SM-30 | Challenger nomination and visible evaluation status | Existing SM-22c/29 | DONE | 104 local tests and live run 607409241163605 passed; company tags, both engines, retained contender, replacement, error and rollback verified |
 | SM-31 | Thin template and reusable workflow/publication services | SM-30 | DONE | 44-line notebook, two Core services, 110 tests, wheel installation/import, strict generation validation and live score run 383572337148835 passed |
-| SM-32 | Independent score selection and promotion policy | SM-31 | ACTIVE | Library's four combinations and approve/reject/rollback implemented; remaining: previous_challenger history, serialized Bundle operator actions and score handoff without fit, matching choices and live proof |
-| SM-33 | Validated config, migration and runtime parameters | SM-32 | WAIT | Per-run version/action/evidence inputs; task/column/key setup; migrate old mode and reject config/job-graph disagreement |
+| SM-32 | Independent score selection and promotion policy | SM-31 | DONE | 194 local tests and personal serverless manual/automatic, approve/reject/rollback/retry, history and score handoff/pin preservation passed; [live evidence](51-sm32-live-validation-report.md) |
+| SM-33 | Validated config, migration and runtime parameters | SM-32 | READY | Per-run version/action/evidence inputs; task/column/key setup; migrate old mode and reject config/job-graph disagreement |
 | SM-34 | Independent score/train schedules and training windows | SM-33 | WAIT | Editable paused score/train cron/timezone, explicit lookback/holdout/label windows; scoring needs no manual dates or retraining |
 | SM-35 | Multi-metric quality gates and clear thresholds | SM-33 | WAIT | One selection metric plus optional guardrails; task/domain validation, first-model gate, failed-gate explanations and no probability-threshold confusion |
 | SM-36 | Core tuning, model search and optional explainability | SM-35 | WAIT | Existing Core search/trials and FE reused with budgets, protected holdout, MLflow evidence and selected-model inference parity |

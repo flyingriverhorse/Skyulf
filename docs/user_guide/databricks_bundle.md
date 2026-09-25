@@ -1,5 +1,8 @@
 # Local-engine Databricks Bundle
 
+For job-screen instructions and lifecycle diagrams, use the
+[operator walkthrough](databricks_bundle_walkthrough.md).
+
 The custom Skyulf template generates one editable Bundle with `dev`, `test`,
 `syst` and `prod` targets. It fits and predicts with pandas or Polars. Spark
 reads bounded Unity Catalog Delta rows and publishes predictions; local
@@ -12,7 +15,8 @@ databricks bundle init skyulf-core/templates/databricks --output-dir ./generated
 ```
 
 The short path asks for project name, engine, one existing source row-key
-column, model-change and model-selection modes, optional retraining mode and cron, serverless
+column, model-change mode, independent scoring and promotion policies, optional
+score handoff, retraining mode and cron, serverless
 or policy-backed job compute and the existing `dev`
 catalog/schema. Serverless is the default. Reviewable
 noninteractive examples are in `skyulf-core/templates/databricks/examples/`. The generated
@@ -39,21 +43,21 @@ versions; it does not change promotion gates or relabel existing versions.
 
 ## Where the workflow lives
 
-The generated `src/workflow.py` reads job widgets and JSON, calls the installed
-library, and serializes its result. Reusable behavior lives in
-`skyulf.integrations.databricks.local_workflow`: `resolve_target_config` binds
-target names and `run_action` executes train, train_monthly or score.
-`prediction_output` validates and creates output tables and safely switches
-full-rebuild views. Both reuse the existing training, inference and registry
-services. Importing them does not create a Spark session or cloud resource.
+The generated `src/workflow.py` and `src/score.py` are small entrypoints with
+fixed lifecycle and score roles. The installed `job_runtime` adapter reads
+widgets/configuration, validates operator inputs and publishes task values.
+It delegates target resolution and execution to `local_workflow`; training,
+evaluation, registry changes and prediction use existing Core services.
+`prediction_output` creates output tables and safely switches full-rebuild
+views. Imports do not create a Spark session or cloud resource.
 
 Edit the business pipeline in `config/workflow.json`. Model/preprocessing
 choices remain project configuration; common workflow fixes ship in the
 Skyulf wheel instead of requiring edits to every generated notebook.
 
-### Independent library policies (SM-32 in progress)
+### Independent scoring and promotion policies
 
-Direct `run_action` callers can now separate these two decisions:
+Generated Bundles and direct `run_action` callers separate these decisions:
 
 | `score_model_selection` | `promotion_policy` | Behavior |
 | --- | --- | --- |
@@ -75,14 +79,51 @@ Legacy `auto_champion` retains champion/automatic behavior, and legacy
 Automatic promotion still requires `quality_threshold`, including when
 scoring is pinned. Scoring never updates the caller's configured version.
 
-This first slice is available at the library boundary. The generated Bundle
-still uses its existing `model_selection_mode` and job graph. Do not migrate
-only its JSON: the lifecycle actions and matching job handoff must be delivered
-together. `manual_approval` currently means no automatic promotion; approve,
-reject and rollback are separate operator actions. The library now supports
-`approve`, `reject` and `rollback`. `previous_challenger` and the matching Bundle
-choices/action handoff remain open in SM-32.
-No new cloud deployment is implied by these library changes.
+New Bundles require both policy fields and `score_handoff`. Migrate an older
+project's configuration, both notebook entrypoints and job graph together;
+changing only JSON is insufficient. Core direct callers retain the legacy
+compatibility path described above. Generated projects use the new policies.
+
+### Operator actions through Run now
+
+The existing `train` job is the serialized lifecycle writer. In **Run now with
+different parameters**, choose `lifecycle_action`:
+
+| Action | Required job parameters |
+| --- | --- |
+| `train` / `train_monthly` | No operator evidence; leave other parameters empty |
+| `approve` | `candidate_version`, `comparison_sha256`, `expected_champion_version` |
+| `reject` | Same as approve, plus `rejection_reason` |
+| `rollback` | `promotion_receipt_json`, `expected_champion_version` |
+
+Manual training returns copyable `next_actions.approve` and `next_actions.reject`
+fields. Review the comparison and copy its exact values; add a reason for
+rejection. `expected_champion_version=none` explicitly selects first-champion
+initialization; an empty value fails. Configure the metric and absolute quality
+threshold **before training** so saved evidence matches the approval policy.
+A completed promotion returns `next_actions.rollback`, including its complete
+receipt JSON. Copy that receipt rather than reconstructing it from alias names.
+These operator actions reuse the existing candidate; they do not fit a model.
+
+`score_handoff=after_alias_change` requests the existing score job after a
+successful initialization, promotion or rollback. `disabled` leaves scoring to
+an explicit score run or its schedule. Rejection and training without a champion
+transition never trigger score. Handoff preserves the score selector: a pinned
+scorer still uses its configured version even after champion changes.
+
+There are still two jobs. The lifecycle job contains three tasks: execute the
+action, check `score_requested`, and conditionally call the score job. Both jobs
+queue runs with `max_concurrent_runs: 1`. Score's fixed notebook role ignores inherited
+lifecycle parameters and cannot dispatch alias actions; this is input isolation, not a replacement for exclusive
+registry write permissions. A failed/uncertain alias action never publishes a
+successful score request. If the alias change succeeded but score failed, retry
+score directly; no retraining is needed.
+
+Local tests and strict generated-project validation cover this wiring. The
+personal serverless SM-32 rehearsal verified manual approval, rejection,
+rollback/retry, automatic promotion, score handoff and pinned selection.
+The score entrypoint filters inherited parent-job evidence before dispatching
+score. Company targets and production identities remain separate acceptance work.
 
 ### Approve an existing candidate without training
 
@@ -125,8 +166,8 @@ receipt; changed champion, pending writes or incompatible evidence fail.
 Training runs created before the saved specification was introduced cannot
 use this action without explicitly supplying that missing provenance through
 a separately reviewed migration; there is no fallback to current training dates.
-Use the same externally serialized lifecycle writer as training. Bundle widgets
-and automatic score handoff for operator actions are still pending.
+Use the same externally serialized lifecycle writer as training. The Bundle
+operator parameters above provide that path with optional score handoff.
 
 ### Reject a candidate or roll back a promotion
 
@@ -171,10 +212,34 @@ or rollback returns the same committed receipt; incompatible evidence,
 conflicting alias state and unresolved writes stop the action.
 
 All lifecycle actions must use the same externally serialized writer as training.
-No additional control table is created. These actions do not launch score or
-rewrite its version pin. A later `champion` score follows the restored alias;
+No additional control table is created. Direct `run_action` calls do not launch
+score or rewrite its version pin; the Bundle adapter can request score afterward. A later `champion` score follows the restored alias;
 a `pinned_version` score continues using its configured version. Rollback does
 not undo predictions already written; scoring's model-change policy still applies.
+
+### Recent challenger history
+
+The Core lifecycle keeps the last displaced contender as `previous_challenger`:
+
+| Action | Champion | Challenger | Previous challenger |
+| --- | --- | --- | --- |
+| Starting state | v2 | v3 | unset |
+| Nominate v4 | v2 | v4 | v3 |
+| Repeat nomination of v4 | v2 | v4 | v3 |
+| Promote v4 | v4 | unset | v3 |
+
+Only replacing an existing contender rotates this pointer. Evaluation and
+promotion retain it, and promotion still puts the old champion in
+`previous_champion`. If the historical version becomes champion through
+rollback, or becomes challenger again, its history alias is cleared. The
+version and its earlier event records remain available.
+
+This alias is neither a complete history nor a scoring fallback. It creates
+no table or job. History changes share the lifecycle's pending-event checks
+and writer ownership; manual alias/receipt disagreement stops further actions,
+including retries. Partial writes require reconciliation before proceeding.
+This history extension passed local and personal-serverless Bundle verification,
+including replacement, explicit rejection and rollback while retaining a contender.
 
 ## What is created
 
@@ -182,7 +247,7 @@ not undo predictions already written; scoring's model-change policy still applie
 
 | Job | Purpose | UC objects created when run |
 | --- | --- | --- |
-| `train` | Fit one candidate and log held-out metrics | One registered model/version |
+| `train` | Train/evaluate a candidate or execute approve/reject/rollback | Model/version only for training |
 | `score` | Score initial and later CDF rows | Prediction output and rows |
 
 The default project has no schedule. Choosing `monthly_paused` at initialization
@@ -190,21 +255,22 @@ adds a paused schedule to the existing `train` job, without adding a third
 job or running it at deployment. The Quartz cron and timezone are selected
 at initialization and remain editable Bundle variables. No endpoint or Unity Catalog table is
 created by deployment alone.
-`pinned_version` keeps manual model selection. `auto_champion` uses the same
-train job to compare candidate and champion on a pinned temporal holdout. The
+`promotion_policy=automatic` uses the same train job to compare candidate and
+champion on a pinned temporal holdout, independently of the score selector. The
 selected `metric`, `min_improvement`, and absolute `quality_threshold` stay
 editable in `config/workflow.json`. A first champion requires a numeric
 absolute threshold because no prior version exists for comparison. Later
 versions must pass that threshold and improve on champion by the chosen
 minimum. A passing candidate is staged and promoted through checked registry
 receipts; an ineligible candidate leaves champion unchanged. The train job
-then calls the existing score job. No third job or control table is added.
+calls the existing score job only after a champion transition when handoff is
+enabled. No third job or control table is added.
 
 In both modes, registration nominates `@challenger` before comparison. A tied
 or worse candidate retains that alias with `validation_status=rejected` and
 a reason; comparison errors retain it with `validation_status=error`.
 New contenders replace the pointer without deleting earlier version evidence.
-Manual mode records these results without promotion or changing pinned scoring.
+Manual approval records these results without automatically promoting the candidate.
 Training resolves the current champion; a stale explicit `champion_version`
 fails before fit. Generic Core training remains alias-free unless a caller
 supplies the explicit `on_registered` lifecycle callback.
@@ -224,8 +290,9 @@ identifies the version previously held by the affected alias, not necessarily
 the previous champion. These are audit records,
 not settings to edit. Earlier compact receipts remain supported.
 
-In automatic mode, score resolves `@champion` once to a concrete version per
-run. In both modes, only the serialized train job identity may write this
+With `score_model_selection=champion`, score resolves the alias once to a
+concrete version per run, under either promotion policy. Only the serialized
+train job identity may write this
 model's aliases; other alias-write grants must be removed before training.
 Alias promotion and Delta scoring are separate transactions. If scoring fails
 after promotion, the last successful prediction output remains and the score
@@ -233,14 +300,16 @@ job must be retried. Unknown alias outcomes need receipt reconciliation.
 Skyulf marks an alias transition as pending before writing it; automatic
 training and scoring stop until that pending event is reconciled. An existing
 champion alias set outside this controlled lifecycle also needs reconciliation
-before automatic mode can use it.
+before controlled champion scoring or promotion can use it.
 
 For example, a regression project can select its gate in the generated config:
 
 ```json
 {
   "engine": "polars",
-  "model_selection_mode": "auto_champion",
+  "score_model_selection": "champion",
+  "promotion_policy": "automatic",
+  "score_handoff": "after_alias_change",
   "metric": "heldout_rmse",
   "min_improvement": 0.1,
   "quality_threshold": 5.0,
@@ -255,7 +324,7 @@ from the metric: RMSE/MAE/log loss are minimized, while R²/accuracy/F1 are
 maximized. Use a metric supported by the configured model task. The first
 comparison reports `reason=no_champion` and `eligible=false` because no
 baseline exists; successful bootstrap is recorded separately as
-`alias_change.kind=initial` after the absolute gate passes.
+`result.alias_change.kind=initial` in the Bundle output after the absolute gate passes.
 
 If promotion succeeds but scoring fails, the train job reports a failed
 dependent score task. Correct the scoring problem and run `score` again;
@@ -312,9 +381,10 @@ databricks bundle deploy -t dev --profile <profile>
 databricks bundle run train -t dev --profile <profile>
 ```
 
-In manual mode, inspect the registered model version, put that concrete value
-in `model_version`, redeploy the changed JSON, then run `score`. In automatic
-mode, inspect the train and dependent score task results. The first score
+For pinned scoring, inspect the registered version, put that concrete value
+in `model_version`, redeploy the changed JSON, then run `score`. For champion
+scoring, approve manually or use automatic promotion gates, then run score or
+enable the optional handoff. Inspect both lifecycle and score task results. The first score
 rejects a missing source, disabled CDF, unsuitable row keys, a model output
 mismatch or an existing target schema mismatch before creating prediction
 output. It checks initial row count against `max_rows`; each score
@@ -324,8 +394,8 @@ snapshot; later runs process only new inserts since the committed Delta
 receipt. A repeat without new rows is a no-op. No monthly date or source
 version is entered for each run.
 
-In manual mode, the first candidate does not become champion automatically;
-scoring stays pinned to its configured version. At initialization, choose
+With manual approval, the first candidate requires explicit approval to become
+champion. Pinned scoring can use a registered version without that approval. At initialization, choose
 `incremental_append` to keep
 v1 predictions and score only later source inserts with pinned v2. Choose
 `full_rebuild` to write a new physical `<prediction_table>_v2` generation,
@@ -346,8 +416,9 @@ run, unpause it deliberately. Each run pins the source's latest Delta version an
 first day of the current UTC month as the label cutoff. The preceding month is
 holdout; `monthly_lookback_months` (default four) controls the full window.
 Only labels available by the cutoff are eligible. `@champion` is resolved to a
-concrete version for comparison if present. Manual mode leaves selection
-unchanged; automatic mode applies its metric gates and invokes score. The source version is
+concrete version for comparison if present. Manual approval leaves champion
+unchanged; automatic promotion applies its metric gates. Score handoff follows
+only a successful champion transition when enabled. The source version is
 pinned at run start, so `label_at` must faithfully record availability.
 
 The older SM-20a personal serverless rehearsal passed, but its jobs and test

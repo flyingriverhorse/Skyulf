@@ -5,6 +5,17 @@ resources:
       max_concurrent_runs: 1
       queue:
         enabled: true
+      parameters:
+        - name: lifecycle_action
+          default: {{if eq .retraining_mode "monthly_paused"}}train_monthly{{else}}train{{end}}
+        - name: candidate_version
+          default: ""
+        - name: expected_champion_version
+          default: ""
+        - name: rejection_reason
+          default: ""
+        - name: promotion_receipt_json
+          default: ""
 {{if eq .retraining_mode "monthly_paused"}}
       schedule:
         quartz_cron_expression: ${var.retraining_cron_expression}
@@ -16,7 +27,11 @@ resources:
           notebook_task:
             notebook_path: ../src/workflow.py
             base_parameters:
-              action: {{if eq .retraining_mode "monthly_paused"}}train_monthly{{else}}train{{end}}
+              lifecycle_action: '{{"{{job.parameters.lifecycle_action}}"}}'
+              candidate_version: '{{"{{job.parameters.candidate_version}}"}}'
+              expected_champion_version: '{{"{{job.parameters.expected_champion_version}}"}}'
+              rejection_reason: '{{"{{job.parameters.rejection_reason}}"}}'
+              promotion_receipt_json: '{{"{{job.parameters.promotion_receipt_json}}"}}'
               config_path: ${workspace.file_path}/config/workflow.json
               experiment_name: ${workspace.root_path}/experiment
               catalog: ${var.catalog}
@@ -33,13 +48,19 @@ resources:
             - pypi:
                 package: mlflow==3.16.1
 {{end}}
-{{if eq .model_selection_mode "auto_champion"}}
-        - task_key: score_after_training
+        - task_key: should_score
           depends_on:
             - task_key: train
+          condition_task:
+            op: EQUAL_TO
+            left: '{{"{{tasks.train.values.score_requested}}"}}'
+            right: "true"
+        - task_key: score_after_lifecycle
+          depends_on:
+            - task_key: should_score
+              outcome: "true"
           run_job_task:
             job_id: ${resources.jobs.score.id}
-{{end}}
 {{if eq .compute_mode "serverless"}}
       environments:
         - environment_key: skyulf
@@ -69,9 +90,8 @@ resources:
       tasks:
         - task_key: score
           notebook_task:
-            notebook_path: ../src/workflow.py
+            notebook_path: ../src/score.py
             base_parameters:
-              action: score
               config_path: ${workspace.file_path}/config/workflow.json
               catalog: ${var.catalog}
               input_schema: ${var.input_schema}

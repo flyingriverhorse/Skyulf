@@ -9,15 +9,16 @@ from unittest.mock import Mock
 import pandas as pd
 import pytest
 
-from skyulf.integrations.databricks import local_retraining, local_workflow
+from skyulf.integrations.databricks import job_runtime, local_retraining, local_workflow
 from skyulf.integrations.mlflow.promotion import AliasConflictError
 
 mlflow = pytest.importorskip("mlflow")
 
 
 @pytest.mark.parametrize("engine", ["pandas", "polars"])
+@pytest.mark.parametrize("evidence_mode", ["explicit", "saved"])
 def test_manual_approval_reuses_registered_versions_and_replays_receipt(
-    tmp_path, monkeypatch, engine
+    tmp_path, monkeypatch, engine, evidence_mode
 ):
     """Approval, including bootstrap and retry, must never retrain or register a new model."""
     frame = pd.DataFrame(
@@ -44,6 +45,7 @@ def test_manual_approval_reuses_registered_versions_and_replays_receipt(
         "registry_uri": uri,
         "score_model_selection": "pinned_version",
         "promotion_policy": "manual_approval",
+        "score_handoff": "after_alias_change",
         "model_version": "1",
         "row_keys": ["id"],
         "input_columns": ["x"],
@@ -64,10 +66,41 @@ def test_manual_approval_reuses_registered_versions_and_replays_receipt(
         },
     }
 
+    def operator_action(spark, config, action, **kwargs):
+        """Exercise real operator parameter decoding and copyable evidence with MLflow artifacts."""
+        experiment = kwargs.pop("experiment_name", None)
+        artifact = kwargs.pop("artifact_path", None)
+        parameters = {"lifecycle_action": action}
+        for key, value in kwargs.items():
+            if key == "promotion_receipt":
+                parameters["promotion_receipt_json"] = json.dumps(asdict(value))
+            else:
+                parameters[key] = "none" if value is None else value
+        outcome = job_runtime.run_bundle_action(
+            spark,
+            config,
+            parameters,
+            task_role="lifecycle",
+            experiment_name=experiment,
+            artifact_path=artifact,
+        )
+        assert outcome.score_requested == (action in {"approve", "rollback"})
+        if action == "train":
+            assert (
+                outcome.next_actions["approve"]["candidate_version"] == outcome.result.model_version
+            )
+            assert outcome.next_actions["approve"]["expected_champion_version"] == (
+                outcome.result.comparison.champion_version or "none"
+            )
+        if action == "approve" and outcome.result.kind == "promotion":
+            decoded = json.loads(outcome.next_actions["rollback"]["promotion_receipt_json"])
+            assert decoded == asdict(outcome.result)
+        return outcome.result
+
     def train():
         """Create actual artifacts before the separate approval operation."""
         version = len(client.search_model_versions("name = 'approval_model'")) + 1
-        return local_workflow.run_action(
+        return operator_action(
             None,
             config,
             "train",
@@ -82,11 +115,11 @@ def test_manual_approval_reuses_registered_versions_and_replays_receipt(
         ).hexdigest()
         options: dict[str, Any] = {
             "candidate_version": candidate.model_version,
-            "comparison_sha256": digest,
+            "comparison_sha256": digest if evidence_mode == "explicit" else "",
             "expected_champion_version": expected,
         }
         options.update(changes)
-        return local_workflow.run_action(None, config, "approve", **options)
+        return operator_action(None, config, "approve", **options)
 
     first = train()
     assert not client.get_registered_model(config["model_name"]).aliases.get("champion")
@@ -109,6 +142,13 @@ def test_manual_approval_reuses_registered_versions_and_replays_receipt(
     assert str(client.get_registered_model(config["model_name"]).aliases["champion"]) == "1"
     with pytest.raises(ValueError, match="digest"):
         approve(second, "1", comparison_sha256="0" * 64)
+    original_report = asdict(second.comparison)
+    client.log_dict(
+        second.run_id, {**original_report, "quality_threshold": 999.0}, "candidate_comparison.json"
+    )
+    with pytest.raises(ValueError, match="digest"):
+        approve(second, "1")
+    client.log_dict(second.run_id, original_report, "candidate_comparison.json")
     with pytest.raises(ValueError, match="expected|Expected"):
         approve(second, "9")
     config["quality_threshold"] = 200.0
@@ -140,6 +180,10 @@ def test_manual_approval_reuses_registered_versions_and_replays_receipt(
     assert len(client.search_model_versions("name = 'approval_model'")) == 2
     assert config["model_version"] == "1"
     assert str(client.get_registered_model(config["model_name"]).aliases["champion"]) == "2"
+    client.set_registered_model_alias(config["model_name"], "previous_challenger", "1")
+    with pytest.raises(AliasConflictError, match="history"):
+        approve(second, "1")
+    client.delete_registered_model_alias(config["model_name"], "previous_challenger")
     with pytest.raises(AliasConflictError):
         approve(first, None)
 
@@ -151,6 +195,8 @@ def test_manual_approval_reuses_registered_versions_and_replays_receipt(
     tied_digest = hashlib.sha256(
         json.dumps(asdict(tied.comparison), sort_keys=True, allow_nan=False).encode()
     ).hexdigest()
+    if evidence_mode == "saved":
+        tied_digest = ""
     with monkeypatch.context() as no_training:
         no_training.setattr(
             local_workflow, "train_local_candidate", Mock(side_effect=AssertionError("fit"))
@@ -167,7 +213,7 @@ def test_manual_approval_reuses_registered_versions_and_replays_receipt(
             json.dumps({"event_id": promoted.event_id, "version": "1"}),
         )
         with pytest.raises(AliasConflictError, match="receipt disagrees"):
-            local_workflow.run_action(
+            operator_action(
                 None,
                 config,
                 "reject",
@@ -181,7 +227,7 @@ def test_manual_approval_reuses_registered_versions_and_replays_receipt(
             not in client.get_model_version(config["model_name"], tied.model_version).tags
         )
         client.set_registered_model_tag(config["model_name"], "champion_current_event", marker)
-        rejected = local_workflow.run_action(
+        rejected = operator_action(
             None,
             config,
             "reject",
@@ -191,7 +237,7 @@ def test_manual_approval_reuses_registered_versions_and_replays_receipt(
             rejection_reason="Retain the current production model",
         )
         assert (
-            local_workflow.run_action(
+            operator_action(
                 None,
                 config,
                 "reject",
@@ -205,12 +251,12 @@ def test_manual_approval_reuses_registered_versions_and_replays_receipt(
         with pytest.raises(AliasConflictError, match="rejected"):
             approve(tied, "2")
         config["promotion_policy"] = "automatic"
-        rollback = local_workflow.run_action(
+        rollback = operator_action(
             None, config, "rollback", promotion_receipt=promoted, expected_champion_version="2"
         )
         assert rollback.kind == "rollback" and rollback.new_version == "1"
         assert (
-            local_workflow.run_action(
+            operator_action(
                 None, config, "rollback", promotion_receipt=promoted, expected_champion_version="2"
             )
             == rollback

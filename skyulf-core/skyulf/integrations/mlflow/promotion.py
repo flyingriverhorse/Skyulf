@@ -33,6 +33,8 @@ from .validation import ModelComparisonReport, compare_registered_local_models
 _ALIAS = "champion"
 _CHALLENGER = "challenger"
 _PREVIOUS = "previous_champion"
+_HISTORY = "previous_challenger"
+_HISTORY_TAG = "previous_challenger_current_event"
 _ACTIVE_TAG = "champion_current_event"
 _CHALLENGER_TAG = "challenger_current_event"
 _PENDING_TAG = "pending_alias_event"
@@ -181,6 +183,93 @@ def _assert_no_pending(client: Any, name: str) -> None:
     tags = client.get_registered_model(name).tags or {}
     if tags.get(_PENDING_TAG):
         raise AliasConflictError("A pending alias event requires reconciliation.")
+    _read_challenger_history(client, name)
+
+
+def _read_challenger_history(client: Any, name: str) -> str | None:
+    """Verify the history pointer, including an explicitly cleared pointer's receipt."""
+    current = _read_optional_alias(client, name, _HISTORY)
+    raw = (client.get_registered_model(name).tags or {}).get(_HISTORY_TAG)
+    if raw is None:
+        if current is not None:
+            raise AliasConflictError("Challenger history alias lacks a controlled receipt.")
+        return None
+    try:
+        marker = json.loads(raw)
+        if (
+            not isinstance(marker, dict)
+            or not isinstance(marker.get("event_id"), str)
+            or not marker["event_id"]
+            or not isinstance(marker.get("version"), str)
+            or not marker["version"].isascii()
+            or not marker["version"].isdigit()
+        ):
+            raise ValueError
+        tags = client.get_model_version(name, marker["version"]).tags or {}
+        history = json.loads(tags[f"challenger_history_{marker['event_id']}"])
+        event = _read_event(tags[_event_tag(marker["event_id"])])
+        if (
+            history["state"] != "committed"
+            or event["s"] != "committed"
+            or history["to_version"] != current
+            or event["k"] not in {"nomination", "challenger", "initial", "promotion", "rollback"}
+        ):
+            raise ValueError
+        if current is not None:
+            if event["k"] not in {"nomination", "challenger"} or event["p"] != current:
+                raise ValueError
+            if current in {
+                _read_optional_alias(client, name, _ALIAS),
+                _read_optional_alias(client, name, _CHALLENGER),
+            }:
+                raise ValueError
+        elif history["from_version"] != marker["version"]:
+            raise ValueError
+    except (TypeError, ValueError, KeyError) as exc:
+        raise AliasConflictError(
+            "Challenger history disagrees with its committed receipt."
+        ) from exc
+    return current
+
+
+def _plan_challenger_history(
+    client: Any, receipt: AliasChangeReceipt, updates: list[tuple[str, str | None, str | None]]
+) -> tuple[str | None, str | None] | None:
+    """Archive only displaced contenders and clear history when it becomes a current role."""
+    previous = _read_challenger_history(client, receipt.model_name)
+    desired = previous
+    champion = _read_optional_alias(client, receipt.model_name, _ALIAS)
+    challenger = _read_optional_alias(client, receipt.model_name, _CHALLENGER)
+    for alias, new_version, old_version in updates:
+        if alias == _ALIAS:
+            champion = new_version
+        elif alias == _CHALLENGER:
+            challenger = new_version
+            if new_version is not None and old_version is not None and new_version != old_version:
+                _checked_challenger_event(client, receipt.model_name, old_version)
+                desired = old_version
+    if desired in {champion, challenger}:
+        desired = None
+    return (previous, desired) if previous != desired else None
+
+
+def _write_challenger_history(
+    client: Any,
+    receipt: AliasChangeReceipt,
+    change: tuple[str | None, str | None],
+    status: str,
+) -> None:
+    """Persist history intent separately to preserve the existing bounded receipt format."""
+    value = json.dumps(
+        {"from_version": change[0], "to_version": change[1], "state": status},
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+    if len(value.encode("utf-8")) > 256:
+        raise ValueError("Challenger history exceeds the 256-byte tag value limit.")
+    client.set_model_version_tag(
+        receipt.model_name, receipt.new_version, f"challenger_history_{receipt.event_id}", value
+    )
 
 
 def _assert_not_rejected(client: Any, name: str, version: str) -> None:
@@ -207,6 +296,7 @@ def controlled_champion_version(
     tags = registered.tags or {}
     if tags.get(_PENDING_TAG):
         raise AliasConflictError("A pending alias event requires reconciliation.")
+    _read_challenger_history(client, model_name)
     current = _read_optional_alias(client, model_name, _ALIAS)
     if current is None:
         if tags.get(_ACTIVE_TAG):
@@ -329,6 +419,9 @@ def _commit_change(
     failures are reported as unknown and require reconciliation before retry.
     """
     _assert_no_pending(client, receipt.model_name)
+    history = _plan_challenger_history(client, receipt, updates)
+    if history is not None:
+        updates = [*updates, (_HISTORY, history[1], history[0])]
     try:
         _write_event(client, receipt, "prepared")
     except Exception as exc:  # noqa: BLE001 - registry transport boundary
@@ -342,6 +435,13 @@ def _commit_change(
         raise AliasOutcomeUnknownError(
             f"Alias preparation outcome unknown; inspect event {receipt.event_id}."
         ) from exc
+    if history is not None:
+        try:
+            _write_challenger_history(client, receipt, history, "prepared")
+        except Exception as exc:  # noqa: BLE001 - pending history requires reconciliation
+            raise AliasOutcomeUnknownError(
+                f"History preparation outcome unknown; inspect event {receipt.event_id}."
+            ) from exc
     changed = False
     for alias, new_version, old_version in updates:
         try:
@@ -381,6 +481,14 @@ def _commit_change(
         if any(stored.get(key) != value for key, value in tags.items()):
             raise AliasOutcomeUnknownError("Model version status was not verified.")
         _write_event(client, receipt, "committed")
+        if history is not None:
+            _write_challenger_history(client, receipt, history, "committed")
+            client.set_registered_model_tag(
+                receipt.model_name,
+                _HISTORY_TAG,
+                json.dumps({"event_id": receipt.event_id, "version": receipt.new_version}),
+            )
+        _read_challenger_history(client, receipt.model_name)
         tag = _ACTIVE_TAG if receipt.alias == _ALIAS else _CHALLENGER_TAG
         client.set_registered_model_tag(
             receipt.model_name,

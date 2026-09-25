@@ -1,12 +1,9 @@
 """Exercise generated lifecycle orchestration against a real local MLflow store."""
 
-import importlib.util
-from pathlib import Path
-
 import pandas as pd
 import pytest
 
-from skyulf.integrations.databricks import local_retraining, local_workflow
+from skyulf.integrations.databricks import job_runtime, local_retraining, local_workflow
 
 mlflow = pytest.importorskip("mlflow")
 
@@ -17,13 +14,6 @@ def test_bundle_nomination_comparison_and_promotion_are_separate(
     tmp_path, monkeypatch, engine, selection
 ):
     """Real artifacts must retain a tied contender and survive failed comparison on either engine."""
-    path = Path(__file__).resolve().parents[2] / (
-        "templates/databricks/template/{{.project_name}}/src/workflow.py"
-    )
-    spec = importlib.util.spec_from_file_location("sm30_workflow", path)
-    assert spec is not None and spec.loader is not None
-    workflow = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(workflow)
     frame = pd.DataFrame(
         {
             "id": range(12),
@@ -47,6 +37,7 @@ def test_bundle_nomination_comparison_and_promotion_are_separate(
         "registry_uri": store,
         "score_model_selection": selection,
         "promotion_policy": "automatic",
+        "score_handoff": "after_alias_change",
         "model_version": "1",
         "row_keys": ["id"],
         "input_columns": ["x"],
@@ -72,13 +63,16 @@ def test_bundle_nomination_comparison_and_promotion_are_separate(
 
     def run(version):
         """Use the exact template action with only its Spark input boundary replaced."""
-        return workflow.run_action(
+        outcome = job_runtime.run_bundle_action(
             None,
             config,
-            "train",
+            {"lifecycle_action": "train"},
+            task_role="lifecycle",
             experiment_name="lifecycle",
             artifact_path=tmp_path / f"model-{version}",
         )
+        assert outcome.score_requested == (version in {1, 2})
+        return outcome.result
 
     first = run(1)
     assert first.alias_change.kind == "initial"
