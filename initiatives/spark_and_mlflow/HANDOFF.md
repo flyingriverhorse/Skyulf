@@ -1,3 +1,34 @@
+# Current handoff: SM-33B locally verified
+
+SM-33A committed as `fa7a1171` on branch `090`, signed with hooks passed;
+no push. SM-33B is DONE locally and remains uncommitted. See
+[date validation evidence](56-sm33b-training-date-validation.md).
+
+Added `TrainingDateSpec` with independent `event_time_parsing` and
+`result_time_parsing` (format/timezone/date_only). Source types determine native
+vs string handling. Strict shared parsing, DST validation before source filters,
+integer-microsecond transport, and saved parsing rules for approval are verified.
+Generated JSON exposes editable native defaults; conditional prompts remain E.
+No compatibility adapter was reintroduced. English docs include examples.
+
+Validation: 161 CLI/template/lifecycle/workflow/runtime regressions; final
+72 focused date/training/config tests; 7 updated real MLflow approval tests with
+nondefault source formats on pandas/Polars; 9 real Delta date tests via WSL.
+Full ty, scoped Ruff, strict docs and independent final review passed. Windows
+Delta lacks Hadoop support: use `.cache/sm15-linux-run.sh` separately from plain
+Spark fixtures. Keep timezone data aligned across execution/replay environments.
+
+Next READY: SM-33C date-free/random training and optional result availability.
+Then SM-33D Core CV and SM-33E combined live acceptance. SM-34 stays WAIT.
+No Databricks deployment or cleanup happened; remote jobs retain the prior
+SM-33 wheel/config. New projects/models will be created for combined acceptance.
+
+At the next requested commit, include new `training_dates.py`, two date test
+files and force-add exact initiative report 56. Leave unrelated
+`.tmp-review-model/` untouched. Do not push without a request.
+
+## Historical snapshot: SM-33A delivery
+
 # Current handoff: SM-33A direct field rename
 
 SM-33 was committed as `0c0fd17f` on branch `090`, with sign-off and hooks.
@@ -12,12 +43,12 @@ Databricks training/scoring, saved evidence, template configuration and examples
 Old initializer fields are removed. Recreate earlier experimental projects and
 models when carrying out live acceptance; do not reintroduce aliases.
 
-SM-33A is DONE locally; the rename and new plan are uncommitted. Verification:
+SM-33A is committed as `fa7a1171` (signed, hooks passed; no push). Verification:
 503 integration/contract tests, 106 Spark checks and 53 Delta cases passed
 (52 in the suite plus one corrected fixture case on focused rerun). Full ty,
 scoped Ruff, strict docs and real CLI generation passed. See
 [SM-33A evidence](55-sm33a-field-naming-validation.md).
-Current dated training requirements still apply; SM-33B parsing/timezones is next,
+Current dated training requirements still apply; SM-33B parsing/timezones is ACTIVE,
 then SM-33C date-free training, SM-33D CV and SM-33E combined live acceptance.
 SM-34 stays WAIT. No live deployment or cloud deletion happened in this slice;
 existing Databricks jobs still use the committed SM-33 wheel/config.

@@ -1,11 +1,14 @@
 """Bounded, label-aware local candidate training from a pinned Delta snapshot.
 
-This adapter uses Spark only for a narrow, bounded read. Fit and evaluation run
-on the recorded local engine. Alias management requires an explicit caller hook.
+Spark validates source dates before materializing a narrow, bounded read. Fit
+and evaluation run on the recorded local engine. Alias management requires an
+explicit caller hook.
 """
 
 from __future__ import annotations
 
+import hashlib
+import json
 import math
 import pickle
 from collections.abc import Callable
@@ -25,6 +28,13 @@ from ..mlflow.tracking import TrackingConfig, track_run
 from ..mlflow.validation import ModelComparisonReport, compare_registered_local_models
 from ._contracts import column_name, table_name
 from .local_batch import _frame_bytes, fit_local_workflow
+from .training_dates import (
+    TrainingDateSpec,
+    instant_from_microseconds,
+    instant_microseconds,
+    normalize_training_dates,
+    parse_training_date,
+)
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -43,10 +53,15 @@ class LocalTrainingSpec:
     target_column: str
     max_rows: int
     max_bytes: int
+    event_time_parsing: TrainingDateSpec = TrainingDateSpec()
+    result_time_parsing: TrainingDateSpec = TrainingDateSpec()
 
     def __post_init__(self) -> None:
         """Reject ambiguous or unsafe snapshots before opening a Spark reader."""
         table_name(self.table)
+        for field in ("event_time_parsing", "result_time_parsing"):
+            if not isinstance(getattr(self, field), TrainingDateSpec):
+                raise TypeError(f"{field} must be TrainingDateSpec.")
         if type(self.version) is not int or self.version < 0:
             raise ValueError("version must be a nonnegative Delta snapshot version.")
         for name in ("start", "holdout_start", "cutoff"):
@@ -57,7 +72,11 @@ class LocalTrainingSpec:
                 tzinfo=None
             ):
                 raise ValueError(f"{name} is not a valid local instant.")
-        if not self.start < self.holdout_start < self.cutoff:
+        if (
+            not self.start.astimezone(UTC)
+            < self.holdout_start.astimezone(UTC)
+            < self.cutoff.astimezone(UTC)
+        ):
             raise ValueError("Require start < holdout_start < cutoff.")
         if not self.record_key_columns or not self.input_columns:
             raise ValueError("record_key_columns and input_columns must be nonempty.")
@@ -80,6 +99,16 @@ class LocalTrainingSpec:
     @property
     def dataset_id(self) -> str:
         """Describe the immutable evaluation rows and temporal selection."""
+        parsing = hashlib.sha256(
+            json.dumps(
+                {
+                    "event": asdict(self.event_time_parsing),
+                    "result": asdict(self.result_time_parsing),
+                },
+                sort_keys=True,
+                separators=(",", ":"),
+            ).encode()
+        ).hexdigest()
         return (
             f"{self.table}@{self.version}/event[{self.start.astimezone(UTC).isoformat()},"
             f"{self.cutoff.astimezone(UTC).isoformat()})/holdout>="
@@ -87,6 +116,7 @@ class LocalTrainingSpec:
             f"/label<={self.cutoff.astimezone(UTC).isoformat()}"
             f"/event_column={self.event_column}/label_column={self.result_available_at_column}"
             f"/target={self.target_column}/keys={','.join(self.record_key_columns)}"
+            f"/date_parsing={parsing}"
         )
 
 
@@ -118,14 +148,20 @@ def read_training_snapshot(spark: Any, spec: LocalTrainingSpec) -> pd.DataFrame:
         spec.target_column,
     )
     source = spark.read.format("delta").option("versionAsOf", spec.version).table(spec.table)
-    start = spec.start.astimezone(UTC).isoformat()
-    cutoff = spec.cutoff.astimezone(UTC).isoformat()
+    source = normalize_training_dates(
+        source.select(*names),
+        event_column=spec.event_column,
+        result_column=spec.result_available_at_column,
+        event_spec=spec.event_time_parsing,
+        result_spec=spec.result_time_parsing,
+    )
+    start = instant_microseconds(spec.start)
+    cutoff = instant_microseconds(spec.cutoff)
     selected = (
         source.where(
-            f"{column_name(spec.event_column)} >= TIMESTAMP '{start}' AND "
-            f"{column_name(spec.event_column)} < TIMESTAMP '{cutoff}'"
+            f"{column_name(spec.event_column)} >= {start} AND "
+            f"{column_name(spec.event_column)} < {cutoff}"
         )
-        .select(*names)
         .orderBy(spec.event_column, *spec.record_key_columns)
         .limit(spec.max_rows + 1)
     )
@@ -135,6 +171,8 @@ def read_training_snapshot(spark: Any, spec: LocalTrainingSpec) -> pd.DataFrame:
         if len(records) >= spec.max_rows:
             raise ValueError("Training source exceeds max_rows.")
         record = row.asDict(recursive=True) if hasattr(row, "asDict") else dict(row)
+        for name in (spec.event_column, spec.result_available_at_column):
+            record[name] = instant_from_microseconds(record[name])
         serialized_bytes += len(pickle.dumps(record, protocol=pickle.HIGHEST_PROTOCOL))
         if serialized_bytes > spec.max_bytes:
             raise ValueError("Training source exceeds max_bytes.")
@@ -164,8 +202,19 @@ def split_labeled_snapshot(
         raise ValueError("Training row keys must not be null.")
     if frame.duplicated(subset=list(spec.record_key_columns)).any():
         raise ValueError("Training row keys must be unique.")
-    events = pd.to_datetime(frame[spec.event_column], utc=True, errors="raise")
-    labels = pd.to_datetime(frame[spec.result_available_at_column], utc=True, errors="raise")
+    events = pd.Series(
+        [parse_training_date(value, spec.event_time_parsing) for value in frame[spec.event_column]],
+        index=frame.index,
+        dtype="datetime64[ns, UTC]",
+    )
+    labels = pd.Series(
+        [
+            parse_training_date(value, spec.result_time_parsing, allow_null=True)
+            for value in frame[spec.result_available_at_column]
+        ],
+        index=frame.index,
+        dtype="datetime64[ns, UTC]",
+    )
     if events.isna().any() or (events < spec.start).any() or (events >= spec.cutoff).any():
         raise ValueError("Training event time falls outside the pinned window.")
     if ((labels < events) & labels.notna()).any():

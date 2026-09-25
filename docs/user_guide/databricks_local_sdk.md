@@ -48,7 +48,8 @@ result = train_local_candidate(
 print(result.model_version, result.comparison.eligible)
 ```
 
-The example assumes event and label timestamps represent UTC instants. A
+The example uses native Spark timestamp instants; their stored instants are
+retained independently of the Spark session timezone. A
 missing or later label is not a training label, even if its target value is
 already present in the pinned table. The source must have unique nonnull row
 keys and distinct feature, target and timestamp columns. A nonempty training
@@ -59,6 +60,29 @@ Review the comparison report, then use the separate guarded staging/promotion
 operations if a human approves a change. If fit, packaging, registration or
 comparison fails, no alias moves; a registered but unapproved candidate may
 remain for inspection. A scheduling policy is separate from this service.
+
+For string, local-clock or date-only source columns, supply independent rules:
+
+```python
+from dataclasses import replace
+from skyulf.integrations.databricks import TrainingDateSpec
+
+spec = replace(
+    spec,
+    event_time_parsing=TrainingDateSpec(
+        format="%d/%m/%Y %H:%M:%S", timezone="Europe/Copenhagen"
+    ),
+    result_time_parsing=TrainingDateSpec(format="%Y-%m-%dT%H:%M:%S%z"),
+)
+```
+
+Leave the format unset for native timestamp columns. Naive local timestamps
+need an explicit source timezone; dates additionally require
+`date_only="midnight"`. The default rejects date-only inputs. Ambiguous and
+nonexistent local times are rejected, and strings are never guessed.
+See the [source-date contract](databricks_bundle.md#source-date-formats-and-timezones)
+for examples, boundaries, supported directives and distributed validation cost.
+`candidate_training_spec.json` retains both parsing rules for approval replay.
 
 ## Fit and score a small batch
 

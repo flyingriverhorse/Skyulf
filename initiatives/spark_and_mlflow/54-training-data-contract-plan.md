@@ -75,16 +75,16 @@ declared timezone/calendar semantics. Already aware timestamps retain their
 instant. Normalize before source filtering, ordering, label filtering and
 local conversion; preserve the instant across Spark-to-Python transport.
 
-- [ ] Reproduce the current unsafe naive-as-UTC assumption and boundary shift.
-- [ ] Add shared parsed-date rules with native/explicit-format modes. Document
+- [x] Reproduce the current unsafe naive-as-UTC assumption and boundary shift.
+- [x] Add shared parsed-date rules with native/explicit-format modes. Document
   syntax per engine; do not pass pandas format strings into Spark unchecked.
-- [ ] Reject ambiguous day/month strings, missing years, invalid dates,
+- [x] Reject ambiguous day/month strings, missing years, invalid dates,
   missing timezone for local times and DST overlaps/gaps without guessing.
-- [ ] Implement bounded, deterministic source projection/filtering on normalized
+- [x] Implement bounded, deterministic source projection/filtering on normalized
   values; do not hide invalid/null event rows by filtering them away first.
-- [ ] Verify equivalent `03:00+03:00`/`00:00Z` instants, different event/result
+- [x] Verify equivalent `03:00+03:00`/`00:00Z` instants, different event/result
   zones, date-only policy, offset mixtures, null results and exact boundaries.
-- [ ] Verify with non-UTC Spark session and process timezone, pandas/Polars and
+- [x] Verify with non-UTC Spark session and process timezone, pandas/Polars and
   real Delta reads. Valid rows must retain the same split and availability.
 
 ## SM-33C — Date-free training and independent result availability
@@ -166,3 +166,13 @@ and bounded rehearsal driver using existing personal workspace resources.
 - 2026-09-25: User explicitly rejected field compatibility overhead because
   this work is pre-production. Use direct renames and recreate old test models
   when running the combined live acceptance; do not add a field adapter.
+
+- 2026-09-25 (SM-33B): Use `event_time_parsing` and `result_time_parsing` objects
+  with `format`, `timezone` and `date_only`; source types determine native vs
+  string handling, so no duplicate mode flag is needed. Defaults accept native
+  instants and reject implicit date-only/naive interpretation. Shared numeric
+  Python formats avoid separate pandas/Spark pattern languages.
+- 2026-09-25 (SM-33B): Keep advanced parsing editable in generated workflow JSON.
+  Conditional initializer prompts remain SM-33E, after date-free training/CV
+  contracts are settled. Source validation stays distributed; driver limits
+  do not cap the scan required to reject malformed source rows.

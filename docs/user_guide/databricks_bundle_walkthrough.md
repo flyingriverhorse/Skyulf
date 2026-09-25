@@ -122,6 +122,9 @@ Earlier experimental projects and training evidence are not automatically conver
    model name, prediction name, training split and bounded read limits.
    For manual training, replace the unset snapshot/date fields with an actual
    `training_version` and timezone-aware `start < holdout_start < cutoff`.
+   For strings, local-clock timestamps or dates, configure `event_time_parsing`
+   and `result_time_parsing` using the [source-date examples](databricks_bundle.md#source-date-formats-and-timezones).
+   Source timezones and the cron timezone are separate.
    Review the local validation and migration examples in the
    [configuration guide](databricks_bundle.md#configuration-validation-and-migration).
 2. Select the three policies above. For learning the approval flow, use:

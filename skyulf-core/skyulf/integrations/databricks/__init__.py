@@ -30,6 +30,7 @@ from .local_sdk import (
     preflight_local,
     prepare_local_workflow,
 )
+from .training_dates import TrainingDateSpec
 
 __all__ = [
     "BatchResult",
@@ -47,6 +48,7 @@ __all__ = [
     "PreflightIssue",
     "PreflightResult",
     "PreparedLocalWorkflow",
+    "TrainingDateSpec",
     "evaluate_local_holdout",
     "fit_local_workflow",
     "preflight_local",

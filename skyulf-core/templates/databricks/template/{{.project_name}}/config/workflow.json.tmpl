@@ -20,6 +20,8 @@
   "target_column": "{{.target_column}}",
   "event_column": "{{.event_column}}",
   "result_available_at_column": "{{.result_available_at_column}}",
+  "event_time_parsing": {"format": null, "timezone": null, "date_only": "reject"},
+  "result_time_parsing": {"format": null, "timezone": null, "date_only": "reject"},
   "start": {{if .start}}"{{.start}}"{{else}}null{{end}},
   "holdout_start": {{if .holdout_start}}"{{.holdout_start}}"{{else}}null{{end}},
   "cutoff": {{if .cutoff}}"{{.cutoff}}"{{else}}null{{end}},

@@ -3,7 +3,9 @@
 from contextlib import contextmanager
 from datetime import UTC, datetime
 from types import SimpleNamespace
+from typing import Any
 from unittest.mock import MagicMock
+from zoneinfo import ZoneInfo
 
 import pandas as pd
 import polars as pl
@@ -11,11 +13,12 @@ import pytest
 
 from skyulf.data.dataset import SplitDataset
 from skyulf.integrations.databricks import local_retraining as retraining
+from skyulf.integrations.databricks.training_dates import TrainingDateSpec
 
 
 def _spec(**changes):
     """Keep training, holdout and label cutoffs explicit in tests."""
-    values = {
+    values: dict[str, Any] = {
         "table": "workspace.test.labels",
         "version": 4,
         "start": datetime(2026, 1, 1, tzinfo=UTC),
@@ -78,7 +81,7 @@ def test_split_rejects_event_after_label_and_unpinned_source():
         _spec(version=None)
 
 
-def test_reader_pins_projects_and_limits_before_collecting():
+def test_reader_pins_projects_and_limits_before_collecting(monkeypatch):
     """Training must not materialize a whole unversioned Delta table."""
     source = MagicMock()
     source.read.format.return_value = source.read
@@ -88,13 +91,56 @@ def test_reader_pins_projects_and_limits_before_collecting():
     source.select.return_value = source
     source.orderBy.return_value = source
     source.limit.return_value = source
-    source.toLocalIterator.return_value = iter([_frame().iloc[0].to_dict()])
+    row = _frame().iloc[0].to_dict()
+    row["event_time"] = int(row["event_time"].value // 1000)
+    row["label_at"] = int(row["label_at"].value // 1000)
+    source.toLocalIterator.return_value = iter([row])
+    monkeypatch.setattr(retraining, "normalize_training_dates", lambda frame, **kwargs: frame)
     frame = retraining.read_training_snapshot(source, _spec())
     source.read.option.assert_called_once_with("versionAsOf", 4)
     source.where.assert_called_once()
     source.select.assert_called_once_with("id", "event_time", "label_at", "x", "target")
     source.limit.assert_called_once_with(11)
     assert len(frame) == 1
+    assert frame.iloc[0]["event_time"] == _frame().iloc[0]["event_time"]
+
+
+def test_split_rejects_naive_times_without_an_explicit_timezone():
+    """Naive pandas input must obey the same source-zone policy as distributed reads."""
+    frame = _frame()
+    frame["event_time"] = frame["event_time"].dt.tz_localize(None)
+    with pytest.raises(ValueError, match="timezone"):
+        retraining.split_labeled_snapshot(frame, _spec())
+
+
+def test_training_boundary_order_uses_instants_across_dst_folds():
+    """Repeated-hour wall-clock order must not invert the actual pinned window."""
+    zone = ZoneInfo("Europe/Vilnius")
+    with pytest.raises(ValueError, match="start < holdout_start"):
+        _spec(
+            start=datetime(2026, 10, 25, 3, 15, tzinfo=zone, fold=1),
+            holdout_start=datetime(2026, 10, 25, 3, 45, tzinfo=zone, fold=0),
+            cutoff=datetime(2026, 10, 25, 4, tzinfo=zone),
+        )
+
+
+def test_split_parses_independent_event_and_result_rules_and_null_labels():
+    """Mixed source calendars preserve split membership and unknown label availability."""
+    frame = _frame()
+    frame["event_time"] = (
+        frame["event_time"].dt.tz_convert("Asia/Tokyo").dt.strftime("%d/%m/%Y %H:%M")
+    )
+    frame["label_at"] = frame["label_at"].dt.strftime("%Y-%m-%dT%H:%M:%S%z")
+    frame.loc[2, "label_at"] = None
+    spec = _spec(
+        event_time_parsing=TrainingDateSpec(format="%d/%m/%Y %H:%M", timezone="Asia/Tokyo"),
+        result_time_parsing=TrainingDateSpec(format="%Y-%m-%dT%H:%M:%S%z"),
+    )
+    train, holdout, skipped = retraining.split_labeled_snapshot(frame, spec)
+    assert train["x"].tolist() == [1.0, 2.0]
+    assert holdout["x"].tolist() == [3.0, 5.0]
+    assert skipped == 1
+    assert spec.dataset_id != _spec().dataset_id
 
 
 @pytest.mark.parametrize("engine", ["pandas", "polars"])

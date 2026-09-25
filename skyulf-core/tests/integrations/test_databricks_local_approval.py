@@ -10,6 +10,7 @@ import pandas as pd
 import pytest
 
 from skyulf.integrations.databricks import job_runtime, local_retraining, local_workflow
+from skyulf.integrations.databricks.training_dates import TrainingDateSpec
 from skyulf.integrations.mlflow.promotion import AliasConflictError
 
 mlflow = pytest.importorskip("mlflow")
@@ -30,6 +31,10 @@ def test_manual_approval_reuses_registered_versions_and_replays_receipt(
             "label_at": pd.to_datetime(["2026-01-11"] * 8 + ["2026-02-11"] * 4, utc=True),
         }
     )
+    frame["event_time"] = (
+        frame["event_time"].dt.tz_convert("Asia/Tokyo").dt.strftime("%d/%m/%Y %H:%M")
+    )
+    frame["label_at"] = frame["label_at"].dt.strftime("%Y-%m-%dT%H:%M:%S%z")
     read_snapshot = Mock(return_value=frame)
     monkeypatch.setattr(local_retraining, "read_training_snapshot", read_snapshot)
     monkeypatch.setattr(local_workflow, "read_training_snapshot", Mock(return_value=frame))
@@ -52,6 +57,8 @@ def test_manual_approval_reuses_registered_versions_and_replays_receipt(
         "target_column": "target",
         "event_column": "event_time",
         "result_available_at_column": "label_at",
+        "event_time_parsing": {"format": "%d/%m/%Y %H:%M", "timezone": "Asia/Tokyo"},
+        "result_time_parsing": {"format": "%Y-%m-%dT%H:%M:%S%z"},
         "start": "2026-01-01T00:00:00+00:00",
         "holdout_start": "2026-02-01T00:00:00+00:00",
         "cutoff": "2026-03-01T00:00:00+00:00",
@@ -125,6 +132,8 @@ def test_manual_approval_reuses_registered_versions_and_replays_receipt(
     assert not client.get_registered_model(config["model_name"]).aliases.get("champion")
     # Never derive approval data from today's training configuration.
     config["training_version"] = 99
+    original_parsing = config["event_time_parsing"]
+    config["event_time_parsing"] = {"format": "%d/%m/%Y %H:%M", "timezone": "UTC"}
     with monkeypatch.context() as no_training:
         no_training.setattr(
             local_workflow, "train_local_candidate", Mock(side_effect=AssertionError("fit"))
@@ -134,9 +143,16 @@ def test_manual_approval_reuses_registered_versions_and_replays_receipt(
         assert approve(first, None) == receipt
     assert read_snapshot.call_count == 2
     assert read_snapshot.call_args.args[1].version == 4
+    replay_spec = read_snapshot.call_args.args[1]
+    assert replay_spec.event_time_parsing == TrainingDateSpec(
+        format="%d/%m/%Y %H:%M", timezone="Asia/Tokyo"
+    )
+    assert replay_spec.result_time_parsing == TrainingDateSpec(format="%Y-%m-%dT%H:%M:%S%z")
+    assert replay_spec.dataset_id == first.dataset_id
     assert len(client.search_model_versions("name = 'approval_model'")) == 1
 
     config["training_version"] = 4
+    config["event_time_parsing"] = original_parsing
     config["pipeline"]["modeling"]["params"]["fit_intercept"] = True
     second = train()
     assert str(client.get_registered_model(config["model_name"]).aliases["champion"]) == "1"

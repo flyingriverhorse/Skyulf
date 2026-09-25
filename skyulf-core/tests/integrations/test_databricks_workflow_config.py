@@ -5,6 +5,22 @@ from copy import deepcopy
 import pytest
 
 
+@pytest.mark.parametrize("action", ["train", "train_monthly", "score"])
+def test_source_date_rules_are_validated_offline(workflow_config, action):
+    """Invalid parsing cannot wait until a monthly run has opened its Delta source."""
+    from skyulf.integrations.databricks.workflow_config import validate_workflow_config
+
+    config = {
+        **workflow_config,
+        "event_time_parsing": {"format": "%d/%m/%Y %H:%M", "timezone": "Asia/Tokyo"},
+    }
+    assert validate_workflow_config(config, action=action) == config
+    with pytest.raises(ValueError, match="timezone"):
+        validate_workflow_config(
+            {**config, "result_time_parsing": {"format": "%Y-%m-%d %H:%M"}}, action=action
+        )
+
+
 def test_column_names_remain_canonical_through_validation(workflow_config):
     """Validated settings must use the same column names as the saved workflow."""
     from skyulf.integrations.databricks.workflow_config import validate_workflow_config

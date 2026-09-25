@@ -143,6 +143,13 @@ def test_minimal_generated_config_uses_one_existing_source():
     assert bound["training_table"] == bound["score_source_table"]
 
 
+def test_generated_date_rules_do_not_assume_a_source_timezone():
+    """Source timestamps need explicit interpretation independent of the job schedule."""
+    config = _render_default_config()
+    for name in ("event_time_parsing", "result_time_parsing"):
+        assert config[name] == {"format": None, "timezone": None, "date_only": "reject"}
+
+
 def test_generated_config_has_no_admission_or_alias_state():
     """The starting Bundle must not ask users to provision coordination tables."""
     config = _render_default_config()

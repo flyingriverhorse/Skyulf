@@ -14,6 +14,7 @@ from ._contracts import PREDICTION_METADATA_COLUMNS
 from .local_retraining import LocalTrainingSpec
 from .local_sdk import ModelSelection
 from .prediction_output import _IDENTIFIER, _TABLE_NAME
+from .training_dates import training_date_spec
 
 _ACTIONS = {"train", "train_monthly", "score", "approve", "reject", "rollback"}
 _FIELDS = {
@@ -36,6 +37,8 @@ _FIELDS = {
     "target_column",
     "event_column",
     "result_available_at_column",
+    "event_time_parsing",
+    "result_time_parsing",
     "training_version",
     "start",
     "holdout_start",
@@ -128,6 +131,8 @@ def _training_contract(config: dict[str, Any], action: str) -> None:
         target_column=config["target_column"],
         max_rows=config["max_rows"],
         max_bytes=config["max_bytes"],
+        event_time_parsing=training_date_spec(config.get("event_time_parsing", {})),
+        result_time_parsing=training_date_spec(config.get("result_time_parsing", {})),
     )
 
 
@@ -171,6 +176,8 @@ def validate_workflow_config(config: dict[str, Any], *, action: str) -> dict[str
         if type(config.get(key)) is not int or config[key] <= 0:
             raise ValueError(f"{key} must be a positive integer.")
     _columns(config)
+    for field in ("event_time_parsing", "result_time_parsing"):
+        training_date_spec(config.get(field, {}))
     champion = config.get("champion_version")
     if champion is not None and (
         not isinstance(champion, str) or not re.fullmatch(r"[1-9][0-9]*", champion)

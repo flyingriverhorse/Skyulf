@@ -62,11 +62,86 @@ This is an intentional pre-production breaking rename: regenerate projects and
 retrain test models created with the previous column settings. There is no
 field-alias adapter or automatic conversion of earlier training evidence.
 
-This naming update does **not** make temporal fields optional. Date-free
-training, explicit source date formats/timezones and configurable split/CV
-are tracked as the required pre-SM-34 follow-up. The current training adapter
-still requires temporal inputs; do not supply invented dates to bypass that
-requirement. It does not guarantee arbitrary text-date or naive-time parsing.
+Temporal fields are still required for training. Date-free training and
+configurable split/CV are separate pre-SM-34 tasks; do not supply invented dates.
+
+### Source date formats and timezones
+
+Column names and time boundaries serve different purposes. `event_column`
+selects the source column; `event_time_parsing` explains its values. The
+`start`, `holdout_start` and `cutoff` boundaries are timezone-aware instants.
+They do not need to use the same UTC offset as source values.
+
+Edit these settings in the generated `config/workflow.json`:
+
+```json
+{
+  "event_column": "observation_date",
+  "event_time_parsing": {
+    "format": "%d/%m/%Y %H:%M:%S",
+    "timezone": "Europe/Copenhagen",
+    "date_only": "reject"
+  },
+  "result_available_at_column": "result_confirmed_at",
+  "result_time_parsing": {
+    "format": "%Y-%m-%dT%H:%M:%S%z",
+    "timezone": null,
+    "date_only": "reject"
+  },
+  "start": "2026-06-01T00:00:00+00:00",
+  "holdout_start": "2026-08-01T00:00:00+00:00",
+  "cutoff": "2026-09-01T00:00:00+00:00"
+}
+```
+
+In this example `01/08/2026 02:00:00` in Copenhagen and
+`2026-08-01T03:00:00+03:00` represent the same instant: August 1 at 00:00 UTC.
+An event at that instant belongs to the holdout. The window includes `start`
+and excludes `cutoff`; the holdout includes `holdout_start`.
+
+| Source values | Parsing settings |
+| --- | --- |
+| Native Spark `TIMESTAMP` instants | Keep defaults: `format: null`, `timezone: null`, `date_only: "reject"`; the stored instant is retained. |
+| Native `TIMESTAMP_NTZ` or naive local datetimes | Set the source IANA `timezone`; leave `format: null`. |
+| Strings containing UTC offsets | Set an explicit `format` with `%z`; leave `timezone: null`. |
+| Strings containing local clock times | Set an explicit `format` and source `timezone`. |
+| Native `DATE` or date-only strings | Set `date_only: "midnight"` and source `timezone`; strings also need a date `format`. |
+
+Formats use Python numeric directives: `%Y`, `%m`, `%d`, `%H`, `%M`, `%S`,
+`%f` and `%z`, with literal separators. A complete four-digit year, month and
+day are required. They are not Spark/Java patterns such as `yyyy-MM-dd`.
+The same parser handles formatted source values and local validation, so
+pandas and Polars training receive the same instants. Precision is limited to
+microseconds; submicrosecond pandas timestamps are rejected. Local month names,
+missing years and guessed day/month order are not supported. An explicit
+`%d/%m/%Y` resolves day/month order; a string without a format does not.
+
+Date-only values are not automatically interpreted as UTC. For example,
+`2026-08-01` with `date_only: "midnight"` and `Europe/Copenhagen` means
+July 31 at 22:00 UTC, before the holdout boundary above. Ambiguous or nonexistent
+local times at daylight-saving transitions fail; supply an offset-bearing
+source timestamp to make the intended instant explicit.
+
+Source dates are normalized in Spark before filtering. Invalid/null event
+values fail validation even if a window filter would otherwise hide them.
+A null result-availability value remains unavailable, while a malformed value
+fails. Normalized instants cross the Spark/Python boundary as integer
+microseconds; session and process timezone settings do not reinterpret them.
+The local row/byte limits still apply after filtering. Date validation may scan
+the pinned source snapshot in Spark; these limits bound driver materialization,
+not the amount of distributed source validation.
+
+Keep driver, worker and replay environments' timezone data aligned. Saved rules
+record zone identifiers, not a copy of the IANA timezone database.
+
+Parsing rules are saved with the candidate's training specification and dataset
+identity. Approval replays those saved rules. The job's cron timezone only
+controls when it runs; it does not define the source timestamps' timezone.
+For Python APIs, use `TrainingDateSpec` in the
+[local training guide](databricks_local_sdk.md#train-a-candidate-when-labels-are-ready).
+The supported format vocabulary is a subset of Python's
+[strptime directives](https://docs.python.org/3/library/datetime.html#strftime-and-strptime-format-codes);
+source timezone rules use [IANA zoneinfo](https://docs.python.org/3/library/zoneinfo.html).
 
 Manual `training_version`, `start`, `holdout_start` and `cutoff` default to
 `null`. Set an actual Delta snapshot and timezone-aware split before running

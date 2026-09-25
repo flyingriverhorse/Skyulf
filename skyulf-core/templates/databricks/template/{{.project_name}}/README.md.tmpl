@@ -160,9 +160,22 @@ training boundaries apply to it. Rows can have different result dates.
 The library and saved training settings use these same names directly.
 Regenerate projects and retrain models created before this pre-production
 rename; earlier column settings and saved training evidence are not converted.
-This update does not yet make dates optional; date-free training and explicit
-parsing/timezone controls are separate follow-up work. Do not assume arbitrary
-date strings are understood.
+Training dates are still required; date-free training is separate follow-up
+work. Configure `event_time_parsing` and `result_time_parsing` independently in
+`config/workflow.json`. Defaults accept native Spark `TIMESTAMP` instants.
+For strings use an explicit numeric Python format, for example
+`{"format": "%d/%m/%Y %H:%M:%S", "timezone": "Europe/Copenhagen", "date_only": "reject"}`.
+For offset-bearing strings use `%z` and leave timezone null. Native local-clock
+`TIMESTAMP_NTZ` needs a timezone but no format. Date-only inputs additionally
+need `date_only: "midnight"`; they represent local midnight, not UTC by default.
+Full year/month/day are required; unknown formats and DST gaps/overlaps fail.
+These are Python format directives, not Spark `yyyy-MM-dd` patterns.
+
+Source dates are validated before filtering, so invalid events cannot disappear
+outside a training window. Null result availability remains unavailable. The
+saved training spec retains the parsing rules for approval replay. Row/byte
+budgets bound driver materialization; source validation can scan the snapshot
+in Spark. The source timezone is independent of the job's cron timezone.
 
 Initialization never creates an ID in the source. Keep key
 columns out of `input_columns`; they identify predictions, not model features.

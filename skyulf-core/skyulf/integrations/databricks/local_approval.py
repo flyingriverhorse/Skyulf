@@ -33,6 +33,7 @@ from ..mlflow.rejection import reject_candidate
 from ..mlflow.validation import ModelComparisonReport
 from . import local_retraining
 from .local_retraining import LocalTrainingSpec
+from .training_dates import training_date_spec
 
 
 def resolve_candidate_comparison_digest(
@@ -110,6 +111,8 @@ def _load_evidence(
         saved_spec[field] = datetime.fromisoformat(saved_spec[field])
     for field in ("record_key_columns", "input_columns"):
         saved_spec[field] = tuple(saved_spec[field])
+    for field in ("event_time_parsing", "result_time_parsing"):
+        saved_spec[field] = training_date_spec(saved_spec[field])
     spec = LocalTrainingSpec(**saved_spec)
     if spec.dataset_id != report.dataset_id:
         raise ValueError("Saved training snapshot differs from comparison evidence.")

@@ -47,6 +47,7 @@ from .prediction_output import (
     _scoring_target,
     provision_prediction_table,
 )
+from .training_dates import training_date_spec
 
 _TABLE_FIELDS = (
     "training_table",
@@ -176,11 +177,15 @@ def _training_spec(config: dict[str, Any]) -> LocalTrainingSpec:
         target_column=config["target_column"],
         max_rows=config["max_rows"],
         max_bytes=config["max_bytes"],
+        event_time_parsing=training_date_spec(config.get("event_time_parsing", {})),
+        result_time_parsing=training_date_spec(config.get("result_time_parsing", {})),
     )
 
 
 def _monthly_training_spec(spark: Any, config: dict[str, Any], now: datetime) -> LocalTrainingSpec:
     """Pin one Delta version and a UTC calendar window for monthly training."""
+    event_parsing = training_date_spec(config.get("event_time_parsing", {}))
+    result_parsing = training_date_spec(config.get("result_time_parsing", {}))
     if now.tzinfo is None or now.utcoffset() is None:
         raise ValueError("Monthly training needs a timezone-aware run instant.")
     lookback = config.get("monthly_lookback_months")
@@ -217,6 +222,8 @@ def _monthly_training_spec(spark: Any, config: dict[str, Any], now: datetime) ->
         target_column=config["target_column"],
         max_rows=config["max_rows"],
         max_bytes=config["max_bytes"],
+        event_time_parsing=event_parsing,
+        result_time_parsing=result_parsing,
     )
 
 
