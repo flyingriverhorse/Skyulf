@@ -9,6 +9,13 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 PREDICTION_METADATA_COLUMNS = ("run_id", "model_name", "model_version")
 
 
+def input_budget_bytes(max_input_mb: Any) -> int:
+    """Convert a positive whole-MiB Bundle input limit to the SDK's byte unit."""
+    if type(max_input_mb) is not int or max_input_mb <= 0:
+        raise ValueError("max_input_mb must be a positive integer (1 unit = 1024 * 1024 bytes).")
+    return max_input_mb * 1024 * 1024
+
+
 def table_name(value: str) -> str:
     """Validate and quote a simple one-, two- or three-part catalog identifier."""
     if type(value) is not str or not re.fullmatch(

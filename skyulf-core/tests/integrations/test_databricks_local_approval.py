@@ -55,6 +55,9 @@ def test_manual_approval_reuses_registered_versions_and_replays_receipt(
         "record_key_columns": ["id"],
         "input_columns": ["x"],
         "target_column": "target",
+        "split_strategy": "temporal",
+        "filter_unavailable_results": True,
+        "result_cutoff": "2026-03-01T00:00:00+00:00",
         "event_column": "event_time",
         "result_available_at_column": "label_at",
         "event_time_parsing": {"format": "%d/%m/%Y %H:%M", "timezone": "Asia/Tokyo"},
@@ -63,7 +66,7 @@ def test_manual_approval_reuses_registered_versions_and_replays_receipt(
         "holdout_start": "2026-02-01T00:00:00+00:00",
         "cutoff": "2026-03-01T00:00:00+00:00",
         "max_rows": 20,
-        "max_bytes": 100_000,
+        "max_input_mb": 2,
         "metric": "heldout_rmse",
         "min_improvement": 0.1,
         "quality_threshold": 100.0,
@@ -131,7 +134,10 @@ def test_manual_approval_reuses_registered_versions_and_replays_receipt(
     first = train()
     assert not client.get_registered_model(config["model_name"]).aliases.get("champion")
     # Never derive approval data from today's training configuration.
+    config["max_input_mb"] = 1
     config["training_version"] = 99
+    config["training_table"] = "workspace.changed.source"
+    config["input_columns"] = ["changed_feature"]
     original_parsing = config["event_time_parsing"]
     config["event_time_parsing"] = {"format": "%d/%m/%Y %H:%M", "timezone": "UTC"}
     with monkeypatch.context() as no_training:
@@ -148,10 +154,13 @@ def test_manual_approval_reuses_registered_versions_and_replays_receipt(
         format="%d/%m/%Y %H:%M", timezone="Asia/Tokyo"
     )
     assert replay_spec.result_time_parsing == TrainingDateSpec(format="%Y-%m-%dT%H:%M:%S%z")
+    assert replay_spec.max_bytes == 1024 * 1024
     assert replay_spec.dataset_id == first.dataset_id
     assert len(client.search_model_versions("name = 'approval_model'")) == 1
 
     config["training_version"] = 4
+    config["training_table"] = "workspace.test.source"
+    config["input_columns"] = ["x"]
     config["event_time_parsing"] = original_parsing
     config["pipeline"]["modeling"]["params"]["fit_intercept"] = True
     second = train()
@@ -171,10 +180,6 @@ def test_manual_approval_reuses_registered_versions_and_replays_receipt(
     with pytest.raises(ValueError, match="policy"):
         approve(second, "1")
     config["quality_threshold"] = 100.0
-    config["input_columns"] = ["wrong_feature"]
-    with pytest.raises(ValueError, match="data contract"):
-        approve(second, "1")
-    config["input_columns"] = ["x"]
     client.set_registered_model_tag(config["model_name"], "pending_alias_event", "uncertain-test")
     with pytest.raises(AliasConflictError, match="pending"):
         approve(second, "1")

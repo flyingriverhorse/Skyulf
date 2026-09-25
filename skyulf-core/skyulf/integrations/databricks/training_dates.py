@@ -165,8 +165,8 @@ def instant_from_microseconds(value: int | None) -> datetime | None:
 def normalize_training_dates(
     source: Any,
     *,
-    event_column: str,
-    result_column: str,
+    event_column: str | None,
+    result_column: str | None,
     event_spec: TrainingDateSpec,
     result_spec: TrainingDateSpec,
 ) -> Any:
@@ -177,6 +177,8 @@ def normalize_training_dates(
     interprets a naive timestamp received from Spark. Other types run the same
     strict scalar parser on workers, independent of Spark's date parser policy.
     """
+    if event_column is None and result_column is None:
+        return source
     F = import_module("pyspark.sql.functions")
     types = import_module("pyspark.sql.types")
 
@@ -185,6 +187,8 @@ def normalize_training_dates(
         (event_column, event_spec, False),
         (result_column, result_spec, True),
     ):
+        if name is None:
+            continue
         dtype = source.schema[name].dataType
         value = F.col(name)
         if isinstance(dtype, types.TimestampType):
@@ -218,22 +222,14 @@ def normalize_training_dates(
             for name in source.columns
         )
     )
+    errors = [F.col(name).getField("error") for name in expressions]
     invalid = (
-        normalized.where(
-            F.col(event_column).getField("error").isNotNull()
-            | F.col(result_column).getField("error").isNotNull()
-        )
-        .select(
-            F.col(event_column).getField("error").alias("event_error"),
-            F.col(result_column).getField("error").alias("result_error"),
-        )
+        normalized.select(F.coalesce(*errors).alias("error"))
+        .where(F.col("error").isNotNull())
         .limit(1)
     )
     for row in invalid.toLocalIterator():
-        name = event_column if row["event_error"] else result_column
-        raise ValueError(
-            f"Invalid training dates in {name}: {row['event_error'] or row['result_error']}"
-        )
+        raise ValueError(f"Invalid training dates in {', '.join(expressions)}: {row['error']}")
     return normalized.select(
         *(
             F.col(name).getField("micros").alias(name) if name in expressions else F.col(name)

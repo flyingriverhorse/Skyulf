@@ -156,10 +156,7 @@
       "type": "string",
       "default": "regression",
       "description": "Model task; selects a starting estimator and automatic heldout metric",
-      "enum": [
-        "regression",
-        "classification"
-      ]
+      "enum": ["regression", "classification"]
     },
     "source_table_name": {
       "order": 24,
@@ -183,74 +180,125 @@
       "pattern": "^\\[[ \\t\\r\\n]*\"[A-Za-z_][A-Za-z0-9_]*\"(?:[ \\t\\r\\n]*,[ \\t\\r\\n]*\"[A-Za-z_][A-Za-z0-9_]*\")*[ \\t\\r\\n]*\\]$"
     },
     "input_columns_json": {
-      "order": 27,
+      "order": 26,
       "type": "string",
       "default": "[\"feature_value\"]",
       "description": "JSON array of existing model feature columns; exclude keys and target",
       "pattern": "^\\[[ \\t\\r\\n]*\"[A-Za-z_][A-Za-z0-9_]*\"(?:[ \\t\\r\\n]*,[ \\t\\r\\n]*\"[A-Za-z_][A-Za-z0-9_]*\")*[ \\t\\r\\n]*\\]$"
     },
     "target_column": {
-      "order": 28,
+      "order": 27,
       "type": "string",
       "default": "target",
       "description": "Existing training label column",
       "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
     },
     "event_column": {
-      "order": 29,
+      "order": 33,
       "type": "string",
-      "default": "event_time",
+      "default": "",
       "description": "Existing event timestamp column for the temporal training split",
-      "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+      "pattern": "^(?:[A-Za-z_][A-Za-z0-9_]*)?$",
+      "skip_prompt_if": {"properties": {"split_strategy": {"const": "random"}}}
     },
     "result_available_at_column": {
-      "order": 30,
+      "order": 34,
       "type": "string",
-      "default": "label_at",
-      "description": "Existing column recording when each target result became available",
-      "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+      "default": "",
+      "description": "Existing per-row target availability timestamp; required only when filtering unavailable results",
+      "pattern": "^(?:[A-Za-z_][A-Za-z0-9_]*)?$",
+      "skip_prompt_if": {"properties": {"filter_unavailable_results": {"const": "false"}}}
     },
     "training_version": {
-      "order": 31,
+      "order": 35,
       "type": "string",
       "default": "null",
       "description": "Concrete nonnegative Delta source version for manual training; null requires configuration before running",
       "pattern": "^(?:null|0|[1-9][0-9]*)$"
     },
     "start": {
-      "order": 32,
+      "order": 36,
       "type": "string",
       "default": "",
-      "description": "Manual training start as a timezone-aware ISO timestamp; blank requires configuration before running",
-      "pattern": "^(?:[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:.]+(?:Z|[+-][0-9]{2}:[0-9]{2}))?$"
+      "description": "Manual temporal observation window start (inclusive), as a timezone-aware ISO timestamp",
+      "pattern": "^(?:[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:.]+(?:Z|[+-][0-9]{2}:[0-9]{2}))?$",
+      "skip_prompt_if": {"properties": {"split_strategy": {"const": "random"}}}
     },
     "holdout_start": {
-      "order": 33,
+      "order": 37,
       "type": "string",
       "default": "",
-      "description": "Manual heldout split start as a timezone-aware ISO timestamp",
-      "pattern": "^(?:[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:.]+(?:Z|[+-][0-9]{2}:[0-9]{2}))?$"
+      "description": "Manual temporal holdout start (inclusive), as a timezone-aware ISO timestamp",
+      "pattern": "^(?:[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:.]+(?:Z|[+-][0-9]{2}:[0-9]{2}))?$",
+      "skip_prompt_if": {"properties": {"split_strategy": {"const": "random"}}}
     },
     "cutoff": {
-      "order": 34,
+      "order": 38,
       "type": "string",
       "default": "",
-      "description": "Manual label-availability cutoff as a timezone-aware ISO timestamp",
-      "pattern": "^(?:[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:.]+(?:Z|[+-][0-9]{2}:[0-9]{2}))?$"
+      "description": "Manual observation window end (exclusive), as a timezone-aware ISO timestamp",
+      "pattern": "^(?:[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:.]+(?:Z|[+-][0-9]{2}:[0-9]{2}))?$",
+      "skip_prompt_if": {"properties": {"split_strategy": {"const": "random"}}}
     },
     "max_rows": {
-      "order": 35,
+      "order": 40,
       "type": "string",
       "default": "10000",
       "description": "Positive row limit for each bounded local data transfer",
       "pattern": "^[1-9][0-9]*$"
     },
-    "max_bytes": {
-      "order": 36,
+    "max_input_mb": {
+      "order": 41,
       "type": "string",
-      "default": "67108864",
-      "description": "Positive byte limit for each bounded local data transfer",
+      "default": "64",
+      "description": "Positive local input limit in MiB (1 unit = 1024 * 1024 bytes); not total training RAM",
       "pattern": "^[1-9][0-9]*$"
+    },
+    "split_strategy": {
+      "type": "string",
+      "default": "random",
+      "description": "Final evaluation split: random needs no event dates; temporal holds out the latest observation window",
+      "enum": ["random", "temporal"],
+      "order": 28
+    },
+    "test_size": {
+      "type": "string",
+      "default": "0.2",
+      "description": "Random holdout fraction strictly between 0 and 1",
+      "pattern": "^0\\.[0-9]*[1-9][0-9]*$",
+      "skip_prompt_if": {"properties": {"split_strategy": {"const": "temporal"}}},
+      "order": 29
+    },
+    "random_state": {
+      "type": "string",
+      "default": "42",
+      "description": "Random split seed; stable keys and a pinned snapshot make membership reproducible",
+      "pattern": "^(?:0|[1-9][0-9]*)$",
+      "skip_prompt_if": {"properties": {"split_strategy": {"const": "temporal"}}},
+      "order": 30
+    },
+    "stratify": {
+      "type": "string",
+      "default": "false",
+      "description": "Preserve target class proportions in the random split (classification only)",
+      "enum": ["false", "true"],
+      "skip_prompt_if": {"properties": {"split_strategy": {"const": "temporal"}}},
+      "order": 31
+    },
+    "filter_unavailable_results": {
+      "type": "string",
+      "default": "false",
+      "description": "Exclude rows whose target outcome was unknown or became available after result_cutoff",
+      "enum": ["false", "true"],
+      "order": 32
+    },
+    "result_cutoff": {
+      "type": "string",
+      "default": "",
+      "description": "Manual result-availability cutoff (inclusive), independent of the observation window end",
+      "pattern": "^(?:[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:.]+(?:Z|[+-][0-9]{2}:[0-9]{2}))?$",
+      "skip_prompt_if": {"properties": {"filter_unavailable_results": {"const": "false"}}},
+      "order": 39
     }
   }
 }

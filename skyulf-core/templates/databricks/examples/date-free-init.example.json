@@ -1,0 +1,18 @@
+{
+  "project_name": "my_model",
+  "engine": "pandas",
+  "record_key_columns_json": "[\"customer_id\"]",
+  "retraining_mode": "manual",
+  "model_change_mode": "incremental_append",
+  "score_model_selection": "pinned_version",
+  "promotion_policy": "manual_approval",
+  "score_handoff": "disabled",
+  "compute_mode": "serverless",
+  "catalog": "workspace",
+  "schema": "my_dev_schema",
+  "source_table_name": "labeled_customers",
+  "input_columns_json": "[\"income\", \"age\"]",
+  "target_column": "claim_amount",
+  "training_version": "12",
+  "split_strategy": "random"
+}

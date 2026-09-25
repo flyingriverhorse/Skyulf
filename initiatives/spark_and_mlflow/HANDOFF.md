@@ -1,3 +1,80 @@
+# Current handoff: SM-33C locally verified
+
+Commit preparation (2026-09-25): the user requested committing SM-33C, the
+input-budget follow-up, and the subsequent CV/modular-setup plans together.
+Fresh checks: 172 training/approval/workflow/template/lifecycle tests passed;
+strict MkDocs passed. Reports 57 and 58 belong in this commit. No cloud deployment
+or push is included. The uncommitted references below describe pre-commit work.
+
+SM-33B committed as `7cec33a7` on branch `090`, signed with hooks passed; no push.
+SM-33C is DONE locally and remains uncommitted. The follow-up input-budget
+rename is also verified and uncommitted: Bundle JSON/init use `max_input_mb`
+(default 64 MiB); existing SDK byte contracts stay internal. Training, scoring
+and approval share the conversion; old Bundle `max_bytes` is rejected.
+Follow-up verification: 211 integration/runtime/template tests + 41 real CLI
+generation tests passed, full ty, scoped Ruff/format, strict docs, wheel build
+and strict generated dev Bundle validation passed. No live deployment.
+Explicit training subsampling is now included in SM-33D; `max_rows` still
+fails on overflow, and scoring does not sample. See
+[date-free training validation](57-sm33c-date-free-training-validation.md).
+
+New initialization defaults to random splitting, no invented date columns,
+Core `DataSplitter` with stable record-key ordering, seed/proportion and optional
+classification stratification. Temporal splitting remains explicit. Independent
+result filtering uses `filter_unavailable_results`, `result_available_at_column`
+and `result_cutoff`. Inactive fields must be null/default; no compatibility layer.
+Monthly random reads the latest bounded snapshot with no lookback. Monthly
+result cutoff is invocation time; temporal observation windows remain UTC months.
+
+Saved source/split/parsing settings and holdout membership are replayed for
+approval. Membership is bound to the comparison dataset identity after review
+found and corrected an initial omission. Read budgets remain outside identity.
+Three initializer examples and English guides/Mermaid explain the four combinations.
+
+Validation: 165 native integration tests, 54 real CLI/template tests and 11
+real Delta tests passed (230 total). Full ty, scoped Ruff/format, strict docs,
+current wheel build, strict generated dev Bundle validation and independent
+review passed. Native tests use `.cache/sm33c-final` as basetemp to avoid Windows
+Temp ACL issues. Delta runs through `.cache/sm15-linux-run.sh` under WSL.
+
+Planning follow-up: inspected `mlmodeltesting` source read-only (no pickle loading
+or execution). It scores four separate targets from shared features, then applies
+color rules; its monthly job does not train. Added SM-36a custom project FE/code
+packaging, SM-36b multiple training branches, SM-36c model-set scoring/lifecycle,
+and SM-44 LATER company migration after the generic Bundle gate. See report 58.
+These are planned only. User further requested progressive Bundle setup for
+basics, preprocessing, model, optional CV/search and opt-in multi-model scenarios.
+Recorded conditional prompts, Core schema reuse, editable config, execution
+preview and phased delivery across SM-33E/36/36a/b/c/42 in report 58 and the queue.
+At the next commit, force-add exactly report 58 too.
+
+Core CV/tuning audit: ordinary-model optional CV routes to
+`StatefulEstimator.cross_validate` with fold-local preprocessing; advanced search
+routes to the existing pipeline `hyperparameter_tuner` and `TuningConfig`.
+User confirmed ordinary defaults/overrides versus advanced search-space/budget
+controls. Report 58 records shared CV mapping, temporal metadata, final-holdout
+isolation, validator gaps and the diagnostic-only standalone nested CV caveat.
+The four focused Core CV/leakage/time-series suites passed (96 tests). This was
+inspection and planning; no Bundle CV/tuning runtime support was added here.
+
+Canvas follow-up: source tracing confirmed supervised Basic also uses the tuner
+internally with a single fixed candidate; Advanced searches multiple candidates.
+Both can run a later CV report. Existing Canvas `cv_*` fields affect search and
+post-fit evaluation. Report 58 now distinguishes this from proposed Bundle
+routing and requires explicit search/report semantics, separate seeds and gated
+decision-threshold tuning. No Canvas/runtime behavior was changed.
+
+Next READY: SM-33D Core CV, explicit training sampling and selection/window configuration.
+Then SM-33E combined live acceptance. SM-34 remains WAIT. No cloud resources
+were changed; current remote jobs still use the previous SM-33 wheel/config.
+Old experimental evidence must be recreated when doing combined acceptance.
+
+At the next requested commit, include new date-free training test, three
+initializer examples, and force-add exactly initiative report 57. Leave unrelated
+`.tmp-review-model/` untouched. Do not push without a request.
+
+## Historical snapshot: SM-33B delivery
+
 # Current handoff: SM-33B locally verified
 
 SM-33A committed as `fa7a1171` on branch `090`, signed with hooks passed;

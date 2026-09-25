@@ -15,10 +15,12 @@ incremental runner below discovers new source inserts automatically.
 ## Train a candidate when labels are ready
 
 `train_local_candidate` reads a **specific Delta table version**, filters a
-bounded event window in Spark, then makes a temporal split in pandas. Rows whose
-labels were not available by `cutoff` are excluded from both fit and holdout.
-The feature/model pipeline fits only on events before `holdout_start`; later
-eligible events are reserved for evaluation. The fit engine can be pandas or
+bounded event window in Spark when temporal splitting is selected. Random
+splitting uses Core `DataSplitter` on stable record-key order and needs no dates.
+Optional availability filtering excludes unknown results and those after the
+independent `result_cutoff` from both fit and holdout.
+For temporal splitting, the feature/model pipeline fits only on events before
+`holdout_start`; later eligible events are reserved for evaluation. The fit engine can be pandas or
 Polars. The run logs the Skyulf config, source and code identities, fitted model,
 held-out metrics and `candidate_comparison.json`. It registers a new concrete
 model version but never assigns `@challenger` or `@champion`.
@@ -29,6 +31,8 @@ from skyulf.integrations.databricks import LocalTrainingSpec, train_local_candid
 
 spec = LocalTrainingSpec(
     table="catalog.schema.labeled_events", version=12,
+    split_strategy="temporal", filter_unavailable_results=True,
+    result_cutoff=datetime(2026, 3, 15, tzinfo=UTC),
     start=datetime(2026, 1, 1, tzinfo=UTC),
     holdout_start=datetime(2026, 2, 1, tzinfo=UTC),
     cutoff=datetime(2026, 3, 1, tzinfo=UTC),
@@ -83,6 +87,25 @@ nonexistent local times are rejected, and strings are never guessed.
 See the [source-date contract](databricks_bundle.md#source-date-formats-and-timezones)
 for examples, boundaries, supported directives and distributed validation cost.
 `candidate_training_spec.json` retains both parsing rules for approval replay.
+
+For a table without dates, create the same specification with no time fields:
+
+```python
+spec = LocalTrainingSpec(
+    table="catalog.schema.labeled_customers", version=12,
+    record_key_columns=("customer_id",), input_columns=("income", "age"),
+    target_column="target", max_rows=10_000, max_bytes=32_000_000,
+    split_strategy="random", test_size=0.2, random_state=42, stratify=False,
+)
+```
+
+Pass this spec to the same `train_local_candidate` call above with either fit
+engine. All targets must be known. Enable `filter_unavailable_results` and set
+`result_available_at_column` plus `result_cutoff` if outcomes arrive later;
+random splitting still needs no observation timestamp. The returned candidate
+and saved spec record holdout membership evidence for approval replay.
+See the [split/availability matrix](databricks_bundle.md#choose-the-evaluation-split-and-result-availability)
+for the four supported combinations.
 
 ## Fit and score a small batch
 

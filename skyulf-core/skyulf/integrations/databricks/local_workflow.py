@@ -5,7 +5,7 @@ this module creates no Spark session, registry connection or cloud resource.
 """
 
 import warnings
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -23,6 +23,7 @@ from ..mlflow.promotion import (
     stage_challenger,
 )
 from ..mlflow.registry import RegistryModelNotFoundError, resolve_model
+from ._contracts import input_budget_bytes
 from .admission import SingleWriterAdmission
 from .local_approval import approve_local_candidate, reject_local_candidate
 from .local_incremental import run_incremental_local_batch
@@ -149,7 +150,7 @@ def _scoring_config(config: dict[str, Any]) -> LocalWorkflowConfig:
             table=config["score_source_table"],
             read_mode="incremental",
             max_rows=config["max_rows"],
-            max_bytes=config["max_bytes"],
+            max_bytes=input_budget_bytes(config.get("max_input_mb")),
         ),
         model=ModelSelection(
             kind="local_pipeline",
@@ -164,43 +165,88 @@ def _scoring_config(config: dict[str, Any]) -> LocalWorkflowConfig:
 
 def _training_spec(config: dict[str, Any]) -> LocalTrainingSpec:
     """Keep the evaluation split and source snapshot identical across actions."""
+    if (
+        config.get("split_strategy", "random") == "random"
+        and config.get("monthly_lookback_months") is not None
+    ):
+        raise ValueError("Random full-snapshot training requires null monthly_lookback_months.")
+    version = config.get("training_version")
+    if type(version) is not int or version < 0:
+        raise ValueError(
+            "Set training_version to an explicit nonnegative Delta version before train."
+        )
     return LocalTrainingSpec(
         table=config["training_table"],
-        version=config["training_version"],
-        start=datetime.fromisoformat(config["start"]),
-        holdout_start=datetime.fromisoformat(config["holdout_start"]),
-        cutoff=datetime.fromisoformat(config["cutoff"]),
-        event_column=config["event_column"],
-        result_available_at_column=config["result_available_at_column"],
+        version=version,
+        split_strategy=config.get("split_strategy", "random"),
+        test_size=config.get("test_size", 0.2),
+        random_state=config.get("random_state", 42),
+        stratify=config.get("stratify", False),
+        start=_optional_boundary(config, "start"),
+        holdout_start=_optional_boundary(config, "holdout_start"),
+        cutoff=_optional_boundary(config, "cutoff"),
+        event_column=config.get("event_column"),
+        filter_unavailable_results=config.get("filter_unavailable_results", False),
+        result_available_at_column=config.get("result_available_at_column"),
+        result_cutoff=_optional_boundary(config, "result_cutoff"),
         record_key_columns=tuple(config["record_key_columns"]),
         input_columns=tuple(config["input_columns"]),
         target_column=config["target_column"],
         max_rows=config["max_rows"],
-        max_bytes=config["max_bytes"],
-        event_time_parsing=training_date_spec(config.get("event_time_parsing", {})),
-        result_time_parsing=training_date_spec(config.get("result_time_parsing", {})),
+        max_bytes=input_budget_bytes(config.get("max_input_mb")),
+        event_time_parsing=training_date_spec(
+            config.get("event_time_parsing") if config.get("event_time_parsing") is not None else {}
+        ),
+        result_time_parsing=training_date_spec(
+            config.get("result_time_parsing")
+            if config.get("result_time_parsing") is not None
+            else {}
+        ),
     )
 
 
+def _optional_boundary(config: dict[str, Any], field: str) -> datetime | None:
+    """Decode an explicitly supplied boundary without inventing an inactive date."""
+    value = config.get(field)
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise ValueError(f"{field} must be an ISO timestamp with timezone.")
+    try:
+        return datetime.fromisoformat(value)
+    except ValueError as exc:
+        raise ValueError(f"{field} must be an ISO timestamp with timezone.") from exc
+
+
 def _monthly_training_spec(spark: Any, config: dict[str, Any], now: datetime) -> LocalTrainingSpec:
-    """Pin one Delta version and a UTC calendar window for monthly training."""
-    event_parsing = training_date_spec(config.get("event_time_parsing", {}))
-    result_parsing = training_date_spec(config.get("result_time_parsing", {}))
+    """Pin latest full data or an explicit UTC temporal window at the invocation instant."""
     if now.tzinfo is None or now.utcoffset() is None:
         raise ValueError("Monthly training needs a timezone-aware run instant.")
-    lookback = config.get("monthly_lookback_months")
-    if type(lookback) is not int or not 2 <= lookback <= 120:
-        raise ValueError("monthly_lookback_months must be an integer from 2 to 120.")
-    cutoff = now.astimezone(UTC).replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    settings = dict(config)
+    if config.get("split_strategy", "random") == "temporal":
+        lookback = config.get("monthly_lookback_months")
+        if type(lookback) is not int or not 2 <= lookback <= 120:
+            raise ValueError("monthly_lookback_months must be an integer from 2 to 120.")
+        cutoff = now.astimezone(UTC).replace(day=1, hour=0, minute=0, second=0, microsecond=0)
 
-    def months_before(count: int) -> datetime:
-        """Preserve the first-of-month boundary across year rollover."""
-        index = cutoff.year * 12 + cutoff.month - 1 - count
-        return datetime(index // 12, index % 12 + 1, 1, tzinfo=UTC)
+        def months_before(count: int) -> datetime:
+            """Preserve the first-of-month boundary across year rollover."""
+            index = cutoff.year * 12 + cutoff.month - 1 - count
+            return datetime(index // 12, index % 12 + 1, 1, tzinfo=UTC)
 
-    table = config["training_table"]
-    if not _TABLE_NAME.fullmatch(table):
-        raise ValueError("training_table must be a three-part UC name.")
+        settings.update(
+            start=months_before(lookback).isoformat(),
+            holdout_start=months_before(1).isoformat(),
+            cutoff=cutoff.isoformat(),
+        )
+    elif config.get("monthly_lookback_months") is not None:
+        raise ValueError("Random full-snapshot training requires null monthly_lookback_months.")
+    if config.get("filter_unavailable_results", False):
+        settings["result_cutoff"] = now.astimezone(UTC).isoformat()
+    # Validate all selection policies before contacting the source history.
+    settings["training_version"] = 0
+    spec = _training_spec(settings)
+    table = spec.table
     latest = (
         spark.sql(f"DESCRIBE HISTORY {table}")
         .select("version")
@@ -209,22 +255,7 @@ def _monthly_training_spec(spark: Any, config: dict[str, Any], now: datetime) ->
     )
     if latest is None or type(latest["version"]) is not int:
         raise ValueError("Training source has no concrete Delta version.")
-    return LocalTrainingSpec(
-        table=table,
-        version=latest["version"],
-        start=months_before(lookback),
-        holdout_start=months_before(1),
-        cutoff=cutoff,
-        event_column=config["event_column"],
-        result_available_at_column=config["result_available_at_column"],
-        record_key_columns=tuple(config["record_key_columns"]),
-        input_columns=tuple(config["input_columns"]),
-        target_column=config["target_column"],
-        max_rows=config["max_rows"],
-        max_bytes=config["max_bytes"],
-        event_time_parsing=event_parsing,
-        result_time_parsing=result_parsing,
-    )
+    return replace(spec, version=latest["version"])
 
 
 def _monthly_champion_version(config: dict[str, Any]) -> str | None:
@@ -251,6 +282,7 @@ def _automatic_promotion(
 ) -> AliasChangeReceipt | None:
     """Record contender evidence separately from any optional champion transition."""
     report = candidate.comparison
+    spec = replace(spec, holdout_key_sha256=candidate.holdout_key_sha256)
     frame = read_training_snapshot(spark, spec)
     _, heldout, _ = split_labeled_snapshot(frame, spec)
     native = pl.from_pandas(heldout) if config["engine"] == "polars" else heldout

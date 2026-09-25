@@ -109,6 +109,31 @@ dispatches alias actions. Role/action override attempts are rejected.
 These controls still require appropriate registry/table permissions; another
 independent job or a direct Catalog alias edit can violate writer ownership.
 
+## Training data flow
+
+```mermaid
+flowchart TD
+    S[Pin Delta source version] --> P{Split strategy}
+    P -->|Random| R[Read bounded full snapshot]
+    P -->|Temporal| T[Validate event dates and select observation window]
+    R --> A{Filter unavailable results?}
+    T --> A
+    A -->|Yes| F[Keep known result dates at or before result cutoff]
+    A -->|No| L[Require all targets to be known]
+    F --> K[Validate labels and stable record keys]
+    L --> K
+    K --> H[Create disjoint training and final holdout sets]
+    H --> M[Fit preprocessing and model on training rows only]
+    M --> E[Evaluate candidate and champion on the same holdout]
+    E --> V[Save snapshot, split settings and holdout membership digest]
+    V --> O[Approval replays saved evidence before alias change]
+```
+
+Random splitting uses Core `DataSplitter` with stable key ordering and a seed.
+Temporal splitting reserves observations from `holdout_start` to the exclusive
+`cutoff`. Result availability uses its own `result_cutoff`; it does not select
+the observation window. Job cron controls when this flow starts.
+
 ## Prepare the project
 
 Use `record_key_columns` for source record identities and
@@ -119,9 +144,15 @@ Use a newly generated project and models trained with these field names.
 Earlier experimental projects and training evidence are not automatically converted.
 
 1. Set the task, engine, existing source tables, row keys, features, target, pipeline,
-   model name, prediction name, training split and bounded read limits.
-   For manual training, replace the unset snapshot/date fields with an actual
-   `training_version` and timezone-aware `start < holdout_start < cutoff`.
+   model name, prediction name, training split and bounded read limits:
+   `max_rows` and `max_input_mb` (MiB, not total process RAM).
+   For manual training, set a concrete `training_version`. The default random
+   split needs no date columns: configure `test_size`, `random_state`, and optional
+   classification `stratify`. For temporal splitting, select `split_strategy: "temporal"`,
+   map `event_column` and set aware `start < holdout_start < cutoff`.
+   Independently enable `filter_unavailable_results` if results arrive later;
+   map `result_available_at_column` and set `result_cutoff`. Leave inactive fields
+   null/default. See the [four training combinations](databricks_bundle.md#choose-the-evaluation-split-and-result-availability).
    For strings, local-clock timestamps or dates, configure `event_time_parsing`
    and `result_time_parsing` using the [source-date examples](databricks_bundle.md#source-date-formats-and-timezones).
    Source timezones and the cron timezone are separate.

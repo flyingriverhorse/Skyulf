@@ -32,6 +32,7 @@ from ..mlflow.registry import _make_client, _require_mlflow, resolve_model
 from ..mlflow.rejection import reject_candidate
 from ..mlflow.validation import ModelComparisonReport
 from . import local_retraining
+from ._contracts import input_budget_bytes
 from .local_retraining import LocalTrainingSpec
 from .training_dates import training_date_spec
 
@@ -107,13 +108,16 @@ def _load_evidence(
     engine = saved_spec.pop("engine")
     if engine not in ("pandas", "polars"):
         raise ValueError("Saved approval engine must be pandas or polars.")
-    for field in ("start", "holdout_start", "cutoff"):
-        saved_spec[field] = datetime.fromisoformat(saved_spec[field])
+    for field in ("start", "holdout_start", "cutoff", "result_cutoff"):
+        value = saved_spec[field]
+        saved_spec[field] = None if value is None else datetime.fromisoformat(value)
     for field in ("record_key_columns", "input_columns"):
         saved_spec[field] = tuple(saved_spec[field])
     for field in ("event_time_parsing", "result_time_parsing"):
         saved_spec[field] = training_date_spec(saved_spec[field])
     spec = LocalTrainingSpec(**saved_spec)
+    if spec.holdout_key_sha256 is None:
+        raise ValueError("Saved training evidence requires holdout membership proof.")
     if spec.dataset_id != report.dataset_id:
         raise ValueError("Saved training snapshot differs from comparison evidence.")
     return report, spec, engine
@@ -230,9 +234,9 @@ def approve_local_candidate(
     candidate_version, comparison_sha256 = _validate_candidate_request(
         candidate_version, comparison_sha256, expected_champion_version
     )
-    for field in ("max_rows", "max_bytes"):
-        if type(config.get(field)) is not int or config[field] <= 0:
-            raise ValueError(f"Approval {field} must be a positive integer.")
+    if type(config.get("max_rows")) is not int or config["max_rows"] <= 0:
+        raise ValueError("Approval max_rows must be a positive integer.")
+    max_bytes = input_budget_bytes(config.get("max_input_mb"))
     tracking_uri = config.get("tracking_uri", "databricks")
     registry_uri = config.get("registry_uri", "databricks-uc")
     name = config["model_name"]
@@ -248,15 +252,6 @@ def approve_local_candidate(
         or report.quality_threshold is None
     ):
         raise ValueError("Approval policy must match the saved, absolute-quality-gated comparison.")
-    if engine != config["engine"] or any(
-        (
-            spec.table != config["training_table"],
-            spec.target_column != config["target_column"],
-            spec.input_columns != tuple(config["input_columns"]),
-            spec.record_key_columns != tuple(config["record_key_columns"]),
-        )
-    ):
-        raise ValueError("Approval data contract differs from saved training evidence.")
     candidate = resolve_model(
         name, version=candidate_version, tracking_uri=tracking_uri, registry_uri=registry_uri
     )
@@ -273,7 +268,7 @@ def approve_local_candidate(
     bounded_spec = replace(
         spec,
         max_rows=min(spec.max_rows, config["max_rows"]),
-        max_bytes=min(spec.max_bytes, config["max_bytes"]),
+        max_bytes=min(spec.max_bytes, max_bytes),
     )
     frame = local_retraining.read_training_snapshot(spark, bounded_spec)
     _, heldout, _ = local_retraining.split_labeled_snapshot(frame, bounded_spec)

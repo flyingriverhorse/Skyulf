@@ -5,6 +5,55 @@ from copy import deepcopy
 import pytest
 
 
+@pytest.mark.parametrize("action", ["train", "train_monthly", "score", "approve"])
+def test_random_workflow_allows_null_inactive_dates_and_explicit_snapshot(workflow_config, action):
+    """Regenerated ordinary-table projects require no time columns or calendar windows."""
+    from skyulf.integrations.databricks.workflow_config import validate_workflow_config
+
+    settings = {**workflow_config, "split_strategy": "random", "filter_unavailable_results": False}
+    for field in (
+        "start",
+        "holdout_start",
+        "cutoff",
+        "event_column",
+        "event_time_parsing",
+        "result_cutoff",
+        "result_available_at_column",
+        "result_time_parsing",
+        "monthly_lookback_months",
+    ):
+        settings[field] = None
+    assert validate_workflow_config(settings, action=action) == settings
+    with pytest.raises(ValueError, match="inactive event"):
+        validate_workflow_config({**settings, "event_column": "event_time"}, action=action)
+    with pytest.raises(ValueError, match="object"):
+        validate_workflow_config({**settings, "event_time_parsing": []}, action=action)
+
+
+def test_random_stratification_requires_classification_in_workflow(workflow_config):
+    """Preflight must not interpret repeated continuous targets as stratification classes."""
+    from skyulf.integrations.databricks.workflow_config import validate_workflow_config
+
+    settings = {
+        **workflow_config,
+        "split_strategy": "random",
+        "stratify": True,
+        "filter_unavailable_results": False,
+    }
+    for field in (
+        "start",
+        "holdout_start",
+        "cutoff",
+        "event_column",
+        "result_cutoff",
+        "result_available_at_column",
+        "monthly_lookback_months",
+    ):
+        settings[field] = None
+    with pytest.raises(ValueError, match="classification"):
+        validate_workflow_config(settings, action="train")
+
+
 @pytest.mark.parametrize("action", ["train", "train_monthly", "score"])
 def test_source_date_rules_are_validated_offline(workflow_config, action):
     """Invalid parsing cannot wait until a monthly run has opened its Delta source."""
@@ -32,7 +81,7 @@ def test_column_names_remain_canonical_through_validation(workflow_config):
     assert workflow_config == before
 
 
-@pytest.mark.parametrize("old_name", ["row_keys", "label_time_column"])
+@pytest.mark.parametrize("old_name", ["row_keys", "label_time_column", "max_bytes"])
 def test_retired_column_names_are_unknown_settings(workflow_config, old_name):
     """Removed field names must not silently override the current training contract."""
     from skyulf.integrations.databricks.workflow_config import validate_workflow_config
@@ -47,7 +96,7 @@ def test_retired_column_names_are_unknown_settings(workflow_config, old_name):
         ({"config_version": 2}, "config_version"),
         ({"config_version": True}, "config_version"),
         ({"max_rows": True}, "max_rows"),
-        ({"max_bytes": -1}, "max_bytes"),
+        ({"max_input_mb": -1}, "max_input_mb"),
         ({"metric": "heldout_accuracy"}, "metric"),
         ({"quality_threshold": float("nan")}, "finite"),
         ({"min_improvement": float("inf")}, "finite"),
@@ -195,3 +244,28 @@ def test_reserved_output_and_cdf_columns_fail_before_compute(workflow_config, ch
 
     with pytest.raises(ValueError, match="reserved"):
         validate_workflow_config({**workflow_config, **change}, action="score")
+
+
+@pytest.mark.parametrize("megabytes", [1, 64, 256])
+def test_input_megabytes_reach_training_and_scoring_as_bytes(workflow_config, megabytes):
+    """Readable Bundle units must preserve the same byte budget on both execution paths."""
+    from skyulf.integrations.databricks.local_workflow import _scoring_config, _training_spec
+    from skyulf.integrations.databricks.workflow_config import validate_workflow_config
+
+    config = {key: value for key, value in workflow_config.items() if key != "max_bytes"}
+    config["max_input_mb"] = megabytes
+    checked = validate_workflow_config(config, action="train")
+    assert _training_spec(checked).max_bytes == megabytes * 1024 * 1024
+    assert _scoring_config(checked).source.max_bytes == megabytes * 1024 * 1024
+    assert "max_bytes" not in checked
+
+
+@pytest.mark.parametrize("value", [None, 0, -1, True, "64", 1.5, float("inf")])
+def test_input_megabytes_reject_invalid_units_before_execution(workflow_config, value):
+    """An invalid size must never become an unlimited or incorrectly scaled byte budget."""
+    from skyulf.integrations.databricks.workflow_config import validate_workflow_config
+
+    config = {key: item for key, item in workflow_config.items() if key != "max_bytes"}
+    config["max_input_mb"] = value
+    with pytest.raises(ValueError, match="max_input_mb"):
+        validate_workflow_config(config, action="train")

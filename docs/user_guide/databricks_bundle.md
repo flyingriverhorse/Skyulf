@@ -27,9 +27,37 @@ Regression starts with Core `linear_regression` and `heldout_rmse`;
 classification starts with `logistic_regression` and `heldout_accuracy`.
 The pipeline remains editable: add registered Core preprocessing nodes and
 choose a task-compatible model. With a JSON init file, `max_rows` and
-`max_bytes` are positive integer **strings**; the generated workflow stores
+`max_input_mb` are positive integer **strings**; the generated workflow stores
 them as numbers. `record_key_columns_json` accepts one or more source key
 columns, for example `["customer_id", "observation_id"]`.
+
+### Local input limits
+
+`max_rows` bounds the rows read into the local process before train/test splitting.
+For temporal training it applies after observation-window selection, but before
+result-availability filtering. An overflow fails; the reader never silently
+truncates or samples training data. Training sampling is planned separately.
+
+`max_input_mb` defaults to `64`. One unit is 1 MiB (1,048,576 bytes). It bounds
+measured decoded input/serialized row sizes and local frames; it does not cap
+Spark's scan, total process RAM, preprocessing expansion or model training RAM.
+The existing scoring services also check bounded prediction frames. Row count
+alone cannot predict size: wide numeric tables and long strings cost more.
+
+```json
+{
+  "max_rows": 100000,
+  "max_input_mb": 256
+}
+```
+
+These are illustrative limits, not a claim that every 100,000-row dataset fits
+256 MiB. Training, scoring and approval convert this value to bytes internally.
+Approval may tighten but never relax the saved training budget. The lower-level
+Python SDK still accepts `max_bytes`; Bundle workflow settings use only
+`max_input_mb`. Replace an old Bundle `"max_bytes": 67108864` with
+`"max_input_mb": 64`; no legacy alias is accepted. In an initializer file use
+`"max_input_mb": "64"`; generated workflow JSON stores the number `64`.
 
 ### Record identity and result availability
 
@@ -49,21 +77,87 @@ They do not create an ID, become features, or implicitly define CV groups.
 `event_column` names the source observation timestamp; `start`, `holdout_start`
 and `cutoff` are boundaries applied to that column. `result_available_at_column`
 names each row's actual result-availability timestamp. Different rows can have
-different availability dates; the existing temporal workflow excludes results
-that are unknown or become available after its cutoff. Skyulf does not invent
+different availability dates. With `filter_unavailable_results: true`, exclude
+unknown results and results later than the independent `result_cutoff`. Skyulf does not invent
 those timestamps or fill them with the job's execution time.
 
 Use `record_key_columns_json` and `result_available_at_column` in initialization
-files. The default example column names are `entity_id` and `label_at`;
-initialization does not create those columns or generate timestamps.
+files. The default example identity column is `entity_id`; date mappings default
+to null. Initialization does not create columns or generate timestamps.
 
 The same names are used throughout the library and saved training settings.
 This is an intentional pre-production breaking rename: regenerate projects and
 retrain test models created with the previous column settings. There is no
 field-alias adapter or automatic conversion of earlier training evidence.
 
-Temporal fields are still required for training. Date-free training and
-configurable split/CV are separate pre-SM-34 tasks; do not supply invented dates.
+### Choose the evaluation split and result availability
+
+The default `split_strategy: "random"` needs only existing keys, features and a
+nonnull target. `training_version` pins the source Delta snapshot; it is unrelated
+to dates. Set it before manual training. This example shows the training-related
+part of the generated `config/workflow.json`:
+
+```json
+{
+  "split_strategy": "random",
+  "training_version": 12,
+  "record_key_columns": ["customer_id"],
+  "input_columns": ["income", "age"],
+  "target_column": "claim_amount",
+  "test_size": 0.2,
+  "random_state": 42,
+  "stratify": false,
+  "event_column": null,
+  "start": null,
+  "holdout_start": null,
+  "cutoff": null,
+  "monthly_lookback_months": null,
+  "filter_unavailable_results": false,
+  "result_available_at_column": null,
+  "result_cutoff": null
+}
+```
+
+| Split | Availability filter | Required date settings |
+| --- | --- | --- |
+| Random | Disabled | None; all supplied targets must be known. |
+| Random | Enabled | `result_available_at_column`, `result_cutoff`, and source parsing rules when needed. |
+| Temporal | Disabled | `event_column`, `start`, `holdout_start`, `cutoff`, and source parsing rules when needed. |
+| Temporal | Enabled | Both sets above; observation and result cutoffs are independent. |
+
+For random splitting with delayed outcomes, keep the event fields null and set
+`filter_unavailable_results: true`, `result_available_at_column: "confirmed_at"`
+and an aware `result_cutoff`, for example `2026-09-15T00:00:00+00:00`. Each row
+is eligible only if its own result date is known and no later than that instant.
+A future snapshot/cutoff can admit results that became available later. Null
+availability is excluded; a known, eligible result with a null target fails.
+With filtering disabled, any null target fails: Skyulf does not manufacture labels.
+
+Core `DataSplitter` selects the random holdout after sorting by the complete
+record key. The same snapshot, keys, seed and split settings retain membership
+when input row order changes. `stratify: true` is for classification; insufficient
+class counts or an impossible partition fail instead of silently disabling it.
+A different snapshot may produce different membership even with the same seed.
+The final holdout never fits preprocessing or the model.
+
+Saved training settings include the split policy and a holdout-key digest.
+`holdout_membership.json` records the key-column names, count and digest without
+labels. Approval replays the saved snapshot and verifies that membership before
+comparison; changing today's workflow cannot silently replace the evaluation set.
+Old experimental training evidence must be recreated. Optional training CV and
+selection-window controls remain SM-33D work.
+
+Inactive fields must stay null/default: a random configuration with an event
+column or temporal boundaries is rejected, as is a result column with availability
+filtering disabled. Missing temporal dates never switch training to random.
+Initialization hides irrelevant prompts but preserves explicitly supplied values
+so validation can identify conflicts. The examples folder contains
+`date-free-init.example.json`, `random-delayed-results-init.example.json` and
+`temporal-delayed-results-init.example.json`. Replace their table/feature names
+and snapshot before using them. Their date examples assume native timestamp
+instants; edit parsing rules for other source types. In initializer JSON,
+`test_size`, `random_state`, `stratify` and `filter_unavailable_results` are
+strings; generated workflow JSON stores numbers and booleans.
 
 ### Source date formats and timezones
 
@@ -76,6 +170,8 @@ Edit these settings in the generated `config/workflow.json`:
 
 ```json
 {
+  "split_strategy": "temporal",
+  "filter_unavailable_results": true,
   "event_column": "observation_date",
   "event_time_parsing": {
     "format": "%d/%m/%Y %H:%M:%S",
@@ -90,7 +186,8 @@ Edit these settings in the generated `config/workflow.json`:
   },
   "start": "2026-06-01T00:00:00+00:00",
   "holdout_start": "2026-08-01T00:00:00+00:00",
-  "cutoff": "2026-09-01T00:00:00+00:00"
+  "cutoff": "2026-09-01T00:00:00+00:00",
+  "result_cutoff": "2026-09-15T00:00:00+00:00"
 }
 ```
 
@@ -143,11 +240,10 @@ The supported format vocabulary is a subset of Python's
 [strptime directives](https://docs.python.org/3/library/datetime.html#strftime-and-strptime-format-codes);
 source timezone rules use [IANA zoneinfo](https://docs.python.org/3/library/zoneinfo.html).
 
-Manual `training_version`, `start`, `holdout_start` and `cutoff` default to
-`null`. Set an actual Delta snapshot and timezone-aware split before running
-`train`. Scoring and saved-evidence actions do not require these dates.
-`train_monthly` keeps its existing rolling-window behavior; detailed schedule
-and window controls are a separate follow-up.
+Manual `training_version` defaults to `null`; set a concrete Delta version before
+`train`. Date boundaries default to null and are required only by their active
+policy. Scoring and saved-evidence actions do not require a new training window.
+`train_monthly` pins the latest snapshot automatically; its policy is described below.
 
 ### Configuration validation and migration
 
@@ -428,7 +524,7 @@ job or running it at deployment. The Quartz cron and timezone are selected
 at initialization and remain editable Bundle variables. No endpoint or Unity Catalog table is
 created by deployment alone.
 `promotion_policy=automatic` uses the same train job to compare candidate and
-champion on a pinned temporal holdout, independently of the score selector. The
+champion on the same pinned holdout, independently of the score selector. The
 selected `metric`, `min_improvement`, and absolute `quality_threshold` stay
 editable in `config/workflow.json`. A first champion requires a numeric
 absolute threshold because no prior version exists for comparison. Later
@@ -544,7 +640,7 @@ WHERE customer_id = 'C123';
 
 Build and place the matching Skyulf wheel in the generated project's `dist/`,
 then edit `config/workflow.json` for real source columns, preprocessing, model,
-temporal split and size limits. The JSON values are an example, not a dataset.
+split policy and size limits. The JSON values are an example, not a dataset.
 Enable Change Data Feed on the scoring source before later inserts arrive.
 
 ```powershell
@@ -560,7 +656,7 @@ enable the optional handoff. Inspect both lifecycle and score task results. The 
 rejects a missing source, disabled CDF, unsuitable row keys, a model output
 mismatch or an existing target schema mismatch before creating prediction
 output. It checks initial row count against `max_rows`; each score
-also checks decoded transfer bytes against `max_bytes`. Existing tables are
+also checks decoded transfer size against the `max_input_mb` budget. Existing tables are
 never overwritten. The first score processes the current source
 snapshot; later runs process only new inserts since the committed Delta
 receipt. A repeat without new rows is a no-op. No monthly date or source
@@ -584,14 +680,17 @@ separate work.
 The optional monthly `train` schedule defaults to 03:00 UTC on day three and
 starts paused. Edit its Bundle cron and timezone variables for the desired
 monthly run time. After configuring real labeled data and verifying a manual
-run, unpause it deliberately. Each run pins the source's latest Delta version and uses the
-first day of the current UTC month as the label cutoff. The preceding month is
-holdout; `monthly_lookback_months` (default four) controls the full window.
-Only labels available by the cutoff are eligible. `@champion` is resolved to a
+run, unpause it deliberately. Each run pins the source's latest Delta version.
+Random mode uses the whole bounded snapshot with its saved split settings and
+no date window or lookback. Temporal mode uses the first day of the current UTC
+month as the observation cutoff, holds out the preceding month and uses
+`monthly_lookback_months` (default four) for the full window including holdout.
+When availability filtering is enabled, the separate result cutoff is the job's
+invocation instant. The source must truthfully record per-row availability. `@champion` is resolved to a
 concrete version for comparison if present. Manual approval leaves champion
 unchanged; automatic promotion applies its metric gates. Score handoff follows
 only a successful champion transition when enabled. The source version is
-pinned at run start, so `label_at` must faithfully record availability.
+pinned at run start; it is not a historical snapshot as of the observation cutoff.
 
 The older SM-20a personal serverless rehearsal passed, but its jobs and test
 schemas were removed at the user's request. The subsequent clean generic

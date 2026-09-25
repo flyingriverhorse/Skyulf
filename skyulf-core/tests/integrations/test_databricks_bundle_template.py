@@ -40,7 +40,15 @@ def _render_default_config(record_key="entity_id", risk_category=""):
         risk_category=risk_category,
     )
     content = template.read_text(encoding="utf-8")
-    for name in ("risk_category", "start", "holdout_start", "cutoff"):
+    for name in (
+        "risk_category",
+        "event_column",
+        "result_available_at_column",
+        "start",
+        "holdout_start",
+        "cutoff",
+        "result_cutoff",
+    ):
         content = content.replace(
             "{{if ." + name + '}}"{{.' + name + '}}"{{else}}null{{end}}',
             json.dumps(values[name] or None),
@@ -65,6 +73,7 @@ def _render_default_config(record_key="entity_id", risk_category=""):
             "customer_model_source",
         )
     )
+    content = content.replace('{{if eq .split_strategy "temporal"}}4{{else}}null{{end}}', "null")
     for name, value in values.items():
         content = content.replace("{{." + name + "}}", str(value))
     return json.loads(content)
@@ -234,3 +243,32 @@ def test_auto_champion_init_exposes_metric_gates_and_reuses_score_job():
     assert "job_id: ${resources.jobs.score.id}" in jobs
     assert "task_key: score_after_lifecycle" in jobs
     assert jobs.count("queue:\n        enabled: true") == 2
+
+
+def test_generated_default_training_does_not_require_dates():
+    """Ordinary labeled tables must initialize without invented observation or result dates."""
+    config = _render_default_config()
+    assert config["split_strategy"] == "random"
+    assert config["test_size"] == 0.2
+    assert config["random_state"] == 42
+    assert config["stratify"] is False
+    assert config["filter_unavailable_results"] is False
+    assert all(
+        config[key] is None
+        for key in (
+            "event_column",
+            "result_available_at_column",
+            "start",
+            "holdout_start",
+            "cutoff",
+            "result_cutoff",
+            "monthly_lookback_months",
+        )
+    )
+
+
+def test_generated_input_limit_uses_readable_megabytes():
+    """The default must remain 64 MiB after replacing the byte-valued Bundle field."""
+    config = _render_default_config()
+    assert config["max_input_mb"] == 64
+    assert "max_bytes" not in config

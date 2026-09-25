@@ -24,6 +24,9 @@ def _spec(table, **changes):
         start=datetime(2026, 1, 1, tzinfo=UTC),
         holdout_start=datetime(2026, 2, 1, tzinfo=UTC),
         cutoff=datetime(2026, 3, 1, tzinfo=UTC),
+        split_strategy="temporal",
+        filter_unavailable_results=True,
+        result_cutoff=datetime(2026, 3, 1, tzinfo=UTC),
         event_column="event_at",
         result_available_at_column="result_at",
         record_key_columns=("id",),
@@ -41,6 +44,72 @@ def source_table(delta_spark):
     table = f"spark_catalog.default.training_dates_{uuid4().hex}"
     yield table
     delta_spark.sql(f"DROP TABLE IF EXISTS {table}")
+
+
+def test_date_free_delta_snapshot_stays_pinned_and_bounded(delta_spark, source_table):
+    """Random reads need only keys/features/target and preserve old versions after append."""
+    delta_spark.createDataFrame(
+        [("a" if i < 10 else "b", i % 10, float(i), float(2 * i)) for i in reversed(range(20))],
+        "tenant string, id long, x double, target double",
+    ).write.format("delta").saveAsTable(source_table)
+    spec = LocalTrainingSpec(
+        table=source_table,
+        version=0,
+        record_key_columns=("tenant", "id"),
+        input_columns=("x",),
+        target_column="target",
+        max_rows=20,
+        max_bytes=100000,
+    )
+    first = read_training_snapshot(delta_spark, spec)
+    assert first.x.tolist() == list(range(20))
+    train, heldout, excluded = split_labeled_snapshot(first, spec)
+    assert len(train) == 16 and len(heldout) == 4 and excluded == 0
+    delta_spark.createDataFrame([("c", 1, 20.0, 40.0)], list(first.columns)).write.format(
+        "delta"
+    ).mode("append").saveAsTable(source_table)
+    assert read_training_snapshot(delta_spark, spec).equals(first)
+    with pytest.raises(ValueError, match="max_rows"):
+        read_training_snapshot(delta_spark, replace(spec, version=1))
+    with pytest.raises(ValueError, match="max_bytes"):
+        read_training_snapshot(delta_spark, replace(spec, max_bytes=1))
+
+
+def test_random_delta_result_filtering_without_event_date(delta_spark, source_table):
+    """Availability-only normalization must exclude unknown/late rows without an event mapping."""
+    delta_spark.createDataFrame(
+        [
+            (
+                i,
+                float(i),
+                float(i * 2) if i < 10 else None,
+                "2026-03-01T00:00:00Z" if i < 10 else (None if i == 10 else "2026-04-01T00:00:00Z"),
+            )
+            for i in range(12)
+        ],
+        "id long, x double, target double, available string",
+    ).write.format("delta").saveAsTable(source_table)
+    spec = LocalTrainingSpec(
+        table=source_table,
+        version=0,
+        record_key_columns=("id",),
+        input_columns=("x",),
+        target_column="target",
+        max_rows=20,
+        max_bytes=100000,
+        filter_unavailable_results=True,
+        result_available_at_column="available",
+        result_time_parsing=TrainingDateSpec(format="%Y-%m-%dT%H:%M:%S%z"),
+        result_cutoff=datetime(2026, 3, 15, tzinfo=UTC),
+    )
+    train, heldout, excluded = split_labeled_snapshot(
+        read_training_snapshot(delta_spark, spec), spec
+    )
+    assert excluded == 2 and set(train.x).union(heldout.x) == set(range(10))
+    delta_spark.sql(f"UPDATE {source_table} SET target = 22.0 WHERE id = 11")
+    later = replace(spec, version=1, result_cutoff=datetime(2026, 4, 1, tzinfo=UTC))
+    assert split_labeled_snapshot(read_training_snapshot(delta_spark, later), later)[2] == 1
+    assert split_labeled_snapshot(read_training_snapshot(delta_spark, spec), spec)[2] == 2
 
 
 def test_native_timestamps_keep_instants_in_non_utc_session_and_process(delta_spark, source_table):

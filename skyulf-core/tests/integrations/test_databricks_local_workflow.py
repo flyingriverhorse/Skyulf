@@ -36,13 +36,16 @@ def _config():
         "record_key_columns": ["entity_id"],
         "input_columns": ["x"],
         "target_column": "target",
+        "split_strategy": "temporal",
+        "filter_unavailable_results": True,
+        "result_cutoff": "2026-03-01T00:00:00+00:00",
         "event_column": "event_time",
         "result_available_at_column": "label_at",
         "start": "2026-01-01T00:00:00+00:00",
         "holdout_start": "2026-02-01T00:00:00+00:00",
         "cutoff": "2026-03-01T00:00:00+00:00",
         "max_rows": 100,
-        "max_bytes": 100_000,
+        "max_input_mb": 1,
         "metric": "heldout_rmse",
         "min_improvement": 0.0,
         "quality_threshold": None,
@@ -325,7 +328,7 @@ def test_auto_champion_train_promotes_only_an_eligible_candidate(monkeypatch, tm
     config = _config()
     config.update(model_selection_mode="auto_champion", quality_threshold=1.0, engine="pandas")
     report = SimpleNamespace(champion_version="1", candidate_version="2", eligible=True)
-    candidate = SimpleNamespace(comparison=report)
+    candidate = SimpleNamespace(comparison=report, holdout_key_sha256="a" * 64)
     frame = object()
     heldout = object()
     monkeypatch.setattr(workflow, "train_local_candidate", Mock(return_value=candidate))
@@ -363,9 +366,10 @@ def test_auto_champion_train_retains_challenger_when_candidate_fails_gate(monkey
         "train_local_candidate",
         Mock(
             return_value=SimpleNamespace(
+                holdout_key_sha256="a" * 64,
                 comparison=SimpleNamespace(
                     champion_version="1", candidate_version="2", eligible=False
-                )
+                ),
             )
         ),
     )
@@ -396,6 +400,7 @@ def test_auto_champion_bootstraps_first_model_or_rejects_missing_threshold(monke
     config.update(model_selection_mode="auto_champion", quality_threshold=None, engine="pandas")
     train = Mock(
         return_value=SimpleNamespace(
+            holdout_key_sha256="a" * 64,
             comparison=SimpleNamespace(
                 champion_version=None,
                 candidate_version="1",
@@ -403,7 +408,7 @@ def test_auto_champion_bootstraps_first_model_or_rejects_missing_threshold(monke
                 metric="heldout_rmse",
                 metric_direction="minimize",
                 quality_threshold=1.0,
-            )
+            ),
         )
     )
     monkeypatch.setattr(workflow, "train_local_candidate", train)

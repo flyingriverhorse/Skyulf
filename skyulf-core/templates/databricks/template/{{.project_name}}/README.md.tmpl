@@ -33,7 +33,8 @@ table-free alias admission relies on that externally enforced ownership.
 Run and model-version tags use `train_data_version`, `test_data_version`,
 `train_data_destination`, `test_data_destination`, `model_type`, and
 `candidate_date_tag`. Both data versions refer to the pinned source snapshot;
-`train_start`, `test_start`, and `data_end` describe its temporal split.
+`split_strategy` names the evaluation split. Temporal runs also record
+`train_start`, `test_start`, and `data_end`; date-free runs omit these tags.
 Optional `risk_category` is selected at initialization and stays editable in
 config/workflow.json. Leaving it blank omits the tag; it never changes promotion gates.
 For policy compute, select `PayingRegNo` as the cost tag key when required by
@@ -113,12 +114,13 @@ are selected at initialization and remain editable as
 The default is 03:00 UTC on the third day of each month. Configure one run per
 month; a different cadence can retrain the same UTC month more than once.
 After you unpause it, each run captures the latest concrete Delta source
-version, uses the first day of that month as its UTC label cutoff, holds out
-the preceding calendar month, and starts fit data
-`monthly_lookback_months` months before the cutoff. The default lookback is
-four months. `label_at` must reflect when a label became available: rows with
-later labels are excluded. The captured Delta version is pinned at run start;
-it is not a historical snapshot as of the cutoff. If the source has too few
+version. Random splitting uses the whole bounded snapshot, with no dates or
+lookback. Temporal splitting uses the first day of that month as its UTC
+observation cutoff, holds out the preceding calendar month, and selects
+`monthly_lookback_months` months including holdout (default four). If result
+availability filtering is enabled, its separate cutoff is the job invocation
+instant. The captured Delta version is pinned at run start; it is not a
+historical snapshot as of the observation cutoff. If the source has too few
 labeled rows in either partition, training fails without publishing a model.
 The run compares against the concrete version behind `@champion` if present;
 a missing alias means first-model training. An explicit `champion_version`
@@ -154,14 +156,32 @@ across all scored rows, including later inserts. The resulting
 With no key input, `entity_id` remains the example source-column name.
 
 `result_available_at_column` names the source timestamp recording when each
-row's target became available. It defaults to the example column name `label_at`,
-not to an invented timestamp. `event_column` names the observation timestamp;
-training boundaries apply to it. Rows can have different result dates.
+row's target became available. It defaults to null and is required only with
+`filter_unavailable_results: true`, together with an aware `result_cutoff`.
+`event_column` names the observation timestamp for `split_strategy: temporal`;
+`start`, `holdout_start` and `cutoff` apply to it. Rows can have different result
+dates. Result availability is independent of the observation window.
 The library and saved training settings use these same names directly.
 Regenerate projects and retrain models created before this pre-production
 rename; earlier column settings and saved training evidence are not converted.
-Training dates are still required; date-free training is separate follow-up
-work. Configure `event_time_parsing` and `result_time_parsing` independently in
+The default `split_strategy: random` requires no date columns. Set `test_size`
+(default 0.2), `random_state` (42) and optionally classification `stratify`
+(false). Stable record-key sorting precedes Core splitting. Approval replays the
+saved snapshot, split policy and holdout-key digest; input row ordering cannot
+silently change evaluation membership. A different snapshot can change the split.
+
+| Split | Availability filter | Date settings |
+| --- | --- | --- |
+| Random | Disabled | None; all targets must be known. |
+| Random | Enabled | Result column and `result_cutoff`. |
+| Temporal | Disabled | Event column and ordered `start`, `holdout_start`, `cutoff`. |
+| Temporal | Enabled | Both sets; independent observation and result cutoffs. |
+
+Null or late result times are excluded when filtering is enabled. Eligible
+null targets fail. With filtering disabled, every target must be nonnull.
+Keep inactive date fields null and parsing rules at defaults; contradictory
+settings fail rather than silently switching policies. Configure
+`event_time_parsing` and `result_time_parsing` independently in
 `config/workflow.json`. Defaults accept native Spark `TIMESTAMP` instants.
 For strings use an explicit numeric Python format, for example
 `{"format": "%d/%m/%Y %H:%M:%S", "timezone": "Europe/Copenhagen", "date_only": "reject"}`.
@@ -191,19 +211,23 @@ need to publish to one target.
 1. Build a matching, trusted wheel from a Skyulf checkout with `uv build
    --wheel --no-build-isolation --out-dir <this-project>/dist skyulf-core`.
 2. Edit `config/workflow.json` for real source/model names, row keys, model
-   inputs, preprocessing, estimator, temporal split and size limits. The
+   inputs, preprocessing, estimator, split policy and size limits. The
    initialized task is **{{.task}}**: regression starts with linear regression
    and RMSE; classification starts with logistic regression and accuracy when
    `metric=auto`. Select existing features with `input_columns_json`, then edit
    the generated `pipeline` for your preprocessing and estimator. Feature
    engineering is not inferred automatically. Set a task-compatible metric
-   and quality threshold, and positive `max_rows`/`max_bytes` transfer limits.
+   and quality threshold, and positive `max_rows`/`max_input_mb` transfer limits.
+   `max_input_mb` defaults to 64 MiB (one unit = 1024 * 1024 bytes), limiting
+   local input size rather than total training RAM. `max_rows` bounds input
+   before train/test splitting; overflow fails without sampling or truncation.
    In an initialization config file, supply those limits as integer strings
    (for example, `"max_rows": "10000"`); generated workflow limits are numbers.
-   For manual training, explicitly set `training_version`, `start`,
-   `holdout_start`, and `cutoff`; the defaults are null, with no example snapshot
-   or dates. Use an ordered, timezone-aware split for your actual labeled data.
-   Monthly training derives its snapshot and UTC windows per run.
+   For manual training, explicitly set `training_version`. Random splitting
+   needs no dates. Temporal splitting requires an event column and aware
+   `start < holdout_start < cutoff`. Availability filtering requires a result
+   column and independent `result_cutoff`. Monthly training derives its snapshot
+   per run and, only in temporal mode, its UTC observation window.
    Enable Delta Change
    Data Feed on the scoring source before new rows arrive. Check that the
    source's initial rows are the rows you intend to score: the first `score`
@@ -262,7 +286,7 @@ prediction target or an explicit data migration.
    only a missing physical prediction table; it never overwrites an existing
    table or creates the source. Full mode then creates or updates its managed
    view after a complete nonempty score. The initial row check is bounded by `max_rows`, and
-   scoring enforces `max_rows` and `max_bytes` for each local transfer.
+   scoring enforces `max_rows` and `max_input_mb` for each local transfer.
 3. Add new rows to the existing source Delta table and run `score`
    again. An unchanged replay is a no-op. No date or source-version argument
    is entered for each run. Source updates or deletes require a separate

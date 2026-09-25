@@ -99,18 +99,18 @@ Temporal requires the event mapping and valid boundaries. Independently choose
 availability disabled or a result-date mapping plus pinned cutoff. Manual
 snapshot version still identifies data independently of event dates.
 
-- [ ] Test a table containing only keys, features and target on both engines.
-- [ ] Reuse Core DataSplitter for deterministic random holdout; order by stable
+- [x] Test a table containing only keys, features and target on both engines.
+- [x] Reuse Core DataSplitter for deterministic random holdout; order by stable
   record identity before splitting and persist enough evidence to replay.
-- [ ] Permit absent/null time fields only when unused. Reject contradictory
+- [x] Permit absent/null time fields only when unused. Reject contradictory
   policies and malformed active fields; do not infer a split from missing data.
-- [ ] Make availability filtering optional and per-row. Count late/unknown
+- [x] Make availability filtering optional and per-row. Count late/unknown
   outcomes and define null-target failure behavior for the labeled-data mode.
-- [ ] Separate observation window end from result-availability cutoff in new
+- [x] Separate observation window end from result-availability cutoff in new
   settings; document the new contract for regenerated projects.
-- [ ] Extend saved evidence/versioned readers so approval and retries use the
+- [x] Extend saved evidence/versioned readers so approval and retries use the
   same snapshot and holdout. Use newly generated evidence for validation.
-- [ ] Test delayed outcomes becoming eligible in a later snapshot; no target
+- [x] Test delayed outcomes becoming eligible in a later snapshot; no target
   leakage, deterministic class stratification and bounded-read failures.
 
 ## SM-33D — Core CV connection and selection/window separation
@@ -125,10 +125,26 @@ settings. Temporal CV consumes correctly ordered data and never shuffles. Keep
 the final heldout dataset identical for candidate/champion comparison. Model
 search/trial tuning and explainability remain SM-36 scope.
 
-- [ ] Audit/reuse existing pipeline CV entrypoints and FE fold-refitting rules.
+- [x] Inspect Core ordinary-model CV and tuning routes; record the API mapping,
+  limitations and 96-test evidence in report 58's Core routing audit.
+- [ ] Reuse existing CV entrypoints and FE fold-refitting rules.
   Reject unsupported combinations rather than silently downgrade requested CV.
+- [ ] Route ordinary-model CV through `StatefulEstimator.cross_validate` using
+  raw training rows and `FeatureEngineerFoldAdapter`, then fit the final pipeline.
+  Preserve model defaults unless explicitly overridden; CV itself does not tune.
+  Keep one CV settings contract that SM-36 can map to the tuner's `cv_*` fields.
+- [ ] Carry explicit temporal ordering metadata across source splitting without
+  including it in model features. Exclude final holdout from every fold. Do not
+  expose diagnostic `nested_cv` as nested hyperparameter search.
 - [ ] Wire optional CV with deterministic seeds/folds and MLflow evidence;
   tests must show heldout rows never reach fitting or fold preprocessing.
+- [ ] Add explicit optional training sampling independently of `max_rows`:
+  choose up to a requested row count with a recorded seed and stable record-key
+  identity on the pinned source before driver transfer. Apply availability rules
+  before selecting eligible rows. Preserve an explicit final-evaluation policy
+  and classification/temporal semantics; never sample scoring implicitly. Test
+  100,000 source rows selecting 10,000 reproducibly, partition/order changes,
+  bounded transfer and approval replay. Keep overflow-fail as the default.
 - [ ] Make full-snapshot selection and rolling-calendar selection explicit.
   Rolling lookback names its event column and window timezone; clarify whether
   counts include the holdout period. Document the chosen semantics explicitly,
@@ -144,6 +160,12 @@ search/trial tuning and explainability remain SM-36 scope.
 Mermaid walkthrough; focused generated-project tests; a new initiative report
 and bounded rehearsal driver using existing personal workspace resources.
 
+- [ ] Introduce guided setup sections for basics/data, ordered preprocessing,
+  task-compatible model/parameters and optional CV. Reuse Core contracts and
+  keep advanced settings editable in the generated workflow config. Support
+  equivalent noninteractive inputs and show a readable execution preview.
+  Tuning/custom/multi-model sections arrive with SM-36/36a/36b/36c, not as empty
+  advertised options. See the modular setup contract in report 58.
 - [ ] Hide irrelevant date prompts for random/no-availability initialization;
   show explicit column, format, source zone and cutoff controls only when used.
 - [ ] Provide complete English random/date-free and temporal/delayed-result
@@ -176,3 +198,19 @@ and bounded rehearsal driver using existing personal workspace resources.
   Conditional initializer prompts remain SM-33E, after date-free training/CV
   contracts are settled. Source validation stays distributed; driver limits
   do not cap the scan required to reject malformed source rows.
+
+- 2026-09-25 (SM-33C): New initializations default to random splitting (.2 holdout,
+  seed 42, stratification disabled), with nullable inactive date fields. Result
+  availability is independently opt-in via `filter_unavailable_results` and
+  `result_cutoff`. Monthly random uses the full bounded latest snapshot, no
+  lookback; monthly availability uses invocation time. Temporal window defaults
+  remain UTC months until SM-33D. Saved membership evidence is checked on replay.
+
+- 2026-09-25 (SM-33C review): Bind the populated holdout-key digest into the
+  comparison dataset identity. Only read budgets are excluded. A membership-only
+  edit to the saved spec must invalidate the committed comparison evidence.
+
+- 2026-09-25 (input limits): User requested `max_input_mb` for the Bundle
+  instead of `max_bytes`. Keep lower-level byte contracts and convert in existing
+  integration modules. Random training subsampling is an explicit SM-33D selection
+  option; do not change current overflow-fail or prediction completeness silently.

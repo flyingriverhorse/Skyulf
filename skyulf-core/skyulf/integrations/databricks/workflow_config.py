@@ -3,16 +3,16 @@
 import math
 import re
 from copy import deepcopy
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 from ...config_validation import validate_pipeline_config
 from ...modeling.base import BaseModelCalculator
 from ...registry import NodeRegistry
 from ..mlflow.validation import _CLASSIFICATION, _MINIMIZE, _REGRESSION
-from ._contracts import PREDICTION_METADATA_COLUMNS
-from .local_retraining import LocalTrainingSpec
+from ._contracts import PREDICTION_METADATA_COLUMNS, input_budget_bytes
 from .local_sdk import ModelSelection
+from .local_workflow import _training_spec
 from .prediction_output import _IDENTIFIER, _TABLE_NAME
 from .training_dates import training_date_spec
 
@@ -40,12 +40,18 @@ _FIELDS = {
     "event_time_parsing",
     "result_time_parsing",
     "training_version",
+    "split_strategy",
+    "test_size",
+    "random_state",
+    "stratify",
+    "filter_unavailable_results",
+    "result_cutoff",
     "start",
     "holdout_start",
     "cutoff",
     "monthly_lookback_months",
     "max_rows",
-    "max_bytes",
+    "max_input_mb",
     "metric",
     "min_improvement",
     "quality_threshold",
@@ -78,8 +84,11 @@ def _columns(config: dict[str, Any]) -> None:
         if not isinstance(value, list) or not value:
             raise ValueError(f"{key} must be a nonempty list of source column names.")
         names.extend(value)
+    names.append(config.get("target_column"))
     names.extend(
-        config.get(key) for key in ("target_column", "event_column", "result_available_at_column")
+        config[key]
+        for key in ("event_column", "result_available_at_column")
+        if config.get(key) is not None
     )
     checked: list[str] = []
     for name in names:
@@ -97,43 +106,32 @@ def _columns(config: dict[str, Any]) -> None:
 
 
 def _training_contract(config: dict[str, Any], action: str) -> None:
-    """Reuse the pinned training specification without requiring dates for scoring."""
-    if action == "train_monthly":
+    """Validate explicit policies while requiring manual pins only for manual training."""
+    settings = dict(config)
+    strategy = config.get("split_strategy", "random")
+    if strategy == "random" and config.get("monthly_lookback_months") is not None:
+        raise ValueError("Random full-snapshot training requires null monthly_lookback_months.")
+    if config.get("stratify") is True and config["task"] != "classification":
+        raise ValueError("stratify requires a classification task.")
+    if action == "train_monthly" and strategy == "temporal":
         months = config.get("monthly_lookback_months")
         if type(months) is not int or not 2 <= months <= 120:
             raise ValueError("monthly_lookback_months must be an integer from 2 to 120.")
-    if action != "train":
-        return
-    version = config.get("training_version")
-    if type(version) is not int or version < 0:
-        raise ValueError(
-            "Set training_version to an explicit nonnegative Delta version before train."
-        )
-    dates = {}
-    for key in ("start", "holdout_start", "cutoff"):
-        raw = config.get(key)
-        if not isinstance(raw, str) or not raw:
+    if action == "train":
+        version = config.get("training_version")
+        if type(version) is not int or version < 0:
             raise ValueError(
-                f"Set {key} to an explicit timezone-aware training boundary before train."
+                "Set training_version to an explicit nonnegative Delta version before train."
             )
-        try:
-            dates[key] = datetime.fromisoformat(raw)
-        except ValueError as exc:
-            raise ValueError(f"{key} must be an ISO timestamp with timezone.") from exc
-    LocalTrainingSpec(
-        table=config["training_table"],
-        version=version,
-        **dates,
-        event_column=config["event_column"],
-        result_available_at_column=config["result_available_at_column"],
-        record_key_columns=tuple(config["record_key_columns"]),
-        input_columns=tuple(config["input_columns"]),
-        target_column=config["target_column"],
-        max_rows=config["max_rows"],
-        max_bytes=config["max_bytes"],
-        event_time_parsing=training_date_spec(config.get("event_time_parsing", {})),
-        result_time_parsing=training_date_spec(config.get("result_time_parsing", {})),
-    )
+    else:
+        settings["training_version"] = 0
+        # These actions use saved evidence or derive fresh boundaries at invocation.
+        if strategy == "temporal":
+            for key, month in (("start", 1), ("holdout_start", 2), ("cutoff", 3)):
+                settings[key] = datetime(2000, month, 1, tzinfo=UTC).isoformat()
+        if config.get("filter_unavailable_results") is True:
+            settings["result_cutoff"] = datetime(2000, 3, 1, tzinfo=UTC).isoformat()
+    _training_spec(settings)
 
 
 def validate_workflow_config(config: dict[str, Any], *, action: str) -> dict[str, Any]:
@@ -172,12 +170,12 @@ def validate_workflow_config(config: dict[str, Any], *, action: str) -> dict[str
         config[key].casefold() for key in ("training_table", "score_source_table")
     }:
         raise ValueError("prediction_table must not overwrite a training/scoring source.")
-    for key in ("max_rows", "max_bytes"):
-        if type(config.get(key)) is not int or config[key] <= 0:
-            raise ValueError(f"{key} must be a positive integer.")
+    if type(config.get("max_rows")) is not int or config["max_rows"] <= 0:
+        raise ValueError("max_rows must be a positive integer.")
+    input_budget_bytes(config.get("max_input_mb"))
     _columns(config)
     for field in ("event_time_parsing", "result_time_parsing"):
-        training_date_spec(config.get(field, {}))
+        training_date_spec(config.get(field) if config.get(field) is not None else {})
     champion = config.get("champion_version")
     if champion is not None and (
         not isinstance(champion, str) or not re.fullmatch(r"[1-9][0-9]*", champion)

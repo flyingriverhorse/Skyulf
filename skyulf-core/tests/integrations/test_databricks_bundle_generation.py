@@ -56,11 +56,11 @@ def _generate_project(tmp_path, **overrides):
     ("field", "value"),
     [
         ("max_rows", 0),
-        ("max_bytes", -1),
+        ("max_input_mb", -1),
         ("max_rows", "0"),
-        ("max_bytes", "-1"),
+        ("max_input_mb", "-1"),
         ("max_rows", "1.5"),
-        ("max_bytes", "1e3"),
+        ("max_input_mb", "1e3"),
         ("record_key_columns_json", '[\f"id"]'),
         ("input_columns_json", '["x",\f"y"]'),
         ("record_key_columns_json", '["id"], "task": "classification"'),
@@ -126,14 +126,17 @@ def test_cli_preserves_existing_sources_composite_keys_and_explicit_split(tmp_pa
         record_key_columns_json='[\n "customer_id",\t"observation_id"\r\n]',
         input_columns_json='[\t"income", "age"\n]',
         target_column="churn",
+        split_strategy="temporal",
+        filter_unavailable_results="true",
         event_column="observed_at",
         result_available_at_column="labeled_at",
         training_version="17",
         start="2026-06-01T00:00:00+00:00",
         holdout_start="2026-07-01T00:00:00+00:00",
         cutoff="2026-08-01T00:00:00+00:00",
+        result_cutoff="2026-09-01T00:00:00+00:00",
         max_rows="500",
-        max_bytes="1048576",
+        max_input_mb="1",
         metric="heldout_f1",
         quality_threshold="0.8",
     )
@@ -149,7 +152,10 @@ def test_cli_preserves_existing_sources_composite_keys_and_explicit_split(tmp_pa
     assert config["start"] == "2026-06-01T00:00:00+00:00"
     assert config["holdout_start"] == "2026-07-01T00:00:00+00:00"
     assert config["cutoff"] == "2026-08-01T00:00:00+00:00"
-    assert config["max_rows"] == 500 and config["max_bytes"] == 1048576
+    assert config["result_cutoff"] == "2026-09-01T00:00:00+00:00"
+    assert config["split_strategy"] == "temporal"
+    assert config["filter_unavailable_results"] is True
+    assert config["max_rows"] == 500 and config["max_input_mb"] == 1
     assert config["metric"] == "heldout_f1" and config["quality_threshold"] == 0.8
 
 
@@ -242,3 +248,100 @@ def test_cli_emits_independent_policies_and_serialized_operator_graph(
     else:
         assert tasks["train"]["job_cluster_key"] == "skyulf"
         assert "environments" not in jobs["train"]
+
+
+@pytest.mark.parametrize("engine", ["pandas", "polars"])
+@pytest.mark.parametrize("task", ["regression", "classification"])
+@pytest.mark.parametrize("availability", [False, True])
+def test_cli_generates_date_free_training_contract(tmp_path, engine, task, availability):
+    """The real initializer must support date-free training and independent delayed results."""
+    from skyulf.integrations.databricks.local_workflow import resolve_target_config
+    from skyulf.integrations.databricks.workflow_config import validate_workflow_config
+
+    project = _generate_project(
+        tmp_path,
+        engine=engine,
+        task=task,
+        training_version="7",
+        filter_unavailable_results="true" if availability else "false",
+        result_available_at_column="confirmed_at" if availability else "",
+        result_cutoff="2026-09-01T00:00:00+00:00" if availability else "",
+        stratify="true" if task == "classification" else "false",
+    )
+    config = _read_validated_config(project)
+    resolved = resolve_target_config(
+        config,
+        {
+            "catalog": "workspace",
+            "input_schema": "inputs",
+            "output_schema": "outputs",
+            "metadata_schema": "metadata",
+            "resource_suffix": "",
+        },
+    )
+    validate_workflow_config(resolved, action="train")
+    assert config["split_strategy"] == "random"
+    assert config["engine"] == engine
+    assert config["test_size"] == 0.2 and config["random_state"] == 42
+    assert config["stratify"] == (task == "classification")
+    assert config["event_column"] is None
+    assert all(
+        config[key] is None
+        for key in ("start", "holdout_start", "cutoff", "monthly_lookback_months")
+    )
+    assert config["filter_unavailable_results"] == availability
+    assert config["result_available_at_column"] == ("confirmed_at" if availability else None)
+
+
+def test_cli_preserves_conflicting_fields_for_preflight_rejection(tmp_path):
+    """Initialization must not silently discard a supplied date mapping in random mode."""
+    from skyulf.integrations.databricks.local_workflow import resolve_target_config
+    from skyulf.integrations.databricks.workflow_config import validate_workflow_config
+
+    project = _generate_project(tmp_path, event_column="observed_at", training_version="7")
+    config = json.loads((project / "config/workflow.json").read_text())
+    assert config["event_column"] == "observed_at"
+    resolved = resolve_target_config(
+        config,
+        {
+            "catalog": "workspace",
+            "input_schema": "inputs",
+            "output_schema": "outputs",
+            "metadata_schema": "metadata",
+            "resource_suffix": "",
+        },
+    )
+    with pytest.raises(ValueError, match="event_column|[Rr]andom"):
+        validate_workflow_config(resolved, action="train")
+
+
+@pytest.mark.parametrize(
+    "filename",
+    [
+        "date-free-init.example.json",
+        "random-delayed-results-init.example.json",
+        "temporal-delayed-results-init.example.json",
+    ],
+)
+def test_cli_training_examples_pass_manual_preflight(tmp_path, filename):
+    """Published examples must render and validate as usable manual training policies."""
+    from skyulf.integrations.databricks.local_workflow import resolve_target_config
+    from skyulf.integrations.databricks.workflow_config import validate_workflow_config
+
+    root = Path(__file__).resolve().parents[2] / "templates/databricks/examples"
+    inputs = json.loads((root / filename).read_text())
+    inputs.pop("project_name")
+    config = _read_validated_config(_generate_project(tmp_path, **inputs))
+    resolved = resolve_target_config(
+        config,
+        {
+            "catalog": "workspace",
+            "input_schema": "inputs",
+            "output_schema": "outputs",
+            "metadata_schema": "metadata",
+            "resource_suffix": "",
+        },
+    )
+    checked = validate_workflow_config(resolved, action="train")
+    assert checked["training_version"] == 12
+    assert checked["split_strategy"] == inputs["split_strategy"]
