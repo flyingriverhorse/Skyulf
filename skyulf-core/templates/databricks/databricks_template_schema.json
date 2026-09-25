@@ -60,9 +60,9 @@
     "metric": {
       "order": 19,
       "type": "string",
-      "default": "heldout_rmse",
-      "description": "Heldout metric for candidate/champion comparison; must match the model task",
-      "enum": ["heldout_mae", "heldout_mse", "heldout_rmse", "heldout_r2", "heldout_mape", "heldout_explained_variance", "heldout_accuracy", "heldout_balanced_accuracy", "heldout_precision_weighted", "heldout_recall_weighted", "heldout_f1_weighted", "heldout_matthews_corrcoef", "heldout_precision", "heldout_recall", "heldout_f1", "heldout_g_score", "heldout_log_loss", "heldout_roc_auc", "heldout_pr_auc", "heldout_roc_auc_ovr_weighted", "heldout_roc_auc_weighted", "heldout_roc_auc_ovr", "heldout_roc_auc_ovo", "heldout_roc_auc_ovo_weighted", "heldout_pr_auc_weighted"]
+      "default": "auto",
+      "description": "Heldout comparison metric; auto selects RMSE for regression or accuracy for classification",
+      "enum": ["auto", "heldout_mae", "heldout_mse", "heldout_rmse", "heldout_r2", "heldout_mape", "heldout_explained_variance", "heldout_accuracy", "heldout_balanced_accuracy", "heldout_precision_weighted", "heldout_recall_weighted", "heldout_f1_weighted", "heldout_matthews_corrcoef", "heldout_precision", "heldout_recall", "heldout_f1", "heldout_g_score", "heldout_log_loss", "heldout_roc_auc", "heldout_pr_auc", "heldout_roc_auc_ovr_weighted", "heldout_roc_auc_weighted", "heldout_roc_auc_ovr", "heldout_roc_auc_ovo", "heldout_roc_auc_ovo_weighted", "heldout_pr_auc_weighted"]
     },
     "min_improvement": {
       "order": 20,
@@ -157,6 +157,107 @@
       "default": "",
       "description": "Optional business risk label (e.g. Low, Medium, High); leave blank when unused. This label does not change promotion gates.",
       "pattern": "^(?:[A-Za-z0-9][A-Za-z0-9 ._-]{0,63})?$"
+    },
+    "task": {
+      "order": 23,
+      "type": "string",
+      "default": "regression",
+      "description": "Model task; selects a starting estimator and automatic heldout metric",
+      "enum": [
+        "regression",
+        "classification"
+      ]
+    },
+    "source_table_name": {
+      "order": 24,
+      "type": "string",
+      "default": "",
+      "description": "Existing source table name within the input schema; blank uses <project_name>_source",
+      "pattern": "^(?:[A-Za-z_][A-Za-z0-9_]*)?$"
+    },
+    "score_source_table_name": {
+      "order": 25,
+      "type": "string",
+      "default": "",
+      "description": "Existing scoring table name within the input schema; blank reuses the training source",
+      "pattern": "^(?:[A-Za-z_][A-Za-z0-9_]*)?$"
+    },
+    "row_keys_json": {
+      "order": 26,
+      "type": "string",
+      "default": "",
+      "description": "Optional JSON array of existing jointly unique source keys; overrides row_key",
+      "pattern": "^(?:\\[[ \\t\\r\\n]*\"[A-Za-z_][A-Za-z0-9_]*\"(?:[ \\t\\r\\n]*,[ \\t\\r\\n]*\"[A-Za-z_][A-Za-z0-9_]*\")*[ \\t\\r\\n]*\\])?$"
+    },
+    "input_columns_json": {
+      "order": 27,
+      "type": "string",
+      "default": "[\"feature_value\"]",
+      "description": "JSON array of existing model feature columns; exclude keys and target",
+      "pattern": "^\\[[ \\t\\r\\n]*\"[A-Za-z_][A-Za-z0-9_]*\"(?:[ \\t\\r\\n]*,[ \\t\\r\\n]*\"[A-Za-z_][A-Za-z0-9_]*\")*[ \\t\\r\\n]*\\]$"
+    },
+    "target_column": {
+      "order": 28,
+      "type": "string",
+      "default": "target",
+      "description": "Existing training label column",
+      "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+    },
+    "event_column": {
+      "order": 29,
+      "type": "string",
+      "default": "event_time",
+      "description": "Existing event timestamp column for the temporal training split",
+      "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+    },
+    "label_time_column": {
+      "order": 30,
+      "type": "string",
+      "default": "label_at",
+      "description": "Existing timestamp column recording when each training label became available",
+      "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+    },
+    "training_version": {
+      "order": 31,
+      "type": "string",
+      "default": "null",
+      "description": "Concrete nonnegative Delta source version for manual training; null requires configuration before running",
+      "pattern": "^(?:null|0|[1-9][0-9]*)$"
+    },
+    "start": {
+      "order": 32,
+      "type": "string",
+      "default": "",
+      "description": "Manual training start as a timezone-aware ISO timestamp; blank requires configuration before running",
+      "pattern": "^(?:[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:.]+(?:Z|[+-][0-9]{2}:[0-9]{2}))?$"
+    },
+    "holdout_start": {
+      "order": 33,
+      "type": "string",
+      "default": "",
+      "description": "Manual heldout split start as a timezone-aware ISO timestamp",
+      "pattern": "^(?:[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:.]+(?:Z|[+-][0-9]{2}:[0-9]{2}))?$"
+    },
+    "cutoff": {
+      "order": 34,
+      "type": "string",
+      "default": "",
+      "description": "Manual label-availability cutoff as a timezone-aware ISO timestamp",
+      "pattern": "^(?:[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:.]+(?:Z|[+-][0-9]{2}:[0-9]{2}))?$"
+    },
+    "max_rows": {
+      "order": 35,
+      "type": "string",
+      "default": "10000",
+      "description": "Positive row limit for each bounded local data transfer",
+      "pattern": "^[1-9][0-9]*$"
+    },
+    "max_bytes": {
+      "order": 36,
+      "type": "string",
+      "default": "67108864",
+      "description": "Positive byte limit for each bounded local data transfer",
+      "pattern": "^[1-9][0-9]*$"
     }
   }
 }

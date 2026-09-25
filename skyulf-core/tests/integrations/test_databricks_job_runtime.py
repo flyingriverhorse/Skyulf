@@ -34,6 +34,57 @@ def _receipt(kind="promotion"):
     )
 
 
+@pytest.mark.parametrize("version", ["", "2", "123"])
+def test_score_version_override_is_run_scoped(monkeypatch, version):
+    """An operator can select a version without changing the saved policy or champion."""
+    from unittest.mock import Mock
+
+    from skyulf.integrations.databricks import job_runtime
+
+    execute = Mock(return_value={})
+    monkeypatch.setattr(job_runtime, "run_action", execute)
+    config = _config(score_model_selection="champion")
+    job_runtime.run_bundle_action(None, config, {"score_model_version": version}, task_role="score")
+    used = execute.call_args.args[1]
+    assert used["score_model_selection"] == ("pinned_version" if version else "champion")
+    assert used["model_version"] == (version or "1")
+    assert config == _config(score_model_selection="champion")
+
+
+@pytest.mark.parametrize("version", ["latest", "0", "-1", "1.0", " 2", 2, None])
+def test_invalid_score_override_never_reaches_core(monkeypatch, version):
+    """Only explicit positive versions can bypass the configured scoring selector."""
+    from unittest.mock import Mock
+
+    from skyulf.integrations.databricks import job_runtime
+
+    execute = Mock()
+    monkeypatch.setattr(job_runtime, "run_action", execute)
+    with pytest.raises(ValueError):
+        job_runtime.run_bundle_action(
+            None, _config(), {"score_model_version": version}, task_role="score"
+        )
+    execute.assert_not_called()
+
+
+def test_lifecycle_refuses_scoring_override(monkeypatch):
+    """A lifecycle run cannot silently pass an accidental model pin to child scoring."""
+    from unittest.mock import Mock
+
+    from skyulf.integrations.databricks import job_runtime
+
+    execute = Mock()
+    monkeypatch.setattr(job_runtime, "run_action", execute)
+    with pytest.raises(ValueError, match="score_model_version"):
+        job_runtime.run_bundle_action(
+            None,
+            _config(),
+            {"lifecycle_action": "train", "score_model_version": "2"},
+            task_role="lifecycle",
+        )
+    execute.assert_not_called()
+
+
 @pytest.mark.parametrize("action", ["approve", "reject", "rollback"])
 def test_score_role_refuses_lifecycle_inputs_before_calling_core(action):
     """The score notebook cannot serve as an independent concurrent alias writer."""

@@ -32,6 +32,8 @@ class IncrementalBatchResult:
     commit_version: int | None
     manifest: dict[str, Any] | None
     noop: bool
+    selected_model_name: str | None = None
+    selected_model_version: str | None = None
 
 
 def _latest(spark: Any, table: str) -> Any:
@@ -208,7 +210,15 @@ def run_incremental_local_batch(
             raise BatchConflictError("Source version moved behind the committed watermark.")
         if prior_version == upper_version:
             return IncrementalBatchResult(
-                prior_version, upper_version, 0, 0, int(target_latest["version"]), previous, True
+                prior_version,
+                upper_version,
+                0,
+                0,
+                int(target_latest["version"]),
+                previous,
+                True,
+                config.model.name,
+                config.model.version,
             )
         if prior_version is None:
             selected = (
@@ -239,7 +249,15 @@ def run_incremental_local_batch(
         )
         if frame.empty:
             return IncrementalBatchResult(
-                prior_version, upper_version, 0, 0, int(target_latest["version"]), previous, True
+                prior_version,
+                upper_version,
+                0,
+                0,
+                int(target_latest["version"]),
+                previous,
+                True,
+                config.model.name,
+                config.model.version,
             )
         target = spark.table(target_table)
         output_names = _check_target(spark, selected, target, row_keys, period_column, prepared)
@@ -334,4 +352,6 @@ def run_incremental_local_batch(
             int(committed["version"]),
             recorded,
             False,
+            config.model.name,
+            config.model.version,
         )

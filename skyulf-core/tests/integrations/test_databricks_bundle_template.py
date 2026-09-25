@@ -28,20 +28,45 @@ def _output():
 
 
 def _render_default_config(row_key="entity_id", risk_category=""):
-    """Resolve the manual-mode template fields read by the generated-config tests."""
+    """Resolve default branches for offline checks; real CLI tests cover Go rendering."""
     template = WORKFLOW.parents[1] / "config/workflow.json.tmpl"
-    content = (
-        template.read_text(encoding="utf-8")
-        .replace("{{.project_name}}", "customer_model")
-        .replace("{{.engine}}", "pandas")
-        .replace("{{.row_key}}", row_key)
-        .replace("{{.min_improvement}}", "0.0")
-        .replace(
-            '{{if .risk_category}}"{{.risk_category}}"{{else}}null{{end}}',
-            json.dumps(risk_category or None),
-        )
-        .replace("{{.quality_threshold}}", "null")
+    schema = json.loads(
+        (WORKFLOW.parents[3] / "databricks_template_schema.json").read_text(encoding="utf-8")
     )
+    values = {key: spec["default"] for key, spec in schema["properties"].items()}
+    values.update(project_name="customer_model", row_key=row_key, risk_category=risk_category)
+    content = template.read_text(encoding="utf-8")
+    for name in ("risk_category", "start", "holdout_start", "cutoff"):
+        content = content.replace(
+            "{{if ." + name + '}}"{{.' + name + '}}"{{else}}null{{end}}',
+            json.dumps(values[name] or None),
+        )
+    content = (
+        content.replace(
+            '{{if eq .metric "auto"}}{{if eq .task "classification"}}heldout_accuracy'
+            "{{else}}heldout_rmse{{end}}{{else}}{{.metric}}{{end}}",
+            "heldout_rmse",
+        )
+        .replace(
+            '{{if eq .task "classification"}}logistic_regression{{else}}linear_regression{{end}}',
+            "linear_regression",
+        )
+        .replace(
+            '{{if .row_keys_json}}{{.row_keys_json}}{{else}}["{{.row_key}}"]{{end}}',
+            json.dumps([row_key]),
+        )
+        .replace(
+            "{{if .source_table_name}}{{.source_table_name}}{{else}}{{.project_name}}_source{{end}}",
+            "customer_model_source",
+        )
+        .replace(
+            "{{if .score_source_table_name}}{{.score_source_table_name}}"
+            "{{else}}customer_model_source{{end}}",
+            "customer_model_source",
+        )
+    )
+    for name, value in values.items():
+        content = content.replace("{{." + name + "}}", str(value))
     return json.loads(content)
 
 
@@ -197,7 +222,7 @@ def test_auto_champion_init_exposes_metric_gates_and_reuses_score_job():
     assert properties["quality_threshold"]["default"] == "null"
     config = (WORKFLOW.parents[1] / "config/workflow.json.tmpl").read_text(encoding="utf-8")
     assert '"score_model_selection": "{{.score_model_selection}}"' in config
-    assert '"metric": "{{.metric}}"' in config
+    assert _render_default_config()["metric"] == "heldout_rmse"
     jobs = (WORKFLOW.parents[1] / "resources/workflow.jobs.yml.tmpl").read_text(encoding="utf-8")
     assert "job_id: ${resources.jobs.score.id}" in jobs
     assert "task_key: score_after_lifecycle" in jobs

@@ -1,6 +1,36 @@
 # Session handoff - 2026-09-25
 
-## Current snapshot after SM-32 delivery
+## Current snapshot after SM-33
+
+SM-33 is DONE for its documented local/personal-serverless scope; SM-34 is READY.
+Changes are uncommitted on `090`, based on SM-32 commit `5ba388ec`.
+See [SM-33 evidence and boundaries](53-sm33-config-and-runtime-validation.md).
+
+Delivered: versioned offline workflow validation, explicit legacy migration,
+task/source/column/composite-key initialization, and a run-only
+`score_model_version` parameter. Shared reports display the selected model
+separately from previous-write provenance. Generated manual snapshots are unset.
+
+Verification: 178 affected regression tests, 40 template/real CLI checks and one
+real Delta append/replay test passed. Full repository ty, scoped Ruff and strict
+docs passed. The existing personal dev Bundle was strictly validated and updated
+once to the SM-33 R1 wheel. Score runs `518924307260524` (v1 override) and
+`440928047261182` (empty override -> champion v5) succeeded without redeployment
+between runs. Both were no-ops at Delta version 2. Run `805365754123156` is an
+intentional negative test: v0 was rejected before Core dispatch.
+
+Existing train/score IDs, sources, outputs, and aliases are unchanged.
+Champion is v5; previous_champion v1; previous_challenger v4 (live-verified).
+No new persistent jobs, schemas or model versions were created. Each job remains
+bounded to 900 seconds. Personal inference verification does not imply company
+production readiness. Next: SM-34 schedules/windows, then the remaining local
+Bundle improvement queue; broad Spark expansion remains parked.
+
+When committing, include new `workflow_config.py`, its tests and the report
+above. `initiatives/` ignores new files, so force-add that exact report if needed.
+Leave unrelated `.tmp-review-model/` untouched. Do not push without a request.
+
+## Historical snapshot after SM-32 delivery
 
 SM-32 is DONE for its documented local/personal-serverless scope; SM-33 is READY.
 The delivery includes checked challenger history, independent Bundle policies,

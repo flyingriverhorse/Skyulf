@@ -9,6 +9,41 @@ from pathlib import Path
 import pytest
 
 
+@pytest.fixture
+def workflow_config():
+    """Use a complete offline project so notebook tests exercise real configuration checks."""
+    return {
+        "config_version": 1,
+        "task": "regression",
+        "engine": "polars",
+        "training_table": "workspace.test.source",
+        "score_source_table": "workspace.test.source",
+        "prediction_table": "workspace.test.predictions",
+        "model_name": "workspace.test.model",
+        "model_version": "1",
+        "score_model_selection": "champion",
+        "promotion_policy": "manual_approval",
+        "score_handoff": "after_alias_change",
+        "model_change_mode": "incremental_append",
+        "row_keys": ["id", "record_id"],
+        "input_columns": ["x"],
+        "target_column": "target",
+        "event_column": "event_time",
+        "label_time_column": "label_at",
+        "training_version": 0,
+        "start": "2026-01-01T00:00:00+00:00",
+        "holdout_start": "2026-02-01T00:00:00+00:00",
+        "cutoff": "2026-03-01T00:00:00+00:00",
+        "monthly_lookback_months": 4,
+        "max_rows": 1000,
+        "max_bytes": 1048576,
+        "metric": "heldout_rmse",
+        "quality_threshold": 5.0,
+        "min_improvement": 0.0,
+        "pipeline": {"preprocessing": [], "modeling": {"type": "linear_regression"}},
+    }
+
+
 @pytest.fixture(scope="session")
 def delta_spark(tmp_path_factory):
     """Run actual Delta I/O; required lanes fail rather than silently skip."""

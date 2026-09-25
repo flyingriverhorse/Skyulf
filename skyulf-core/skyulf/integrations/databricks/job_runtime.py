@@ -19,6 +19,7 @@ from .local_workflow import (
     resolve_target_config,
     run_action,
 )
+from .workflow_config import validate_deployed_contract, validate_workflow_config
 
 _OPERATOR_FIELDS = {
     "candidate_version",
@@ -145,7 +146,12 @@ def run_bundle_action(
     _, policy = _workflow_policies(config)
     if config.get("score_handoff") not in {"disabled", "after_alias_change"}:
         raise ValueError("score_handoff must be disabled or after_alias_change.")
-    for key in _OPERATOR_FIELDS | {"lifecycle_action", "task_role", "action"}:
+    for key in _OPERATOR_FIELDS | {
+        "lifecycle_action",
+        "task_role",
+        "action",
+        "score_model_version",
+    }:
         if key in parameters and not isinstance(parameters[key], str):
             raise ValueError("Job parameters must be strings.")
     if parameters.get("task_role") or parameters.get("action"):
@@ -162,6 +168,17 @@ def run_bundle_action(
             )
     else:
         raise ValueError("Notebook task_role must be lifecycle or score.")
+    override = parameters.get("score_model_version", "")
+    if override:
+        if action != "score":
+            raise ValueError("score_model_version is only valid on the score job.")
+        config = {
+            **config,
+            "score_model_selection": "pinned_version",
+            "model_version": _version(override),
+        }
+    if "config_version" in config:
+        config = validate_workflow_config(config, action=action)
     options = _operator_options(action, parameters)
     if action in {"approve", "reject"} and not options["comparison_sha256"]:
         options["comparison_sha256"] = resolve_candidate_comparison_digest(
@@ -207,6 +224,13 @@ def run_notebook(
         else values
     )
     config = json.loads(Path(values["config_path"]).read_text(encoding="utf-8"))
+    required = {"training_table", "score_source_table", "prediction_table", "model_name"}
+    if not isinstance(config, dict) or any(
+        not isinstance(config.get(key), str) for key in required
+    ):
+        raise ValueError(
+            "Workflow configuration must be an object with training_table, score_source_table, prediction_table and model_name bindings."
+        )
     config = resolve_target_config(
         config,
         {
@@ -220,6 +244,9 @@ def run_notebook(
             )
         },
     )
+    validate_deployed_contract(config, parameters)
+    if config.get("config_version") != 1:
+        raise ValueError("config_version must be 1; migrate and regenerate/redeploy this Bundle.")
     with tempfile.TemporaryDirectory(prefix="skyulf-bundle-") as directory:
         outcome = run_bundle_action(
             spark,

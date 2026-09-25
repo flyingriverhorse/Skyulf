@@ -14,13 +14,72 @@ Initialize a project from a Skyulf checkout:
 databricks bundle init skyulf-core/templates/databricks --output-dir ./generated
 ```
 
-The short path asks for project name, engine, one existing source row-key
-column, model-change mode, independent scoring and promotion policies, optional
+Initialization asks for project name, task, engine, existing source tables,
+row keys (including composite keys), feature and label columns, model-change
+mode, independent scoring and promotion policies, optional
 score handoff, retraining mode and cron, serverless
 or policy-backed job compute and the existing `dev`
 catalog/schema. Serverless is the default. Reviewable
 noninteractive examples are in `skyulf-core/templates/databricks/examples/`. The generated
 project has its own `databricks.yml`; Skyulf's root has no Bundle config.
+
+Regression starts with Core `linear_regression` and `heldout_rmse`;
+classification starts with `logistic_regression` and `heldout_accuracy`.
+The pipeline remains editable: add registered Core preprocessing nodes and
+choose a task-compatible model. With a JSON init file, `max_rows` and
+`max_bytes` are positive integer **strings**; the generated workflow stores
+them as numbers. `row_keys_json` overrides the single `row_key` choice.
+
+Manual `training_version`, `start`, `holdout_start` and `cutoff` default to
+`null`. Set an actual Delta snapshot and timezone-aware split before running
+`train`. Scoring and saved-evidence actions do not require these dates.
+`train_monthly` keeps its existing rolling-window behavior; detailed schedule
+and window controls are a separate follow-up.
+
+### Configuration validation and migration
+
+New projects declare `config_version: 1` and `task`. The notebook validates
+the resolved configuration before training, registry access or output writes:
+resource names, distinct columns, reserved metadata names, budgets, model/task
+compatibility, metric/threshold domains and action-specific snapshot inputs.
+Actual source schema, keys and artifact compatibility are checked by the
+existing data-read and scoring services against the real data.
+
+The same check can run locally, without Spark or registry access:
+
+```python
+from skyulf.integrations.databricks.local_workflow import resolve_target_config
+from skyulf.integrations.databricks.workflow_config import validate_workflow_config
+
+resolved = resolve_target_config(config, {
+    "catalog": "workspace",
+    "input_schema": "my_inputs",
+    "output_schema": "my_outputs",
+    "metadata_schema": "my_models",
+    "resource_suffix": "",
+})
+validate_workflow_config(resolved, action="train")  # Or score, approve, etc.
+```
+
+For an older project's loaded JSON, migrate explicitly:
+
+```python
+from skyulf.integrations.databricks.workflow_config import migrate_workflow_config
+
+updated = migrate_workflow_config(
+    config, task="regression", score_handoff="after_alias_change"
+)
+```
+
+Review/save `updated`, regenerate both job definitions and entrypoints, then
+validate and redeploy together. Migration returns a copy; it does not upload
+files, invent training dates, or change aliases. Legacy `auto_champion` maps
+to champion/automatic; legacy `pinned_version` maps to pinned/manual approval.
+Mixed policies, unknown config versions and contradictory existing task or
+handoff settings are rejected. The notebook checks the deployed
+`workflow_contract` and `deployed_score_handoff` markers against the JSON.
+These detect stale generated definitions; they are not workspace permissions
+or a complete audit of manually edited Jobs settings.
 
 `dev` uses the selected CLI profile's workspace host. `test`, `syst` and
 `prod` each have a different placeholder host and catalog in the generated
@@ -92,7 +151,7 @@ different parameters**, choose `lifecycle_action`:
 | Action | Required job parameters |
 | --- | --- |
 | `train` / `train_monthly` | No operator evidence; leave other parameters empty |
-| `approve` | `candidate_version`, `comparison_sha256`, `expected_champion_version` |
+| `approve` | `candidate_version`, `expected_champion_version`; comparison proof resolves automatically |
 | `reject` | Same as approve, plus `rejection_reason` |
 | `rollback` | `promotion_receipt_json`, `expected_champion_version` |
 

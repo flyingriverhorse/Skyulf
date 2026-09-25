@@ -291,6 +291,9 @@ def test_incremental_local_batch_discovers_appends_without_period_inputs(local_d
     assert [(row.id, round(row.prediction)) for row in rows] == [(1, 4), (2, 8), (3, 12)]
     assert first.input_count == 2 and second.input_count == 1
     assert replay.input_count == 0 and replay.noop
+    assert first.selected_model_version == prepared.config.model.version
+    assert second.selected_model_name == prepared.config.model.name
+    assert replay.selected_model_version == prepared.config.model.version
     assert rows[0]["run_id"] == rows[1]["run_id"]
     assert rows[2]["run_id"] != rows[1]["run_id"]
 

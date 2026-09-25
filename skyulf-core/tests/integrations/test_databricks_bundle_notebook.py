@@ -10,11 +10,49 @@ from unittest.mock import Mock
 import pytest
 
 
+@pytest.mark.parametrize(
+    "change",
+    [
+        {"config_version": 2},
+        {"max_rows": 0},
+        {"score_handoff": "disabled"},
+        {"training_table": None},
+    ],
+)
+def test_notebook_rejects_invalid_project_before_registry_or_writes(
+    tmp_path, monkeypatch, workflow_config, change
+):
+    """Config and deployed graph mismatch must fail before any data or alias side effect."""
+    from skyulf.integrations.databricks import job_runtime
+
+    config_path = tmp_path / "workflow.json"
+    config_path.write_text(json.dumps({**workflow_config, **change}))
+    values = {
+        "config_path": str(config_path),
+        "catalog": "workspace",
+        "input_schema": "test",
+        "output_schema": "test",
+        "metadata_schema": "test",
+        "resource_suffix": "",
+        "workflow_contract": "1",
+        "deployed_score_handoff": "after_alias_change",
+    }
+    execute = Mock()
+    monkeypatch.setattr(job_runtime, "run_action", execute)
+    with pytest.raises(ValueError):
+        job_runtime.run_notebook(
+            None, SimpleNamespace(widgets=SimpleNamespace(getAll=lambda: values)), task_role="score"
+        )
+    execute.assert_not_called()
+
+
 @pytest.mark.parametrize("engine", ["pandas", "polars"])
 @pytest.mark.parametrize(
     "action", ["train", "train_monthly", "score", "score_from_approve", "score_from_rollback"]
 )
-def test_notebook_delegates_bound_target_and_selected_action(tmp_path, monkeypatch, engine, action):
+def test_notebook_delegates_bound_target_and_selected_action(
+    tmp_path, monkeypatch, workflow_config, engine, action
+):
     """All widget actions must use the public library while preserving engine and target binding."""
     from skyulf.integrations.databricks import job_runtime
 
@@ -28,6 +66,7 @@ def test_notebook_delegates_bound_target_and_selected_action(tmp_path, monkeypat
         / ("score.py" if action == "score" else "workflow.py")
     )
     config = {
+        **workflow_config,
         "engine": engine,
         "score_model_selection": "pinned_version",
         "promotion_policy": "manual_approval",
@@ -41,6 +80,8 @@ def test_notebook_delegates_bound_target_and_selected_action(tmp_path, monkeypat
     config_path.write_text(json.dumps(config))
     values = {
         "config_path": str(config_path),
+        "workflow_contract": "1",
+        "deployed_score_handoff": "disabled",
         "experiment_name": "/test/experiment",
         "catalog": "workspace",
         "input_schema": "test",
@@ -115,7 +156,7 @@ def test_notebook_delegates_bound_target_and_selected_action(tmp_path, monkeypat
 
 @pytest.mark.parametrize("override", ["task_role", "action"])
 def test_score_notebook_retains_override_guards_when_removing_parent_evidence(
-    tmp_path, monkeypatch, override
+    tmp_path, monkeypatch, workflow_config, override
 ):
     """Filtering inherited approval inputs must not hide attempts to override the fixed role."""
     from skyulf.integrations.databricks import job_runtime
@@ -124,6 +165,7 @@ def test_score_notebook_retains_override_guards_when_removing_parent_evidence(
     config_path.write_text(
         json.dumps(
             {
+                **workflow_config,
                 "score_model_selection": "champion",
                 "promotion_policy": "manual_approval",
                 "score_handoff": "after_alias_change",
@@ -141,6 +183,8 @@ def test_score_notebook_retains_override_guards_when_removing_parent_evidence(
     )
     values = {
         "config_path": str(config_path),
+        "workflow_contract": "1",
+        "deployed_score_handoff": "after_alias_change",
         "catalog": "workspace",
         "input_schema": "test",
         "output_schema": "test",

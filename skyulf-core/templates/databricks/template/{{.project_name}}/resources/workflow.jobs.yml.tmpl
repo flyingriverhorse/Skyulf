@@ -27,6 +27,8 @@ resources:
           notebook_task:
             notebook_path: ../src/workflow.py
             base_parameters:
+              workflow_contract: "1"
+              deployed_score_handoff: "{{.score_handoff}}"
               lifecycle_action: '{{"{{job.parameters.lifecycle_action}}"}}'
               candidate_version: '{{"{{job.parameters.candidate_version}}"}}'
               expected_champion_version: '{{"{{job.parameters.expected_champion_version}}"}}'
@@ -61,6 +63,8 @@ resources:
               outcome: "true"
           run_job_task:
             job_id: ${resources.jobs.score.id}
+            job_parameters:
+              score_model_version: ""
 {{if eq .compute_mode "serverless"}}
       environments:
         - environment_key: skyulf
@@ -87,11 +91,17 @@ resources:
       max_concurrent_runs: 1
       queue:
         enabled: true
+      parameters:
+        - name: score_model_version
+          default: ""
       tasks:
         - task_key: score
           notebook_task:
             notebook_path: ../src/score.py
             base_parameters:
+              workflow_contract: "1"
+              deployed_score_handoff: "{{.score_handoff}}"
+              score_model_version: '{{"{{job.parameters.score_model_version}}"}}'
               config_path: ${workspace.file_path}/config/workflow.json
               catalog: ${var.catalog}
               input_schema: ${var.input_schema}

@@ -39,6 +39,24 @@ A pin can also select a registered version that has not become champion.
 Approval governs the champion alias; it does not automatically gate an
 explicit pinned scoring choice.
 
+For a **single score run**, open the `score` job's **Run with different
+settings** form. Set `score_model_version=2` to use registered v2 for that
+run, or leave it empty to follow `score_model_selection`. No model upload or
+Bundle redeployment is needed. This does not promote v2 or modify the saved
+pin. Automatic lifecycle handoff clears this override and follows the saved
+selection policy. Supplying it to the lifecycle job is rejected.
+
+The model-change policy still applies: `incremental_append` keeps existing
+predictions and scores new rows only; `full_rebuild` uses a separate model
+generation. A one-run pin with full rebuild can therefore change the active
+prediction view even though champion does not change. The next normal score
+run follows the configured selector again.
+
+The readable score report identifies **Selected model for this run**. If no
+new data exists, it also shows the model recorded by the **previous write**;
+those versions can legitimately differ. Changing model version alone does
+not cause an incremental run to rewrite existing predictions.
+
 ```mermaid
 flowchart TD
     A["Run train job: train or train_monthly"] --> B["Fit with pandas or Polars; log artifacts and metrics"]
@@ -60,12 +78,15 @@ flowchart TD
     T -->|"disabled"| U["Wait for a separate score run"]
     T -->|"after_alias_change"| V["Call existing score job"]
     U --> W["Operator or configured trigger starts score"]
-    W --> X{"Score model selection?"}
+    W --> O{"Per-run score_model_version supplied?"}
+    O -->|"Yes"| OV["Pin that version for this run only"]
+    O -->|"No"| X{"Score model selection?"}
     V --> X
     X -->|"champion"| Y["Resolve current champion once"]
     X -->|"pinned_version"| Z["Use configured model_version"]
     Y --> P["Apply saved preprocessing and predict"]
     Z --> P
+    OV --> P
     P --> Q["Publish predictions according to model-change policy"]
 ```
 
@@ -90,8 +111,12 @@ independent job or a direct Catalog alias edit can violate writer ownership.
 
 ## Prepare the project
 
-1. Set the engine, existing source tables, row keys, features, target, pipeline,
+1. Set the task, engine, existing source tables, row keys, features, target, pipeline,
    model name, prediction name, training split and bounded read limits.
+   For manual training, replace the unset snapshot/date fields with an actual
+   `training_version` and timezone-aware `start < holdout_start < cutoff`.
+   Review the local validation and migration examples in the
+   [configuration guide](databricks_bundle.md#configuration-validation-and-migration).
 2. Select the three policies above. For learning the approval flow, use:
 
    ```json

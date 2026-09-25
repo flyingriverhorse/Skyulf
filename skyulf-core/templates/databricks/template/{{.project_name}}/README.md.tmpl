@@ -45,7 +45,10 @@ Technical promotion event tags contain recovery receipts; do not edit them.
 
 This project uses `score_model_selection={{.score_model_selection}}`,
 `promotion_policy={{.promotion_policy}}`, and `score_handoff={{.score_handoff}}`.
-These choices remain editable in `config/workflow.json`.
+These choices remain editable in `config/workflow.json`. Changing `score_handoff`
+also requires updating `deployed_score_handoff` in both notebook tasks in
+`resources/workflow.jobs.yml` and redeploying. A mismatch fails before execution.
+Keep `workflow_contract: "1"` fixed in both tasks; it is not a run parameter.
 
 | Setting | Choices |
 | --- | --- |
@@ -60,6 +63,7 @@ meeting `min_improvement`. Configure the metric and gates for your task before f
 
 Use the **train job's Run now parameters** for every lifecycle action. It is
 queued with one active run, so operator actions share training's writer.
+Configuration and lifecycle policy overrides are not accepted as run parameters.
 
 | `lifecycle_action` | Additional parameters |
 | --- | --- |
@@ -91,6 +95,11 @@ With handoff enabled, a completed champion change triggers score using the
 configured selector, including an unchanged pinned version if selected.
 The score notebook has a fixed score role. It ignores inherited lifecycle
 parameters from the parent job and rejects role/action override attempts.
+For one independent score run, set its `score_model_version` parameter to a
+positive concrete version number. This overrides the selector for that run
+without redeployment; leave it blank to use the configured selector. It does
+not change the saved pin or champion. The lifecycle handoff explicitly clears
+this parameter so it always uses the configured selection policy.
 
 Handoff and Delta publication remain separate operations. If score fails,
 retry the independent score job or repair only the handoff task; do not rerun
@@ -118,7 +127,9 @@ fail the job. Retry runs can create additional candidate versions.
 Manual approval mode retains the candidate until a separate operator action.
 
 `training_table` is the existing labeled input. `score_source_table` is the
-existing input to predict; the generated config points both at **one table**.
+existing input to predict. Initialization accepts `source_table_name` and an
+optional `score_source_table_name` within the target's input schema. A blank
+source name uses `<project_name>_source`; a blank scoring source reuses training.
 You may give them different UC names when the labeled training data and new
 inference data have different lifecycles. Neither is created by this Bundle.
 `prediction_table` is the physical output table in `incremental_append` mode.
@@ -137,10 +148,10 @@ admission table.
 The `row_key` selected during initialization names an existing source column;
 `score` copies it into the prediction table for SQL lookups. It must be
 non-null, `STRING` or `BIGINT`, and unique across all scored rows, including
-later inserts. If a customer can have multiple prediction rows, edit
-`row_keys` in `config/workflow.json` to a jointly unique list such as
-`["customer_id", "observation_id"]` before deployment. The initialization
-prompt chooses one column; it never creates an ID in the source. Keep key
+later inserts. For composite keys, supply `row_keys_json` at initialization,
+for example `["customer_id", "observation_id"]`; this overrides `row_key`.
+The resulting `row_keys` remains editable in `config/workflow.json`.
+Initialization never creates an ID in the source. Keep key
 columns out of `input_columns`; they identify predictions, not model features.
 The score job has `max_concurrent_runs: 1`; grant write access to its physical
 prediction targets only to this job's identity. In full mode the job also
@@ -155,7 +166,19 @@ need to publish to one target.
    --wheel --no-build-isolation --out-dir <this-project>/dist skyulf-core`.
 2. Edit `config/workflow.json` for real source/model names, row keys, model
    inputs, preprocessing, estimator, temporal split and size limits. The
-   generated JSON is an example, not a usable dataset. Enable Delta Change
+   initialized task is **{{.task}}**: regression starts with linear regression
+   and RMSE; classification starts with logistic regression and accuracy when
+   `metric=auto`. Select existing features with `input_columns_json`, then edit
+   the generated `pipeline` for your preprocessing and estimator. Feature
+   engineering is not inferred automatically. Set a task-compatible metric
+   and quality threshold, and positive `max_rows`/`max_bytes` transfer limits.
+   In an initialization config file, supply those limits as integer strings
+   (for example, `"max_rows": "10000"`); generated workflow limits are numbers.
+   For manual training, explicitly set `training_version`, `start`,
+   `holdout_start`, and `cutoff`; the defaults are null, with no example snapshot
+   or dates. Use an ordered, timezone-aware split for your actual labeled data.
+   Monthly training derives its snapshot and UTC windows per run.
+   Enable Delta Change
    Data Feed on the scoring source before new rows arrive. Check that the
    source's initial rows are the rows you intend to score: the first `score`
    run predicts **all** existing source rows, including labeled training rows
@@ -184,13 +207,29 @@ The generated jobs use Databricks serverless Python environment 4. Policy
 clusters are a separate compute choice at project initialization.
 {{end}}
 
+## Existing-project migration
+
+New projects use `config_version: 1` and an explicit `task`. Before upgrading
+an existing project, review its source snapshot, date split, task, metric and
+limits. Replace legacy `model_selection_mode` with explicit
+`score_model_selection`, `promotion_policy`, and `score_handoff`; do not retain
+both formats. The helper
+`skyulf.integrations.databricks.workflow_config.migrate_workflow_config(config,
+task="regression", score_handoff="disabled")` returns a migrated copy; select
+the task and handoff deliberately, then review and save the result.
+Add the fixed notebook contract fields and score run parameter
+from this template, then validate and redeploy. Keep row keys and prediction
+columns compatible with existing outputs; incompatible changes require a new
+prediction target or an explicit data migration.
+
 ## First run and later increments
 
 1. Run `train` against a pinned labeled Delta version. It logs held-out MLflow
    metrics and registers a concrete model version.
 2. In manual mode, approve the existing candidate if champion-based scoring
    is desired. Pinned scoring instead uses the explicit `model_version`;
-   update and redeploy that config to change its pin. Run `score` independently,
+   update and redeploy that config to change its saved pin, or use
+   `score_model_version` for one run. Run `score` independently,
    or inspect the optional handoff following a successful champion transition.
    Scoring verifies the source, Change Data Feed, model
    outputs, row keys and any existing target schema before writing. It creates
@@ -204,14 +243,16 @@ clusters are a separate compute choice at project initialization.
    rescore policy.
 
 {{if eq .score_model_selection "pinned_version"}}
-`score` always uses its configured concrete model version. Training a new
+`score` uses its configured concrete model version unless the run supplies
+`score_model_version`. Training a new
 candidate or changing a registry alias alone does not change predictions.
 {{else}}
-`score` loads the concrete champion version at run start. A later alias change
+`score` loads the concrete champion version at run start unless the run supplies
+`score_model_version`. A later alias change
 cannot alter that run's pinned model. Score remains independently runnable
 for new source rows, regardless of the configured handoff choice.
 {{end}}
-After pinning v2 and redeploying, `incremental_append` leaves v1 rows intact
+When a score run selects v2, `incremental_append` leaves v1 rows intact
 and scores only new source inserts with v2. `full_rebuild` scores every current
 source row into a new v2 table, switches the view only after success, then
 uses that table's Delta receipt to append future inserts. A failed rebuild

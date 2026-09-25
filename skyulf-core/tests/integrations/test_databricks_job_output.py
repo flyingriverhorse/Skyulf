@@ -53,6 +53,8 @@ def test_output_escapes_model_names_and_explains_noop_manifest():
             "next_actions": {},
             "result": {
                 "noop": True,
+                "selected_model_name": "workspace.test.model",
+                "selected_model_version": "5",
                 "input_count": 0,
                 "output_count": 0,
                 "manifest": {"model_name": "<script>alert(1)</script>", "model_version": "1"},
@@ -62,6 +64,7 @@ def test_output_escapes_model_names_and_explains_noop_manifest():
     assert "<script>" not in html and "&lt;script&gt;" in html
     assert "No new predictions written" in html
     assert "previous write" in html
+    assert "Selected model for this run" in html and "workspace.test.model v5" in html
 
 
 def test_manual_training_output_shows_metrics_and_simple_action_fields():
@@ -98,16 +101,18 @@ def test_manual_training_output_shows_metrics_and_simple_action_fields():
 
 @pytest.mark.parametrize("display_fails", [False, True])
 def test_notebook_renders_summary_and_preserves_machine_result(
-    tmp_path, monkeypatch, capsys, display_fails
+    tmp_path, monkeypatch, workflow_config, capsys, display_fails
 ):
     """Readable notebook output must preserve the API exit JSON contract."""
     from types import SimpleNamespace
     from unittest.mock import Mock
 
     path = tmp_path / "workflow.json"
-    path.write_text("{}")
+    path.write_text(json.dumps(workflow_config))
     values = {
         "config_path": str(path),
+        "workflow_contract": "1",
+        "deployed_score_handoff": "after_alias_change",
         "catalog": "workspace",
         "input_schema": "test",
         "output_schema": "test",

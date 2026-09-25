@@ -67,6 +67,12 @@ def render_bundle_output(payload: dict[str, Any]) -> str:
                 )
             )
     if action == "score":
+        if result.get("selected_model_version"):
+            sections.append(
+                "<p><strong>Selected model for this run:</strong> "
+                f"{_text(result.get('selected_model_name'))} "
+                f"v{_text(result['selected_model_version'])}</p>"
+            )
         noop = result.get("noop", False)
         sections.append(
             "<p><strong>No new predictions written.</strong></p>"
