@@ -44,8 +44,10 @@ Commit `fcfcee31` passed 116 tests and all applicable commit hooks.
 The first SM-32 library policy slice passed 78 tests; see
 [policy separation progress](43-sm32-policy-separation-progress.md).
 The [manual approve library action](45-sm32-manual-approval-progress.md) now
-rechecks saved candidate evidence without training; reject/rollback, contender
-history and Bundle wiring remain open. [36 misplaced Core test files](44-core-test-relocation.md)
+rechecks saved candidate evidence without training. Library reject/rollback
+and checked retries are implemented in the [current slice](46-sm32-reject-rollback-progress.md);
+145 affected tests passed locally; contender history and Bundle wiring remain open.
+[36 misplaced Core test files](44-core-test-relocation.md)
 were relocated and verified before this continuation. See
 [the implementation evidence](40-sm30-challenger-validation-report.md): 104
 tests passed, including real MLflow lifecycles with pandas and Polars.
@@ -60,7 +62,7 @@ on an existing candidate without retraining or reuploading the model.
 | --- | --- | --- | --- | --- |
 | SM-30 | Challenger nomination and visible evaluation status | Existing SM-22c/29 | DONE | 104 local tests and live run 607409241163605 passed; company tags, both engines, retained contender, replacement, error and rollback verified |
 | SM-31 | Thin template and reusable workflow/publication services | SM-30 | DONE | 44-line notebook, two Core services, 110 tests, wheel installation/import, strict generation validation and live score run 383572337148835 passed |
-| SM-32 | Independent score selection and promotion policy | SM-31 | ACTIVE | Library's four combinations and saved-evidence approve implemented; remaining: reject/rollback via one writer, score handoff without fit, previous_challenger history, matching Bundle choices and live proof |
+| SM-32 | Independent score selection and promotion policy | SM-31 | ACTIVE | Library's four combinations and approve/reject/rollback implemented; remaining: previous_challenger history, serialized Bundle operator actions and score handoff without fit, matching choices and live proof |
 | SM-33 | Validated config, migration and runtime parameters | SM-32 | WAIT | Per-run version/action/evidence inputs; task/column/key setup; migrate old mode and reject config/job-graph disagreement |
 | SM-34 | Independent score/train schedules and training windows | SM-33 | WAIT | Editable paused score/train cron/timezone, explicit lookback/holdout/label windows; scoring needs no manual dates or retraining |
 | SM-35 | Multi-metric quality gates and clear thresholds | SM-33 | WAIT | One selection metric plus optional guardrails; task/domain validation, first-model gate, failed-gate explanations and no probability-threshold confusion |

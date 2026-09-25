@@ -80,7 +80,8 @@ still uses its existing `model_selection_mode` and job graph. Do not migrate
 only its JSON: the lifecycle actions and matching job handoff must be delivered
 together. `manual_approval` currently means no automatic promotion; approve,
 reject and rollback are separate operator actions. The library now supports
-`approve`; reject, rollback and `previous_challenger` remain the next SM-32 work.
+`approve`, `reject` and `rollback`. `previous_challenger` and the matching Bundle
+choices/action handoff remain open in SM-32.
 No new cloud deployment is implied by these library changes.
 
 ### Approve an existing candidate without training
@@ -126,6 +127,54 @@ use this action without explicitly supplying that missing provenance through
 a separately reviewed migration; there is no fallback to current training dates.
 Use the same externally serialized lifecycle writer as training. Bundle widgets
 and automatic score handoff for operator actions are still pending.
+
+### Reject a candidate or roll back a promotion
+
+To decline the candidate above, use the same version and evidence digest with
+an explicit manual policy. This is an alternative to approving that candidate:
+
+```python
+decision = run_action(
+    spark,
+    config,
+    "reject",
+    candidate_version=candidate.model_version,
+    comparison_sha256=comparison_sha256,
+    expected_champion_version=candidate.comparison.champion_version,
+    rejection_reason="Business review requires another candidate",
+)
+```
+
+Rejection retains both aliases and the evaluation metrics/status. It records
+`approval_status=rejected` and the human-readable `approval_reason` separately.
+The reason must be nonempty and at most 256 UTF-8 bytes. A rejected version
+cannot be implicitly approved, restaged, renominated or made the first champion.
+There is no reopen action in this slice; a later training run creates a new candidate.
+Neither rejection nor rollback reads training rows, fits or registers a model.
+
+To undo an earlier completed promotion, pass that promotion's receipt:
+
+```python
+reversal = run_action(
+    spark,
+    config,
+    "rollback",
+    promotion_receipt=receipt,  # kind="promotion", not first-champion initialization
+    expected_champion_version=receipt.new_version,
+)
+```
+
+Rollback is available under either promotion policy. It restores the previous
+champion only when the saved transition still matches controlled registry state.
+A separately verified challenger is retained. Repeating an unchanged rejection
+or rollback returns the same committed receipt; incompatible evidence,
+conflicting alias state and unresolved writes stop the action.
+
+All lifecycle actions must use the same externally serialized writer as training.
+No additional control table is created. These actions do not launch score or
+rewrite its version pin. A later `champion` score follows the restored alias;
+a `pinned_version` score continues using its configured version. Rollback does
+not undo predictions already written; scoring's model-change policy still applies.
 
 ## What is created
 

@@ -9,6 +9,7 @@ from .promotion import (
     _active_marker,
     _admission,
     _assert_no_pending,
+    _assert_not_rejected,
     _checked_challenger_event,
     _commit_change,
     _read_optional_alias,
@@ -57,7 +58,7 @@ class ChallengerLifecycle:
             raise ValueError("Candidate artifact digest changed before nomination.")
         client = _make_client(_require_mlflow(), self.tracking_uri, self.registry_uri)
         with self.admission.hold(alias_resource_id(candidate.name)):
-            _assert_no_pending(client, candidate.name)
+            _assert_not_rejected(client, candidate.name, candidate.version)
             champion = _read_optional_alias(client, candidate.name, "champion")
             if champion != self.expected_champion_version:
                 raise AliasConflictError("Champion changed before challenger nomination.")

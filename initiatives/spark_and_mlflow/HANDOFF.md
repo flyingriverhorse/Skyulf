@@ -1,4 +1,4 @@
-# Session handoff - 2026-09-24
+# Session handoff - 2026-09-25
 
 ## Current priority: SM-30 through SM-43
 
@@ -18,10 +18,15 @@ the relocated cases plus workflow tests passed 281 tests after type narrowing.
 Library approve now loads saved candidate evidence and rechecks it without fit
 or registration; see [manual approval progress](45-sm32-manual-approval-progress.md).
 Final combined regression suite passed 321 tests; full repository ty and
-scoped Ruff passed. This commit includes the SM-32 policy/approval slice and
+scoped Ruff passed. Commit `94b28320` includes the SM-32 policy/approval slice and
 the Core test relocation; the complete SM-32 task remains open.
-Next implement reject/rollback, previous_challenger and matching Bundle actions/
-handoff; do not mark SM-32 complete yet. No new Databricks run was made.
+The continuation implements library reject/rollback and safe retries;
+see [its evidence and limits](46-sm32-reject-rollback-progress.md).
+The combined affected suites passed 145 tests, scoped Ruff lint/format and full
+repository ty passed, and strict MkDocs built successfully. The progress
+report is included alongside this implementation.
+Next implement previous_challenger and matching Bundle actions/handoff;
+do not mark SM-32 complete yet. No new Databricks run was made.
 Latest follow-up: Bundle initialization now asks for optional risk_category,
 PayingRegNo has an explicit policy-compute example, and new receipts use
 from_version while reading older formats. 44 relevant tests and real CLI

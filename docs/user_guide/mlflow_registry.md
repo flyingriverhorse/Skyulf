@@ -287,11 +287,28 @@ before retrying. `@previous_champion` identifies only the latest rollback
 pointer, not the full history. Concrete versions and promotion/rollback event
 tags retain that history; predictions should record the resolved model version.
 Rollback refuses a later promotion, even if it selects the same version.
+An unchanged repeat of a completed rollback returns its original reversal
+receipt without another alias mutation. The active receipt, previous-champion
+pointer and any retained challenger must still be consistent.
 AliasOutcomeUnknownError includes the event ID for inspection. A prepared tag
 is not proof that promotion completed. Registry tags are audit records for
 controlled writers, not tamper-proof authorization tokens.
 The event tag key uses underscores, and its compact value stays within Unity
 Catalog's 256-byte tag-value limit.
+
+`skyulf.integrations.mlflow.rejection.reject_candidate(report, reason=...,
+expected_champion_version=..., admission=..., tracking_uri=..., registry_uri=...)`
+records an explicit operator decision against the exact staged comparison.
+It leaves aliases and evaluation metrics/status unchanged, adding
+`approval_status=rejected` and `approval_reason` to the candidate version.
+It requires no training rows and accepts a failed quality comparison too.
+The same unchanged request reuses its committed receipt; a changed reason,
+proof, champion, challenger or pending event is refused. Promotion, initialization,
+staging and nomination do not implicitly override rejection. A partial metadata
+write reports an unknown outcome and keeps the pending event for inspection.
+The local workflow wrapper additionally verifies controlled champion state and
+requires an explicit manual policy; the low-level registry API retains its
+existing legacy-champion compatibility.
 
 The lock protects only participating jobs. A principal with direct registry
 write permission can bypass it. A crashed Delta admission owner does not

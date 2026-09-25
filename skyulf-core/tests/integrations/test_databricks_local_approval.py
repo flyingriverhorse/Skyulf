@@ -148,6 +148,77 @@ def test_manual_approval_reuses_registered_versions_and_replays_receipt(
         approve(tied, "2")
     assert str(client.get_registered_model(config["model_name"]).aliases["champion"]) == "2"
 
+    tied_digest = hashlib.sha256(
+        json.dumps(asdict(tied.comparison), sort_keys=True, allow_nan=False).encode()
+    ).hexdigest()
+    with monkeypatch.context() as no_training:
+        no_training.setattr(
+            local_workflow, "train_local_candidate", Mock(side_effect=AssertionError("fit"))
+        )
+        no_training.setattr(
+            local_retraining,
+            "read_training_snapshot",
+            Mock(side_effect=AssertionError("data read")),
+        )
+        marker = client.get_registered_model(config["model_name"]).tags["champion_current_event"]
+        client.set_registered_model_tag(
+            config["model_name"],
+            "champion_current_event",
+            json.dumps({"event_id": promoted.event_id, "version": "1"}),
+        )
+        with pytest.raises(AliasConflictError, match="receipt disagrees"):
+            local_workflow.run_action(
+                None,
+                config,
+                "reject",
+                candidate_version=tied.model_version,
+                comparison_sha256=tied_digest,
+                expected_champion_version="2",
+                rejection_reason="Retain the current production model",
+            )
+        assert (
+            "approval_status"
+            not in client.get_model_version(config["model_name"], tied.model_version).tags
+        )
+        client.set_registered_model_tag(config["model_name"], "champion_current_event", marker)
+        rejected = local_workflow.run_action(
+            None,
+            config,
+            "reject",
+            candidate_version=tied.model_version,
+            comparison_sha256=tied_digest,
+            expected_champion_version="2",
+            rejection_reason="Retain the current production model",
+        )
+        assert (
+            local_workflow.run_action(
+                None,
+                config,
+                "reject",
+                candidate_version=tied.model_version,
+                comparison_sha256=tied_digest,
+                expected_champion_version="2",
+                rejection_reason="Retain the current production model",
+            )
+            == rejected
+        )
+        with pytest.raises(AliasConflictError, match="rejected"):
+            approve(tied, "2")
+        config["promotion_policy"] = "automatic"
+        rollback = local_workflow.run_action(
+            None, config, "rollback", promotion_receipt=promoted, expected_champion_version="2"
+        )
+        assert rollback.kind == "rollback" and rollback.new_version == "1"
+        assert (
+            local_workflow.run_action(
+                None, config, "rollback", promotion_receipt=promoted, expected_champion_version="2"
+            )
+            == rollback
+        )
+    assert len(client.search_model_versions("name = 'approval_model'")) == 3
+    assert str(client.get_model_version_by_alias(config["model_name"], "challenger").version) == "3"
+    assert config["model_version"] == "1"
+
 
 @pytest.mark.parametrize("selection", ["pinned_version", "champion"])
 def test_approval_refuses_automatic_policy_before_registry_access(selection):

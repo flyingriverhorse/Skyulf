@@ -1,4 +1,4 @@
-"""Approve an existing local model using its saved, pinned evaluation evidence.
+"""Approve or reject an existing local model using its pinned evaluation evidence.
 
 The caller must serialize this operation with every other lifecycle writer.
 Approval never fits, registers or uploads a model and never changes a scoring pin.
@@ -29,6 +29,7 @@ from ..mlflow.promotion import (
     promote_candidate,
 )
 from ..mlflow.registry import _make_client, _require_mlflow, resolve_model
+from ..mlflow.rejection import reject_candidate
 from ..mlflow.validation import ModelComparisonReport
 from . import local_retraining
 from .local_retraining import LocalTrainingSpec
@@ -102,6 +103,65 @@ def _completed_approval(
     return receipt
 
 
+def _validate_candidate_request(
+    candidate_version: str | None,
+    comparison_sha256: str | None,
+    expected_champion_version: str | None,
+) -> tuple[str, str]:
+    """Reject ambiguous candidate and evidence pins before accessing the registry."""
+    if not isinstance(candidate_version, str) or not re.fullmatch(
+        r"[1-9][0-9]*", candidate_version
+    ):
+        raise ValueError("Approval requires a concrete candidate_version.")
+    if not isinstance(comparison_sha256, str) or not re.fullmatch(
+        r"[a-f0-9]{64}", comparison_sha256
+    ):
+        raise ValueError("Approval requires a comparison_sha256 evidence digest.")
+    if expected_champion_version is not None and (
+        not isinstance(expected_champion_version, str)
+        or not re.fullmatch(r"[1-9][0-9]*", expected_champion_version)
+    ):
+        raise ValueError("Expected champion must be a concrete version or None for bootstrap.")
+    return candidate_version, comparison_sha256
+
+
+def reject_local_candidate(
+    config: dict[str, Any],
+    *,
+    candidate_version: str | None,
+    comparison_sha256: str | None,
+    expected_champion_version: str | None,
+    rejection_reason: str,
+) -> AliasChangeReceipt:
+    """Reject saved candidate evidence without fitting, reading rows or changing a scoring pin."""
+    if config.get("promotion_policy") != "manual_approval":
+        raise ValueError("Rejection requires explicit promotion_policy=manual_approval.")
+    candidate_version, comparison_sha256 = _validate_candidate_request(
+        candidate_version, comparison_sha256, expected_champion_version
+    )
+    tracking_uri = config.get("tracking_uri", "databricks")
+    registry_uri = config.get("registry_uri", "databricks-uc")
+    client = _make_client(_require_mlflow(), tracking_uri, registry_uri)
+    report, _, _ = _load_evidence(
+        client, config["model_name"], candidate_version, comparison_sha256
+    )
+    if (
+        controlled_champion_version(
+            config["model_name"], tracking_uri=tracking_uri, registry_uri=registry_uri
+        )
+        != expected_champion_version
+    ):
+        raise AliasConflictError("Champion changed before rejection.")
+    return reject_candidate(
+        report,
+        reason=rejection_reason,
+        expected_champion_version=expected_champion_version,
+        admission=ExclusiveAliasWriterAdmission(),
+        tracking_uri=tracking_uri,
+        registry_uri=registry_uri,
+    )
+
+
 def approve_local_candidate(
     spark: Any,
     config: dict[str, Any],
@@ -119,19 +179,9 @@ def approve_local_candidate(
     """
     if config.get("promotion_policy") != "manual_approval":
         raise ValueError("Approval requires explicit promotion_policy=manual_approval.")
-    if not isinstance(candidate_version, str) or not re.fullmatch(
-        r"[1-9][0-9]*", candidate_version
-    ):
-        raise ValueError("Approval requires a concrete candidate_version.")
-    if not isinstance(comparison_sha256, str) or not re.fullmatch(
-        r"[a-f0-9]{64}", comparison_sha256
-    ):
-        raise ValueError("Approval requires a comparison_sha256 evidence digest.")
-    if expected_champion_version is not None and (
-        not isinstance(expected_champion_version, str)
-        or not re.fullmatch(r"[1-9][0-9]*", expected_champion_version)
-    ):
-        raise ValueError("Expected champion must be a concrete version or None for bootstrap.")
+    candidate_version, comparison_sha256 = _validate_candidate_request(
+        candidate_version, comparison_sha256, expected_champion_version
+    )
     for field in ("max_rows", "max_bytes"):
         if type(config.get(field)) is not int or config[field] <= 0:
             raise ValueError(f"Approval {field} must be a positive integer.")

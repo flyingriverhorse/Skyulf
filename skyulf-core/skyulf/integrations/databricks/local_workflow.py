@@ -19,11 +19,12 @@ from ..mlflow.promotion import (
     controlled_champion_version,
     initialize_champion,
     promote_candidate,
+    rollback_promotion,
     stage_challenger,
 )
 from ..mlflow.registry import RegistryModelNotFoundError, resolve_model
 from .admission import SingleWriterAdmission
-from .local_approval import approve_local_candidate
+from .local_approval import approve_local_candidate, reject_local_candidate
 from .local_incremental import run_incremental_local_batch
 from .local_retraining import (
     LocalTrainingSpec,
@@ -292,11 +293,37 @@ def run_action(
     candidate_version: str | None = None,
     comparison_sha256: str | None = None,
     expected_champion_version: str | None = None,
+    rejection_reason: str = "",
+    promotion_receipt: AliasChangeReceipt | None = None,
 ) -> Any:
-    """Delegate training or scoring to Skyulf's existing services."""
+    """Delegate training, scoring and explicit lifecycle actions to existing Core services."""
     tracking_uri = config.get("tracking_uri", "databricks")
     registry_uri = config.get("registry_uri", "databricks-uc")
     selection, policy = _workflow_policies(config)
+    if action == "rollback":
+        if (
+            not isinstance(promotion_receipt, AliasChangeReceipt)
+            or promotion_receipt.model_name != config["model_name"]
+            or not isinstance(expected_champion_version, str)
+        ):
+            raise ValueError(
+                "Rollback needs a receipt for the configured model and expected champion."
+            )
+        return rollback_promotion(
+            promotion_receipt,
+            expected_current_version=expected_champion_version,
+            admission=ExclusiveAliasWriterAdmission(),
+            tracking_uri=tracking_uri,
+            registry_uri=registry_uri,
+        )
+    if action == "reject":
+        return reject_local_candidate(
+            config,
+            candidate_version=candidate_version,
+            comparison_sha256=comparison_sha256,
+            expected_champion_version=expected_champion_version,
+            rejection_reason=rejection_reason,
+        )
     if action == "approve":
         if policy != "manual_approval" or "promotion_policy" not in config:
             raise ValueError("Approval requires explicit promotion_policy=manual_approval.")

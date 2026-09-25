@@ -118,6 +118,172 @@ def _stage(case, **changes):
     return stage_challenger(selected, heldout, **options)
 
 
+def _reject(case, reason="Business review declined deployment", **changes):
+    """Reject the staged comparison through the same explicit alias admission."""
+    from skyulf.integrations.mlflow.rejection import reject_candidate
+
+    _, uri, _, _, report, admission = case
+    options = {
+        "expected_champion_version": report.champion_version,
+        "admission": admission,
+        "tracking_uri": uri,
+        "registry_uri": uri,
+    }
+    options.update(changes)
+    return reject_candidate(report, reason=reason, **options)
+
+
+def test_manual_rejection_retains_aliases_and_cannot_be_erased_by_recheck(case):
+    """An operator rejection must survive quality rechecks without changing objective metrics."""
+    client, _, name, _, _, _ = case
+    _stage(case)
+    before = client.get_registered_model(name).aliases
+    receipt = _reject(case)
+    assert receipt.kind == "rejection"
+    assert client.get_registered_model(name).aliases == before
+    tags = client.get_model_version(name, "2").tags
+    assert tags["validation_status"] == "passed"
+    assert tags["approval_status"] == "rejected"
+    assert tags["approval_reason"] == "Business review declined deployment"
+    assert _reject(case) == receipt
+    with pytest.raises(AliasConflictError, match="reason|decision"):
+        _reject(case, reason="Different decision")
+    with pytest.raises(AliasConflictError, match="rejected"):
+        _promote(case)
+    with pytest.raises(AliasConflictError, match="rejected"):
+        _stage(case, expected_challenger_version="2")
+    assert client.get_registered_model(name).aliases == before
+
+
+def test_rejected_first_candidate_cannot_initialize_or_renominate(case):
+    """Bootstrap and nomination must not bypass a recorded operator rejection."""
+    from skyulf.integrations.mlflow.challenger import ChallengerLifecycle
+    from skyulf.integrations.mlflow.promotion import initialize_champion
+    from skyulf.integrations.mlflow.rejection import reject_candidate
+
+    client, uri, name, heldout, _, admission = case
+    client.delete_registered_model_alias(name, "champion")
+    candidate = resolve_model(name, version="2", tracking_uri=uri, registry_uri=uri)
+    evaluation: dict[str, Any] = {
+        "target_column": "target",
+        "max_rows": 10,
+        "max_bytes": 10_000,
+        "tracking_uri": uri,
+        "registry_uri": uri,
+    }
+    report = compare_registered_local_models(
+        candidate,
+        None,
+        heldout,
+        dataset_id="labels@5/heldout",
+        metric="heldout_mse",
+        min_improvement=1.0,
+        quality_threshold=1.0,
+        **evaluation,
+    )
+    _stage(case, report=report, expected_champion_version=None)
+    reject_candidate(
+        report,
+        reason="Review declined first deployment",
+        expected_champion_version=None,
+        admission=admission,
+        tracking_uri=uri,
+        registry_uri=uri,
+    )
+    with pytest.raises(AliasConflictError, match="rejected"):
+        initialize_champion(report, heldout, admission=admission, **evaluation)
+    lifecycle = ChallengerLifecycle(
+        name,
+        expected_champion_version=None,
+        admission=admission,
+        tracking_uri=uri,
+        registry_uri=uri,
+    )
+    with pytest.raises(AliasConflictError, match="rejected"):
+        lifecycle.registered(candidate)
+    aliases = client.get_registered_model(name).aliases
+    assert set(aliases) == {"challenger"}
+    assert str(aliases["challenger"]) == "2"
+
+
+@pytest.mark.parametrize("reason", ["", "   ", "a" * 257, "\u00fc" * 129])
+def test_invalid_rejection_reason_cannot_write_a_decision(case, reason):
+    """Empty and oversized UTF-8 reasons must fail before changing model metadata."""
+    client, _, name, _, _, _ = case
+    _stage(case)
+    tags = client.get_model_version(name, "2").tags
+    with pytest.raises(ValueError, match="reason"):
+        _reject(case, reason=reason)
+    assert client.get_model_version(name, "2").tags == tags
+
+
+def test_partial_rejection_retains_pending_event_and_blocks_retry(case, monkeypatch):
+    """A lost decision-tag write cannot be treated as a completed or safe-to-repeat rejection."""
+    client, _, name, _, _, _ = case
+    _stage(case)
+    original = mlflow.MlflowClient.set_model_version_tag
+
+    def fail_reason(self, model_name, version, key, value):
+        """Fail after status was written but before its human-readable reason."""
+        if key == "approval_reason":
+            raise RuntimeError("lost decision response")
+        return original(self, model_name, version, key, value)
+
+    monkeypatch.setattr(mlflow.MlflowClient, "set_model_version_tag", fail_reason)
+    with pytest.raises(AliasOutcomeUnknownError):
+        _reject(case)
+    with pytest.raises(AliasConflictError, match="pending"):
+        _reject(case)
+    assert client.get_registered_model(name).tags["pending_alias_event"]
+
+
+def test_rollback_retry_returns_original_receipt_without_alias_writes(case, monkeypatch):
+    """A repeated logical rollback must be idempotent even though its expected source moved."""
+    client, uri, name, _, _, admission = case
+    _stage(case)
+    receipt = _promote(case)
+    options: dict[str, Any] = {
+        "expected_current_version": "2",
+        "admission": admission,
+        "tracking_uri": uri,
+        "registry_uri": uri,
+    }
+    reversal = rollback_promotion(receipt, **options)
+    before = client.get_registered_model(name).tags
+
+    def unexpected_write(*args, **kwargs):
+        """Replaying a committed rollback may read state but must not mutate it."""
+        raise AssertionError("rollback replay attempted a write")
+
+    monkeypatch.setattr(mlflow.MlflowClient, "set_registered_model_alias", unexpected_write)
+    assert rollback_promotion(receipt, **options) == reversal
+    assert client.get_registered_model(name).tags == before
+
+
+@pytest.mark.parametrize("changed", ["pending", "previous", "receipt"])
+def test_rollback_retry_refuses_changed_control_state(case, changed):
+    """A completed rollback is not permission to ignore later corruption or pending writes."""
+    client, uri, name, _, _, admission = case
+    _stage(case)
+    receipt = _promote(case)
+    options: dict[str, Any] = {
+        "expected_current_version": "2",
+        "admission": admission,
+        "tracking_uri": uri,
+        "registry_uri": uri,
+    }
+    reversal = rollback_promotion(receipt, **options)
+    if changed == "pending":
+        client.set_registered_model_tag(name, "pending_alias_event", "uncertain")
+    elif changed == "previous":
+        client.set_registered_model_alias(name, "previous_champion", "2")
+    else:
+        client.set_model_version_tag(name, "1", f"promotion_{reversal.event_id}", "{}")
+    with pytest.raises((AliasConflictError, ValueError)):
+        rollback_promotion(receipt, **options)
+    assert str(client.get_model_version_by_alias(name, "champion").version) == "1"
+
+
 def test_stage_challenger_requires_validation_and_preserves_champion(case) -> None:
     """Staging verifies evidence while leaving the production version unchanged."""
     client, _, name, _, report, _ = case
@@ -621,7 +787,7 @@ def test_rollback_rejects_newer_alias_state(case) -> None:
     _stage(case)
     receipt = _promote(case)
     client.set_registered_model_alias(name, "champion", "1")
-    with pytest.raises(AliasConflictError, match="expected"):
+    with pytest.raises(AliasConflictError, match="receipt disagrees"):
         rollback_promotion(
             receipt,
             expected_current_version="2",
