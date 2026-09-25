@@ -146,6 +146,14 @@ generated-project and configuration tests.
 - Acceptance: strict generated Bundle validation, defaults/migration tests,
   actionable negative tests and a per-run version change without redeployment.
 
+### Pre-SM-34 prerequisite: SM-33A through SM-33E
+
+The user approved the [training data contract extension](54-training-data-contract-plan.md).
+Complete the direct field rename, explicit date/timezone normalization, date-free
+training with optional result availability, Core CV integration and combined
+live acceptance before scheduling work. Existing SM-33 completion does not
+imply that these additional behaviors are implemented.
+
 ### SM-34 — Independent schedules and explicit training windows
 
 Files: template schema, job resources, target variables, workflow config and

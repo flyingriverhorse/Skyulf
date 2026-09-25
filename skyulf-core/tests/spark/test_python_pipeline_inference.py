@@ -26,7 +26,7 @@ def _predict(frame, bundle, **kwargs):
     return inference.predict_spark(
         frame,
         bundle,
-        frame_spec=kwargs.pop("frame_spec", FrameSpec(row_keys=("id",))),
+        frame_spec=kwargs.pop("frame_spec", FrameSpec(record_key_columns=("id",))),
         options=kwargs.pop("options", ExecutionOptions("spark", python_batch_rows=2)),
         mode=kwargs.pop("mode", "python_pipeline"),
         **kwargs,
@@ -152,7 +152,7 @@ def test_native_mode_still_uses_native_feature_path(spark, regression_bundle):
     rows = inference.predict_spark(
         frame,
         regression_bundle,
-        frame_spec=FrameSpec(row_keys=("id",)),
+        frame_spec=FrameSpec(record_key_columns=("id",)),
         options=ExecutionOptions("spark", python_batch_rows=2),
         mode="native_features",
     ).collect()

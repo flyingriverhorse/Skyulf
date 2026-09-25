@@ -52,7 +52,7 @@ def _spark_output(
             predict_spark(
                 frame,
                 bundle,
-                frame_spec=FrameSpec(row_keys=("id",)),
+                frame_spec=FrameSpec(record_key_columns=("id",)),
                 options=ExecutionOptions("spark", python_batch_rows=2),
                 mode=mode,
             )

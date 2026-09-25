@@ -106,7 +106,7 @@ transfer. Raw data is not collected into a pandas DataFrame on the driver.
 4. Only prepared model features and row keys reach the Python workers.
 5. Each worker iterator loads the same model payload. It predicts on its
    pandas/NumPy batches without applying FE again.
-6. The result is a Spark DataFrame containing `row_keys + prediction`; classifiers
+6. The result is a Spark DataFrame containing `record_key_columns + prediction`; classifiers
    also expose probability columns in the manifest class order.
 
 **Pandas describes the small piece being processed inside a worker.** The entire

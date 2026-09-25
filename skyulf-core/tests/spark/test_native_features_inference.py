@@ -30,7 +30,7 @@ def _predict(frame, bundle, **kwargs):
     return inference.predict_spark(
         frame,
         bundle,
-        frame_spec=kwargs.pop("frame_spec", FrameSpec(row_keys=("id",))),
+        frame_spec=kwargs.pop("frame_spec", FrameSpec(record_key_columns=("id",))),
         options=kwargs.pop("options", ExecutionOptions("spark", python_batch_rows=2)),
         mode=kwargs.pop("mode", "native_features"),
         **kwargs,
@@ -103,7 +103,7 @@ def test_empty_partitions_and_composite_key_schema(spark, regression_bundle, emp
         "tiny byte, small short, id int, large long, text string, flag boolean, x double, z double",
     ).repartition(3)
     keys = ("tiny", "small", "id", "large", "text", "flag")
-    output = _predict(frame, regression_bundle, frame_spec=FrameSpec(row_keys=keys))
+    output = _predict(frame, regression_bundle, frame_spec=FrameSpec(record_key_columns=keys))
     rows = output.collect()
     assert output.schema.fields[:-1] == [frame.schema[key] for key in keys]
     assert output.schema["prediction"].dataType.typeName() == "double"
@@ -118,7 +118,7 @@ def test_empty_partitions_and_composite_key_schema(spark, regression_bundle, emp
         ("missing", "missing"),
         ("dtype", "dtype"),
         ("duplicate", "[Dd]uplicate"),
-        ("key_feature", "colli|row_keys"),
+        ("key_feature", "colli|record_key_columns"),
         ("key_output", "colli|prediction"),
         ("output_input", "colli|prediction"),
         ("date_key", "key.*dtype|key.*type"),
@@ -146,16 +146,16 @@ def test_preflight_rejects_invalid_contract_before_actions(
     elif change == "duplicate":
         frame = frame.selectExpr("id", "x", "z", "x as X")
     elif change == "key_feature":
-        kwargs["frame_spec"] = FrameSpec(row_keys=("x",))
+        kwargs["frame_spec"] = FrameSpec(record_key_columns=("x",))
     elif change == "key_output":
         frame = frame.withColumnRenamed("id", "PREDICTION")
-        kwargs["frame_spec"] = FrameSpec(row_keys=("PREDICTION",))
+        kwargs["frame_spec"] = FrameSpec(record_key_columns=("PREDICTION",))
     elif change == "output_input":
         frame = frame.selectExpr("*", "1 as prediction")
     elif change == "date_key":
         frame = frame.selectExpr("date'2026-01-01' as id", "x", "z")
     elif change == "target":
-        kwargs["frame_spec"] = FrameSpec(row_keys=("id",), target="z")
+        kwargs["frame_spec"] = FrameSpec(record_key_columns=("id",), target="z")
     elif change == "stage":
         bundle = build_bundle(
             fitted_regression_pipeline, input_stage="features", feature_order=("x", "z")

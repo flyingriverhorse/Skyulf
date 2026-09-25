@@ -33,11 +33,11 @@ def _config():
         "model_version": "1",
         "model_change_mode": "incremental_append",
         "champion_version": "1",
-        "row_keys": ["entity_id"],
+        "record_key_columns": ["entity_id"],
         "input_columns": ["x"],
         "target_column": "target",
         "event_column": "event_time",
-        "label_time_column": "label_at",
+        "result_available_at_column": "label_at",
         "start": "2026-01-01T00:00:00+00:00",
         "holdout_start": "2026-02-01T00:00:00+00:00",
         "cutoff": "2026-03-01T00:00:00+00:00",
@@ -535,7 +535,7 @@ def test_score_uses_incremental_service_without_period_or_source_version(monkeyp
     monkeypatch.setattr(workflow, "provision_prediction_table", Mock())
     result = workflow.run_action(object(), _config(), "score")
     assert result.input_count == 2
-    assert score.call_args.kwargs["row_keys"] == ("entity_id",)
+    assert score.call_args.kwargs["record_key_columns"] == ("entity_id",)
     assert "period_start" not in score.call_args.kwargs
     assert "source_version" not in score.call_args.kwargs
     assert prepare.call_args.args[0].engine == "polars"

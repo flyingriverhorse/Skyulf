@@ -32,8 +32,8 @@ spec = LocalTrainingSpec(
     start=datetime(2026, 1, 1, tzinfo=UTC),
     holdout_start=datetime(2026, 2, 1, tzinfo=UTC),
     cutoff=datetime(2026, 3, 1, tzinfo=UTC),
-    event_column="event_time", label_time_column="label_available_at",
-    row_keys=("event_id",), input_columns=("feature_a", "feature_b"),
+    event_column="event_time", result_available_at_column="label_available_at",
+    record_key_columns=("event_id",), input_columns=("feature_a", "feature_b"),
     target_column="target", max_rows=10_000, max_bytes=32_000_000,
 )
 result = train_local_candidate(
@@ -274,7 +274,7 @@ config = LocalWorkflowConfig(
 )
 prepared = prepare_local_workflow(config)  # resolves a concrete model version
 period = LocalSourceSpec(
-    table=table, version=12, row_keys=("entity_id",),
+    table=table, version=12, record_key_columns=("entity_id",),
     input_columns=("amount", "city"),  # exact saved raw input order
     period_start=datetime(2026, 1, 1, tzinfo=UTC),
     period_end=datetime(2026, 2, 1, tzinfo=UTC),
@@ -340,7 +340,7 @@ source = LocalSourceSpec(
     version=source_version,
     period_start=datetime(2026, 1, 1, tzinfo=UTC),
     period_end=datetime(2026, 2, 1, tzinfo=UTC),
-    row_keys=("entity_id",),
+    record_key_columns=("entity_id",),
     input_columns=("amount", "city"),
     max_rows=10_000,
     max_bytes=32_000_000,
@@ -363,7 +363,7 @@ spec = BatchSpec(
     period_start=source.period_start,
     period_end=source.period_end,
     as_of=datetime.now(UTC) + timedelta(minutes=2),
-    row_keys=source.row_keys,
+    record_key_columns=source.record_key_columns,
     output_table=target_table,
     model_name=config.model.name,
     model_version=prepared.preflight.model_version,
@@ -435,7 +435,7 @@ config = LocalWorkflowConfig(
 )
 prepared = prepare_local_workflow(config)
 result = run_incremental_local_batch(
-    spark, prepared, row_keys=("event_id",),
+    spark, prepared, record_key_columns=("event_id",),
     admission=DeltaTableAdmission(spark, "catalog.schema.prediction_admission"),
 )
 print(result.input_count, result.commit_version, result.noop)

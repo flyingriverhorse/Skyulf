@@ -108,7 +108,7 @@ def _load_evidence(
         raise ValueError("Saved approval engine must be pandas or polars.")
     for field in ("start", "holdout_start", "cutoff"):
         saved_spec[field] = datetime.fromisoformat(saved_spec[field])
-    for field in ("row_keys", "input_columns"):
+    for field in ("record_key_columns", "input_columns"):
         saved_spec[field] = tuple(saved_spec[field])
     spec = LocalTrainingSpec(**saved_spec)
     if spec.dataset_id != report.dataset_id:
@@ -250,7 +250,7 @@ def approve_local_candidate(
             spec.table != config["training_table"],
             spec.target_column != config["target_column"],
             spec.input_columns != tuple(config["input_columns"]),
-            spec.row_keys != tuple(config["row_keys"]),
+            spec.record_key_columns != tuple(config["record_key_columns"]),
         )
     ):
         raise ValueError("Approval data contract differs from saved training evidence.")

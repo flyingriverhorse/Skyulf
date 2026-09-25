@@ -31,11 +31,11 @@ _FIELDS = {
     "score_handoff",
     "champion_version",
     "risk_category",
-    "row_keys",
+    "record_key_columns",
     "input_columns",
     "target_column",
     "event_column",
-    "label_time_column",
+    "result_available_at_column",
     "training_version",
     "start",
     "holdout_start",
@@ -70,12 +70,14 @@ def _finite(value: Any, name: str) -> float:
 def _columns(config: dict[str, Any]) -> None:
     """Require explicit, distinct source identities and feature/label roles."""
     names = []
-    for key in ("row_keys", "input_columns"):
+    for key in ("record_key_columns", "input_columns"):
         value = config.get(key)
         if not isinstance(value, list) or not value:
             raise ValueError(f"{key} must be a nonempty list of source column names.")
         names.extend(value)
-    names.extend(config.get(key) for key in ("target_column", "event_column", "label_time_column"))
+    names.extend(
+        config.get(key) for key in ("target_column", "event_column", "result_available_at_column")
+    )
     checked: list[str] = []
     for name in names:
         if not isinstance(name, str) or not _IDENTIFIER.fullmatch(name):
@@ -83,8 +85,8 @@ def _columns(config: dict[str, Any]) -> None:
         checked.append(name)
     if len({name.casefold() for name in checked}) != len(checked):
         raise ValueError("Key, input, target, event and label columns must be distinct.")
-    if any(name.lower() in PREDICTION_METADATA_COLUMNS for name in config["row_keys"]):
-        raise ValueError("row_keys contain reserved prediction metadata names.")
+    if any(name.lower() in PREDICTION_METADATA_COLUMNS for name in config["record_key_columns"]):
+        raise ValueError("record_key_columns contain reserved prediction metadata names.")
     if any(
         name.lower() in {"_change_type", "_commit_version", "_commit_timestamp"} for name in checked
     ):
@@ -120,8 +122,8 @@ def _training_contract(config: dict[str, Any], action: str) -> None:
         version=version,
         **dates,
         event_column=config["event_column"],
-        label_time_column=config["label_time_column"],
-        row_keys=tuple(config["row_keys"]),
+        result_available_at_column=config["result_available_at_column"],
+        record_key_columns=tuple(config["record_key_columns"]),
         input_columns=tuple(config["input_columns"]),
         target_column=config["target_column"],
         max_rows=config["max_rows"],

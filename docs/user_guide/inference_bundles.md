@@ -165,7 +165,7 @@ incoming = spark.createDataFrame(
 predictions = predict_spark(
     incoming,
     bundle,
-    frame_spec=FrameSpec(row_keys=("id",)),
+    frame_spec=FrameSpec(record_key_columns=("id",)),
     options=ExecutionOptions("spark", python_batch_rows=2),
     mode="native_features",
 )

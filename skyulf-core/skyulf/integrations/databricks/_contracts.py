@@ -40,7 +40,7 @@ class BatchSpec:
     period_start: datetime
     period_end: datetime
     as_of: datetime
-    row_keys: tuple[str, ...]
+    record_key_columns: tuple[str, ...]
     output_table: str
     model_name: str
     model_version: str
@@ -70,17 +70,19 @@ class BatchSpec:
             raise ValueError("period_start must precede period_end.")
         table_name(self.output_table)
         column_name(self.period_column)
-        if type(self.row_keys) is not tuple or not self.row_keys:
-            raise ValueError("row_keys must be a nonempty tuple.")
-        for key in self.row_keys:
+        if type(self.record_key_columns) is not tuple or not self.record_key_columns:
+            raise ValueError("record_key_columns must be a nonempty tuple.")
+        for key in self.record_key_columns:
             column_name(key)
-        names = [key.lower() for key in self.row_keys]
+        names = [key.lower() for key in self.record_key_columns]
         if len(set(names)) != len(names) or self.period_column.lower() in names:
-            raise ValueError("row_keys and period_column must be distinct.")
+            raise ValueError("record_key_columns and period_column must be distinct.")
         if any(
             name in PREDICTION_METADATA_COLUMNS for name in (*names, self.period_column.lower())
         ):
-            raise ValueError("row_keys and period_column collide with prediction metadata.")
+            raise ValueError(
+                "record_key_columns and period_column collide with prediction metadata."
+            )
         for name in ("model_name", "code_version", "run_id"):
             value = getattr(self, name)
             if type(value) is not str or not value.strip() or len(value) > 512:

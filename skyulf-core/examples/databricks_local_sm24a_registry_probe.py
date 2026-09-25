@@ -95,7 +95,7 @@ def probe(spark: Any) -> dict[str, Any]:
                 version=source_version,
                 period_start=datetime(2026, 1, 1, tzinfo=UTC),
                 period_end=datetime(2026, 2, 1, tzinfo=UTC),
-                row_keys=("entity_id",),
+                record_key_columns=("entity_id",),
                 input_columns=tuple(model["columns"]),
                 max_rows=80,
                 max_bytes=4_000_000,

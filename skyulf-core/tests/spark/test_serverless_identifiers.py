@@ -55,7 +55,7 @@ def test_inference_with_hidden_identifier_config(
     rows = predict_spark(
         frame,
         bundle,
-        frame_spec=FrameSpec(row_keys=("id",)),
+        frame_spec=FrameSpec(record_key_columns=("id",)),
         options=ExecutionOptions("spark"),
         mode=mode,
     ).collect()
@@ -65,7 +65,7 @@ def test_inference_with_hidden_identifier_config(
         predict_spark(
             ambiguous,
             bundle,
-            frame_spec=FrameSpec(row_keys=("id",)),
+            frame_spec=FrameSpec(record_key_columns=("id",)),
             options=ExecutionOptions("spark"),
             mode=mode,
         )

@@ -87,12 +87,14 @@ def run_batch(
     predictions = predict_spark(
         selected,
         bundle,
-        frame_spec=FrameSpec(row_keys=spec.row_keys),
+        frame_spec=FrameSpec(record_key_columns=spec.record_key_columns),
         options=options,
         mode=spec.mode,
     )
     output = predictions.join(
-        selected.select(*spec.row_keys, spec.period_column), on=list(spec.row_keys), how="inner"
+        selected.select(*spec.record_key_columns, spec.period_column),
+        on=list(spec.record_key_columns),
+        how="inner",
     )
     for name, value in (
         ("run_id", spec.run_id),

@@ -39,7 +39,11 @@ scope and do not imply the improvements below already exist.
 Read [the improvement program](37-local-bundle-improvement-program.md) and
 [the independent selection/approval design](38-model-selection-and-approval-design.md).
 Each task includes implementation locations and concrete acceptance checks.
-**SM-32 is DONE for the documented local/personal-serverless scope; SM-33 is DONE; SM-34 is READY.**
+The user added a mandatory pre-SM-34 sequence for optional dates, clear names,
+explicit timezone parsing and Core split/CV reuse. Read the
+[training data contract plan](54-training-data-contract-plan.md).
+SM-33 was committed as `0c0fd17f`; subsequent tasks are separate work.
+**SM-32 is DONE for the documented local/personal-serverless scope; SM-33 is DONE; SM-33A is DONE; SM-33B is READY. SM-34 waits for SM-33A through SM-33E.**
 User-requested operator usability follow-up: readable notebook reports and
 automatic full-proof lookup are implemented and verified locally and in the
 same personal Bundle; see [the follow-up evidence](52-sm32-operator-output-and-evidence.md).
@@ -77,7 +81,12 @@ on an existing candidate without retraining or reuploading the model.
 | SM-31 | Thin template and reusable workflow/publication services | SM-30 | DONE | 44-line notebook, two Core services, 110 tests, wheel installation/import, strict generation validation and live score run 383572337148835 passed |
 | SM-32 | Independent score selection and promotion policy | SM-31 | DONE | 194 local tests and personal serverless manual/automatic, approve/reject/rollback/retry, history and score handoff/pin preservation passed; [live evidence](51-sm32-live-validation-report.md) |
 | SM-33 | Validated config, migration and runtime parameters | SM-32 | DONE | 219 local checks passed; existing personal Bundle selected v1 then champion v5 without redeploy and rejected invalid v0; [evidence](53-sm33-config-and-runtime-validation.md) |
-| SM-34 | Independent score/train schedules and training windows | SM-33 | READY | Editable paused score/train cron/timezone, explicit lookback/holdout/label windows; scoring needs no manual dates or retraining |
+| SM-33A | Direct readable record/result field names | SM-33 | DONE | No aliases/adapter; regenerate experimental projects/models. Verified pandas/Polars, Spark, Delta and CLI; [evidence](55-sm33a-field-naming-validation.md) |
+| SM-33B | Explicit date parsing, source timezone and UTC-safe reads | SM-33A | READY | Normalize before filtering; native/string/date policies, DST/ambiguous/null rejection and non-UTC Spark transport tests |
+| SM-33C | Date-free training and optional per-row result availability | SM-33B | WAIT | Explicit random/temporal split; Core splitter reuse; optional dates, delayed labels, pinned snapshot/holdout and approval replay |
+| SM-33D | Core CV connection and independent data-window selection | SM-33C | WAIT | Protected final holdout; existing random/stratified/time-series CV; explicit lookback source/zone and monthly date-free training |
+| SM-33E | Training setup examples, operator guide and live acceptance | SM-33A through SM-33D | WAIT | Both engines/tasks; date-free/temporal generated projects and actual Databricks train/MLflow/approval/score acceptance |
+| SM-34 | Independent score/train schedules and training windows | SM-33E | WAIT | Editable paused score/train cron/timezone, explicit lookback/holdout/label windows; scoring needs no manual dates or retraining |
 | SM-35 | Multi-metric quality gates and clear thresholds | SM-33 | WAIT | One selection metric plus optional guardrails; task/domain validation, first-model gate, failed-gate explanations and no probability-threshold confusion |
 | SM-36 | Core tuning, model search and optional explainability | SM-35 | WAIT | Existing Core search/trials and FE reused with budgets, protected holdout, MLflow evidence and selected-model inference parity |
 | SM-37 | Production identities and enforced writer ownership | SM-32, SM-33 | WAIT | Per-target run_as/permissions/hosts/roots; one lifecycle writer; scoring cannot move aliases; actual denial and lifecycle queue evidence |

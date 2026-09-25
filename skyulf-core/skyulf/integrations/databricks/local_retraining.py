@@ -37,8 +37,8 @@ class LocalTrainingSpec:
     holdout_start: datetime
     cutoff: datetime
     event_column: str
-    label_time_column: str
-    row_keys: tuple[str, ...]
+    result_available_at_column: str
+    record_key_columns: tuple[str, ...]
     input_columns: tuple[str, ...]
     target_column: str
     max_rows: int
@@ -59,14 +59,14 @@ class LocalTrainingSpec:
                 raise ValueError(f"{name} is not a valid local instant.")
         if not self.start < self.holdout_start < self.cutoff:
             raise ValueError("Require start < holdout_start < cutoff.")
-        if not self.row_keys or not self.input_columns:
-            raise ValueError("row_keys and input_columns must be nonempty.")
+        if not self.record_key_columns or not self.input_columns:
+            raise ValueError("record_key_columns and input_columns must be nonempty.")
         names = (
-            *self.row_keys,
+            *self.record_key_columns,
             *self.input_columns,
             self.target_column,
             self.event_column,
-            self.label_time_column,
+            self.result_available_at_column,
         )
         for name in names:
             column_name(name)
@@ -85,8 +85,8 @@ class LocalTrainingSpec:
             f"{self.cutoff.astimezone(UTC).isoformat()})/holdout>="
             f"{self.holdout_start.astimezone(UTC).isoformat()}"
             f"/label<={self.cutoff.astimezone(UTC).isoformat()}"
-            f"/event_column={self.event_column}/label_column={self.label_time_column}"
-            f"/target={self.target_column}/keys={','.join(self.row_keys)}"
+            f"/event_column={self.event_column}/label_column={self.result_available_at_column}"
+            f"/target={self.target_column}/keys={','.join(self.record_key_columns)}"
         )
 
 
@@ -111,9 +111,9 @@ def read_training_snapshot(spark: Any, spec: LocalTrainingSpec) -> pd.DataFrame:
     if not isinstance(spec, LocalTrainingSpec):
         raise TypeError("spec must be LocalTrainingSpec.")
     names = (
-        *spec.row_keys,
+        *spec.record_key_columns,
         spec.event_column,
-        spec.label_time_column,
+        spec.result_available_at_column,
         *spec.input_columns,
         spec.target_column,
     )
@@ -126,7 +126,7 @@ def read_training_snapshot(spark: Any, spec: LocalTrainingSpec) -> pd.DataFrame:
             f"{column_name(spec.event_column)} < TIMESTAMP '{cutoff}'"
         )
         .select(*names)
-        .orderBy(spec.event_column, *spec.row_keys)
+        .orderBy(spec.event_column, *spec.record_key_columns)
         .limit(spec.max_rows + 1)
     )
     records: list[dict[str, Any]] = []
@@ -152,20 +152,20 @@ def split_labeled_snapshot(
     if not isinstance(frame, pd.DataFrame) or not isinstance(spec, LocalTrainingSpec):
         raise TypeError("Expected a pandas frame and LocalTrainingSpec.")
     expected = (
-        *spec.row_keys,
+        *spec.record_key_columns,
         spec.event_column,
-        spec.label_time_column,
+        spec.result_available_at_column,
         *spec.input_columns,
         spec.target_column,
     )
     if not set(expected).issubset(frame.columns):
         raise ValueError("Training snapshot is missing required columns.")
-    if frame.loc[:, list(spec.row_keys)].isna().any().any():
+    if frame.loc[:, list(spec.record_key_columns)].isna().any().any():
         raise ValueError("Training row keys must not be null.")
-    if frame.duplicated(subset=list(spec.row_keys)).any():
+    if frame.duplicated(subset=list(spec.record_key_columns)).any():
         raise ValueError("Training row keys must be unique.")
     events = pd.to_datetime(frame[spec.event_column], utc=True, errors="raise")
-    labels = pd.to_datetime(frame[spec.label_time_column], utc=True, errors="raise")
+    labels = pd.to_datetime(frame[spec.result_available_at_column], utc=True, errors="raise")
     if events.isna().any() or (events < spec.start).any() or (events >= spec.cutoff).any():
         raise ValueError("Training event time falls outside the pinned window.")
     if ((labels < events) & labels.notna()).any():
@@ -175,7 +175,7 @@ def split_labeled_snapshot(
         raise ValueError("Available labels must have nonnull targets.")
     selected = frame.loc[available].copy()
     selected[spec.event_column] = events.loc[available]
-    selected = selected.sort_values([spec.event_column, *spec.row_keys], kind="stable")
+    selected = selected.sort_values([spec.event_column, *spec.record_key_columns], kind="stable")
     holdout = selected[spec.event_column] >= spec.holdout_start
     columns = [*spec.input_columns, spec.target_column]
     train_frame = selected.loc[~holdout, columns].reset_index(drop=True)

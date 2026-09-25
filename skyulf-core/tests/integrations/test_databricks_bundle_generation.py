@@ -61,9 +61,9 @@ def _generate_project(tmp_path, **overrides):
         ("max_bytes", "-1"),
         ("max_rows", "1.5"),
         ("max_bytes", "1e3"),
-        ("row_keys_json", '[\f"id"]'),
+        ("record_key_columns_json", '[\f"id"]'),
         ("input_columns_json", '["x",\f"y"]'),
-        ("row_keys_json", '["id"], "task": "classification"'),
+        ("record_key_columns_json", '["id"], "task": "classification"'),
     ],
 )
 def test_cli_rejects_invalid_limits_and_non_json_column_arrays(tmp_path, field, value):
@@ -110,7 +110,7 @@ def test_cli_initializes_task_without_stale_training_inputs(tmp_path, task, mode
     assert config["metric"] == metric
     assert config["training_version"] is None
     assert all(config[key] is None for key in ("start", "holdout_start", "cutoff"))
-    assert config["row_keys"] == ["entity_id"]
+    assert config["record_key_columns"] == ["entity_id"]
     assert config["input_columns"] == ["feature_value"]
     assert config["training_table"] == "{catalog}.{input_schema}.sm33_generated_source"
     assert config["score_source_table"] == config["training_table"]
@@ -123,12 +123,11 @@ def test_cli_preserves_existing_sources_composite_keys_and_explicit_split(tmp_pa
         task="classification",
         source_table_name="labeled_customers",
         score_source_table_name="new_customers",
-        row_key="ignored_single_key",
-        row_keys_json='[\n "customer_id",\t"observation_id"\r\n]',
+        record_key_columns_json='[\n "customer_id",\t"observation_id"\r\n]',
         input_columns_json='[\t"income", "age"\n]',
         target_column="churn",
         event_column="observed_at",
-        label_time_column="labeled_at",
+        result_available_at_column="labeled_at",
         training_version="17",
         start="2026-06-01T00:00:00+00:00",
         holdout_start="2026-07-01T00:00:00+00:00",
@@ -141,11 +140,11 @@ def test_cli_preserves_existing_sources_composite_keys_and_explicit_split(tmp_pa
     config = _read_validated_config(project)
     assert config["training_table"] == "{catalog}.{input_schema}.labeled_customers"
     assert config["score_source_table"] == "{catalog}.{input_schema}.new_customers"
-    assert config["row_keys"] == ["customer_id", "observation_id"]
+    assert config["record_key_columns"] == ["customer_id", "observation_id"]
     assert config["input_columns"] == ["income", "age"]
     assert config["target_column"] == "churn"
     assert config["event_column"] == "observed_at"
-    assert config["label_time_column"] == "labeled_at"
+    assert config["result_available_at_column"] == "labeled_at"
     assert config["training_version"] == 17
     assert config["start"] == "2026-06-01T00:00:00+00:00"
     assert config["holdout_start"] == "2026-07-01T00:00:00+00:00"
@@ -156,9 +155,11 @@ def test_cli_preserves_existing_sources_composite_keys_and_explicit_split(tmp_pa
 
 def test_cli_reuses_named_training_source_and_existing_single_key(tmp_path):
     """An omitted scoring table and composite key must preserve the simpler setup."""
-    project = _generate_project(tmp_path, source_table_name="customers", row_key="customer_id")
+    project = _generate_project(
+        tmp_path, source_table_name="customers", record_key_columns_json='["customer_id"]'
+    )
     config = _read_validated_config(project)
-    assert config["row_keys"] == ["customer_id"]
+    assert config["record_key_columns"] == ["customer_id"]
     assert config["training_table"] == "{catalog}.{input_schema}.customers"
     assert config["score_source_table"] == config["training_table"]
 

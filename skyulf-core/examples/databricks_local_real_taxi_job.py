@@ -142,7 +142,7 @@ def _training_frame(spark: Any) -> Any:
             period_start=datetime(2016, 1, 1, tzinfo=UTC),
             period_end=datetime(2016, 3, 1, tzinfo=UTC),
             period_column="tpep_pickup_datetime",
-            row_keys=("entity_id",),
+            record_key_columns=("entity_id",),
             input_columns=(*FEATURES, "fare_amount"),
             max_rows=3_500,
             max_bytes=12_000_000,
@@ -294,7 +294,7 @@ def _score(spark: Any, stage: str, expected_input: int, expected_total: int) -> 
     with mlflow.start_run(run_name=f"skyulf-nyctaxi-{stage}") as run:
         mlflow.set_tags({"skyulf_phase": stage, "dataset": SAMPLE})
         result = run_incremental_local_batch(
-            spark, prepared, row_keys=("entity_id",), admission=admission
+            spark, prepared, record_key_columns=("entity_id",), admission=admission
         )
         if result.noop or result.input_count != expected_input:
             raise AssertionError("The incremental scorer selected the wrong number of trips.")
@@ -353,7 +353,10 @@ def score_append(spark: Any) -> dict[str, Any]:
     if [row for row in after if row.entity_id in original_keys] != before:
         raise AssertionError("The first 200 persisted predictions changed after append.")
     replay = run_incremental_local_batch(
-        spark, _prepared(), row_keys=("entity_id",), admission=DeltaTableAdmission(spark, CONTROL)
+        spark,
+        _prepared(),
+        record_key_columns=("entity_id",),
+        admission=DeltaTableAdmission(spark, CONTROL),
     )
     if (
         not replay.noop

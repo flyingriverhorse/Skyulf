@@ -78,7 +78,7 @@ def _source_spec(
         version=source_version,
         period_start=start,
         period_end=end,
-        row_keys=("entity_id",),
+        record_key_columns=("entity_id",),
         input_columns=columns,
         max_rows=rows,
         max_bytes=4_000_000,

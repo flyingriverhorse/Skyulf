@@ -5,6 +5,26 @@ from copy import deepcopy
 import pytest
 
 
+def test_column_names_remain_canonical_through_validation(workflow_config):
+    """Validated settings must use the same column names as the saved workflow."""
+    from skyulf.integrations.databricks.workflow_config import validate_workflow_config
+
+    before = deepcopy(workflow_config)
+    validated = validate_workflow_config(workflow_config, action="train")
+    assert validated == before
+    validated["record_key_columns"].append("another_key")
+    assert workflow_config == before
+
+
+@pytest.mark.parametrize("old_name", ["row_keys", "label_time_column"])
+def test_retired_column_names_are_unknown_settings(workflow_config, old_name):
+    """Removed field names must not silently override the current training contract."""
+    from skyulf.integrations.databricks.workflow_config import validate_workflow_config
+
+    with pytest.raises(ValueError, match="Unknown workflow settings"):
+        validate_workflow_config({**workflow_config, old_name: "unused"}, action="train")
+
+
 @pytest.mark.parametrize(
     "changes, message",
     [
@@ -18,9 +38,9 @@ import pytest
         ({"min_improvement": -1}, "min_improvement"),
         ({"quality_threshold": -1}, "threshold"),
         ({"prediction_table": "workspace.test.source"}, "source"),
-        ({"row_keys": ["id", "ID"]}, "distinct"),
+        ({"record_key_columns": ["id", "ID"]}, "distinct"),
         ({"input_columns": ["target"]}, "distinct"),
-        ({"row_keys": "id"}, "row_keys"),
+        ({"record_key_columns": "id"}, "record_key_columns"),
         ({"unknown_option": True}, "unknown_option"),
         ({"engine": "spark"}, "engine"),
         ({"model_version": "latest"}, "model_version"),
@@ -149,7 +169,7 @@ def test_migration_does_not_downgrade_or_reinterpret_project(workflow_config, ch
 @pytest.mark.parametrize(
     "change",
     [
-        {"row_keys": ["run_id"]},
+        {"record_key_columns": ["run_id"]},
         {"input_columns": ["_commit_version"]},
     ],
 )

@@ -56,7 +56,7 @@ def _validate_request(
         raise ValueError("Publication code version differs from the installed runtime.")
     if (
         spec.source_version != source.version
-        or spec.row_keys != source.row_keys
+        or spec.record_key_columns != source.record_key_columns
         or spec.period_column != source.period_column
         or spec.period_start_utc != source.period_start.astimezone(spec.period_start_utc.tzinfo)
         or spec.period_end_utc != source.period_end.astimezone(spec.period_end_utc.tzinfo)
@@ -72,19 +72,19 @@ def _check_target(
     spark: Any,
     source_frame: Any,
     target: Any,
-    row_keys: tuple[str, ...],
+    record_key_columns: tuple[str, ...],
     period_column: str | None,
     prepared: PreparedLocalWorkflow,
 ) -> tuple[str, ...]:
     """Require a precreated target with exact key, output and metadata types."""
     outputs = prepared.preflight.output_schema
     names = tuple(column.name for column in outputs)
-    expected = {*row_keys, *names, *_METADATA}
+    expected = {*record_key_columns, *names, *_METADATA}
     if period_column is not None:
         expected.add(period_column)
     if (
         len(expected)
-        != len(row_keys) + len(names) + len(_METADATA) + int(period_column is not None)
+        != len(record_key_columns) + len(names) + len(_METADATA) + int(period_column is not None)
         or set(target.columns) != expected
     ):
         raise ValueError("Prediction target columns differ from the explicit local output schema.")
@@ -93,7 +93,7 @@ def _check_target(
             raise ValueError("Prediction target period must be a Spark timestamp.")
         if source_frame.schema[period_column].dataType.typeName() != "timestamp":
             raise ValueError("Source period must be a Spark timestamp.")
-    for name in row_keys:
+    for name in record_key_columns:
         target_type = target.schema[name].dataType
         if target_type != source_frame.schema[name].dataType or target_type.typeName() not in (
             "long",
@@ -155,14 +155,14 @@ def run_local_batch(
     )
     target = spark.table(spec.output_table)
     output_names = _check_target(
-        spark, source_frame, target, source.row_keys, source.period_column, prepared
+        spark, source_frame, target, source.record_key_columns, source.period_column, prepared
     )
-    bridge_names = (*source.row_keys, *output_names)
+    bridge_names = (*source.record_key_columns, *output_names)
     if list(scored.predictions.columns) != list(bridge_names):
         raise ValueError("Local prediction columns differ from the saved model output.")
-    if scored.predictions.loc[:, list(source.row_keys)].isna().any().any():
+    if scored.predictions.loc[:, list(source.record_key_columns)].isna().any().any():
         raise ValueError("Local prediction row keys must not be null.")
-    if scored.predictions.duplicated(subset=list(source.row_keys)).any():
+    if scored.predictions.duplicated(subset=list(source.record_key_columns)).any():
         raise ValueError("Local prediction row keys must be unique.")
     bridge_schema = target.select(*bridge_names).schema
     records = [
@@ -174,8 +174,8 @@ def run_local_batch(
     source_period = source_frame.where(
         (period >= functions.lit(spec.period_start_utc))
         & (period < functions.lit(spec.period_end_utc))
-    ).select(*source.row_keys, source.period_column)
-    output = bridge.join(source_period, on=list(source.row_keys), how="inner")
+    ).select(*source.record_key_columns, source.period_column)
+    output = bridge.join(source_period, on=list(source.record_key_columns), how="inner")
     for name, value in (
         ("run_id", spec.run_id),
         ("model_name", spec.model_name),

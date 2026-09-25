@@ -144,7 +144,7 @@ options = ExecutionOptions.from_config({
     "python_batch_rows": 4096,
     "state_max_bytes": 8 * 1024 * 1024,
 })
-identity = FrameSpec(row_keys=("customer_id", "event_id"), target="label")
+identity = FrameSpec(record_key_columns=("customer_id", "event_id"), target="label")
 ```
 
 Engine values are `pandas`, `polars` and `spark`; `databricks` names a platform,
@@ -174,7 +174,7 @@ data = spark.createDataFrame(
 ).repartition(2)
 engineer = FeatureEngineer(
     [],
-    frame_spec=FrameSpec(row_keys=("customer_id",), target="label"),
+    frame_spec=FrameSpec(record_key_columns=("customer_id",), target="label"),
     execution_options=ExecutionOptions(engine="spark"),
 )
 training, metrics = engineer.fit_transform(data)
@@ -245,7 +245,7 @@ train = spark.createDataFrame(
 engineer = FeatureEngineer(
     [{"name": "fill", "transformer": "SimpleImputer",
       "params": {"columns": ["amount"], "strategy": "mean"}}],
-    frame_spec=FrameSpec(row_keys=("customer_id",), target="label"),
+    frame_spec=FrameSpec(record_key_columns=("customer_id",), target="label"),
     execution_options=ExecutionOptions(engine="spark", state_max_bytes=8192),
 )
 training, metrics = engineer.fit_transform(train)
@@ -330,7 +330,7 @@ train = spark.createDataFrame(
 scaler = FeatureEngineer(
     [{"name": "scale", "transformer": "StandardScaler",
       "params": {"columns": ["amount"], "with_mean": True, "with_std": True}}],
-    frame_spec=FrameSpec(row_keys=("id",), target="label"),
+    frame_spec=FrameSpec(record_key_columns=("id",), target="label"),
     execution_options=ExecutionOptions(engine="spark", state_max_bytes=8192),
 )
 scaled_train, _ = scaler.fit_transform(train)
@@ -473,7 +473,7 @@ payload = engineer.export_state()
 # Application code may persist these bytes with Path(...).write_bytes(payload).
 restored = FeatureEngineer.from_state(
     payload,
-    frame_spec=FrameSpec(row_keys=("customer_id",)),
+    frame_spec=FrameSpec(record_key_columns=("customer_id",)),
     execution_options=ExecutionOptions(engine="spark"),
 )
 batch = spark.createDataFrame(

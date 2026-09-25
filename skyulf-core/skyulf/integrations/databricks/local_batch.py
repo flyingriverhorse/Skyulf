@@ -36,7 +36,7 @@ class LocalSourceSpec:
     version: int
     period_start: datetime
     period_end: datetime
-    row_keys: tuple[str, ...]
+    record_key_columns: tuple[str, ...]
     input_columns: tuple[str, ...]
     max_rows: int
     max_bytes: int
@@ -58,11 +58,11 @@ class LocalSourceSpec:
                 raise ValueError(f"{name} is not a valid local instant.")
         if self.period_start >= self.period_end:
             raise ValueError("period_start must precede period_end.")
-        for name in (*self.row_keys, *self.input_columns, self.period_column):
+        for name in (*self.record_key_columns, *self.input_columns, self.period_column):
             column_name(name)
-        if not self.row_keys or not self.input_columns:
-            raise ValueError("row_keys and input_columns must be nonempty.")
-        names = [*self.row_keys, *self.input_columns, self.period_column]
+        if not self.record_key_columns or not self.input_columns:
+            raise ValueError("record_key_columns and input_columns must be nonempty.")
+        names = [*self.record_key_columns, *self.input_columns, self.period_column]
         if len({name.lower() for name in names}) != len(names):
             raise ValueError("Row keys, input columns and period column must be distinct.")
         if type(self.max_rows) is not int or self.max_rows <= 0:
@@ -135,8 +135,8 @@ def read_local_source(spark: Any, spec: LocalSourceSpec) -> pd.DataFrame:
         f"{column_name(spec.period_column)} >= TIMESTAMP '{start}' AND "
         f"{column_name(spec.period_column)} < TIMESTAMP '{end}'"
     )
-    names = (*spec.row_keys, *spec.input_columns)
-    selected = selected.select(*names).orderBy(*spec.row_keys).limit(spec.max_rows + 1)
+    names = (*spec.record_key_columns, *spec.input_columns)
+    selected = selected.select(*names).orderBy(*spec.record_key_columns).limit(spec.max_rows + 1)
     records: list[dict[str, Any]] = []
     serialized_bytes = 0
     for row in selected.toLocalIterator():
@@ -151,9 +151,9 @@ def read_local_source(spark: Any, spec: LocalSourceSpec) -> pd.DataFrame:
     frame = pd.DataFrame.from_records(records, columns=names)
     if _frame_bytes(frame) > spec.max_bytes:
         raise ValueError("Source local frame exceeds max_bytes.")
-    if frame.loc[:, list(spec.row_keys)].isna().any().any():
+    if frame.loc[:, list(spec.record_key_columns)].isna().any().any():
         raise ValueError("Source row keys must not be null.")
-    if frame.duplicated(subset=list(spec.row_keys)).any():
+    if frame.duplicated(subset=list(spec.record_key_columns)).any():
         raise ValueError("Source row keys must be unique within the requested period.")
     return frame
 
@@ -186,7 +186,7 @@ def score_local_source(
         raise ValueError("Prediction changed source row membership.")
     result = pd.concat(
         [
-            frame.loc[:, list(spec.row_keys)].reset_index(drop=True),
+            frame.loc[:, list(spec.record_key_columns)].reset_index(drop=True),
             predictions.reset_index(drop=True),
         ],
         axis=1,

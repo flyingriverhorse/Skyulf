@@ -28,7 +28,45 @@ classification starts with `logistic_regression` and `heldout_accuracy`.
 The pipeline remains editable: add registered Core preprocessing nodes and
 choose a task-compatible model. With a JSON init file, `max_rows` and
 `max_bytes` are positive integer **strings**; the generated workflow stores
-them as numbers. `row_keys_json` overrides the single `row_key` choice.
+them as numbers. `record_key_columns_json` accepts one or more source key
+columns, for example `["customer_id", "observation_id"]`.
+
+### Record identity and result availability
+
+New workflow JSON uses the following names:
+
+```json
+{
+  "record_key_columns": ["customer_id", "observation_id"],
+  "event_column": "observation_date",
+  "target_column": "claim_amount",
+  "result_available_at_column": "result_confirmed_at"
+}
+```
+
+The key columns identify a source record and are copied to prediction output.
+They do not create an ID, become features, or implicitly define CV groups.
+`event_column` names the source observation timestamp; `start`, `holdout_start`
+and `cutoff` are boundaries applied to that column. `result_available_at_column`
+names each row's actual result-availability timestamp. Different rows can have
+different availability dates; the existing temporal workflow excludes results
+that are unknown or become available after its cutoff. Skyulf does not invent
+those timestamps or fill them with the job's execution time.
+
+Use `record_key_columns_json` and `result_available_at_column` in initialization
+files. The default example column names are `entity_id` and `label_at`;
+initialization does not create those columns or generate timestamps.
+
+The same names are used throughout the library and saved training settings.
+This is an intentional pre-production breaking rename: regenerate projects and
+retrain test models created with the previous column settings. There is no
+field-alias adapter or automatic conversion of earlier training evidence.
+
+This naming update does **not** make temporal fields optional. Date-free
+training, explicit source date formats/timezones and configurable split/CV
+are tracked as the required pre-SM-34 follow-up. The current training adapter
+still requires temporal inputs; do not supply invented dates to bypass that
+requirement. It does not guarantee arbitrary text-date or naive-time parsing.
 
 Manual `training_version`, `start`, `holdout_start` and `cutoff` default to
 `null`. Set an actual Delta snapshot and timezone-aware split before running
@@ -410,13 +448,13 @@ version and artifact digest. Scoring rejects an existing table at that name
 when its model provenance differs. A new model with the same numeric version
 needs a different logical prediction name or a new model version.
 
-The initialization question `row_key` defaults to `entity_id`, but you can
-choose an existing `customer_id` column. It becomes `row_keys` in the generated
+The initialization question `record_key_columns_json` accepts `["customer_id"]`
+or multiple existing key columns. It becomes `record_key_columns` in the generated
 configuration, and the same column appears in the prediction table. It must
 be non-null, `STRING` or `BIGINT`, and unique across the initial data and all
 later inserts. For multiple predictions per customer, edit the generated
 configuration to a composite key such as
-`"row_keys": ["customer_id", "observation_id"]` before deployment. The Bundle
+`"record_key_columns": ["customer_id", "observation_id"]` before deployment. The Bundle
 does not create an ID in the source. Keep keys out of `input_columns`. With
 `customer_id` in the output, a query
 can find a customer's predictions:

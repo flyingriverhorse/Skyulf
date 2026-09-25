@@ -137,7 +137,7 @@ def run_smoke(
             output = predict_spark(
                 frame,
                 downloaded,
-                frame_spec=FrameSpec(row_keys=("id",)),
+                frame_spec=FrameSpec(record_key_columns=("id",)),
                 options=ExecutionOptions("spark", python_batch_rows=2),
                 mode=mode,
             )

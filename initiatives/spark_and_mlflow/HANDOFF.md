@@ -1,3 +1,32 @@
+# Current handoff: SM-33A direct field rename
+
+SM-33 was committed as `0c0fd17f` on branch `090`, with sign-off and hooks.
+No push. SM-33A through SM-33E now precede SM-34; see
+[the training contract plan](54-training-data-contract-plan.md).
+
+The user explicitly rejected compatibility for the two renamed fields because
+this is pre-production. Removed the uncommitted `_workflow_fields.py` adapter
+and its compatibility-only tests. `record_key_columns` and
+`result_available_at_column` now run directly through Core frame contracts,
+Databricks training/scoring, saved evidence, template configuration and examples.
+Old initializer fields are removed. Recreate earlier experimental projects and
+models when carrying out live acceptance; do not reintroduce aliases.
+
+SM-33A is DONE locally; the rename and new plan are uncommitted. Verification:
+503 integration/contract tests, 106 Spark checks and 53 Delta cases passed
+(52 in the suite plus one corrected fixture case on focused rerun). Full ty,
+scoped Ruff, strict docs and real CLI generation passed. See
+[SM-33A evidence](55-sm33a-field-naming-validation.md).
+Current dated training requirements still apply; SM-33B parsing/timezones is next,
+then SM-33C date-free training, SM-33D CV and SM-33E combined live acceptance.
+SM-34 stays WAIT. No live deployment or cloud deletion happened in this slice;
+existing Databricks jobs still use the committed SM-33 wheel/config.
+
+Leave unrelated `.tmp-review-model/` untouched. Force-add exact new initiative
+files at the next requested commit because `initiatives/` ignores new files.
+
+## Historical snapshot: SM-33 delivery
+
 # Session handoff - 2026-09-25
 
 ## Current snapshot after SM-33

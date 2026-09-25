@@ -79,7 +79,7 @@ def test_key_target_alignment_and_unknown_metrics(spark, native_node):
 def test_invalid_keys_rejected(spark, rows):
     """Duplicate or null keys cannot identify predictions reliably."""
     frame = spark.createDataFrame(rows, "id long, value double")
-    with pytest.raises(ValueError, match="row_keys"):
+    with pytest.raises(ValueError, match="record_key_columns"):
         engineer(target=None).fit_transform(frame)
 
 
@@ -164,7 +164,7 @@ def test_false_preservation_declaration_rejected(spark, native_node, monkeypatch
 
     monkeypatch.setattr(applier, "apply", corrupt)
     pipeline = engineer([{"name": "bad", "transformer": "TestSparkDouble"}])
-    with pytest.raises(ValueError, match="changed row_keys/target"):
+    with pytest.raises(ValueError, match="changed record_key_columns/target"):
         pipeline.fit_transform(frame)
     assert pipeline.fitted_steps == []
 
@@ -175,7 +175,7 @@ def test_explicit_protected_features_rejected(spark, native_node, column):
     pipeline = engineer(
         [{"name": "bad", "transformer": "TestSparkDouble", "params": {"columns": [column]}}]
     )
-    with pytest.raises(ValueError, match="cannot include row_keys or target"):
+    with pytest.raises(ValueError, match="cannot include record_key_columns or target"):
         pipeline.fit_transform(spark.range(2))
     assert native_node == []
 

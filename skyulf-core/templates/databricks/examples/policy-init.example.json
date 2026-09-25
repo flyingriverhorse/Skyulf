@@ -1,7 +1,7 @@
 {
   "project_name": "my_model",
   "engine": "pandas",
-  "row_key": "entity_id",
+  "record_key_columns_json": "[\"entity_id\"]",
   "retraining_mode": "manual",
   "model_change_mode": "incremental_append",
   "score_model_selection": "pinned_version",

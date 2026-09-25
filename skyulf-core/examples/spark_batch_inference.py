@@ -45,7 +45,7 @@ def run_example(mode: str) -> None:
         output = predict_spark(
             incoming,
             build_demo_bundle(),
-            frame_spec=FrameSpec(row_keys=("id",)),
+            frame_spec=FrameSpec(record_key_columns=("id",)),
             options=ExecutionOptions("spark", python_batch_rows=2),
             mode=mode,
         )

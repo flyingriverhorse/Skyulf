@@ -111,6 +111,13 @@ independent job or a direct Catalog alias edit can violate writer ownership.
 
 ## Prepare the project
 
+Use `record_key_columns` for source record identities and
+`result_available_at_column` for the source column indicating when each
+target became available. `event_column` identifies the observation timestamp.
+These are column mappings, not date values; the boundaries are separate.
+Use a newly generated project and models trained with these field names.
+Earlier experimental projects and training evidence are not automatically converted.
+
 1. Set the task, engine, existing source tables, row keys, features, target, pipeline,
    model name, prediction name, training split and bounded read limits.
    For manual training, replace the unset snapshot/date fields with an actual

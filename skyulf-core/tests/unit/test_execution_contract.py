@@ -59,8 +59,8 @@ def test_frame_spec_rejects_ambiguous_keys(keys):
     """Row matching requires a nonempty immutable tuple of distinct column names."""
     from skyulf.core.execution import FrameSpec
 
-    with pytest.raises(ValueError, match="row_keys"):
-        FrameSpec(row_keys=keys)
+    with pytest.raises(ValueError, match="record_key_columns"):
+        FrameSpec(record_key_columns=keys)
 
 
 @pytest.mark.parametrize("target", ["id", "", "  ", 1])
@@ -69,16 +69,16 @@ def test_frame_spec_rejects_invalid_target(target):
     from skyulf.core.execution import FrameSpec
 
     with pytest.raises(ValueError, match="target"):
-        FrameSpec(row_keys=("id",), target=target)
+        FrameSpec(record_key_columns=("id",), target=target)
 
 
 def test_contracts_are_immutable():
     """A concurrent caller must not be able to mutate another run's options."""
     from skyulf.core.execution import ExecutionOptions, FrameSpec
 
-    spec = FrameSpec(row_keys=("entity", "event"), target="label")
+    spec = FrameSpec(record_key_columns=("entity", "event"), target="label")
     options = ExecutionOptions(engine="pandas")
     for instance, field, value in [(spec, "target", "other"), (options, "engine", "spark")]:
         with pytest.raises(FrozenInstanceError):
             setattr(instance, field, value)
-    assert spec.row_keys == ("entity", "event")
+    assert spec.record_key_columns == ("entity", "event")

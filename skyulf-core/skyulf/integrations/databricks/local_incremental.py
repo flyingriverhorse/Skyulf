@@ -69,7 +69,7 @@ def _last_receipt(latest: Any, source_id: str, target_id: str) -> dict[str, Any]
 
 
 def _validate_prepared(
-    prepared: PreparedLocalWorkflow, row_keys: tuple[str, ...], period_column: str | None
+    prepared: PreparedLocalWorkflow, record_key_columns: tuple[str, ...], period_column: str | None
 ) -> tuple[str, ...]:
     """Require a ready UC model and an automatic source-selection contract."""
     if not isinstance(prepared, PreparedLocalWorkflow):
@@ -96,19 +96,19 @@ def _validate_prepared(
         or prepared.preflight.model_digest != prepared.artifact.manifest.pipeline_sha256
     ):
         raise ValueError("Incremental scoring requires a pinned, ready local pipeline model.")
-    if type(row_keys) is not tuple or not row_keys:
-        raise ValueError("row_keys must be a nonempty tuple.")
-    for name in row_keys:
+    if type(record_key_columns) is not tuple or not record_key_columns:
+        raise ValueError("record_key_columns must be a nonempty tuple.")
+    for name in record_key_columns:
         column_name(name)
     if period_column is not None:
         column_name(period_column)
-    names = (*row_keys, *((period_column,) if period_column is not None else ()))
+    names = (*record_key_columns, *((period_column,) if period_column is not None else ()))
     if len({name.lower() for name in names}) != len(names):
-        raise ValueError("row_keys and period_column must be distinct.")
+        raise ValueError("record_key_columns and period_column must be distinct.")
     if any(name.lower() in PREDICTION_METADATA_COLUMNS for name in names):
-        raise ValueError("row_keys and period_column collide with prediction metadata.")
+        raise ValueError("record_key_columns and period_column collide with prediction metadata.")
     inputs = prepared.artifact.manifest.input_columns
-    if any(key in inputs for key in row_keys) or (
+    if any(key in inputs for key in record_key_columns) or (
         period_column is not None and period_column in inputs
     ):
         raise ValueError("Model inputs must be distinct from keys and event time.")
@@ -120,14 +120,16 @@ def _validate_prepared(
 def _bounded_frame(
     selected: Any,
     columns: tuple[str, ...],
-    row_keys: tuple[str, ...],
+    record_key_columns: tuple[str, ...],
     max_rows: int,
     max_bytes: int,
 ) -> pd.DataFrame:
     """Move only a bounded, projected set of source rows to the local model."""
     records: list[dict[str, Any]] = []
     decoded_bytes = 0
-    for row in selected.select(*columns).orderBy(*row_keys).limit(max_rows + 1).toLocalIterator():
+    for row in (
+        selected.select(*columns).orderBy(*record_key_columns).limit(max_rows + 1).toLocalIterator()
+    ):
         if len(records) == max_rows:
             raise ValueError("Source increment exceeds max_rows.")
         record = row.asDict(recursive=True)
@@ -138,9 +140,9 @@ def _bounded_frame(
     frame = pd.DataFrame.from_records(records, columns=columns)
     if _frame_bytes(frame) > max_bytes:
         raise ValueError("Source local frame exceeds max_bytes.")
-    if frame.loc[:, list(row_keys)].isna().any().any():
+    if frame.loc[:, list(record_key_columns)].isna().any().any():
         raise ValueError("Source row keys must not be null.")
-    if frame.duplicated(subset=list(row_keys)).any():
+    if frame.duplicated(subset=list(record_key_columns)).any():
         raise ValueError("Source row keys must be globally unique within this increment.")
     return frame
 
@@ -149,7 +151,7 @@ def run_incremental_local_batch(
     spark: Any,
     prepared: PreparedLocalWorkflow,
     *,
-    row_keys: tuple[str, ...],
+    record_key_columns: tuple[str, ...],
     admission: PublishAdmission | None,
     period_column: str | None = None,
 ) -> IncrementalBatchResult:
@@ -161,7 +163,7 @@ def run_incremental_local_batch(
     when its job is serialized and no other writer can modify the target.
     A target commit outside this protocol halts automatic scoring.
     """
-    inputs = _validate_prepared(prepared, row_keys, period_column)
+    inputs = _validate_prepared(prepared, record_key_columns, period_column)
     admission = validate_admission(spark, admission)
     config = prepared.config
     source_table = config.source.table
@@ -242,8 +244,8 @@ def run_incremental_local_batch(
                 raise ValueError("Source event time must not be null.")
         frame = _bounded_frame(
             selected,
-            (*row_keys, *inputs),
-            row_keys,
+            (*record_key_columns, *inputs),
+            record_key_columns,
             config.source.max_rows,
             config.source.max_bytes,
         )
@@ -260,19 +262,24 @@ def run_incremental_local_batch(
                 config.model.version,
             )
         target = spark.table(target_table)
-        output_names = _check_target(spark, selected, target, row_keys, period_column, prepared)
+        output_names = _check_target(
+            spark, selected, target, record_key_columns, period_column, prepared
+        )
         predicted = prepared.predict(frame.loc[:, list(inputs)])
         if list(predicted.columns) != list(output_names) or len(predicted) != len(frame):
             raise ValueError(
                 "Local prediction schema or row count differs from the model contract."
             )
         bridge_frame = pd.concat(
-            [frame.loc[:, list(row_keys)].reset_index(drop=True), predicted.reset_index(drop=True)],
+            [
+                frame.loc[:, list(record_key_columns)].reset_index(drop=True),
+                predicted.reset_index(drop=True),
+            ],
             axis=1,
         )
         if _frame_bytes(bridge_frame) > config.source.max_bytes:
             raise ValueError("Prediction result exceeds max_bytes.")
-        bridge_columns = (*row_keys, *output_names)
+        bridge_columns = (*record_key_columns, *output_names)
         bridge = spark.createDataFrame(
             [
                 tuple(_scalar(value) for value in row)
@@ -281,14 +288,18 @@ def run_incremental_local_batch(
             schema=target.select(*bridge_columns).schema,
         )
         if (
-            bridge.select(*row_keys)
-            .join(target.select(*row_keys), on=list(row_keys), how="left_semi")
+            bridge.select(*record_key_columns)
+            .join(target.select(*record_key_columns), on=list(record_key_columns), how="left_semi")
             .limit(1)
             .count()
         ):
             raise BatchConflictError("Source key already has a published prediction.")
         output = (
-            bridge.join(selected.select(*row_keys, period_column), on=list(row_keys), how="inner")
+            bridge.join(
+                selected.select(*record_key_columns, period_column),
+                on=list(record_key_columns),
+                how="inner",
+            )
             if period_column is not None
             else bridge
         )

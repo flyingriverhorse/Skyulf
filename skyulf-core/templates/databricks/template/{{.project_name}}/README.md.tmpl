@@ -145,12 +145,25 @@ Moving an already deployed append-mode table to full mode under the same
 logical name is rejected; choose a new view name or migrate deliberately.
 `model_name` is a registered UC model, not a table. The Bundle creates no
 admission table.
-The `row_key` selected during initialization names an existing source column;
-`score` copies it into the prediction table for SQL lookups. It must be
-non-null, `STRING` or `BIGINT`, and unique across all scored rows, including
-later inserts. For composite keys, supply `row_keys_json` at initialization,
-for example `["customer_id", "observation_id"]`; this overrides `row_key`.
-The resulting `row_keys` remains editable in `config/workflow.json`.
+The `record_key_columns_json` initialization input names existing source keys,
+for example `["customer_id"]` or `["customer_id", "observation_id"]`.
+`score` copies them into the prediction table for SQL lookups. Each key must be
+non-null and `STRING` or `BIGINT`; the combination must uniquely identify records
+across all scored rows, including later inserts. The resulting
+`record_key_columns` remains editable in `config/workflow.json`.
+With no key input, `entity_id` remains the example source-column name.
+
+`result_available_at_column` names the source timestamp recording when each
+row's target became available. It defaults to the example column name `label_at`,
+not to an invented timestamp. `event_column` names the observation timestamp;
+training boundaries apply to it. Rows can have different result dates.
+The library and saved training settings use these same names directly.
+Regenerate projects and retrain models created before this pre-production
+rename; earlier column settings and saved training evidence are not converted.
+This update does not yet make dates optional; date-free training and explicit
+parsing/timezone controls are separate follow-up work. Do not assume arbitrary
+date strings are understood.
+
 Initialization never creates an ID in the source. Keep key
 columns out of `input_columns`; they identify predictions, not model features.
 The score job has `max_concurrent_runs: 1`; grant write access to its physical

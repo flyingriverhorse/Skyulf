@@ -64,7 +64,7 @@ def _validate_schema(frame: Any, spec: FrameSpec, *, training: bool) -> None:
     resolved_names = _resolved_names(frame)
     if len(set(resolved_names)) != len(names):
         raise ValueError("Duplicate Spark column names are unsupported.")
-    required = set(spec.row_keys)
+    required = set(spec.record_key_columns)
     if training and spec.target is not None:
         required.add(spec.target)
     missing = required.difference(names)
@@ -97,14 +97,14 @@ def _validate_keys(frame: Any, spec: FrameSpec) -> None:
     existing = _resolved_names(frame)
     while count_name in existing:
         count_name += "_"
-    grouped = frame.groupBy(*[_column(frame, name) for name in spec.row_keys]).agg(
+    grouped = frame.groupBy(*[_column(frame, name) for name in spec.record_key_columns]).agg(
         functions.count(functions.lit(1)).alias(count_name)
     )
     invalid = reduce(
-        lambda a, b: a | b, [_column(grouped, name).isNull() for name in spec.row_keys]
+        lambda a, b: a | b, [_column(grouped, name).isNull() for name in spec.record_key_columns]
     )
     if grouped.filter(invalid | (_column(grouped, count_name) > 1)).limit(1).collect():
-        raise ValueError("Spark row_keys must be unique and non-null.")
+        raise ValueError("Spark record_key_columns must be unique and non-null.")
 
 
 def _case_sensitive(frame: Any) -> bool:
@@ -134,11 +134,11 @@ def _resolved_names(frame: Any) -> list[str]:
 def _params(config: Any, spec: FrameSpec, frame: Any = None) -> dict[str, Any]:
     """Protect identity/target columns while resolving explicit or automatic features."""
     params = deepcopy(dict(config))
-    protected = set(spec.row_keys) | {spec.target}
+    protected = set(spec.record_key_columns) | {spec.target}
     columns = params.get("columns")
     _validate_feature_names(columns)
     if columns and any(name in protected for name in columns):
-        raise ValueError("Spark feature columns cannot include row_keys or target.")
+        raise ValueError("Spark feature columns cannot include record_key_columns or target.")
     if frame is not None:
         params.setdefault("_auto_columns", columns is None)
         selected = (
@@ -207,16 +207,16 @@ def _check_output(before: Any, output: Any, spec: FrameSpec) -> Any:
     """Verify protected values and row identity after each declared preserving step."""
     after = _native(output)
     _validate_schema(after, spec, training=spec.target in before.columns)
-    protected = list(spec.row_keys)
+    protected = list(spec.record_key_columns)
     if spec.target is not None and spec.target in before.columns:
         protected.append(spec.target)
     left = before.select(*[_column(before, name) for name in protected])
     right = after.select(*[_column(after, name) for name in protected])
     # Nullable metadata can change harmlessly, but identity/label types cannot.
     if left.dtypes != right.dtypes:
-        raise ValueError("Spark step changed row_keys/target dtypes.")
+        raise ValueError("Spark step changed record_key_columns/target dtypes.")
     if left.exceptAll(right).unionByName(right.exceptAll(left)).limit(1).collect():
-        raise ValueError("Spark step changed row_keys/target values or row membership.")
+        raise ValueError("Spark step changed record_key_columns/target values or row membership.")
     return after
 
 

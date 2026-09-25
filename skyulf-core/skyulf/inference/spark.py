@@ -76,9 +76,10 @@ def predict_spark(
     raw = native.select(*[_column(native, name) for name in native.columns if name in input_names])
     _validate_frame(raw, manifest.input_schema, "bundle input")
     selected_names = (
-        tuple(frame_spec.row_keys) + tuple(column.name for column in manifest.input_schema)
+        tuple(frame_spec.record_key_columns)
+        + tuple(column.name for column in manifest.input_schema)
         if mode == "python_pipeline"
-        else tuple(frame_spec.row_keys) + tuple(raw.columns)
+        else tuple(frame_spec.record_key_columns) + tuple(raw.columns)
     )
     selected = native.select(*[_column(native, name) for name in selected_names])
     if mode == "python_pipeline":
@@ -93,7 +94,7 @@ def predict_spark(
             bundle.feature_state,
             bundle.model_payload,
             manifest,
-            frame_spec.row_keys,
+            frame_spec.record_key_columns,
             options.python_batch_rows,
             options.state_max_bytes,
         )
@@ -110,11 +111,14 @@ def predict_spark(
     transformed = _native(engineer.transform(selected, preserve_rows=True))
     features = _model_features(transformed, manifest)
     worker_frame = transformed.select(
-        *[_column(transformed, name) for name in (*frame_spec.row_keys, *features.columns)]
+        *[
+            _column(transformed, name)
+            for name in (*frame_spec.record_key_columns, *features.columns)
+        ]
     )
     schema = _prediction_schema(native, manifest, frame_spec)
     worker = _prediction_iterator(
-        bundle.model_payload, manifest, frame_spec.row_keys, options.python_batch_rows
+        bundle.model_payload, manifest, frame_spec.record_key_columns, options.python_batch_rows
     )
     return worker_frame.mapInPandas(worker, schema=schema)
 
@@ -123,7 +127,7 @@ def _prediction_schema(native: Any, manifest: BundleManifest, spec: FrameSpec) -
     """Build the stable Spark output schema from source key fields and the manifest."""
     types = importlib.import_module("pyspark.sql.types")
     return types.StructType(
-        [native.schema[key] for key in spec.row_keys]
+        [native.schema[key] for key in spec.record_key_columns]
         + [
             types.StructField(column.name, _spark_output_type(types, column.dtype), True)
             for column in manifest.output_schema
@@ -190,7 +194,7 @@ def _python_pipeline_prediction_iterator(
     feature_state: bytes,
     payload: bytes,
     manifest: BundleManifest,
-    row_keys: tuple[str, ...],
+    record_key_columns: tuple[str, ...],
     batch_rows: int,
     state_max_bytes: int,
 ) -> Callable[[Iterator[pd.DataFrame]], Iterator[pd.DataFrame]]:
@@ -213,13 +217,13 @@ def _python_pipeline_prediction_iterator(
         for batch in batches:
             if batch.empty:
                 continue
-            source = batch.loc[:, [*row_keys, *raw_columns]]
+            source = batch.loc[:, [*record_key_columns, *raw_columns]]
             transformed = engineer.transform(source, preserve_rows=True)
             features = transformed.loc[:, list(manifest.feature_order)]
             _validate_frame(features, manifest.feature_schema, "worker model features")
             for offset in range(0, len(features), batch_rows):
                 chunk = features.iloc[offset : offset + batch_rows]
-                keys = source.iloc[offset : offset + batch_rows].loc[:, list(row_keys)]
+                keys = source.iloc[offset : offset + batch_rows].loc[:, list(record_key_columns)]
                 predictions = _predict_features(chunk, model, manifest, chunk.index)
                 yield pd.concat(
                     [keys.reset_index(drop=True), predictions.reset_index(drop=True)], axis=1
@@ -258,21 +262,21 @@ def _validate_names_and_keys(frame: Any, manifest: BundleManifest, spec: FrameSp
         """Apply the same identifier resolution used by Spark for collision checks."""
         return set(columns if sensitive else (name.lower() for name in columns))
 
-    keys = names(spec.row_keys)
+    keys = names(spec.record_key_columns)
     raw = names(tuple(col.name for col in manifest.input_schema))
     features = names(manifest.feature_order)
     output = names(tuple(col.name for col in manifest.output_schema))
-    if len(keys) != len(spec.row_keys) or keys & (raw | features | output):
-        raise ValueError("row_keys collide with feature or prediction columns.")
+    if len(keys) != len(spec.record_key_columns) or keys & (raw | features | output):
+        raise ValueError("record_key_columns collide with feature or prediction columns.")
     if output & (raw | features | set(resolved)):
         raise ValueError("Input and prediction output columns collide.")
     if len(raw) != len(manifest.input_schema) or len(features) != len(manifest.feature_order):
         raise ValueError("Duplicate Spark feature names in bundle schema.")
-    missing = set(spec.row_keys).difference(frame.columns)
+    missing = set(spec.record_key_columns).difference(frame.columns)
     if missing:
-        raise ValueError(f"Missing Spark row_keys: {sorted(missing)}")
+        raise ValueError(f"Missing Spark record_key_columns: {sorted(missing)}")
     supported = {"byte", "short", "integer", "long", "string", "boolean"}
-    for key in spec.row_keys:
+    for key in spec.record_key_columns:
         if frame.schema[key].dataType.typeName() not in supported:
             raise TypeError(
                 f"Unsupported inference key dtype for {key}; use integer/string/boolean."
@@ -280,7 +284,7 @@ def _validate_names_and_keys(frame: Any, manifest: BundleManifest, spec: FrameSp
 
 
 def _prediction_iterator(
-    payload: bytes, manifest: BundleManifest, row_keys: tuple[str, ...], batch_rows: int
+    payload: bytes, manifest: BundleManifest, record_key_columns: tuple[str, ...], batch_rows: int
 ) -> Callable[[Iterator[pd.DataFrame]], Iterator[pd.DataFrame]]:
     """Capture only frozen metadata and bytes, never a Spark session or dataframe."""
 
@@ -296,6 +300,6 @@ def _prediction_iterator(
                 features = chunk.loc[:, list(manifest.feature_order)]
                 _validate_frame(features, manifest.feature_schema, "worker model features")
                 predictions = _predict_features(features, model, manifest, chunk.index)
-                yield pd.concat([chunk.loc[:, list(row_keys)], predictions], axis=1)
+                yield pd.concat([chunk.loc[:, list(record_key_columns)], predictions], axis=1)
 
     return predict_batches

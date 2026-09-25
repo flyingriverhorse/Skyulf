@@ -94,7 +94,7 @@ spec = BatchSpec(
     period_start=datetime(2026, 1, 1, tzinfo=UTC),
     period_end=datetime(2026, 2, 1, tzinfo=UTC),
     as_of=datetime(2026, 2, 2, tzinfo=UTC),
-    row_keys=("customer_id",),
+    record_key_columns=("customer_id",),
     output_table="analytics.customer_predictions",
     model_name="customer-risk",
     model_version="7",

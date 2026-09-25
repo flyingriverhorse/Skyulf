@@ -91,7 +91,7 @@ def bootstrap(spark: Any) -> dict[str, Any]:
     result = run_incremental_local_batch(
         spark,
         prepared,
-        row_keys=("entity_id",),
+        record_key_columns=("entity_id",),
         admission=DeltaTableAdmission(spark, CONTROL),
     )
     _verify(spark, prepared, 80)
@@ -124,10 +124,10 @@ def append(spark: Any) -> dict[str, Any]:
     prepared = _prepare()
     admission = DeltaTableAdmission(spark, CONTROL)
     result = run_incremental_local_batch(
-        spark, prepared, row_keys=("entity_id",), admission=admission
+        spark, prepared, record_key_columns=("entity_id",), admission=admission
     )
     replay = run_incremental_local_batch(
-        spark, prepared, row_keys=("entity_id",), admission=admission
+        spark, prepared, record_key_columns=("entity_id",), admission=admission
     )
     _verify(spark, prepared, 160)
     after = spark.table(TARGET).orderBy("entity_id").collect()

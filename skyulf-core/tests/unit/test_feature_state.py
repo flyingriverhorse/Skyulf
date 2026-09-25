@@ -142,7 +142,7 @@ def test_spark_context_is_rebound_and_protected_features_rejected():
     payload = _engineer().export_state()
     with pytest.raises(ValueError, match="frame_spec"):
         FeatureEngineer.from_state(payload, execution_options=ExecutionOptions("spark"))
-    with pytest.raises(ValueError, match="row_keys|target|protected"):
+    with pytest.raises(ValueError, match="record_key_columns|target|protected"):
         FeatureEngineer.from_state(
             payload, frame_spec=FrameSpec(("x",)), execution_options=ExecutionOptions("spark")
         )

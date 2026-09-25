@@ -15,13 +15,6 @@
       "description": "Local fit and prediction engine",
       "enum": ["pandas", "polars"]
     },
-    "row_key": {
-      "order": 3,
-      "type": "string",
-      "default": "entity_id",
-      "description": "Existing source column identifying one prediction row (also copied to output)",
-      "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
-    },
     "retraining_mode": {
       "order": 12,
       "type": "string",
@@ -182,12 +175,12 @@
       "description": "Existing scoring table name within the input schema; blank reuses the training source",
       "pattern": "^(?:[A-Za-z_][A-Za-z0-9_]*)?$"
     },
-    "row_keys_json": {
-      "order": 26,
+    "record_key_columns_json": {
+      "order": 3,
       "type": "string",
-      "default": "",
-      "description": "Optional JSON array of existing jointly unique source keys; overrides row_key",
-      "pattern": "^(?:\\[[ \\t\\r\\n]*\"[A-Za-z_][A-Za-z0-9_]*\"(?:[ \\t\\r\\n]*,[ \\t\\r\\n]*\"[A-Za-z_][A-Za-z0-9_]*\")*[ \\t\\r\\n]*\\])?$"
+      "default": "[\"entity_id\"]",
+      "description": "Existing record identity columns as a JSON array, e.g. [\"customer_id\"] or [\"customer_id\", \"observation_id\"]",
+      "pattern": "^\\[[ \\t\\r\\n]*\"[A-Za-z_][A-Za-z0-9_]*\"(?:[ \\t\\r\\n]*,[ \\t\\r\\n]*\"[A-Za-z_][A-Za-z0-9_]*\")*[ \\t\\r\\n]*\\]$"
     },
     "input_columns_json": {
       "order": 27,
@@ -210,11 +203,11 @@
       "description": "Existing event timestamp column for the temporal training split",
       "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
     },
-    "label_time_column": {
+    "result_available_at_column": {
       "order": 30,
       "type": "string",
       "default": "label_at",
-      "description": "Existing timestamp column recording when each training label became available",
+      "description": "Existing column recording when each target result became available",
       "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
     },
     "training_version": {

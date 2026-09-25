@@ -85,7 +85,7 @@ def _prediction_columns(
     config: dict[str, Any], prepared: Any, source: Any
 ) -> tuple[tuple[str, str, str], ...]:
     """Derive an exact Delta target schema from source keys and saved model outputs."""
-    keys = tuple(config["row_keys"])
+    keys = tuple(config["record_key_columns"])
     inputs = tuple(prepared.artifact.manifest.input_columns)
     if not keys or tuple(config["input_columns"]) != inputs:
         raise ValueError("Configured keys or model inputs differ from the fitted model.")
@@ -173,7 +173,7 @@ def provision_prediction_table(spark: Any, config: dict[str, Any], prepared: Any
         _check_existing_table(spark, target_name, columns)
     if not target_exists:
         if (
-            source.select(*config["row_keys"], *config["input_columns"])
+            source.select(*config["record_key_columns"], *config["input_columns"])
             .limit(config["max_rows"] + 1)
             .count()
             > config["max_rows"]

@@ -19,14 +19,14 @@ def _require_positive_integer(name: str, value: object) -> None:
         raise ValueError(f"{name} must be a positive integer.")
 
 
-def _validate_row_keys(keys: tuple[str, ...]) -> None:
+def _validate_record_key_columns(keys: tuple[str, ...]) -> None:
     """Require stable, distinct names without accepting a mutable container."""
     if not isinstance(keys, tuple) or not keys:
-        raise ValueError("row_keys must be a nonempty tuple of column names.")
+        raise ValueError("record_key_columns must be a nonempty tuple of column names.")
     if any(not isinstance(key, str) or not key.strip() for key in keys):
-        raise ValueError("row_keys must contain nonempty column names.")
+        raise ValueError("record_key_columns must contain nonempty column names.")
     if len(set(keys)) != len(keys):
-        raise ValueError("row_keys must contain distinct column names.")
+        raise ValueError("record_key_columns must contain distinct column names.")
 
 
 @dataclass(frozen=True)
@@ -37,17 +37,17 @@ class FrameSpec:
     belongs to the runtime that receives the actual dataframe.
     """
 
-    row_keys: tuple[str, ...]
+    record_key_columns: tuple[str, ...]
     target: str | None = None
 
     def __post_init__(self) -> None:
         """Validate identity names without reading or modifying any data."""
-        _validate_row_keys(self.row_keys)
+        _validate_record_key_columns(self.record_key_columns)
         if self.target is not None:
             if not isinstance(self.target, str) or not self.target.strip():
                 raise ValueError("target must be a nonempty column name or None.")
-            if self.target in self.row_keys:
-                raise ValueError("target must not also be a row_keys column.")
+            if self.target in self.record_key_columns:
+                raise ValueError("target must not also be a record_key_columns column.")
 
 
 @dataclass(frozen=True)

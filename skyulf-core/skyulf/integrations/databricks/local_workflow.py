@@ -170,8 +170,8 @@ def _training_spec(config: dict[str, Any]) -> LocalTrainingSpec:
         holdout_start=datetime.fromisoformat(config["holdout_start"]),
         cutoff=datetime.fromisoformat(config["cutoff"]),
         event_column=config["event_column"],
-        label_time_column=config["label_time_column"],
-        row_keys=tuple(config["row_keys"]),
+        result_available_at_column=config["result_available_at_column"],
+        record_key_columns=tuple(config["record_key_columns"]),
         input_columns=tuple(config["input_columns"]),
         target_column=config["target_column"],
         max_rows=config["max_rows"],
@@ -211,8 +211,8 @@ def _monthly_training_spec(spark: Any, config: dict[str, Any], now: datetime) ->
         holdout_start=months_before(1),
         cutoff=cutoff,
         event_column=config["event_column"],
-        label_time_column=config["label_time_column"],
-        row_keys=tuple(config["row_keys"]),
+        result_available_at_column=config["result_available_at_column"],
+        record_key_columns=tuple(config["record_key_columns"]),
         input_columns=tuple(config["input_columns"]),
         target_column=config["target_column"],
         max_rows=config["max_rows"],
@@ -423,7 +423,7 @@ def run_action(
         result = run_incremental_local_batch(
             spark,
             prepared,
-            row_keys=tuple(config["row_keys"]),
+            record_key_columns=tuple(config["record_key_columns"]),
             admission=SingleWriterAdmission(),
         )
         if config.get("model_change_mode", "incremental_append") == "full_rebuild":

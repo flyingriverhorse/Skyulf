@@ -102,7 +102,7 @@ def _spec(**changes):
         "version": 2,
         "period_start": datetime(2026, 1, 1, tzinfo=UTC),
         "period_end": datetime(2026, 2, 1, tzinfo=UTC),
-        "row_keys": ("entity_id",),
+        "record_key_columns": ("entity_id",),
         "input_columns": ("x",),
         "max_rows": 3,
         "max_bytes": 1024,
@@ -322,7 +322,7 @@ def test_real_spark_iterator_filters_requested_month(monkeypatch) -> None:
         spark.stop()
 
 
-def test_reader_rejects_null_row_keys_before_scoring() -> None:
+def test_reader_rejects_null_record_key_columns_before_scoring() -> None:
     """A missing business key cannot be repaired after local prediction."""
     with pytest.raises(ValueError, match="row keys must not be null"):
         read_local_source(_Spark([{"entity_id": None, "x": 2.0}], []), _spec())

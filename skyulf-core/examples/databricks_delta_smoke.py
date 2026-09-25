@@ -63,7 +63,7 @@ def run_smoke(
         period_start=datetime(2026, 1, 1, tzinfo=UTC),
         period_end=datetime(2026, 2, 1, tzinfo=UTC),
         as_of=datetime.now(UTC) + timedelta(minutes=10),
-        row_keys=("id",),
+        record_key_columns=("id",),
         output_table=names["target"],
         model_name=model_name,
         model_version=model_version,

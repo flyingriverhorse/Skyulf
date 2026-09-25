@@ -27,14 +27,18 @@ def _output():
     return prediction_output
 
 
-def _render_default_config(row_key="entity_id", risk_category=""):
+def _render_default_config(record_key="entity_id", risk_category=""):
     """Resolve default branches for offline checks; real CLI tests cover Go rendering."""
     template = WORKFLOW.parents[1] / "config/workflow.json.tmpl"
     schema = json.loads(
         (WORKFLOW.parents[3] / "databricks_template_schema.json").read_text(encoding="utf-8")
     )
     values = {key: spec["default"] for key, spec in schema["properties"].items()}
-    values.update(project_name="customer_model", row_key=row_key, risk_category=risk_category)
+    values.update(
+        project_name="customer_model",
+        record_key_columns_json=json.dumps([record_key]),
+        risk_category=risk_category,
+    )
     content = template.read_text(encoding="utf-8")
     for name in ("risk_category", "start", "holdout_start", "cutoff"):
         content = content.replace(
@@ -50,10 +54,6 @@ def _render_default_config(row_key="entity_id", risk_category=""):
         .replace(
             '{{if eq .task "classification"}}logistic_regression{{else}}linear_regression{{end}}',
             "linear_regression",
-        )
-        .replace(
-            '{{if .row_keys_json}}{{.row_keys_json}}{{else}}["{{.row_key}}"]{{end}}',
-            json.dumps([row_key]),
         )
         .replace(
             "{{if .source_table_name}}{{.source_table_name}}{{else}}{{.project_name}}_source{{end}}",
@@ -151,11 +151,11 @@ def test_generated_config_has_no_admission_or_alias_state():
     assert "include_lifecycle" not in config
 
 
-def test_init_row_key_becomes_prediction_table_key():
+def test_init_record_key_becomes_prediction_table_key():
     """A chosen source identity must be carried into the generated output schema."""
     root = WORKFLOW.parents[3]
     schema = json.loads((root / "databricks_template_schema.json").read_text(encoding="utf-8"))
-    assert schema["properties"]["row_key"]["default"] == "entity_id"
+    assert json.loads(schema["properties"]["record_key_columns_json"]["default"]) == ["entity_id"]
 
     config = _render_default_config("customer_id")
     source = SimpleNamespace(
@@ -171,7 +171,7 @@ def test_init_row_key_becomes_prediction_table_key():
         ),
     )
     columns = _output()._prediction_columns(config, prepared, source)
-    assert config["row_keys"] == ["customer_id"]
+    assert config["record_key_columns"] == ["customer_id"]
     assert columns[0] == ("customer_id", "string", "STRING")
 
 

@@ -73,7 +73,7 @@ def local_delta_case(delta_spark, tmp_path):
         version=0,
         period_start=datetime(2026, 1, 1, tzinfo=UTC),
         period_end=datetime(2026, 2, 1, tzinfo=UTC),
-        row_keys=("id",),
+        record_key_columns=("id",),
         input_columns=("x",),
         max_rows=10,
         max_bytes=10_000,
@@ -82,7 +82,7 @@ def local_delta_case(delta_spark, tmp_path):
         period_start=january.period_start,
         period_end=january.period_end,
         as_of=datetime.now(UTC) + timedelta(minutes=10),
-        row_keys=("id",),
+        record_key_columns=("id",),
         output_table=target,
         model_name="workspace.test.local_model",
         model_version="1",
@@ -275,17 +275,17 @@ def test_incremental_local_batch_discovers_appends_without_period_inputs(local_d
     )
     prepared = replace(prepared, config=config)
     first = run_incremental_local_batch(
-        spark, prepared, row_keys=("id",), period_column="event_time", admission=admission
+        spark, prepared, record_key_columns=("id",), period_column="event_time", admission=admission
     )
     spark.createDataFrame(
         [(3, datetime(2026, 1, 6, tzinfo=UTC), 6.0)],
         "id long, event_time timestamp, x double",
     ).write.format("delta").mode("append").saveAsTable(source)
     second = run_incremental_local_batch(
-        spark, prepared, row_keys=("id",), period_column="event_time", admission=admission
+        spark, prepared, record_key_columns=("id",), period_column="event_time", admission=admission
     )
     replay = run_incremental_local_batch(
-        spark, prepared, row_keys=("id",), period_column="event_time", admission=admission
+        spark, prepared, record_key_columns=("id",), period_column="event_time", admission=admission
     )
     rows = spark.table(target).orderBy("id").collect()
     assert [(row.id, round(row.prediction)) for row in rows] == [(1, 4), (2, 8), (3, 12)]
@@ -306,17 +306,17 @@ def test_incremental_single_writer_uses_receipts_without_control_table(local_del
     spark, source, target, prepared, _ = _prepared_incremental_case(local_delta_case)
     admission = SingleWriterAdmission()
     first = run_incremental_local_batch(
-        spark, prepared, row_keys=("id",), period_column="event_time", admission=admission
+        spark, prepared, record_key_columns=("id",), period_column="event_time", admission=admission
     )
     spark.createDataFrame(
         [(3, datetime(2026, 1, 6, tzinfo=UTC), 6.0)],
         "id long, event_time timestamp, x double",
     ).write.format("delta").mode("append").saveAsTable(source)
     second = run_incremental_local_batch(
-        spark, prepared, row_keys=("id",), period_column="event_time", admission=admission
+        spark, prepared, record_key_columns=("id",), period_column="event_time", admission=admission
     )
     replay = run_incremental_local_batch(
-        spark, prepared, row_keys=("id",), period_column="event_time", admission=admission
+        spark, prepared, record_key_columns=("id",), period_column="event_time", admission=admission
     )
     assert (first.input_count, second.input_count, replay.input_count) == (2, 1, 0)
     assert replay.noop and replay.commit_version == second.commit_version
@@ -332,7 +332,11 @@ def test_new_model_generation_rebuilds_existing_rows_then_scores_new_inserts(loc
     v2_target = f"spark_catalog.default.local_predictions_v2_{uuid4().hex}"
     try:
         first = run_incremental_local_batch(
-            spark, prepared, row_keys=("id",), admission=SingleWriterAdmission()
+            spark,
+            prepared,
+            record_key_columns=("id",),
+            period_column="event_time",
+            admission=SingleWriterAdmission(),
         )
         spark.createDataFrame(
             [(3, datetime(2026, 1, 8, tzinfo=UTC), 6.0)],
@@ -355,14 +359,22 @@ def test_new_model_generation_rebuilds_existing_rows_then_scores_new_inserts(loc
             preflight=replace(prepared.preflight, model_version="2"),
         )
         rebuilt = run_incremental_local_batch(
-            spark, v2_prepared, row_keys=("id",), admission=SingleWriterAdmission()
+            spark,
+            v2_prepared,
+            record_key_columns=("id",),
+            period_column="event_time",
+            admission=SingleWriterAdmission(),
         )
         spark.createDataFrame(
             [(4, datetime(2026, 1, 9, tzinfo=UTC), 8.0)],
             "id long, event_time timestamp, x double",
         ).write.format("delta").mode("append").saveAsTable(source)
         continued = run_incremental_local_batch(
-            spark, v2_prepared, row_keys=("id",), admission=SingleWriterAdmission()
+            spark,
+            v2_prepared,
+            record_key_columns=("id",),
+            period_column="event_time",
+            admission=SingleWriterAdmission(),
         )
         assert (first.input_count, rebuilt.input_count, continued.input_count) == (2, 3, 1)
         assert [
@@ -412,11 +424,15 @@ def test_incremental_local_batch_does_not_require_a_date_column(local_delta_case
     )
     prepared = replace(prepared, config=config)
     try:
-        first = run_incremental_local_batch(spark, prepared, row_keys=("id",), admission=admission)
+        first = run_incremental_local_batch(
+            spark, prepared, record_key_columns=("id",), admission=admission
+        )
         spark.createDataFrame([(3, 6.0)], "id long, x double").write.format("delta").mode(
             "append"
         ).saveAsTable(source)
-        second = run_incremental_local_batch(spark, prepared, row_keys=("id",), admission=admission)
+        second = run_incremental_local_batch(
+            spark, prepared, record_key_columns=("id",), admission=admission
+        )
         assert (first.input_count, second.input_count) == (2, 1)
         assert [
             (row.id, round(row.prediction)) for row in spark.table(target).orderBy("id").collect()
@@ -451,13 +467,17 @@ def test_incremental_local_batch_rejects_source_updates(local_delta_case):
 
     spark, source, target, prepared, admission = _prepared_incremental_case(local_delta_case)
     first = run_incremental_local_batch(
-        spark, prepared, row_keys=("id",), period_column="event_time", admission=admission
+        spark, prepared, record_key_columns=("id",), period_column="event_time", admission=admission
     )
     original = spark.table(target).orderBy("id").collect()
     spark.sql(f"UPDATE {source} SET x = 100.0 WHERE id = 1")
     with pytest.raises(ValueError, match="updates and deletes"):
         run_incremental_local_batch(
-            spark, prepared, row_keys=("id",), period_column="event_time", admission=admission
+            spark,
+            prepared,
+            record_key_columns=("id",),
+            period_column="event_time",
+            admission=admission,
         )
     assert spark.table(target).orderBy("id").collect() == original
     assert spark.sql(f"DESCRIBE HISTORY {target}").first().version == first.commit_version
@@ -469,7 +489,7 @@ def test_incremental_local_batch_rejects_existing_prediction_key(local_delta_cas
 
     spark, source, target, prepared, admission = _prepared_incremental_case(local_delta_case)
     first = run_incremental_local_batch(
-        spark, prepared, row_keys=("id",), period_column="event_time", admission=admission
+        spark, prepared, record_key_columns=("id",), period_column="event_time", admission=admission
     )
     spark.createDataFrame(
         [(1, datetime(2026, 2, 8, tzinfo=UTC), 40.0)],
@@ -477,7 +497,11 @@ def test_incremental_local_batch_rejects_existing_prediction_key(local_delta_cas
     ).write.format("delta").mode("append").saveAsTable(source)
     with pytest.raises(BatchConflictError, match="already has"):
         run_incremental_local_batch(
-            spark, prepared, row_keys=("id",), period_column="event_time", admission=admission
+            spark,
+            prepared,
+            record_key_columns=("id",),
+            period_column="event_time",
+            admission=admission,
         )
     assert spark.table(target).count() == 2
     assert spark.sql(f"DESCRIBE HISTORY {target}").first().version == first.commit_version
@@ -504,7 +528,11 @@ def test_incremental_local_batch_requires_change_feed_before_bootstrap(local_del
     before = spark.sql(f"DESCRIBE HISTORY {target}").first().version
     with pytest.raises(ValueError, match="Change Data Feed"):
         run_incremental_local_batch(
-            spark, prepared, row_keys=("id",), period_column="event_time", admission=admission
+            spark,
+            prepared,
+            record_key_columns=("id",),
+            period_column="event_time",
+            admission=admission,
         )
     assert spark.sql(f"DESCRIBE HISTORY {target}").first().version == before
     assert spark.table(target).count() == 0
@@ -516,13 +544,17 @@ def test_incremental_local_batch_rejects_target_reset_without_watermark(local_de
 
     spark, _, target, prepared, admission = _prepared_incremental_case(local_delta_case)
     run_incremental_local_batch(
-        spark, prepared, row_keys=("id",), period_column="event_time", admission=admission
+        spark, prepared, record_key_columns=("id",), period_column="event_time", admission=admission
     )
     spark.sql(f"DELETE FROM {target} WHERE id IN (1, 2)")
     before = spark.sql(f"DESCRIBE HISTORY {target}").first().version
     with pytest.raises(BatchConflictError, match="outside|receipt"):
         run_incremental_local_batch(
-            spark, prepared, row_keys=("id",), period_column="event_time", admission=admission
+            spark,
+            prepared,
+            record_key_columns=("id",),
+            period_column="event_time",
+            admission=admission,
         )
     assert spark.table(target).count() == 0
     assert spark.sql(f"DESCRIBE HISTORY {target}").first().version == before
@@ -553,14 +585,14 @@ def test_incremental_local_batch_scores_polars_artifact(local_delta_case, tmp_pa
         ),
     )
     first = run_incremental_local_batch(
-        spark, prepared, row_keys=("id",), period_column="event_time", admission=admission
+        spark, prepared, record_key_columns=("id",), period_column="event_time", admission=admission
     )
     spark.createDataFrame(
         [(3, datetime(2026, 1, 6, tzinfo=UTC), 6.0)],
         "id long, event_time timestamp, x double",
     ).write.format("delta").mode("append").saveAsTable(source)
     second = run_incremental_local_batch(
-        spark, prepared, row_keys=("id",), period_column="event_time", admission=admission
+        spark, prepared, record_key_columns=("id",), period_column="event_time", admission=admission
     )
     assert (first.input_count, second.input_count) == (2, 1)
     assert [
@@ -577,7 +609,7 @@ def test_incremental_local_batch_failed_write_keeps_watermark(local_delta_case, 
 
     spark, source, target, prepared, admission = _prepared_incremental_case(local_delta_case)
     first = run_incremental_local_batch(
-        spark, prepared, row_keys=("id",), period_column="event_time", admission=admission
+        spark, prepared, record_key_columns=("id",), period_column="event_time", admission=admission
     )
     spark.createDataFrame(
         [(3, datetime(2026, 1, 6, tzinfo=UTC), 6.0)],
@@ -597,13 +629,13 @@ def test_incremental_local_batch_failed_write_keeps_watermark(local_delta_case, 
             run_incremental_local_batch(
                 spark,
                 prepared,
-                row_keys=("id",),
+                record_key_columns=("id",),
                 period_column="event_time",
                 admission=admission,
             )
     assert spark.sql(f"DESCRIBE HISTORY {target}").first().version == first.commit_version
     retried = run_incremental_local_batch(
-        spark, prepared, row_keys=("id",), period_column="event_time", admission=admission
+        spark, prepared, record_key_columns=("id",), period_column="event_time", admission=admission
     )
     assert retried.input_count == 1 and spark.table(target).count() == 3
 
@@ -614,7 +646,7 @@ def test_incremental_local_batch_lost_acknowledgement_is_noop(local_delta_case, 
 
     spark, source, target, prepared, admission = _prepared_incremental_case(local_delta_case)
     run_incremental_local_batch(
-        spark, prepared, row_keys=("id",), period_column="event_time", admission=admission
+        spark, prepared, record_key_columns=("id",), period_column="event_time", admission=admission
     )
     spark.createDataFrame(
         [(3, datetime(2026, 1, 6, tzinfo=UTC), 6.0)],
@@ -637,13 +669,13 @@ def test_incremental_local_batch_lost_acknowledgement_is_noop(local_delta_case, 
             run_incremental_local_batch(
                 spark,
                 prepared,
-                row_keys=("id",),
+                record_key_columns=("id",),
                 period_column="event_time",
                 admission=admission,
             )
     committed_version = spark.sql(f"DESCRIBE HISTORY {target}").first().version
     retry = run_incremental_local_batch(
-        spark, prepared, row_keys=("id",), period_column="event_time", admission=admission
+        spark, prepared, record_key_columns=("id",), period_column="event_time", admission=admission
     )
     assert retry.noop and retry.commit_version == committed_version
     assert spark.table(target).count() == 3
@@ -663,7 +695,7 @@ def test_incremental_local_batch_respects_shared_admission(local_delta_case):
         run_incremental_local_batch(
             spark,
             prepared,
-            row_keys=("id",),
+            record_key_columns=("id",),
             period_column="event_time",
             admission=admission,
         )
@@ -681,7 +713,7 @@ def test_incremental_local_batch_expired_change_read_does_not_fallback(
 
     spark, source, target, prepared, admission = _prepared_incremental_case(local_delta_case)
     first = run_incremental_local_batch(
-        spark, prepared, row_keys=("id",), period_column="event_time", admission=admission
+        spark, prepared, record_key_columns=("id",), period_column="event_time", admission=admission
     )
     spark.createDataFrame(
         [(3, datetime(2026, 1, 6, tzinfo=UTC), 6.0)],
@@ -701,7 +733,7 @@ def test_incremental_local_batch_expired_change_read_does_not_fallback(
             run_incremental_local_batch(
                 spark,
                 prepared,
-                row_keys=("id",),
+                record_key_columns=("id",),
                 period_column="event_time",
                 admission=admission,
             )
